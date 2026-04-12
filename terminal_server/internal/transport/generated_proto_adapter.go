@@ -62,6 +62,20 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				DeviceID: payload.Heartbeat.GetDeviceId(),
 			},
 		}, nil
+	case *controlv1.ConnectRequest_Input:
+		input := payload.Input
+		internal := &InputRequest{
+			DeviceID: input.GetDeviceId(),
+		}
+		if action := input.GetUiAction(); action != nil {
+			internal.ComponentID = action.GetComponentId()
+			internal.Action = action.GetAction()
+			internal.Value = action.GetValue()
+		}
+		if key := input.GetKey(); key != nil {
+			internal.KeyText = key.GetText()
+		}
+		return ClientMessage{Input: internal}, nil
 	case *controlv1.ConnectRequest_Command:
 		command := payload.Command
 		return ClientMessage{
@@ -74,7 +88,7 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				Intent:    command.GetIntent(),
 			},
 		}, nil
-	case *controlv1.ConnectRequest_Input, *controlv1.ConnectRequest_Sensor, *controlv1.ConnectRequest_StreamReady:
+	case *controlv1.ConnectRequest_Sensor, *controlv1.ConnectRequest_StreamReady:
 		// Unsupported payloads are treated as invalid client messages by the stream handler.
 		return ClientMessage{}, nil
 	default:

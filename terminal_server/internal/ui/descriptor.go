@@ -30,3 +30,32 @@ func HelloWorld(deviceName string) Descriptor {
 		"color": "#E7F0F7",
 	}))
 }
+
+// TerminalView returns a simple server-driven terminal layout.
+func TerminalView(deviceID string) Descriptor {
+	return TerminalViewWithOutput(deviceID, "")
+}
+
+// TerminalViewWithOutput returns a simple server-driven terminal layout with output.
+func TerminalViewWithOutput(deviceID, output string) Descriptor {
+	return New("stack", map[string]string{
+		"id":         "terminal_root",
+		"background": "#000000",
+	}, New("text", map[string]string{
+		"id":    "terminal_banner",
+		"value": "Terminal session on " + deviceID,
+		"style": "monospace",
+		"color": "#39FF14",
+	}), New("scroll", map[string]string{
+		"id": "terminal_output_scroll",
+	}, New("text", map[string]string{
+		"id":    "terminal_output",
+		"value": output,
+		"style": "monospace",
+		"color": "#E8E8E8",
+	})), New("text_input", map[string]string{
+		"id":          "terminal_input",
+		"placeholder": "Type command and press enter",
+		"autofocus":   "true",
+	}))
+}

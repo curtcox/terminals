@@ -29,3 +29,11 @@ func TestParseVoiceTriggerTimer(t *testing.T) {
 		t.Fatalf("fire_unix_ms should be populated")
 	}
 }
+
+func TestParseVoiceTriggerTerminal(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "open terminal", now)
+	if got.Intent != "terminal" {
+		t.Fatalf("Intent = %q, want terminal", got.Intent)
+	}
+}

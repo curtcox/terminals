@@ -110,6 +110,125 @@ func TestHandleMessageCommandManual(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandManualTerminal(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command manual terminal) error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[0].ScenarioStart != "terminal" {
+		t.Fatalf("ScenarioStart = %q, want terminal", out[0].ScenarioStart)
+	}
+	if out[0].CommandAck != "cmd-terminal-1" {
+		t.Fatalf("CommandAck = %q, want cmd-terminal-1", out[0].CommandAck)
+	}
+	if out[1].SetUI == nil {
+		t.Fatalf("expected second response to include SetUI")
+	}
+	if out[1].SetUI.Type != "stack" {
+		t.Fatalf("terminal SetUI root type = %q, want stack", out[1].SetUI.Type)
+	}
+	events := broadcaster.Events()
+	if len(events) == 0 {
+		t.Fatalf("expected terminal broadcast event")
+	}
+}
+
+func TestHandleMessageInputTerminal(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-input-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "echo terminal-input-test",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input terminal) error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].SetUI == nil {
+		t.Fatalf("expected SetUI response for terminal input")
+	}
+	found := false
+	for _, child := range out[0].SetUI.Children {
+		if child.Type != "scroll" || len(child.Children) == 0 {
+			continue
+		}
+		value := child.Children[0].Props["value"]
+		if strings.Contains(value, "terminal-input-test") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("terminal output did not include command marker: %+v", out[0].SetUI)
+	}
+}
+
 func TestHandleMessageCommandStop(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

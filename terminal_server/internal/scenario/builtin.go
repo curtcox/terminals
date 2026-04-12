@@ -99,3 +99,35 @@ func (s *TimerReminderScenario) Start(ctx context.Context, env *Environment) err
 
 // Stop ends the scenario and currently has no side effects.
 func (s *TimerReminderScenario) Stop() error { return nil }
+
+// TerminalScenario activates interactive terminal mode on the requesting device.
+type TerminalScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *TerminalScenario) Name() string { return "terminal" }
+
+// Match records trigger metadata when terminal mode is requested.
+func (s *TerminalScenario) Match(trigger Trigger) bool {
+	if trigger.Intent != "terminal" {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start announces terminal activation for the requesting device.
+func (s *TerminalScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil || env.Broadcast == nil {
+		return nil
+	}
+	deviceIDs := []string{}
+	if s.trigger.SourceID != "" {
+		deviceIDs = []string{s.trigger.SourceID}
+	}
+	return env.Broadcast.Notify(ctx, deviceIDs, "Terminal active")
+}
+
+// Stop ends terminal mode and currently has no side effects.
+func (s *TerminalScenario) Stop() error { return nil }

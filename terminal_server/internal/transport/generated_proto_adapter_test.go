@@ -5,6 +5,7 @@ import (
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
@@ -38,6 +39,39 @@ func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
 	}
 	if msg.Register.Capabilities["platform"] != "android" {
 		t.Fatalf("platform capability = %q, want %q", msg.Register.Capabilities["platform"], "android")
+	}
+}
+
+func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Input{
+			Input: &iov1.InputEvent{
+				DeviceId: "device-2",
+				Payload: &iov1.InputEvent_UiAction{
+					UiAction: &iov1.UIAction{
+						ComponentId: "terminal_input",
+						Action:      "submit",
+						Value:       "echo hello",
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal() error = %v", err)
+	}
+	if msg.Input == nil {
+		t.Fatalf("expected input message")
+	}
+	if msg.Input.DeviceID != "device-2" {
+		t.Fatalf("input device_id = %q, want device-2", msg.Input.DeviceID)
+	}
+	if msg.Input.ComponentID != "terminal_input" || msg.Input.Action != "submit" {
+		t.Fatalf("unexpected input mapping: %+v", msg.Input)
+	}
+	if msg.Input.Value != "echo hello" {
+		t.Fatalf("input value = %q, want echo hello", msg.Input.Value)
 	}
 }
 

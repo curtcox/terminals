@@ -11,6 +11,10 @@ func RegisterBuiltins(engine *Engine) {
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
+		Scenario: &TerminalScenario{},
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
 		Scenario: AlertScenario{},
 		Priority: PriorityCritical,
 	})

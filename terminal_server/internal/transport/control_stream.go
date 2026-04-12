@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
+	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
@@ -41,6 +42,15 @@ type HeartbeatRequest struct {
 	DeviceID string
 }
 
+// InputRequest carries client input events relevant to active scenarios.
+type InputRequest struct {
+	DeviceID    string
+	ComponentID string
+	Action      string
+	Value       string
+	KeyText     string
+}
+
 // CommandRequest carries a client-issued scenario command.
 type CommandRequest struct {
 	RequestID string
@@ -56,6 +66,7 @@ type ClientMessage struct {
 	Register   *RegisterRequest
 	Capability *CapabilityUpdateRequest
 	Heartbeat  *HeartbeatRequest
+	Input      *InputRequest
 	Command    *CommandRequest
 }
 
@@ -83,6 +94,10 @@ type StreamHandler struct {
 	seenLimit   int
 	recent      []CommandEvent
 	recentLimit int
+
+	terminals              *terminal.Manager
+	terminalByDevice       map[string]string
+	terminalOutputByDevice map[string]string
 }
 
 // CommandEvent is a bounded audit record of command handling.
@@ -99,25 +114,31 @@ type CommandEvent struct {
 // NewStreamHandler creates a handler for control stream messages.
 func NewStreamHandler(control *ControlService) *StreamHandler {
 	return &StreamHandler{
-		control:     control,
-		metrics:     &Metrics{},
-		seen:        map[string]ServerMessage{},
-		seenLimit:   1024,
-		recent:      []CommandEvent{},
-		recentLimit: 200,
+		control:                control,
+		metrics:                &Metrics{},
+		seen:                   map[string]ServerMessage{},
+		seenLimit:              1024,
+		recent:                 []CommandEvent{},
+		recentLimit:            200,
+		terminals:              terminal.NewManager(),
+		terminalByDevice:       map[string]string{},
+		terminalOutputByDevice: map[string]string{},
 	}
 }
 
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
 func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
 	return &StreamHandler{
-		control:     control,
-		runtime:     runtime,
-		metrics:     &Metrics{},
-		seen:        map[string]ServerMessage{},
-		seenLimit:   1024,
-		recent:      []CommandEvent{},
-		recentLimit: 200,
+		control:                control,
+		runtime:                runtime,
+		metrics:                &Metrics{},
+		seen:                   map[string]ServerMessage{},
+		seenLimit:              1024,
+		recent:                 []CommandEvent{},
+		recentLimit:            200,
+		terminals:              terminal.NewManager(),
+		terminalByDevice:       map[string]string{},
+		terminalOutputByDevice: map[string]string{},
 	}
 }
 
@@ -151,6 +172,13 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
 		return nil, nil
+	case msg.Input != nil:
+		out, err := h.handleInput(ctx, msg.Input)
+		if err != nil {
+			h.metrics.protocolErrors.Add(1)
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
+		}
+		return out, nil
 	case msg.Command != nil:
 		h.metrics.commandReceived.Add(1)
 		if msg.Command.RequestID != "" {
@@ -212,11 +240,141 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			}
 			h.mu.Unlock()
 		}
-		return []ServerMessage{commandResult}, nil
+		postResponses := h.commandResponses(ctx, msg.Command, commandResult)
+		return postResponses, nil
 	default:
 		h.metrics.protocolErrors.Add(1)
 		return []ServerMessage{{ErrorCode: errorCodeFor(ErrInvalidClientMessage), Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
 	}
+}
+
+func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandRequest, commandResult ServerMessage) []ServerMessage {
+	responses := []ServerMessage{commandResult}
+	if cmd == nil {
+		return responses
+	}
+	if cmd.Action != "" && cmd.Action != CommandActionStart {
+		return responses
+	}
+	if commandResult.ScenarioStart != "terminal" {
+		if commandResult.ScenarioStop == "terminal" {
+			h.terminateTerminalForDevice(cmd.DeviceID)
+		}
+		return responses
+	}
+
+	output, err := h.ensureTerminalSession(ctx, cmd.DeviceID)
+	if err != nil {
+		responses = append(responses, ServerMessage{
+			Notification: "Terminal session failed: " + err.Error(),
+		})
+		return responses
+	}
+	terminalUI := ui.TerminalViewWithOutput(cmd.DeviceID, output)
+	responses = append(responses, ServerMessage{SetUI: &terminalUI})
+	return responses
+}
+
+func (h *StreamHandler) ensureTerminalSession(ctx context.Context, deviceID string) (string, error) {
+	if strings.TrimSpace(deviceID) == "" {
+		return "", ErrMissingCommandDeviceID
+	}
+
+	h.mu.Lock()
+	sessionID := h.terminalByDevice[deviceID]
+	h.mu.Unlock()
+	if sessionID != "" {
+		h.mu.Lock()
+		output := h.terminalOutputByDevice[deviceID]
+		h.mu.Unlock()
+		return output, nil
+	}
+
+	session, err := h.terminals.Start(ctx, terminal.StartOptions{DeviceID: deviceID})
+	if err != nil {
+		return "", err
+	}
+
+	h.mu.Lock()
+	h.terminalByDevice[deviceID] = session.ID
+	h.terminalOutputByDevice[deviceID] = ""
+	h.mu.Unlock()
+	return "", nil
+}
+
+func (h *StreamHandler) terminateTerminalForDevice(deviceID string) {
+	if strings.TrimSpace(deviceID) == "" {
+		return
+	}
+
+	h.mu.Lock()
+	sessionID := h.terminalByDevice[deviceID]
+	delete(h.terminalByDevice, deviceID)
+	delete(h.terminalOutputByDevice, deviceID)
+	h.mu.Unlock()
+	if sessionID != "" {
+		_ = h.terminals.Close(sessionID)
+	}
+}
+
+func (h *StreamHandler) handleInput(_ context.Context, in *InputRequest) ([]ServerMessage, error) {
+	if in == nil {
+		return nil, ErrInvalidClientMessage
+	}
+	deviceID := strings.TrimSpace(in.DeviceID)
+	if deviceID == "" {
+		return nil, ErrMissingCommandDeviceID
+	}
+
+	h.mu.Lock()
+	sessionID := h.terminalByDevice[deviceID]
+	h.mu.Unlock()
+	if sessionID == "" {
+		return nil, nil
+	}
+
+	text := strings.TrimSpace(in.Value)
+	if text == "" {
+		text = in.KeyText
+	}
+	if text == "" {
+		return nil, nil
+	}
+	if !strings.HasSuffix(text, "\n") {
+		text += "\n"
+	}
+	if err := h.terminals.Write(sessionID, []byte(text)); err != nil {
+		return nil, err
+	}
+
+	combinedOutput := h.readTerminalOutput(deviceID, sessionID)
+	terminalUI := ui.TerminalViewWithOutput(deviceID, combinedOutput)
+	return []ServerMessage{{SetUI: &terminalUI}}, nil
+}
+
+func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
+	deadline := time.Now().Add(350 * time.Millisecond)
+	var chunk []byte
+	for time.Now().Before(deadline) {
+		out, err := h.terminals.ReadAvailable(sessionID, 4096)
+		if err != nil {
+			break
+		}
+		if len(out) > 0 {
+			chunk = append(chunk, out...)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+
+	h.mu.Lock()
+	existing := h.terminalOutputByDevice[deviceID]
+	existing += string(chunk)
+	if len(existing) > 12000 {
+		existing = existing[len(existing)-12000:]
+	}
+	h.terminalOutputByDevice[deviceID] = existing
+	h.mu.Unlock()
+	return existing
 }
 
 func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) (ServerMessage, error) {

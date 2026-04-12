@@ -21,6 +21,8 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		trigger.Intent = "red alert"
 	case normalized == "photo frame":
 		trigger.Intent = "photo frame"
+	case normalized == "terminal" || normalized == "open terminal":
+		trigger.Intent = "terminal"
 	case strings.HasPrefix(normalized, "set a timer for "):
 		trigger.Intent = "set timer"
 		parseTimerMinutes(trigger.Arguments, normalized, now)
