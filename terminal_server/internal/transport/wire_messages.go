@@ -25,7 +25,7 @@ type WireCommandRequest struct {
 	RequestID string
 	DeviceID  string
 	Action    WireCommandAction
-	Kind      string
+	Kind      WireCommandKind
 	Text      string
 	Intent    string
 }
@@ -37,6 +37,17 @@ const (
 	WireCommandActionUnspecified WireCommandAction = 0
 	WireCommandActionStart       WireCommandAction = 1
 	WireCommandActionStop        WireCommandAction = 2
+)
+
+// WireCommandKind mirrors control.proto command kind semantics.
+// We keep string values stable to preserve existing system/manual/voice logic.
+type WireCommandKind int32
+
+const (
+	WireCommandKindUnspecified WireCommandKind = 0
+	WireCommandKindVoice       WireCommandKind = 1
+	WireCommandKindManual      WireCommandKind = 2
+	WireCommandKindSystem      WireCommandKind = 3
 )
 
 // WireClientMessage is a protobuf-adapter-friendly oneof shape.

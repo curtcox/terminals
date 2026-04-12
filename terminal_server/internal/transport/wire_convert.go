@@ -43,7 +43,7 @@ func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
 				RequestID: w.Command.RequestID,
 				DeviceID:  w.Command.DeviceID,
 				Action:    internalActionFromWire(w.Command.Action),
-				Kind:      w.Command.Kind,
+				Kind:      internalKindFromWire(w.Command.Kind),
 				Text:      w.Command.Text,
 				Intent:    w.Command.Intent,
 			},
@@ -59,6 +59,19 @@ func internalActionFromWire(action WireCommandAction) string {
 		return CommandActionStart
 	case WireCommandActionStop:
 		return CommandActionStop
+	default:
+		return ""
+	}
+}
+
+func internalKindFromWire(kind WireCommandKind) string {
+	switch kind {
+	case WireCommandKindVoice:
+		return CommandKindVoice
+	case WireCommandKindManual:
+		return CommandKindManual
+	case WireCommandKindSystem:
+		return CommandKindSystem
 	default:
 		return ""
 	}

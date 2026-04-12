@@ -13,3 +13,18 @@ func TestInternalActionFromWire(t *testing.T) {
 		t.Fatalf("unspecified mapping = %q, want empty", got)
 	}
 }
+
+func TestInternalKindFromWire(t *testing.T) {
+	if got := internalKindFromWire(WireCommandKindVoice); got != CommandKindVoice {
+		t.Fatalf("voice mapping = %q, want %q", got, CommandKindVoice)
+	}
+	if got := internalKindFromWire(WireCommandKindManual); got != CommandKindManual {
+		t.Fatalf("manual mapping = %q, want %q", got, CommandKindManual)
+	}
+	if got := internalKindFromWire(WireCommandKindSystem); got != CommandKindSystem {
+		t.Fatalf("system mapping = %q, want %q", got, CommandKindSystem)
+	}
+	if got := internalKindFromWire(WireCommandKindUnspecified); got != "" {
+		t.Fatalf("unspecified mapping = %q, want empty", got)
+	}
+}

@@ -66,7 +66,7 @@ func TestWireSessionCommandValidationErrorCode(t *testing.T) {
 			WireClientMessage{Command: &WireCommandRequest{
 				RequestID: "bad-manual",
 				DeviceID:  "device-1",
-				Kind:      CommandKindManual,
+				Kind:      WireCommandKindManual,
 				Intent:    "   ",
 			}},
 		},
@@ -97,7 +97,7 @@ func TestWireSessionSystemDataDeterministicOrder(t *testing.T) {
 			WireClientMessage{Register: &WireRegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
 			WireClientMessage{Command: &WireCommandRequest{
 				RequestID: "sys-help",
-				Kind:      CommandKindSystem,
+				Kind:      WireCommandKindSystem,
 				Intent:    SystemIntentHelp,
 			}},
 		},
