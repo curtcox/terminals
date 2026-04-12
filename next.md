@@ -1,1 +1,3 @@
-Install Flutter SDK, then run `flutter pub get`, `flutter analyze`, and `flutter test` in `terminal_client`, fixing any client compile/lint issues from the new gRPC stream skeleton and generated proto imports.
+1. Install Flutter SDK in this environment.
+2. Run `cd terminal_client && flutter pub get && flutter analyze && flutter test`.
+3. Fix any client lint/test issues discovered by those Flutter checks.

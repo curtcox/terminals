@@ -28,21 +28,48 @@ class _ControlStreamScaffold extends StatefulWidget {
 }
 
 class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
-  final TerminalControlGrpcClient _client = TerminalControlGrpcClient(
-    host: '127.0.0.1',
-    port: 50051,
+  final TextEditingController _hostController = TextEditingController(
+    text: '127.0.0.1',
   );
+  final TextEditingController _portController = TextEditingController(
+    text: '50051',
+  );
+  final TextEditingController _deviceNameController = TextEditingController(
+    text: 'Flutter Client',
+  );
+  final TextEditingController _deviceTypeController = TextEditingController(
+    text: 'desktop',
+  );
+  final TextEditingController _platformController = TextEditingController(
+    text: 'flutter',
+  );
+  TerminalControlGrpcClient? _client;
   final StreamController<ConnectRequest> _outgoing =
       StreamController<ConnectRequest>();
 
   StreamSubscription<ConnectResponse>? _incoming;
   String _status = 'Idle';
   int _responses = 0;
+  String _deviceId = 'flutter-client-1';
 
   Future<void> _startStream() async {
-    await _incoming?.cancel();
+    final host = _hostController.text.trim();
+    final port = int.tryParse(_portController.text.trim());
+    if (host.isEmpty || port == null || port <= 0 || port > 65535) {
+      setState(() {
+        _status = 'Invalid host or port';
+      });
+      return;
+    }
 
-    final stream = _client.connect(_outgoing.stream);
+    await _incoming?.cancel();
+    final existingClient = _client;
+    if (existingClient != null) {
+      await existingClient.shutdown();
+    }
+    _client = TerminalControlGrpcClient(host: host, port: port);
+
+    final stream = _client!.connect(_outgoing.stream);
     _incoming = stream.listen(
       (_) {
         if (!mounted) {
@@ -71,17 +98,24 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       },
     );
 
+    _deviceId = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
     _outgoing.add(
       TerminalControlGrpcClient.registerRequest(
-        deviceId: 'flutter-client-1',
-        deviceName: 'Flutter Client',
-        deviceType: 'desktop',
-        platform: 'flutter',
+        deviceId: _deviceId,
+        deviceName: _deviceNameController.text.trim(),
+        deviceType: _deviceTypeController.text.trim(),
+        platform: _platformController.text.trim(),
+        screenWidth: size.width.round(),
+        screenHeight: size.height.round(),
+        screenDensity: mediaQuery.devicePixelRatio,
+        screenTouch: true,
       ),
     );
     _outgoing.add(
       TerminalControlGrpcClient.heartbeatRequest(
-        deviceId: 'flutter-client-1',
+        deviceId: _deviceId,
         unixMs: DateTime.now().millisecondsSinceEpoch,
       ),
     );
@@ -90,6 +124,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   Future<void> _stopStream() async {
     await _incoming?.cancel();
     _incoming = null;
+    final existingClient = _client;
+    if (existingClient != null) {
+      await existingClient.shutdown();
+      _client = null;
+    }
     if (mounted) {
       setState(() {
         _status = 'Disconnected';
@@ -99,9 +138,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
 
   @override
   void dispose() {
-    _incoming?.cancel();
+    final incoming = _incoming;
+    if (incoming != null) {
+      unawaited(incoming.cancel());
+    }
     _outgoing.close();
-    _client.shutdown();
+    final existingClient = _client;
+    if (existingClient != null) {
+      unawaited(existingClient.shutdown());
+    }
+    _hostController.dispose();
+    _portController.dispose();
+    _deviceNameController.dispose();
+    _deviceTypeController.dispose();
+    _platformController.dispose();
     super.dispose();
   }
 
@@ -114,6 +164,35 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              TextField(
+                controller: _hostController,
+                decoration: const InputDecoration(
+                  labelText: 'Server Host',
+                  hintText: '127.0.0.1',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _portController,
+                decoration: const InputDecoration(labelText: 'Server Port'),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _deviceNameController,
+                decoration: const InputDecoration(labelText: 'Device Name'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _deviceTypeController,
+                decoration: const InputDecoration(labelText: 'Device Type'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _platformController,
+                decoration: const InputDecoration(labelText: 'Platform'),
+              ),
+              const SizedBox(height: 20),
               Text('Control Stream: $_status'),
               const SizedBox(height: 12),
               Text('Responses: $_responses'),

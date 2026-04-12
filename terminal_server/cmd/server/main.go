@@ -51,7 +51,7 @@ func main() {
 	grpcServer := transport.NewServer(cfg.GRPCAddress())
 	grpcServer.ConfigureControl(controlService, transport.GeneratedProtoAdapter{})
 	grpcServer.ConfigureRuntime(scenarioRuntime)
-	mdns := discovery.NoopAdvertiser{}
+	mdns := discovery.NewMDNSAdvertiser()
 
 	log.Printf("terminal server starting at %s", grpcServer.Address())
 

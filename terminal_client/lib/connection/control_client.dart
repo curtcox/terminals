@@ -41,15 +41,48 @@ class TerminalControlGrpcClient {
     required String deviceName,
     required String deviceType,
     required String platform,
+    int? screenWidth,
+    int? screenHeight,
+    double? screenDensity,
+    bool? screenTouch,
+    bool keyboardPhysical = true,
+    String keyboardLayout = 'en-US',
+    String pointerType = 'touch_or_mouse',
+    bool pointerHover = true,
+    int speakerChannels = 2,
+    List<int> speakerSampleRates = const [44100, 48000],
+    int microphoneChannels = 1,
+    List<int> microphoneSampleRates = const [16000, 44100, 48000],
   }) {
+    final capabilities = DeviceCapabilities()
+      ..deviceId = deviceId
+      ..identity = (DeviceIdentity()
+        ..deviceName = deviceName
+        ..deviceType = deviceType
+        ..platform = platform)
+      ..keyboard = (KeyboardCapability()
+        ..physical = keyboardPhysical
+        ..layout = keyboardLayout)
+      ..pointer = (PointerCapability()
+        ..type = pointerType
+        ..hover = pointerHover)
+      ..speakers = (AudioOutputCapability()
+        ..channels = speakerChannels
+        ..sampleRates.addAll(speakerSampleRates))
+      ..microphone = (AudioInputCapability()
+        ..channels = microphoneChannels
+        ..sampleRates.addAll(microphoneSampleRates));
+
+    if (screenWidth != null || screenHeight != null || screenDensity != null) {
+      capabilities.screen = (ScreenCapability()
+        ..width = screenWidth ?? 0
+        ..height = screenHeight ?? 0
+        ..density = screenDensity ?? 1.0
+        ..touch = screenTouch ?? false);
+    }
+
     return ConnectRequest()
-      ..register = (RegisterDevice()
-        ..capabilities = (DeviceCapabilities()
-          ..deviceId = deviceId
-          ..identity = (DeviceIdentity()
-            ..deviceName = deviceName
-            ..deviceType = deviceType
-            ..platform = platform)));
+      ..register = (RegisterDevice()..capabilities = capabilities);
   }
 
   /// Builds a heartbeat message.
