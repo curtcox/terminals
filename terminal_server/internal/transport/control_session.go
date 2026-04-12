@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -51,6 +52,13 @@ func (s *Session) Run(stream ControlStream) error {
 			return err
 		}
 
+		if sessionErr := validateSessionMessage(connectedDeviceID, in); sessionErr != nil {
+			if sendErr := stream.Send(ServerMessage{Error: sessionErr.Error()}); sendErr != nil {
+				return sendErr
+			}
+			continue
+		}
+
 		if in.Register != nil {
 			connectedDeviceID = in.Register.DeviceID
 		}
@@ -72,6 +80,41 @@ func (s *Session) Run(stream ControlStream) error {
 			}
 			return handleErr
 		}
+	}
+}
+
+func validateSessionMessage(connectedDeviceID string, in ClientMessage) error {
+	if in.Register != nil {
+		if in.Register.DeviceID == "" {
+			return fmt.Errorf("register requires device id")
+		}
+		if connectedDeviceID != "" && in.Register.DeviceID != connectedDeviceID {
+			return fmt.Errorf("register device id mismatch: connected=%s requested=%s", connectedDeviceID, in.Register.DeviceID)
+		}
+		return nil
+	}
+
+	if connectedDeviceID == "" {
+		return fmt.Errorf("register required before other messages")
+	}
+
+	msgDeviceID, hasDeviceID := extractMessageDeviceID(in)
+	if hasDeviceID && msgDeviceID != "" && msgDeviceID != connectedDeviceID {
+		return fmt.Errorf("message device id mismatch: connected=%s message=%s", connectedDeviceID, msgDeviceID)
+	}
+	return nil
+}
+
+func extractMessageDeviceID(in ClientMessage) (string, bool) {
+	switch {
+	case in.Capability != nil:
+		return in.Capability.DeviceID, true
+	case in.Heartbeat != nil:
+		return in.Heartbeat.DeviceID, true
+	case in.Command != nil:
+		return in.Command.DeviceID, true
+	default:
+		return "", false
 	}
 }
 

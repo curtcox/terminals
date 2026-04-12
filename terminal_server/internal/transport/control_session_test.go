@@ -157,3 +157,99 @@ func TestSessionRunContinuesAfterRecoverableError(t *testing.T) {
 		t.Fatalf("expected heartbeat to be processed after recoverable error")
 	}
 }
+
+func TestSessionRunRejectsPreRegisterMessageButContinues(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        iorouter.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Heartbeat: &HeartbeatRequest{DeviceID: "d1"}},
+			{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}},
+			{Heartbeat: &HeartbeatRequest{DeviceID: "d1"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(stream.sent) < 3 {
+		t.Fatalf("len(sent) = %d, want at least 3", len(stream.sent))
+	}
+	if stream.sent[0].Error == "" {
+		t.Fatalf("first message should be structured pre-register error")
+	}
+
+	got, ok := manager.Get("d1")
+	if !ok {
+		t.Fatalf("expected device d1")
+	}
+	if got.LastHeartbeat.IsZero() {
+		t.Fatalf("expected post-register heartbeat to be processed")
+	}
+}
+
+func TestSessionRunRejectsDeviceIDMismatchButContinues(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        iorouter.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}},
+			{Capability: &CapabilityUpdateRequest{
+				DeviceID: "d2",
+				Capabilities: map[string]string{
+					"screen.width": "1920",
+				},
+			}},
+			{Heartbeat: &HeartbeatRequest{DeviceID: "d1"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	foundMismatchError := false
+	for _, sent := range stream.sent {
+		if sent.Error != "" {
+			foundMismatchError = true
+		}
+	}
+	if !foundMismatchError {
+		t.Fatalf("expected mismatch structured error")
+	}
+
+	got, ok := manager.Get("d1")
+	if !ok {
+		t.Fatalf("expected device d1")
+	}
+	if got.LastHeartbeat.IsZero() {
+		t.Fatalf("expected heartbeat to be processed after mismatch error")
+	}
+}
