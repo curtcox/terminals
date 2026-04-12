@@ -200,6 +200,9 @@ func TestSessionRunRejectsPreRegisterMessageButContinues(t *testing.T) {
 	if got.LastHeartbeat.IsZero() {
 		t.Fatalf("expected post-register heartbeat to be processed")
 	}
+	if handler.metrics.protocolErrors.Load() == 0 {
+		t.Fatalf("expected protocol error metric increment")
+	}
 }
 
 func TestSessionRunRejectsDeviceIDMismatchButContinues(t *testing.T) {
@@ -251,5 +254,8 @@ func TestSessionRunRejectsDeviceIDMismatchButContinues(t *testing.T) {
 	}
 	if got.LastHeartbeat.IsZero() {
 		t.Fatalf("expected heartbeat to be processed after mismatch error")
+	}
+	if handler.metrics.protocolErrors.Load() == 0 {
+		t.Fatalf("expected protocol error metric increment")
 	}
 }

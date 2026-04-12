@@ -53,6 +53,7 @@ func (s *Session) Run(stream ControlStream) error {
 		}
 
 		if sessionErr := validateSessionMessage(connectedDeviceID, in); sessionErr != nil {
+			s.handler.NoteProtocolError()
 			if sendErr := stream.Send(ServerMessage{Error: sessionErr.Error()}); sendErr != nil {
 				return sendErr
 			}

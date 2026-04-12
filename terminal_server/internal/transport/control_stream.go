@@ -65,6 +65,7 @@ type ServerMessage struct {
 type StreamHandler struct {
 	control   *ControlService
 	runtime   *scenario.Runtime
+	metrics   *Metrics
 	mu        sync.Mutex
 	seen      map[string]ServerMessage
 	seenOrder []string
@@ -75,6 +76,7 @@ type StreamHandler struct {
 func NewStreamHandler(control *ControlService) *StreamHandler {
 	return &StreamHandler{
 		control:   control,
+		metrics:   &Metrics{},
 		seen:      map[string]ServerMessage{},
 		seenLimit: 1024,
 	}
@@ -85,6 +87,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 	return &StreamHandler{
 		control:   control,
 		runtime:   runtime,
+		metrics:   &Metrics{},
 		seen:      map[string]ServerMessage{},
 		seenLimit: 1024,
 	}
@@ -94,8 +97,10 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([]ServerMessage, error) {
 	switch {
 	case msg.Register != nil:
+		h.metrics.registerReceived.Add(1)
 		resp, err := h.control.Register(ctx, *msg.Register)
 		if err != nil {
+			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{Error: err.Error()}}, err
 		}
 		return []ServerMessage{
@@ -103,18 +108,23 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			{SetUI: &resp.Initial},
 		}, nil
 	case msg.Capability != nil:
+		h.metrics.capabilityReceived.Add(1)
 		err := h.control.UpdateCapabilities(ctx, msg.Capability.DeviceID, msg.Capability.Capabilities)
 		if err != nil {
+			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{Error: err.Error()}}, err
 		}
 		return nil, nil
 	case msg.Heartbeat != nil:
+		h.metrics.heartbeatReceived.Add(1)
 		err := h.control.Heartbeat(ctx, msg.Heartbeat.DeviceID)
 		if err != nil {
+			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{Error: err.Error()}}, err
 		}
 		return nil, nil
 	case msg.Command != nil:
+		h.metrics.commandReceived.Add(1)
 		if msg.Command.RequestID != "" {
 			h.mu.Lock()
 			if prior, ok := h.seen[msg.Command.RequestID]; ok {
@@ -125,6 +135,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		}
 		commandResult, err := h.handleCommand(ctx, msg.Command)
 		if err != nil {
+			h.metrics.commandErrors.Add(1)
 			return []ServerMessage{{Error: err.Error()}}, err
 		}
 		if msg.Command.RequestID != "" {
@@ -141,6 +152,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		}
 		return []ServerMessage{commandResult}, nil
 	default:
+		h.metrics.protocolErrors.Add(1)
 		return []ServerMessage{{Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
 	}
 }
@@ -240,6 +252,17 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 			Notification: "System query: runtime_status",
 			Data:         data,
 		}, nil
+	case "transport_metrics":
+		data := map[string]string{}
+		if h.metrics != nil {
+			for k, v := range h.metrics.Snapshot() {
+				data[k] = v
+			}
+		}
+		return ServerMessage{
+			Notification: "System query: transport_metrics",
+			Data:         data,
+		}, nil
 	case "list_devices":
 		data := map[string]string{}
 		for _, d := range h.control.devices.List() {
@@ -262,5 +285,12 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		}, nil
 	default:
 		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", strings.TrimSpace(cmd.Intent))
+	}
+}
+
+// NoteProtocolError increments protocol error counters from session-level validation.
+func (h *StreamHandler) NoteProtocolError() {
+	if h.metrics != nil {
+		h.metrics.protocolErrors.Add(1)
 	}
 }

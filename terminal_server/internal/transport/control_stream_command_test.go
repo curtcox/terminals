@@ -408,6 +408,53 @@ func TestHandleMessageSystemRuntimeStatus(t *testing.T) {
 	}
 }
 
+func TestHandleMessageSystemTransportMetrics(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+		IO:      io.NewRouter(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "metrics-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-metrics-1",
+			Kind:      "system",
+			Intent:    "transport_metrics",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system transport_metrics error = %v", err)
+	}
+	if out[0].Data["register_received"] != "1" {
+		t.Fatalf("register_received = %q, want 1", out[0].Data["register_received"])
+	}
+	if out[0].Data["heartbeat_received"] != "1" {
+		t.Fatalf("heartbeat_received = %q, want 1", out[0].Data["heartbeat_received"])
+	}
+	if out[0].Data["command_received"] != "2" {
+		t.Fatalf("command_received = %q, want 2", out[0].Data["command_received"])
+	}
+}
+
 func TestHandleMessageSystemWithoutRuntime(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
