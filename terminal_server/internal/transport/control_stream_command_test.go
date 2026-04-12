@@ -210,22 +210,14 @@ func TestHandleMessageInputTerminal(t *testing.T) {
 	if len(out) != 1 {
 		t.Fatalf("len(out) = %d, want 1", len(out))
 	}
-	if out[0].SetUI == nil {
-		t.Fatalf("expected SetUI response for terminal input")
+	if out[0].UpdateUI == nil {
+		t.Fatalf("expected UpdateUI response for terminal input")
 	}
-	found := false
-	for _, child := range out[0].SetUI.Children {
-		if child.Type != "scroll" || len(child.Children) == 0 {
-			continue
-		}
-		value := child.Children[0].Props["value"]
-		if strings.Contains(value, "terminal-input-test") {
-			found = true
-			break
-		}
+	if out[0].UpdateUI.ComponentID != "terminal_output" {
+		t.Fatalf("update component_id = %q, want terminal_output", out[0].UpdateUI.ComponentID)
 	}
-	if !found {
-		t.Fatalf("terminal output did not include command marker: %+v", out[0].SetUI)
+	if !strings.Contains(out[0].UpdateUI.Node.Props["value"], "terminal-input-test") {
+		t.Fatalf("terminal output patch did not include command marker: %+v", out[0].UpdateUI.Node.Props)
 	}
 }
 

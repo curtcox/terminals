@@ -59,3 +59,13 @@ func TerminalViewWithOutput(deviceID, output string) Descriptor {
 		"autofocus":   "true",
 	}))
 }
+
+// TerminalOutputPatch returns a descriptor for updating terminal output text only.
+func TerminalOutputPatch(output string) Descriptor {
+	return New("text", map[string]string{
+		"id":    "terminal_output",
+		"value": output,
+		"style": "monospace",
+		"color": "#E8E8E8",
+	})
+}

@@ -14,3 +14,16 @@ func TestHelloWorld(t *testing.T) {
 		t.Fatalf("child type = %q, want text", d.Children[0].Type)
 	}
 }
+
+func TestTerminalOutputPatch(t *testing.T) {
+	d := TerminalOutputPatch("line1\nline2")
+	if d.Type != "text" {
+		t.Fatalf("Type = %q, want text", d.Type)
+	}
+	if d.Props["id"] != "terminal_output" {
+		t.Fatalf("id = %q, want terminal_output", d.Props["id"])
+	}
+	if d.Props["value"] != "line1\nline2" {
+		t.Fatalf("value = %q, want line1\\nline2", d.Props["value"])
+	}
+}

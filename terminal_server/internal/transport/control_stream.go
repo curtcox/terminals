@@ -364,8 +364,12 @@ func (h *StreamHandler) handleInput(_ context.Context, in *InputRequest) ([]Serv
 	}
 
 	combinedOutput := h.readTerminalOutput(deviceID, sessionID)
-	terminalUI := ui.TerminalViewWithOutput(deviceID, combinedOutput)
-	return []ServerMessage{{SetUI: &terminalUI}}, nil
+	return []ServerMessage{{
+		UpdateUI: &UIUpdate{
+			ComponentID: "terminal_output",
+			Node:        ui.TerminalOutputPatch(combinedOutput),
+		},
+	}}, nil
 }
 
 func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {

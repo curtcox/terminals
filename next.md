@@ -1,1 +1,1 @@
-Use `UpdateUI` in the terminal input flow so command output patches only `terminal_output` instead of re-sending full `SetUI`.
+Emit `TransitionUI` hints when scenario UI changes (start/stop terminal) and verify client behavior with integration tests.
