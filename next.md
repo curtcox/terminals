@@ -1,1 +1,1 @@
-Implement Flutter rendering + tests for interactive UI primitives (`slider`, `toggle`, `dropdown`) and wire `UIAction` events for each.
+Implement Flutter rendering + tests for remaining baseline UI primitives (`gesture_area`, `overlay`) and UI action forwarding from gesture taps.

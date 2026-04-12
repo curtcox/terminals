@@ -366,6 +366,89 @@ void main() {
 
     expect(find.byType(Image), findsOneWidget);
   });
+
+  testWidgets('wires slider, toggle, and dropdown actions to UIAction',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.addAll([
+              uiv1.Node()
+                ..id = 'volume'
+                ..slider = (uiv1.SliderWidget()
+                  ..min = 0
+                  ..max = 1
+                  ..value = 0.25),
+              uiv1.Node()
+                ..id = 'mute'
+                ..toggle = (uiv1.ToggleWidget()..value = false),
+              uiv1.Node()
+                ..id = 'channel'
+                ..dropdown = (uiv1.DropdownWidget()
+                  ..options.addAll(['alpha', 'beta'])
+                  ..value = 'alpha'),
+            ]))),
+    );
+    await tester.pump();
+
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged?.call(0.75);
+    await tester.pump();
+
+    final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+    toggle.onChanged?.call(true);
+    await tester.pump();
+
+    final dropdown = tester
+        .widget<DropdownButton<String>>(find.byType(DropdownButton<String>));
+    dropdown.onChanged?.call('beta');
+    await tester.pump();
+
+    final actions = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasUiAction())
+        .map((request) => request.input.uiAction)
+        .toList();
+
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == 'volume' &&
+            action.action == 'change' &&
+            action.value == '0.75',
+      ),
+      isTrue,
+    );
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == 'mute' &&
+            action.action == 'toggle' &&
+            action.value == 'true',
+      ),
+      isTrue,
+    );
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == 'channel' &&
+            action.action == 'select' &&
+            action.value == 'beta',
+      ),
+      isTrue,
+    );
+  });
 }
 
 class _FakeClientHarness {

@@ -795,6 +795,73 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             child: Text(node.button.label),
           ),
         );
+      case uiv1.Node_Widget.slider:
+        final componentId = _nodeId(node);
+        final min = node.slider.min;
+        final max = node.slider.max > min ? node.slider.max : min + 1;
+        final value = node.slider.value.clamp(min, max).toDouble();
+        return Slider(
+          value: value,
+          min: min,
+          max: max,
+          onChanged: (nextValue) {
+            unawaited(
+              _sendUiAction(
+                componentId: componentId.isNotEmpty ? componentId : 'slider',
+                action: 'change',
+                value: nextValue.toString(),
+              ),
+            );
+          },
+        );
+      case uiv1.Node_Widget.toggle:
+        final componentId = _nodeId(node);
+        return SwitchListTile(
+          value: node.toggle.value,
+          onChanged: (nextValue) {
+            unawaited(
+              _sendUiAction(
+                componentId: componentId.isNotEmpty ? componentId : 'toggle',
+                action: 'toggle',
+                value: nextValue.toString(),
+              ),
+            );
+          },
+        );
+      case uiv1.Node_Widget.dropdown:
+        final componentId = _nodeId(node);
+        final options = node.dropdown.options;
+        final selected = options.contains(node.dropdown.value)
+            ? node.dropdown.value
+            : (options.isNotEmpty ? options.first : null);
+        return DropdownButton<String>(
+          isExpanded: true,
+          value: selected,
+          hint: const Text('Select option'),
+          items: options
+              .map(
+                (option) => DropdownMenuItem<String>(
+                  value: option,
+                  child: Text(option),
+                ),
+              )
+              .toList(),
+          onChanged: options.isEmpty
+              ? null
+              : (nextValue) {
+                  if (nextValue == null) {
+                    return;
+                  }
+                  unawaited(
+                    _sendUiAction(
+                      componentId:
+                          componentId.isNotEmpty ? componentId : 'dropdown',
+                      action: 'select',
+                      value: nextValue,
+                    ),
+                  );
+                },
+        );
       case uiv1.Node_Widget.image:
         return Image.network(
           node.image.url,
