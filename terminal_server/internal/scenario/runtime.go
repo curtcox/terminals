@@ -3,6 +3,7 @@ package scenario
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 var (
@@ -36,6 +37,11 @@ func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, e
 		return "", err
 	}
 	return reg.Scenario.Name(), nil
+}
+
+// HandleVoiceText parses spoken text and routes to HandleTrigger.
+func (r *Runtime) HandleVoiceText(ctx context.Context, sourceID, spoken string, now time.Time) (string, error) {
+	return r.HandleTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
 }
 
 func targetDevices(env *Environment, trigger Trigger) []string {

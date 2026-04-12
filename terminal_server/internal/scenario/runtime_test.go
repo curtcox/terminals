@@ -3,8 +3,10 @@ package scenario
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
@@ -47,5 +49,42 @@ func TestRuntimeNoMatch(t *testing.T) {
 	runtime := NewRuntime(NewEngine(), &Environment{})
 	if _, err := runtime.HandleTrigger(context.Background(), Trigger{Intent: "unknown"}); err != ErrNoMatchingScenario {
 		t.Fatalf("HandleTrigger() error = %v, want %v", err, ErrNoMatchingScenario)
+	}
+}
+
+func TestRuntimeHandleVoiceTimer(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	scheduler := storage.NewMemoryScheduler()
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: &TimerReminderScenario{},
+		Priority: PriorityNormal,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Scheduler: scheduler,
+		Broadcast: broadcaster,
+	})
+
+	_, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"set a timer for 5 minutes",
+		time.Date(2026, 4, 11, 21, 30, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("HandleVoiceText() error = %v", err)
+	}
+
+	scheduled := scheduler.List()
+	if len(scheduled) != 1 {
+		t.Fatalf("len(scheduled) = %d, want 1", len(scheduled))
+	}
+	events := broadcaster.Events()
+	if len(events) != 1 || events[0].Message != "Timer set" {
+		t.Fatalf("unexpected broadcast events: %+v", events)
 	}
 }

@@ -80,7 +80,7 @@ func main() {
 	}
 	log.Printf("control service ready for server id %q", cfg.MDNSName)
 	log.Printf("control stream handler initialized")
-	log.Printf("scenario runtime initialized with %d builtin scenarios", 2)
+	log.Printf("scenario runtime initialized with %d builtin scenarios", 3)
 	_ = controlService
 	_ = controlStream
 	_ = scenarioRuntime
