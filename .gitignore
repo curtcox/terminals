@@ -30,3 +30,5 @@ dist/
 build/
 tmp/
 .bin/
+.home/
+.sdk/

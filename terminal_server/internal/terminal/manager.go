@@ -179,8 +179,8 @@ func (m *Manager) Close(sessionID string) error {
 
 // CloseAll terminates all active sessions.
 func (m *Manager) CloseAll() {
-	ids := []string{}
 	m.mu.RLock()
+	ids := make([]string, 0, len(m.sessions))
 	for id := range m.sessions {
 		ids = append(ids, id)
 	}

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:terminal_client/connection/control_client.dart';
@@ -31,6 +32,10 @@ class _ControlStreamScaffold extends StatefulWidget {
 }
 
 class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
+  static const Duration _heartbeatInterval = Duration(seconds: 10);
+  static const Duration _reconnectDelayBase = Duration(seconds: 2);
+  static const int _reconnectDelayMaxSeconds = 30;
+
   final TextEditingController _hostController = TextEditingController(
     text: '127.0.0.1',
   );
@@ -54,7 +59,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   StreamSubscription<ConnectResponse>? _incoming;
   String _status = 'Idle';
   int _responses = 0;
-  String _deviceId = 'flutter-client-1';
+  final String _deviceId = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
   uiv1.Node? _activeRoot;
   String _lastNotification = '';
   final TextEditingController _terminalInputController =
@@ -62,87 +67,172 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   bool _isScanning = false;
   List<DiscoveredServer> _discoveredServers = [];
   String? _selectedDiscoveredServer;
+  Timer? _heartbeatTimer;
+  Timer? _reconnectTimer;
+  bool _shouldStayConnected = false;
+  bool _isConnecting = false;
+  int _reconnectAttempt = 0;
 
-  Future<void> _startStream() async {
+  Future<void> _startStream({bool userInitiated = true}) async {
+    if (_isConnecting) {
+      return;
+    }
+    if (userInitiated) {
+      _shouldStayConnected = true;
+      _reconnectAttempt = 0;
+      _cancelReconnectTimer();
+    }
+
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim());
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
     if (host.isEmpty || port == null || port <= 0 || port > 65535) {
+      _shouldStayConnected = false;
       setState(() {
         _status = 'Invalid host or port';
       });
       return;
     }
 
-    await _incoming?.cancel();
-    final existingClient = _client;
-    if (existingClient != null) {
-      await existingClient.shutdown();
+    _isConnecting = true;
+    if (mounted) {
+      setState(() {
+        _status = userInitiated ? 'Connecting...' : 'Reconnecting...';
+      });
     }
-    _client = TerminalControlGrpcClient(host: host, port: port);
+    try {
+      await _incoming?.cancel();
+      _incoming = null;
+      final existingClient = _client;
+      if (existingClient != null) {
+        await existingClient.shutdown();
+      }
+      _client = TerminalControlGrpcClient(host: host, port: port);
 
-    final stream = _client!.connect(_outgoing.stream);
-    _incoming = stream.listen(
-      (ConnectResponse response) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _responses += 1;
-          _status = _statusFromResponse(response);
-          if (response.hasSetUi() && response.setUi.hasRoot()) {
-            _activeRoot = response.setUi.root;
+      final stream = _client!.connect(_outgoing.stream);
+      _incoming = stream.listen(
+        (ConnectResponse response) {
+          if (!mounted) {
+            return;
           }
-          if (response.hasNotification()) {
-            _lastNotification = response.notification.body;
-          }
-          if (response.hasCommandResult() &&
-              response.commandResult.notification.isNotEmpty) {
-            _lastNotification = response.commandResult.notification;
-          }
-          if (response.hasError()) {
-            _lastNotification = response.error.message;
-          }
-        });
-      },
-      onError: (Object error) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _status = 'Stream error: $error';
-        });
-      },
-      onDone: () {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _status = 'Disconnected';
-        });
-      },
-    );
+          _reconnectAttempt = 0;
+          setState(() {
+            _responses += 1;
+            _status = _statusFromResponse(response);
+            if (response.hasSetUi() && response.setUi.hasRoot()) {
+              _activeRoot = response.setUi.root;
+            }
+            if (response.hasNotification()) {
+              _lastNotification = response.notification.body;
+            }
+            if (response.hasCommandResult() &&
+                response.commandResult.notification.isNotEmpty) {
+              _lastNotification = response.commandResult.notification;
+            }
+            if (response.hasError()) {
+              _lastNotification = response.error.message;
+            }
+          });
+        },
+        onError: (Object error) {
+          _handleStreamClosed('Stream error: $error');
+        },
+        onDone: () {
+          _handleStreamClosed('Disconnected');
+        },
+      );
 
-    _deviceId = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
-    final mediaQuery = MediaQuery.of(context);
-    final size = mediaQuery.size;
-    _outgoing.add(
-      TerminalControlGrpcClient.registerRequest(
-        deviceId: _deviceId,
-        deviceName: _deviceNameController.text.trim(),
-        deviceType: _deviceTypeController.text.trim(),
-        platform: _platformController.text.trim(),
-        screenWidth: size.width.round(),
-        screenHeight: size.height.round(),
-        screenDensity: mediaQuery.devicePixelRatio,
-        screenTouch: true,
-      ),
-    );
-    _outgoing.add(
-      TerminalControlGrpcClient.heartbeatRequest(
-        deviceId: _deviceId,
-        unixMs: DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+      _startHeartbeatLoop();
+      _outgoing.add(
+        TerminalControlGrpcClient.registerRequest(
+          deviceId: _deviceId,
+          deviceName: _deviceNameController.text.trim(),
+          deviceType: _deviceTypeController.text.trim(),
+          platform: _platformController.text.trim(),
+          screenWidth: size.width.round(),
+          screenHeight: size.height.round(),
+          screenDensity: mediaQuery.devicePixelRatio,
+          screenTouch: true,
+        ),
+      );
+      _outgoing.add(
+        TerminalControlGrpcClient.heartbeatRequest(
+          deviceId: _deviceId,
+          unixMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+    } catch (error) {
+      _handleStreamClosed('Connection error: $error');
+    } finally {
+      _isConnecting = false;
+    }
+  }
+
+  void _startHeartbeatLoop() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+      if (!_shouldStayConnected || _deviceId.isEmpty) {
+        return;
+      }
+      _outgoing.add(
+        TerminalControlGrpcClient.heartbeatRequest(
+          deviceId: _deviceId,
+          unixMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+    });
+  }
+
+  void _stopHeartbeatLoop() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+
+  void _cancelReconnectTimer() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
+  void _handleStreamClosed(String status) {
+    _stopHeartbeatLoop();
+    _incoming = null;
+    final existingClient = _client;
+    _client = null;
+    if (existingClient != null) {
+      unawaited(existingClient.shutdown());
+    }
+    if (mounted) {
+      setState(() {
+        _status = status;
+      });
+    }
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    if (!_shouldStayConnected || _isConnecting) {
+      return;
+    }
+    if (_reconnectTimer?.isActive ?? false) {
+      return;
+    }
+    _reconnectAttempt += 1;
+    final scaledSeconds = _reconnectDelayBase.inSeconds *
+        math.pow(2, _reconnectAttempt - 1).toInt();
+    final delaySeconds = math.min(_reconnectDelayMaxSeconds, scaledSeconds);
+    if (mounted) {
+      setState(() {
+        _status = 'Connection lost, retrying in ${delaySeconds}s...';
+      });
+    }
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      _reconnectTimer = null;
+      if (!_shouldStayConnected || !mounted) {
+        return;
+      }
+      unawaited(_startStream(userInitiated: false));
+    });
   }
 
   Future<void> _scanForServers() async {
@@ -187,6 +277,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   }
 
   Future<void> _stopStream() async {
+    _shouldStayConnected = false;
+    _reconnectAttempt = 0;
+    _cancelReconnectTimer();
+    _stopHeartbeatLoop();
     await _incoming?.cancel();
     _incoming = null;
     final existingClient = _client;
@@ -204,6 +298,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
 
   @override
   void dispose() {
+    _shouldStayConnected = false;
+    _cancelReconnectTimer();
+    _stopHeartbeatLoop();
     final incoming = _incoming;
     if (incoming != null) {
       unawaited(incoming.cancel());
@@ -250,7 +347,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
               if (_discoveredServers.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _selectedDiscoveredServer,
+                  key: ValueKey<String?>(_selectedDiscoveredServer),
+                  initialValue: _selectedDiscoveredServer,
                   decoration:
                       const InputDecoration(labelText: 'Discovered Server'),
                   items: _discoveredServers
@@ -406,8 +504,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             node.text.value,
             style: TextStyle(
               color: _parseHexColor(node.text.color),
-              fontFamily:
-                  node.text.style == 'monospace' ? 'monospace' : null,
+              fontFamily: node.text.style == 'monospace' ? 'monospace' : null,
             ),
           ),
         );

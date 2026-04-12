@@ -1,3 +1,8 @@
+ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+LOCAL_BIN := $(ROOT_DIR)/.bin
+LOCAL_FLUTTER_BIN := $(ROOT_DIR)/.sdk/flutter/bin
+export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
+
 .PHONY: server-build server-test server-lint server-coverage \
 	client-build client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
@@ -31,7 +36,7 @@ proto-lint:
 	cd api && buf lint
 
 proto-breaking:
-	cd api && buf breaking --against '.git#branch=main'
+	cd api && buf breaking --against '../.git#branch=main,subdir=api'
 
 proto-generate:
 	cd api && buf generate
@@ -47,4 +52,3 @@ run-server:
 
 run-client-web:
 	cd terminal_client && flutter run -d web-server
-
