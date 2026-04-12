@@ -55,24 +55,31 @@ func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
 
 // WireFromInternalServer converts internal server messages to adapter-level wire messages.
 func WireFromInternalServer(msg ServerMessage) WireServerMessage {
-	out := WireServerMessage{
-		CommandAck:    msg.CommandAck,
-		Notification:  msg.Notification,
-		ScenarioStart: msg.ScenarioStart,
-		ScenarioStop:  msg.ScenarioStop,
-		Data:          EncodeDataMap(msg.Data),
-		ErrorCode:     msg.ErrorCode,
-		Error:         msg.Error,
-	}
+	out := WireServerMessage{}
 	if msg.RegisterAck != nil {
 		out.RegisterAck = &WireRegisterResponse{
 			ServerID: msg.RegisterAck.ServerID,
 			Message:  msg.RegisterAck.Message,
 		}
 	}
+	if msg.CommandAck != "" || msg.Notification != "" || msg.ScenarioStart != "" || msg.ScenarioStop != "" || len(msg.Data) > 0 {
+		out.CommandResult = &WireCommandResult{
+			RequestID:     msg.CommandAck,
+			ScenarioStart: msg.ScenarioStart,
+			ScenarioStop:  msg.ScenarioStop,
+			Notification:  msg.Notification,
+			Data:          EncodeDataMap(msg.Data),
+		}
+	}
 	if msg.SetUI != nil {
 		uiNode := wireDescriptorFromUI(*msg.SetUI)
 		out.SetUI = &uiNode
+	}
+	if msg.ErrorCode != "" || msg.Error != "" {
+		out.Error = &WireControlError{
+			Code:    msg.ErrorCode,
+			Message: msg.Error,
+		}
 	}
 	return out
 }

@@ -44,17 +44,27 @@ type WireRegisterResponse struct {
 	Message  string
 }
 
+// WireCommandResult is a protobuf-adapter-friendly command result payload.
+type WireCommandResult struct {
+	RequestID     string
+	ScenarioStart string
+	ScenarioStop  string
+	Notification  string
+	Data          []DataEntry
+}
+
+// WireControlError is a protobuf-adapter-friendly control error payload.
+type WireControlError struct {
+	Code    string
+	Message string
+}
+
 // WireServerMessage is a protobuf-adapter-friendly oneof response shape.
 type WireServerMessage struct {
 	RegisterAck   *WireRegisterResponse
-	CommandAck    string
+	CommandResult *WireCommandResult
 	SetUI         *uiWireDescriptor
-	Notification  string
-	ScenarioStart string
-	ScenarioStop  string
-	Data          []DataEntry
-	ErrorCode     string
-	Error         string
+	Error         *WireControlError
 }
 
 // uiWireDescriptor is a compact wire representation for UI descriptors.

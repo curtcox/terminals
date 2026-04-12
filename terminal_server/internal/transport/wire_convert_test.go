@@ -34,14 +34,14 @@ func TestWireFromInternalServer(t *testing.T) {
 	if wire.RegisterAck == nil || wire.RegisterAck.ServerID != "srv-1" {
 		t.Fatalf("unexpected register ack mapping: %+v", wire.RegisterAck)
 	}
-	if wire.CommandAck != "cmd-1" {
-		t.Fatalf("CommandAck = %q, want cmd-1", wire.CommandAck)
+	if wire.CommandResult == nil || wire.CommandResult.RequestID != "cmd-1" {
+		t.Fatalf("unexpected command result mapping: %+v", wire.CommandResult)
 	}
-	if wire.ErrorCode != ErrorCodeInvalidCommandAction || wire.Error == "" {
-		t.Fatalf("unexpected error fields: code=%q err=%q", wire.ErrorCode, wire.Error)
+	if wire.Error == nil || wire.Error.Code != ErrorCodeInvalidCommandAction || wire.Error.Message == "" {
+		t.Fatalf("unexpected error fields: %+v", wire.Error)
 	}
-	if len(wire.Data) != 2 || wire.Data[0].Key != "a" || wire.Data[1].Key != "b" {
-		t.Fatalf("unexpected data order: %+v", wire.Data)
+	if len(wire.CommandResult.Data) != 2 || wire.CommandResult.Data[0].Key != "a" || wire.CommandResult.Data[1].Key != "b" {
+		t.Fatalf("unexpected data order: %+v", wire.CommandResult.Data)
 	}
 }
 

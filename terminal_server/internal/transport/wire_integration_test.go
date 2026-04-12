@@ -37,11 +37,11 @@ func TestWireSessionProtocolViolationRecoverable(t *testing.T) {
 	if !ok {
 		t.Fatalf("first response type = %T, want WireServerMessage", stream.sent[0])
 	}
-	if first.ErrorCode != ErrorCodeProtocolViolation {
-		t.Fatalf("ErrorCode = %q, want %q", first.ErrorCode, ErrorCodeProtocolViolation)
+	if first.Error == nil || first.Error.Code != ErrorCodeProtocolViolation {
+		t.Fatalf("ErrorCode = %+v, want %q", first.Error, ErrorCodeProtocolViolation)
 	}
-	if !strings.Contains(first.Error, "register required") {
-		t.Fatalf("Error = %q, expected register-required text", first.Error)
+	if !strings.Contains(first.Error.Message, "register required") {
+		t.Fatalf("Error = %q, expected register-required text", first.Error.Message)
 	}
 }
 
@@ -82,8 +82,8 @@ func TestWireSessionCommandValidationErrorCode(t *testing.T) {
 	if !ok {
 		t.Fatalf("last response type = %T, want WireServerMessage", stream.sent[len(stream.sent)-1])
 	}
-	if last.ErrorCode != ErrorCodeMissingIntent {
-		t.Fatalf("ErrorCode = %q, want %q", last.ErrorCode, ErrorCodeMissingIntent)
+	if last.Error == nil || last.Error.Code != ErrorCodeMissingIntent {
+		t.Fatalf("ErrorCode = %+v, want %q", last.Error, ErrorCodeMissingIntent)
 	}
 }
 
@@ -110,12 +110,12 @@ func TestWireSessionSystemDataDeterministicOrder(t *testing.T) {
 	if !ok {
 		t.Fatalf("help response type = %T, want WireServerMessage", stream.sent[len(stream.sent)-1])
 	}
-	if len(helpMsg.Data) < 2 {
-		t.Fatalf("expected help data entries, got %+v", helpMsg.Data)
+	if helpMsg.CommandResult == nil || len(helpMsg.CommandResult.Data) < 2 {
+		t.Fatalf("expected help command result data entries, got %+v", helpMsg.CommandResult)
 	}
-	for i := 1; i < len(helpMsg.Data); i++ {
-		if helpMsg.Data[i-1].Key > helpMsg.Data[i].Key {
-			t.Fatalf("data entries not sorted: %+v", helpMsg.Data)
+	for i := 1; i < len(helpMsg.CommandResult.Data); i++ {
+		if helpMsg.CommandResult.Data[i-1].Key > helpMsg.CommandResult.Data[i].Key {
+			t.Fatalf("data entries not sorted: %+v", helpMsg.CommandResult.Data)
 		}
 	}
 }
