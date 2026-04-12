@@ -341,3 +341,43 @@ func TestSessionRunDisconnectCleansTerminalSession(t *testing.T) {
 		t.Fatalf("expected terminalByDevice entry removed on disconnect")
 	}
 }
+
+func TestSessionRunDisconnectCleansIORoutes(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	routes := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        routes,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	session := NewSession(handler, control)
+
+	_ = routes.Connect("d1", "d2", "audio")
+	_ = routes.Connect("d3", "d1", "video")
+	_ = routes.Connect("x", "y", "audio")
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	remaining := routes.Routes()
+	if len(remaining) != 1 {
+		t.Fatalf("remaining routes = %d, want 1", len(remaining))
+	}
+	if remaining[0].SourceID != "x" || remaining[0].TargetID != "y" {
+		t.Fatalf("unexpected remaining route: %+v", remaining[0])
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
@@ -253,13 +254,14 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	if cmd == nil {
 		return responses
 	}
+	if commandResult.ScenarioStop == "terminal" {
+		h.terminateTerminalForDevice(cmd.DeviceID)
+		return responses
+	}
 	if cmd.Action != "" && cmd.Action != CommandActionStart {
 		return responses
 	}
 	if commandResult.ScenarioStart != "terminal" {
-		if commandResult.ScenarioStop == "terminal" {
-			h.terminateTerminalForDevice(cmd.DeviceID)
-		}
 		return responses
 	}
 
@@ -642,6 +644,25 @@ func (h *StreamHandler) NoteProtocolError() {
 // HandleDisconnect releases stream-scoped resources for a disconnected device.
 func (h *StreamHandler) HandleDisconnect(deviceID string) {
 	h.terminateTerminalForDevice(deviceID)
+	h.disconnectRoutesForDevice(deviceID)
+}
+
+func (h *StreamHandler) disconnectRoutesForDevice(deviceID string) {
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+		return
+	}
+	routeIO, ok := h.runtime.Env.IO.(interface {
+		RoutesForDevice(string) []iorouter.Route
+		Disconnect(sourceID, targetID, streamKind string) error
+	})
+	if !ok {
+		return
+	}
+
+	routes := routeIO.RoutesForDevice(deviceID)
+	for _, route := range routes {
+		_ = routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
+	}
 }
 
 func (h *StreamHandler) appendCommandEventLocked(ev CommandEvent) {

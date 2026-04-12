@@ -3,6 +3,7 @@ package io //nolint:revive
 
 import (
 	"errors"
+	"sort"
 	"sync"
 )
 
@@ -78,6 +79,67 @@ func (r *Router) RouteCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.routes)
+}
+
+// ConnectFanout creates one source->target route per target, skipping existing routes.
+// It returns how many new routes were added.
+func (r *Router) ConnectFanout(sourceID string, targetIDs []string, streamKind string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	added := 0
+	for _, targetID := range targetIDs {
+		key := routeKey(sourceID, targetID, streamKind)
+		if _, exists := r.routes[key]; exists {
+			continue
+		}
+		r.routes[key] = Route{
+			SourceID:   sourceID,
+			TargetID:   targetID,
+			StreamKind: streamKind,
+		}
+		added++
+	}
+	return added
+}
+
+// DisconnectDevice removes any route where the given device is source or target.
+// It returns how many routes were removed.
+func (r *Router) DisconnectDevice(deviceID string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	removed := 0
+	for key, route := range r.routes {
+		if route.SourceID == deviceID || route.TargetID == deviceID {
+			delete(r.routes, key)
+			removed++
+		}
+	}
+	return removed
+}
+
+// RoutesForDevice returns routes where the device appears as source or target.
+func (r *Router) RoutesForDevice(deviceID string) []Route {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	out := make([]Route, 0)
+	for _, route := range r.routes {
+		if route.SourceID == deviceID || route.TargetID == deviceID {
+			out = append(out, route)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].SourceID == out[j].SourceID {
+			if out[i].TargetID == out[j].TargetID {
+				return out[i].StreamKind < out[j].StreamKind
+			}
+			return out[i].TargetID < out[j].TargetID
+		}
+		return out[i].SourceID < out[j].SourceID
+	})
+	return out
 }
 
 func routeKey(sourceID, targetID, streamKind string) string {

@@ -229,6 +229,111 @@ func TestHandleMessageInputTerminal(t *testing.T) {
 	}
 }
 
+func TestHandleMessageTerminalSessionLifecycle(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+
+	startOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("start command error = %v", err)
+	}
+	if len(startOut) != 2 {
+		t.Fatalf("start len(out) = %d, want 2", len(startOut))
+	}
+	activeSessions := handler.terminals.List()
+	if len(activeSessions) != 1 {
+		t.Fatalf("terminal session count after start = %d, want 1", len(activeSessions))
+	}
+	firstSessionID := activeSessions[0].ID
+
+	// Starting terminal again should reuse existing session for the device.
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-start-again",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("second start command error = %v", err)
+	}
+	activeSessions = handler.terminals.List()
+	if len(activeSessions) != 1 {
+		t.Fatalf("terminal session count after second start = %d, want 1", len(activeSessions))
+	}
+	if activeSessions[0].ID != firstSessionID {
+		t.Fatalf("session id changed on second start: got %q want %q", activeSessions[0].ID, firstSessionID)
+	}
+
+	stopOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-stop",
+			DeviceID:  "device-1",
+			Action:    "stop",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("stop command error = %v", err)
+	}
+	if len(stopOut) != 1 {
+		t.Fatalf("stop len(out) = %d, want 1", len(stopOut))
+	}
+	if stopOut[0].ScenarioStop != "terminal" {
+		t.Fatalf("ScenarioStop = %q, want terminal", stopOut[0].ScenarioStop)
+	}
+	if len(handler.terminals.List()) != 0 {
+		t.Fatalf("terminal sessions should be empty after stop")
+	}
+
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-restart",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("restart command error = %v", err)
+	}
+	activeSessions = handler.terminals.List()
+	if len(activeSessions) != 1 {
+		t.Fatalf("terminal session count after restart = %d, want 1", len(activeSessions))
+	}
+	if activeSessions[0].ID == firstSessionID {
+		t.Fatalf("expected new session id after stop/restart, still %q", firstSessionID)
+	}
+}
+
 func TestHandleMessageCommandStop(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
