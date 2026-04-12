@@ -76,7 +76,7 @@ message CommandRequest {
   string device_id = 2;
   CommandAction action = 3;
   CommandKind kind = 4;
-  string text = 5;   // voice transcript
+  string text = 5; // voice transcript
   string intent = 6; // intent name or system intent
 }
 
