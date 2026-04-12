@@ -10,29 +10,19 @@ class TerminalControlGrpcClient {
   TerminalControlGrpcClient({
     required this.host,
     required this.port,
-  }) : this._internal(
-          host: host,
+  }) : _channel = ClientChannel(
+          host,
           port: port,
-          channel: ClientChannel(
-            host,
-            port: port,
-            options: const ChannelOptions(
-              credentials: ChannelCredentials.insecure(),
-            ),
+          options: const ChannelOptions(
+            credentials: ChannelCredentials.insecure(),
           ),
         );
-
-  TerminalControlGrpcClient._internal({
-    required this.host,
-    required this.port,
-    required ClientChannel channel,
-  })  : _channel = channel,
-        _stub = _TerminalControlServiceClient(channel);
 
   final String host;
   final int port;
   final ClientChannel _channel;
-  final _TerminalControlServiceClient _stub;
+  late final _TerminalControlServiceClient _stub =
+      _TerminalControlServiceClient(_channel);
 
   /// Starts the bidirectional control stream.
   ResponseStream<ConnectResponse> connect(
