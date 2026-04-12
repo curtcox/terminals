@@ -57,6 +57,10 @@ func TerminalViewWithOutput(deviceID, output string) Descriptor {
 		"id":          "terminal_input",
 		"placeholder": "Type command and press enter",
 		"autofocus":   "true",
+	}), New("button", map[string]string{
+		"id":     "terminal_refresh_button",
+		"label":  "Refresh",
+		"action": "terminal_refresh",
 	}))
 }
 

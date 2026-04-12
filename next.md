@@ -1,1 +1,1 @@
-Add a terminal UI refresh control (button action) and route that UIAction to terminal_refresh so users can force a PTY flush from the server-driven UI.
+Implement key event forwarding for terminal mode (client sends InputEvent.key, server maps KeyText to PTY input) and add transport/client tests.

@@ -423,6 +423,17 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 			return []ServerMessage{{UpdateUI: update}}, nil
 		}
 		return nil, nil
+	case SystemIntentTerminalRefresh:
+		cmd := &CommandRequest{
+			DeviceID: deviceID,
+			Kind:     CommandKindManual,
+			Intent:   SystemIntentTerminalRefresh,
+		}
+		commandResult, err := h.handleCommand(ctx, cmd)
+		if err != nil {
+			return nil, err
+		}
+		return h.commandResponses(ctx, cmd, commandResult), nil
 	}
 
 	if action != "" && (componentID != "terminal_input" || action != "submit") {

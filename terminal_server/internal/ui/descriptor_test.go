@@ -27,3 +27,29 @@ func TestTerminalOutputPatch(t *testing.T) {
 		t.Fatalf("value = %q, want line1\\nline2", d.Props["value"])
 	}
 }
+
+func TestTerminalViewIncludesRefreshButton(t *testing.T) {
+	d := TerminalViewWithOutput("device-1", "hello")
+	if d.Type != "stack" {
+		t.Fatalf("Type = %q, want stack", d.Type)
+	}
+	if len(d.Children) < 4 {
+		t.Fatalf("children = %d, want at least 4", len(d.Children))
+	}
+
+	var found bool
+	for _, child := range d.Children {
+		if child.Type != "button" {
+			continue
+		}
+		if child.Props["id"] == "terminal_refresh_button" &&
+			child.Props["label"] == "Refresh" &&
+			child.Props["action"] == "terminal_refresh" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected terminal refresh button descriptor")
+	}
+}

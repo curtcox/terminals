@@ -14,6 +14,30 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
+func waitForRefreshMarker(
+	t *testing.T,
+	handler *StreamHandler,
+	request ClientMessage,
+	marker string,
+	attempts int,
+	delay time.Duration,
+) []ServerMessage {
+	t.Helper()
+	for i := 0; i < attempts; i++ {
+		out, err := handler.HandleMessage(context.Background(), request)
+		if err != nil {
+			t.Fatalf("refresh request error = %v", err)
+		}
+		if len(out) >= 2 && out[len(out)-1].UpdateUI != nil &&
+			strings.Contains(out[len(out)-1].UpdateUI.Node.Props["value"], marker) {
+			return out
+		}
+		time.Sleep(delay)
+	}
+	t.Fatalf("timed out waiting for refresh marker %q", marker)
+	return nil
+}
+
 func TestHandleMessageCommandVoice(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -1452,17 +1476,14 @@ func TestHandleMessageManualTerminalRefresh(t *testing.T) {
 	})
 	time.Sleep(1200 * time.Millisecond)
 
-	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+	out := waitForRefreshMarker(t, handler, ClientMessage{
 		Command: &CommandRequest{
 			RequestID: "manual-refresh-1",
 			DeviceID:  "device-1",
 			Kind:      "manual",
 			Intent:    SystemIntentTerminalRefresh,
 		},
-	})
-	if err != nil {
-		t.Fatalf("manual terminal_refresh error = %v", err)
-	}
+	}, "refresh-manual", 10, 200*time.Millisecond)
 	if len(out) != 2 {
 		t.Fatalf("len(out) = %d, want 2", len(out))
 	}
@@ -1511,16 +1532,13 @@ func TestHandleMessageSystemTerminalRefresh(t *testing.T) {
 	})
 	time.Sleep(1200 * time.Millisecond)
 
-	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+	out := waitForRefreshMarker(t, handler, ClientMessage{
 		Command: &CommandRequest{
 			RequestID: "sys-refresh-1",
 			Kind:      "system",
 			Intent:    SystemIntentTerminalRefresh + " device-1",
 		},
-	})
-	if err != nil {
-		t.Fatalf("system terminal_refresh error = %v", err)
-	}
+	}, "refresh-system", 10, 200*time.Millisecond)
 	if len(out) != 2 {
 		t.Fatalf("len(out) = %d, want 2", len(out))
 	}
@@ -1532,6 +1550,61 @@ func TestHandleMessageSystemTerminalRefresh(t *testing.T) {
 	}
 	if !strings.Contains(out[1].UpdateUI.Node.Props["value"], "refresh-system") {
 		t.Fatalf("system terminal_refresh missing delayed output: %+v", out[1].UpdateUI.Node.Props)
+	}
+}
+
+func TestHandleMessageInputTerminalRefreshAction(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "ui-refresh-start-terminal",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "sleep 1; printf '\\x72\\x65\\x66\\x72\\x65\\x73\\x68\\x2d\\x75\\x69\\n'",
+		},
+	})
+	time.Sleep(1200 * time.Millisecond)
+
+	out := waitForRefreshMarker(t, handler, ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_refresh_button",
+			Action:      SystemIntentTerminalRefresh,
+		},
+	}, "refresh-ui", 10, 200*time.Millisecond)
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[0].Notification == "" {
+		t.Fatalf("expected notification response before ui update")
+	}
+	if out[1].UpdateUI == nil {
+		t.Fatalf("expected UpdateUI response after terminal_refresh UIAction")
+	}
+	if !strings.Contains(out[1].UpdateUI.Node.Props["value"], "refresh-ui") {
+		t.Fatalf("terminal_refresh UIAction missing delayed output: %+v", out[1].UpdateUI.Node.Props)
 	}
 }
 
