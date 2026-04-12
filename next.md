@@ -1,1 +1,1 @@
-Handle button/gesture UIAction routing in the server control stream (for active scenarios) and add transport tests.
+Implement terminal output streaming from PTY to client without requiring a new input event.

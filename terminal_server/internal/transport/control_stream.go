@@ -349,20 +349,13 @@ func (h *StreamHandler) terminateTerminalForDevice(deviceID string) {
 	}
 }
 
-func (h *StreamHandler) handleInput(_ context.Context, in *InputRequest) ([]ServerMessage, error) {
+func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]ServerMessage, error) {
 	if in == nil {
 		return nil, ErrInvalidClientMessage
 	}
 	deviceID := strings.TrimSpace(in.DeviceID)
 	if deviceID == "" {
 		return nil, ErrMissingCommandDeviceID
-	}
-
-	h.mu.Lock()
-	sessionID := h.terminalByDevice[deviceID]
-	h.mu.Unlock()
-	if sessionID == "" {
-		return nil, nil
 	}
 
 	action := strings.ToLower(strings.TrimSpace(in.Action))
@@ -384,6 +377,19 @@ func (h *StreamHandler) handleInput(_ context.Context, in *InputRequest) ([]Serv
 		if update, ok := h.renderTerminalUIAction(deviceID, componentID, action, in.Value); ok {
 			return []ServerMessage{{UpdateUI: update}}, nil
 		}
+		return nil, nil
+	}
+
+	if action != "" && (componentID != "terminal_input" || action != "submit") {
+		if out, routed, err := h.routeScenarioUIAction(ctx, deviceID, action); routed {
+			return out, err
+		}
+	}
+
+	h.mu.Lock()
+	sessionID := h.terminalByDevice[deviceID]
+	h.mu.Unlock()
+	if sessionID == "" {
 		return nil, nil
 	}
 
@@ -418,6 +424,99 @@ func (h *StreamHandler) handleInput(_ context.Context, in *InputRequest) ([]Serv
 			Node:        ui.TerminalOutputPatch(combinedOutput),
 		},
 	}}, nil
+}
+
+func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, action string) ([]ServerMessage, bool, error) {
+	if h.runtime == nil || h.runtime.Engine == nil {
+		return nil, false, nil
+	}
+
+	activeName, active := h.runtime.Engine.Active(deviceID)
+	if !active {
+		return nil, false, nil
+	}
+
+	action = strings.TrimSpace(action)
+	if action == "" {
+		return nil, false, nil
+	}
+
+	intent := ""
+	commandAction := CommandActionStart
+	switch {
+	case action == "stop_active":
+		intent = activeName
+		commandAction = CommandActionStop
+	case strings.HasPrefix(action, "start:"):
+		intent = strings.TrimSpace(strings.TrimPrefix(action, "start:"))
+	case strings.HasPrefix(action, "stop:"):
+		intent = strings.TrimSpace(strings.TrimPrefix(action, "stop:"))
+		commandAction = CommandActionStop
+	default:
+		intent = action
+	}
+	if intent == "" {
+		return nil, true, nil
+	}
+	if commandAction == CommandActionStart && !h.isRegisteredScenario(intent) {
+		return nil, false, nil
+	}
+	if commandAction == CommandActionStop && action != "stop_active" && !h.isRegisteredScenario(intent) {
+		return nil, false, nil
+	}
+
+	trigger := scenario.Trigger{
+		Kind:     scenario.TriggerManual,
+		SourceID: deviceID,
+		Intent:   intent,
+		Arguments: map[string]string{
+			"device_id": deviceID,
+		},
+	}
+	if commandAction == CommandActionStop {
+		name, err := h.runtime.StopTrigger(ctx, trigger)
+		if err != nil {
+			return nil, true, err
+		}
+		result := ServerMessage{
+			ScenarioStop: name,
+			Notification: "Scenario stopped: " + name,
+		}
+		cmd := &CommandRequest{
+			DeviceID: deviceID,
+			Action:   commandAction,
+			Kind:     CommandKindManual,
+			Intent:   intent,
+		}
+		return h.commandResponses(ctx, cmd, result), true, nil
+	}
+	name, err := h.runtime.HandleTrigger(ctx, trigger)
+	if err != nil {
+		return nil, true, err
+	}
+	result := ServerMessage{
+		ScenarioStart: name,
+		Notification:  "Scenario started: " + name,
+	}
+	cmd := &CommandRequest{
+		DeviceID: deviceID,
+		Action:   commandAction,
+		Kind:     CommandKindManual,
+		Intent:   intent,
+	}
+	return h.commandResponses(ctx, cmd, result), true, nil
+}
+
+func (h *StreamHandler) isRegisteredScenario(name string) bool {
+	if h.runtime == nil || h.runtime.Engine == nil || strings.TrimSpace(name) == "" {
+		return false
+	}
+	for _, item := range h.runtime.Engine.RegistrySnapshot() {
+		if item.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *StreamHandler) renderTerminalUIAction(deviceID, componentID, action, value string) (*UIUpdate, bool) {

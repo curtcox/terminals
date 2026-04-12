@@ -365,6 +365,182 @@ func TestHandleMessageInputTerminalInteractiveActions(t *testing.T) {
 	}
 }
 
+func TestHandleMessageInputRoutesStartActionWhenScenarioIsActive(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-ui-route-photo-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "open_terminal_button",
+			Action:      "start:terminal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input start:terminal) error = %v", err)
+	}
+	if len(out) != 3 {
+		t.Fatalf("len(out) = %d, want 3", len(out))
+	}
+	if out[0].ScenarioStart != "terminal" {
+		t.Fatalf("ScenarioStart = %q, want terminal", out[0].ScenarioStart)
+	}
+	if out[1].SetUI == nil {
+		t.Fatalf("expected SetUI response after starting terminal")
+	}
+	if out[2].TransitionUI == nil || out[2].TransitionUI.Transition != "terminal_enter" {
+		t.Fatalf("expected terminal_enter transition, got %+v", out[2].TransitionUI)
+	}
+	active, ok := runtime.Engine.Active("device-1")
+	if !ok || active != "terminal" {
+		t.Fatalf("active scenario = %q (ok=%t), want terminal", active, ok)
+	}
+}
+
+func TestHandleMessageInputRoutesStopActiveAction(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-ui-route-terminal-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "stop_gesture",
+			Action:      "stop_active",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input stop_active) error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[0].ScenarioStop != "terminal" {
+		t.Fatalf("ScenarioStop = %q, want terminal", out[0].ScenarioStop)
+	}
+	if out[1].TransitionUI == nil || out[1].TransitionUI.Transition != "terminal_exit" {
+		t.Fatalf("expected terminal_exit transition, got %+v", out[1].TransitionUI)
+	}
+	if _, ok := runtime.Engine.Active("device-1"); ok {
+		t.Fatalf("expected no active scenario after stop_active")
+	}
+}
+
+func TestHandleMessageInputActionIgnoredWithoutActiveScenario(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "open_terminal_button",
+			Action:      "start:terminal",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input action without active scenario) error = %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("len(out) = %d, want 0", len(out))
+	}
+}
+
+func TestHandleMessageInputTapIgnoredWithActiveScenario(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-ui-route-photo-start-tap",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "generic_tap",
+			Action:      "tap",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input tap) error = %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("len(out) = %d, want 0", len(out))
+	}
+	active, ok := runtime.Engine.Active("device-1")
+	if !ok || active != "photo_frame" {
+		t.Fatalf("active scenario = %q (ok=%t), want photo_frame", active, ok)
+	}
+}
+
 func TestHandleMessageTerminalSessionLifecycle(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
