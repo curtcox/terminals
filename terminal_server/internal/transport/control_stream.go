@@ -463,6 +463,9 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	if text == "" || (!fromKey && strings.TrimSpace(text) == "") {
 		return nil, nil
 	}
+	if fromKey {
+		text = normalizeTerminalKeyText(text)
+	}
 	if !fromKey && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
@@ -631,6 +634,14 @@ func (h *StreamHandler) appendTerminalOutput(deviceID, chunk string) string {
 	h.terminalOutputByDevice[deviceID] = existing
 	h.mu.Unlock()
 	return existing
+}
+
+func normalizeTerminalKeyText(text string) string {
+	if text == "" {
+		return text
+	}
+	// PTY line discipline typically expects DEL (0x7f) for backward delete.
+	return strings.ReplaceAll(text, "\b", "\x7f")
 }
 
 func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {

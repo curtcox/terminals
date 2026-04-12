@@ -1,1 +1,1 @@
-Normalize terminal key forwarding control characters (map client backspace key text to PTY delete sequence) and add transport tests.
+Reduce terminal output polling latency by making readTerminalOutput configurable (shorter poll interval/deadline), with transport tests for immediate command echo behavior.
