@@ -449,19 +449,21 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 		return nil, nil
 	}
 
-	text := strings.TrimSpace(in.Value)
+	text := in.Value
+	fromKey := false
 	if text == "" && componentID == "terminal_input" {
 		h.mu.Lock()
-		text = strings.TrimSpace(h.terminalDraftByDevice[deviceID])
+		text = h.terminalDraftByDevice[deviceID]
 		h.mu.Unlock()
 	}
 	if text == "" {
 		text = in.KeyText
+		fromKey = text != ""
 	}
-	if text == "" {
+	if text == "" || (!fromKey && strings.TrimSpace(text) == "") {
 		return nil, nil
 	}
-	if !strings.HasSuffix(text, "\n") {
+	if !fromKey && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
 	if err := h.terminals.Write(sessionID, []byte(text)); err != nil {

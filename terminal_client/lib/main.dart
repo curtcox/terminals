@@ -106,6 +106,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _lastNotification = '';
   final TextEditingController _terminalInputController =
       TextEditingController();
+  String _terminalInputShadow = '';
   bool _isScanning = false;
   List<DiscoveredServer> _discoveredServers = [];
   String? _selectedDiscoveredServer;
@@ -688,6 +689,18 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     );
   }
 
+  Future<void> _sendKeyText(String text) async {
+    if (_deviceId.isEmpty || text.isEmpty) {
+      return;
+    }
+    _outgoing.add(
+      ConnectRequest()
+        ..input = (iov1.InputEvent()
+          ..deviceId = _deviceId
+          ..key = (iov1.KeyEvent()..text = text)),
+    );
+  }
+
   String _nodeId(uiv1.Node node) {
     if (node.id.isNotEmpty) {
       return node.id;
@@ -761,19 +774,46 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         );
       case uiv1.Node_Widget.textInput:
         final componentId = _nodeId(node);
+        final isTerminalInput = componentId == 'terminal_input';
         return TextField(
           controller: _terminalInputController,
           decoration: InputDecoration(
             hintText: node.textInput.placeholder,
           ),
           autofocus: node.textInput.autofocus,
+          onChanged: (value) {
+            if (!isTerminalInput) {
+              return;
+            }
+            final previous = _terminalInputShadow;
+            if (value.startsWith(previous) && value.length > previous.length) {
+              final inserted = value.substring(previous.length);
+              if (inserted.isNotEmpty) {
+                unawaited(_sendKeyText(inserted));
+              }
+            } else if (previous.startsWith(value) &&
+                previous.length > value.length) {
+              final removed = previous.length - value.length;
+              if (removed > 0) {
+                unawaited(
+                    _sendKeyText(List<String>.filled(removed, '\b').join()));
+              }
+            }
+            _terminalInputShadow = value;
+          },
           onSubmitted: (value) async {
-            await _sendUiAction(
-              componentId: componentId.isNotEmpty ? componentId : 'text_input',
-              action: 'submit',
-              value: value,
-            );
+            if (isTerminalInput) {
+              await _sendKeyText('\n');
+            } else {
+              await _sendUiAction(
+                componentId:
+                    componentId.isNotEmpty ? componentId : 'text_input',
+                action: 'submit',
+                value: value,
+              );
+            }
             _terminalInputController.clear();
+            _terminalInputShadow = '';
           },
         );
       case uiv1.Node_Widget.button:

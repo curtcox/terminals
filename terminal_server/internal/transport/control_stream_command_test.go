@@ -251,6 +251,56 @@ func TestHandleMessageInputTerminal(t *testing.T) {
 	}
 }
 
+func TestHandleMessageInputTerminalKeyText(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-key-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID: "device-1",
+			KeyText:  "echo key-forwarded-test\n",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input key text) error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].UpdateUI == nil {
+		t.Fatalf("expected UpdateUI response for key text input")
+	}
+	if !strings.Contains(out[0].UpdateUI.Node.Props["value"], "key-forwarded-test") {
+		t.Fatalf("key text output missing marker: %+v", out[0].UpdateUI.Node.Props)
+	}
+}
+
 func TestHandleMessageHeartbeatFlushesTerminalOutput(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

@@ -450,6 +450,63 @@ void main() {
     );
   });
 
+  testWidgets('wires terminal text input changes/submission to key events',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'terminal_input'
+                ..textInput =
+                    (uiv1.TextInputWidget()..placeholder = 'Terminal prompt'),
+            ))),
+    );
+    await tester.pump();
+
+    final terminalField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == 'Terminal prompt',
+    );
+    expect(terminalField, findsOneWidget);
+
+    await tester.enterText(terminalField, 'ls');
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    final keyEvents = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasKey())
+        .map((request) => request.input.key.text)
+        .toList();
+    expect(keyEvents.any((text) => text == 'ls'), isTrue);
+    expect(keyEvents.any((text) => text == '\n'), isTrue);
+
+    final terminalSubmitActions = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasUiAction())
+        .map((request) => request.input.uiAction)
+        .where(
+          (action) =>
+              action.componentId == 'terminal_input' &&
+              action.action == 'submit',
+        )
+        .toList();
+    expect(terminalSubmitActions, isEmpty);
+  });
+
   testWidgets('renders overlay primitive with layered children',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));

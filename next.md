@@ -1,1 +1,1 @@
-Implement key event forwarding for terminal mode (client sends InputEvent.key, server maps KeyText to PTY input) and add transport/client tests.
+Normalize terminal key forwarding control characters (map client backspace key text to PTY delete sequence) and add transport tests.
