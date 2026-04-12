@@ -10,6 +10,7 @@ import (
 // Priority defines scenario preemption order.
 type Priority int
 
+// Priority constants define scenario preemption order from lowest to highest.
 const (
 	PriorityIdle Priority = iota
 	PriorityLow

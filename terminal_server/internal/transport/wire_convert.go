@@ -55,6 +55,8 @@ func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
 
 func internalActionFromWire(action WireCommandAction) string {
 	switch action {
+	case WireCommandActionUnspecified:
+		return ""
 	case WireCommandActionStart:
 		return CommandActionStart
 	case WireCommandActionStop:
@@ -66,6 +68,8 @@ func internalActionFromWire(action WireCommandAction) string {
 
 func internalKindFromWire(kind WireCommandKind) string {
 	switch kind {
+	case WireCommandKindUnspecified:
+		return ""
 	case WireCommandKindVoice:
 		return CommandKindVoice
 	case WireCommandKindManual:

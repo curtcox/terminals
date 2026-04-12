@@ -60,6 +60,7 @@ func main() {
 		Port:        cfg.GRPCPort,
 		Version:     cfg.Version,
 	}); err != nil {
+		stop()
 		log.Fatalf("start mDNS: %v", err)
 	}
 
