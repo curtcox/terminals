@@ -12,9 +12,7 @@ class TerminalClientApp extends StatelessWidget {
     return MaterialApp(
       title: 'Terminal Client',
       home: const Scaffold(
-        body: Center(
-          child: Text('Terminal client scaffold'),
-        ),
+        body: Center(child: Text('Terminal client scaffold')),
       ),
     );
   }

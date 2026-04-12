@@ -68,8 +68,8 @@ message CommandRequest {
   string request_id = 1;
   string device_id = 2;
   CommandAction action = 3;
-  string kind = 4;   // voice, manual, system
-  string text = 5;   // voice transcript
+  string kind = 4; // voice, manual, system
+  string text = 5; // voice transcript
   string intent = 6; // intent name or system intent
 }
 
