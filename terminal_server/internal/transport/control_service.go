@@ -120,3 +120,11 @@ func (s *ControlService) ReconcileLiveness(timeout time.Duration) int {
 	cutoff := s.now().UTC().Add(-timeout)
 	return s.devices.MarkStaleDisconnected(cutoff)
 }
+
+// SetNowForTest overrides the service clock in tests.
+func (s *ControlService) SetNowForTest(now func() time.Time) {
+	if now == nil {
+		return
+	}
+	s.now = now
+}
