@@ -10,19 +10,19 @@ class TerminalControlGrpcClient {
   TerminalControlGrpcClient({
     required this.host,
     required this.port,
-  })  : _channel = ClientChannel(
+  }) : _channel = ClientChannel(
           host,
           port: port,
           options: const ChannelOptions(
             credentials: ChannelCredentials.insecure(),
           ),
-        ),
-        _stub = _TerminalControlServiceClient(_channel);
+        );
 
   final String host;
   final int port;
   final ClientChannel _channel;
-  final _TerminalControlServiceClient _stub;
+  late final _TerminalControlServiceClient _stub =
+      _TerminalControlServiceClient(_channel);
 
   /// Starts the bidirectional control stream.
   ResponseStream<ConnectResponse> connect(
@@ -49,7 +49,7 @@ class TerminalControlGrpcClient {
           ..identity = (DeviceIdentity()
             ..deviceName = deviceName
             ..deviceType = deviceType
-            ..platform = platform));
+            ..platform = platform)));
   }
 
   /// Builds a heartbeat message.

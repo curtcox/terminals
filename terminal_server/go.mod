@@ -1,6 +1,6 @@
 module github.com/curtcox/terminals/terminal_server
 
-go 1.26.0
+go 1.26.2
 
 require (
 	google.golang.org/grpc v1.80.0
