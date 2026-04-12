@@ -1,3 +1,4 @@
+// Package ai provides AI backend interfaces and placeholder implementations.
 package ai
 
 import "context"

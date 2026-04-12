@@ -1,3 +1,4 @@
+// Package discovery provides service advertisement and LAN discovery support.
 package discovery
 
 import "context"

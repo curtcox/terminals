@@ -1,3 +1,4 @@
+// Package ui provides broadcast and notification utilities for connected clients.
 package ui
 
 import (

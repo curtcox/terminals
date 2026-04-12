@@ -26,5 +26,5 @@ jobs:
       - name: Buf generate
         run: buf generate
       - name: Buf breaking
-        run: buf breaking --against '.git#branch=main'
+        run: buf breaking --against 'https://github.com/curtcox/terminals.git#branch=main,subdir=api'
 

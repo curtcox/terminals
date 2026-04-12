@@ -5,6 +5,7 @@ import "context"
 // TriggerKind identifies how a scenario was requested.
 type TriggerKind string
 
+// Trigger kind constants identify how a scenario was activated.
 const (
 	TriggerVoice    TriggerKind = "voice"
 	TriggerSchedule TriggerKind = "schedule"

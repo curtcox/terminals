@@ -1,3 +1,4 @@
+// Package transport defines the command and event model for client/server communication.
 package transport
 
 // Command kinds.

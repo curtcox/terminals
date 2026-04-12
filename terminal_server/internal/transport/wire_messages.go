@@ -33,6 +33,7 @@ type WireCommandRequest struct {
 // WireCommandAction mirrors control.proto CommandAction.
 type WireCommandAction int32
 
+// WireCommandAction constants mirror control.proto CommandAction enum values.
 const (
 	WireCommandActionUnspecified WireCommandAction = 0
 	WireCommandActionStart       WireCommandAction = 1
@@ -43,6 +44,8 @@ const (
 // We keep string values stable to preserve existing system/manual/voice logic.
 type WireCommandKind int32
 
+// WireCommandKind constants mirror control.proto command kind semantics.
+// String values are kept stable to preserve existing system/manual/voice logic.
 const (
 	WireCommandKindUnspecified WireCommandKind = 0
 	WireCommandKindVoice       WireCommandKind = 1
