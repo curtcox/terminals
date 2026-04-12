@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
@@ -53,10 +54,15 @@ func (s *ControlService) Register(_ context.Context, req RegisterRequest) (Regis
 		return RegisterResponse{}, err
 	}
 
+	initial := ui.HelloWorld(registered.DeviceName)
+	if err := ui.Validate(initial); err != nil {
+		return RegisterResponse{}, fmt.Errorf("validate initial ui: %w", err)
+	}
+
 	return RegisterResponse{
 		ServerID: s.serverID,
 		Message:  "registered",
-		Initial:  ui.HelloWorld(registered.DeviceName),
+		Initial:  initial,
 	}, nil
 }
 
@@ -68,4 +74,9 @@ func (s *ControlService) Heartbeat(_ context.Context, deviceID string) error {
 // UpdateCapabilities replaces capabilities for a registered device.
 func (s *ControlService) UpdateCapabilities(_ context.Context, deviceID string, caps map[string]string) error {
 	return s.devices.UpdateCapabilities(deviceID, caps)
+}
+
+// Disconnect marks a device as disconnected when a control stream ends.
+func (s *ControlService) Disconnect(_ context.Context, deviceID string) error {
+	return s.devices.MarkDisconnected(deviceID)
 }
