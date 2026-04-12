@@ -1,3 +1,4 @@
+// Package device manages device registration and state tracking.
 package device
 
 import (

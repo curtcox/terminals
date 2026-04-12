@@ -1,3 +1,4 @@
+// Package main is the entry point for the terminal server binary.
 package main
 
 import (
@@ -61,7 +62,7 @@ func main() {
 		Version:     cfg.Version,
 	}); err != nil {
 		stop()
-		log.Fatalf("start mDNS: %v", err)
+		log.Fatalf("start mDNS: %v", err) //nolint:gocritic
 	}
 
 	if err := grpcServer.Start(ctx); err != nil {
