@@ -449,6 +449,92 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets('renders overlay primitive with layered children',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'alert_overlay'
+                ..overlay = (uiv1.OverlayWidget())
+                ..children.addAll([
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Base content'),
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Overlay content'),
+                ]),
+            ))),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey<String>('ui-overlay-alert_overlay')),
+      findsOneWidget,
+    );
+    expect(find.text('Base content'), findsOneWidget);
+    expect(find.text('Overlay content'), findsOneWidget);
+  });
+
+  testWidgets('wires gesture area tap to UIAction',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'gesture_tap_zone'
+                ..gestureArea = (uiv1.GestureAreaWidget()..action = 'announce')
+                ..children.add(
+                  uiv1.Node()..text = (uiv1.TextWidget()..value = 'Tap me'),
+                ),
+            ))),
+    );
+    await tester.pump();
+
+    final gesture = tester.widget<GestureDetector>(
+      find.byKey(const ValueKey<String>('ui-gesture-gesture_tap_zone')),
+    );
+    gesture.onTap?.call();
+    await tester.pump();
+
+    final actions = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasUiAction())
+        .map((request) => request.input.uiAction)
+        .toList();
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == 'gesture_tap_zone' &&
+            action.action == 'announce' &&
+            action.value.isEmpty,
+      ),
+      isTrue,
+    );
+  });
 }
 
 class _FakeClientHarness {

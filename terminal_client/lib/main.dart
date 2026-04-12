@@ -862,6 +862,36 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                   );
                 },
         );
+      case uiv1.Node_Widget.gestureArea:
+        final componentId = _nodeId(node);
+        final action = node.gestureArea.action.isNotEmpty
+            ? node.gestureArea.action
+            : 'tap';
+        final child = _renderNodeChildren(node.children);
+        return GestureDetector(
+          key: ValueKey<String>('ui-gesture-$componentId'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            unawaited(
+              _sendUiAction(
+                componentId:
+                    componentId.isNotEmpty ? componentId : 'gesture_area',
+                action: action,
+                value: '',
+              ),
+            );
+          },
+          child: node.children.isEmpty
+              ? const SizedBox(width: 48, height: 48)
+              : child,
+        );
+      case uiv1.Node_Widget.overlay:
+        final componentId = _nodeId(node);
+        return Stack(
+          key: ValueKey<String>('ui-overlay-$componentId'),
+          fit: StackFit.loose,
+          children: node.children.map(_renderNode).toList(),
+        );
       case uiv1.Node_Widget.image:
         return Image.network(
           node.image.url,
