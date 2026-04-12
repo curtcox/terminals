@@ -639,6 +639,11 @@ func (h *StreamHandler) NoteProtocolError() {
 	}
 }
 
+// HandleDisconnect releases stream-scoped resources for a disconnected device.
+func (h *StreamHandler) HandleDisconnect(deviceID string) {
+	h.terminateTerminalForDevice(deviceID)
+}
+
 func (h *StreamHandler) appendCommandEventLocked(ev CommandEvent) {
 	h.recent = append(h.recent, ev)
 	if len(h.recent) > h.recentLimit {

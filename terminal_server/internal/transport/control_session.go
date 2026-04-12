@@ -43,6 +43,7 @@ func (s *Session) Run(stream ControlStream) error {
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				if connectedDeviceID != "" {
+					s.handler.HandleDisconnect(connectedDeviceID)
 					_ = s.control.Disconnect(stream.Context(), connectedDeviceID)
 				}
 				return nil
@@ -115,6 +116,8 @@ func extractMessageDeviceID(in ClientMessage) (string, bool) {
 		return in.Heartbeat.DeviceID, true
 	case in.Command != nil:
 		return in.Command.DeviceID, true
+	case in.Input != nil:
+		return in.Input.DeviceID, true
 	default:
 		return "", false
 	}

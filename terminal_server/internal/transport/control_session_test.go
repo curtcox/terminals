@@ -259,3 +259,85 @@ func TestSessionRunRejectsDeviceIDMismatchButContinues(t *testing.T) {
 		t.Fatalf("expected protocol error metric increment")
 	}
 }
+
+func TestSessionRunRejectsInputDeviceIDMismatchButContinues(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(control)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}},
+			{Input: &InputRequest{
+				DeviceID:    "d2",
+				ComponentID: "terminal_input",
+				Action:      "submit",
+				Value:       "echo mismatch",
+			}},
+			{Heartbeat: &HeartbeatRequest{DeviceID: "d1"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	foundMismatchError := false
+	for _, sent := range stream.sent {
+		if sent.Error != "" {
+			foundMismatchError = true
+		}
+	}
+	if !foundMismatchError {
+		t.Fatalf("expected mismatch structured error")
+	}
+
+	got, ok := manager.Get("d1")
+	if !ok {
+		t.Fatalf("expected device d1")
+	}
+	if got.LastHeartbeat.IsZero() {
+		t.Fatalf("expected heartbeat to be processed after mismatch error")
+	}
+}
+
+func TestSessionRunDisconnectCleansTerminalSession(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        iorouter.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}},
+			{Command: &CommandRequest{
+				RequestID: "start-terminal",
+				DeviceID:  "d1",
+				Kind:      "manual",
+				Intent:    "terminal",
+			}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(handler.terminals.List()) != 0 {
+		t.Fatalf("expected terminal sessions to be cleaned up on disconnect")
+	}
+	if _, exists := handler.terminalByDevice["d1"]; exists {
+		t.Fatalf("expected terminalByDevice entry removed on disconnect")
+	}
+}

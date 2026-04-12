@@ -3,6 +3,7 @@ package transport
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
@@ -213,7 +214,75 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		out["device_type"] = identity.GetDeviceType()
 		out["platform"] = identity.GetPlatform()
 	}
+	if screen := caps.GetScreen(); screen != nil {
+		out["screen.width"] = strconv.FormatInt(int64(screen.GetWidth()), 10)
+		out["screen.height"] = strconv.FormatInt(int64(screen.GetHeight()), 10)
+		out["screen.density"] = strconv.FormatFloat(screen.GetDensity(), 'f', -1, 64)
+		out["screen.touch"] = strconv.FormatBool(screen.GetTouch())
+	}
+	if keyboard := caps.GetKeyboard(); keyboard != nil {
+		out["keyboard.physical"] = strconv.FormatBool(keyboard.GetPhysical())
+		out["keyboard.layout"] = keyboard.GetLayout()
+	}
+	if pointer := caps.GetPointer(); pointer != nil {
+		out["pointer.type"] = pointer.GetType()
+		out["pointer.hover"] = strconv.FormatBool(pointer.GetHover())
+	}
+	if touch := caps.GetTouch(); touch != nil {
+		out["touch.supported"] = strconv.FormatBool(touch.GetSupported())
+		out["touch.max_points"] = strconv.FormatInt(int64(touch.GetMaxPoints()), 10)
+	}
+	if speakers := caps.GetSpeakers(); speakers != nil {
+		out["speakers.channels"] = strconv.FormatInt(int64(speakers.GetChannels()), 10)
+		out["speakers.sample_rates"] = joinInts(speakers.GetSampleRates())
+	}
+	if mic := caps.GetMicrophone(); mic != nil {
+		out["microphone.channels"] = strconv.FormatInt(int64(mic.GetChannels()), 10)
+		out["microphone.sample_rates"] = joinInts(mic.GetSampleRates())
+	}
+	if camera := caps.GetCamera(); camera != nil {
+		if front := camera.GetFront(); front != nil {
+			out["camera.front.width"] = strconv.FormatInt(int64(front.GetWidth()), 10)
+			out["camera.front.height"] = strconv.FormatInt(int64(front.GetHeight()), 10)
+			out["camera.front.fps"] = strconv.FormatInt(int64(front.GetFps()), 10)
+		}
+		if back := camera.GetBack(); back != nil {
+			out["camera.back.width"] = strconv.FormatInt(int64(back.GetWidth()), 10)
+			out["camera.back.height"] = strconv.FormatInt(int64(back.GetHeight()), 10)
+			out["camera.back.fps"] = strconv.FormatInt(int64(back.GetFps()), 10)
+		}
+	}
+	if sensors := caps.GetSensors(); sensors != nil {
+		out["sensors.accelerometer"] = strconv.FormatBool(sensors.GetAccelerometer())
+		out["sensors.gyroscope"] = strconv.FormatBool(sensors.GetGyroscope())
+		out["sensors.compass"] = strconv.FormatBool(sensors.GetCompass())
+		out["sensors.ambient_light"] = strconv.FormatBool(sensors.GetAmbientLight())
+		out["sensors.proximity"] = strconv.FormatBool(sensors.GetProximity())
+		out["sensors.gps"] = strconv.FormatBool(sensors.GetGps())
+	}
+	if connectivity := caps.GetConnectivity(); connectivity != nil {
+		out["connectivity.bluetooth_version"] = connectivity.GetBluetoothVersion()
+		out["connectivity.wifi_signal_strength"] = strconv.FormatBool(connectivity.GetWifiSignalStrength())
+		out["connectivity.usb_host"] = strconv.FormatBool(connectivity.GetUsbHost())
+		out["connectivity.usb_ports"] = strconv.FormatInt(int64(connectivity.GetUsbPorts()), 10)
+		out["connectivity.nfc"] = strconv.FormatBool(connectivity.GetNfc())
+	}
+	if battery := caps.GetBattery(); battery != nil {
+		out["battery.level"] = strconv.FormatFloat(float64(battery.GetLevel()), 'f', -1, 32)
+		out["battery.charging"] = strconv.FormatBool(battery.GetCharging())
+	}
 	return out
+}
+
+func joinInts(values []int32) string {
+	if len(values) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(values))
+	for _, v := range values {
+		parts = append(parts, strconv.FormatInt(int64(v), 10))
+	}
+	return strings.Join(parts, ",")
 }
 
 func descriptorToUINode(d ui.Descriptor) *uiv1.Node {

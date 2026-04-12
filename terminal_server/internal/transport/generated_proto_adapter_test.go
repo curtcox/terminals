@@ -21,6 +21,16 @@ func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
 						DeviceType: "tablet",
 						Platform:   "android",
 					},
+					Screen: &capabilitiesv1.ScreenCapability{
+						Width:   1920,
+						Height:  1080,
+						Density: 2.0,
+						Touch:   true,
+					},
+					Speakers: &capabilitiesv1.AudioOutputCapability{
+						Channels:    2,
+						SampleRates: []int32{44100, 48000},
+					},
 				},
 			},
 		},
@@ -39,6 +49,15 @@ func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
 	}
 	if msg.Register.Capabilities["platform"] != "android" {
 		t.Fatalf("platform capability = %q, want %q", msg.Register.Capabilities["platform"], "android")
+	}
+	if msg.Register.Capabilities["screen.width"] != "1920" {
+		t.Fatalf("screen.width capability = %q, want 1920", msg.Register.Capabilities["screen.width"])
+	}
+	if msg.Register.Capabilities["speakers.sample_rates"] != "44100,48000" {
+		t.Fatalf(
+			"speakers.sample_rates capability = %q, want 44100,48000",
+			msg.Register.Capabilities["speakers.sample_rates"],
+		)
 	}
 }
 
