@@ -67,8 +67,10 @@ func (r *Runtime) StopVoiceText(ctx context.Context, sourceID, spoken string, no
 // StatusData returns runtime-focused counters for control-plane system queries.
 func (r *Runtime) StatusData() map[string]string {
 	activeScenarios := 0
+	registeredScenarios := 0
 	if r != nil && r.Engine != nil {
 		activeScenarios = len(r.Engine.ActiveSnapshot())
+		registeredScenarios = len(r.Engine.RegistrySnapshot())
 	}
 
 	activeRoutes := 0
@@ -77,8 +79,9 @@ func (r *Runtime) StatusData() map[string]string {
 	}
 
 	return map[string]string{
-		"active_scenarios": strconv.Itoa(activeScenarios),
-		"active_routes":    strconv.Itoa(activeRoutes),
+		"active_scenarios":     strconv.Itoa(activeScenarios),
+		"active_routes":        strconv.Itoa(activeRoutes),
+		"registered_scenarios": strconv.Itoa(registeredScenarios),
 	}
 }
 

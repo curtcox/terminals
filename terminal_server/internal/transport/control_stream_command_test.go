@@ -406,6 +406,41 @@ func TestHandleMessageSystemRuntimeStatus(t *testing.T) {
 	if out[0].Data["active_routes"] != "1" {
 		t.Fatalf("active_routes = %q, want 1", out[0].Data["active_routes"])
 	}
+	if out[0].Data["registered_scenarios"] == "" {
+		t.Fatalf("expected registered_scenarios in runtime_status")
+	}
+}
+
+func TestHandleMessageSystemScenarioRegistry(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+		IO:      io.NewRouter(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-registry-1",
+			Kind:      "system",
+			Intent:    "scenario_registry",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system scenario_registry error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].Data["red_alert"] == "" {
+		t.Fatalf("expected red_alert in registry data")
+	}
 }
 
 func TestHandleMessageSystemTransportMetrics(t *testing.T) {

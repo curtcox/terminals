@@ -155,4 +155,7 @@ func TestRuntimeStatusData(t *testing.T) {
 	if status["active_routes"] != "1" {
 		t.Fatalf("active_routes = %q, want 1", status["active_routes"])
 	}
+	if status["registered_scenarios"] != "1" {
+		t.Fatalf("registered_scenarios = %q, want 1", status["registered_scenarios"])
+	}
 }

@@ -244,7 +244,7 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		return ServerMessage{
 			Notification: "System query: system_help",
 			Data: map[string]string{
-				"system_intents":  "server_status,runtime_status,transport_metrics,list_devices,active_scenarios,device_status <device_id>,system_help",
+				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,device_status <device_id>,system_help",
 				"command_kinds":   "voice,manual,system",
 				"command_actions": "start,stop",
 			},
@@ -263,6 +263,17 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		}
 		return ServerMessage{
 			Notification: "System query: runtime_status",
+			Data:         data,
+		}, nil
+	case "scenario_registry":
+		data := map[string]string{}
+		if h.runtime != nil && h.runtime.Engine != nil {
+			for _, item := range h.runtime.Engine.RegistrySnapshot() {
+				data[item.Name] = fmt.Sprintf("priority=%d", item.Priority)
+			}
+		}
+		return ServerMessage{
+			Notification: "System query: scenario_registry",
 			Data:         data,
 		}, nil
 	case "transport_metrics":

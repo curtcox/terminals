@@ -98,3 +98,20 @@ func TestActiveSnapshot(t *testing.T) {
 		t.Fatalf("snapshot should be copied")
 	}
 }
+
+func TestRegistrySnapshot(t *testing.T) {
+	e := NewEngine()
+	e.Register(Registration{Scenario: &stubScenario{name: "b", match: false}, Priority: PriorityLow})
+	e.Register(Registration{Scenario: &stubScenario{name: "a", match: false}, Priority: PriorityHigh})
+
+	reg := e.RegistrySnapshot()
+	if len(reg) != 2 {
+		t.Fatalf("len(RegistrySnapshot()) = %d, want 2", len(reg))
+	}
+	if reg[0].Name != "a" || reg[1].Name != "b" {
+		t.Fatalf("unexpected registry ordering: %+v", reg)
+	}
+	if reg[0].Priority != PriorityHigh {
+		t.Fatalf("reg[0].Priority = %d, want %d", reg[0].Priority, PriorityHigh)
+	}
+}

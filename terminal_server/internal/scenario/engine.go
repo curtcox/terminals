@@ -29,6 +29,12 @@ type Registration struct {
 	Priority Priority
 }
 
+// RegistrationInfo is a stable snapshot of a registered scenario.
+type RegistrationInfo struct {
+	Name     string
+	Priority Priority
+}
+
 type activeScenario struct {
 	name     string
 	priority Priority
@@ -154,5 +160,23 @@ func (e *Engine) ActiveSnapshot() map[string]string {
 	for deviceID, active := range e.activeByDev {
 		out[deviceID] = active.name
 	}
+	return out
+}
+
+// RegistrySnapshot returns all registered scenarios sorted by name.
+func (e *Engine) RegistrySnapshot() []RegistrationInfo {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	out := make([]RegistrationInfo, 0, len(e.registry))
+	for name, reg := range e.registry {
+		out = append(out, RegistrationInfo{
+			Name:     name,
+			Priority: reg.Priority,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Name < out[j].Name
+	})
 	return out
 }
