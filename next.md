@@ -1,1 +1,1 @@
-Render `TransitionUI` hints as real animated UI transitions in Flutter (not just status text) and cover with widget tests.
+Implement Flutter rendering + tests for interactive UI primitives (`slider`, `toggle`, `dropdown`) and wire `UIAction` events for each.

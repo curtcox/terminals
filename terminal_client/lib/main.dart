@@ -100,6 +100,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   int _responses = 0;
   final String _deviceId = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
   uiv1.Node? _activeRoot;
+  int _activeRootRevision = 0;
+  String _activeTransition = 'none';
+  Duration _activeTransitionDuration = Duration.zero;
   String _lastNotification = '';
   final TextEditingController _terminalInputController =
       TextEditingController();
@@ -162,19 +165,31 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             if (responseStatus.isNotEmpty) {
               _status = responseStatus;
             }
+            var nextRoot = _activeRoot;
+            var uiChanged = false;
             if (response.hasSetUi() && response.setUi.hasRoot()) {
-              _activeRoot = response.setUi.root.deepCopy();
+              nextRoot = response.setUi.root.deepCopy();
+              uiChanged = true;
             }
             if (response.hasUpdateUi()) {
-              _activeRoot = _applyUpdateUi(
-                currentRoot: _activeRoot,
+              final updatedRoot = _applyUpdateUi(
+                currentRoot: nextRoot,
                 update: response.updateUi,
               );
+              if (!identical(updatedRoot, nextRoot)) {
+                uiChanged = true;
+              }
+              nextRoot = updatedRoot;
             }
             if (response.hasTransitionUi()) {
-              final transition = response.transitionUi.transition;
-              final durationMs = response.transitionUi.durationMs;
-              _lastNotification = 'Transition: $transition (${durationMs}ms)';
+              _applyTransitionHint(response.transitionUi);
+              if (nextRoot != null) {
+                uiChanged = true;
+              }
+            }
+            _activeRoot = nextRoot;
+            if (uiChanged) {
+              _activeRootRevision += 1;
             }
             if (response.hasNotification()) {
               _lastNotification = response.notification.body;
@@ -494,7 +509,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 320,
-                  child: _renderNode(_activeRoot!),
+                  child: AnimatedSwitcher(
+                    duration: _activeTransitionDuration,
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: _buildTransition,
+                    child: KeyedSubtree(
+                      key: ValueKey<int>(_activeRootRevision),
+                      child: _renderNode(_activeRoot!),
+                    ),
+                  ),
                 ),
               ],
             ],
@@ -524,6 +548,72 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       return 'UI updated';
     }
     return 'Connected';
+  }
+
+  void _applyTransitionHint(uiv1.TransitionUI transitionUi) {
+    final transition = transitionUi.transition.trim().toLowerCase();
+    final hasTransition = transition.isNotEmpty && transition != 'none';
+    final defaultDuration = hasTransition ? 250 : 0;
+    final durationMs =
+        transitionUi.durationMs > 0 ? transitionUi.durationMs : defaultDuration;
+    _activeTransition = transition;
+    _activeTransitionDuration = Duration(milliseconds: durationMs);
+    _lastNotification =
+        'Transition: ${transitionUi.transition} (${transitionUi.durationMs}ms)';
+  }
+
+  Widget _buildTransition(Widget child, Animation<double> animation) {
+    switch (_activeTransition) {
+      case 'fade':
+        return FadeTransition(opacity: animation, child: child);
+      case 'scale':
+        return ScaleTransition(scale: animation, child: child);
+      case 'slide':
+      case 'slide_left':
+      case 'slide-left':
+        return _buildSlideTransition(
+          child: child,
+          animation: animation,
+          beginOffset: const Offset(0.15, 0),
+        );
+      case 'slide_right':
+      case 'slide-right':
+        return _buildSlideTransition(
+          child: child,
+          animation: animation,
+          beginOffset: const Offset(-0.15, 0),
+        );
+      case 'slide_up':
+      case 'slide-up':
+        return _buildSlideTransition(
+          child: child,
+          animation: animation,
+          beginOffset: const Offset(0, 0.15),
+        );
+      case 'slide_down':
+      case 'slide-down':
+        return _buildSlideTransition(
+          child: child,
+          animation: animation,
+          beginOffset: const Offset(0, -0.15),
+        );
+      default:
+        return child;
+    }
+  }
+
+  Widget _buildSlideTransition({
+    required Widget child,
+    required Animation<double> animation,
+    required Offset beginOffset,
+  }) {
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: beginOffset,
+        end: Offset.zero,
+      ).animate(animation),
+      child: child,
+    );
   }
 
   uiv1.Node? _applyUpdateUi({
@@ -617,6 +707,31 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         );
       case uiv1.Node_Widget.row:
         return Row(children: node.children.map(_renderNode).toList());
+      case uiv1.Node_Widget.grid:
+        final columns = node.grid.columns > 0 ? node.grid.columns : 1;
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 8.0;
+            final maxWidth = constraints.maxWidth.isFinite
+                ? constraints.maxWidth
+                : MediaQuery.of(context).size.width;
+            final totalSpacing = spacing * (columns - 1);
+            final itemWidth =
+                columns <= 1 ? maxWidth : (maxWidth - totalSpacing) / columns;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: node.children
+                  .map(
+                    (child) => SizedBox(
+                      width: itemWidth,
+                      child: _renderNode(child),
+                    ),
+                  )
+                  .toList(),
+            );
+          },
+        );
       case uiv1.Node_Widget.scroll:
         return SingleChildScrollView(
           child: Column(
@@ -624,6 +739,15 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             children: node.children.map(_renderNode).toList(),
           ),
         );
+      case uiv1.Node_Widget.padding:
+        return Padding(
+          padding: EdgeInsets.all(node.padding.all.toDouble()),
+          child: _renderNodeChildren(node.children),
+        );
+      case uiv1.Node_Widget.center:
+        return Center(child: _renderNodeChildren(node.children));
+      case uiv1.Node_Widget.expand:
+        return Expanded(child: _renderNodeChildren(node.children));
       case uiv1.Node_Widget.text:
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -671,18 +795,37 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             child: Text(node.button.label),
           ),
         );
+      case uiv1.Node_Widget.image:
+        return Image.network(
+          node.image.url,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return const Icon(Icons.broken_image_outlined);
+          },
+        );
+      case uiv1.Node_Widget.progress:
+        return LinearProgressIndicator(
+          value: node.progress.value.clamp(0.0, 1.0).toDouble(),
+        );
       case uiv1.Node_Widget.notSet:
         break;
       default:
-        if (node.children.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: node.children.map(_renderNode).toList(),
-        );
+        return _renderNodeChildren(node.children);
     }
     return const SizedBox.shrink();
+  }
+
+  Widget _renderNodeChildren(List<uiv1.Node> children) {
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    if (children.length == 1) {
+      return _renderNode(children.first);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children.map(_renderNode).toList(),
+    );
   }
 
   Color? _parseHexColor(String? raw) {

@@ -180,15 +180,191 @@ void main() {
 
     harness.lastClient.emitResponse(
       ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'message'
+                ..text = (uiv1.TextWidget()..value = 'Before transition'),
+            ))),
+    );
+    await tester.pump();
+    expect(find.text('Before transition'), findsOneWidget);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
         ..transitionUi = (uiv1.TransitionUI()
           ..transition = 'fade'
           ..durationMs = 220),
     );
     await tester.pump();
 
+    expect(find.byType(FadeTransition), findsWidgets);
     expect(
         find.textContaining('Control Stream: UI transition'), findsOneWidget);
     expect(find.textContaining('Transition: fade (220ms)'), findsOneWidget);
+  });
+
+  testWidgets('uses slide transition hint for UI updates', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'message'
+                ..text = (uiv1.TextWidget()..value = 'Before'),
+            ))),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'slide_left'
+          ..durationMs = 200),
+    );
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'message'
+          ..node = (uiv1.Node()
+            ..id = 'message'
+            ..text = (uiv1.TextWidget()..value = 'After'))),
+    );
+    await tester.pump();
+
+    expect(find.byType(SlideTransition), findsWidgets);
+    expect(find.text('After'), findsOneWidget);
+  });
+
+  testWidgets('renders grid, padding, and progress primitives',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.addAll([
+              uiv1.Node()
+                ..padding = (uiv1.PaddingWidget()..all = 16)
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Padded child'),
+                ),
+              uiv1.Node()
+                ..center = (uiv1.CenterWidget())
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Centered child'),
+                ),
+              uiv1.Node()
+                ..grid = (uiv1.GridWidget()..columns = 2)
+                ..children.addAll([
+                  uiv1.Node()..text = (uiv1.TextWidget()..value = 'Cell A'),
+                  uiv1.Node()..text = (uiv1.TextWidget()..value = 'Cell B'),
+                ]),
+              uiv1.Node()..progress = (uiv1.ProgressWidget()..value = 0.4),
+            ]))),
+    );
+    await tester.pump();
+
+    expect(find.byType(Wrap), findsWidgets);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Padding && widget.padding == const EdgeInsets.all(16),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Cell A'), findsOneWidget);
+    expect(find.text('Cell B'), findsOneWidget);
+    expect(find.text('Centered child'), findsOneWidget);
+  });
+
+  testWidgets('renders expand primitive as Expanded widget',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..expand = (uiv1.ExpandWidget())
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Expanded child'),
+                ),
+            ))),
+    );
+    await tester.pump();
+
+    expect(find.byType(Expanded), findsOneWidget);
+    expect(find.text('Expanded child'), findsOneWidget);
+  });
+
+  testWidgets('renders image primitive as Image widget',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..image = (uiv1.ImageWidget()
+                  ..url = 'https://example.com/camera.jpg'),
+            ))),
+    );
+    await tester.pump();
+
+    expect(find.byType(Image), findsOneWidget);
   });
 }
 
