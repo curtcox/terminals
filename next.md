@@ -1,1 +1,1 @@
-Handle `UIAction` events for interactive controls (`change`, `toggle`, `select`) in the server terminal scenario path and add transport/scenario tests.
+Handle button/gesture UIAction routing in the server control stream (for active scenarios) and add transport tests.

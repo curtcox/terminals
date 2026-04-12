@@ -227,6 +227,144 @@ func TestHandleMessageInputTerminal(t *testing.T) {
 	}
 }
 
+func TestHandleMessageInputTerminalChangeUsesDraftOnSubmit(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-input-start-change",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	changeOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "change",
+			Value:       "echo from-change-draft",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(change) error = %v", err)
+	}
+	if len(changeOut) != 0 {
+		t.Fatalf("len(changeOut) = %d, want 0", len(changeOut))
+	}
+
+	submitOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(submit) error = %v", err)
+	}
+	if len(submitOut) != 1 {
+		t.Fatalf("len(submitOut) = %d, want 1", len(submitOut))
+	}
+	if submitOut[0].UpdateUI == nil {
+		t.Fatalf("expected UpdateUI response for terminal submit")
+	}
+	if !strings.Contains(submitOut[0].UpdateUI.Node.Props["value"], "from-change-draft") {
+		t.Fatalf("terminal output patch did not include draft command marker: %+v", submitOut[0].UpdateUI.Node.Props)
+	}
+}
+
+func TestHandleMessageInputTerminalInteractiveActions(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-input-start-interactive",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	firstOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "music_toggle",
+			Action:      "toggle",
+			Value:       "true",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(toggle) error = %v", err)
+	}
+	if len(firstOut) != 1 || firstOut[0].UpdateUI == nil {
+		t.Fatalf("expected one UpdateUI response for toggle, got %+v", firstOut)
+	}
+	if !strings.Contains(firstOut[0].UpdateUI.Node.Props["value"], "[ui_action] music_toggle toggle = true") {
+		t.Fatalf("missing toggle action in output: %+v", firstOut[0].UpdateUI.Node.Props)
+	}
+
+	secondOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "camera_source",
+			Action:      "select",
+			Value:       "front-door",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(select) error = %v", err)
+	}
+	if len(secondOut) != 1 || secondOut[0].UpdateUI == nil {
+		t.Fatalf("expected one UpdateUI response for select, got %+v", secondOut)
+	}
+	output := secondOut[0].UpdateUI.Node.Props["value"]
+	if !strings.Contains(output, "[ui_action] music_toggle toggle = true") {
+		t.Fatalf("expected accumulated output to include prior toggle action: %+v", secondOut[0].UpdateUI.Node.Props)
+	}
+	if !strings.Contains(output, "[ui_action] camera_source select = front-door") {
+		t.Fatalf("missing select action in output: %+v", secondOut[0].UpdateUI.Node.Props)
+	}
+}
+
 func TestHandleMessageTerminalSessionLifecycle(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

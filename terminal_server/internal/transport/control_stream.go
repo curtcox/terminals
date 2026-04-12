@@ -113,6 +113,7 @@ type StreamHandler struct {
 	terminals              *terminal.Manager
 	terminalByDevice       map[string]string
 	terminalOutputByDevice map[string]string
+	terminalDraftByDevice  map[string]string
 }
 
 // CommandEvent is a bounded audit record of command handling.
@@ -138,6 +139,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminals:              terminal.NewManager(),
 		terminalByDevice:       map[string]string{},
 		terminalOutputByDevice: map[string]string{},
+		terminalDraftByDevice:  map[string]string{},
 	}
 }
 
@@ -154,6 +156,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminals:              terminal.NewManager(),
 		terminalByDevice:       map[string]string{},
 		terminalOutputByDevice: map[string]string{},
+		terminalDraftByDevice:  map[string]string{},
 	}
 }
 
@@ -339,6 +342,7 @@ func (h *StreamHandler) terminateTerminalForDevice(deviceID string) {
 	sessionID := h.terminalByDevice[deviceID]
 	delete(h.terminalByDevice, deviceID)
 	delete(h.terminalOutputByDevice, deviceID)
+	delete(h.terminalDraftByDevice, deviceID)
 	h.mu.Unlock()
 	if sessionID != "" {
 		_ = h.terminals.Close(sessionID)
@@ -361,7 +365,34 @@ func (h *StreamHandler) handleInput(_ context.Context, in *InputRequest) ([]Serv
 		return nil, nil
 	}
 
+	action := strings.ToLower(strings.TrimSpace(in.Action))
+	componentID := strings.TrimSpace(in.ComponentID)
+
+	switch action {
+	case "change":
+		if componentID == "terminal_input" {
+			h.mu.Lock()
+			h.terminalDraftByDevice[deviceID] = in.Value
+			h.mu.Unlock()
+			return nil, nil
+		}
+		if update, ok := h.renderTerminalUIAction(deviceID, componentID, action, in.Value); ok {
+			return []ServerMessage{{UpdateUI: update}}, nil
+		}
+		return nil, nil
+	case "toggle", "select":
+		if update, ok := h.renderTerminalUIAction(deviceID, componentID, action, in.Value); ok {
+			return []ServerMessage{{UpdateUI: update}}, nil
+		}
+		return nil, nil
+	}
+
 	text := strings.TrimSpace(in.Value)
+	if text == "" && componentID == "terminal_input" {
+		h.mu.Lock()
+		text = strings.TrimSpace(h.terminalDraftByDevice[deviceID])
+		h.mu.Unlock()
+	}
 	if text == "" {
 		text = in.KeyText
 	}
@@ -374,6 +405,11 @@ func (h *StreamHandler) handleInput(_ context.Context, in *InputRequest) ([]Serv
 	if err := h.terminals.Write(sessionID, []byte(text)); err != nil {
 		return nil, err
 	}
+	if componentID == "terminal_input" {
+		h.mu.Lock()
+		h.terminalDraftByDevice[deviceID] = ""
+		h.mu.Unlock()
+	}
 
 	combinedOutput := h.readTerminalOutput(deviceID, sessionID)
 	return []ServerMessage{{
@@ -382,6 +418,27 @@ func (h *StreamHandler) handleInput(_ context.Context, in *InputRequest) ([]Serv
 			Node:        ui.TerminalOutputPatch(combinedOutput),
 		},
 	}}, nil
+}
+
+func (h *StreamHandler) renderTerminalUIAction(deviceID, componentID, action, value string) (*UIUpdate, bool) {
+	if strings.TrimSpace(componentID) == "" {
+		return nil, false
+	}
+	line := fmt.Sprintf("[ui_action] %s %s = %s\n", componentID, action, value)
+
+	h.mu.Lock()
+	existing := h.terminalOutputByDevice[deviceID]
+	existing += line
+	if len(existing) > 12000 {
+		existing = existing[len(existing)-12000:]
+	}
+	h.terminalOutputByDevice[deviceID] = existing
+	h.mu.Unlock()
+
+	return &UIUpdate{
+		ComponentID: "terminal_output",
+		Node:        ui.TerminalOutputPatch(existing),
+	}, true
 }
 
 func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {

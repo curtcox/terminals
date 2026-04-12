@@ -128,6 +128,47 @@ func TestRuntimeStopTrigger(t *testing.T) {
 	}
 }
 
+func TestRuntimeHandleVoiceTerminalTargetsSourceDevice(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: &TerminalScenario{},
+		Priority: PriorityNormal,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+	})
+
+	name, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"open terminal",
+		time.Date(2026, 4, 12, 0, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("HandleVoiceText() error = %v", err)
+	}
+	if name != "terminal" {
+		t.Fatalf("scenario name = %q, want terminal", name)
+	}
+
+	events := broadcaster.Events()
+	if len(events) != 1 {
+		t.Fatalf("len(events) = %d, want 1", len(events))
+	}
+	if events[0].Message != "Terminal active" {
+		t.Fatalf("event message = %q, want Terminal active", events[0].Message)
+	}
+	if len(events[0].DeviceIDs) != 1 || events[0].DeviceIDs[0] != "d1" {
+		t.Fatalf("event device IDs = %+v, want [d1]", events[0].DeviceIDs)
+	}
+}
+
 func TestRuntimeStatusData(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
