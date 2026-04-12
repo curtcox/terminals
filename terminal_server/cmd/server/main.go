@@ -6,12 +6,16 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/curtcox/terminals/terminal_server/internal/ai"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
+	"github.com/curtcox/terminals/terminal_server/internal/storage"
+	"github.com/curtcox/terminals/terminal_server/internal/telephony"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
+	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
 func main() {
@@ -27,6 +31,20 @@ func main() {
 	ioRouter := io.NewRouter()
 	scenarioEngine := scenario.NewEngine()
 	controlService := transport.NewControlService(cfg.MDNSName, deviceManager)
+	store := storage.NewMemoryStore()
+	scheduler := storage.NewMemoryScheduler()
+	broadcaster := ui.NewMemoryBroadcaster()
+	environment := &scenario.Environment{
+		Devices:   deviceManager,
+		IO:        ioRouter,
+		AI:        ai.NoopBackend{},
+		Telephony: telephony.NoopBridge{},
+		Storage:   store,
+		Scheduler: scheduler,
+		Broadcast: broadcaster,
+	}
+	scenario.RegisterBuiltins(scenarioEngine)
+	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
 	grpcServer := transport.NewServer(cfg.GRPCAddress())
 	mdns := discovery.NoopAdvertiser{}
 
@@ -55,8 +73,13 @@ func main() {
 	if _, ok := scenarioEngine.Active("bootstrap"); ok {
 		log.Fatalf("unexpected initial scenario state")
 	}
+	if len(scheduler.List()) != 0 {
+		log.Fatalf("unexpected initial scheduler state")
+	}
 	log.Printf("control service ready for server id %q", cfg.MDNSName)
+	log.Printf("scenario runtime initialized with %d builtin scenarios", 2)
 	_ = controlService
+	_ = scenarioRuntime
 
 	<-ctx.Done()
 	log.Println("terminal server shutting down")
