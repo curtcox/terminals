@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
+
+	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
 
 var (
@@ -16,8 +18,8 @@ type Server struct {
 	addr    string
 	running atomic.Bool
 	control *ControlService
-	handler *StreamHandler
 	adapter ProtoAdapter
+	runtime *scenario.Runtime
 }
 
 // NewServer returns a lifecycle-managed transport server placeholder.
@@ -50,14 +52,19 @@ func (s *Server) Running() bool {
 // ConfigureControl wires the control dependencies needed by Connect.
 func (s *Server) ConfigureControl(control *ControlService, adapter ProtoAdapter) {
 	s.control = control
-	s.handler = NewStreamHandler(control)
 	s.adapter = adapter
+}
+
+// ConfigureRuntime wires scenario runtime support for command handling.
+func (s *Server) ConfigureRuntime(runtime *scenario.Runtime) {
+	s.runtime = runtime
 }
 
 // Connect handles a single bidirectional control stream session.
 func (s *Server) Connect(stream ProtoStream) error {
-	if s.control == nil || s.handler == nil || s.adapter == nil {
+	if s.control == nil || s.adapter == nil {
 		return ErrControlNotConfigured
 	}
-	return RunProtoSession(s.handler, s.control, stream, s.adapter)
+	handler := NewStreamHandlerWithRuntime(s.control, s.runtime)
+	return RunProtoSession(handler, s.control, stream, s.adapter)
 }
