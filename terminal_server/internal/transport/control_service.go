@@ -64,3 +64,8 @@ func (s *ControlService) Register(_ context.Context, req RegisterRequest) (Regis
 func (s *ControlService) Heartbeat(_ context.Context, deviceID string) error {
 	return s.devices.Heartbeat(deviceID, s.now().UTC())
 }
+
+// UpdateCapabilities replaces capabilities for a registered device.
+func (s *ControlService) UpdateCapabilities(_ context.Context, deviceID string, caps map[string]string) error {
+	return s.devices.UpdateCapabilities(deviceID, caps)
+}
