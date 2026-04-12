@@ -5,8 +5,18 @@ import 'package:grpc/grpc.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 
+/// Transport contract used by the app for control-stream lifecycle.
+abstract class TerminalControlClient {
+  Stream<ConnectResponse> connect(
+    Stream<ConnectRequest> requests, {
+    CallOptions? options,
+  });
+
+  Future<void> shutdown();
+}
+
 /// Thin gRPC client wrapper around TerminalControlService.Connect.
-class TerminalControlGrpcClient {
+class TerminalControlGrpcClient implements TerminalControlClient {
   TerminalControlGrpcClient({
     required this.host,
     required this.port,
@@ -25,6 +35,7 @@ class TerminalControlGrpcClient {
       _TerminalControlServiceClient(_channel);
 
   /// Starts the bidirectional control stream.
+  @override
   ResponseStream<ConnectResponse> connect(
     Stream<ConnectRequest> requests, {
     CallOptions? options,
@@ -33,6 +44,7 @@ class TerminalControlGrpcClient {
   }
 
   /// Gracefully closes the underlying channel.
+  @override
   Future<void> shutdown() => _channel.shutdown();
 
   /// Builds a canonical register message for session bootstrap.

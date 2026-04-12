@@ -8,34 +8,73 @@ import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 
+typedef TerminalControlClientFactory = TerminalControlClient Function({
+  required String host,
+  required int port,
+});
+
+Duration calculateReconnectDelay({
+  required int reconnectAttempt,
+  required Duration reconnectDelayBase,
+  required int reconnectDelayMaxSeconds,
+}) {
+  final scaledMs = reconnectDelayBase.inMilliseconds *
+      math.pow(2, reconnectAttempt - 1).toInt();
+  final maxMs = reconnectDelayMaxSeconds * 1000;
+  final delayMs = math.min(maxMs, math.max(1, scaledMs));
+  return Duration(milliseconds: delayMs);
+}
+
 void main() {
   runApp(const TerminalClientApp());
 }
 
 class TerminalClientApp extends StatelessWidget {
-  const TerminalClientApp({super.key});
+  const TerminalClientApp({
+    super.key,
+    this.clientFactory = TerminalControlGrpcClient.new,
+    this.heartbeatInterval = const Duration(seconds: 10),
+    this.reconnectDelayBase = const Duration(seconds: 2),
+    this.reconnectDelayMaxSeconds = 30,
+  });
+
+  final TerminalControlClientFactory clientFactory;
+  final Duration heartbeatInterval;
+  final Duration reconnectDelayBase;
+  final int reconnectDelayMaxSeconds;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Terminal Client',
-      home: const _ControlStreamScaffold(),
+      home: _ControlStreamScaffold(
+        clientFactory: clientFactory,
+        heartbeatInterval: heartbeatInterval,
+        reconnectDelayBase: reconnectDelayBase,
+        reconnectDelayMaxSeconds: reconnectDelayMaxSeconds,
+      ),
     );
   }
 }
 
 class _ControlStreamScaffold extends StatefulWidget {
-  const _ControlStreamScaffold();
+  const _ControlStreamScaffold({
+    required this.clientFactory,
+    required this.heartbeatInterval,
+    required this.reconnectDelayBase,
+    required this.reconnectDelayMaxSeconds,
+  });
+
+  final TerminalControlClientFactory clientFactory;
+  final Duration heartbeatInterval;
+  final Duration reconnectDelayBase;
+  final int reconnectDelayMaxSeconds;
 
   @override
   State<_ControlStreamScaffold> createState() => _ControlStreamScaffoldState();
 }
 
 class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
-  static const Duration _heartbeatInterval = Duration(seconds: 10);
-  static const Duration _reconnectDelayBase = Duration(seconds: 2);
-  static const int _reconnectDelayMaxSeconds = 30;
-
   final TextEditingController _hostController = TextEditingController(
     text: '127.0.0.1',
   );
@@ -52,7 +91,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     text: 'flutter',
   );
   final MdnsScanner _mdnsScanner = MdnsScanner();
-  TerminalControlGrpcClient? _client;
+  TerminalControlClient? _client;
   final StreamController<ConnectRequest> _outgoing =
       StreamController<ConnectRequest>();
 
@@ -108,7 +147,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       if (existingClient != null) {
         await existingClient.shutdown();
       }
-      _client = TerminalControlGrpcClient(host: host, port: port);
+      _client = widget.clientFactory(host: host, port: port);
 
       final stream = _client!.connect(_outgoing.stream);
       _incoming = stream.listen(
@@ -136,10 +175,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           });
         },
         onError: (Object error) {
-          _handleStreamClosed('Stream error: $error');
+          unawaited(_handleStreamClosed('Stream error: $error'));
         },
         onDone: () {
-          _handleStreamClosed('Disconnected');
+          unawaited(_handleStreamClosed('Disconnected'));
         },
       );
 
@@ -163,7 +202,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         ),
       );
     } catch (error) {
-      _handleStreamClosed('Connection error: $error');
+      await _handleStreamClosed('Connection error: $error');
     } finally {
       _isConnecting = false;
     }
@@ -171,7 +210,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
 
   void _startHeartbeatLoop() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+    _heartbeatTimer = Timer.periodic(widget.heartbeatInterval, (_) {
       if (!_shouldStayConnected || _deviceId.isEmpty) {
         return;
       }
@@ -194,13 +233,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _reconnectTimer = null;
   }
 
-  void _handleStreamClosed(String status) {
+  Future<void> _handleStreamClosed(String status) async {
     _stopHeartbeatLoop();
     _incoming = null;
     final existingClient = _client;
     _client = null;
     if (existingClient != null) {
-      unawaited(existingClient.shutdown());
+      await existingClient.shutdown();
     }
     if (mounted) {
       setState(() {
@@ -211,24 +250,33 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   }
 
   void _scheduleReconnect() {
-    if (!_shouldStayConnected || _isConnecting) {
+    if (!_shouldStayConnected) {
       return;
     }
     if (_reconnectTimer?.isActive ?? false) {
       return;
     }
     _reconnectAttempt += 1;
-    final scaledSeconds = _reconnectDelayBase.inSeconds *
-        math.pow(2, _reconnectAttempt - 1).toInt();
-    final delaySeconds = math.min(_reconnectDelayMaxSeconds, scaledSeconds);
+    final reconnectDelay = calculateReconnectDelay(
+      reconnectAttempt: _reconnectAttempt,
+      reconnectDelayBase: widget.reconnectDelayBase,
+      reconnectDelayMaxSeconds: widget.reconnectDelayMaxSeconds,
+    );
+    final displaySeconds = reconnectDelay.inMilliseconds <= 1000
+        ? 1
+        : (reconnectDelay.inMilliseconds / 1000).ceil();
     if (mounted) {
       setState(() {
-        _status = 'Connection lost, retrying in ${delaySeconds}s...';
+        _status = 'Connection lost, retrying in ${displaySeconds}s...';
       });
     }
-    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+    _reconnectTimer = Timer(reconnectDelay, () {
       _reconnectTimer = null;
       if (!_shouldStayConnected || !mounted) {
+        return;
+      }
+      if (_isConnecting) {
+        _scheduleReconnect();
         return;
       }
       unawaited(_startStream(userInitiated: false));
