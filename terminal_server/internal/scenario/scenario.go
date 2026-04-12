@@ -53,6 +53,8 @@ type StorageManager interface {
 // Scheduler provides timer/reminder and recurring activation hooks.
 type Scheduler interface {
 	Schedule(ctx context.Context, key string, unixMS int64) error
+	Due(unixMS int64) []string
+	Remove(ctx context.Context, key string) error
 }
 
 // Broadcaster sends one-to-many notifications or commands.

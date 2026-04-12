@@ -47,3 +47,26 @@ func (s *MemoryScheduler) List() []ScheduledItem {
 	})
 	return out
 }
+
+// Due returns scheduled keys with trigger times at or before unixMS.
+func (s *MemoryScheduler) Due(unixMS int64) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]string, 0)
+	for k, ts := range s.items {
+		if ts <= unixMS {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Remove deletes a scheduled item by key.
+func (s *MemoryScheduler) Remove(_ context.Context, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.items, key)
+	return nil
+}

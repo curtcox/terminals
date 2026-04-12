@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -83,6 +84,40 @@ func (r *Runtime) StatusData() map[string]string {
 		"active_routes":        strconv.Itoa(activeRoutes),
 		"registered_scenarios": strconv.Itoa(registeredScenarios),
 	}
+}
+
+// ProcessDueTimers emits notifications for due timer keys and removes them.
+// It returns the number of processed keys.
+func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, error) {
+	if r == nil || r.Env == nil || r.Env.Scheduler == nil {
+		return 0, nil
+	}
+
+	due := r.Env.Scheduler.Due(now.UnixMilli())
+	processed := 0
+	for _, key := range due {
+		if strings.HasPrefix(key, "timer:") {
+			targetDevice := ""
+			parts := strings.Split(key, ":")
+			if len(parts) >= 2 {
+				targetDevice = parts[1]
+			}
+			if r.Env.Broadcast != nil {
+				deviceIDs := []string{}
+				if targetDevice != "" {
+					deviceIDs = []string{targetDevice}
+				}
+				if err := r.Env.Broadcast.Notify(ctx, deviceIDs, "Timer complete"); err != nil {
+					return processed, err
+				}
+			}
+		}
+		if err := r.Env.Scheduler.Remove(ctx, key); err != nil {
+			return processed, err
+		}
+		processed++
+	}
+	return processed, nil
 }
 
 func targetDevices(env *Environment, trigger Trigger) []string {

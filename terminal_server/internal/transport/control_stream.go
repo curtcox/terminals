@@ -171,7 +171,7 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	}
 
 	if kind == "system" {
-		return h.handleSystemCommand(cmd)
+		return h.handleSystemCommand(ctx, cmd)
 	}
 	if h.runtime == nil {
 		return ServerMessage{}, errors.New("scenario runtime not configured")
@@ -235,7 +235,7 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	}
 }
 
-func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage, error) {
+func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandRequest) (ServerMessage, error) {
 	if cmd == nil {
 		return ServerMessage{}, ErrInvalidClientMessage
 	}
@@ -244,7 +244,7 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		return ServerMessage{
 			Notification: "System query: system_help",
 			Data: map[string]string{
-				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,device_status <device_id>,system_help",
+				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,device_status <device_id>,run_due_timers,system_help",
 				"command_kinds":   "voice,manual,system",
 				"command_actions": "start,stop",
 			},
@@ -275,6 +275,21 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		return ServerMessage{
 			Notification: "System query: scenario_registry",
 			Data:         data,
+		}, nil
+	case "run_due_timers":
+		processed := 0
+		if h.runtime != nil {
+			count, err := h.runtime.ProcessDueTimers(ctx, h.control.now().UTC())
+			if err != nil {
+				return ServerMessage{}, err
+			}
+			processed = count
+		}
+		return ServerMessage{
+			Notification: "System query: run_due_timers",
+			Data: map[string]string{
+				"processed": toString(int64(processed)),
+			},
 		}, nil
 	case "transport_metrics":
 		data := map[string]string{}

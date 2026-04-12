@@ -159,3 +159,43 @@ func TestRuntimeStatusData(t *testing.T) {
 		t.Fatalf("registered_scenarios = %q, want 1", status["registered_scenarios"])
 	}
 }
+
+func TestRuntimeProcessDueTimers(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	scheduler := storage.NewMemoryScheduler()
+	broadcaster := ui.NewMemoryBroadcaster()
+	runtime := NewRuntime(NewEngine(), &Environment{
+		Devices:   devices,
+		Scheduler: scheduler,
+		Broadcast: broadcaster,
+	})
+
+	now := time.Date(2026, 4, 12, 9, 0, 0, 0, time.UTC)
+	_ = scheduler.Schedule(context.Background(), "timer:d1:100", now.UnixMilli()-1000)
+	_ = scheduler.Schedule(context.Background(), "timer:d1:200", now.UnixMilli()+60_000)
+
+	processed, err := runtime.ProcessDueTimers(context.Background(), now)
+	if err != nil {
+		t.Fatalf("ProcessDueTimers() error = %v", err)
+	}
+	if processed != 1 {
+		t.Fatalf("processed = %d, want 1", processed)
+	}
+	events := broadcaster.Events()
+	if len(events) != 1 {
+		t.Fatalf("len(events) = %d, want 1", len(events))
+	}
+	if events[0].Message != "Timer complete" {
+		t.Fatalf("message = %q, want Timer complete", events[0].Message)
+	}
+	if len(scheduler.Due(now.UnixMilli())) != 0 {
+		t.Fatalf("expected due timers to be removed")
+	}
+
+	// Not-yet-due timer should still exist.
+	laterDue := scheduler.Due(now.Add(2 * time.Minute).UnixMilli())
+	if len(laterDue) != 1 || laterDue[0] != "timer:d1:200" {
+		t.Fatalf("later due = %+v, want timer:d1:200", laterDue)
+	}
+}

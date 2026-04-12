@@ -443,6 +443,45 @@ func TestHandleMessageSystemScenarioRegistry(t *testing.T) {
 	}
 }
 
+func TestHandleMessageSystemRunDueTimers(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	scheduler := storage.NewMemoryScheduler()
+	broadcaster := ui.NewMemoryBroadcaster()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Scheduler: scheduler,
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_ = scheduler.Schedule(context.Background(), "timer:device-1:1", control.now().Add(-1*time.Minute).UnixMilli())
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-run-due-1",
+			Kind:      "system",
+			Intent:    "run_due_timers",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system run_due_timers error = %v", err)
+	}
+	if out[0].Data["processed"] != "1" {
+		t.Fatalf("processed = %q, want 1", out[0].Data["processed"])
+	}
+	events := broadcaster.Events()
+	if len(events) != 1 || events[0].Message != "Timer complete" {
+		t.Fatalf("unexpected broadcast events: %+v", events)
+	}
+}
+
 func TestHandleMessageSystemTransportMetrics(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

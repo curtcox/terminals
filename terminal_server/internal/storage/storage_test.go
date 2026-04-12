@@ -39,3 +39,26 @@ func TestMemorySchedulerSchedule(t *testing.T) {
 		t.Fatalf("List()[0] = %+v", items[0])
 	}
 }
+
+func TestMemorySchedulerDueAndRemove(t *testing.T) {
+	s := NewMemoryScheduler()
+	_ = s.Schedule(context.Background(), "timer-2", 200)
+	_ = s.Schedule(context.Background(), "timer-1", 100)
+	_ = s.Schedule(context.Background(), "timer-3", 300)
+
+	due := s.Due(200)
+	if len(due) != 2 {
+		t.Fatalf("len(Due(200)) = %d, want 2", len(due))
+	}
+	if due[0] != "timer-1" || due[1] != "timer-2" {
+		t.Fatalf("Due(200) order = %+v", due)
+	}
+
+	if err := s.Remove(context.Background(), "timer-1"); err != nil {
+		t.Fatalf("Remove() error = %v", err)
+	}
+	due = s.Due(200)
+	if len(due) != 1 || due[0] != "timer-2" {
+		t.Fatalf("Due(200) after remove = %+v", due)
+	}
+}
