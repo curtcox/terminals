@@ -72,3 +72,49 @@ func TestServerConnectRunsSession(t *testing.T) {
 		t.Fatalf("state = %q, want %q", got.State, device.StateDisconnected)
 	}
 }
+
+func TestServerConnectRunsSessionWithWireAdapter(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	s := NewServer("127.0.0.1:50051")
+	s.ConfigureControl(control, WireProtoAdapter{})
+
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			WireClientMessage{
+				Register: &WireRegisterRequest{
+					DeviceID:   "device-1",
+					DeviceName: "Kitchen Chromebook",
+				},
+			},
+			WireClientMessage{
+				Heartbeat: &WireHeartbeatRequest{
+					DeviceID: "device-1",
+				},
+			},
+		},
+	}
+
+	if err := s.Connect(stream); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	if len(stream.sent) != 2 {
+		t.Fatalf("len(sent) = %d, want 2", len(stream.sent))
+	}
+	first, ok := stream.sent[0].(WireServerMessage)
+	if !ok {
+		t.Fatalf("first sent envelope type = %T, want WireServerMessage", stream.sent[0])
+	}
+	if first.RegisterAck == nil || first.RegisterAck.ServerID != "srv-1" {
+		t.Fatalf("unexpected register ack payload: %+v", first.RegisterAck)
+	}
+
+	got, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected registered device")
+	}
+	if got.State != device.StateDisconnected {
+		t.Fatalf("state = %q, want %q", got.State, device.StateDisconnected)
+	}
+}
