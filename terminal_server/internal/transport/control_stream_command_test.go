@@ -38,9 +38,10 @@ func TestHandleMessageCommandVoice(t *testing.T) {
 
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		Command: &CommandRequest{
-			DeviceID: "device-1",
-			Kind:     "voice",
-			Text:     "red alert",
+			RequestID: "cmd-1",
+			DeviceID:  "device-1",
+			Kind:      "voice",
+			Text:      "red alert",
 		},
 	})
 	if err != nil {
@@ -51,6 +52,9 @@ func TestHandleMessageCommandVoice(t *testing.T) {
 	}
 	if out[0].ScenarioStart != "red_alert" {
 		t.Fatalf("ScenarioStart = %q, want red_alert", out[0].ScenarioStart)
+	}
+	if out[0].CommandAck != "cmd-1" {
+		t.Fatalf("CommandAck = %q, want cmd-1", out[0].CommandAck)
 	}
 
 	events := broadcaster.Events()
@@ -84,9 +88,10 @@ func TestHandleMessageCommandManual(t *testing.T) {
 
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		Command: &CommandRequest{
-			DeviceID: "device-1",
-			Kind:     "manual",
-			Intent:   "photo frame",
+			RequestID: "cmd-2",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
 		},
 	})
 	if err != nil {
@@ -97,6 +102,9 @@ func TestHandleMessageCommandManual(t *testing.T) {
 	}
 	if out[0].ScenarioStart != "photo_frame" {
 		t.Fatalf("ScenarioStart = %q, want photo_frame", out[0].ScenarioStart)
+	}
+	if out[0].CommandAck != "cmd-2" {
+		t.Fatalf("CommandAck = %q, want cmd-2", out[0].CommandAck)
 	}
 }
 
@@ -124,9 +132,10 @@ func TestHandleMessageCommandStop(t *testing.T) {
 	})
 	_, err := handler.HandleMessage(context.Background(), ClientMessage{
 		Command: &CommandRequest{
-			DeviceID: "device-1",
-			Kind:     "manual",
-			Intent:   "photo frame",
+			RequestID: "cmd-3-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
 		},
 	})
 	if err != nil {
@@ -135,10 +144,11 @@ func TestHandleMessageCommandStop(t *testing.T) {
 
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		Command: &CommandRequest{
-			DeviceID: "device-1",
-			Action:   "stop",
-			Kind:     "manual",
-			Intent:   "photo frame",
+			RequestID: "cmd-3-stop",
+			DeviceID:  "device-1",
+			Action:    "stop",
+			Kind:      "manual",
+			Intent:    "photo frame",
 		},
 	})
 	if err != nil {
@@ -149,5 +159,93 @@ func TestHandleMessageCommandStop(t *testing.T) {
 	}
 	if out[0].ScenarioStop != "photo_frame" {
 		t.Fatalf("ScenarioStop = %q, want photo_frame", out[0].ScenarioStop)
+	}
+	if out[0].CommandAck != "cmd-3-stop" {
+		t.Fatalf("CommandAck = %q, want cmd-3-stop", out[0].CommandAck)
+	}
+}
+
+func TestHandleMessageCommandDedupesRequestID(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+
+	first, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "dup-1",
+			DeviceID:  "device-1",
+			Kind:      "voice",
+			Text:      "red alert",
+		},
+	})
+	if err != nil {
+		t.Fatalf("first HandleMessage() error = %v", err)
+	}
+	second, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "dup-1",
+			DeviceID:  "device-1",
+			Kind:      "voice",
+			Text:      "red alert",
+		},
+	})
+	if err != nil {
+		t.Fatalf("second HandleMessage() error = %v", err)
+	}
+	if len(first) != 1 || len(second) != 1 {
+		t.Fatalf("unexpected response lengths")
+	}
+	if first[0].CommandAck != "dup-1" || second[0].CommandAck != "dup-1" {
+		t.Fatalf("unexpected command ack values")
+	}
+
+	events := broadcaster.Events()
+	if len(events) != 1 {
+		t.Fatalf("expected exactly one broadcast event after duplicate request id, got %d", len(events))
+	}
+}
+
+func TestHandleMessageCommandRejectsInvalidAction(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "bad-1",
+			DeviceID:  "device-1",
+			Action:    "pause",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	if err != ErrInvalidCommandAction {
+		t.Fatalf("error = %v, want %v", err, ErrInvalidCommandAction)
 	}
 }

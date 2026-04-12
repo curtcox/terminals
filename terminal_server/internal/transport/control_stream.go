@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
@@ -11,6 +12,8 @@ import (
 var (
 	// ErrInvalidClientMessage indicates an unsupported or empty client payload.
 	ErrInvalidClientMessage = errors.New("invalid client message")
+	// ErrInvalidCommandAction indicates an unsupported command action.
+	ErrInvalidCommandAction = errors.New("invalid command action")
 )
 
 // CapabilityUpdateRequest is a transport-neutral capability update payload.
@@ -26,11 +29,12 @@ type HeartbeatRequest struct {
 
 // CommandRequest carries a client-issued scenario command.
 type CommandRequest struct {
-	DeviceID string
-	Action   string // "start" (default) or "stop"
-	Kind     string // "voice" or "manual"
-	Text     string // voice transcript
-	Intent   string // explicit scenario intent
+	RequestID string
+	DeviceID  string
+	Action    string // "start" (default) or "stop"
+	Kind      string // "voice" or "manual"
+	Text      string // voice transcript
+	Intent    string // explicit scenario intent
 }
 
 // ClientMessage is a one-of control stream message from client to server.
@@ -44,6 +48,7 @@ type ClientMessage struct {
 // ServerMessage is a one-of control stream message from server to client.
 type ServerMessage struct {
 	RegisterAck   *RegisterResponse
+	CommandAck    string
 	SetUI         *ui.Descriptor
 	Notification  string
 	ScenarioStart string
@@ -55,11 +60,16 @@ type ServerMessage struct {
 type StreamHandler struct {
 	control *ControlService
 	runtime *scenario.Runtime
+	mu      sync.Mutex
+	seen    map[string]ServerMessage
 }
 
 // NewStreamHandler creates a handler for control stream messages.
 func NewStreamHandler(control *ControlService) *StreamHandler {
-	return &StreamHandler{control: control}
+	return &StreamHandler{
+		control: control,
+		seen:    map[string]ServerMessage{},
+	}
 }
 
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
@@ -67,6 +77,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 	return &StreamHandler{
 		control: control,
 		runtime: runtime,
+		seen:    map[string]ServerMessage{},
 	}
 }
 
@@ -99,9 +110,23 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			err := errors.New("scenario runtime not configured")
 			return []ServerMessage{{Error: err.Error()}}, err
 		}
+		if msg.Command.RequestID != "" {
+			h.mu.Lock()
+			if prior, ok := h.seen[msg.Command.RequestID]; ok {
+				h.mu.Unlock()
+				return []ServerMessage{prior}, nil
+			}
+			h.mu.Unlock()
+		}
 		commandResult, err := h.handleCommand(ctx, msg.Command)
 		if err != nil {
 			return []ServerMessage{{Error: err.Error()}}, err
+		}
+		if msg.Command.RequestID != "" {
+			commandResult.CommandAck = msg.Command.RequestID
+			h.mu.Lock()
+			h.seen[msg.Command.RequestID] = commandResult
+			h.mu.Unlock()
 		}
 		return []ServerMessage{commandResult}, nil
 	default:
@@ -116,6 +141,9 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	action := cmd.Action
 	if action == "" {
 		action = "start"
+	}
+	if action != "start" && action != "stop" {
+		return ServerMessage{}, ErrInvalidCommandAction
 	}
 
 	switch cmd.Kind {
