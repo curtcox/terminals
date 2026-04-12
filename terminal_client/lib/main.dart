@@ -17,4 +17,3 @@ class TerminalClientApp extends StatelessWidget {
     );
   }
 }
-
