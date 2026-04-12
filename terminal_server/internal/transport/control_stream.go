@@ -306,16 +306,16 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 	if cmd == nil {
 		return ServerMessage{}, ErrInvalidClientMessage
 	}
-	intent := strings.TrimSpace(cmd.Intent)
-	if intent == "" {
-		return ServerMessage{}, ErrMissingCommandIntent
+	parsed, err := ParseSystemIntent(cmd.Intent)
+	if err != nil {
+		return ServerMessage{}, err
 	}
-	switch intent {
+	switch parsed.Name {
 	case SystemIntentHelp:
 		return ServerMessage{
 			Notification: "System query: system_help",
 			Data: map[string]string{
-				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,pending_timers,recent_commands,device_status <device_id>,run_due_timers,reconcile_liveness <seconds>,system_help",
+				"system_intents":  SystemHelpIntentsString(),
 				"command_kinds":   "voice,manual,system",
 				"command_actions": "start,stop",
 			},
@@ -363,12 +363,22 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			},
 		}, nil
 	case SystemIntentReconcileLiveness:
-		updated := h.control.ReconcileLiveness(2 * time.Minute)
+		timeout := 2 * time.Minute
+		timeoutSeconds := "120"
+		if parsed.Arg != "" {
+			seconds, convErr := strconv.Atoi(parsed.Arg)
+			if convErr != nil || seconds < 0 {
+				return ServerMessage{}, fmt.Errorf("invalid reconcile_liveness seconds: %s", parsed.Arg)
+			}
+			timeout = time.Duration(seconds) * time.Second
+			timeoutSeconds = parsed.Arg
+		}
+		updated := h.control.ReconcileLiveness(timeout)
 		return ServerMessage{
 			Notification: "System query: reconcile_liveness",
 			Data: map[string]string{
 				"updated":         toString(int64(updated)),
-				"timeout_seconds": "120",
+				"timeout_seconds": timeoutSeconds,
 			},
 		}, nil
 	case SystemIntentTransportMetrics:
@@ -440,29 +450,10 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Data:         data,
 		}, nil
 	default:
-		if strings.HasPrefix(intent, SystemIntentReconcileLiveness+" ") {
-			secondsText := strings.TrimSpace(strings.TrimPrefix(intent, SystemIntentReconcileLiveness+" "))
-			seconds, err := strconv.Atoi(secondsText)
-			if err != nil || seconds < 0 {
-				return ServerMessage{}, fmt.Errorf("invalid reconcile_liveness seconds: %s", secondsText)
-			}
-			updated := h.control.ReconcileLiveness(time.Duration(seconds) * time.Second)
-			return ServerMessage{
-				Notification: "System query: reconcile_liveness",
-				Data: map[string]string{
-					"updated":         toString(int64(updated)),
-					"timeout_seconds": secondsText,
-				},
-			}, nil
-		}
-		if strings.HasPrefix(intent, SystemIntentDeviceStatus+" ") {
-			deviceID := strings.TrimSpace(strings.TrimPrefix(intent, SystemIntentDeviceStatus+" "))
-			if deviceID == "" {
-				return ServerMessage{}, fmt.Errorf("device_status requires device id")
-			}
-			deviceState, ok := h.control.devices.Get(deviceID)
+		if parsed.Name == SystemIntentDeviceStatus && parsed.Arg != "" {
+			deviceState, ok := h.control.devices.Get(parsed.Arg)
 			if !ok {
-				return ServerMessage{}, fmt.Errorf("device not found: %s", deviceID)
+				return ServerMessage{}, fmt.Errorf("device not found: %s", parsed.Arg)
 			}
 			data := map[string]string{
 				"device_id":   deviceState.DeviceID,
@@ -479,7 +470,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 				Data:         data,
 			}, nil
 		}
-		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", intent)
+		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", cmd.Intent)
 	}
 }
 
