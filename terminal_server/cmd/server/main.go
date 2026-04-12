@@ -9,6 +9,8 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
+	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 )
 
@@ -22,6 +24,9 @@ func main() {
 	defer stop()
 
 	deviceManager := device.NewManager()
+	ioRouter := io.NewRouter()
+	scenarioEngine := scenario.NewEngine()
+	controlService := transport.NewControlService(cfg.MDNSName, deviceManager)
 	grpcServer := transport.NewServer(cfg.GRPCAddress())
 	mdns := discovery.NoopAdvertiser{}
 
@@ -44,6 +49,14 @@ func main() {
 	if len(deviceManager.List()) != 0 {
 		log.Fatalf("unexpected initial device registry state")
 	}
+	if len(ioRouter.Routes()) != 0 {
+		log.Fatalf("unexpected initial route registry state")
+	}
+	if _, ok := scenarioEngine.Active("bootstrap"); ok {
+		log.Fatalf("unexpected initial scenario state")
+	}
+	log.Printf("control service ready for server id %q", cfg.MDNSName)
+	_ = controlService
 
 	<-ctx.Done()
 	log.Println("terminal server shutting down")
