@@ -72,6 +72,13 @@ func (r *Router) Routes() []Route {
 	return out
 }
 
+// RouteCount returns the number of active routes.
+func (r *Router) RouteCount() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return len(r.routes)
+}
+
 func routeKey(sourceID, targetID, streamKind string) string {
 	return sourceID + "|" + targetID + "|" + streamKind
 }

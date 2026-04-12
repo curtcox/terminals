@@ -365,6 +365,72 @@ func TestHandleMessageSystemServerStatus(t *testing.T) {
 	}
 }
 
+func TestHandleMessageSystemRuntimeStatus(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	routes := io.NewRouter()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+		IO:      routes,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-start-rs",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	_ = routes.Connect("device-1", "device-2", "audio")
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-runtime-1",
+			Kind:      "system",
+			Intent:    "runtime_status",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system runtime_status error = %v", err)
+	}
+	if out[0].Data["active_scenarios"] != "1" {
+		t.Fatalf("active_scenarios = %q, want 1", out[0].Data["active_scenarios"])
+	}
+	if out[0].Data["active_routes"] != "1" {
+		t.Fatalf("active_routes = %q, want 1", out[0].Data["active_routes"])
+	}
+}
+
+func TestHandleMessageSystemWithoutRuntime(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-no-runtime",
+			Kind:      "system",
+			Intent:    "server_status",
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected server_status to work without runtime, err=%v", err)
+	}
+	if len(out) != 1 || out[0].Data["server_id"] != "srv-1" {
+		t.Fatalf("unexpected server_status response: %+v", out)
+	}
+}
+
 func TestHandleMessageDedupeEviction(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -401,5 +467,29 @@ func TestHandleMessageDedupeEviction(t *testing.T) {
 	handler.mu.Unlock()
 	if hasR1 || !hasR2 {
 		t.Fatalf("expected r1 evicted and r2 retained, got hasR1=%v hasR2=%v", hasR1, hasR2)
+	}
+}
+
+func TestHandleMessageRejectsInvalidCommandKind(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{Devices: devices})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "bad-kind",
+			DeviceID:  "device-1",
+			Kind:      "remote",
+			Intent:    "photo frame",
+		},
+	})
+	if err != ErrInvalidCommandKind {
+		t.Fatalf("error = %v, want %v", err, ErrInvalidCommandKind)
 	}
 }

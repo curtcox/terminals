@@ -30,6 +30,7 @@ type DeviceManager interface {
 type IORouter interface {
 	Connect(sourceID, targetID, streamKind string) error
 	Disconnect(sourceID, targetID, streamKind string) error
+	RouteCount() int
 }
 
 // AIBackend represents scenario-accessible AI services.

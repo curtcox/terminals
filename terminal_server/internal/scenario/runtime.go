@@ -3,6 +3,7 @@ package scenario
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 )
 
@@ -61,6 +62,24 @@ func (r *Runtime) StopTrigger(_ context.Context, trigger Trigger) (string, error
 // StopVoiceText parses spoken text and routes to StopTrigger.
 func (r *Runtime) StopVoiceText(ctx context.Context, sourceID, spoken string, now time.Time) (string, error) {
 	return r.StopTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
+}
+
+// StatusData returns runtime-focused counters for control-plane system queries.
+func (r *Runtime) StatusData() map[string]string {
+	activeScenarios := 0
+	if r != nil && r.Engine != nil {
+		activeScenarios = len(r.Engine.ActiveSnapshot())
+	}
+
+	activeRoutes := 0
+	if r != nil && r.Env != nil && r.Env.IO != nil {
+		activeRoutes = r.Env.IO.RouteCount()
+	}
+
+	return map[string]string{
+		"active_scenarios": strconv.Itoa(activeScenarios),
+		"active_routes":    strconv.Itoa(activeRoutes),
+	}
 }
 
 func targetDevices(env *Environment, trigger Trigger) []string {

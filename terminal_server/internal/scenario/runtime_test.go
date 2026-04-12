@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
@@ -124,5 +125,34 @@ func TestRuntimeStopTrigger(t *testing.T) {
 	}
 	if _, ok := engine.Active("d1"); ok {
 		t.Fatalf("expected no active scenario after stop")
+	}
+}
+
+func TestRuntimeStatusData(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	routes := iorouter.NewRouter()
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: PhotoFrameScenario{},
+		Priority: PriorityLow,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices: devices,
+		IO:      routes,
+	})
+
+	_, _ = runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:   TriggerManual,
+		Intent: "photo frame",
+	})
+	_ = routes.Connect("d1", "d2", "audio")
+
+	status := runtime.StatusData()
+	if status["active_scenarios"] != "1" {
+		t.Fatalf("active_scenarios = %q, want 1", status["active_scenarios"])
+	}
+	if status["active_routes"] != "1" {
+		t.Fatalf("active_routes = %q, want 1", status["active_routes"])
 	}
 }

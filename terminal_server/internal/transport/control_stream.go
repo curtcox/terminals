@@ -16,6 +16,8 @@ var (
 	ErrInvalidClientMessage = errors.New("invalid client message")
 	// ErrInvalidCommandAction indicates an unsupported command action.
 	ErrInvalidCommandAction = errors.New("invalid command action")
+	// ErrInvalidCommandKind indicates an unsupported command kind.
+	ErrInvalidCommandKind = errors.New("invalid command kind")
 )
 
 // CapabilityUpdateRequest is a transport-neutral capability update payload.
@@ -113,10 +115,6 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		}
 		return nil, nil
 	case msg.Command != nil:
-		if h.runtime == nil {
-			err := errors.New("scenario runtime not configured")
-			return []ServerMessage{{Error: err.Error()}}, err
-		}
 		if msg.Command.RequestID != "" {
 			h.mu.Lock()
 			if prior, ok := h.seen[msg.Command.RequestID]; ok {
@@ -151,8 +149,16 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	if cmd == nil {
 		return ServerMessage{}, ErrInvalidClientMessage
 	}
-	if cmd.Kind == "system" {
+	kind := cmd.Kind
+	if kind == "" {
+		kind = "manual"
+	}
+
+	if kind == "system" {
 		return h.handleSystemCommand(cmd)
+	}
+	if h.runtime == nil {
+		return ServerMessage{}, errors.New("scenario runtime not configured")
 	}
 
 	action := cmd.Action
@@ -163,7 +169,7 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 		return ServerMessage{}, ErrInvalidCommandAction
 	}
 
-	switch cmd.Kind {
+	switch kind {
 	case "voice":
 		if action == "stop" {
 			name, err := h.runtime.StopVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
@@ -183,7 +189,7 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			ScenarioStart: name,
 			Notification:  "Scenario started: " + name,
 		}, nil
-	default:
+	case "manual":
 		trigger := scenario.Trigger{
 			Kind:      scenario.TriggerManual,
 			SourceID:  cmd.DeviceID,
@@ -208,6 +214,8 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			ScenarioStart: name,
 			Notification:  "Scenario started: " + name,
 		}, nil
+	default:
+		return ServerMessage{}, ErrInvalidCommandKind
 	}
 }
 
@@ -220,6 +228,17 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		return ServerMessage{
 			Notification: "System query: server_status",
 			Data:         h.control.StatusData(),
+		}, nil
+	case "runtime_status":
+		data := map[string]string{}
+		if h.runtime != nil {
+			for k, v := range h.runtime.StatusData() {
+				data[k] = v
+			}
+		}
+		return ServerMessage{
+			Notification: "System query: runtime_status",
+			Data:         data,
 		}, nil
 	case "list_devices":
 		data := map[string]string{}
