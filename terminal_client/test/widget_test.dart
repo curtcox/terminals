@@ -535,6 +535,79 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets(
+      'renders safe placeholders for canvas, media, and system hint primitives',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..scroll = (uiv1.ScrollWidget())
+            ..children.addAll([
+              uiv1.Node()
+                ..id = 'camera_a'
+                ..videoSurface =
+                    (uiv1.VideoSurfaceWidget()..trackId = 'track-a'),
+              uiv1.Node()
+                ..id = 'mic_mix'
+                ..audioVisualizer =
+                    (uiv1.AudioVisualizerWidget()..streamId = 'stream-mix'),
+              uiv1.Node()
+                ..id = 'drawing'
+                ..canvas = (uiv1.CanvasWidget()
+                  ..drawOpsJson = '{"ops":[{"line":"x"}]}'),
+              uiv1.Node()
+                ..id = 'fs_hint'
+                ..fullscreen = (uiv1.FullscreenWidget()..enabled = true)
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Fullscreen body'),
+                ),
+              uiv1.Node()
+                ..id = 'awake_hint'
+                ..keepAwake = (uiv1.KeepAwakeWidget()..enabled = true)
+                ..children.add(
+                  uiv1.Node()..text = (uiv1.TextWidget()..value = 'Awake body'),
+                ),
+              uiv1.Node()
+                ..id = 'brightness_hint'
+                ..brightness = (uiv1.BrightnessWidget()..value = 0.8)
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Brightness body'),
+                ),
+            ]))),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey<String>('ui-video-surface-camera_a')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('ui-audio-visualizer-mic_mix')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('ui-canvas-drawing')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('ui-fullscreen-fs_hint')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('ui-keep-awake-awake_hint')),
+        findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('ui-brightness-brightness_hint')),
+      findsOneWidget,
+    );
+    expect(find.text('Fullscreen body'), findsOneWidget);
+    expect(find.text('Awake body'), findsOneWidget);
+    expect(find.text('Brightness body'), findsOneWidget);
+  });
 }
 
 class _FakeClientHarness {

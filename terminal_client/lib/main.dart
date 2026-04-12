@@ -892,6 +892,66 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           fit: StackFit.loose,
           children: node.children.map(_renderNode).toList(),
         );
+      case uiv1.Node_Widget.videoSurface:
+        final componentId = _nodeId(node);
+        return _placeholderPrimitive(
+          key: ValueKey<String>('ui-video-surface-$componentId'),
+          title: 'Video surface',
+          detail: node.videoSurface.trackId,
+          child: const SizedBox(
+            height: 120,
+            child: Center(
+              child: Icon(Icons.videocam_outlined),
+            ),
+          ),
+        );
+      case uiv1.Node_Widget.audioVisualizer:
+        final componentId = _nodeId(node);
+        return _placeholderPrimitive(
+          key: ValueKey<String>('ui-audio-visualizer-$componentId'),
+          title: 'Audio visualizer',
+          detail: node.audioVisualizer.streamId,
+          child: const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: LinearProgressIndicator(),
+          ),
+        );
+      case uiv1.Node_Widget.canvas:
+        final componentId = _nodeId(node);
+        final drawOps = node.canvas.drawOpsJson.trim();
+        final drawOpsPreview = drawOps.isEmpty
+            ? 'No draw ops'
+            : (drawOps.length > 64 ? '${drawOps.substring(0, 64)}…' : drawOps);
+        return _placeholderPrimitive(
+          key: ValueKey<String>('ui-canvas-$componentId'),
+          title: 'Canvas',
+          detail: drawOpsPreview,
+        );
+      case uiv1.Node_Widget.fullscreen:
+        final componentId = _nodeId(node);
+        return _placeholderPrimitive(
+          key: ValueKey<String>('ui-fullscreen-$componentId'),
+          title:
+              'Fullscreen ${node.fullscreen.enabled ? 'enabled' : 'disabled'}',
+          child: _renderNodeChildren(node.children),
+        );
+      case uiv1.Node_Widget.keepAwake:
+        final componentId = _nodeId(node);
+        return _placeholderPrimitive(
+          key: ValueKey<String>('ui-keep-awake-$componentId'),
+          title:
+              'Keep awake ${node.keepAwake.enabled ? 'enabled' : 'disabled'}',
+          child: _renderNodeChildren(node.children),
+        );
+      case uiv1.Node_Widget.brightness:
+        final componentId = _nodeId(node);
+        final brightness = node.brightness.value.clamp(0.0, 1.0).toDouble();
+        return _placeholderPrimitive(
+          key: ValueKey<String>('ui-brightness-$componentId'),
+          title: 'Brightness hint',
+          detail: brightness.toStringAsFixed(2),
+          child: _renderNodeChildren(node.children),
+        );
       case uiv1.Node_Widget.image:
         return Image.network(
           node.image.url,
@@ -906,8 +966,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         );
       case uiv1.Node_Widget.notSet:
         break;
-      default:
-        return _renderNodeChildren(node.children);
     }
     return const SizedBox.shrink();
   }
@@ -922,6 +980,37 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: children.map(_renderNode).toList(),
+    );
+  }
+
+  Widget _placeholderPrimitive({
+    required Key key,
+    required String title,
+    String? detail,
+    Widget? child,
+  }) {
+    return Container(
+      key: key,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blueGrey.shade200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title),
+          if (detail != null && detail.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(detail, style: const TextStyle(fontSize: 12)),
+          ],
+          if (child != null) ...[
+            const SizedBox(height: 6),
+            child,
+          ],
+        ],
+      ),
     );
   }
 
