@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
@@ -30,14 +31,17 @@ type ControlService struct {
 	serverID string
 	devices  *device.Manager
 	now      func() time.Time
+	started  time.Time
 }
 
 // NewControlService creates a control service.
 func NewControlService(serverID string, devices *device.Manager) *ControlService {
+	started := time.Now().UTC()
 	return &ControlService{
 		serverID: serverID,
 		devices:  devices,
 		now:      time.Now,
+		started:  started,
 	}
 }
 
@@ -79,4 +83,31 @@ func (s *ControlService) UpdateCapabilities(_ context.Context, deviceID string, 
 // Disconnect marks a device as disconnected when a control stream ends.
 func (s *ControlService) Disconnect(_ context.Context, deviceID string) error {
 	return s.devices.MarkDisconnected(deviceID)
+}
+
+// StatusData returns a stable map representation for system status responses.
+func (s *ControlService) StatusData() map[string]string {
+	now := s.now().UTC()
+	connected := 0
+	disconnected := 0
+	for _, d := range s.devices.List() {
+		if d.State == device.StateConnected {
+			connected++
+		} else {
+			disconnected++
+		}
+	}
+
+	uptime := now.Sub(s.started)
+	if uptime < 0 {
+		uptime = 0
+	}
+
+	return map[string]string{
+		"server_id":            s.serverID,
+		"uptime_seconds":       strconv.FormatInt(int64(uptime.Seconds()), 10),
+		"devices_total":        strconv.Itoa(connected + disconnected),
+		"devices_connected":    strconv.Itoa(connected),
+		"devices_disconnected": strconv.Itoa(disconnected),
+	}
 }

@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
@@ -322,6 +323,45 @@ func TestHandleMessageSystemActiveScenarios(t *testing.T) {
 	}
 	if out[0].Data["device-1"] != "photo_frame" {
 		t.Fatalf("active scenario = %q, want photo_frame", out[0].Data["device-1"])
+	}
+}
+
+func TestHandleMessageSystemServerStatus(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	control.started = control.now().Add(-2 * time.Hour)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-status-1",
+			Kind:      "system",
+			Intent:    "server_status",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system server_status error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].Data["server_id"] != "srv-1" {
+		t.Fatalf("server_id = %q, want srv-1", out[0].Data["server_id"])
+	}
+	if out[0].Data["devices_total"] != "1" {
+		t.Fatalf("devices_total = %q, want 1", out[0].Data["devices_total"])
+	}
+	if out[0].CommandAck != "sys-status-1" {
+		t.Fatalf("CommandAck = %q, want sys-status-1", out[0].CommandAck)
 	}
 }
 

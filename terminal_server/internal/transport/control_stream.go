@@ -216,6 +216,11 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		return ServerMessage{}, ErrInvalidClientMessage
 	}
 	switch cmd.Intent {
+	case "server_status":
+		return ServerMessage{
+			Notification: "System query: server_status",
+			Data:         h.control.StatusData(),
+		}, nil
 	case "list_devices":
 		data := map[string]string{}
 		for _, d := range h.control.devices.List() {

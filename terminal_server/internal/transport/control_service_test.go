@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -47,5 +48,43 @@ func TestHeartbeat(t *testing.T) {
 	}
 	if got.LastHeartbeat != fixed {
 		t.Fatalf("LastHeartbeat = %v, want %v", got.LastHeartbeat, fixed)
+	}
+}
+
+func TestStatusData(t *testing.T) {
+	m := device.NewManager()
+	s := NewControlService("srv-1", m)
+
+	started := time.Date(2026, 4, 12, 8, 0, 0, 0, time.UTC)
+	now := started.Add(90 * time.Second)
+	s.started = started
+	s.now = func() time.Time { return now }
+
+	_, _ = s.Register(context.Background(), RegisterRequest{
+		DeviceID:   "d1",
+		DeviceName: "Kitchen",
+	})
+	_, _ = s.Register(context.Background(), RegisterRequest{
+		DeviceID:   "d2",
+		DeviceName: "Hall",
+	})
+	_ = s.Disconnect(context.Background(), "d2")
+
+	status := s.StatusData()
+	if status["server_id"] != "srv-1" {
+		t.Fatalf("server_id = %q, want srv-1", status["server_id"])
+	}
+	if status["devices_total"] != "2" {
+		t.Fatalf("devices_total = %q, want 2", status["devices_total"])
+	}
+	if status["devices_connected"] != "1" || status["devices_disconnected"] != "1" {
+		t.Fatalf("unexpected connected/disconnected values: %+v", status)
+	}
+	gotUptime, err := strconv.Atoi(status["uptime_seconds"])
+	if err != nil {
+		t.Fatalf("uptime_seconds parse error: %v", err)
+	}
+	if gotUptime != 90 {
+		t.Fatalf("uptime_seconds = %d, want 90", gotUptime)
 	}
 }
