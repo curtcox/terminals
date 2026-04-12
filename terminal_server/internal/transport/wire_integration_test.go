@@ -37,8 +37,8 @@ func TestWireSessionProtocolViolationRecoverable(t *testing.T) {
 	if !ok {
 		t.Fatalf("first response type = %T, want WireServerMessage", stream.sent[0])
 	}
-	if first.Error == nil || first.Error.Code != ErrorCodeProtocolViolation {
-		t.Fatalf("ErrorCode = %+v, want %q", first.Error, ErrorCodeProtocolViolation)
+	if first.Error == nil || first.Error.Code != WireControlErrorCodeProtocolViolation {
+		t.Fatalf("ErrorCode = %+v, want %d", first.Error, WireControlErrorCodeProtocolViolation)
 	}
 	if !strings.Contains(first.Error.Message, "register required") {
 		t.Fatalf("Error = %q, expected register-required text", first.Error.Message)
@@ -82,8 +82,8 @@ func TestWireSessionCommandValidationErrorCode(t *testing.T) {
 	if !ok {
 		t.Fatalf("last response type = %T, want WireServerMessage", stream.sent[len(stream.sent)-1])
 	}
-	if last.Error == nil || last.Error.Code != ErrorCodeMissingIntent {
-		t.Fatalf("ErrorCode = %+v, want %q", last.Error, ErrorCodeMissingIntent)
+	if last.Error == nil || last.Error.Code != WireControlErrorCodeMissingCommandIntent {
+		t.Fatalf("ErrorCode = %+v, want %d", last.Error, WireControlErrorCodeMissingCommandIntent)
 	}
 }
 

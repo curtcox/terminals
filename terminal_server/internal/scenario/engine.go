@@ -11,17 +11,20 @@ import (
 type Priority int
 
 const (
+	// PriorityIdle is the lowest possible priority and never preempts others.
 	PriorityIdle Priority = iota
+	// PriorityLow is for background ambient scenarios.
 	PriorityLow
+	// PriorityNormal is the default scenario priority.
 	PriorityNormal
+	// PriorityHigh is for user-facing urgent scenarios.
 	PriorityHigh
+	// PriorityCritical is for emergency scenarios that preempt all others.
 	PriorityCritical
 )
 
-var (
-	// ErrScenarioNotFound indicates an unknown scenario name was referenced.
-	ErrScenarioNotFound = errors.New("scenario not found")
-)
+// ErrScenarioNotFound indicates an unknown scenario name was referenced.
+var ErrScenarioNotFound = errors.New("scenario not found")
 
 // Registration wraps a scenario with runtime metadata.
 type Registration struct {

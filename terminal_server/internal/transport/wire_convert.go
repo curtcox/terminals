@@ -6,10 +6,8 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
-var (
-	// ErrInvalidWireMessage indicates the wire message had no payload.
-	ErrInvalidWireMessage = errors.New("invalid wire message")
-)
+// ErrInvalidWireMessage indicates the wire message had no payload.
+var ErrInvalidWireMessage = errors.New("invalid wire message")
 
 // InternalFromWireClient converts adapter-level wire messages to internal messages.
 func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
@@ -55,6 +53,8 @@ func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
 
 func internalActionFromWire(action WireCommandAction) string {
 	switch action {
+	case WireCommandActionUnspecified:
+		return ""
 	case WireCommandActionStart:
 		return CommandActionStart
 	case WireCommandActionStop:
@@ -66,6 +66,8 @@ func internalActionFromWire(action WireCommandAction) string {
 
 func internalKindFromWire(kind WireCommandKind) string {
 	switch kind {
+	case WireCommandKindUnspecified:
+		return ""
 	case WireCommandKindVoice:
 		return CommandKindVoice
 	case WireCommandKindManual:
@@ -74,6 +76,27 @@ func internalKindFromWire(kind WireCommandKind) string {
 		return CommandKindSystem
 	default:
 		return ""
+	}
+}
+
+func wireErrorCodeFromInternal(code string) WireControlErrorCode {
+	switch code {
+	case ErrorCodeInvalidClientMessage:
+		return WireControlErrorCodeInvalidClientMessage
+	case ErrorCodeInvalidCommandAction:
+		return WireControlErrorCodeInvalidCommandAction
+	case ErrorCodeInvalidCommandKind:
+		return WireControlErrorCodeInvalidCommandKind
+	case ErrorCodeMissingIntent:
+		return WireControlErrorCodeMissingCommandIntent
+	case ErrorCodeMissingText:
+		return WireControlErrorCodeMissingCommandText
+	case ErrorCodeMissingDeviceID:
+		return WireControlErrorCodeMissingCommandDeviceID
+	case ErrorCodeProtocolViolation:
+		return WireControlErrorCodeProtocolViolation
+	default:
+		return WireControlErrorCodeUnknown
 	}
 }
 
@@ -101,7 +124,7 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 	}
 	if msg.ErrorCode != "" || msg.Error != "" {
 		out.Error = &WireControlError{
-			Code:    msg.ErrorCode,
+			Code:    wireErrorCodeFromInternal(msg.ErrorCode),
 			Message: msg.Error,
 		}
 	}

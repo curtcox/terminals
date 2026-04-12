@@ -1,3 +1,4 @@
+// Package discovery contains LAN discovery adapters and service metadata.
 package discovery
 
 import "context"

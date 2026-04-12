@@ -8,10 +8,8 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
 
-var (
-	// ErrControlNotConfigured indicates Connect was called before control wiring.
-	ErrControlNotConfigured = errors.New("control service not configured")
-)
+// ErrControlNotConfigured indicates Connect was called before control wiring.
+var ErrControlNotConfigured = errors.New("control service not configured")
 
 // Server is a small lifecycle wrapper for the future gRPC control server.
 type Server struct {

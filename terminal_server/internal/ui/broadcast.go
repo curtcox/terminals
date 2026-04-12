@@ -1,3 +1,4 @@
+// Package ui contains descriptor and broadcast utilities.
 package ui
 
 import (

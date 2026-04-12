@@ -28,3 +28,15 @@ func TestInternalKindFromWire(t *testing.T) {
 		t.Fatalf("unspecified mapping = %q, want empty", got)
 	}
 }
+
+func TestWireErrorCodeFromInternal(t *testing.T) {
+	if got := wireErrorCodeFromInternal(ErrorCodeInvalidClientMessage); got != WireControlErrorCodeInvalidClientMessage {
+		t.Fatalf("invalid client mapping = %d", got)
+	}
+	if got := wireErrorCodeFromInternal(ErrorCodeProtocolViolation); got != WireControlErrorCodeProtocolViolation {
+		t.Fatalf("protocol violation mapping = %d", got)
+	}
+	if got := wireErrorCodeFromInternal("something_else"); got != WireControlErrorCodeUnknown {
+		t.Fatalf("unknown mapping = %d, want unknown", got)
+	}
+}

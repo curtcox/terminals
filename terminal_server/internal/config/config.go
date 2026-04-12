@@ -1,3 +1,4 @@
+// Package config loads runtime server configuration.
 package config
 
 import (

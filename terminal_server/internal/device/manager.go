@@ -1,3 +1,4 @@
+// Package device manages connected device registry state.
 package device
 
 import (

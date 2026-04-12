@@ -1,3 +1,4 @@
+// Package ai contains scenario-facing AI backend interfaces and placeholders.
 package ai
 
 import "context"

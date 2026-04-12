@@ -1,3 +1,4 @@
+// Package telephony contains scenario-facing telephony bridge abstractions.
 package telephony
 
 import "context"

@@ -6,11 +6,16 @@ import "context"
 type TriggerKind string
 
 const (
-	TriggerVoice    TriggerKind = "voice"
+	// TriggerVoice indicates a spoken command initiated the scenario.
+	TriggerVoice TriggerKind = "voice"
+	// TriggerSchedule indicates a scheduled timer/reminder initiated the scenario.
 	TriggerSchedule TriggerKind = "schedule"
-	TriggerEvent    TriggerKind = "event"
-	TriggerManual   TriggerKind = "manual"
-	TriggerCascade  TriggerKind = "cascade"
+	// TriggerEvent indicates an external event initiated the scenario.
+	TriggerEvent TriggerKind = "event"
+	// TriggerManual indicates a direct manual request initiated the scenario.
+	TriggerManual TriggerKind = "manual"
+	// TriggerCascade indicates another scenario initiated this scenario.
+	TriggerCascade TriggerKind = "cascade"
 )
 
 // Trigger contains routing metadata used for scenario matching.

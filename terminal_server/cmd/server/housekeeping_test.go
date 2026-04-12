@@ -1,3 +1,4 @@
+// Package main tests server process lifecycle helpers.
 package main
 
 import (

@@ -1,0 +1,320 @@
+package transport
+
+import (
+	"fmt"
+	"strconv"
+
+	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
+	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	uiv1 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
+	"github.com/curtcox/terminals/terminal_server/internal/ui"
+)
+
+// GeneratedProtoAdapter maps generated protobuf messages to internal transport messages.
+type GeneratedProtoAdapter struct{}
+
+// ToInternal converts a generated protobuf request envelope into internal message form.
+func (GeneratedProtoAdapter) ToInternal(env ProtoClientEnvelope) (ClientMessage, error) {
+	switch typed := env.(type) {
+	case *controlv1.ConnectRequest:
+		return internalFromProtoRequest(typed)
+	case controlv1.ConnectRequest:
+		return internalFromProtoRequest(&typed)
+	default:
+		return ClientMessage{}, fmt.Errorf("unsupported proto client envelope %T", env)
+	}
+}
+
+// FromInternal converts an internal server message to a generated protobuf response envelope.
+func (GeneratedProtoAdapter) FromInternal(msg ServerMessage) (ProtoServerEnvelope, error) {
+	return protoFromInternalServer(msg), nil
+}
+
+func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, error) {
+	if req == nil {
+		return ClientMessage{}, fmt.Errorf("nil connect request")
+	}
+
+	switch payload := req.GetPayload().(type) {
+	case *controlv1.ConnectRequest_Register:
+		caps := payload.Register.GetCapabilities()
+		identity := caps.GetIdentity()
+		return ClientMessage{
+			Register: &RegisterRequest{
+				DeviceID:     caps.GetDeviceId(),
+				DeviceName:   identity.GetDeviceName(),
+				DeviceType:   identity.GetDeviceType(),
+				Platform:     identity.GetPlatform(),
+				Capabilities: capabilitiesToDataMap(caps),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_Capability:
+		caps := payload.Capability.GetCapabilities()
+		return ClientMessage{
+			Capability: &CapabilityUpdateRequest{
+				DeviceID:     caps.GetDeviceId(),
+				Capabilities: capabilitiesToDataMap(caps),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_Heartbeat:
+		return ClientMessage{
+			Heartbeat: &HeartbeatRequest{
+				DeviceID: payload.Heartbeat.GetDeviceId(),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_Command:
+		command := payload.Command
+		return ClientMessage{
+			Command: &CommandRequest{
+				RequestID: command.GetRequestId(),
+				DeviceID:  command.GetDeviceId(),
+				Action:    internalActionFromProto(command.GetAction()),
+				Kind:      internalKindFromProto(command.GetKind()),
+				Text:      command.GetText(),
+				Intent:    command.GetIntent(),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_Input, *controlv1.ConnectRequest_Sensor, *controlv1.ConnectRequest_StreamReady:
+		// Unsupported payloads are treated as invalid client messages by the stream handler.
+		return ClientMessage{}, nil
+	default:
+		return ClientMessage{}, nil
+	}
+}
+
+func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
+	switch {
+	case msg.RegisterAck != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_RegisterAck{
+				RegisterAck: &controlv1.RegisterAck{
+					ServerId: msg.RegisterAck.ServerID,
+					Message:  msg.RegisterAck.Message,
+				},
+			},
+		}
+	case msg.SetUI != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_SetUi{
+				SetUi: &uiv1.SetUI{
+					Root: descriptorToUINode(*msg.SetUI),
+				},
+			},
+		}
+	case msg.CommandAck != "" || msg.ScenarioStart != "" || msg.ScenarioStop != "" || msg.Notification != "" || len(msg.Data) > 0:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_CommandResult{
+				CommandResult: &controlv1.CommandResult{
+					RequestId:     msg.CommandAck,
+					ScenarioStart: msg.ScenarioStart,
+					ScenarioStop:  msg.ScenarioStop,
+					Notification:  msg.Notification,
+					Data:          msg.Data,
+				},
+			},
+		}
+	case msg.Notification != "":
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_Notification{
+				Notification: &uiv1.Notification{
+					Body:  msg.Notification,
+					Level: "info",
+				},
+			},
+		}
+	case msg.Error != "" || msg.ErrorCode != "":
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_Error{
+				Error: &controlv1.ControlError{
+					Code:    protoErrorCodeFromInternal(msg.ErrorCode),
+					Message: msg.Error,
+				},
+			},
+		}
+	default:
+		return &controlv1.ConnectResponse{}
+	}
+}
+
+func internalActionFromProto(action controlv1.CommandAction) string {
+	switch action {
+	case controlv1.CommandAction_COMMAND_ACTION_UNSPECIFIED:
+		return ""
+	case controlv1.CommandAction_COMMAND_ACTION_START:
+		return CommandActionStart
+	case controlv1.CommandAction_COMMAND_ACTION_STOP:
+		return CommandActionStop
+	default:
+		return ""
+	}
+}
+
+func internalKindFromProto(kind controlv1.CommandKind) string {
+	switch kind {
+	case controlv1.CommandKind_COMMAND_KIND_UNSPECIFIED:
+		return ""
+	case controlv1.CommandKind_COMMAND_KIND_VOICE:
+		return CommandKindVoice
+	case controlv1.CommandKind_COMMAND_KIND_MANUAL:
+		return CommandKindManual
+	case controlv1.CommandKind_COMMAND_KIND_SYSTEM:
+		return CommandKindSystem
+	default:
+		return ""
+	}
+}
+
+func protoErrorCodeFromInternal(code string) controlv1.ControlErrorCode {
+	switch code {
+	case ErrorCodeInvalidClientMessage:
+		return controlv1.ControlErrorCode_CONTROL_ERROR_CODE_INVALID_CLIENT_MESSAGE
+	case ErrorCodeInvalidCommandAction:
+		return controlv1.ControlErrorCode_CONTROL_ERROR_CODE_INVALID_COMMAND_ACTION
+	case ErrorCodeInvalidCommandKind:
+		return controlv1.ControlErrorCode_CONTROL_ERROR_CODE_INVALID_COMMAND_KIND
+	case ErrorCodeMissingIntent:
+		return controlv1.ControlErrorCode_CONTROL_ERROR_CODE_MISSING_COMMAND_INTENT
+	case ErrorCodeMissingText:
+		return controlv1.ControlErrorCode_CONTROL_ERROR_CODE_MISSING_COMMAND_TEXT
+	case ErrorCodeMissingDeviceID:
+		return controlv1.ControlErrorCode_CONTROL_ERROR_CODE_MISSING_COMMAND_DEVICE_ID
+	case ErrorCodeProtocolViolation:
+		return controlv1.ControlErrorCode_CONTROL_ERROR_CODE_PROTOCOL_VIOLATION
+	default:
+		return controlv1.ControlErrorCode_CONTROL_ERROR_CODE_UNKNOWN
+	}
+}
+
+func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]string {
+	if caps == nil {
+		return map[string]string{}
+	}
+
+	out := map[string]string{
+		"device_id": caps.GetDeviceId(),
+	}
+	identity := caps.GetIdentity()
+	if identity != nil {
+		out["device_name"] = identity.GetDeviceName()
+		out["device_type"] = identity.GetDeviceType()
+		out["platform"] = identity.GetPlatform()
+	}
+	return out
+}
+
+func descriptorToUINode(d ui.Descriptor) *uiv1.Node {
+	children := make([]*uiv1.Node, 0, len(d.Children))
+	for _, child := range d.Children {
+		children = append(children, descriptorToUINode(child))
+	}
+
+	props := make(map[string]string, len(d.Props)+1)
+	for k, v := range d.Props {
+		props[k] = v
+	}
+	if _, ok := props["type"]; !ok && d.Type != "" {
+		props["type"] = d.Type
+	}
+
+	node := &uiv1.Node{
+		Id:       d.ID,
+		Props:    props,
+		Children: children,
+	}
+	applyWidgetFromDescriptor(node, d.Type, d.Props)
+	return node
+}
+
+func applyWidgetFromDescriptor(node *uiv1.Node, nodeType string, props map[string]string) {
+	switch nodeType {
+	case "stack":
+		node.Widget = &uiv1.Node_Stack{Stack: &uiv1.StackWidget{}}
+	case "row":
+		node.Widget = &uiv1.Node_Row{Row: &uiv1.RowWidget{}}
+	case "grid":
+		node.Widget = &uiv1.Node_Grid{Grid: &uiv1.GridWidget{Columns: parseInt32(props["columns"])}}
+	case "scroll":
+		node.Widget = &uiv1.Node_Scroll{Scroll: &uiv1.ScrollWidget{Direction: props["direction"]}}
+	case "padding":
+		node.Widget = &uiv1.Node_Padding{Padding: &uiv1.PaddingWidget{All: parseInt32(props["all"])}}
+	case "center":
+		node.Widget = &uiv1.Node_Center{Center: &uiv1.CenterWidget{}}
+	case "expand":
+		node.Widget = &uiv1.Node_Expand{Expand: &uiv1.ExpandWidget{}}
+	case "text":
+		node.Widget = &uiv1.Node_Text{
+			Text: &uiv1.TextWidget{
+				Value: props["value"],
+				Style: props["style"],
+				Color: props["color"],
+			},
+		}
+	case "image":
+		node.Widget = &uiv1.Node_Image{Image: &uiv1.ImageWidget{Url: props["url"]}}
+	case "video_surface":
+		node.Widget = &uiv1.Node_VideoSurface{VideoSurface: &uiv1.VideoSurfaceWidget{TrackId: props["track_id"]}}
+	case "audio_visualizer":
+		node.Widget = &uiv1.Node_AudioVisualizer{AudioVisualizer: &uiv1.AudioVisualizerWidget{StreamId: props["stream_id"]}}
+	case "canvas":
+		node.Widget = &uiv1.Node_Canvas{Canvas: &uiv1.CanvasWidget{DrawOpsJson: props["draw_ops_json"]}}
+	case "text_input":
+		node.Widget = &uiv1.Node_TextInput{
+			TextInput: &uiv1.TextInputWidget{
+				Placeholder: props["placeholder"],
+				Autofocus:   parseBool(props["autofocus"]),
+			},
+		}
+	case "button":
+		node.Widget = &uiv1.Node_Button{Button: &uiv1.ButtonWidget{Label: props["label"], Action: props["action"]}}
+	case "slider":
+		node.Widget = &uiv1.Node_Slider{
+			Slider: &uiv1.SliderWidget{
+				Min:   parseFloat64(props["min"]),
+				Max:   parseFloat64(props["max"]),
+				Value: parseFloat64(props["value"]),
+			},
+		}
+	case "toggle":
+		node.Widget = &uiv1.Node_Toggle{Toggle: &uiv1.ToggleWidget{Value: parseBool(props["value"])}}
+	case "dropdown":
+		node.Widget = &uiv1.Node_Dropdown{Dropdown: &uiv1.DropdownWidget{Value: props["value"]}}
+	case "gesture_area":
+		node.Widget = &uiv1.Node_GestureArea{GestureArea: &uiv1.GestureAreaWidget{Action: props["action"]}}
+	case "overlay":
+		node.Widget = &uiv1.Node_Overlay{Overlay: &uiv1.OverlayWidget{}}
+	case "progress":
+		node.Widget = &uiv1.Node_Progress{Progress: &uiv1.ProgressWidget{Value: parseFloat64(props["value"])}}
+	case "fullscreen":
+		node.Widget = &uiv1.Node_Fullscreen{Fullscreen: &uiv1.FullscreenWidget{Enabled: parseBool(props["enabled"])}}
+	case "keep_awake":
+		node.Widget = &uiv1.Node_KeepAwake{KeepAwake: &uiv1.KeepAwakeWidget{Enabled: parseBool(props["enabled"])}}
+	case "brightness":
+		node.Widget = &uiv1.Node_Brightness{Brightness: &uiv1.BrightnessWidget{Value: parseFloat64(props["value"])}}
+	default:
+		node.Widget = nil
+	}
+}
+
+func parseInt32(raw string) int32 {
+	v, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil {
+		return 0
+	}
+	return int32(v)
+}
+
+func parseFloat64(raw string) float64 {
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
+func parseBool(raw string) bool {
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false
+	}
+	return v
+}

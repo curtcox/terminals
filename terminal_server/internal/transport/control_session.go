@@ -7,10 +7,8 @@ import (
 	"io"
 )
 
-var (
-	// ErrNilStream indicates the caller passed a nil stream.
-	ErrNilStream = errors.New("nil control stream")
-)
+// ErrNilStream indicates the caller passed a nil stream.
+var ErrNilStream = errors.New("nil control stream")
 
 // ControlStream is the transport-neutral interface mapped to gRPC streams.
 type ControlStream interface {

@@ -1,3 +1,4 @@
+// Package io manages logical stream-routing state.
 package io
 
 import (

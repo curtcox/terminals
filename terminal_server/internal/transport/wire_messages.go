@@ -34,9 +34,12 @@ type WireCommandRequest struct {
 type WireCommandAction int32
 
 const (
+	// WireCommandActionUnspecified indicates the command action was not set.
 	WireCommandActionUnspecified WireCommandAction = 0
-	WireCommandActionStart       WireCommandAction = 1
-	WireCommandActionStop        WireCommandAction = 2
+	// WireCommandActionStart requests scenario/flow activation.
+	WireCommandActionStart WireCommandAction = 1
+	// WireCommandActionStop requests scenario/flow stop.
+	WireCommandActionStop WireCommandAction = 2
 )
 
 // WireCommandKind mirrors control.proto command kind semantics.
@@ -44,10 +47,14 @@ const (
 type WireCommandKind int32
 
 const (
+	// WireCommandKindUnspecified indicates the command kind was not set.
 	WireCommandKindUnspecified WireCommandKind = 0
-	WireCommandKindVoice       WireCommandKind = 1
-	WireCommandKindManual      WireCommandKind = 2
-	WireCommandKindSystem      WireCommandKind = 3
+	// WireCommandKindVoice indicates speech-derived commands.
+	WireCommandKindVoice WireCommandKind = 1
+	// WireCommandKindManual indicates explicit manual commands.
+	WireCommandKindManual WireCommandKind = 2
+	// WireCommandKindSystem indicates introspection/admin commands.
+	WireCommandKindSystem WireCommandKind = 3
 )
 
 // WireClientMessage is a protobuf-adapter-friendly oneof shape.
@@ -75,9 +82,33 @@ type WireCommandResult struct {
 
 // WireControlError is a protobuf-adapter-friendly control error payload.
 type WireControlError struct {
-	Code    string
+	Code    WireControlErrorCode
 	Message string
 }
+
+// WireControlErrorCode mirrors control.proto ControlErrorCode semantics.
+type WireControlErrorCode int32
+
+const (
+	// WireControlErrorCodeUnspecified indicates no explicit error classification.
+	WireControlErrorCodeUnspecified WireControlErrorCode = 0
+	// WireControlErrorCodeInvalidClientMessage indicates malformed top-level payload.
+	WireControlErrorCodeInvalidClientMessage WireControlErrorCode = 1
+	// WireControlErrorCodeInvalidCommandAction indicates unknown/unsupported action.
+	WireControlErrorCodeInvalidCommandAction WireControlErrorCode = 2
+	// WireControlErrorCodeInvalidCommandKind indicates unknown/unsupported command kind.
+	WireControlErrorCodeInvalidCommandKind WireControlErrorCode = 3
+	// WireControlErrorCodeMissingCommandIntent indicates missing required intent.
+	WireControlErrorCodeMissingCommandIntent WireControlErrorCode = 4
+	// WireControlErrorCodeMissingCommandText indicates missing required text.
+	WireControlErrorCodeMissingCommandText WireControlErrorCode = 5
+	// WireControlErrorCodeMissingCommandDeviceID indicates missing required device id.
+	WireControlErrorCodeMissingCommandDeviceID WireControlErrorCode = 6
+	// WireControlErrorCodeProtocolViolation indicates stream/session protocol misuse.
+	WireControlErrorCodeProtocolViolation WireControlErrorCode = 7
+	// WireControlErrorCodeUnknown indicates uncategorized server errors.
+	WireControlErrorCodeUnknown WireControlErrorCode = 99
+)
 
 // WireServerMessage is a protobuf-adapter-friendly oneof response shape.
 type WireServerMessage struct {

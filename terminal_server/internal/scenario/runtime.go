@@ -9,10 +9,8 @@ import (
 	"time"
 )
 
-var (
-	// ErrNoMatchingScenario indicates no scenario handled the trigger.
-	ErrNoMatchingScenario = errors.New("no matching scenario")
-)
+// ErrNoMatchingScenario indicates no scenario handled the trigger.
+var ErrNoMatchingScenario = errors.New("no matching scenario")
 
 // Runtime coordinates trigger matching and activation.
 type Runtime struct {

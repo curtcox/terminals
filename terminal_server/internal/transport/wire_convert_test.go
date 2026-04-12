@@ -37,7 +37,7 @@ func TestWireFromInternalServer(t *testing.T) {
 	if wire.CommandResult == nil || wire.CommandResult.RequestID != "cmd-1" {
 		t.Fatalf("unexpected command result mapping: %+v", wire.CommandResult)
 	}
-	if wire.Error == nil || wire.Error.Code != ErrorCodeInvalidCommandAction || wire.Error.Message == "" {
+	if wire.Error == nil || wire.Error.Code != WireControlErrorCodeInvalidCommandAction || wire.Error.Message == "" {
 		t.Fatalf("unexpected error fields: %+v", wire.Error)
 	}
 	if len(wire.CommandResult.Data) != 2 || wire.CommandResult.Data[0].Key != "a" || wire.CommandResult.Data[1].Key != "b" {

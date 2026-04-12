@@ -1,3 +1,4 @@
+// Package transport implements control-plane message handling and adaptation.
 package transport
 
 // Command kinds.

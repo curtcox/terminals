@@ -1,3 +1,4 @@
+// Package storage contains in-memory persistence primitives.
 package storage
 
 import (

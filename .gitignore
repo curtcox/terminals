@@ -29,3 +29,4 @@ api/gen/
 dist/
 build/
 tmp/
+.bin/

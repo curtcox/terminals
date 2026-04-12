@@ -1,13 +1,14 @@
 version: v1
 plugins:
   - plugin: buf.build/protocolbuffers/go
-    out: gen/go
+    out: ../terminal_server
     opt:
-      - paths=source_relative
+      - paths=import
+      - module=github.com/curtcox/terminals/terminal_server
   - plugin: buf.build/grpc/go
-    out: gen/go
+    out: ../terminal_server
     opt:
-      - paths=source_relative
+      - paths=import
+      - module=github.com/curtcox/terminals/terminal_server
   - plugin: buf.build/protocolbuffers/dart
     out: gen/dart
-

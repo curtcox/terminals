@@ -48,7 +48,7 @@ func main() {
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
 	controlStream := transport.NewStreamHandler(controlService)
 	grpcServer := transport.NewServer(cfg.GRPCAddress())
-	grpcServer.ConfigureControl(controlService, transport.WireProtoAdapter{})
+	grpcServer.ConfigureControl(controlService, transport.GeneratedProtoAdapter{})
 	grpcServer.ConfigureRuntime(scenarioRuntime)
 	mdns := discovery.NoopAdvertiser{}
 
@@ -60,25 +60,31 @@ func main() {
 		Port:        cfg.GRPCPort,
 		Version:     cfg.Version,
 	}); err != nil {
-		log.Fatalf("start mDNS: %v", err)
+		log.Printf("start mDNS: %v", err)
+		return
 	}
 
 	if err := grpcServer.Start(ctx); err != nil {
-		log.Fatalf("start transport: %v", err)
+		log.Printf("start transport: %v", err)
+		return
 	}
 
 	// Keep this non-empty so startup validates major foundational services.
 	if len(deviceManager.List()) != 0 {
-		log.Fatalf("unexpected initial device registry state")
+		log.Printf("unexpected initial device registry state")
+		return
 	}
 	if len(ioRouter.Routes()) != 0 {
-		log.Fatalf("unexpected initial route registry state")
+		log.Printf("unexpected initial route registry state")
+		return
 	}
 	if _, ok := scenarioEngine.Active("bootstrap"); ok {
-		log.Fatalf("unexpected initial scenario state")
+		log.Printf("unexpected initial scenario state")
+		return
 	}
 	if len(scheduler.List()) != 0 {
-		log.Fatalf("unexpected initial scheduler state")
+		log.Printf("unexpected initial scheduler state")
+		return
 	}
 	log.Printf("control service ready for server id %q", cfg.MDNSName)
 	log.Printf("control stream handler initialized")

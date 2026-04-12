@@ -2,17 +2,17 @@ syntax = "proto3";
 
 package terminals.control.v1;
 
-import "proto/capabilities.proto";
-import "proto/io.proto";
-import "proto/ui.proto";
+import "terminals/capabilities/v1/capabilities.proto";
+import "terminals/io/v1/io.proto";
+import "terminals/ui/v1/ui.proto";
 
 option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/control/v1;controlv1";
 
-service TerminalControl {
-  rpc Connect(stream ClientMessage) returns (stream ServerMessage);
+service TerminalControlService {
+  rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
 }
 
-message ClientMessage {
+message ConnectRequest {
   oneof payload {
     RegisterDevice register = 1;
     CapabilityUpdate capability = 2;
@@ -24,7 +24,7 @@ message ClientMessage {
   }
 }
 
-message ServerMessage {
+message ConnectResponse {
   oneof payload {
     RegisterAck register_ack = 1;
     terminals.ui.v1.SetUI set_ui = 2;
@@ -64,11 +64,18 @@ enum CommandAction {
   COMMAND_ACTION_STOP = 2;
 }
 
+enum CommandKind {
+  COMMAND_KIND_UNSPECIFIED = 0;
+  COMMAND_KIND_VOICE = 1;
+  COMMAND_KIND_MANUAL = 2;
+  COMMAND_KIND_SYSTEM = 3;
+}
+
 message CommandRequest {
   string request_id = 1;
   string device_id = 2;
   CommandAction action = 3;
-  string kind = 4;   // voice, manual, system
+  CommandKind kind = 4;
   string text = 5;   // voice transcript
   string intent = 6; // intent name or system intent
 }
@@ -81,8 +88,20 @@ message CommandResult {
   map<string, string> data = 5;
 }
 
+enum ControlErrorCode {
+  CONTROL_ERROR_CODE_UNSPECIFIED = 0;
+  CONTROL_ERROR_CODE_INVALID_CLIENT_MESSAGE = 1;
+  CONTROL_ERROR_CODE_INVALID_COMMAND_ACTION = 2;
+  CONTROL_ERROR_CODE_INVALID_COMMAND_KIND = 3;
+  CONTROL_ERROR_CODE_MISSING_COMMAND_INTENT = 4;
+  CONTROL_ERROR_CODE_MISSING_COMMAND_TEXT = 5;
+  CONTROL_ERROR_CODE_MISSING_COMMAND_DEVICE_ID = 6;
+  CONTROL_ERROR_CODE_PROTOCOL_VIOLATION = 7;
+  CONTROL_ERROR_CODE_UNKNOWN = 99;
+}
+
 message ControlError {
-  string code = 1;
+  ControlErrorCode code = 1;
   string message = 2;
 }
 
