@@ -7,7 +7,7 @@ func TestInternalFromWireClient(t *testing.T) {
 		Command: &WireCommandRequest{
 			RequestID: "r1",
 			DeviceID:  "d1",
-			Action:    CommandActionStart,
+			Action:    WireCommandActionStart,
 			Kind:      CommandKindManual,
 			Intent:    "photo frame",
 		},

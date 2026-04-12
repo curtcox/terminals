@@ -24,11 +24,20 @@ type WireHeartbeatRequest struct {
 type WireCommandRequest struct {
 	RequestID string
 	DeviceID  string
-	Action    string
+	Action    WireCommandAction
 	Kind      string
 	Text      string
 	Intent    string
 }
+
+// WireCommandAction mirrors control.proto CommandAction.
+type WireCommandAction int32
+
+const (
+	WireCommandActionUnspecified WireCommandAction = 0
+	WireCommandActionStart       WireCommandAction = 1
+	WireCommandActionStop        WireCommandAction = 2
+)
 
 // WireClientMessage is a protobuf-adapter-friendly oneof shape.
 type WireClientMessage struct {
