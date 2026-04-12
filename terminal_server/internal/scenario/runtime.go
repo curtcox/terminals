@@ -3,6 +3,7 @@ package scenario
 import (
 	"context"
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -75,14 +76,19 @@ func (r *Runtime) StatusData() map[string]string {
 	}
 
 	activeRoutes := 0
+	pendingTimers := 0
 	if r != nil && r.Env != nil && r.Env.IO != nil {
 		activeRoutes = r.Env.IO.RouteCount()
+	}
+	if r != nil && r.Env != nil && r.Env.Scheduler != nil {
+		pendingTimers = len(r.Env.Scheduler.Due(math.MaxInt64))
 	}
 
 	return map[string]string{
 		"active_scenarios":     strconv.Itoa(activeScenarios),
 		"active_routes":        strconv.Itoa(activeRoutes),
 		"registered_scenarios": strconv.Itoa(registeredScenarios),
+		"pending_timers":       strconv.Itoa(pendingTimers),
 	}
 }
 

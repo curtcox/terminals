@@ -5,6 +5,7 @@ import (
 	"log"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/ai"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
@@ -82,9 +83,17 @@ func main() {
 	log.Printf("control service ready for server id %q", cfg.MDNSName)
 	log.Printf("control stream handler initialized")
 	log.Printf("scenario runtime initialized with %d builtin scenarios", 3)
+	log.Printf(
+		"housekeeping configured heartbeat_timeout=%ds liveness_interval=%ds due_timer_interval=%ds",
+		cfg.HeartbeatTimeoutSeconds,
+		cfg.LivenessReconcileIntervalSecs,
+		cfg.DueTimerProcessIntervalSecs,
+	)
 	_ = controlService
 	_ = controlStream
-	_ = scenarioRuntime
+
+	go runDueTimerLoop(ctx, scenarioRuntime, time.Duration(cfg.DueTimerProcessIntervalSecs)*time.Second)
+	go runLivenessLoop(ctx, controlService, time.Duration(cfg.HeartbeatTimeoutSeconds)*time.Second, time.Duration(cfg.LivenessReconcileIntervalSecs)*time.Second)
 
 	<-ctx.Done()
 	log.Println("terminal server shutting down")
@@ -96,5 +105,49 @@ func main() {
 	}
 	if err := mdns.Stop(shutdownCtx); err != nil {
 		log.Printf("stop mDNS: %v", err)
+	}
+}
+
+func runDueTimerLoop(ctx context.Context, runtime *scenario.Runtime, interval time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			processed, err := runtime.ProcessDueTimers(ctx, now.UTC())
+			if err != nil {
+				log.Printf("due timer loop error: %v", err)
+				continue
+			}
+			if processed > 0 {
+				log.Printf("due timer loop processed=%d", processed)
+			}
+		}
+	}
+}
+
+func runLivenessLoop(ctx context.Context, control *transport.ControlService, timeout, interval time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			updated := control.ReconcileLiveness(timeout)
+			if updated > 0 {
+				log.Printf("liveness reconcile updated=%d", updated)
+			}
+		}
 	}
 }

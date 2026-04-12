@@ -138,8 +138,9 @@ func TestRuntimeStatusData(t *testing.T) {
 		Priority: PriorityLow,
 	})
 	runtime := NewRuntime(engine, &Environment{
-		Devices: devices,
-		IO:      routes,
+		Devices:   devices,
+		IO:        routes,
+		Scheduler: storage.NewMemoryScheduler(),
 	})
 
 	_, _ = runtime.HandleTrigger(context.Background(), Trigger{
@@ -157,6 +158,9 @@ func TestRuntimeStatusData(t *testing.T) {
 	}
 	if status["registered_scenarios"] != "1" {
 		t.Fatalf("registered_scenarios = %q, want 1", status["registered_scenarios"])
+	}
+	if status["pending_timers"] != "0" {
+		t.Fatalf("pending_timers = %q, want 0", status["pending_timers"])
 	}
 }
 

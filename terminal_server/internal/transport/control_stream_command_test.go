@@ -410,6 +410,9 @@ func TestHandleMessageSystemRuntimeStatus(t *testing.T) {
 	if out[0].Data["registered_scenarios"] == "" {
 		t.Fatalf("expected registered_scenarios in runtime_status")
 	}
+	if out[0].Data["pending_timers"] == "" {
+		t.Fatalf("expected pending_timers in runtime_status")
+	}
 }
 
 func TestHandleMessageSystemScenarioRegistry(t *testing.T) {
