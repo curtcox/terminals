@@ -1,5 +1,5 @@
 // Package io manages logical stream-routing state.
-package io
+package io //nolint:revive
 
 import (
 	"errors"

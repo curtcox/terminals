@@ -5,6 +5,7 @@ import "context"
 // TriggerKind identifies how a scenario was requested.
 type TriggerKind string
 
+// Trigger kind constants identify how a scenario was activated.
 const (
 	// TriggerVoice indicates a spoken command initiated the scenario.
 	TriggerVoice TriggerKind = "voice"
