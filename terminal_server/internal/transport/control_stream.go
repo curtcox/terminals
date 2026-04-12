@@ -279,6 +279,10 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	if cmd == nil {
 		return responses
 	}
+	if refresh, ok := h.commandTerminalRefresh(ctx, cmd); ok {
+		responses = append(responses, refresh)
+		return responses
+	}
 	if commandResult.ScenarioStop == "terminal" {
 		h.terminateTerminalForDevice(cmd.DeviceID)
 		responses = append(responses, ServerMessage{
@@ -312,6 +316,39 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		},
 	})
 	return responses
+}
+
+func (h *StreamHandler) commandTerminalRefresh(_ context.Context, cmd *CommandRequest) (ServerMessage, bool) {
+	if cmd == nil {
+		return ServerMessage{}, false
+	}
+	targetDeviceID := ""
+	switch cmd.Kind {
+	case CommandKindManual:
+		if strings.TrimSpace(cmd.Intent) != SystemIntentTerminalRefresh {
+			return ServerMessage{}, false
+		}
+		targetDeviceID = strings.TrimSpace(cmd.DeviceID)
+	case CommandKindSystem:
+		parsed, err := ParseSystemIntent(cmd.Intent)
+		if err != nil || parsed.Name != SystemIntentTerminalRefresh {
+			return ServerMessage{}, false
+		}
+		targetDeviceID = strings.TrimSpace(parsed.Arg)
+		if targetDeviceID == "" {
+			targetDeviceID = strings.TrimSpace(cmd.DeviceID)
+		}
+	default:
+		return ServerMessage{}, false
+	}
+	if targetDeviceID == "" {
+		return ServerMessage{}, false
+	}
+	update, err := h.pollTerminalOutput(targetDeviceID)
+	if err != nil || update == nil {
+		return ServerMessage{}, false
+	}
+	return *update, true
 }
 
 func (h *StreamHandler) ensureTerminalSession(ctx context.Context, deviceID string) (string, error) {
@@ -654,6 +691,17 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 		if strings.TrimSpace(cmd.Intent) == "" {
 			return ServerMessage{}, ErrMissingCommandIntent
 		}
+		if strings.TrimSpace(cmd.Intent) == SystemIntentTerminalRefresh {
+			if action == CommandActionStop {
+				return ServerMessage{}, ErrInvalidCommandAction
+			}
+			return ServerMessage{
+				Notification: "Terminal refresh requested",
+				Data: map[string]string{
+					"device_id": cmd.DeviceID,
+				},
+			}, nil
+		}
 		trigger := scenario.Trigger{
 			Kind:      scenario.TriggerManual,
 			SourceID:  cmd.DeviceID,
@@ -829,6 +877,20 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		return ServerMessage{
 			Notification: "System query: recent_commands",
 			Data:         data,
+		}, nil
+	case SystemIntentTerminalRefresh:
+		targetDeviceID := strings.TrimSpace(parsed.Arg)
+		if targetDeviceID == "" {
+			targetDeviceID = strings.TrimSpace(cmd.DeviceID)
+		}
+		if targetDeviceID == "" {
+			return ServerMessage{}, ErrMissingCommandDeviceID
+		}
+		return ServerMessage{
+			Notification: "System query: terminal_refresh",
+			Data: map[string]string{
+				"device_id": targetDeviceID,
+			},
 		}, nil
 	default:
 		if parsed.Name == SystemIntentDeviceStatus && parsed.Arg != "" {

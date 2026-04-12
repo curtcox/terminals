@@ -1418,6 +1418,143 @@ func TestHandleMessageSystemRecentCommands(t *testing.T) {
 	}
 }
 
+func TestHandleMessageManualTerminalRefresh(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "manual-refresh-start-terminal",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "sleep 1; printf '\\x72\\x65\\x66\\x72\\x65\\x73\\x68\\x2d\\x6d\\x61\\x6e\\x75\\x61\\x6c\\n'",
+		},
+	})
+	time.Sleep(1200 * time.Millisecond)
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "manual-refresh-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    SystemIntentTerminalRefresh,
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual terminal_refresh error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[0].CommandAck != "manual-refresh-1" {
+		t.Fatalf("CommandAck = %q, want manual-refresh-1", out[0].CommandAck)
+	}
+	if out[1].UpdateUI == nil {
+		t.Fatalf("expected UpdateUI response after manual terminal_refresh")
+	}
+	if !strings.Contains(out[1].UpdateUI.Node.Props["value"], "refresh-manual") {
+		t.Fatalf("manual terminal_refresh missing delayed output: %+v", out[1].UpdateUI.Node.Props)
+	}
+}
+
+func TestHandleMessageSystemTerminalRefresh(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "system-refresh-start-terminal",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "sleep 1; printf '\\x72\\x65\\x66\\x72\\x65\\x73\\x68\\x2d\\x73\\x79\\x73\\x74\\x65\\x6d\\n'",
+		},
+	})
+	time.Sleep(1200 * time.Millisecond)
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-refresh-1",
+			Kind:      "system",
+			Intent:    SystemIntentTerminalRefresh + " device-1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system terminal_refresh error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[0].Data["device_id"] != "device-1" {
+		t.Fatalf("device_id = %q, want device-1", out[0].Data["device_id"])
+	}
+	if out[1].UpdateUI == nil {
+		t.Fatalf("expected UpdateUI response after system terminal_refresh")
+	}
+	if !strings.Contains(out[1].UpdateUI.Node.Props["value"], "refresh-system") {
+		t.Fatalf("system terminal_refresh missing delayed output: %+v", out[1].UpdateUI.Node.Props)
+	}
+}
+
+func TestHandleMessageSystemTerminalRefreshRequiresDeviceID(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-refresh-missing-device",
+			Kind:      "system",
+			Intent:    SystemIntentTerminalRefresh,
+		},
+	})
+	if err != ErrMissingCommandDeviceID {
+		t.Fatalf("error = %v, want %v", err, ErrMissingCommandDeviceID)
+	}
+}
+
 func TestHandleMessageSystemReconcileLivenessDefault(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

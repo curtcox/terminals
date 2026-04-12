@@ -28,4 +28,5 @@ const (
 	SystemIntentRunDueTimers      = "run_due_timers"
 	SystemIntentReconcileLiveness = "reconcile_liveness"
 	SystemIntentDeviceStatus      = "device_status"
+	SystemIntentTerminalRefresh   = "terminal_refresh"
 )

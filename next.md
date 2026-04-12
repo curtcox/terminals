@@ -1,1 +1,1 @@
-Add a dedicated server-driven terminal refresh command (system/manual) to force immediate PTY flush and UI update on demand.
+Add a terminal UI refresh control (button action) and route that UIAction to terminal_refresh so users can force a PTY flush from the server-driven UI.

@@ -39,6 +39,14 @@ func TestParseSystemIntent(t *testing.T) {
 	if reconcile.Name != SystemIntentReconcileLiveness || reconcile.Arg != "30" {
 		t.Fatalf("unexpected parsed reconcile intent: %+v", reconcile)
 	}
+
+	refresh, err := ParseSystemIntent(SystemIntentTerminalRefresh + " device-1")
+	if err != nil {
+		t.Fatalf("ParseSystemIntent(terminal_refresh) error = %v", err)
+	}
+	if refresh.Name != SystemIntentTerminalRefresh || refresh.Arg != "device-1" {
+		t.Fatalf("unexpected parsed terminal_refresh intent: %+v", refresh)
+	}
 }
 
 func TestParseSystemIntentErrors(t *testing.T) {

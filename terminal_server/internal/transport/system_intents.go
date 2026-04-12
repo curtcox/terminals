@@ -23,6 +23,7 @@ func SystemHelpIntentsString() string {
 		SystemIntentPendingTimers,
 		SystemIntentRecentCommands,
 		SystemIntentDeviceStatus + " <device_id>",
+		SystemIntentTerminalRefresh + " <device_id>",
 		SystemIntentRunDueTimers,
 		SystemIntentReconcileLiveness + " <seconds>",
 		SystemIntentHelp,
@@ -46,6 +47,7 @@ func ParseSystemIntent(raw string) (ParsedSystemIntent, error) {
 		SystemIntentActiveScenarios,
 		SystemIntentPendingTimers,
 		SystemIntentRecentCommands,
+		SystemIntentTerminalRefresh,
 		SystemIntentRunDueTimers,
 		SystemIntentReconcileLiveness:
 		return ParsedSystemIntent{Name: intent}, nil
@@ -64,6 +66,13 @@ func ParseSystemIntent(raw string) (ParsedSystemIntent, error) {
 			return ParsedSystemIntent{}, fmt.Errorf("invalid reconcile_liveness seconds: %s", arg)
 		}
 		return ParsedSystemIntent{Name: SystemIntentReconcileLiveness, Arg: arg}, nil
+	}
+	if strings.HasPrefix(intent, SystemIntentTerminalRefresh+" ") {
+		arg := strings.TrimSpace(strings.TrimPrefix(intent, SystemIntentTerminalRefresh+" "))
+		if arg == "" {
+			return ParsedSystemIntent{}, fmt.Errorf("terminal_refresh requires device id")
+		}
+		return ParsedSystemIntent{Name: SystemIntentTerminalRefresh, Arg: arg}, nil
 	}
 
 	return ParsedSystemIntent{}, fmt.Errorf("unknown system intent: %s", intent)
