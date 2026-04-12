@@ -10,14 +10,24 @@ class TerminalControlGrpcClient {
   TerminalControlGrpcClient({
     required this.host,
     required this.port,
-  })  : _channel = ClientChannel(
-          host,
+  }) : this._internal(
+          host: host,
           port: port,
-          options: const ChannelOptions(
-            credentials: ChannelCredentials.insecure(),
+          channel: ClientChannel(
+            host,
+            port: port,
+            options: const ChannelOptions(
+              credentials: ChannelCredentials.insecure(),
+            ),
           ),
-        ),
-        _stub = _TerminalControlServiceClient(_channel);
+        );
+
+  TerminalControlGrpcClient._internal({
+    required this.host,
+    required this.port,
+    required ClientChannel channel,
+  })  : _channel = channel,
+        _stub = _TerminalControlServiceClient(channel);
 
   final String host;
   final int port;
@@ -49,7 +59,7 @@ class TerminalControlGrpcClient {
           ..identity = (DeviceIdentity()
             ..deviceName = deviceName
             ..deviceType = deviceType
-            ..platform = platform));
+            ..platform = platform)));
   }
 
   /// Builds a heartbeat message.
