@@ -7,9 +7,84 @@ option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/io/v1;i
 message StartStream {
   string stream_id = 1;
   string kind = 2;
+  string source_device_id = 3;
+  string target_device_id = 4;
+  map<string, string> metadata = 5;
 }
 
 message StopStream {
   string stream_id = 1;
 }
 
+message RouteStream {
+  string stream_id = 1;
+  string source_device_id = 2;
+  string target_device_id = 3;
+  string kind = 4;
+}
+
+message PlayAudio {
+  string request_id = 1;
+  string device_id = 2;
+  oneof source {
+    string url = 3;
+    bytes pcm_data = 4;
+    string tts_text = 5;
+  }
+}
+
+message ShowMedia {
+  string request_id = 1;
+  string device_id = 2;
+  string media_url = 3;
+  string media_type = 4;
+}
+
+message InputEvent {
+  string device_id = 1;
+  oneof payload {
+    KeyEvent key = 2;
+    PointerEvent pointer = 3;
+    TouchEvent touch = 4;
+    UIAction ui_action = 5;
+  }
+}
+
+message KeyEvent {
+  string key = 1;
+  bool down = 2;
+  bool up = 3;
+  string text = 4;
+}
+
+message PointerEvent {
+  string action = 1;
+  double x = 2;
+  double y = 3;
+  double delta_x = 4;
+  double delta_y = 5;
+  int32 button = 6;
+}
+
+message TouchPoint {
+  int32 id = 1;
+  double x = 2;
+  double y = 3;
+}
+
+message TouchEvent {
+  string action = 1;
+  repeated TouchPoint points = 2;
+}
+
+message UIAction {
+  string component_id = 1;
+  string action = 2;
+  string value = 3;
+}
+
+message SensorData {
+  string device_id = 1;
+  int64 unix_ms = 2;
+  map<string, double> values = 3;
+}

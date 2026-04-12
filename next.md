@@ -1,4 +1,4 @@
-1. Install `flutter`, `buf`, and `golangci-lint` CLIs locally.
-2. Run `make server-lint`.
-3. Run `make proto-lint proto-generate`.
-4. Run `make client-build client-test client-lint`.
+1. Install `buf`, `flutter`, and `golangci-lint`.
+2. Run `make server-lint proto-lint proto-generate`.
+3. Implement the gRPC `Connect` control stream using generated Go protobuf types.
+4. Wire client discovery + register + heartbeat flow against the control stream.

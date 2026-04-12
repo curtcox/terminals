@@ -1,0 +1,96 @@
+package device
+
+import (
+	"testing"
+	"time"
+)
+
+func TestRegisterAndGet(t *testing.T) {
+	m := NewManager()
+	fixedNow := time.Date(2026, 4, 11, 10, 30, 0, 0, time.UTC)
+	m.now = func() time.Time { return fixedNow }
+
+	got, err := m.Register(Manifest{
+		DeviceID:   "device-1",
+		DeviceName: "Kitchen Chromebook",
+		DeviceType: "laptop",
+		Platform:   "chromeos",
+		Capabilities: CapabilitySet{
+			"screen.width": "1920",
+			"mic.channels": "1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	if got.DeviceID != "device-1" {
+		t.Fatalf("DeviceID = %q, want %q", got.DeviceID, "device-1")
+	}
+	if got.RegisteredAt != fixedNow {
+		t.Fatalf("RegisteredAt = %v, want %v", got.RegisteredAt, fixedNow)
+	}
+
+	found, ok := m.Get("device-1")
+	if !ok {
+		t.Fatalf("Get() did not find registered device")
+	}
+	if found.Capabilities["screen.width"] != "1920" {
+		t.Fatalf("capability screen.width = %q", found.Capabilities["screen.width"])
+	}
+}
+
+func TestRegisterMissingID(t *testing.T) {
+	m := NewManager()
+	if _, err := m.Register(Manifest{}); err != ErrMissingDeviceID {
+		t.Fatalf("Register() error = %v, want %v", err, ErrMissingDeviceID)
+	}
+}
+
+func TestUpdateCapabilities(t *testing.T) {
+	m := NewManager()
+	_, _ = m.Register(Manifest{DeviceID: "device-1"})
+
+	if err := m.UpdateCapabilities("device-1", CapabilitySet{"camera.front": "true"}); err != nil {
+		t.Fatalf("UpdateCapabilities() error = %v", err)
+	}
+
+	found, _ := m.Get("device-1")
+	if found.Capabilities["camera.front"] != "true" {
+		t.Fatalf("camera.front = %q", found.Capabilities["camera.front"])
+	}
+}
+
+func TestHeartbeatAndDisconnect(t *testing.T) {
+	m := NewManager()
+	_, _ = m.Register(Manifest{DeviceID: "device-1"})
+
+	pulse := time.Date(2026, 4, 11, 11, 45, 0, 0, time.UTC)
+	if err := m.Heartbeat("device-1", pulse); err != nil {
+		t.Fatalf("Heartbeat() error = %v", err)
+	}
+	if err := m.MarkDisconnected("device-1"); err != nil {
+		t.Fatalf("MarkDisconnected() error = %v", err)
+	}
+
+	found, _ := m.Get("device-1")
+	if found.LastHeartbeat != pulse {
+		t.Fatalf("LastHeartbeat = %v, want %v", found.LastHeartbeat, pulse)
+	}
+	if found.State != StateDisconnected {
+		t.Fatalf("State = %q, want %q", found.State, StateDisconnected)
+	}
+}
+
+func TestListSorted(t *testing.T) {
+	m := NewManager()
+	_, _ = m.Register(Manifest{DeviceID: "b"})
+	_, _ = m.Register(Manifest{DeviceID: "a"})
+
+	list := m.List()
+	if len(list) != 2 {
+		t.Fatalf("len(List()) = %d, want 2", len(list))
+	}
+	if list[0].DeviceID != "a" || list[1].DeviceID != "b" {
+		t.Fatalf("List() order = %q, %q", list[0].DeviceID, list[1].DeviceID)
+	}
+}

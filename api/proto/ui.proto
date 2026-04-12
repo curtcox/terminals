@@ -5,6 +5,144 @@ package terminals.ui.v1;
 option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1;uiv1";
 
 message SetUI {
-  string root_json = 1;
+  string device_id = 1;
+  Node root = 2;
 }
 
+message UpdateUI {
+  string device_id = 1;
+  string component_id = 2;
+  Node node = 3;
+}
+
+message TransitionUI {
+  string device_id = 1;
+  string transition = 2;
+  int32 duration_ms = 3;
+}
+
+message Notification {
+  string device_id = 1;
+  string title = 2;
+  string body = 3;
+  string level = 4;
+}
+
+message Node {
+  string id = 1;
+  map<string, string> props = 2;
+  repeated Node children = 3;
+
+  oneof widget {
+    StackWidget stack = 10;
+    RowWidget row = 11;
+    GridWidget grid = 12;
+    ScrollWidget scroll = 13;
+    PaddingWidget padding = 14;
+    CenterWidget center = 15;
+    ExpandWidget expand = 16;
+    TextWidget text = 17;
+    ImageWidget image = 18;
+    VideoSurfaceWidget video_surface = 19;
+    AudioVisualizerWidget audio_visualizer = 20;
+    CanvasWidget canvas = 21;
+    TextInputWidget text_input = 22;
+    ButtonWidget button = 23;
+    SliderWidget slider = 24;
+    ToggleWidget toggle = 25;
+    DropdownWidget dropdown = 26;
+    GestureAreaWidget gesture_area = 27;
+    OverlayWidget overlay = 28;
+    ProgressWidget progress = 29;
+    FullscreenWidget fullscreen = 30;
+    KeepAwakeWidget keep_awake = 31;
+    BrightnessWidget brightness = 32;
+  }
+}
+
+message StackWidget {}
+message RowWidget {}
+
+message GridWidget {
+  int32 columns = 1;
+}
+
+message ScrollWidget {
+  string direction = 1;
+}
+
+message PaddingWidget {
+  int32 all = 1;
+}
+
+message CenterWidget {}
+message ExpandWidget {}
+
+message TextWidget {
+  string value = 1;
+  string style = 2;
+  string color = 3;
+}
+
+message ImageWidget {
+  string url = 1;
+}
+
+message VideoSurfaceWidget {
+  string track_id = 1;
+}
+
+message AudioVisualizerWidget {
+  string stream_id = 1;
+}
+
+message CanvasWidget {
+  string draw_ops_json = 1;
+}
+
+message TextInputWidget {
+  string placeholder = 1;
+  bool autofocus = 2;
+}
+
+message ButtonWidget {
+  string label = 1;
+  string action = 2;
+}
+
+message SliderWidget {
+  double min = 1;
+  double max = 2;
+  double value = 3;
+}
+
+message ToggleWidget {
+  bool value = 1;
+}
+
+message DropdownWidget {
+  repeated string options = 1;
+  string value = 2;
+}
+
+message GestureAreaWidget {
+  string action = 1;
+}
+
+message OverlayWidget {}
+
+message ProgressWidget {
+  double value = 1;
+}
+
+message FullscreenWidget {
+  bool enabled = 1;
+}
+
+message KeepAwakeWidget {
+  bool enabled = 1;
+}
+
+message BrightnessWidget {
+  double value = 1;
+}
