@@ -68,6 +68,7 @@ type ServerMessage struct {
 	ScenarioStart string
 	ScenarioStop  string
 	Data          map[string]string
+	ErrorCode     string
 	Error         string
 }
 
@@ -128,7 +129,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		resp, err := h.control.Register(ctx, *msg.Register)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{Error: err.Error()}}, err
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
 		return []ServerMessage{
 			{RegisterAck: &resp},
@@ -139,7 +140,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		err := h.control.UpdateCapabilities(ctx, msg.Capability.DeviceID, msg.Capability.Capabilities)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{Error: err.Error()}}, err
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
 		return nil, nil
 	case msg.Heartbeat != nil:
@@ -147,7 +148,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		err := h.control.Heartbeat(ctx, msg.Heartbeat.DeviceID)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{Error: err.Error()}}, err
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
 		return nil, nil
 	case msg.Command != nil:
@@ -186,7 +187,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 				WhenUnix:  h.control.now().UTC().UnixMilli(),
 			})
 			h.mu.Unlock()
-			return []ServerMessage{{Error: err.Error()}}, err
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
 		h.mu.Lock()
 		h.appendCommandEventLocked(CommandEvent{
@@ -214,7 +215,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		return []ServerMessage{commandResult}, nil
 	default:
 		h.metrics.protocolErrors.Add(1)
-		return []ServerMessage{{Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
+		return []ServerMessage{{ErrorCode: errorCodeFor(ErrInvalidClientMessage), Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
 	}
 }
 

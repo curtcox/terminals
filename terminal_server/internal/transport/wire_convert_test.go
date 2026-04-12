@@ -24,6 +24,8 @@ func TestWireFromInternalServer(t *testing.T) {
 	wire := WireFromInternalServer(ServerMessage{
 		RegisterAck: &RegisterResponse{ServerID: "srv-1", Message: "ok"},
 		CommandAck:  "cmd-1",
+		ErrorCode:   ErrorCodeInvalidCommandAction,
+		Error:       "invalid command action",
 		Data: map[string]string{
 			"b": "2",
 			"a": "1",
@@ -34,6 +36,9 @@ func TestWireFromInternalServer(t *testing.T) {
 	}
 	if wire.CommandAck != "cmd-1" {
 		t.Fatalf("CommandAck = %q, want cmd-1", wire.CommandAck)
+	}
+	if wire.ErrorCode != ErrorCodeInvalidCommandAction || wire.Error == "" {
+		t.Fatalf("unexpected error fields: code=%q err=%q", wire.ErrorCode, wire.Error)
 	}
 	if len(wire.Data) != 2 || wire.Data[0].Key != "a" || wire.Data[1].Key != "b" {
 		t.Fatalf("unexpected data order: %+v", wire.Data)

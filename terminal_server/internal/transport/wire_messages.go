@@ -53,6 +53,7 @@ type WireServerMessage struct {
 	ScenarioStart string
 	ScenarioStop  string
 	Data          []DataEntry
+	ErrorCode     string
 	Error         string
 }
 

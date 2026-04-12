@@ -61,6 +61,7 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 		ScenarioStart: msg.ScenarioStart,
 		ScenarioStop:  msg.ScenarioStop,
 		Data:          EncodeDataMap(msg.Data),
+		ErrorCode:     msg.ErrorCode,
 		Error:         msg.Error,
 	}
 	if msg.RegisterAck != nil {
