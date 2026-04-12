@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -128,6 +129,9 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		if msg.Command.RequestID != "" {
 			h.mu.Lock()
 			if prior, ok := h.seen[msg.Command.RequestID]; ok {
+				if h.metrics != nil {
+					h.metrics.dedupeHits.Add(1)
+				}
 				h.mu.Unlock()
 				return []ServerMessage{prior}, nil
 			}
@@ -236,6 +240,15 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		return ServerMessage{}, ErrInvalidClientMessage
 	}
 	switch cmd.Intent {
+	case "system_help":
+		return ServerMessage{
+			Notification: "System query: system_help",
+			Data: map[string]string{
+				"system_intents":  "server_status,runtime_status,transport_metrics,list_devices,active_scenarios,device_status <device_id>,system_help",
+				"command_kinds":   "voice,manual,system",
+				"command_actions": "start,stop",
+			},
+		}, nil
 	case "server_status":
 		return ServerMessage{
 			Notification: "System query: server_status",
@@ -265,7 +278,11 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 		}, nil
 	case "list_devices":
 		data := map[string]string{}
-		for _, d := range h.control.devices.List() {
+		devices := h.control.devices.List()
+		sort.Slice(devices, func(i, j int) bool {
+			return devices[i].DeviceID < devices[j].DeviceID
+		})
+		for _, d := range devices {
 			data[d.DeviceID] = fmt.Sprintf("%s|%s|%s", d.DeviceName, d.Platform, d.State)
 		}
 		return ServerMessage{
@@ -284,6 +301,30 @@ func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage,
 			Data:         data,
 		}, nil
 	default:
+		if strings.HasPrefix(cmd.Intent, "device_status ") {
+			deviceID := strings.TrimSpace(strings.TrimPrefix(cmd.Intent, "device_status "))
+			if deviceID == "" {
+				return ServerMessage{}, fmt.Errorf("device_status requires device id")
+			}
+			deviceState, ok := h.control.devices.Get(deviceID)
+			if !ok {
+				return ServerMessage{}, fmt.Errorf("device not found: %s", deviceID)
+			}
+			data := map[string]string{
+				"device_id":   deviceState.DeviceID,
+				"device_name": deviceState.DeviceName,
+				"device_type": deviceState.DeviceType,
+				"platform":    deviceState.Platform,
+				"state":       string(deviceState.State),
+			}
+			for k, v := range deviceState.Capabilities {
+				data["cap."+k] = v
+			}
+			return ServerMessage{
+				Notification: "System query: device_status",
+				Data:         data,
+			}, nil
+		}
 		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", strings.TrimSpace(cmd.Intent))
 	}
 }

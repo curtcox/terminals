@@ -453,6 +453,9 @@ func TestHandleMessageSystemTransportMetrics(t *testing.T) {
 	if out[0].Data["command_received"] != "2" {
 		t.Fatalf("command_received = %q, want 2", out[0].Data["command_received"])
 	}
+	if out[0].Data["dedupe_hits"] != "0" {
+		t.Fatalf("dedupe_hits = %q, want 0", out[0].Data["dedupe_hits"])
+	}
 }
 
 func TestHandleMessageSystemWithoutRuntime(t *testing.T) {
@@ -514,6 +517,109 @@ func TestHandleMessageDedupeEviction(t *testing.T) {
 	handler.mu.Unlock()
 	if hasR1 || !hasR2 {
 		t.Fatalf("expected r1 evicted and r2 retained, got hasR1=%v hasR2=%v", hasR1, hasR2)
+	}
+}
+
+func TestHandleMessageTransportMetricsIncludesDedupeHits(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+		IO:      io.NewRouter(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "dup-metrics-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "dup-metrics-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-metrics-dedupe",
+			Kind:      "system",
+			Intent:    "transport_metrics",
+		},
+	})
+	if err != nil {
+		t.Fatalf("transport_metrics query error = %v", err)
+	}
+	if out[0].Data["dedupe_hits"] != "1" {
+		t.Fatalf("dedupe_hits = %q, want 1", out[0].Data["dedupe_hits"])
+	}
+}
+
+func TestHandleMessageSystemHelp(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-help-1",
+			Kind:      "system",
+			Intent:    "system_help",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system_help error = %v", err)
+	}
+	if out[0].Data["system_intents"] == "" || out[0].Data["command_kinds"] == "" {
+		t.Fatalf("missing expected system_help fields: %+v", out[0].Data)
+	}
+}
+
+func TestHandleMessageSystemDeviceStatus(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+			DeviceType: "laptop",
+			Platform:   "linux",
+			Capabilities: map[string]string{
+				"screen.width": "1920",
+			},
+		},
+	})
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-device-1",
+			Kind:      "system",
+			Intent:    "device_status device-1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("device_status error = %v", err)
+	}
+	if out[0].Data["device_id"] != "device-1" {
+		t.Fatalf("device_id = %q, want device-1", out[0].Data["device_id"])
+	}
+	if out[0].Data["cap.screen.width"] != "1920" {
+		t.Fatalf("cap.screen.width = %q, want 1920", out[0].Data["cap.screen.width"])
 	}
 }
 
