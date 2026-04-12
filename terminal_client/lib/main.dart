@@ -93,7 +93,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   final MdnsScanner _mdnsScanner = MdnsScanner();
   TerminalControlClient? _client;
   final StreamController<ConnectRequest> _outgoing =
-      StreamController<ConnectRequest>();
+      StreamController<ConnectRequest>.broadcast();
 
   StreamSubscription<ConnectResponse>? _incoming;
   String _status = 'Idle';

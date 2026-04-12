@@ -59,6 +59,47 @@ void main() {
     expect(harness.createdClients.length, 2);
   });
 
+  testWidgets(
+    'reconnect re-registers capabilities after control stream failure',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness(failFirstConnectStream: true);
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          heartbeatInterval: const Duration(milliseconds: 40),
+          reconnectDelayBase: const Duration(milliseconds: 30),
+          reconnectDelayMaxSeconds: 1,
+        ),
+      );
+
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+
+      for (var i = 0; i < 80; i++) {
+        if (harness.createdClients.length >= 2) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(harness.createdClients.length, 2);
+
+      for (var i = 0; i < 50; i++) {
+        final reconnectRegisters = harness.createdClients[1].requests
+            .where((request) => request.hasRegister())
+            .length;
+        if (reconnectRegisters > 0) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+
+      final reconnectRegisters = harness.createdClients[1].requests
+          .where((request) => request.hasRegister())
+          .length;
+      expect(reconnectRegisters, 1);
+    },
+  );
+
   test('reconnect delay grows exponentially and caps at max', () {
     expect(
       calculateReconnectDelay(
