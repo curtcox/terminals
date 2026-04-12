@@ -1,3 +1,4 @@
+// Package scenario implements the scenario engine and built-in scenario types.
 package scenario
 
 import (

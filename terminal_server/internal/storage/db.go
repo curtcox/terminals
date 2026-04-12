@@ -1,3 +1,4 @@
+// Package storage provides in-memory schedule and key-value store implementations.
 package storage
 
 import (
