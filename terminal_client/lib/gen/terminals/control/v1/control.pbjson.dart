@@ -275,6 +275,24 @@ const ConnectResponse$json = {
       '9': 0,
       '10': 'error'
     },
+    {
+      '1': 'update_ui',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.ui.v1.UpdateUI',
+      '9': 0,
+      '10': 'updateUi'
+    },
+    {
+      '1': 'transition_ui',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.ui.v1.TransitionUI',
+      '9': 0,
+      '10': 'transitionUi'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -297,7 +315,10 @@ final $typed_data.Uint8List connectResponseDescriptor = $convert.base64Decode(
     'FuZF9yZXN1bHQYCiABKAsyIy50ZXJtaW5hbHMuY29udHJvbC52MS5Db21tYW5kUmVzdWx0SABS'
     'DWNvbW1hbmRSZXN1bHQSPwoJaGVhcnRiZWF0GAsgASgLMh8udGVybWluYWxzLmNvbnRyb2wudj'
     'EuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdBI6CgVlcnJvchgMIAEoCzIiLnRlcm1pbmFscy5jb250'
-    'cm9sLnYxLkNvbnRyb2xFcnJvckgAUgVlcnJvckIJCgdwYXlsb2Fk');
+    'cm9sLnYxLkNvbnRyb2xFcnJvckgAUgVlcnJvchI4Cgl1cGRhdGVfdWkYDSABKAsyGS50ZXJtaW'
+    '5hbHMudWkudjEuVXBkYXRlVUlIAFIIdXBkYXRlVWkSRAoNdHJhbnNpdGlvbl91aRgOIAEoCzId'
+    'LnRlcm1pbmFscy51aS52MS5UcmFuc2l0aW9uVUlIAFIMdHJhbnNpdGlvblVpQgkKB3BheWxvYW'
+    'Q=');
 
 @$core.Deprecated('Use registerDeviceDescriptor instead')
 const RegisterDevice$json = {
@@ -575,6 +596,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.control.v1.CommandResult': CommandResult$json,
   '.terminals.control.v1.CommandResult.DataEntry': CommandResult_DataEntry$json,
   '.terminals.control.v1.ControlError': ControlError$json,
+  '.terminals.ui.v1.UpdateUI': $1.UpdateUI$json,
+  '.terminals.ui.v1.TransitionUI': $1.TransitionUI$json,
 };
 
 /// Descriptor for `TerminalControlService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

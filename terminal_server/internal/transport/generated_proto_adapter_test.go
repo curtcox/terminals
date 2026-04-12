@@ -156,4 +156,55 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	if got := resp.GetSetUi().GetRoot().GetChildren()[0].GetText().GetValue(); got != "hello" {
 		t.Fatalf("text value = %q, want %q", got, "hello")
 	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		UpdateUI: &UIUpdate{
+			ComponentID: "terminal_output",
+			Node: ui.Descriptor{
+				Type: "text",
+				Props: map[string]string{
+					"value": "patched",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() update_ui error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("update_ui envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if resp.GetUpdateUi() == nil {
+		t.Fatalf("expected update_ui payload")
+	}
+	if got := resp.GetUpdateUi().GetComponentId(); got != "terminal_output" {
+		t.Fatalf("update_ui component_id = %q, want terminal_output", got)
+	}
+	if got := resp.GetUpdateUi().GetNode().GetText().GetValue(); got != "patched" {
+		t.Fatalf("update_ui node text value = %q, want patched", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		TransitionUI: &UITransition{
+			Transition: "fade",
+			DurationMS: 250,
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() transition_ui error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("transition_ui envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if resp.GetTransitionUi() == nil {
+		t.Fatalf("expected transition_ui payload")
+	}
+	if got := resp.GetTransitionUi().GetTransition(); got != "fade" {
+		t.Fatalf("transition_ui transition = %q, want fade", got)
+	}
+	if got := resp.GetTransitionUi().GetDurationMs(); got != 250 {
+		t.Fatalf("transition_ui duration_ms = %d, want 250", got)
+	}
 }

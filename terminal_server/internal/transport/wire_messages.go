@@ -118,6 +118,8 @@ type WireServerMessage struct {
 	RegisterAck   *WireRegisterResponse
 	CommandResult *WireCommandResult
 	SetUI         *uiWireDescriptor
+	UpdateUI      *uiWireUpdate
+	TransitionUI  *uiWireTransition
 	Error         *WireControlError
 }
 
@@ -127,4 +129,16 @@ type uiWireDescriptor struct {
 	Type     string
 	Props    []DataEntry
 	Children []uiWireDescriptor
+}
+
+// uiWireUpdate is a compact wire representation for UpdateUI payloads.
+type uiWireUpdate struct {
+	ComponentID string
+	Node        uiWireDescriptor
+}
+
+// uiWireTransition is a compact wire representation for TransitionUI payloads.
+type uiWireTransition struct {
+	Transition string
+	DurationMS int32
 }

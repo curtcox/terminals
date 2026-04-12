@@ -76,12 +76,26 @@ type ServerMessage struct {
 	RegisterAck   *RegisterResponse
 	CommandAck    string
 	SetUI         *ui.Descriptor
+	UpdateUI      *UIUpdate
+	TransitionUI  *UITransition
 	Notification  string
 	ScenarioStart string
 	ScenarioStop  string
 	Data          map[string]string
 	ErrorCode     string
 	Error         string
+}
+
+// UIUpdate carries a server-driven patch to a specific UI component.
+type UIUpdate struct {
+	ComponentID string
+	Node        ui.Descriptor
+}
+
+// UITransition carries a UI transition hint for the active device UI.
+type UITransition struct {
+	Transition string
+	DurationMS int32
 }
 
 // StreamHandler processes control stream messages.

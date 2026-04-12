@@ -227,6 +227,8 @@ enum ConnectResponse_Payload {
   commandResult,
   heartbeat,
   error,
+  updateUi,
+  transitionUi,
   notSet
 }
 
@@ -244,6 +246,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
     CommandResult? commandResult,
     Heartbeat? heartbeat,
     ControlError? error,
+    $1.UpdateUI? updateUi,
+    $1.TransitionUI? transitionUi,
   }) {
     final result = create();
     if (registerAck != null) result.registerAck = registerAck;
@@ -258,6 +262,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
     if (commandResult != null) result.commandResult = commandResult;
     if (heartbeat != null) result.heartbeat = heartbeat;
     if (error != null) result.error = error;
+    if (updateUi != null) result.updateUi = updateUi;
+    if (transitionUi != null) result.transitionUi = transitionUi;
     return result;
   }
 
@@ -284,6 +290,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
     10: ConnectResponse_Payload.commandResult,
     11: ConnectResponse_Payload.heartbeat,
     12: ConnectResponse_Payload.error,
+    13: ConnectResponse_Payload.updateUi,
+    14: ConnectResponse_Payload.transitionUi,
     0: ConnectResponse_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -291,7 +299,7 @@ class ConnectResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'terminals.control.v1'),
       createEmptyInstance: create)
-    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
     ..aOM<RegisterAck>(1, _omitFieldNames ? '' : 'registerAck',
         subBuilder: RegisterAck.create)
     ..aOM<$1.SetUI>(2, _omitFieldNames ? '' : 'setUi',
@@ -316,6 +324,10 @@ class ConnectResponse extends $pb.GeneratedMessage {
         subBuilder: Heartbeat.create)
     ..aOM<ControlError>(12, _omitFieldNames ? '' : 'error',
         subBuilder: ControlError.create)
+    ..aOM<$1.UpdateUI>(13, _omitFieldNames ? '' : 'updateUi',
+        subBuilder: $1.UpdateUI.create)
+    ..aOM<$1.TransitionUI>(14, _omitFieldNames ? '' : 'transitionUi',
+        subBuilder: $1.TransitionUI.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -349,6 +361,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   ConnectResponse_Payload whichPayload() =>
       _ConnectResponse_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
@@ -363,6 +377,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -496,6 +512,28 @@ class ConnectResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(12);
   @$pb.TagNumber(12)
   ControlError ensureError() => $_ensure(11);
+
+  @$pb.TagNumber(13)
+  $1.UpdateUI get updateUi => $_getN(12);
+  @$pb.TagNumber(13)
+  set updateUi($1.UpdateUI value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasUpdateUi() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearUpdateUi() => $_clearField(13);
+  @$pb.TagNumber(13)
+  $1.UpdateUI ensureUpdateUi() => $_ensure(12);
+
+  @$pb.TagNumber(14)
+  $1.TransitionUI get transitionUi => $_getN(13);
+  @$pb.TagNumber(14)
+  set transitionUi($1.TransitionUI value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasTransitionUi() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearTransitionUi() => $_clearField(14);
+  @$pb.TagNumber(14)
+  $1.TransitionUI ensureTransitionUi() => $_ensure(13);
 }
 
 class RegisterDevice extends $pb.GeneratedMessage {

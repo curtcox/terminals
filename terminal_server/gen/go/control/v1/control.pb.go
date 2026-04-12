@@ -370,6 +370,8 @@ type ConnectResponse struct {
 	//	*ConnectResponse_CommandResult
 	//	*ConnectResponse_Heartbeat
 	//	*ConnectResponse_Error
+	//	*ConnectResponse_UpdateUi
+	//	*ConnectResponse_TransitionUi
 	Payload       isConnectResponse_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -520,6 +522,24 @@ func (x *ConnectResponse) GetError() *ControlError {
 	return nil
 }
 
+func (x *ConnectResponse) GetUpdateUi() *v11.UpdateUI {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_UpdateUi); ok {
+			return x.UpdateUi
+		}
+	}
+	return nil
+}
+
+func (x *ConnectResponse) GetTransitionUi() *v11.TransitionUI {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_TransitionUi); ok {
+			return x.TransitionUi
+		}
+	}
+	return nil
+}
+
 type isConnectResponse_Payload interface {
 	isConnectResponse_Payload()
 }
@@ -572,6 +592,14 @@ type ConnectResponse_Error struct {
 	Error *ControlError `protobuf:"bytes,12,opt,name=error,proto3,oneof"`
 }
 
+type ConnectResponse_UpdateUi struct {
+	UpdateUi *v11.UpdateUI `protobuf:"bytes,13,opt,name=update_ui,json=updateUi,proto3,oneof"`
+}
+
+type ConnectResponse_TransitionUi struct {
+	TransitionUi *v11.TransitionUI `protobuf:"bytes,14,opt,name=transition_ui,json=transitionUi,proto3,oneof"`
+}
+
 func (*ConnectResponse_RegisterAck) isConnectResponse_Payload() {}
 
 func (*ConnectResponse_SetUi) isConnectResponse_Payload() {}
@@ -595,6 +623,10 @@ func (*ConnectResponse_CommandResult) isConnectResponse_Payload() {}
 func (*ConnectResponse_Heartbeat) isConnectResponse_Payload() {}
 
 func (*ConnectResponse_Error) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_UpdateUi) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_TransitionUi) isConnectResponse_Payload() {}
 
 type RegisterDevice struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
@@ -1119,7 +1151,7 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\fstream_ready\x18\x05 \x01(\v2!.terminals.control.v1.StreamReadyH\x00R\vstreamReady\x12@\n" +
 	"\acommand\x18\x06 \x01(\v2$.terminals.control.v1.CommandRequestH\x00R\acommand\x12?\n" +
 	"\theartbeat\x18\a \x01(\v2\x1f.terminals.control.v1.HeartbeatH\x00R\theartbeatB\t\n" +
-	"\apayload\"\xb0\x06\n" +
+	"\apayload\"\xb0\a\n" +
 	"\x0fConnectResponse\x12F\n" +
 	"\fregister_ack\x18\x01 \x01(\v2!.terminals.control.v1.RegisterAckH\x00R\vregisterAck\x12/\n" +
 	"\x06set_ui\x18\x02 \x01(\v2\x16.terminals.ui.v1.SetUIH\x00R\x05setUi\x12A\n" +
@@ -1136,7 +1168,9 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\x0ecommand_result\x18\n" +
 	" \x01(\v2#.terminals.control.v1.CommandResultH\x00R\rcommandResult\x12?\n" +
 	"\theartbeat\x18\v \x01(\v2\x1f.terminals.control.v1.HeartbeatH\x00R\theartbeat\x12:\n" +
-	"\x05error\x18\f \x01(\v2\".terminals.control.v1.ControlErrorH\x00R\x05errorB\t\n" +
+	"\x05error\x18\f \x01(\v2\".terminals.control.v1.ControlErrorH\x00R\x05error\x128\n" +
+	"\tupdate_ui\x18\r \x01(\v2\x19.terminals.ui.v1.UpdateUIH\x00R\bupdateUi\x12D\n" +
+	"\rtransition_ui\x18\x0e \x01(\v2\x1d.terminals.ui.v1.TransitionUIH\x00R\ftransitionUiB\t\n" +
 	"\apayload\"c\n" +
 	"\x0eRegisterDevice\x12Q\n" +
 	"\fcapabilities\x18\x01 \x01(\v2-.terminals.capabilities.v1.DeviceCapabilitiesR\fcapabilities\"D\n" +
@@ -1237,7 +1271,9 @@ var file_terminals_control_v1_control_proto_goTypes = []any{
 	(*v1.ShowMedia)(nil),           // 21: terminals.io.v1.ShowMedia
 	(*v1.RouteStream)(nil),         // 22: terminals.io.v1.RouteStream
 	(*v11.Notification)(nil),       // 23: terminals.ui.v1.Notification
-	(*v12.DeviceCapabilities)(nil), // 24: terminals.capabilities.v1.DeviceCapabilities
+	(*v11.UpdateUI)(nil),           // 24: terminals.ui.v1.UpdateUI
+	(*v11.TransitionUI)(nil),       // 25: terminals.ui.v1.TransitionUI
+	(*v12.DeviceCapabilities)(nil), // 26: terminals.capabilities.v1.DeviceCapabilities
 }
 var file_terminals_control_v1_control_proto_depIdxs = []int32{
 	5,  // 0: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
@@ -1259,19 +1295,21 @@ var file_terminals_control_v1_control_proto_depIdxs = []int32{
 	10, // 16: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
 	13, // 17: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
 	11, // 18: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
-	24, // 19: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	24, // 20: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	0,  // 21: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
-	1,  // 22: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
-	14, // 23: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
-	2,  // 24: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
-	3,  // 25: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
-	4,  // 26: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
-	26, // [26:27] is the sub-list for method output_type
-	25, // [25:26] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	24, // 19: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
+	25, // 20: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
+	26, // 21: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	26, // 22: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	0,  // 23: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
+	1,  // 24: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
+	14, // 25: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
+	2,  // 26: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
+	3,  // 27: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
+	4,  // 28: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
+	28, // [28:29] is the sub-list for method output_type
+	27, // [27:28] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_terminals_control_v1_control_proto_init() }
@@ -1301,6 +1339,8 @@ func file_terminals_control_v1_control_proto_init() {
 		(*ConnectResponse_CommandResult)(nil),
 		(*ConnectResponse_Heartbeat)(nil),
 		(*ConnectResponse_Error)(nil),
+		(*ConnectResponse_UpdateUi)(nil),
+		(*ConnectResponse_TransitionUi)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

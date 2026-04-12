@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:grpc/grpc.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/main.dart';
 
 void main() {
@@ -126,6 +127,69 @@ void main() {
       const Duration(seconds: 1),
     );
   });
+
+  testWidgets('applies update_ui patch to active server-driven UI', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'greeting_text'
+                ..text = (uiv1.TextWidget()..value = 'Hello'),
+            ))),
+    );
+    await tester.pump();
+    expect(find.text('Hello'), findsOneWidget);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'greeting_text'
+          ..node = (uiv1.Node()
+            ..id = 'greeting_text'
+            ..text = (uiv1.TextWidget()..value = 'Updated hello'))),
+    );
+    await tester.pump();
+    expect(find.text('Hello'), findsNothing);
+    expect(find.text('Updated hello'), findsOneWidget);
+    expect(find.textContaining('Control Stream: UI patched'), findsOneWidget);
+  });
+
+  testWidgets('handles transition_ui responses', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'fade'
+          ..durationMs = 220),
+    );
+    await tester.pump();
+
+    expect(
+        find.textContaining('Control Stream: UI transition'), findsOneWidget);
+    expect(find.textContaining('Transition: fade (220ms)'), findsOneWidget);
+  });
 }
 
 class _FakeClientHarness {
@@ -181,5 +245,9 @@ class _FakeTerminalControlClient implements TerminalControlClient {
   @override
   Future<void> shutdown() async {
     await _requestSubscription?.cancel();
+  }
+
+  void emitResponse(ConnectResponse response) {
+    _responses.add(response);
   }
 }

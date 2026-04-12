@@ -158,9 +158,23 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           _reconnectAttempt = 0;
           setState(() {
             _responses += 1;
-            _status = _statusFromResponse(response);
+            final responseStatus = _statusFromResponse(response);
+            if (responseStatus.isNotEmpty) {
+              _status = responseStatus;
+            }
             if (response.hasSetUi() && response.setUi.hasRoot()) {
-              _activeRoot = response.setUi.root;
+              _activeRoot = response.setUi.root.deepCopy();
+            }
+            if (response.hasUpdateUi()) {
+              _activeRoot = _applyUpdateUi(
+                currentRoot: _activeRoot,
+                update: response.updateUi,
+              );
+            }
+            if (response.hasTransitionUi()) {
+              final transition = response.transitionUi.transition;
+              final durationMs = response.transitionUi.durationMs;
+              _lastNotification = 'Transition: $transition (${durationMs}ms)';
             }
             if (response.hasNotification()) {
               _lastNotification = response.notification.body;
@@ -494,6 +508,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (response.hasError()) {
       return 'Server error';
     }
+    if (response.hasTransitionUi()) {
+      return 'UI transition';
+    }
+    if (response.hasUpdateUi()) {
+      return 'UI patched';
+    }
     if (response.hasRegisterAck()) {
       return 'Registered';
     }
@@ -504,6 +524,59 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       return 'UI updated';
     }
     return 'Connected';
+  }
+
+  uiv1.Node? _applyUpdateUi({
+    required uiv1.Node? currentRoot,
+    required uiv1.UpdateUI update,
+  }) {
+    if (!update.hasNode()) {
+      return currentRoot;
+    }
+    final targetID = update.componentId.trim();
+    final replacement = update.node.deepCopy();
+    if (targetID.isEmpty) {
+      return replacement;
+    }
+    if (currentRoot == null) {
+      return null;
+    }
+
+    final root = currentRoot.deepCopy();
+    if (_nodeId(root) == targetID) {
+      return replacement;
+    }
+    final replaced = _replaceNodeByID(
+      current: root,
+      targetID: targetID,
+      replacement: replacement,
+    );
+    if (!replaced) {
+      return currentRoot;
+    }
+    return root;
+  }
+
+  bool _replaceNodeByID({
+    required uiv1.Node current,
+    required String targetID,
+    required uiv1.Node replacement,
+  }) {
+    for (var i = 0; i < current.children.length; i++) {
+      final child = current.children[i];
+      if (_nodeId(child) == targetID) {
+        current.children[i] = replacement.deepCopy();
+        return true;
+      }
+      if (_replaceNodeByID(
+        current: child,
+        targetID: targetID,
+        replacement: replacement,
+      )) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Future<void> _sendUiAction({

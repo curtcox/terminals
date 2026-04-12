@@ -116,6 +116,24 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 				},
 			},
 		}
+	case msg.UpdateUI != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_UpdateUi{
+				UpdateUi: &uiv1.UpdateUI{
+					ComponentId: msg.UpdateUI.ComponentID,
+					Node:        descriptorToUINode(msg.UpdateUI.Node),
+				},
+			},
+		}
+	case msg.TransitionUI != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_TransitionUi{
+				TransitionUi: &uiv1.TransitionUI{
+					Transition: msg.TransitionUI.Transition,
+					DurationMs: msg.TransitionUI.DurationMS,
+				},
+			},
+		}
 	case msg.CommandAck != "" || msg.ScenarioStart != "" || msg.ScenarioStop != "" || msg.Notification != "" || len(msg.Data) > 0:
 		return &controlv1.ConnectResponse{
 			Payload: &controlv1.ConnectResponse_CommandResult{

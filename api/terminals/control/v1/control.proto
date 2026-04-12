@@ -38,6 +38,8 @@ message ConnectResponse {
     CommandResult command_result = 10;
     Heartbeat heartbeat = 11;
     ControlError error = 12;
+    terminals.ui.v1.UpdateUI update_ui = 13;
+    terminals.ui.v1.TransitionUI transition_ui = 14;
   }
 }
 

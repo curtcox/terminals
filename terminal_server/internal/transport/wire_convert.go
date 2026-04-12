@@ -122,6 +122,18 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 		uiNode := wireDescriptorFromUI(*msg.SetUI)
 		out.SetUI = &uiNode
 	}
+	if msg.UpdateUI != nil {
+		out.UpdateUI = &uiWireUpdate{
+			ComponentID: msg.UpdateUI.ComponentID,
+			Node:        wireDescriptorFromUI(msg.UpdateUI.Node),
+		}
+	}
+	if msg.TransitionUI != nil {
+		out.TransitionUI = &uiWireTransition{
+			Transition: msg.TransitionUI.Transition,
+			DurationMS: msg.TransitionUI.DurationMS,
+		}
+	}
 	if msg.ErrorCode != "" || msg.Error != "" {
 		out.Error = &WireControlError{
 			Code:    wireErrorCodeFromInternal(msg.ErrorCode),
