@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
@@ -313,7 +314,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		return ServerMessage{
 			Notification: "System query: system_help",
 			Data: map[string]string{
-				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,pending_timers,recent_commands,device_status <device_id>,run_due_timers,system_help",
+				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,pending_timers,recent_commands,device_status <device_id>,run_due_timers,reconcile_liveness <seconds>,system_help",
 				"command_kinds":   "voice,manual,system",
 				"command_actions": "start,stop",
 			},
@@ -358,6 +359,15 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: run_due_timers",
 			Data: map[string]string{
 				"processed": toString(int64(processed)),
+			},
+		}, nil
+	case "reconcile_liveness":
+		updated := h.control.ReconcileLiveness(2 * time.Minute)
+		return ServerMessage{
+			Notification: "System query: reconcile_liveness",
+			Data: map[string]string{
+				"updated":         toString(int64(updated)),
+				"timeout_seconds": "120",
 			},
 		}, nil
 	case "transport_metrics":
@@ -429,6 +439,21 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Data:         data,
 		}, nil
 	default:
+		if strings.HasPrefix(intent, "reconcile_liveness ") {
+			secondsText := strings.TrimSpace(strings.TrimPrefix(intent, "reconcile_liveness "))
+			seconds, err := strconv.Atoi(secondsText)
+			if err != nil || seconds < 0 {
+				return ServerMessage{}, fmt.Errorf("invalid reconcile_liveness seconds: %s", secondsText)
+			}
+			updated := h.control.ReconcileLiveness(time.Duration(seconds) * time.Second)
+			return ServerMessage{
+				Notification: "System query: reconcile_liveness",
+				Data: map[string]string{
+					"updated":         toString(int64(updated)),
+					"timeout_seconds": secondsText,
+				},
+			}, nil
+		}
 		if strings.HasPrefix(intent, "device_status ") {
 			deviceID := strings.TrimSpace(strings.TrimPrefix(intent, "device_status "))
 			if deviceID == "" {

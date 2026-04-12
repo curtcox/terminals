@@ -800,6 +800,94 @@ func TestHandleMessageSystemRecentCommands(t *testing.T) {
 	}
 }
 
+func TestHandleMessageSystemReconcileLivenessDefault(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	base := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
+	stale := base.Add(-10 * time.Minute)
+	control.now = func() time.Time { return stale }
+	handler := NewStreamHandler(control)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	control.now = func() time.Time { return base }
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-reconcile-1",
+			Kind:      "system",
+			Intent:    "reconcile_liveness",
+		},
+	})
+	if err != nil {
+		t.Fatalf("reconcile_liveness default error = %v", err)
+	}
+	if out[0].Data["updated"] != "1" {
+		t.Fatalf("updated = %q, want 1", out[0].Data["updated"])
+	}
+	if out[0].Data["timeout_seconds"] != "120" {
+		t.Fatalf("timeout_seconds = %q, want 120", out[0].Data["timeout_seconds"])
+	}
+}
+
+func TestHandleMessageSystemReconcileLivenessCustom(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	base := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
+	stale := base.Add(-45 * time.Second)
+	control.now = func() time.Time { return stale }
+	handler := NewStreamHandler(control)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	control.now = func() time.Time { return base }
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-reconcile-2",
+			Kind:      "system",
+			Intent:    "reconcile_liveness 30",
+		},
+	})
+	if err != nil {
+		t.Fatalf("reconcile_liveness custom error = %v", err)
+	}
+	if out[0].Data["updated"] != "1" {
+		t.Fatalf("updated = %q, want 1", out[0].Data["updated"])
+	}
+	if out[0].Data["timeout_seconds"] != "30" {
+		t.Fatalf("timeout_seconds = %q, want 30", out[0].Data["timeout_seconds"])
+	}
+}
+
+func TestHandleMessageSystemReconcileLivenessInvalidSeconds(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-reconcile-bad",
+			Kind:      "system",
+			Intent:    "reconcile_liveness nope",
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error for invalid reconcile_liveness seconds")
+	}
+}
+
 func TestHandleMessageRecentCommandsEviction(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

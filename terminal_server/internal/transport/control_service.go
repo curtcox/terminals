@@ -111,3 +111,12 @@ func (s *ControlService) StatusData() map[string]string {
 		"devices_disconnected": strconv.Itoa(disconnected),
 	}
 }
+
+// ReconcileLiveness marks stale devices as disconnected based on a heartbeat timeout.
+func (s *ControlService) ReconcileLiveness(timeout time.Duration) int {
+	if timeout < 0 {
+		timeout = 0
+	}
+	cutoff := s.now().UTC().Add(-timeout)
+	return s.devices.MarkStaleDisconnected(cutoff)
+}
