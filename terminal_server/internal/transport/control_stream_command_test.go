@@ -144,8 +144,8 @@ func TestHandleMessageCommandManualTerminal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command manual terminal) error = %v", err)
 	}
-	if len(out) != 2 {
-		t.Fatalf("len(out) = %d, want 2", len(out))
+	if len(out) != 3 {
+		t.Fatalf("len(out) = %d, want 3", len(out))
 	}
 	if out[0].ScenarioStart != "terminal" {
 		t.Fatalf("ScenarioStart = %q, want terminal", out[0].ScenarioStart)
@@ -158,6 +158,12 @@ func TestHandleMessageCommandManualTerminal(t *testing.T) {
 	}
 	if out[1].SetUI.Type != "stack" {
 		t.Fatalf("terminal SetUI root type = %q, want stack", out[1].SetUI.Type)
+	}
+	if out[2].TransitionUI == nil {
+		t.Fatalf("expected third response to include TransitionUI")
+	}
+	if out[2].TransitionUI.Transition != "terminal_enter" {
+		t.Fatalf("transition = %q, want terminal_enter", out[2].TransitionUI.Transition)
 	}
 	events := broadcaster.Events()
 	if len(events) == 0 {
@@ -255,8 +261,8 @@ func TestHandleMessageTerminalSessionLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start command error = %v", err)
 	}
-	if len(startOut) != 2 {
-		t.Fatalf("start len(out) = %d, want 2", len(startOut))
+	if len(startOut) != 3 {
+		t.Fatalf("start len(out) = %d, want 3", len(startOut))
 	}
 	activeSessions := handler.terminals.List()
 	if len(activeSessions) != 1 {
@@ -296,11 +302,17 @@ func TestHandleMessageTerminalSessionLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stop command error = %v", err)
 	}
-	if len(stopOut) != 1 {
-		t.Fatalf("stop len(out) = %d, want 1", len(stopOut))
+	if len(stopOut) != 2 {
+		t.Fatalf("stop len(out) = %d, want 2", len(stopOut))
 	}
 	if stopOut[0].ScenarioStop != "terminal" {
 		t.Fatalf("ScenarioStop = %q, want terminal", stopOut[0].ScenarioStop)
+	}
+	if stopOut[1].TransitionUI == nil {
+		t.Fatalf("expected stop response to include TransitionUI")
+	}
+	if stopOut[1].TransitionUI.Transition != "terminal_exit" {
+		t.Fatalf("stop transition = %q, want terminal_exit", stopOut[1].TransitionUI.Transition)
 	}
 	if len(handler.terminals.List()) != 0 {
 		t.Fatalf("terminal sessions should be empty after stop")

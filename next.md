@@ -1,1 +1,1 @@
-Emit `TransitionUI` hints when scenario UI changes (start/stop terminal) and verify client behavior with integration tests.
+Render `TransitionUI` hints as real animated UI transitions in Flutter (not just status text) and cover with widget tests.

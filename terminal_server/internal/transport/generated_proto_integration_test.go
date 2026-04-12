@@ -166,3 +166,80 @@ func TestGeneratedSessionSystemDataPayload(t *testing.T) {
 		t.Fatalf("command metadata missing from system help payload: %+v", data)
 	}
 }
+
+func TestGeneratedSessionTerminalTransitions(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "device-1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "terminal-start",
+						DeviceId:  "device-1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
+						Intent:    "terminal",
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "terminal-stop",
+						DeviceId:  "device-1",
+						Action:    controlv1.CommandAction_COMMAND_ACTION_STOP,
+						Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
+						Intent:    "terminal",
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawEnter bool
+	var sawExit bool
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok || resp.GetTransitionUi() == nil {
+			continue
+		}
+		switch resp.GetTransitionUi().GetTransition() {
+		case "terminal_enter":
+			sawEnter = true
+		case "terminal_exit":
+			sawExit = true
+		}
+	}
+	if !sawEnter {
+		t.Fatalf("expected terminal_enter transition payload")
+	}
+	if !sawExit {
+		t.Fatalf("expected terminal_exit transition payload")
+	}
+}

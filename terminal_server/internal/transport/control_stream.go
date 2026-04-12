@@ -270,6 +270,12 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	}
 	if commandResult.ScenarioStop == "terminal" {
 		h.terminateTerminalForDevice(cmd.DeviceID)
+		responses = append(responses, ServerMessage{
+			TransitionUI: &UITransition{
+				Transition: "terminal_exit",
+				DurationMS: 220,
+			},
+		})
 		return responses
 	}
 	if cmd.Action != "" && cmd.Action != CommandActionStart {
@@ -288,6 +294,12 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	}
 	terminalUI := ui.TerminalViewWithOutput(cmd.DeviceID, output)
 	responses = append(responses, ServerMessage{SetUI: &terminalUI})
+	responses = append(responses, ServerMessage{
+		TransitionUI: &UITransition{
+			Transition: "terminal_enter",
+			DurationMS: 220,
+		},
+	})
 	return responses
 }
 
