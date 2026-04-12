@@ -253,6 +253,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (!_shouldStayConnected) {
       return;
     }
+    if (_isConnecting) {
+      if (_reconnectTimer?.isActive ?? false) {
+        return;
+      }
+      _reconnectTimer = Timer(const Duration(milliseconds: 50), () {
+        _reconnectTimer = null;
+        _scheduleReconnect();
+      });
+      return;
+    }
     if (_reconnectTimer?.isActive ?? false) {
       return;
     }
@@ -273,10 +283,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _reconnectTimer = Timer(reconnectDelay, () {
       _reconnectTimer = null;
       if (!_shouldStayConnected || !mounted) {
-        return;
-      }
-      if (_isConnecting) {
-        _scheduleReconnect();
         return;
       }
       unawaited(_startStream(userInitiated: false));

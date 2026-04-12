@@ -1,1 +1,1 @@
-Add a deterministic widget test that verifies automatic reconnect creates a second control client after a simulated stream failure.
+Add an integration-style client test that verifies a reconnecting client re-registers capabilities after stream failure.

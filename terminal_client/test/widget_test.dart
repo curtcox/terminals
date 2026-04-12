@@ -34,6 +34,31 @@ void main() {
     expect(requests.where((r) => r.hasRegister()).length, 1);
   });
 
+  testWidgets('reconnect creates a new control client after stream failure', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness(failFirstConnectStream: true);
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        reconnectDelayBase: const Duration(milliseconds: 30),
+        reconnectDelayMaxSeconds: 1,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    expect(harness.createdClients.length, 1);
+
+    for (var i = 0; i < 80; i++) {
+      if (harness.createdClients.length >= 2) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    expect(harness.createdClients.length, 2);
+  });
+
   test('reconnect delay grows exponentially and caps at max', () {
     expect(
       calculateReconnectDelay(
@@ -63,8 +88,11 @@ void main() {
 }
 
 class _FakeClientHarness {
+  _FakeClientHarness({this.failFirstConnectStream = false});
+
   final List<_FakeTerminalControlClient> createdClients =
       <_FakeTerminalControlClient>[];
+  final bool failFirstConnectStream;
 
   _FakeTerminalControlClient get lastClient => createdClients.last;
 
@@ -72,7 +100,11 @@ class _FakeClientHarness {
     required String host,
     required int port,
   }) {
-    final client = _FakeTerminalControlClient(host: host, port: port);
+    final client = _FakeTerminalControlClient(
+      host: host,
+      port: port,
+      failOnConnectStream: failFirstConnectStream && createdClients.isEmpty,
+    );
     createdClients.add(client);
     return client;
   }
@@ -82,10 +114,12 @@ class _FakeTerminalControlClient implements TerminalControlClient {
   _FakeTerminalControlClient({
     required this.host,
     required this.port,
+    required this.failOnConnectStream,
   });
 
   final String host;
   final int port;
+  final bool failOnConnectStream;
   final List<ConnectRequest> requests = <ConnectRequest>[];
   final StreamController<ConnectResponse> _responses =
       StreamController<ConnectResponse>.broadcast();
@@ -97,6 +131,9 @@ class _FakeTerminalControlClient implements TerminalControlClient {
     CallOptions? options,
   }) {
     _requestSubscription = requests.listen(this.requests.add);
+    if (failOnConnectStream) {
+      return Stream<ConnectResponse>.error(StateError('stream dropped'));
+    }
     return _responses.stream;
   }
 
