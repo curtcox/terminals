@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package terminals.ui.v1;
+
+option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1;uiv1";
+
+message SetUI {
+  string root_json = 1;
+}
+

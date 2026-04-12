@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package terminals.io.v1;
+
+option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/io/v1;iov1";
+
+message StartStream {
+  string stream_id = 1;
+  string kind = 2;
+}
+
+message StopStream {
+  string stream_id = 1;
+}
+

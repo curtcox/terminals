@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package terminals.capabilities.v1;
+
+option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1;capabilitiesv1";
+
+message DeviceCapabilities {
+  string device_id = 1;
+  map<string, string> values = 2;
+}
+

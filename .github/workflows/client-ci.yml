@@ -1,0 +1,34 @@
+name: Client CI
+
+on:
+  push:
+    paths:
+      - "terminal_client/**"
+      - "api/**"
+      - ".github/workflows/client-ci.yml"
+  pull_request:
+    paths:
+      - "terminal_client/**"
+      - "api/**"
+      - ".github/workflows/client-ci.yml"
+
+jobs:
+  client:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terminal_client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Flutter pub get
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Format check
+        run: dart format --set-exit-if-changed .
+      - name: Test
+        run: flutter test --coverage
+

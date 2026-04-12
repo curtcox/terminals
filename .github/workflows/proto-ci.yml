@@ -1,0 +1,30 @@
+name: Proto CI
+
+on:
+  push:
+    paths:
+      - "api/**"
+      - ".github/workflows/proto-ci.yml"
+  pull_request:
+    paths:
+      - "api/**"
+      - ".github/workflows/proto-ci.yml"
+
+jobs:
+  proto:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+      - name: Buf format check
+        run: buf format -d --exit-code
+      - name: Buf lint
+        run: buf lint
+      - name: Buf generate
+        run: buf generate
+      - name: Buf breaking
+        run: buf breaking --against '.git#branch=main'
+

@@ -1,0 +1,7 @@
+server:
+  grpc_host: "0.0.0.0"
+  grpc_port: 50051
+  mdns_service: "_terminals._tcp.local."
+  mdns_name: "HomeServer"
+  version: 1
+
