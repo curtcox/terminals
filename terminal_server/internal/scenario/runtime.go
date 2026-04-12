@@ -44,6 +44,25 @@ func (r *Runtime) HandleVoiceText(ctx context.Context, sourceID, spoken string, 
 	return r.HandleTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
 }
 
+// StopTrigger matches and stops a scenario for the selected devices.
+func (r *Runtime) StopTrigger(_ context.Context, trigger Trigger) (string, error) {
+	reg, ok := r.Engine.Match(trigger)
+	if !ok {
+		return "", ErrNoMatchingScenario
+	}
+
+	deviceIDs := targetDevices(r.Env, trigger)
+	if err := r.Engine.Stop(reg.Scenario.Name(), deviceIDs); err != nil {
+		return "", err
+	}
+	return reg.Scenario.Name(), nil
+}
+
+// StopVoiceText parses spoken text and routes to StopTrigger.
+func (r *Runtime) StopVoiceText(ctx context.Context, sourceID, spoken string, now time.Time) (string, error) {
+	return r.StopTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
+}
+
 func targetDevices(env *Environment, trigger Trigger) []string {
 	if env == nil || env.Devices == nil {
 		return nil

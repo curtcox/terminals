@@ -27,6 +27,7 @@ type HeartbeatRequest struct {
 // CommandRequest carries a client-issued scenario command.
 type CommandRequest struct {
 	DeviceID string
+	Action   string // "start" (default) or "stop"
 	Kind     string // "voice" or "manual"
 	Text     string // voice transcript
 	Intent   string // explicit scenario intent
@@ -46,6 +47,7 @@ type ServerMessage struct {
 	SetUI         *ui.Descriptor
 	Notification  string
 	ScenarioStart string
+	ScenarioStop  string
 	Error         string
 }
 
@@ -97,32 +99,69 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			err := errors.New("scenario runtime not configured")
 			return []ServerMessage{{Error: err.Error()}}, err
 		}
-		name, err := h.handleCommand(ctx, msg.Command)
+		commandResult, err := h.handleCommand(ctx, msg.Command)
 		if err != nil {
 			return []ServerMessage{{Error: err.Error()}}, err
 		}
-		return []ServerMessage{{
-			ScenarioStart: name,
-			Notification:  "Scenario started: " + name,
-		}}, nil
+		return []ServerMessage{commandResult}, nil
 	default:
 		return []ServerMessage{{Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
 	}
 }
 
-func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) (string, error) {
+func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) (ServerMessage, error) {
 	if cmd == nil {
-		return "", ErrInvalidClientMessage
+		return ServerMessage{}, ErrInvalidClientMessage
 	}
+	action := cmd.Action
+	if action == "" {
+		action = "start"
+	}
+
 	switch cmd.Kind {
 	case "voice":
-		return h.runtime.HandleVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
+		if action == "stop" {
+			name, err := h.runtime.StopVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
+			if err != nil {
+				return ServerMessage{}, err
+			}
+			return ServerMessage{
+				ScenarioStop: name,
+				Notification: "Scenario stopped: " + name,
+			}, nil
+		}
+		name, err := h.runtime.HandleVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
+		if err != nil {
+			return ServerMessage{}, err
+		}
+		return ServerMessage{
+			ScenarioStart: name,
+			Notification:  "Scenario started: " + name,
+		}, nil
 	default:
-		return h.runtime.HandleTrigger(ctx, scenario.Trigger{
+		trigger := scenario.Trigger{
 			Kind:      scenario.TriggerManual,
 			SourceID:  cmd.DeviceID,
 			Intent:    cmd.Intent,
 			Arguments: map[string]string{},
-		})
+		}
+		if action == "stop" {
+			name, err := h.runtime.StopTrigger(ctx, trigger)
+			if err != nil {
+				return ServerMessage{}, err
+			}
+			return ServerMessage{
+				ScenarioStop: name,
+				Notification: "Scenario stopped: " + name,
+			}, nil
+		}
+		name, err := h.runtime.HandleTrigger(ctx, trigger)
+		if err != nil {
+			return ServerMessage{}, err
+		}
+		return ServerMessage{
+			ScenarioStart: name,
+			Notification:  "Scenario started: " + name,
+		}, nil
 	}
 }

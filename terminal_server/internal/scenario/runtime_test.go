@@ -88,3 +88,41 @@ func TestRuntimeHandleVoiceTimer(t *testing.T) {
 		t.Fatalf("unexpected broadcast events: %+v", events)
 	}
 }
+
+func TestRuntimeStopTrigger(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: PhotoFrameScenario{},
+		Priority: PriorityLow,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices: devices,
+	})
+
+	name, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:   TriggerManual,
+		Intent: "photo frame",
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger() error = %v", err)
+	}
+	if name != "photo_frame" {
+		t.Fatalf("name = %q, want photo_frame", name)
+	}
+
+	stopped, err := runtime.StopTrigger(context.Background(), Trigger{
+		Kind:   TriggerManual,
+		Intent: "photo frame",
+	})
+	if err != nil {
+		t.Fatalf("StopTrigger() error = %v", err)
+	}
+	if stopped != "photo_frame" {
+		t.Fatalf("stopped = %q, want photo_frame", stopped)
+	}
+	if _, ok := engine.Active("d1"); ok {
+		t.Fatalf("expected no active scenario after stop")
+	}
+}
