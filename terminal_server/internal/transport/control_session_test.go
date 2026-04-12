@@ -6,6 +6,11 @@ import (
 	"testing"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/scenario"
+	"github.com/curtcox/terminals/terminal_server/internal/storage"
+	"github.com/curtcox/terminals/terminal_server/internal/telephony"
+	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
 type fakeStream struct {
@@ -96,5 +101,59 @@ func TestSessionRunCapabilityAndHeartbeat(t *testing.T) {
 	}
 	if got.Capabilities["screen.width"] != "1920" {
 		t.Fatalf("screen.width = %q, want 1920", got.Capabilities["screen.width"])
+	}
+}
+
+func TestSessionRunContinuesAfterRecoverableError(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        iorouter.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}},
+			{Command: &CommandRequest{
+				RequestID: "bad-action",
+				DeviceID:  "d1",
+				Action:    "pause",
+				Kind:      "manual",
+				Intent:    "photo frame",
+			}},
+			{Heartbeat: &HeartbeatRequest{DeviceID: "d1"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Register emits 2 responses. Bad command emits structured error response.
+	if len(stream.sent) < 3 {
+		t.Fatalf("len(sent) = %d, want at least 3", len(stream.sent))
+	}
+	last := stream.sent[len(stream.sent)-1]
+	if last.Error == "" {
+		t.Fatalf("expected structured error response for invalid command action")
+	}
+
+	got, ok := manager.Get("d1")
+	if !ok {
+		t.Fatalf("expected device d1")
+	}
+	// Stream EOF marks device disconnected, but heartbeat should have been processed before EOF.
+	if got.LastHeartbeat.IsZero() {
+		t.Fatalf("expected heartbeat to be processed after recoverable error")
 	}
 }

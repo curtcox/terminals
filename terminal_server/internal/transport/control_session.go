@@ -65,7 +65,21 @@ func (s *Session) Run(stream ControlStream) error {
 			}
 		}
 		if handleErr != nil {
+			// If we emitted an explicit error response, keep the session alive
+			// so a malformed client message does not force reconnect.
+			if hasStructuredError(out) {
+				continue
+			}
 			return handleErr
 		}
 	}
+}
+
+func hasStructuredError(messages []ServerMessage) bool {
+	for _, msg := range messages {
+		if msg.Error != "" {
+			return true
+		}
+	}
+	return false
 }
