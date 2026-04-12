@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -19,6 +20,12 @@ var (
 	ErrInvalidCommandAction = errors.New("invalid command action")
 	// ErrInvalidCommandKind indicates an unsupported command kind.
 	ErrInvalidCommandKind = errors.New("invalid command kind")
+	// ErrMissingCommandIntent indicates required command intent is missing.
+	ErrMissingCommandIntent = errors.New("missing command intent")
+	// ErrMissingCommandText indicates required voice command text is missing.
+	ErrMissingCommandText = errors.New("missing command text")
+	// ErrMissingCommandDeviceID indicates required command device id is missing.
+	ErrMissingCommandDeviceID = errors.New("missing command device id")
 )
 
 // CapabilityUpdateRequest is a transport-neutral capability update payload.
@@ -173,6 +180,9 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	if kind == "system" {
 		return h.handleSystemCommand(ctx, cmd)
 	}
+	if strings.TrimSpace(cmd.DeviceID) == "" {
+		return ServerMessage{}, ErrMissingCommandDeviceID
+	}
 	if h.runtime == nil {
 		return ServerMessage{}, errors.New("scenario runtime not configured")
 	}
@@ -187,6 +197,9 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 
 	switch kind {
 	case "voice":
+		if strings.TrimSpace(cmd.Text) == "" {
+			return ServerMessage{}, ErrMissingCommandText
+		}
 		if action == "stop" {
 			name, err := h.runtime.StopVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
 			if err != nil {
@@ -206,6 +219,9 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			Notification:  "Scenario started: " + name,
 		}, nil
 	case "manual":
+		if strings.TrimSpace(cmd.Intent) == "" {
+			return ServerMessage{}, ErrMissingCommandIntent
+		}
 		trigger := scenario.Trigger{
 			Kind:      scenario.TriggerManual,
 			SourceID:  cmd.DeviceID,
@@ -239,12 +255,16 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 	if cmd == nil {
 		return ServerMessage{}, ErrInvalidClientMessage
 	}
-	switch cmd.Intent {
+	intent := strings.TrimSpace(cmd.Intent)
+	if intent == "" {
+		return ServerMessage{}, ErrMissingCommandIntent
+	}
+	switch intent {
 	case "system_help":
 		return ServerMessage{
 			Notification: "System query: system_help",
 			Data: map[string]string{
-				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,device_status <device_id>,run_due_timers,system_help",
+				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,pending_timers,device_status <device_id>,run_due_timers,system_help",
 				"command_kinds":   "voice,manual,system",
 				"command_actions": "start,stop",
 			},
@@ -326,9 +346,20 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: active_scenarios",
 			Data:         data,
 		}, nil
+	case "pending_timers":
+		data := map[string]string{}
+		if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Scheduler != nil {
+			for _, key := range h.runtime.Env.Scheduler.Due(math.MaxInt64) {
+				data[key] = "scheduled"
+			}
+		}
+		return ServerMessage{
+			Notification: "System query: pending_timers",
+			Data:         data,
+		}, nil
 	default:
-		if strings.HasPrefix(cmd.Intent, "device_status ") {
-			deviceID := strings.TrimSpace(strings.TrimPrefix(cmd.Intent, "device_status "))
+		if strings.HasPrefix(intent, "device_status ") {
+			deviceID := strings.TrimSpace(strings.TrimPrefix(intent, "device_status "))
 			if deviceID == "" {
 				return ServerMessage{}, fmt.Errorf("device_status requires device id")
 			}
@@ -351,7 +382,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 				Data:         data,
 			}, nil
 		}
-		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", strings.TrimSpace(cmd.Intent))
+		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", intent)
 	}
 }
 

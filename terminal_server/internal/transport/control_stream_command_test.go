@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -661,6 +662,9 @@ func TestHandleMessageSystemHelp(t *testing.T) {
 	if out[0].Data["system_intents"] == "" || out[0].Data["command_kinds"] == "" {
 		t.Fatalf("missing expected system_help fields: %+v", out[0].Data)
 	}
+	if out[0].Data["system_intents"] == "" || !contains(out[0].Data["system_intents"], "pending_timers") {
+		t.Fatalf("system_help missing pending_timers intent: %+v", out[0].Data)
+	}
 }
 
 func TestHandleMessageSystemDeviceStatus(t *testing.T) {
@@ -697,6 +701,40 @@ func TestHandleMessageSystemDeviceStatus(t *testing.T) {
 	}
 }
 
+func TestHandleMessageSystemPendingTimers(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	scheduler := storage.NewMemoryScheduler()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Scheduler: scheduler,
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_ = scheduler.Schedule(context.Background(), "timer:device-1:100", control.now().Add(5*time.Minute).UnixMilli())
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-pending-1",
+			Kind:      "system",
+			Intent:    "pending_timers",
+		},
+	})
+	if err != nil {
+		t.Fatalf("pending_timers error = %v", err)
+	}
+	if out[0].Data["timer:device-1:100"] != "scheduled" {
+		t.Fatalf("pending timer missing from response: %+v", out[0].Data)
+	}
+}
+
 func TestHandleMessageRejectsInvalidCommandKind(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -719,4 +757,79 @@ func TestHandleMessageRejectsInvalidCommandKind(t *testing.T) {
 	if err != ErrInvalidCommandKind {
 		t.Fatalf("error = %v, want %v", err, ErrInvalidCommandKind)
 	}
+}
+
+func TestHandleMessageRejectsMissingManualIntent(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{Devices: devices})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "bad-intent",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "   ",
+		},
+	})
+	if err != ErrMissingCommandIntent {
+		t.Fatalf("error = %v, want %v", err, ErrMissingCommandIntent)
+	}
+}
+
+func TestHandleMessageRejectsMissingVoiceText(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{Devices: devices})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "bad-text",
+			DeviceID:  "device-1",
+			Kind:      "voice",
+			Text:      "",
+		},
+	})
+	if err != ErrMissingCommandText {
+		t.Fatalf("error = %v, want %v", err, ErrMissingCommandText)
+	}
+}
+
+func TestHandleMessageRejectsMissingCommandDeviceID(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{Devices: devices})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "bad-device",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	if err != ErrMissingCommandDeviceID {
+		t.Fatalf("error = %v, want %v", err, ErrMissingCommandDeviceID)
+	}
+}
+
+func contains(s, needle string) bool {
+	return strings.Contains(s, needle)
 }
