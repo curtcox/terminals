@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:terminal_client/connection/control_client.dart';
+import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
+import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 
 void main() {
   runApp(const TerminalClientApp());
@@ -43,6 +46,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   final TextEditingController _platformController = TextEditingController(
     text: 'flutter',
   );
+  final MdnsScanner _mdnsScanner = MdnsScanner();
   TerminalControlGrpcClient? _client;
   final StreamController<ConnectRequest> _outgoing =
       StreamController<ConnectRequest>();
@@ -51,6 +55,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _status = 'Idle';
   int _responses = 0;
   String _deviceId = 'flutter-client-1';
+  uiv1.Node? _activeRoot;
+  String _lastNotification = '';
+  final TextEditingController _terminalInputController =
+      TextEditingController();
+  bool _isScanning = false;
+  List<DiscoveredServer> _discoveredServers = [];
+  String? _selectedDiscoveredServer;
 
   Future<void> _startStream() async {
     final host = _hostController.text.trim();
@@ -71,13 +82,26 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
 
     final stream = _client!.connect(_outgoing.stream);
     _incoming = stream.listen(
-      (_) {
+      (ConnectResponse response) {
         if (!mounted) {
           return;
         }
         setState(() {
           _responses += 1;
-          _status = 'Connected';
+          _status = _statusFromResponse(response);
+          if (response.hasSetUi() && response.setUi.hasRoot()) {
+            _activeRoot = response.setUi.root;
+          }
+          if (response.hasNotification()) {
+            _lastNotification = response.notification.body;
+          }
+          if (response.hasCommandResult() &&
+              response.commandResult.notification.isNotEmpty) {
+            _lastNotification = response.commandResult.notification;
+          }
+          if (response.hasError()) {
+            _lastNotification = response.error.message;
+          }
         });
       },
       onError: (Object error) {
@@ -121,6 +145,47 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     );
   }
 
+  Future<void> _scanForServers() async {
+    if (_isScanning) {
+      return;
+    }
+    setState(() {
+      _isScanning = true;
+      _status = 'Scanning LAN for server...';
+    });
+    try {
+      final found = await _mdnsScanner.scan();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _discoveredServers = found;
+        if (found.isNotEmpty) {
+          _selectedDiscoveredServer = '${found.first.host}:${found.first.port}';
+          _hostController.text = found.first.host;
+          _portController.text = found.first.port.toString();
+          _status = 'Found ${found.length} server(s)';
+        } else {
+          _selectedDiscoveredServer = null;
+          _status = 'No servers discovered';
+        }
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = 'Discovery error: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
+    }
+  }
+
   Future<void> _stopStream() async {
     await _incoming?.cancel();
     _incoming = null;
@@ -132,6 +197,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (mounted) {
       setState(() {
         _status = 'Disconnected';
+        _activeRoot = null;
       });
     }
   }
@@ -152,6 +218,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _deviceNameController.dispose();
     _deviceTypeController.dispose();
     _platformController.dispose();
+    _terminalInputController.dispose();
     super.dispose();
   }
 
@@ -171,6 +238,47 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                   hintText: '127.0.0.1',
                 ),
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: _isScanning ? null : _scanForServers,
+                    child: Text(_isScanning ? 'Scanning...' : 'Scan LAN'),
+                  ),
+                ],
+              ),
+              if (_discoveredServers.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedDiscoveredServer,
+                  decoration:
+                      const InputDecoration(labelText: 'Discovered Server'),
+                  items: _discoveredServers
+                      .map(
+                        (server) => DropdownMenuItem<String>(
+                          value: '${server.host}:${server.port}',
+                          child: Text(
+                            '${server.name} (${server.host}:${server.port})',
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    final parts = value.split(':');
+                    if (parts.length != 2) {
+                      return;
+                    }
+                    setState(() {
+                      _selectedDiscoveredServer = value;
+                      _hostController.text = parts[0];
+                      _portController.text = parts[1];
+                    });
+                  },
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: _portController,
@@ -196,6 +304,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
               Text('Control Stream: $_status'),
               const SizedBox(height: 12),
               Text('Responses: $_responses'),
+              if (_lastNotification.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('Notification: $_lastNotification'),
+              ],
               const SizedBox(height: 20),
               Wrap(
                 spacing: 12,
@@ -210,10 +322,163 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                   ),
                 ],
               ),
+              if (_activeRoot != null) ...[
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 320,
+                  child: _renderNode(_activeRoot!),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  String _statusFromResponse(ConnectResponse response) {
+    if (response.hasError()) {
+      return 'Server error';
+    }
+    if (response.hasRegisterAck()) {
+      return 'Registered';
+    }
+    if (response.hasCommandResult()) {
+      return 'Command response';
+    }
+    if (response.hasSetUi()) {
+      return 'UI updated';
+    }
+    return 'Connected';
+  }
+
+  Future<void> _sendUiAction({
+    required String componentId,
+    required String action,
+    required String value,
+  }) async {
+    if (_deviceId.isEmpty) {
+      return;
+    }
+    _outgoing.add(
+      ConnectRequest()
+        ..input = (iov1.InputEvent()
+          ..deviceId = _deviceId
+          ..uiAction = (iov1.UIAction()
+            ..componentId = componentId
+            ..action = action
+            ..value = value)),
+    );
+  }
+
+  String _nodeId(uiv1.Node node) {
+    if (node.id.isNotEmpty) {
+      return node.id;
+    }
+    return node.props['id'] ?? '';
+  }
+
+  Widget _renderNode(uiv1.Node node) {
+    switch (node.whichWidget()) {
+      case uiv1.Node_Widget.stack:
+        return Container(
+          color: _parseHexColor(node.props['background']),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: node.children.map(_renderNode).toList(),
+          ),
+        );
+      case uiv1.Node_Widget.row:
+        return Row(children: node.children.map(_renderNode).toList());
+      case uiv1.Node_Widget.scroll:
+        return SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: node.children.map(_renderNode).toList(),
+          ),
+        );
+      case uiv1.Node_Widget.text:
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: SelectableText(
+            node.text.value,
+            style: TextStyle(
+              color: _parseHexColor(node.text.color),
+              fontFamily:
+                  node.text.style == 'monospace' ? 'monospace' : null,
+            ),
+          ),
+        );
+      case uiv1.Node_Widget.textInput:
+        final componentId = _nodeId(node);
+        return TextField(
+          controller: _terminalInputController,
+          decoration: InputDecoration(
+            hintText: node.textInput.placeholder,
+          ),
+          autofocus: node.textInput.autofocus,
+          onSubmitted: (value) async {
+            await _sendUiAction(
+              componentId: componentId.isNotEmpty ? componentId : 'text_input',
+              action: 'submit',
+              value: value,
+            );
+            _terminalInputController.clear();
+          },
+        );
+      case uiv1.Node_Widget.button:
+        final componentId = _nodeId(node);
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: ElevatedButton(
+            onPressed: () {
+              unawaited(
+                _sendUiAction(
+                  componentId: componentId.isNotEmpty ? componentId : 'button',
+                  action: node.button.action.isNotEmpty
+                      ? node.button.action
+                      : 'tap',
+                  value: '',
+                ),
+              );
+            },
+            child: Text(node.button.label),
+          ),
+        );
+      case uiv1.Node_Widget.notSet:
+        break;
+      default:
+        if (node.children.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: node.children.map(_renderNode).toList(),
+        );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Color? _parseHexColor(String? raw) {
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    var value = raw.trim();
+    if (value.startsWith('#')) {
+      value = value.substring(1);
+    }
+    if (value.length == 6) {
+      value = 'FF$value';
+    }
+    if (value.length != 8) {
+      return null;
+    }
+    final parsed = int.tryParse(value, radix: 16);
+    if (parsed == null) {
+      return null;
+    }
+    return Color(parsed);
   }
 }
