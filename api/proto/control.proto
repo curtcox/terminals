@@ -19,7 +19,7 @@ message ClientMessage {
     terminals.io.v1.InputEvent input = 3;
     terminals.io.v1.SensorData sensor = 4;
     StreamReady stream_ready = 5;
-    CommandAck ack = 6;
+    CommandRequest command = 6;
     Heartbeat heartbeat = 7;
   }
 }
@@ -35,8 +35,9 @@ message ServerMessage {
     terminals.io.v1.RouteStream route_stream = 7;
     terminals.ui.v1.Notification notification = 8;
     WebRTCSignal webrtc_signal = 9;
-    CommandRequest command = 10;
+    CommandResult command_result = 10;
     Heartbeat heartbeat = 11;
+    ControlError error = 12;
   }
 }
 
@@ -57,16 +58,32 @@ message StreamReady {
   string stream_id = 1;
 }
 
-message CommandAck {
-  string command_id = 1;
-  bool ok = 2;
-  string error = 3;
+enum CommandAction {
+  COMMAND_ACTION_UNSPECIFIED = 0;
+  COMMAND_ACTION_START = 1;
+  COMMAND_ACTION_STOP = 2;
 }
 
 message CommandRequest {
-  string command_id = 1;
-  string name = 2;
-  map<string, string> args = 3;
+  string request_id = 1;
+  string device_id = 2;
+  CommandAction action = 3;
+  string kind = 4;   // voice, manual, system
+  string text = 5;   // voice transcript
+  string intent = 6; // intent name or system intent
+}
+
+message CommandResult {
+  string request_id = 1; // echoes CommandRequest.request_id
+  string scenario_start = 2;
+  string scenario_stop = 3;
+  string notification = 4;
+  map<string, string> data = 5;
+}
+
+message ControlError {
+  string code = 1;
+  string message = 2;
 }
 
 message WebRTCSignal {
