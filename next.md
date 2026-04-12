@@ -1,1 +1,1 @@
-Implement terminal output streaming from PTY to client without requiring a new input event.
+Add a dedicated server-driven terminal refresh command (system/manual) to force immediate PTY flush and UI update on demand.

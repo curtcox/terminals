@@ -227,6 +227,79 @@ func TestHandleMessageInputTerminal(t *testing.T) {
 	}
 }
 
+func TestHandleMessageHeartbeatFlushesTerminalOutput(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-heartbeat-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	initialOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "sleep 1; printf '\\x68\\x62\\x2d\\x64\\x65\\x6c\\x61\\x79\\x65\\x64\\x2d\\x34\\x32\\n'",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input delayed command) error = %v", err)
+	}
+	if len(initialOut) != 1 || initialOut[0].UpdateUI == nil {
+		t.Fatalf("expected immediate terminal update response, got %+v", initialOut)
+	}
+	initialValue := initialOut[0].UpdateUI.Node.Props["value"]
+	if strings.Contains(initialValue, "hb-delayed-42") {
+		t.Fatalf("unexpected delayed marker in initial response: %+v", initialOut[0].UpdateUI.Node.Props)
+	}
+
+	time.Sleep(1200 * time.Millisecond)
+
+	heartbeatOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(heartbeat) error = %v", err)
+	}
+	if len(heartbeatOut) != 1 || heartbeatOut[0].UpdateUI == nil {
+		t.Fatalf("expected UpdateUI from heartbeat flush, got %+v", heartbeatOut)
+	}
+	if heartbeatOut[0].UpdateUI.ComponentID != "terminal_output" {
+		t.Fatalf("update component_id = %q, want terminal_output", heartbeatOut[0].UpdateUI.ComponentID)
+	}
+	heartbeatValue := heartbeatOut[0].UpdateUI.Node.Props["value"]
+	if !strings.Contains(heartbeatValue, "hb-delayed-42") {
+		t.Fatalf("heartbeat output did not include delayed command result: %+v", heartbeatOut[0].UpdateUI.Node.Props)
+	}
+	if len(heartbeatValue) <= len(initialValue) {
+		t.Fatalf("heartbeat output should extend terminal text (initial=%d heartbeat=%d)", len(initialValue), len(heartbeatValue))
+	}
+}
+
 func TestHandleMessageInputTerminalChangeUsesDraftOnSubmit(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

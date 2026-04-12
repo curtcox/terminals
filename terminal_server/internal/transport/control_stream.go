@@ -189,6 +189,14 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
+		update, pollErr := h.pollTerminalOutput(msg.Heartbeat.DeviceID)
+		if pollErr != nil {
+			h.metrics.protocolErrors.Add(1)
+			return []ServerMessage{{ErrorCode: errorCodeFor(pollErr), Error: pollErr.Error()}}, pollErr
+		}
+		if update != nil {
+			return []ServerMessage{*update}, nil
+		}
 		return nil, nil
 	case msg.Input != nil:
 		out, err := h.handleInput(ctx, msg.Input)
@@ -525,19 +533,54 @@ func (h *StreamHandler) renderTerminalUIAction(deviceID, componentID, action, va
 	}
 	line := fmt.Sprintf("[ui_action] %s %s = %s\n", componentID, action, value)
 
-	h.mu.Lock()
-	existing := h.terminalOutputByDevice[deviceID]
-	existing += line
-	if len(existing) > 12000 {
-		existing = existing[len(existing)-12000:]
-	}
-	h.terminalOutputByDevice[deviceID] = existing
-	h.mu.Unlock()
+	existing := h.appendTerminalOutput(deviceID, line)
 
 	return &UIUpdate{
 		ComponentID: "terminal_output",
 		Node:        ui.TerminalOutputPatch(existing),
 	}, true
+}
+
+func (h *StreamHandler) pollTerminalOutput(deviceID string) (*ServerMessage, error) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil, nil
+	}
+
+	h.mu.Lock()
+	sessionID := h.terminalByDevice[deviceID]
+	h.mu.Unlock()
+	if sessionID == "" {
+		return nil, nil
+	}
+
+	chunk, err := h.terminals.ReadAvailable(sessionID, 4096)
+	if err != nil {
+		return nil, err
+	}
+	if len(chunk) == 0 {
+		return nil, nil
+	}
+
+	combined := h.appendTerminalOutput(deviceID, string(chunk))
+	return &ServerMessage{
+		UpdateUI: &UIUpdate{
+			ComponentID: "terminal_output",
+			Node:        ui.TerminalOutputPatch(combined),
+		},
+	}, nil
+}
+
+func (h *StreamHandler) appendTerminalOutput(deviceID, chunk string) string {
+	h.mu.Lock()
+	existing := h.terminalOutputByDevice[deviceID]
+	existing += chunk
+	if len(existing) > 12000 {
+		existing = existing[len(existing)-12000:]
+	}
+	h.terminalOutputByDevice[deviceID] = existing
+	h.mu.Unlock()
+	return existing
 }
 
 func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
@@ -554,15 +597,7 @@ func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
 		time.Sleep(25 * time.Millisecond)
 	}
 
-	h.mu.Lock()
-	existing := h.terminalOutputByDevice[deviceID]
-	existing += string(chunk)
-	if len(existing) > 12000 {
-		existing = existing[len(existing)-12000:]
-	}
-	h.terminalOutputByDevice[deviceID] = existing
-	h.mu.Unlock()
-	return existing
+	return h.appendTerminalOutput(deviceID, string(chunk))
 }
 
 func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) (ServerMessage, error) {
