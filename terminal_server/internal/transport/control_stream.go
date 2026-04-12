@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -71,33 +72,50 @@ type ServerMessage struct {
 
 // StreamHandler processes control stream messages.
 type StreamHandler struct {
-	control   *ControlService
-	runtime   *scenario.Runtime
-	metrics   *Metrics
-	mu        sync.Mutex
-	seen      map[string]ServerMessage
-	seenOrder []string
-	seenLimit int
+	control     *ControlService
+	runtime     *scenario.Runtime
+	metrics     *Metrics
+	mu          sync.Mutex
+	seen        map[string]ServerMessage
+	seenOrder   []string
+	seenLimit   int
+	recent      []CommandEvent
+	recentLimit int
+}
+
+// CommandEvent is a bounded audit record of command handling.
+type CommandEvent struct {
+	RequestID string
+	DeviceID  string
+	Kind      string
+	Action    string
+	Intent    string
+	Outcome   string
+	WhenUnix  int64
 }
 
 // NewStreamHandler creates a handler for control stream messages.
 func NewStreamHandler(control *ControlService) *StreamHandler {
 	return &StreamHandler{
-		control:   control,
-		metrics:   &Metrics{},
-		seen:      map[string]ServerMessage{},
-		seenLimit: 1024,
+		control:     control,
+		metrics:     &Metrics{},
+		seen:        map[string]ServerMessage{},
+		seenLimit:   1024,
+		recent:      []CommandEvent{},
+		recentLimit: 200,
 	}
 }
 
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
 func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
 	return &StreamHandler{
-		control:   control,
-		runtime:   runtime,
-		metrics:   &Metrics{},
-		seen:      map[string]ServerMessage{},
-		seenLimit: 1024,
+		control:     control,
+		runtime:     runtime,
+		metrics:     &Metrics{},
+		seen:        map[string]ServerMessage{},
+		seenLimit:   1024,
+		recent:      []CommandEvent{},
+		recentLimit: 200,
 	}
 }
 
@@ -139,6 +157,15 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 				if h.metrics != nil {
 					h.metrics.dedupeHits.Add(1)
 				}
+				h.appendCommandEventLocked(CommandEvent{
+					RequestID: msg.Command.RequestID,
+					DeviceID:  msg.Command.DeviceID,
+					Kind:      msg.Command.Kind,
+					Action:    defaultAction(msg.Command.Action),
+					Intent:    msg.Command.Intent,
+					Outcome:   "deduped",
+					WhenUnix:  h.control.now().UTC().UnixMilli(),
+				})
 				h.mu.Unlock()
 				return []ServerMessage{prior}, nil
 			}
@@ -147,8 +174,30 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		commandResult, err := h.handleCommand(ctx, msg.Command)
 		if err != nil {
 			h.metrics.commandErrors.Add(1)
+			h.mu.Lock()
+			h.appendCommandEventLocked(CommandEvent{
+				RequestID: msg.Command.RequestID,
+				DeviceID:  msg.Command.DeviceID,
+				Kind:      msg.Command.Kind,
+				Action:    defaultAction(msg.Command.Action),
+				Intent:    msg.Command.Intent,
+				Outcome:   "error:" + err.Error(),
+				WhenUnix:  h.control.now().UTC().UnixMilli(),
+			})
+			h.mu.Unlock()
 			return []ServerMessage{{Error: err.Error()}}, err
 		}
+		h.mu.Lock()
+		h.appendCommandEventLocked(CommandEvent{
+			RequestID: msg.Command.RequestID,
+			DeviceID:  msg.Command.DeviceID,
+			Kind:      msg.Command.Kind,
+			Action:    defaultAction(msg.Command.Action),
+			Intent:    msg.Command.Intent,
+			Outcome:   commandOutcome(commandResult),
+			WhenUnix:  h.control.now().UTC().UnixMilli(),
+		})
+		h.mu.Unlock()
 		if msg.Command.RequestID != "" {
 			commandResult.CommandAck = msg.Command.RequestID
 			h.mu.Lock()
@@ -264,7 +313,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		return ServerMessage{
 			Notification: "System query: system_help",
 			Data: map[string]string{
-				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,pending_timers,device_status <device_id>,run_due_timers,system_help",
+				"system_intents":  "server_status,runtime_status,scenario_registry,transport_metrics,list_devices,active_scenarios,pending_timers,recent_commands,device_status <device_id>,run_due_timers,system_help",
 				"command_kinds":   "voice,manual,system",
 				"command_actions": "start,stop",
 			},
@@ -357,6 +406,28 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: pending_timers",
 			Data:         data,
 		}, nil
+	case "recent_commands":
+		data := map[string]string{}
+		h.mu.Lock()
+		events := make([]CommandEvent, len(h.recent))
+		copy(events, h.recent)
+		h.mu.Unlock()
+		for i, ev := range events {
+			key := fmt.Sprintf("%03d", i)
+			data[key] = strings.Join([]string{
+				ev.RequestID,
+				ev.DeviceID,
+				ev.Kind,
+				ev.Action,
+				ev.Intent,
+				ev.Outcome,
+				strconv.FormatInt(ev.WhenUnix, 10),
+			}, "|")
+		}
+		return ServerMessage{
+			Notification: "System query: recent_commands",
+			Data:         data,
+		}, nil
 	default:
 		if strings.HasPrefix(intent, "device_status ") {
 			deviceID := strings.TrimSpace(strings.TrimPrefix(intent, "device_status "))
@@ -390,5 +461,32 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 func (h *StreamHandler) NoteProtocolError() {
 	if h.metrics != nil {
 		h.metrics.protocolErrors.Add(1)
+	}
+}
+
+func (h *StreamHandler) appendCommandEventLocked(ev CommandEvent) {
+	h.recent = append(h.recent, ev)
+	if len(h.recent) > h.recentLimit {
+		h.recent = h.recent[len(h.recent)-h.recentLimit:]
+	}
+}
+
+func defaultAction(action string) string {
+	if action == "" {
+		return "start"
+	}
+	return action
+}
+
+func commandOutcome(msg ServerMessage) string {
+	switch {
+	case msg.ScenarioStart != "":
+		return "started:" + msg.ScenarioStart
+	case msg.ScenarioStop != "":
+		return "stopped:" + msg.ScenarioStop
+	case msg.Notification != "":
+		return "notified"
+	default:
+		return "ok"
 	}
 }

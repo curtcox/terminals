@@ -665,6 +665,9 @@ func TestHandleMessageSystemHelp(t *testing.T) {
 	if out[0].Data["system_intents"] == "" || !contains(out[0].Data["system_intents"], "pending_timers") {
 		t.Fatalf("system_help missing pending_timers intent: %+v", out[0].Data)
 	}
+	if !contains(out[0].Data["system_intents"], "recent_commands") {
+		t.Fatalf("system_help missing recent_commands intent: %+v", out[0].Data)
+	}
 }
 
 func TestHandleMessageSystemDeviceStatus(t *testing.T) {
@@ -732,6 +735,101 @@ func TestHandleMessageSystemPendingTimers(t *testing.T) {
 	}
 	if out[0].Data["timer:device-1:100"] != "scheduled" {
 		t.Fatalf("pending timer missing from response: %+v", out[0].Data)
+	}
+}
+
+func TestHandleMessageSystemRecentCommands(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "audit-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "audit-2",
+			DeviceID:  "device-1",
+			Action:    "stop",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-recent-1",
+			Kind:      "system",
+			Intent:    "recent_commands",
+		},
+	})
+	if err != nil {
+		t.Fatalf("recent_commands error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if len(out[0].Data) < 2 {
+		t.Fatalf("expected at least 2 recent command events, got %d", len(out[0].Data))
+	}
+	foundAudit1 := false
+	for _, v := range out[0].Data {
+		if strings.Contains(v, "audit-1") {
+			foundAudit1 = true
+			break
+		}
+	}
+	if !foundAudit1 {
+		t.Fatalf("expected recent_commands payload to include audit-1 event")
+	}
+}
+
+func TestHandleMessageRecentCommandsEviction(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+		IO:      io.NewRouter(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.recentLimit = 2
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{RequestID: "evict-1", DeviceID: "device-1", Kind: "manual", Intent: "photo frame"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{RequestID: "evict-2", DeviceID: "device-1", Action: "stop", Kind: "manual", Intent: "photo frame"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{RequestID: "evict-3", Kind: "system", Intent: "server_status"},
+	})
+
+	if len(handler.recent) != 2 {
+		t.Fatalf("len(recent) = %d, want 2", len(handler.recent))
+	}
+	if handler.recent[0].RequestID != "evict-2" || handler.recent[1].RequestID != "evict-3" {
+		t.Fatalf("unexpected recent eviction order: %+v", handler.recent)
 	}
 }
 
