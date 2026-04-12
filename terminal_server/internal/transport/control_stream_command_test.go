@@ -249,3 +249,117 @@ func TestHandleMessageCommandRejectsInvalidAction(t *testing.T) {
 		t.Fatalf("error = %v, want %v", err, ErrInvalidCommandAction)
 	}
 }
+
+func TestHandleMessageSystemListDevices(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook", Platform: "linux"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Tablet", Platform: "android"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-1",
+			Kind:      "system",
+			Intent:    "list_devices",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system list devices error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].CommandAck != "sys-1" {
+		t.Fatalf("CommandAck = %q, want sys-1", out[0].CommandAck)
+	}
+	if len(out[0].Data) != 2 {
+		t.Fatalf("len(Data) = %d, want 2", len(out[0].Data))
+	}
+}
+
+func TestHandleMessageSystemActiveScenarios(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-2",
+			Kind:      "system",
+			Intent:    "active_scenarios",
+		},
+	})
+	if err != nil {
+		t.Fatalf("system active_scenarios error = %v", err)
+	}
+	if out[0].Data["device-1"] != "photo_frame" {
+		t.Fatalf("active scenario = %q, want photo_frame", out[0].Data["device-1"])
+	}
+}
+
+func TestHandleMessageDedupeEviction(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{Devices: devices})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.seenLimit = 1
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "r1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "r2",
+			DeviceID:  "device-1",
+			Action:    "stop",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+
+	handler.mu.Lock()
+	_, hasR1 := handler.seen["r1"]
+	_, hasR2 := handler.seen["r2"]
+	handler.mu.Unlock()
+	if hasR1 || !hasR2 {
+		t.Fatalf("expected r1 evicted and r2 retained, got hasR1=%v hasR2=%v", hasR1, hasR2)
+	}
+}

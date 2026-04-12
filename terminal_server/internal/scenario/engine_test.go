@@ -79,3 +79,22 @@ func TestStopResumesSuspended(t *testing.T) {
 		t.Fatalf("Active() = %q, want %q", active, "normal")
 	}
 }
+
+func TestActiveSnapshot(t *testing.T) {
+	e := NewEngine()
+	normal := &stubScenario{name: "normal", match: true}
+	e.Register(Registration{Scenario: normal, Priority: PriorityNormal})
+
+	if err := e.Activate(context.Background(), &Environment{}, "normal", []string{"device-1"}); err != nil {
+		t.Fatalf("Activate() error = %v", err)
+	}
+	snap := e.ActiveSnapshot()
+	if snap["device-1"] != "normal" {
+		t.Fatalf("snapshot[device-1] = %q, want normal", snap["device-1"])
+	}
+	snap["device-1"] = "changed"
+	verify := e.ActiveSnapshot()
+	if verify["device-1"] != "normal" {
+		t.Fatalf("snapshot should be copied")
+	}
+}

@@ -144,3 +144,15 @@ func (e *Engine) Active(deviceID string) (string, bool) {
 	}
 	return active.name, true
 }
+
+// ActiveSnapshot returns a copy of active scenario names keyed by device id.
+func (e *Engine) ActiveSnapshot() map[string]string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	out := make(map[string]string, len(e.activeByDev))
+	for deviceID, active := range e.activeByDev {
+		out[deviceID] = active.name
+	}
+	return out
+}

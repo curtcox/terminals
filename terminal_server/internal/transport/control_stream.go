@@ -3,6 +3,8 @@ package transport
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
@@ -53,31 +55,36 @@ type ServerMessage struct {
 	Notification  string
 	ScenarioStart string
 	ScenarioStop  string
+	Data          map[string]string
 	Error         string
 }
 
 // StreamHandler processes control stream messages.
 type StreamHandler struct {
-	control *ControlService
-	runtime *scenario.Runtime
-	mu      sync.Mutex
-	seen    map[string]ServerMessage
+	control   *ControlService
+	runtime   *scenario.Runtime
+	mu        sync.Mutex
+	seen      map[string]ServerMessage
+	seenOrder []string
+	seenLimit int
 }
 
 // NewStreamHandler creates a handler for control stream messages.
 func NewStreamHandler(control *ControlService) *StreamHandler {
 	return &StreamHandler{
-		control: control,
-		seen:    map[string]ServerMessage{},
+		control:   control,
+		seen:      map[string]ServerMessage{},
+		seenLimit: 1024,
 	}
 }
 
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
 func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
 	return &StreamHandler{
-		control: control,
-		runtime: runtime,
-		seen:    map[string]ServerMessage{},
+		control:   control,
+		runtime:   runtime,
+		seen:      map[string]ServerMessage{},
+		seenLimit: 1024,
 	}
 }
 
@@ -126,6 +133,12 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			commandResult.CommandAck = msg.Command.RequestID
 			h.mu.Lock()
 			h.seen[msg.Command.RequestID] = commandResult
+			h.seenOrder = append(h.seenOrder, msg.Command.RequestID)
+			if len(h.seenOrder) > h.seenLimit {
+				evict := h.seenOrder[0]
+				h.seenOrder = h.seenOrder[1:]
+				delete(h.seen, evict)
+			}
 			h.mu.Unlock()
 		}
 		return []ServerMessage{commandResult}, nil
@@ -138,6 +151,10 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	if cmd == nil {
 		return ServerMessage{}, ErrInvalidClientMessage
 	}
+	if cmd.Kind == "system" {
+		return h.handleSystemCommand(cmd)
+	}
+
 	action := cmd.Action
 	if action == "" {
 		action = "start"
@@ -191,5 +208,35 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			ScenarioStart: name,
 			Notification:  "Scenario started: " + name,
 		}, nil
+	}
+}
+
+func (h *StreamHandler) handleSystemCommand(cmd *CommandRequest) (ServerMessage, error) {
+	if cmd == nil {
+		return ServerMessage{}, ErrInvalidClientMessage
+	}
+	switch cmd.Intent {
+	case "list_devices":
+		data := map[string]string{}
+		for _, d := range h.control.devices.List() {
+			data[d.DeviceID] = fmt.Sprintf("%s|%s|%s", d.DeviceName, d.Platform, d.State)
+		}
+		return ServerMessage{
+			Notification: "System query: list_devices",
+			Data:         data,
+		}, nil
+	case "active_scenarios":
+		data := map[string]string{}
+		if h.runtime != nil && h.runtime.Engine != nil {
+			for deviceID, scenarioName := range h.runtime.Engine.ActiveSnapshot() {
+				data[deviceID] = scenarioName
+			}
+		}
+		return ServerMessage{
+			Notification: "System query: active_scenarios",
+			Data:         data,
+		}, nil
+	default:
+		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", strings.TrimSpace(cmd.Intent))
 	}
 }
