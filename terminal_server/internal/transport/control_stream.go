@@ -224,10 +224,10 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	}
 	kind := cmd.Kind
 	if kind == "" {
-		kind = "manual"
+		kind = CommandKindManual
 	}
 
-	if kind == "system" {
+	if kind == CommandKindSystem {
 		return h.handleSystemCommand(ctx, cmd)
 	}
 	if strings.TrimSpace(cmd.DeviceID) == "" {
@@ -239,18 +239,18 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 
 	action := cmd.Action
 	if action == "" {
-		action = "start"
+		action = CommandActionStart
 	}
-	if action != "start" && action != "stop" {
+	if action != CommandActionStart && action != CommandActionStop {
 		return ServerMessage{}, ErrInvalidCommandAction
 	}
 
 	switch kind {
-	case "voice":
+	case CommandKindVoice:
 		if strings.TrimSpace(cmd.Text) == "" {
 			return ServerMessage{}, ErrMissingCommandText
 		}
-		if action == "stop" {
+		if action == CommandActionStop {
 			name, err := h.runtime.StopVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
 			if err != nil {
 				return ServerMessage{}, err
@@ -268,7 +268,7 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			ScenarioStart: name,
 			Notification:  "Scenario started: " + name,
 		}, nil
-	case "manual":
+	case CommandKindManual:
 		if strings.TrimSpace(cmd.Intent) == "" {
 			return ServerMessage{}, ErrMissingCommandIntent
 		}
@@ -278,7 +278,7 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			Intent:    cmd.Intent,
 			Arguments: map[string]string{},
 		}
-		if action == "stop" {
+		if action == CommandActionStop {
 			name, err := h.runtime.StopTrigger(ctx, trigger)
 			if err != nil {
 				return ServerMessage{}, err
@@ -310,7 +310,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		return ServerMessage{}, ErrMissingCommandIntent
 	}
 	switch intent {
-	case "system_help":
+	case SystemIntentHelp:
 		return ServerMessage{
 			Notification: "System query: system_help",
 			Data: map[string]string{
@@ -319,12 +319,12 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 				"command_actions": "start,stop",
 			},
 		}, nil
-	case "server_status":
+	case SystemIntentServerStatus:
 		return ServerMessage{
 			Notification: "System query: server_status",
 			Data:         h.control.StatusData(),
 		}, nil
-	case "runtime_status":
+	case SystemIntentRuntimeStatus:
 		data := map[string]string{}
 		if h.runtime != nil {
 			for k, v := range h.runtime.StatusData() {
@@ -335,7 +335,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: runtime_status",
 			Data:         data,
 		}, nil
-	case "scenario_registry":
+	case SystemIntentScenarioRegistry:
 		data := map[string]string{}
 		if h.runtime != nil && h.runtime.Engine != nil {
 			for _, item := range h.runtime.Engine.RegistrySnapshot() {
@@ -346,7 +346,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: scenario_registry",
 			Data:         data,
 		}, nil
-	case "run_due_timers":
+	case SystemIntentRunDueTimers:
 		processed := 0
 		if h.runtime != nil {
 			count, err := h.runtime.ProcessDueTimers(ctx, h.control.now().UTC())
@@ -361,7 +361,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 				"processed": toString(int64(processed)),
 			},
 		}, nil
-	case "reconcile_liveness":
+	case SystemIntentReconcileLiveness:
 		updated := h.control.ReconcileLiveness(2 * time.Minute)
 		return ServerMessage{
 			Notification: "System query: reconcile_liveness",
@@ -370,7 +370,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 				"timeout_seconds": "120",
 			},
 		}, nil
-	case "transport_metrics":
+	case SystemIntentTransportMetrics:
 		data := map[string]string{}
 		if h.metrics != nil {
 			for k, v := range h.metrics.Snapshot() {
@@ -381,7 +381,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: transport_metrics",
 			Data:         data,
 		}, nil
-	case "list_devices":
+	case SystemIntentListDevices:
 		data := map[string]string{}
 		devices := h.control.devices.List()
 		sort.Slice(devices, func(i, j int) bool {
@@ -394,7 +394,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: list_devices",
 			Data:         data,
 		}, nil
-	case "active_scenarios":
+	case SystemIntentActiveScenarios:
 		data := map[string]string{}
 		if h.runtime != nil && h.runtime.Engine != nil {
 			for deviceID, scenarioName := range h.runtime.Engine.ActiveSnapshot() {
@@ -405,7 +405,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: active_scenarios",
 			Data:         data,
 		}, nil
-	case "pending_timers":
+	case SystemIntentPendingTimers:
 		data := map[string]string{}
 		if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Scheduler != nil {
 			for _, key := range h.runtime.Env.Scheduler.Due(math.MaxInt64) {
@@ -416,7 +416,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: pending_timers",
 			Data:         data,
 		}, nil
-	case "recent_commands":
+	case SystemIntentRecentCommands:
 		data := map[string]string{}
 		h.mu.Lock()
 		events := make([]CommandEvent, len(h.recent))
@@ -439,8 +439,8 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Data:         data,
 		}, nil
 	default:
-		if strings.HasPrefix(intent, "reconcile_liveness ") {
-			secondsText := strings.TrimSpace(strings.TrimPrefix(intent, "reconcile_liveness "))
+		if strings.HasPrefix(intent, SystemIntentReconcileLiveness+" ") {
+			secondsText := strings.TrimSpace(strings.TrimPrefix(intent, SystemIntentReconcileLiveness+" "))
 			seconds, err := strconv.Atoi(secondsText)
 			if err != nil || seconds < 0 {
 				return ServerMessage{}, fmt.Errorf("invalid reconcile_liveness seconds: %s", secondsText)
@@ -454,8 +454,8 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 				},
 			}, nil
 		}
-		if strings.HasPrefix(intent, "device_status ") {
-			deviceID := strings.TrimSpace(strings.TrimPrefix(intent, "device_status "))
+		if strings.HasPrefix(intent, SystemIntentDeviceStatus+" ") {
+			deviceID := strings.TrimSpace(strings.TrimPrefix(intent, SystemIntentDeviceStatus+" "))
 			if deviceID == "" {
 				return ServerMessage{}, fmt.Errorf("device_status requires device id")
 			}
@@ -498,7 +498,7 @@ func (h *StreamHandler) appendCommandEventLocked(ev CommandEvent) {
 
 func defaultAction(action string) string {
 	if action == "" {
-		return "start"
+		return CommandActionStart
 	}
 	return action
 }
