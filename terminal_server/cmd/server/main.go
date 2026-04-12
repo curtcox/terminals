@@ -47,6 +47,7 @@ func main() {
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
 	controlStream := transport.NewStreamHandler(controlService)
 	grpcServer := transport.NewServer(cfg.GRPCAddress())
+	grpcServer.ConfigureControl(controlService, transport.PassthroughProtoAdapter{})
 	mdns := discovery.NoopAdvertiser{}
 
 	log.Printf("terminal server starting at %s", grpcServer.Address())
