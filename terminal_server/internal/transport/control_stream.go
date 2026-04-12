@@ -114,7 +114,14 @@ type StreamHandler struct {
 	terminalByDevice       map[string]string
 	terminalOutputByDevice map[string]string
 	terminalDraftByDevice  map[string]string
+	terminalReadDeadline   time.Duration
+	terminalReadInterval   time.Duration
 }
+
+const (
+	defaultTerminalReadDeadline = 180 * time.Millisecond
+	defaultTerminalReadInterval = 10 * time.Millisecond
+)
 
 // CommandEvent is a bounded audit record of command handling.
 type CommandEvent struct {
@@ -140,6 +147,8 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalByDevice:       map[string]string{},
 		terminalOutputByDevice: map[string]string{},
 		terminalDraftByDevice:  map[string]string{},
+		terminalReadDeadline:   defaultTerminalReadDeadline,
+		terminalReadInterval:   defaultTerminalReadInterval,
 	}
 }
 
@@ -157,6 +166,8 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalByDevice:       map[string]string{},
 		terminalOutputByDevice: map[string]string{},
 		terminalDraftByDevice:  map[string]string{},
+		terminalReadDeadline:   defaultTerminalReadDeadline,
+		terminalReadInterval:   defaultTerminalReadInterval,
 	}
 }
 
@@ -645,7 +656,8 @@ func normalizeTerminalKeyText(text string) string {
 }
 
 func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
-	deadline := time.Now().Add(350 * time.Millisecond)
+	readDeadline, readInterval := h.terminalReadSettings()
+	deadline := time.Now().Add(readDeadline)
 	var chunk []byte
 	for time.Now().Before(deadline) {
 		out, err := h.terminals.ReadAvailable(sessionID, 4096)
@@ -655,10 +667,26 @@ func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
 		if len(out) > 0 {
 			chunk = append(chunk, out...)
 		}
-		time.Sleep(25 * time.Millisecond)
+		time.Sleep(readInterval)
 	}
 
 	return h.appendTerminalOutput(deviceID, string(chunk))
+}
+
+func (h *StreamHandler) terminalReadSettings() (time.Duration, time.Duration) {
+	readDeadline := h.terminalReadDeadline
+	readInterval := h.terminalReadInterval
+
+	if readDeadline <= 0 {
+		readDeadline = defaultTerminalReadDeadline
+	}
+	if readInterval <= 0 {
+		readInterval = defaultTerminalReadInterval
+	}
+	if readInterval > readDeadline {
+		readInterval = readDeadline
+	}
+	return readDeadline, readInterval
 }
 
 func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) (ServerMessage, error) {

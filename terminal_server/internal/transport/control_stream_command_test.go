@@ -301,6 +301,62 @@ func TestHandleMessageInputTerminalKeyText(t *testing.T) {
 	}
 }
 
+func TestHandleMessageInputTerminalWithShortReadWindow(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.terminalReadDeadline = 40 * time.Millisecond
+	handler.terminalReadInterval = 5 * time.Millisecond
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-short-window-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	start := time.Now()
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "echo short-read-window-test",
+		},
+	})
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("HandleMessage(input terminal short read window) error = %v", err)
+	}
+	if len(out) != 1 || out[0].UpdateUI == nil {
+		t.Fatalf("expected single UpdateUI response, got %+v", out)
+	}
+	if !strings.Contains(out[0].UpdateUI.Node.Props["value"], "short-read-window-test") {
+		t.Fatalf("terminal output missing marker: %+v", out[0].UpdateUI.Node.Props)
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Fatalf("terminal input handling took %v, want <= 500ms", elapsed)
+	}
+}
+
 func TestHandleMessageHeartbeatFlushesTerminalOutput(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

@@ -1,6 +1,9 @@
 package transport
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestNormalizeTerminalKeyText(t *testing.T) {
 	tests := []struct {
@@ -22,5 +25,27 @@ func TestNormalizeTerminalKeyText(t *testing.T) {
 				t.Fatalf("normalizeTerminalKeyText(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestTerminalReadSettingsDefaultsAndBounds(t *testing.T) {
+	handler := &StreamHandler{}
+
+	deadline, interval := handler.terminalReadSettings()
+	if deadline != defaultTerminalReadDeadline {
+		t.Fatalf("default deadline = %v, want %v", deadline, defaultTerminalReadDeadline)
+	}
+	if interval != defaultTerminalReadInterval {
+		t.Fatalf("default interval = %v, want %v", interval, defaultTerminalReadInterval)
+	}
+
+	handler.terminalReadDeadline = 40 * time.Millisecond
+	handler.terminalReadInterval = 100 * time.Millisecond
+	deadline, interval = handler.terminalReadSettings()
+	if deadline != 40*time.Millisecond {
+		t.Fatalf("custom deadline = %v, want 40ms", deadline)
+	}
+	if interval != 40*time.Millisecond {
+		t.Fatalf("bounded interval = %v, want 40ms", interval)
 	}
 }
