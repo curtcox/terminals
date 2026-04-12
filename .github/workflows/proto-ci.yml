@@ -17,7 +17,7 @@ jobs:
       run:
         working-directory: api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: bufbuild/buf-setup-action@v1
       - name: Buf format check
         run: buf format -d --exit-code
