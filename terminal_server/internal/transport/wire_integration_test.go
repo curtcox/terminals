@@ -390,3 +390,96 @@ func TestWireSessionPASystemRelaysReceiverOverlayAndTransitions(t *testing.T) {
 		t.Fatalf("session2 RunProtoSession() error = %v", runErr2)
 	}
 }
+
+func TestWireSessionRedAlertRelaysBroadcastNotification(t *testing.T) {
+	globalSessionRelayRegistry = newSessionRelayRegistry()
+	t.Cleanup(func() {
+		globalSessionRelayRegistry = newSessionRelayRegistry()
+	})
+
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	stream1 := &asyncFakeProtoStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ProtoClientEnvelope, 8),
+		sentCh: make(chan ProtoServerEnvelope, 16),
+	}
+	stream2 := &asyncFakeProtoStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ProtoClientEnvelope, 8),
+		sentCh: make(chan ProtoServerEnvelope, 16),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var runErr1 error
+	var runErr2 error
+	go func() {
+		defer wg.Done()
+		runErr1 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream1, WireProtoAdapter{})
+	}()
+	go func() {
+		defer wg.Done()
+		runErr2 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream2, WireProtoAdapter{})
+	}()
+
+	waitFor := func(label string, ch <-chan ProtoServerEnvelope, pred func(WireServerMessage) bool) {
+		deadline := time.After(2 * time.Second)
+		for {
+			select {
+			case env := <-ch:
+				msg, ok := env.(WireServerMessage)
+				if !ok {
+					t.Fatalf("unexpected envelope type %T", env)
+				}
+				if pred(msg) {
+					return
+				}
+			case <-deadline:
+				t.Fatalf("timed out waiting for %s", label)
+			}
+		}
+	}
+
+	stream1.recvCh <- WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}}
+	stream2.recvCh <- WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d2", DeviceName: "Hall"}}
+	for i := 0; i < 2; i++ {
+		<-stream1.sentCh
+		<-stream2.sentCh
+	}
+
+	stream1.recvCh <- WireClientMessage{Command: &WireCommandRequest{
+		RequestID: "cmd-red-alert",
+		DeviceID:  "d1",
+		Kind:      WireCommandKindVoice,
+		Text:      "red alert",
+	}}
+
+	waitFor("source red_alert command result", stream1.sentCh, func(msg WireServerMessage) bool {
+		return msg.CommandResult != nil && msg.CommandResult.ScenarioStart == "red_alert"
+	})
+	waitFor("peer RED ALERT notification relay", stream2.sentCh, func(msg WireServerMessage) bool {
+		return msg.CommandResult != nil && msg.CommandResult.Notification == "RED ALERT"
+	})
+
+	close(stream1.recvCh)
+	close(stream2.recvCh)
+	wg.Wait()
+	if runErr1 != nil {
+		t.Fatalf("session1 RunProtoSession() error = %v", runErr1)
+	}
+	if runErr2 != nil {
+		t.Fatalf("session2 RunProtoSession() error = %v", runErr2)
+	}
+}

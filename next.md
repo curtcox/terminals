@@ -1,1 +1,1 @@
-Add dual-session generated/wire integration tests for generic command broadcast relays (for example red_alert) to verify adapter-level RelayToDevice delivery beyond pa_system.
+Add dual-session generated/wire integration tests for intercom peer fan-out (start_stream, route_stream, stop_stream) to validate adapter-level relay delivery for media commands.
