@@ -1,1 +1,1 @@
-Add generated/wire integration coverage for pa_system start/stop relay payloads (TransitionUI + UpdateUI overlay patches) to guard adapter compatibility.
+Add dual-session generated/wire integration tests for generic command broadcast relays (for example red_alert) to verify adapter-level RelayToDevice delivery beyond pa_system.
