@@ -37,3 +37,25 @@ func TestParseVoiceTriggerTerminal(t *testing.T) {
 		t.Fatalf("Intent = %q, want terminal", got.Intent)
 	}
 }
+
+func TestParseVoiceTriggerPhoneCallWithTarget(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "call 5551212", now)
+	if got.Intent != "phone call" {
+		t.Fatalf("Intent = %q, want phone call", got.Intent)
+	}
+	if got.Arguments["target"] != "5551212" {
+		t.Fatalf("target = %q, want 5551212", got.Arguments["target"])
+	}
+}
+
+func TestParseVoiceTriggerAssistantQuery(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "assistant weather tomorrow", now)
+	if got.Intent != "voice assistant" {
+		t.Fatalf("Intent = %q, want voice assistant", got.Intent)
+	}
+	if got.Arguments["query"] != "weather tomorrow" {
+		t.Fatalf("query = %q, want weather tomorrow", got.Arguments["query"])
+	}
+}

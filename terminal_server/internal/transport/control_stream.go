@@ -43,6 +43,18 @@ type HeartbeatRequest struct {
 	DeviceID string
 }
 
+// SensorDataRequest carries sensor telemetry from device clients.
+type SensorDataRequest struct {
+	DeviceID string
+	UnixMS   int64
+	Values   map[string]float64
+}
+
+// StreamReadyRequest indicates a media stream is ready on the client side.
+type StreamReadyRequest struct {
+	StreamID string
+}
+
 // InputRequest carries client input events relevant to active scenarios.
 type InputRequest struct {
 	DeviceID    string
@@ -67,6 +79,8 @@ type ClientMessage struct {
 	Register   *RegisterRequest
 	Capability *CapabilityUpdateRequest
 	Heartbeat  *HeartbeatRequest
+	Sensor     *SensorDataRequest
+	StreamReady *StreamReadyRequest
 	Input      *InputRequest
 	Command    *CommandRequest
 }
@@ -114,13 +128,17 @@ type StreamHandler struct {
 	terminalByDevice       map[string]string
 	terminalOutputByDevice map[string]string
 	terminalDraftByDevice  map[string]string
+	terminalOutputDirty    map[string]bool
+	terminalLastUIFlush    map[string]time.Time
 	terminalReadDeadline   time.Duration
 	terminalReadInterval   time.Duration
+	terminalUIInterval     time.Duration
 }
 
 const (
 	defaultTerminalReadDeadline = 180 * time.Millisecond
 	defaultTerminalReadInterval = 10 * time.Millisecond
+	defaultTerminalUIInterval   = 800 * time.Millisecond
 )
 
 // CommandEvent is a bounded audit record of command handling.
@@ -147,8 +165,11 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalByDevice:       map[string]string{},
 		terminalOutputByDevice: map[string]string{},
 		terminalDraftByDevice:  map[string]string{},
+		terminalOutputDirty:    map[string]bool{},
+		terminalLastUIFlush:    map[string]time.Time{},
 		terminalReadDeadline:   defaultTerminalReadDeadline,
 		terminalReadInterval:   defaultTerminalReadInterval,
+		terminalUIInterval:     defaultTerminalUIInterval,
 	}
 }
 
@@ -166,8 +187,11 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalByDevice:       map[string]string{},
 		terminalOutputByDevice: map[string]string{},
 		terminalDraftByDevice:  map[string]string{},
+		terminalOutputDirty:    map[string]bool{},
+		terminalLastUIFlush:    map[string]time.Time{},
 		terminalReadDeadline:   defaultTerminalReadDeadline,
 		terminalReadInterval:   defaultTerminalReadInterval,
+		terminalUIInterval:     defaultTerminalUIInterval,
 	}
 }
 
@@ -200,7 +224,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
-		update, pollErr := h.pollTerminalOutput(msg.Heartbeat.DeviceID)
+		update, pollErr := h.pollTerminalOutput(msg.Heartbeat.DeviceID, false)
 		if pollErr != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(pollErr), Error: pollErr.Error()}}, pollErr
@@ -208,6 +232,12 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		if update != nil {
 			return []ServerMessage{*update}, nil
 		}
+		return nil, nil
+	case msg.Sensor != nil:
+		h.metrics.sensorReceived.Add(1)
+		return nil, nil
+	case msg.StreamReady != nil:
+		h.metrics.streamReadyReceived.Add(1)
 		return nil, nil
 	case msg.Input != nil:
 		out, err := h.handleInput(ctx, msg.Input)
@@ -355,7 +385,7 @@ func (h *StreamHandler) commandTerminalRefresh(_ context.Context, cmd *CommandRe
 	if targetDeviceID == "" {
 		return ServerMessage{}, false
 	}
-	update, err := h.pollTerminalOutput(targetDeviceID)
+	update, err := h.pollTerminalOutput(targetDeviceID, true)
 	if err != nil || update == nil {
 		return ServerMessage{}, false
 	}
@@ -399,6 +429,8 @@ func (h *StreamHandler) terminateTerminalForDevice(deviceID string) {
 	delete(h.terminalByDevice, deviceID)
 	delete(h.terminalOutputByDevice, deviceID)
 	delete(h.terminalDraftByDevice, deviceID)
+	delete(h.terminalOutputDirty, deviceID)
+	delete(h.terminalLastUIFlush, deviceID)
 	h.mu.Unlock()
 	if sessionID != "" {
 		_ = h.terminals.Close(sessionID)
@@ -489,12 +521,9 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 		h.mu.Unlock()
 	}
 
-	combinedOutput := h.readTerminalOutput(deviceID, sessionID)
+	h.readTerminalOutput(deviceID, sessionID)
 	return []ServerMessage{{
-		UpdateUI: &UIUpdate{
-			ComponentID: "terminal_output",
-			Node:        ui.TerminalOutputPatch(combinedOutput),
-		},
+		UpdateUI: h.terminalOutputUpdate(deviceID),
 	}}, nil
 }
 
@@ -597,15 +626,11 @@ func (h *StreamHandler) renderTerminalUIAction(deviceID, componentID, action, va
 	}
 	line := fmt.Sprintf("[ui_action] %s %s = %s\n", componentID, action, value)
 
-	existing := h.appendTerminalOutput(deviceID, line)
-
-	return &UIUpdate{
-		ComponentID: "terminal_output",
-		Node:        ui.TerminalOutputPatch(existing),
-	}, true
+	h.appendTerminalOutput(deviceID, line)
+	return h.terminalOutputUpdate(deviceID), true
 }
 
-func (h *StreamHandler) pollTerminalOutput(deviceID string) (*ServerMessage, error) {
+func (h *StreamHandler) pollTerminalOutput(deviceID string, force bool) (*ServerMessage, error) {
 	deviceID = strings.TrimSpace(deviceID)
 	if deviceID == "" {
 		return nil, nil
@@ -623,28 +648,77 @@ func (h *StreamHandler) pollTerminalOutput(deviceID string) (*ServerMessage, err
 		return nil, err
 	}
 	if len(chunk) == 0 {
-		return nil, nil
+		if !h.shouldEmitTerminalUpdate(deviceID, force) {
+			return nil, nil
+		}
+		return &ServerMessage{
+			UpdateUI: h.terminalOutputUpdate(deviceID),
+		}, nil
 	}
 
-	combined := h.appendTerminalOutput(deviceID, string(chunk))
+	h.appendTerminalOutput(deviceID, string(chunk))
+	if !h.shouldEmitTerminalUpdate(deviceID, force) {
+		return nil, nil
+	}
 	return &ServerMessage{
-		UpdateUI: &UIUpdate{
-			ComponentID: "terminal_output",
-			Node:        ui.TerminalOutputPatch(combined),
-		},
+		UpdateUI: h.terminalOutputUpdate(deviceID),
 	}, nil
 }
 
 func (h *StreamHandler) appendTerminalOutput(deviceID, chunk string) string {
 	h.mu.Lock()
 	existing := h.terminalOutputByDevice[deviceID]
-	existing += chunk
+	if chunk != "" {
+		existing += chunk
+		h.terminalOutputDirty[deviceID] = true
+	}
 	if len(existing) > 12000 {
 		existing = existing[len(existing)-12000:]
 	}
 	h.terminalOutputByDevice[deviceID] = existing
 	h.mu.Unlock()
 	return existing
+}
+
+func (h *StreamHandler) shouldEmitTerminalUpdate(deviceID string, force bool) bool {
+	h.mu.Lock()
+	dirty := h.terminalOutputDirty[deviceID]
+	last := h.terminalLastUIFlush[deviceID]
+	interval := h.terminalUIInterval
+	h.mu.Unlock()
+
+	if !dirty {
+		return false
+	}
+	if force {
+		return true
+	}
+	if interval <= 0 {
+		interval = defaultTerminalUIInterval
+	}
+	if last.IsZero() {
+		return true
+	}
+	return h.nowUTC().Sub(last) >= interval
+}
+
+func (h *StreamHandler) terminalOutputUpdate(deviceID string) *UIUpdate {
+	h.mu.Lock()
+	output := h.terminalOutputByDevice[deviceID]
+	h.terminalOutputDirty[deviceID] = false
+	h.terminalLastUIFlush[deviceID] = h.nowUTC()
+	h.mu.Unlock()
+	return &UIUpdate{
+		ComponentID: "terminal_output",
+		Node:        ui.TerminalOutputPatch(output),
+	}
+}
+
+func (h *StreamHandler) nowUTC() time.Time {
+	if h.control != nil && h.control.now != nil {
+		return h.control.now().UTC()
+	}
+	return time.Now().UTC()
 }
 
 func normalizeTerminalKeyText(text string) string {

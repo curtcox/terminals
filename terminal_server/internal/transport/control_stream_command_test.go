@@ -430,6 +430,153 @@ func TestHandleMessageHeartbeatFlushesTerminalOutput(t *testing.T) {
 	}
 }
 
+func TestHandleMessageHeartbeatCoalescesTerminalOutputUpdates(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.terminalUIInterval = 800 * time.Millisecond
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-heartbeat-coalesce-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "sleep 0.3; printf '\\x63\\x6f\\x61\\x6c\\x65\\x73\\x63\\x65\\x2d\\x68\\x62\\n'",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input delayed command) error = %v", err)
+	}
+
+	time.Sleep(450 * time.Millisecond)
+
+	firstHeartbeat, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(first heartbeat) error = %v", err)
+	}
+	if len(firstHeartbeat) != 0 {
+		t.Fatalf("expected first heartbeat output to be coalesced, got %+v", firstHeartbeat)
+	}
+
+	time.Sleep(450 * time.Millisecond)
+
+	secondHeartbeat, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(second heartbeat) error = %v", err)
+	}
+	if len(secondHeartbeat) != 1 || secondHeartbeat[0].UpdateUI == nil {
+		t.Fatalf("expected coalesced UpdateUI on second heartbeat, got %+v", secondHeartbeat)
+	}
+	if !strings.Contains(secondHeartbeat[0].UpdateUI.Node.Props["value"], "coalesce-hb") {
+		t.Fatalf("coalesced heartbeat output missing marker: %+v", secondHeartbeat[0].UpdateUI.Node.Props)
+	}
+}
+
+func TestHandleMessageManualRefreshBypassesHeartbeatCoalescing(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.terminalUIInterval = 10 * time.Second
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-refresh-force-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "terminal_input",
+			Action:      "submit",
+			Value:       "sleep 0.3; printf '\\x66\\x6f\\x72\\x63\\x65\\x2d\\x66\\x6c\\x75\\x73\\x68\\n'",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input delayed command) error = %v", err)
+	}
+
+	time.Sleep(450 * time.Millisecond)
+
+	hbOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(heartbeat) error = %v", err)
+	}
+	if len(hbOut) != 0 {
+		t.Fatalf("expected heartbeat update to be throttled, got %+v", hbOut)
+	}
+
+	refreshOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "manual-refresh-bypass-coalesce",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    SystemIntentTerminalRefresh,
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(manual terminal_refresh) error = %v", err)
+	}
+	if len(refreshOut) != 2 || refreshOut[1].UpdateUI == nil {
+		t.Fatalf("expected command ack + forced UpdateUI, got %+v", refreshOut)
+	}
+	if !strings.Contains(refreshOut[1].UpdateUI.Node.Props["value"], "force-flush") {
+		t.Fatalf("manual refresh should force pending output flush: %+v", refreshOut[1].UpdateUI.Node.Props)
+	}
+}
+
 func TestHandleMessageInputTerminalChangeUsesDraftOnSubmit(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

@@ -23,6 +23,26 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		trigger.Intent = "photo frame"
 	case normalized == "terminal" || normalized == "open terminal":
 		trigger.Intent = "terminal"
+	case normalized == "intercom" || normalized == "start intercom":
+		trigger.Intent = "intercom"
+	case normalized == "pa system":
+		trigger.Intent = "pa system"
+	case normalized == "multi window":
+		trigger.Intent = "multi window"
+	case normalized == "audio monitor":
+		trigger.Intent = "audio monitor"
+	case normalized == "schedule monitor":
+		trigger.Intent = "schedule monitor"
+	case normalized == "voice assistant" || strings.HasPrefix(normalized, "assistant "):
+		trigger.Intent = "voice assistant"
+		if strings.HasPrefix(normalized, "assistant ") {
+			trigger.Arguments["query"] = strings.TrimSpace(strings.TrimPrefix(normalized, "assistant "))
+		}
+	case normalized == "phone call" || strings.HasPrefix(normalized, "call "):
+		trigger.Intent = "phone call"
+		if strings.HasPrefix(normalized, "call ") {
+			trigger.Arguments["target"] = strings.TrimSpace(strings.TrimPrefix(normalized, "call "))
+		}
 	case strings.HasPrefix(normalized, "set a timer for "):
 		trigger.Intent = "set timer"
 		parseTimerMinutes(trigger.Arguments, normalized, now)

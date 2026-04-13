@@ -94,6 +94,55 @@ func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
 	}
 }
 
+func TestGeneratedProtoAdapterToInternalSensorAndStreamReady(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+
+	sensorMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Sensor{
+			Sensor: &iov1.SensorData{
+				DeviceId: "device-3",
+				UnixMs:   1713000000000,
+				Values: map[string]float64{
+					"accelerometer.x": 0.12,
+					"accelerometer.y": -0.45,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(sensor) error = %v", err)
+	}
+	if sensorMsg.Sensor == nil {
+		t.Fatalf("expected sensor message")
+	}
+	if sensorMsg.Sensor.DeviceID != "device-3" {
+		t.Fatalf("sensor device_id = %q, want device-3", sensorMsg.Sensor.DeviceID)
+	}
+	if sensorMsg.Sensor.UnixMS != 1713000000000 {
+		t.Fatalf("sensor unix_ms = %d, want 1713000000000", sensorMsg.Sensor.UnixMS)
+	}
+	if sensorMsg.Sensor.Values["accelerometer.y"] != -0.45 {
+		t.Fatalf("sensor value accelerometer.y = %f, want -0.45", sensorMsg.Sensor.Values["accelerometer.y"])
+	}
+
+	streamReadyMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_StreamReady{
+			StreamReady: &controlv1.StreamReady{
+				StreamId: "stream-7",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(stream_ready) error = %v", err)
+	}
+	if streamReadyMsg.StreamReady == nil {
+		t.Fatalf("expected stream_ready message")
+	}
+	if streamReadyMsg.StreamReady.StreamID != "stream-7" {
+		t.Fatalf("stream_ready stream_id = %q, want stream-7", streamReadyMsg.StreamReady.StreamID)
+	}
+}
+
 func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 

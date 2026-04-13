@@ -79,6 +79,45 @@ func TestHandleMessageCapabilityAndHeartbeat(t *testing.T) {
 	}
 }
 
+func TestHandleMessageSensorAndStreamReady(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Sensor: &SensorDataRequest{
+			DeviceID: "device-1",
+			UnixMS:   1713000000000,
+			Values: map[string]float64{
+				"accelerometer.x": 0.12,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(sensor) error = %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("len(sensor out) = %d, want 0", len(out))
+	}
+
+	out, err = handler.HandleMessage(context.Background(), ClientMessage{
+		StreamReady: &StreamReadyRequest{StreamID: "stream-1"},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(stream_ready) error = %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("len(stream_ready out) = %d, want 0", len(out))
+	}
+}
+
 func TestHandleMessageInvalid(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

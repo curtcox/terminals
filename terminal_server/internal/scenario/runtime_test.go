@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -10,6 +11,29 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
+
+type testAIBackend struct {
+	lastInput string
+	response  string
+}
+
+func (t *testAIBackend) Query(_ context.Context, input string) (string, error) {
+	t.lastInput = input
+	return t.response, nil
+}
+
+type testTelephonyBridge struct {
+	lastTarget string
+}
+
+func (t *testTelephonyBridge) Call(_ context.Context, target string) error {
+	t.lastTarget = target
+	return nil
+}
+
+func (t *testTelephonyBridge) Hangup(context.Context, string) error {
+	return nil
+}
 
 func TestRuntimeHandleTrigger(t *testing.T) {
 	devices := device.NewManager()
@@ -242,5 +266,211 @@ func TestRuntimeProcessDueTimers(t *testing.T) {
 	laterDue := scheduler.Due(now.Add(2 * time.Minute).UnixMilli())
 	if len(laterDue) != 1 || laterDue[0] != "timer:d1:200" {
 		t.Fatalf("later due = %+v, want timer:d1:200", laterDue)
+	}
+}
+
+func TestRuntimeHandleVoiceIntercomCreatesAudioRoutes(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	router := iorouter.NewRouter()
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: &IntercomScenario{},
+		Priority: PriorityHigh,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+
+	name, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"intercom",
+		time.Date(2026, 4, 12, 0, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("HandleVoiceText() error = %v", err)
+	}
+	if name != "intercom" {
+		t.Fatalf("scenario name = %q, want intercom", name)
+	}
+	if router.RouteCount() != 2 {
+		t.Fatalf("route count = %d, want 2", router.RouteCount())
+	}
+	events := broadcaster.Events()
+	if len(events) != 1 || events[0].Message != "Intercom active" {
+		t.Fatalf("unexpected broadcast events: %+v", events)
+	}
+	if len(events[0].DeviceIDs) != 1 || events[0].DeviceIDs[0] != "d1" {
+		t.Fatalf("broadcast target = %+v, want [d1]", events[0].DeviceIDs)
+	}
+}
+
+func TestRuntimeHandleVoiceAssistantAndPhoneCall(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	aiBackend := &testAIBackend{response: "assistant response"}
+	telephony := &testTelephonyBridge{}
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: &VoiceAssistantScenario{},
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
+		Scenario: &PhoneCallScenario{},
+		Priority: PriorityHigh,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+		AI:        aiBackend,
+		Telephony: telephony,
+	})
+
+	assistantName, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"assistant what is on my calendar",
+		time.Date(2026, 4, 12, 0, 5, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("HandleVoiceText(assistant) error = %v", err)
+	}
+	if assistantName != "voice_assistant" {
+		t.Fatalf("assistant scenario name = %q, want voice_assistant", assistantName)
+	}
+	if aiBackend.lastInput != "what is on my calendar" {
+		t.Fatalf("assistant query = %q, want what is on my calendar", aiBackend.lastInput)
+	}
+
+	callName, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"call 5551212",
+		time.Date(2026, 4, 12, 0, 6, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("HandleVoiceText(call) error = %v", err)
+	}
+	if callName != "phone_call" {
+		t.Fatalf("call scenario name = %q, want phone_call", callName)
+	}
+	if telephony.lastTarget != "5551212" {
+		t.Fatalf("last telephony target = %q, want 5551212", telephony.lastTarget)
+	}
+
+	events := broadcaster.Events()
+	if len(events) != 2 {
+		t.Fatalf("len(events) = %d, want 2", len(events))
+	}
+	if events[0].Message != "assistant response" {
+		t.Fatalf("assistant event message = %q, want assistant response", events[0].Message)
+	}
+	if events[1].Message != "Calling 5551212" {
+		t.Fatalf("call event message = %q, want Calling 5551212", events[1].Message)
+	}
+}
+
+func TestRuntimeManualAudioSchedulePAAndMultiWindow(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	router := iorouter.NewRouter()
+	store := storage.NewMemoryStore()
+	scheduler := storage.NewMemoryScheduler()
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &AudioMonitorScenario{}, Priority: PriorityNormal})
+	engine.Register(Registration{Scenario: &ScheduleMonitorScenario{}, Priority: PriorityNormal})
+	engine.Register(Registration{Scenario: &PASystemScenario{}, Priority: PriorityHigh})
+	engine.Register(Registration{Scenario: &MultiWindowScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Storage:   store,
+		Scheduler: scheduler,
+		Broadcast: broadcaster,
+	})
+
+	_, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "audio_monitor",
+		Arguments: map[string]string{
+			"target": "dishwasher",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger(audio_monitor) error = %v", err)
+	}
+	soundTarget, err := store.Get(context.Background(), "audio_monitor:d1")
+	if err != nil {
+		t.Fatalf("store.Get(audio monitor) error = %v", err)
+	}
+	if soundTarget != "dishwasher" {
+		t.Fatalf("audio monitor target = %q, want dishwasher", soundTarget)
+	}
+
+	checkTime := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC).UnixMilli()
+	_, err = runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "schedule_monitor",
+		Arguments: map[string]string{
+			"check_unix_ms": strconv.FormatInt(checkTime, 10),
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger(schedule_monitor) error = %v", err)
+	}
+	if len(scheduler.Due(checkTime)) != 1 || scheduler.Due(checkTime)[0] != "schedule_monitor:d1" {
+		t.Fatalf("schedule monitor due keys = %+v, want [schedule_monitor:d1]", scheduler.Due(checkTime))
+	}
+
+	_, err = runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "pa_system",
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger(pa_system) error = %v", err)
+	}
+	_, err = runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "multi_window",
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger(multi_window) error = %v", err)
+	}
+
+	if router.RouteCount() != 4 {
+		t.Fatalf("route count = %d, want 4", router.RouteCount())
+	}
+	events := broadcaster.Events()
+	if len(events) != 4 {
+		t.Fatalf("len(events) = %d, want 4", len(events))
+	}
+	if events[0].Message != "Audio monitor armed: dishwasher" {
+		t.Fatalf("event0 message = %q", events[0].Message)
+	}
+	if events[1].Message != "Schedule monitor active" {
+		t.Fatalf("event1 message = %q", events[1].Message)
+	}
+	if events[2].Message != "PA system active" {
+		t.Fatalf("event2 message = %q", events[2].Message)
+	}
+	if events[3].Message != "Multi-window active" {
+		t.Fatalf("event3 message = %q", events[3].Message)
 	}
 }

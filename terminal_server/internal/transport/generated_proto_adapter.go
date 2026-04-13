@@ -89,9 +89,25 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				Intent:    command.GetIntent(),
 			},
 		}, nil
-	case *controlv1.ConnectRequest_Sensor, *controlv1.ConnectRequest_StreamReady:
-		// Unsupported payloads are treated as invalid client messages by the stream handler.
-		return ClientMessage{}, nil
+	case *controlv1.ConnectRequest_Sensor:
+		sensor := payload.Sensor
+		values := map[string]float64{}
+		for key, value := range sensor.GetValues() {
+			values[key] = value
+		}
+		return ClientMessage{
+			Sensor: &SensorDataRequest{
+				DeviceID: sensor.GetDeviceId(),
+				UnixMS:   sensor.GetUnixMs(),
+				Values:   values,
+			},
+		}, nil
+	case *controlv1.ConnectRequest_StreamReady:
+		return ClientMessage{
+			StreamReady: &StreamReadyRequest{
+				StreamID: payload.StreamReady.GetStreamId(),
+			},
+		}, nil
 	default:
 		return ClientMessage{}, nil
 	}
