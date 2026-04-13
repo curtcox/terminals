@@ -59,3 +59,19 @@ func TestParseVoiceTriggerAssistantQuery(t *testing.T) {
 		t.Fatalf("query = %q, want weather tomorrow", got.Arguments["query"])
 	}
 }
+
+func TestParseVoiceTriggerPAModeAlias(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "PA mode", now)
+	if got.Intent != "pa system" {
+		t.Fatalf("Intent = %q, want pa system", got.Intent)
+	}
+}
+
+func TestParseVoiceTriggerShowAllCamerasAlias(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "show all cameras", now)
+	if got.Intent != "multi window" {
+		t.Fatalf("Intent = %q, want multi window", got.Intent)
+	}
+}

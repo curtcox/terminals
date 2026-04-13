@@ -823,7 +823,7 @@ func (h *StreamHandler) disconnectScenarioRoutes(deviceID, scenarioName string) 
 func isScenarioOwnedRoute(deviceID, scenarioName string, route iorouter.Route) bool {
 	switch scenarioName {
 	case "intercom":
-		return route.SourceID == deviceID && route.StreamKind == "audio"
+		return route.StreamKind == "audio" && (route.SourceID == deviceID || route.TargetID == deviceID)
 	case "pa_system":
 		return route.SourceID == deviceID && route.StreamKind == "pa_audio"
 	case "multi_window":

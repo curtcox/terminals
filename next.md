@@ -1,1 +1,1 @@
-Install/configure Flutter (flutter + dart CLI) in local PATH, then rerun make all-check and fix any resulting client/proto failures.
+Implement PA scenario receive-side notification targeting (all non-source devices) and validate through runtime/transport tests.

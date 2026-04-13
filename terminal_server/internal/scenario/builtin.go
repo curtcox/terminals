@@ -158,7 +158,7 @@ func (s *IntercomScenario) Start(ctx context.Context, env *Environment) error {
 	if env == nil {
 		return nil
 	}
-	if err := connectSourceToPeers(ctx, env, s.trigger.SourceID, "audio"); err != nil {
+	if err := connectBidirectionalSourcePeers(ctx, env, s.trigger.SourceID, "audio"); err != nil {
 		return err
 	}
 	return notifySource(ctx, env, s.trigger.SourceID, "Intercom active")
@@ -332,7 +332,7 @@ func (s *PASystemScenario) Name() string { return "pa_system" }
 
 // Match records trigger metadata when PA mode is requested.
 func (s *PASystemScenario) Match(trigger Trigger) bool {
-	if !intentMatches(trigger.Intent, "pa system", "pa_system") {
+	if !intentMatches(trigger.Intent, "pa system", "pa_system", "pa mode") {
 		return false
 	}
 	s.trigger = trigger
@@ -363,7 +363,7 @@ func (s *MultiWindowScenario) Name() string { return "multi_window" }
 
 // Match records trigger metadata when multi-window mode is requested.
 func (s *MultiWindowScenario) Match(trigger Trigger) bool {
-	if !intentMatches(trigger.Intent, "multi window", "multi_window") {
+	if !intentMatches(trigger.Intent, "multi window", "multi_window", "show all cameras", "all cameras") {
 		return false
 	}
 	s.trigger = trigger
@@ -426,6 +426,28 @@ func connectSourceToPeers(_ context.Context, env *Environment, sourceID, streamK
 			continue
 		}
 		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+			return err
+		}
+	}
+	return nil
+}
+
+func connectBidirectionalSourcePeers(_ context.Context, env *Environment, sourceID, streamKind string) error {
+	if env == nil || env.IO == nil || env.Devices == nil {
+		return nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	if sourceID == "" {
+		return nil
+	}
+	for _, peerID := range env.Devices.ListDeviceIDs() {
+		if peerID == "" || peerID == sourceID {
+			continue
+		}
+		if err := env.IO.Connect(sourceID, peerID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+			return err
+		}
+		if err := env.IO.Connect(peerID, sourceID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 			return err
 		}
 	}

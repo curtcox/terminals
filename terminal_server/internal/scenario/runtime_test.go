@@ -300,8 +300,8 @@ func TestRuntimeHandleVoiceIntercomCreatesAudioRoutes(t *testing.T) {
 	if name != "intercom" {
 		t.Fatalf("scenario name = %q, want intercom", name)
 	}
-	if router.RouteCount() != 2 {
-		t.Fatalf("route count = %d, want 2", router.RouteCount())
+	if router.RouteCount() != 4 {
+		t.Fatalf("route count = %d, want 4", router.RouteCount())
 	}
 	events := broadcaster.Events()
 	if len(events) != 1 || events[0].Message != "Intercom active" {
@@ -472,5 +472,53 @@ func TestRuntimeManualAudioSchedulePAAndMultiWindow(t *testing.T) {
 	}
 	if events[3].Message != "Multi-window active" {
 		t.Fatalf("event3 message = %q", events[3].Message)
+	}
+}
+
+func TestRuntimeManualAliasIntentsForPAAndMultiWindow(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	router := iorouter.NewRouter()
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &PASystemScenario{}, Priority: PriorityHigh})
+	engine.Register(Registration{Scenario: &MultiWindowScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "pa mode",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(pa mode) error = %v", err)
+	}
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "show all cameras",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(show all cameras) error = %v", err)
+	}
+
+	if router.RouteCount() != 4 {
+		t.Fatalf("route count = %d, want 4", router.RouteCount())
+	}
+	events := broadcaster.Events()
+	if len(events) != 2 {
+		t.Fatalf("len(events) = %d, want 2", len(events))
+	}
+	if events[0].Message != "PA system active" {
+		t.Fatalf("event0 message = %q, want PA system active", events[0].Message)
+	}
+	if events[1].Message != "Multi-window active" {
+		t.Fatalf("event1 message = %q, want Multi-window active", events[1].Message)
 	}
 }

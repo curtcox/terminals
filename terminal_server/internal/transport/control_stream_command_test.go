@@ -222,38 +222,52 @@ func TestHandleMessageCommandIntercomEmitsRouteStreams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command intercom) error = %v", err)
 	}
-	if len(out) != 5 {
-		t.Fatalf("len(out) = %d, want 5", len(out))
+	if len(out) != 9 {
+		t.Fatalf("len(out) = %d, want 9", len(out))
 	}
 	if out[0].ScenarioStart != "intercom" {
 		t.Fatalf("ScenarioStart = %q, want intercom", out[0].ScenarioStart)
 	}
-	if out[1].StartStream == nil {
-		t.Fatalf("expected start_stream response after intercom start")
+	startSeen := map[string]map[string]bool{}
+	routeSeen := map[string]map[string]bool{}
+	for _, msg := range out[1:] {
+		if msg.StartStream != nil {
+			if msg.StartStream.Kind != "audio" {
+				t.Fatalf("start stream kind = %q, want audio", msg.StartStream.Kind)
+			}
+			relay := msg.RelayToDeviceID
+			if relay == "" {
+				relay = "local"
+			}
+			streamID := msg.StartStream.StreamID
+			if startSeen[streamID] == nil {
+				startSeen[streamID] = map[string]bool{}
+			}
+			startSeen[streamID][relay] = true
+		}
+		if msg.RouteStream != nil {
+			relay := msg.RelayToDeviceID
+			if relay == "" {
+				relay = "local"
+			}
+			streamID := msg.RouteStream.StreamID
+			if routeSeen[streamID] == nil {
+				routeSeen[streamID] = map[string]bool{}
+			}
+			routeSeen[streamID][relay] = true
+		}
 	}
-	if out[1].RelayToDeviceID != "" {
-		t.Fatalf("local start_stream relay_to_device_id = %q, want empty", out[1].RelayToDeviceID)
+	expectedStreams := []string{
+		"route:device-1|device-2|audio",
+		"route:device-2|device-1|audio",
 	}
-	if out[1].StartStream.SourceDeviceID != "device-1" || out[1].StartStream.TargetDeviceID != "device-2" {
-		t.Fatalf("unexpected start stream devices: %+v", out[1].StartStream)
-	}
-	if out[1].StartStream.Kind != "audio" {
-		t.Fatalf("start stream kind = %q, want audio", out[1].StartStream.Kind)
-	}
-	if out[2].StartStream == nil || out[2].RelayToDeviceID != "device-2" {
-		t.Fatalf("expected relayed start_stream for device-2, got %+v", out[2])
-	}
-	if out[3].RouteStream == nil {
-		t.Fatalf("expected route_stream response after start_stream")
-	}
-	if out[3].RelayToDeviceID != "" {
-		t.Fatalf("local route_stream relay_to_device_id = %q, want empty", out[3].RelayToDeviceID)
-	}
-	if out[3].RouteStream.SourceDeviceID != "device-1" || out[3].RouteStream.TargetDeviceID != "device-2" {
-		t.Fatalf("unexpected route stream devices: %+v", out[3].RouteStream)
-	}
-	if out[4].RouteStream == nil || out[4].RelayToDeviceID != "device-2" {
-		t.Fatalf("expected relayed route_stream for device-2, got %+v", out[4])
+	for _, streamID := range expectedStreams {
+		if !startSeen[streamID]["local"] || !startSeen[streamID]["device-2"] {
+			t.Fatalf("missing local/relayed start_stream delivery for %s: %+v", streamID, startSeen[streamID])
+		}
+		if !routeSeen[streamID]["local"] || !routeSeen[streamID]["device-2"] {
+			t.Fatalf("missing local/relayed route_stream delivery for %s: %+v", streamID, routeSeen[streamID])
+		}
 	}
 
 	// Starting intercom again should not emit duplicate route stream messages.
@@ -310,8 +324,8 @@ func TestHandleMessageCommandIntercomStopEmitsStopStream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command intercom start) error = %v", err)
 	}
-	if router.RouteCount() != 1 {
-		t.Fatalf("route count after start = %d, want 1", router.RouteCount())
+	if router.RouteCount() != 2 {
+		t.Fatalf("route count after start = %d, want 2", router.RouteCount())
 	}
 
 	stopOut, err := handler.HandleMessage(context.Background(), ClientMessage{
@@ -326,23 +340,35 @@ func TestHandleMessageCommandIntercomStopEmitsStopStream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command intercom stop) error = %v", err)
 	}
-	if len(stopOut) != 3 {
-		t.Fatalf("len(stopOut) = %d, want 3", len(stopOut))
+	if len(stopOut) != 5 {
+		t.Fatalf("len(stopOut) = %d, want 5", len(stopOut))
 	}
 	if stopOut[0].ScenarioStop != "intercom" {
 		t.Fatalf("ScenarioStop = %q, want intercom", stopOut[0].ScenarioStop)
 	}
-	if stopOut[1].StopStream == nil {
-		t.Fatalf("expected stop_stream response after intercom stop")
+	stopSeen := map[string]map[string]bool{}
+	for _, msg := range stopOut[1:] {
+		if msg.StopStream == nil {
+			t.Fatalf("expected stop_stream response after intercom stop, got %+v", msg)
+		}
+		relay := msg.RelayToDeviceID
+		if relay == "" {
+			relay = "local"
+		}
+		streamID := msg.StopStream.StreamID
+		if stopSeen[streamID] == nil {
+			stopSeen[streamID] = map[string]bool{}
+		}
+		stopSeen[streamID][relay] = true
 	}
-	if stopOut[1].RelayToDeviceID != "" {
-		t.Fatalf("local stop_stream relay_to_device_id = %q, want empty", stopOut[1].RelayToDeviceID)
+	expectedStopStreams := []string{
+		"route:device-1|device-2|audio",
+		"route:device-2|device-1|audio",
 	}
-	if stopOut[1].StopStream.StreamID != "route:device-1|device-2|audio" {
-		t.Fatalf("stop_stream stream_id = %q, want route:device-1|device-2|audio", stopOut[1].StopStream.StreamID)
-	}
-	if stopOut[2].StopStream == nil || stopOut[2].RelayToDeviceID != "device-2" {
-		t.Fatalf("expected relayed stop_stream for device-2, got %+v", stopOut[2])
+	for _, streamID := range expectedStopStreams {
+		if !stopSeen[streamID]["local"] || !stopSeen[streamID]["device-2"] {
+			t.Fatalf("missing local/relayed stop_stream delivery for %s: %+v", streamID, stopSeen[streamID])
+		}
 	}
 	if router.RouteCount() != 0 {
 		t.Fatalf("route count after stop = %d, want 0", router.RouteCount())
@@ -1586,14 +1612,13 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	if err != nil {
 		t.Fatalf("intercom start error = %v", err)
 	}
-	streamID := ""
+	streamIDs := map[string]struct{}{}
 	for _, msg := range startOut {
 		if msg.StartStream != nil {
-			streamID = msg.StartStream.StreamID
-			break
+			streamIDs[msg.StartStream.StreamID] = struct{}{}
 		}
 	}
-	if streamID == "" {
+	if len(streamIDs) == 0 {
 		t.Fatalf("expected start_stream message in start output")
 	}
 
@@ -1607,21 +1632,23 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	if err != nil {
 		t.Fatalf("runtime_status pre-ready error = %v", err)
 	}
-	if out[0].Data["media_streams_active"] != "1" {
-		t.Fatalf("media_streams_active pre-ready = %q, want 1", out[0].Data["media_streams_active"])
+	if out[0].Data["media_streams_active"] != "2" {
+		t.Fatalf("media_streams_active pre-ready = %q, want 2", out[0].Data["media_streams_active"])
 	}
 	if out[0].Data["media_streams_ready"] != "0" {
 		t.Fatalf("media_streams_ready pre-ready = %q, want 0", out[0].Data["media_streams_ready"])
 	}
-	if out[0].Data["media_streams_pending"] != "1" {
-		t.Fatalf("media_streams_pending pre-ready = %q, want 1", out[0].Data["media_streams_pending"])
+	if out[0].Data["media_streams_pending"] != "2" {
+		t.Fatalf("media_streams_pending pre-ready = %q, want 2", out[0].Data["media_streams_pending"])
 	}
 
-	_, err = handler.HandleMessage(context.Background(), ClientMessage{
-		StreamReady: &StreamReadyRequest{StreamID: streamID},
-	})
-	if err != nil {
-		t.Fatalf("stream_ready error = %v", err)
+	for streamID := range streamIDs {
+		_, err = handler.HandleMessage(context.Background(), ClientMessage{
+			StreamReady: &StreamReadyRequest{StreamID: streamID},
+		})
+		if err != nil {
+			t.Fatalf("stream_ready error = %v", err)
+		}
 	}
 
 	out, err = handler.HandleMessage(context.Background(), ClientMessage{
@@ -1634,11 +1661,11 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	if err != nil {
 		t.Fatalf("runtime_status ready error = %v", err)
 	}
-	if out[0].Data["media_streams_active"] != "1" {
-		t.Fatalf("media_streams_active ready = %q, want 1", out[0].Data["media_streams_active"])
+	if out[0].Data["media_streams_active"] != "2" {
+		t.Fatalf("media_streams_active ready = %q, want 2", out[0].Data["media_streams_active"])
 	}
-	if out[0].Data["media_streams_ready"] != "1" {
-		t.Fatalf("media_streams_ready = %q, want 1", out[0].Data["media_streams_ready"])
+	if out[0].Data["media_streams_ready"] != "2" {
+		t.Fatalf("media_streams_ready = %q, want 2", out[0].Data["media_streams_ready"])
 	}
 	if out[0].Data["media_streams_pending"] != "0" {
 		t.Fatalf("media_streams_pending ready = %q, want 0", out[0].Data["media_streams_pending"])
