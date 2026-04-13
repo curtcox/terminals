@@ -145,6 +145,15 @@ const ConnectRequest$json = {
       '9': 0,
       '10': 'heartbeat'
     },
+    {
+      '1': 'webrtc_signal',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.WebRTCSignal',
+      '9': 0,
+      '10': 'webrtcSignal'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -161,7 +170,8 @@ final $typed_data.Uint8List connectRequestDescriptor = $convert.base64Decode(
     'JlYWR5GAUgASgLMiEudGVybWluYWxzLmNvbnRyb2wudjEuU3RyZWFtUmVhZHlIAFILc3RyZWFt'
     'UmVhZHkSQAoHY29tbWFuZBgGIAEoCzIkLnRlcm1pbmFscy5jb250cm9sLnYxLkNvbW1hbmRSZX'
     'F1ZXN0SABSB2NvbW1hbmQSPwoJaGVhcnRiZWF0GAcgASgLMh8udGVybWluYWxzLmNvbnRyb2wu'
-    'djEuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdEIJCgdwYXlsb2Fk');
+    'djEuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdBJJCg13ZWJydGNfc2lnbmFsGAggASgLMiIudGVybW'
+    'luYWxzLmNvbnRyb2wudjEuV2ViUlRDU2lnbmFsSABSDHdlYnJ0Y1NpZ25hbEIJCgdwYXlsb2Fk');
 
 @$core.Deprecated('Use connectResponseDescriptor instead')
 const ConnectResponse$json = {
@@ -556,6 +566,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.control.v1.StreamReady': StreamReady$json,
   '.terminals.control.v1.CommandRequest': CommandRequest$json,
   '.terminals.control.v1.Heartbeat': Heartbeat$json,
+  '.terminals.control.v1.WebRTCSignal': WebRTCSignal$json,
   '.terminals.control.v1.ConnectResponse': ConnectResponse$json,
   '.terminals.control.v1.RegisterAck': RegisterAck$json,
   '.terminals.ui.v1.SetUI': $1.SetUI$json,
@@ -592,7 +603,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.io.v1.ShowMedia': $0.ShowMedia$json,
   '.terminals.io.v1.RouteStream': $0.RouteStream$json,
   '.terminals.ui.v1.Notification': $1.Notification$json,
-  '.terminals.control.v1.WebRTCSignal': WebRTCSignal$json,
   '.terminals.control.v1.CommandResult': CommandResult$json,
   '.terminals.control.v1.CommandResult.DataEntry': CommandResult_DataEntry$json,
   '.terminals.control.v1.ControlError': ControlError$json,

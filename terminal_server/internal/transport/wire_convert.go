@@ -35,6 +35,14 @@ func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
 				DeviceID: w.Heartbeat.DeviceID,
 			},
 		}, nil
+	case w.WebRTCSignal != nil:
+		return ClientMessage{
+			WebRTCSignal: &WebRTCSignalRequest{
+				StreamID:   w.WebRTCSignal.StreamID,
+				SignalType: w.WebRTCSignal.SignalType,
+				Payload:    w.WebRTCSignal.Payload,
+			},
+		}, nil
 	case w.Command != nil:
 		return ClientMessage{
 			Command: &CommandRequest{
@@ -148,6 +156,13 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 			SourceDeviceID: msg.RouteStream.SourceDeviceID,
 			TargetDeviceID: msg.RouteStream.TargetDeviceID,
 			Kind:           msg.RouteStream.Kind,
+		}
+	}
+	if msg.WebRTCSignal != nil {
+		out.WebRTCSignal = &WireWebRTCSignal{
+			StreamID:   msg.WebRTCSignal.StreamID,
+			SignalType: msg.WebRTCSignal.SignalType,
+			Payload:    msg.WebRTCSignal.Payload,
 		}
 	}
 	if msg.TransitionUI != nil {

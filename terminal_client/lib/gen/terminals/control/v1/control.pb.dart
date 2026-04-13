@@ -33,6 +33,7 @@ enum ConnectRequest_Payload {
   streamReady,
   command,
   heartbeat,
+  webrtcSignal,
   notSet
 }
 
@@ -45,6 +46,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     StreamReady? streamReady,
     CommandRequest? command,
     Heartbeat? heartbeat,
+    WebRTCSignal? webrtcSignal,
   }) {
     final result = create();
     if (register != null) result.register = register;
@@ -54,6 +56,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     if (streamReady != null) result.streamReady = streamReady;
     if (command != null) result.command = command;
     if (heartbeat != null) result.heartbeat = heartbeat;
+    if (webrtcSignal != null) result.webrtcSignal = webrtcSignal;
     return result;
   }
 
@@ -75,6 +78,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     5: ConnectRequest_Payload.streamReady,
     6: ConnectRequest_Payload.command,
     7: ConnectRequest_Payload.heartbeat,
+    8: ConnectRequest_Payload.webrtcSignal,
     0: ConnectRequest_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -82,7 +86,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'terminals.control.v1'),
       createEmptyInstance: create)
-    ..oo(0, [1, 2, 3, 4, 5, 6, 7])
+    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8])
     ..aOM<RegisterDevice>(1, _omitFieldNames ? '' : 'register',
         subBuilder: RegisterDevice.create)
     ..aOM<CapabilityUpdate>(2, _omitFieldNames ? '' : 'capability',
@@ -97,6 +101,8 @@ class ConnectRequest extends $pb.GeneratedMessage {
         subBuilder: CommandRequest.create)
     ..aOM<Heartbeat>(7, _omitFieldNames ? '' : 'heartbeat',
         subBuilder: Heartbeat.create)
+    ..aOM<WebRTCSignal>(8, _omitFieldNames ? '' : 'webrtcSignal',
+        subBuilder: WebRTCSignal.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -125,6 +131,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   @$pb.TagNumber(6)
   @$pb.TagNumber(7)
+  @$pb.TagNumber(8)
   ConnectRequest_Payload whichPayload() =>
       _ConnectRequest_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
@@ -134,6 +141,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   @$pb.TagNumber(6)
   @$pb.TagNumber(7)
+  @$pb.TagNumber(8)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -212,6 +220,17 @@ class ConnectRequest extends $pb.GeneratedMessage {
   void clearHeartbeat() => $_clearField(7);
   @$pb.TagNumber(7)
   Heartbeat ensureHeartbeat() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  WebRTCSignal get webrtcSignal => $_getN(7);
+  @$pb.TagNumber(8)
+  set webrtcSignal(WebRTCSignal value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasWebrtcSignal() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearWebrtcSignal() => $_clearField(8);
+  @$pb.TagNumber(8)
+  WebRTCSignal ensureWebrtcSignal() => $_ensure(7);
 }
 
 enum ConnectResponse_Payload {

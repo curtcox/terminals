@@ -22,6 +22,26 @@ func TestInternalFromWireClient(t *testing.T) {
 	if msg.Command == nil || msg.Command.RequestID != "r1" {
 		t.Fatalf("unexpected command mapping: %+v", msg.Command)
 	}
+
+	msg, err = InternalFromWireClient(WireClientMessage{
+		WebRTCSignal: &WireWebRTCSignal{
+			StreamID:   "stream-1",
+			SignalType: "candidate",
+			Payload:    "{\"candidate\":\"abc\"}",
+		},
+	})
+	if err != nil {
+		t.Fatalf("InternalFromWireClient(webrtc_signal) error = %v", err)
+	}
+	if msg.WebRTCSignal == nil {
+		t.Fatalf("expected webrtc signal mapping")
+	}
+	if msg.WebRTCSignal.StreamID != "stream-1" || msg.WebRTCSignal.SignalType != "candidate" {
+		t.Fatalf("unexpected webrtc signal mapping: %+v", msg.WebRTCSignal)
+	}
+	if msg.WebRTCSignal.Payload != "{\"candidate\":\"abc\"}" {
+		t.Fatalf("unexpected webrtc payload: %q", msg.WebRTCSignal.Payload)
+	}
 }
 
 func TestWireFromInternalServer(t *testing.T) {
@@ -31,7 +51,7 @@ func TestWireFromInternalServer(t *testing.T) {
 		UpdateUI: &UIUpdate{
 			ComponentID: "terminal_output",
 			Node: ui.Descriptor{
-				Type: "text",
+				Type:  "text",
 				Props: map[string]string{"value": "patched"},
 			},
 		},
@@ -53,12 +73,17 @@ func TestWireFromInternalServer(t *testing.T) {
 			TargetDeviceID: "d2",
 			Kind:           "audio",
 		},
+		WebRTCSignal: &WebRTCSignalResponse{
+			StreamID:   "stream-1",
+			SignalType: "offer",
+			Payload:    "{\"sdp\":\"v=0...\"}",
+		},
 		TransitionUI: &UITransition{
 			Transition: "fade",
 			DurationMS: 150,
 		},
-		ErrorCode:   ErrorCodeInvalidCommandAction,
-		Error:       "invalid command action",
+		ErrorCode: ErrorCodeInvalidCommandAction,
+		Error:     "invalid command action",
 		Data: map[string]string{
 			"b": "2",
 			"a": "1",
@@ -93,6 +118,12 @@ func TestWireFromInternalServer(t *testing.T) {
 	}
 	if wire.RouteStream.SourceDeviceID != "d1" || wire.RouteStream.TargetDeviceID != "d2" || wire.RouteStream.Kind != "audio" {
 		t.Fatalf("unexpected route_stream fields: %+v", wire.RouteStream)
+	}
+	if wire.WebRTCSignal == nil || wire.WebRTCSignal.StreamID != "stream-1" || wire.WebRTCSignal.SignalType != "offer" {
+		t.Fatalf("unexpected webrtc signal mapping: %+v", wire.WebRTCSignal)
+	}
+	if wire.WebRTCSignal.Payload != "{\"sdp\":\"v=0...\"}" {
+		t.Fatalf("unexpected webrtc payload mapping: %q", wire.WebRTCSignal.Payload)
 	}
 	if wire.TransitionUI == nil || wire.TransitionUI.Transition != "fade" || wire.TransitionUI.DurationMS != 150 {
 		t.Fatalf("unexpected transition_ui mapping: %+v", wire.TransitionUI)

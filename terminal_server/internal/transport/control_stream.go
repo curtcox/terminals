@@ -55,6 +55,20 @@ type StreamReadyRequest struct {
 	StreamID string
 }
 
+// WebRTCSignalRequest carries client-originated WebRTC signaling payloads.
+type WebRTCSignalRequest struct {
+	StreamID   string
+	SignalType string
+	Payload    string
+}
+
+// WebRTCSignalResponse carries server-originated WebRTC signaling payloads.
+type WebRTCSignalResponse struct {
+	StreamID   string
+	SignalType string
+	Payload    string
+}
+
 // RouteStreamResponse instructs clients to establish or acknowledge media routing.
 type RouteStreamResponse struct {
 	StreamID       string
@@ -98,13 +112,14 @@ type CommandRequest struct {
 
 // ClientMessage is a one-of control stream message from client to server.
 type ClientMessage struct {
-	Register   *RegisterRequest
-	Capability *CapabilityUpdateRequest
-	Heartbeat  *HeartbeatRequest
-	Sensor     *SensorDataRequest
-	StreamReady *StreamReadyRequest
-	Input      *InputRequest
-	Command    *CommandRequest
+	Register     *RegisterRequest
+	Capability   *CapabilityUpdateRequest
+	Heartbeat    *HeartbeatRequest
+	Sensor       *SensorDataRequest
+	StreamReady  *StreamReadyRequest
+	WebRTCSignal *WebRTCSignalRequest
+	Input        *InputRequest
+	Command      *CommandRequest
 }
 
 // ServerMessage is a one-of control stream message from server to client.
@@ -116,6 +131,7 @@ type ServerMessage struct {
 	StartStream   *StartStreamResponse
 	StopStream    *StopStreamResponse
 	RouteStream   *RouteStreamResponse
+	WebRTCSignal  *WebRTCSignalResponse
 	TransitionUI  *UITransition
 	Notification  string
 	ScenarioStart string
@@ -286,6 +302,10 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 	case msg.StreamReady != nil:
 		h.metrics.streamReadyReceived.Add(1)
 		h.markStreamReady(msg.StreamReady.StreamID)
+		return nil, nil
+	case msg.WebRTCSignal != nil:
+		h.metrics.webrtcSignalReceived.Add(1)
+		// Placeholder for future signaling broker/SFU integration.
 		return nil, nil
 	case msg.Input != nil:
 		out, err := h.handleInput(ctx, msg.Input)

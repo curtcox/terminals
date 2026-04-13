@@ -21,6 +21,7 @@ message ConnectRequest {
     StreamReady stream_ready = 5;
     CommandRequest command = 6;
     Heartbeat heartbeat = 7;
+    WebRTCSignal webrtc_signal = 8;
   }
 }
 

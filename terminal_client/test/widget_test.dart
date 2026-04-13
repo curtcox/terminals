@@ -732,6 +732,20 @@ void main() {
           .toList();
       expect(readyRequests.length, 1);
       expect(readyRequests.first.streamReady.streamId, 'stream-a');
+      final localOfferRequests = harness.lastClient.requests
+          .where((request) =>
+              request.hasWebrtcSignal() &&
+              request.webrtcSignal.streamId == 'stream-a' &&
+              request.webrtcSignal.signalType == 'offer')
+          .toList();
+      expect(localOfferRequests.length, 1);
+      final initialCandidateRequests = harness.lastClient.requests
+          .where((request) =>
+              request.hasWebrtcSignal() &&
+              request.webrtcSignal.streamId == 'stream-a' &&
+              request.webrtcSignal.signalType == 'candidate')
+          .toList();
+      expect(initialCandidateRequests.length, 1);
 
       harness.lastClient.emitResponse(
         ConnectResponse()
@@ -763,6 +777,20 @@ void main() {
       expect(find.textContaining('Signals: 1'), findsOneWidget);
       expect(find.textContaining('WebRTC signal: offer (stream-a)'),
           findsOneWidget);
+      final localAnswerRequests = harness.lastClient.requests
+          .where((request) =>
+              request.hasWebrtcSignal() &&
+              request.webrtcSignal.streamId == 'stream-a' &&
+              request.webrtcSignal.signalType == 'answer')
+          .toList();
+      expect(localAnswerRequests.length, 1);
+      final localCandidateRequests = harness.lastClient.requests
+          .where((request) =>
+              request.hasWebrtcSignal() &&
+              request.webrtcSignal.streamId == 'stream-a' &&
+              request.webrtcSignal.signalType == 'candidate')
+          .toList();
+      expect(localCandidateRequests.length, 2);
 
       harness.lastClient.emitResponse(
         ConnectResponse()

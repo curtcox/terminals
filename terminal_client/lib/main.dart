@@ -755,6 +755,18 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             ..streamReady = (StreamReady()..streamId = start.streamId),
         );
         _streamReadyAckCount += 1;
+        _sendWebRTCSignal(
+          streamID: start.streamId,
+          signalType: 'offer',
+          payload:
+              '{"type":"offer","stream_id":"${start.streamId}","kind":"${start.kind}","source":"client"}',
+        );
+        _sendWebRTCSignal(
+          streamID: start.streamId,
+          signalType: 'candidate',
+          payload:
+              '{"type":"candidate","stream_id":"${start.streamId}","candidate":"candidate:local-1"}',
+        );
       }
       if (start.kind.isNotEmpty) {
         _lastNotification = 'Start stream: ${start.kind} (${start.streamId})';
@@ -787,6 +799,21 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       }
       _lastNotification =
           'WebRTC signal: ${response.webrtcSignal.signalType} (${response.webrtcSignal.streamId})';
+      final signalType = response.webrtcSignal.signalType.trim().toLowerCase();
+      if (signalType == 'offer') {
+        _sendWebRTCSignal(
+          streamID: response.webrtcSignal.streamId,
+          signalType: 'answer',
+          payload:
+              '{"type":"answer","stream_id":"${response.webrtcSignal.streamId}","source":"client"}',
+        );
+        _sendWebRTCSignal(
+          streamID: response.webrtcSignal.streamId,
+          signalType: 'candidate',
+          payload:
+              '{"type":"candidate","stream_id":"${response.webrtcSignal.streamId}","candidate":"candidate:local-2"}',
+        );
+      }
     }
   }
 
@@ -937,6 +964,23 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         ..input = (iov1.InputEvent()
           ..deviceId = _deviceId
           ..key = (iov1.KeyEvent()..text = text)),
+    );
+  }
+
+  void _sendWebRTCSignal({
+    required String streamID,
+    required String signalType,
+    required String payload,
+  }) {
+    if (streamID.isEmpty || signalType.isEmpty) {
+      return;
+    }
+    _outgoing.add(
+      ConnectRequest()
+        ..webrtcSignal = (WebRTCSignal()
+          ..streamId = streamID
+          ..signalType = signalType
+          ..payload = payload),
     );
   }
 

@@ -141,6 +141,31 @@ func TestGeneratedProtoAdapterToInternalSensorAndStreamReady(t *testing.T) {
 	if streamReadyMsg.StreamReady.StreamID != "stream-7" {
 		t.Fatalf("stream_ready stream_id = %q, want stream-7", streamReadyMsg.StreamReady.StreamID)
 	}
+
+	webrtcMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_WebrtcSignal{
+			WebrtcSignal: &controlv1.WebRTCSignal{
+				StreamId:   "stream-7",
+				SignalType: "offer",
+				Payload:    "{\"sdp\":\"v=0...\"}",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(webrtc_signal) error = %v", err)
+	}
+	if webrtcMsg.WebRTCSignal == nil {
+		t.Fatalf("expected webrtc_signal message")
+	}
+	if webrtcMsg.WebRTCSignal.StreamID != "stream-7" {
+		t.Fatalf("webrtc_signal stream_id = %q, want stream-7", webrtcMsg.WebRTCSignal.StreamID)
+	}
+	if webrtcMsg.WebRTCSignal.SignalType != "offer" {
+		t.Fatalf("webrtc_signal signal_type = %q, want offer", webrtcMsg.WebRTCSignal.SignalType)
+	}
+	if webrtcMsg.WebRTCSignal.Payload != "{\"sdp\":\"v=0...\"}" {
+		t.Fatalf("webrtc_signal payload = %q, want {\"sdp\":\"v=0...\"}", webrtcMsg.WebRTCSignal.Payload)
+	}
 }
 
 func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
@@ -240,7 +265,7 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 			Kind:           "audio",
 			SourceDeviceID: "d1",
 			TargetDeviceID: "d2",
-			Metadata: map[string]string{"codec": "opus"},
+			Metadata:       map[string]string{"codec": "opus"},
 		},
 	})
 	if err != nil {
@@ -311,6 +336,33 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	}
 	if got := resp.GetRouteStream().GetKind(); got != "audio" {
 		t.Fatalf("route_stream kind = %q, want audio", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		WebRTCSignal: &WebRTCSignalResponse{
+			StreamID:   "stream-1",
+			SignalType: "answer",
+			Payload:    "{\"sdp\":\"v=0-answer\"}",
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() webrtc_signal error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("webrtc_signal envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if resp.GetWebrtcSignal() == nil {
+		t.Fatalf("expected webrtc_signal payload")
+	}
+	if got := resp.GetWebrtcSignal().GetStreamId(); got != "stream-1" {
+		t.Fatalf("webrtc_signal stream_id = %q, want stream-1", got)
+	}
+	if got := resp.GetWebrtcSignal().GetSignalType(); got != "answer" {
+		t.Fatalf("webrtc_signal signal_type = %q, want answer", got)
+	}
+	if got := resp.GetWebrtcSignal().GetPayload(); got != "{\"sdp\":\"v=0-answer\"}" {
+		t.Fatalf("webrtc_signal payload = %q, want {\"sdp\":\"v=0-answer\"}", got)
 	}
 
 	envelope, err = adapter.FromInternal(ServerMessage{

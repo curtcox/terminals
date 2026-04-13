@@ -109,6 +109,15 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				StreamID: payload.StreamReady.GetStreamId(),
 			},
 		}, nil
+	case *controlv1.ConnectRequest_WebrtcSignal:
+		signal := payload.WebrtcSignal
+		return ClientMessage{
+			WebRTCSignal: &WebRTCSignalRequest{
+				StreamID:   signal.GetStreamId(),
+				SignalType: signal.GetSignalType(),
+				Payload:    signal.GetPayload(),
+			},
+		}, nil
 	default:
 		return ClientMessage{}, nil
 	}
@@ -170,6 +179,16 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					SourceDeviceId: msg.RouteStream.SourceDeviceID,
 					TargetDeviceId: msg.RouteStream.TargetDeviceID,
 					Kind:           msg.RouteStream.Kind,
+				},
+			},
+		}
+	case msg.WebRTCSignal != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_WebrtcSignal{
+				WebrtcSignal: &controlv1.WebRTCSignal{
+					StreamId:   msg.WebRTCSignal.StreamID,
+					SignalType: msg.WebRTCSignal.SignalType,
+					Payload:    msg.WebRTCSignal.Payload,
 				},
 			},
 		}

@@ -1,1 +1,1 @@
-Implement client-to-server WebRTC signaling input path: send WebRTCSignal messages from client for offer/answer/candidate actions and validate transport adapters handle round-trip signal payloads.
+Implement server-side WebRTC signaling relay in transport/scenario runtime: accept client WebRTCSignal input and forward offer/answer/candidate payloads to the intended peer device stream.

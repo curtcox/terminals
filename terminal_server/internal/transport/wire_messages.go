@@ -62,10 +62,11 @@ const (
 
 // WireClientMessage is a protobuf-adapter-friendly oneof shape.
 type WireClientMessage struct {
-	Register   *WireRegisterRequest
-	Capability *WireCapabilityUpdateRequest
-	Heartbeat  *WireHeartbeatRequest
-	Command    *WireCommandRequest
+	Register     *WireRegisterRequest
+	Capability   *WireCapabilityUpdateRequest
+	Heartbeat    *WireHeartbeatRequest
+	WebRTCSignal *WireWebRTCSignal
+	Command      *WireCommandRequest
 }
 
 // WireRegisterResponse is a protobuf-adapter-friendly register response.
@@ -122,6 +123,7 @@ type WireServerMessage struct {
 	StartStream   *WireStartStream
 	StopStream    *WireStopStream
 	RouteStream   *WireRouteStream
+	WebRTCSignal  *WireWebRTCSignal
 	TransitionUI  *uiWireTransition
 	Error         *WireControlError
 }
@@ -146,6 +148,13 @@ type WireRouteStream struct {
 	SourceDeviceID string
 	TargetDeviceID string
 	Kind           string
+}
+
+// WireWebRTCSignal is a protobuf-adapter-friendly WebRTC signaling payload.
+type WireWebRTCSignal struct {
+	StreamID   string
+	SignalType string
+	Payload    string
 }
 
 // uiWireDescriptor is a compact wire representation for UI descriptors.
