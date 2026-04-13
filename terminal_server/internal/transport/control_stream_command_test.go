@@ -222,8 +222,8 @@ func TestHandleMessageCommandIntercomEmitsRouteStreams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command intercom) error = %v", err)
 	}
-	if len(out) != 3 {
-		t.Fatalf("len(out) = %d, want 3", len(out))
+	if len(out) != 5 {
+		t.Fatalf("len(out) = %d, want 5", len(out))
 	}
 	if out[0].ScenarioStart != "intercom" {
 		t.Fatalf("ScenarioStart = %q, want intercom", out[0].ScenarioStart)
@@ -231,17 +231,29 @@ func TestHandleMessageCommandIntercomEmitsRouteStreams(t *testing.T) {
 	if out[1].StartStream == nil {
 		t.Fatalf("expected start_stream response after intercom start")
 	}
+	if out[1].RelayToDeviceID != "" {
+		t.Fatalf("local start_stream relay_to_device_id = %q, want empty", out[1].RelayToDeviceID)
+	}
 	if out[1].StartStream.SourceDeviceID != "device-1" || out[1].StartStream.TargetDeviceID != "device-2" {
 		t.Fatalf("unexpected start stream devices: %+v", out[1].StartStream)
 	}
 	if out[1].StartStream.Kind != "audio" {
 		t.Fatalf("start stream kind = %q, want audio", out[1].StartStream.Kind)
 	}
-	if out[2].RouteStream == nil {
+	if out[2].StartStream == nil || out[2].RelayToDeviceID != "device-2" {
+		t.Fatalf("expected relayed start_stream for device-2, got %+v", out[2])
+	}
+	if out[3].RouteStream == nil {
 		t.Fatalf("expected route_stream response after start_stream")
 	}
-	if out[2].RouteStream.SourceDeviceID != "device-1" || out[2].RouteStream.TargetDeviceID != "device-2" {
-		t.Fatalf("unexpected route stream devices: %+v", out[2].RouteStream)
+	if out[3].RelayToDeviceID != "" {
+		t.Fatalf("local route_stream relay_to_device_id = %q, want empty", out[3].RelayToDeviceID)
+	}
+	if out[3].RouteStream.SourceDeviceID != "device-1" || out[3].RouteStream.TargetDeviceID != "device-2" {
+		t.Fatalf("unexpected route stream devices: %+v", out[3].RouteStream)
+	}
+	if out[4].RouteStream == nil || out[4].RelayToDeviceID != "device-2" {
+		t.Fatalf("expected relayed route_stream for device-2, got %+v", out[4])
 	}
 
 	// Starting intercom again should not emit duplicate route stream messages.
@@ -314,8 +326,8 @@ func TestHandleMessageCommandIntercomStopEmitsStopStream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command intercom stop) error = %v", err)
 	}
-	if len(stopOut) != 2 {
-		t.Fatalf("len(stopOut) = %d, want 2", len(stopOut))
+	if len(stopOut) != 3 {
+		t.Fatalf("len(stopOut) = %d, want 3", len(stopOut))
 	}
 	if stopOut[0].ScenarioStop != "intercom" {
 		t.Fatalf("ScenarioStop = %q, want intercom", stopOut[0].ScenarioStop)
@@ -323,8 +335,14 @@ func TestHandleMessageCommandIntercomStopEmitsStopStream(t *testing.T) {
 	if stopOut[1].StopStream == nil {
 		t.Fatalf("expected stop_stream response after intercom stop")
 	}
+	if stopOut[1].RelayToDeviceID != "" {
+		t.Fatalf("local stop_stream relay_to_device_id = %q, want empty", stopOut[1].RelayToDeviceID)
+	}
 	if stopOut[1].StopStream.StreamID != "route:device-1|device-2|audio" {
 		t.Fatalf("stop_stream stream_id = %q, want route:device-1|device-2|audio", stopOut[1].StopStream.StreamID)
+	}
+	if stopOut[2].StopStream == nil || stopOut[2].RelayToDeviceID != "device-2" {
+		t.Fatalf("expected relayed stop_stream for device-2, got %+v", stopOut[2])
 	}
 	if router.RouteCount() != 0 {
 		t.Fatalf("route count after stop = %d, want 0", router.RouteCount())

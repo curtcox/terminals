@@ -1,1 +1,1 @@
-Deliver RouteStream/StartStream/StopStream to both source and target connected sessions (not only command-issuing session) so each peer can establish and tear down media routes without relying on local inference.
+Install/configure Flutter (flutter + dart CLI) in local PATH, then rerun make all-check and fix any resulting client/proto failures.

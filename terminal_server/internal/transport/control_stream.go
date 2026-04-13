@@ -468,7 +468,7 @@ func (h *StreamHandler) routeUpdatesForCommand(
 			if _, exists := beforeSet[routeID]; exists {
 				continue
 			}
-			out = append(out, ServerMessage{
+			startMsg := ServerMessage{
 				StartStream: &StartStreamResponse{
 					StreamID:       routeID,
 					Kind:           route.StreamKind,
@@ -478,7 +478,8 @@ func (h *StreamHandler) routeUpdatesForCommand(
 						"origin": "route_delta",
 					},
 				},
-			})
+			}
+			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, startMsg)
 			h.registerMediaStream(StartStreamResponse{
 				StreamID:       routeID,
 				Kind:           route.StreamKind,
@@ -488,14 +489,15 @@ func (h *StreamHandler) routeUpdatesForCommand(
 					"origin": "route_delta",
 				},
 			})
-			out = append(out, ServerMessage{
+			routeMsg := ServerMessage{
 				RouteStream: &RouteStreamResponse{
 					StreamID:       routeID,
 					SourceDeviceID: route.SourceID,
 					TargetDeviceID: route.TargetID,
 					Kind:           route.StreamKind,
 				},
-			})
+			}
+			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, routeMsg)
 		}
 	}
 	if action == CommandActionStop {
@@ -504,13 +506,45 @@ func (h *StreamHandler) routeUpdatesForCommand(
 			if _, exists := afterSet[routeID]; exists {
 				continue
 			}
-			out = append(out, ServerMessage{
+			stopMsg := ServerMessage{
 				StopStream: &StopStreamResponse{
 					StreamID: routeID,
 				},
-			})
+			}
+			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, stopMsg)
 			h.unregisterMediaStream(routeID)
 		}
+	}
+	return out
+}
+
+func (h *StreamHandler) appendRouteMessageForPeers(
+	out []ServerMessage,
+	sessionDeviceID string,
+	sourceDeviceID string,
+	targetDeviceID string,
+	msg ServerMessage,
+) []ServerMessage {
+	peers := []string{}
+	seen := map[string]struct{}{}
+	for _, deviceID := range []string{sourceDeviceID, targetDeviceID} {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" {
+			continue
+		}
+		if _, exists := seen[deviceID]; exists {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		peers = append(peers, deviceID)
+	}
+	sessionDeviceID = strings.TrimSpace(sessionDeviceID)
+	for _, peerDeviceID := range peers {
+		next := msg
+		if peerDeviceID != sessionDeviceID {
+			next.RelayToDeviceID = peerDeviceID
+		}
+		out = append(out, next)
 	}
 	return out
 }
