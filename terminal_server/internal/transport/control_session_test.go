@@ -3,7 +3,9 @@ package transport
 import (
 	"context"
 	"io"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
@@ -379,5 +381,120 @@ func TestSessionRunDisconnectCleansIORoutes(t *testing.T) {
 	}
 	if remaining[0].SourceID != "x" || remaining[0].TargetID != "y" {
 		t.Fatalf("unexpected remaining route: %+v", remaining[0])
+	}
+}
+
+type asyncFakeStream struct {
+	ctx    context.Context
+	recvCh chan ClientMessage
+	sentCh chan ServerMessage
+}
+
+func (a *asyncFakeStream) Recv() (ClientMessage, error) {
+	msg, ok := <-a.recvCh
+	if !ok {
+		return ClientMessage{}, io.EOF
+	}
+	return msg, nil
+}
+
+func (a *asyncFakeStream) Send(msg ServerMessage) error {
+	a.sentCh <- msg
+	return nil
+}
+
+func (a *asyncFakeStream) Context() context.Context {
+	return a.ctx
+}
+
+func TestSessionRunRelaysWebRTCSignalsAcrossDeviceSessions(t *testing.T) {
+	t.Cleanup(func() {
+		globalSessionRelayRegistry = newSessionRelayRegistry()
+	})
+
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	routes := iorouter.NewRouter()
+	_ = routes.Connect("d1", "d2", "audio")
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        routes,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	session1 := NewSession(NewStreamHandlerWithRuntime(control, runtime), control)
+	session2 := NewSession(NewStreamHandlerWithRuntime(control, runtime), control)
+
+	stream1 := &asyncFakeStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ClientMessage, 8),
+		sentCh: make(chan ServerMessage, 16),
+	}
+	stream2 := &asyncFakeStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ClientMessage, 8),
+		sentCh: make(chan ServerMessage, 16),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var runErr1 error
+	var runErr2 error
+	go func() {
+		defer wg.Done()
+		runErr1 = session1.Run(stream1)
+	}()
+	go func() {
+		defer wg.Done()
+		runErr2 = session2.Run(stream2)
+	}()
+
+	stream1.recvCh <- ClientMessage{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}}
+	stream2.recvCh <- ClientMessage{Register: &RegisterRequest{DeviceID: "d2", DeviceName: "Hall"}}
+
+	for i := 0; i < 2; i++ {
+		<-stream1.sentCh
+		<-stream2.sentCh
+	}
+
+	stream1.recvCh <- ClientMessage{
+		WebRTCSignal: &WebRTCSignalRequest{
+			StreamID:   "route:d1|d2|audio",
+			SignalType: "offer",
+			Payload:    "{\"sdp\":\"v=0-offer\"}",
+		},
+	}
+
+	select {
+	case relayed := <-stream2.sentCh:
+		if relayed.WebRTCSignal == nil {
+			t.Fatalf("expected relayed WebRTCSignal payload")
+		}
+		if relayed.WebRTCSignal.StreamID != "route:d1|d2|audio" {
+			t.Fatalf("relayed stream_id = %q, want route:d1|d2|audio", relayed.WebRTCSignal.StreamID)
+		}
+		if relayed.WebRTCSignal.SignalType != "offer" {
+			t.Fatalf("relayed signal_type = %q, want offer", relayed.WebRTCSignal.SignalType)
+		}
+		if relayed.WebRTCSignal.Payload != "{\"sdp\":\"v=0-offer\"}" {
+			t.Fatalf("relayed payload = %q, want offer payload", relayed.WebRTCSignal.Payload)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for relayed WebRTC signal")
+	}
+
+	close(stream1.recvCh)
+	close(stream2.recvCh)
+	wg.Wait()
+	if runErr1 != nil {
+		t.Fatalf("session1.Run() error = %v", runErr1)
+	}
+	if runErr2 != nil {
+		t.Fatalf("session2.Run() error = %v", runErr2)
 	}
 }

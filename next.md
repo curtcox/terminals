@@ -1,1 +1,1 @@
-Implement server-side WebRTC signaling relay in transport/scenario runtime: accept client WebRTCSignal input and forward offer/answer/candidate payloads to the intended peer device stream.
+Deliver RouteStream/StartStream/StopStream to both source and target connected sessions (not only command-issuing session) so each peer can establish and tear down media routes without relying on local inference.

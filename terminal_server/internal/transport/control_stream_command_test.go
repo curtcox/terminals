@@ -89,6 +89,60 @@ func TestHandleMessageCommandVoice(t *testing.T) {
 	}
 }
 
+func TestHandleMessageWebRTCSignalProducesRelayToPeer(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		SessionDeviceID: "device-1",
+		WebRTCSignal: &WebRTCSignalRequest{
+			StreamID:   "route:device-1|device-2|audio",
+			SignalType: "offer",
+			Payload:    "{\"sdp\":\"v=0-offer\"}",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(webrtc_signal) error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].RelayToDeviceID != "device-2" {
+		t.Fatalf("RelayToDeviceID = %q, want device-2", out[0].RelayToDeviceID)
+	}
+	if out[0].WebRTCSignal == nil {
+		t.Fatalf("expected webrtc signal payload")
+	}
+	if out[0].WebRTCSignal.StreamID != "route:device-1|device-2|audio" {
+		t.Fatalf("stream_id = %q, want route stream id", out[0].WebRTCSignal.StreamID)
+	}
+	if out[0].WebRTCSignal.SignalType != "offer" {
+		t.Fatalf("signal_type = %q, want offer", out[0].WebRTCSignal.SignalType)
+	}
+	if out[0].WebRTCSignal.Payload != "{\"sdp\":\"v=0-offer\"}" {
+		t.Fatalf("payload = %q, want offer payload", out[0].WebRTCSignal.Payload)
+	}
+
+	replyOut, replyErr := handler.HandleMessage(context.Background(), ClientMessage{
+		SessionDeviceID: "device-2",
+		WebRTCSignal: &WebRTCSignalRequest{
+			StreamID:   "route:device-1|device-2|audio",
+			SignalType: "answer",
+			Payload:    "{\"sdp\":\"v=0-answer\"}",
+		},
+	})
+	if replyErr != nil {
+		t.Fatalf("HandleMessage(webrtc answer) error = %v", replyErr)
+	}
+	if len(replyOut) != 1 {
+		t.Fatalf("len(replyOut) = %d, want 1", len(replyOut))
+	}
+	if replyOut[0].RelayToDeviceID != "device-1" {
+		t.Fatalf("reply RelayToDeviceID = %q, want device-1", replyOut[0].RelayToDeviceID)
+	}
+}
+
 func TestHandleMessageCommandManual(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

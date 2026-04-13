@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 )
 
 // ErrNilStream indicates the caller passed a nil stream.
@@ -38,6 +39,18 @@ func (s *Session) Run(stream ControlStream) error {
 	}
 
 	var connectedDeviceID string
+	var sendMu sync.Mutex
+	send := func(msg ServerMessage) error {
+		sendMu.Lock()
+		defer sendMu.Unlock()
+		return stream.Send(msg)
+	}
+	registeredRelayDeviceID := ""
+	defer func() {
+		if registeredRelayDeviceID != "" {
+			globalSessionRelayRegistry.Unregister(registeredRelayDeviceID)
+		}
+	}()
 	for {
 		in, err := stream.Recv()
 		if err != nil {
@@ -53,7 +66,7 @@ func (s *Session) Run(stream ControlStream) error {
 
 		if sessionErr := validateSessionMessage(connectedDeviceID, in); sessionErr != nil {
 			s.handler.NoteProtocolError()
-			if sendErr := stream.Send(ServerMessage{
+			if sendErr := send(ServerMessage{
 				ErrorCode: ErrorCodeProtocolViolation,
 				Error:     sessionErr.Error(),
 			}); sendErr != nil {
@@ -64,14 +77,30 @@ func (s *Session) Run(stream ControlStream) error {
 
 		if in.Register != nil {
 			connectedDeviceID = in.Register.DeviceID
+			if connectedDeviceID != "" && connectedDeviceID != registeredRelayDeviceID {
+				if registeredRelayDeviceID != "" {
+					globalSessionRelayRegistry.Unregister(registeredRelayDeviceID)
+				}
+				globalSessionRelayRegistry.Register(connectedDeviceID, send)
+				registeredRelayDeviceID = connectedDeviceID
+			}
 		}
 		if in.Heartbeat != nil && connectedDeviceID == "" {
 			connectedDeviceID = in.Heartbeat.DeviceID
 		}
+		in.SessionDeviceID = connectedDeviceID
 
 		out, handleErr := s.handler.HandleMessage(stream.Context(), in)
 		for _, msg := range out {
-			if sendErr := stream.Send(msg); sendErr != nil {
+			if msg.RelayToDeviceID != "" {
+				relayMsg := msg
+				relayMsg.RelayToDeviceID = ""
+				if sendErr := globalSessionRelayRegistry.Relay(msg.RelayToDeviceID, relayMsg); sendErr != nil {
+					return sendErr
+				}
+				continue
+			}
+			if sendErr := send(msg); sendErr != nil {
 				return sendErr
 			}
 		}

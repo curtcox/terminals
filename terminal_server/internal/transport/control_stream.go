@@ -112,33 +112,35 @@ type CommandRequest struct {
 
 // ClientMessage is a one-of control stream message from client to server.
 type ClientMessage struct {
-	Register     *RegisterRequest
-	Capability   *CapabilityUpdateRequest
-	Heartbeat    *HeartbeatRequest
-	Sensor       *SensorDataRequest
-	StreamReady  *StreamReadyRequest
-	WebRTCSignal *WebRTCSignalRequest
-	Input        *InputRequest
-	Command      *CommandRequest
+	Register        *RegisterRequest
+	Capability      *CapabilityUpdateRequest
+	Heartbeat       *HeartbeatRequest
+	Sensor          *SensorDataRequest
+	StreamReady     *StreamReadyRequest
+	WebRTCSignal    *WebRTCSignalRequest
+	Input           *InputRequest
+	Command         *CommandRequest
+	SessionDeviceID string
 }
 
 // ServerMessage is a one-of control stream message from server to client.
 type ServerMessage struct {
-	RegisterAck   *RegisterResponse
-	CommandAck    string
-	SetUI         *ui.Descriptor
-	UpdateUI      *UIUpdate
-	StartStream   *StartStreamResponse
-	StopStream    *StopStreamResponse
-	RouteStream   *RouteStreamResponse
-	WebRTCSignal  *WebRTCSignalResponse
-	TransitionUI  *UITransition
-	Notification  string
-	ScenarioStart string
-	ScenarioStop  string
-	Data          map[string]string
-	ErrorCode     string
-	Error         string
+	RegisterAck     *RegisterResponse
+	CommandAck      string
+	SetUI           *ui.Descriptor
+	UpdateUI        *UIUpdate
+	StartStream     *StartStreamResponse
+	StopStream      *StopStreamResponse
+	RouteStream     *RouteStreamResponse
+	WebRTCSignal    *WebRTCSignalResponse
+	TransitionUI    *UITransition
+	Notification    string
+	ScenarioStart   string
+	ScenarioStop    string
+	Data            map[string]string
+	ErrorCode       string
+	Error           string
+	RelayToDeviceID string
 }
 
 // UIUpdate carries a server-driven patch to a specific UI component.
@@ -305,8 +307,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		return nil, nil
 	case msg.WebRTCSignal != nil:
 		h.metrics.webrtcSignalReceived.Add(1)
-		// Placeholder for future signaling broker/SFU integration.
-		return nil, nil
+		return h.relayWebRTCSignal(msg.WebRTCSignal, msg.SessionDeviceID), nil
 	case msg.Input != nil:
 		out, err := h.handleInput(ctx, msg.Input)
 		if err != nil {
@@ -533,6 +534,60 @@ func (h *StreamHandler) routeSnapshotForDevice(deviceID string) []iorouter.Route
 
 func routeStreamID(route iorouter.Route) string {
 	return "route:" + route.SourceID + "|" + route.TargetID + "|" + route.StreamKind
+}
+
+func (h *StreamHandler) relayWebRTCSignal(signal *WebRTCSignalRequest, sourceDeviceID string) []ServerMessage {
+	if signal == nil {
+		return nil
+	}
+	streamID := strings.TrimSpace(signal.StreamID)
+	signalType := strings.TrimSpace(signal.SignalType)
+	if streamID == "" || signalType == "" {
+		return nil
+	}
+	peerDeviceID := h.peerDeviceForStream(streamID, strings.TrimSpace(sourceDeviceID))
+	if peerDeviceID == "" {
+		return nil
+	}
+	return []ServerMessage{
+		{
+			WebRTCSignal: &WebRTCSignalResponse{
+				StreamID:   streamID,
+				SignalType: signalType,
+				Payload:    signal.Payload,
+			},
+			RelayToDeviceID: peerDeviceID,
+		},
+	}
+}
+
+func (h *StreamHandler) peerDeviceForStream(streamID, sourceDeviceID string) string {
+	const prefix = "route:"
+	if strings.HasPrefix(streamID, prefix) {
+		parts := strings.SplitN(strings.TrimPrefix(streamID, prefix), "|", 3)
+		if len(parts) == 3 {
+			if sourceDeviceID == parts[0] {
+				return parts[1]
+			}
+			if sourceDeviceID == parts[1] {
+				return parts[0]
+			}
+		}
+	}
+
+	h.mu.Lock()
+	state, ok := h.mediaStreams[streamID]
+	h.mu.Unlock()
+	if !ok {
+		return ""
+	}
+	if sourceDeviceID == state.SourceDeviceID {
+		return state.TargetDeviceID
+	}
+	if sourceDeviceID == state.TargetDeviceID {
+		return state.SourceDeviceID
+	}
+	return ""
 }
 
 func (h *StreamHandler) registerMediaStream(start StartStreamResponse) {
