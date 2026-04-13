@@ -1,1 +1,1 @@
-Generalize broadcast-event relay from PA-only to all scenario broadcasts (e.g., red alert/photo frame) with transport tests for target session delivery.
+Implement explicit PA receiver overlay UI updates (notification/overlay primitives) routed to non-source sessions, with transport + client rendering tests.

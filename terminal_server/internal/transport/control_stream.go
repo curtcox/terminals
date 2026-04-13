@@ -413,7 +413,10 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 	commandResult ServerMessage,
 	beforeCount int,
 ) []ServerMessage {
-	if cmd == nil || commandResult.ScenarioStart != "pa_system" {
+	if cmd == nil {
+		return nil
+	}
+	if commandResult.ScenarioStart == "" && commandResult.ScenarioStop == "" {
 		return nil
 	}
 	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.Broadcast == nil {
@@ -441,10 +444,6 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 	sessionDeviceID := strings.TrimSpace(cmd.DeviceID)
 	for _, event := range newEvents {
 		if len(event.DeviceIDs) == 0 {
-			if sessionDeviceID == "" {
-				continue
-			}
-			out = append(out, ServerMessage{Notification: event.Message})
 			continue
 		}
 		for _, targetDeviceID := range event.DeviceIDs {
@@ -452,11 +451,13 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 			if targetDeviceID == "" {
 				continue
 			}
-			msg := ServerMessage{Notification: event.Message}
-			if targetDeviceID != sessionDeviceID {
-				msg.RelayToDeviceID = targetDeviceID
+			if targetDeviceID == sessionDeviceID {
+				continue
 			}
-			out = append(out, msg)
+			out = append(out, ServerMessage{
+				Notification:   event.Message,
+				RelayToDeviceID: targetDeviceID,
+			})
 		}
 	}
 	return out

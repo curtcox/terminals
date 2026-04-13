@@ -625,3 +625,93 @@ func TestSessionRunIntercomRoutesFanOutToPeerSession(t *testing.T) {
 		t.Fatalf("session2.Run() error = %v", runErr2)
 	}
 }
+
+func TestSessionRunRelaysScenarioBroadcastNotificationsToPeerSessions(t *testing.T) {
+	t.Cleanup(func() {
+		globalSessionRelayRegistry = newSessionRelayRegistry()
+	})
+
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        iorouter.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	session1 := NewSession(NewStreamHandlerWithRuntime(control, runtime), control)
+	session2 := NewSession(NewStreamHandlerWithRuntime(control, runtime), control)
+
+	stream1 := &asyncFakeStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ClientMessage, 8),
+		sentCh: make(chan ServerMessage, 16),
+	}
+	stream2 := &asyncFakeStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ClientMessage, 8),
+		sentCh: make(chan ServerMessage, 16),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var runErr1 error
+	var runErr2 error
+	go func() {
+		defer wg.Done()
+		runErr1 = session1.Run(stream1)
+	}()
+	go func() {
+		defer wg.Done()
+		runErr2 = session2.Run(stream2)
+	}()
+
+	waitFor := func(ch <-chan ServerMessage, pred func(ServerMessage) bool) ServerMessage {
+		deadline := time.After(2 * time.Second)
+		for {
+			select {
+			case msg := <-ch:
+				if pred(msg) {
+					return msg
+				}
+			case <-deadline:
+				t.Fatalf("timed out waiting for expected message")
+			}
+		}
+	}
+
+	stream1.recvCh <- ClientMessage{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}}
+	stream2.recvCh <- ClientMessage{Register: &RegisterRequest{DeviceID: "d2", DeviceName: "Hall"}}
+
+	for i := 0; i < 2; i++ {
+		<-stream1.sentCh
+		<-stream2.sentCh
+	}
+
+	stream1.recvCh <- ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-red-alert",
+			DeviceID:  "d1",
+			Kind:      CommandKindVoice,
+			Text:      "red alert",
+		},
+	}
+
+	waitFor(stream1.sentCh, func(msg ServerMessage) bool { return msg.ScenarioStart == "red_alert" })
+	waitFor(stream2.sentCh, func(msg ServerMessage) bool { return msg.Notification == "RED ALERT" })
+
+	close(stream1.recvCh)
+	close(stream2.recvCh)
+	wg.Wait()
+	if runErr1 != nil {
+		t.Fatalf("session1.Run() error = %v", runErr1)
+	}
+	if runErr2 != nil {
+		t.Fatalf("session2.Run() error = %v", runErr2)
+	}
+}

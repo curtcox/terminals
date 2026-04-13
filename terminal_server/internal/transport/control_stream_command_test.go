@@ -413,18 +413,18 @@ func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
 		t.Fatalf("HandleMessage(command pa_system) error = %v", err)
 	}
 
-	seenLocalActive := false
+	seenScenarioStart := false
 	seenRelay := map[string]bool{}
 	for _, msg := range out {
-		if msg.Notification == "PA system active" && msg.RelayToDeviceID == "" {
-			seenLocalActive = true
+		if msg.ScenarioStart == "pa_system" {
+			seenScenarioStart = true
 		}
 		if msg.Notification == "PA from device-1" {
 			seenRelay[msg.RelayToDeviceID] = true
 		}
 	}
-	if !seenLocalActive {
-		t.Fatalf("expected local PA system active notification in command output")
+	if !seenScenarioStart {
+		t.Fatalf("expected pa_system scenario start in command output")
 	}
 	if !seenRelay["device-2"] || !seenRelay["device-3"] {
 		t.Fatalf("expected PA receiver notifications relayed to device-2 and device-3, got %+v", seenRelay)
