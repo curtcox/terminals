@@ -758,3 +758,125 @@ func TestWireSessionPASystemVoiceStopAliasesRelayCleanup(t *testing.T) {
 		})
 	}
 }
+
+func TestWireSessionWebRTCSignalRelayAcrossSessions(t *testing.T) {
+	globalSessionRelayRegistry = newSessionRelayRegistry()
+	t.Cleanup(func() {
+		globalSessionRelayRegistry = newSessionRelayRegistry()
+	})
+
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	stream1 := &asyncFakeProtoStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ProtoClientEnvelope, 8),
+		sentCh: make(chan ProtoServerEnvelope, 24),
+	}
+	stream2 := &asyncFakeProtoStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ProtoClientEnvelope, 8),
+		sentCh: make(chan ProtoServerEnvelope, 24),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var runErr1 error
+	var runErr2 error
+	go func() {
+		defer wg.Done()
+		runErr1 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream1, WireProtoAdapter{})
+	}()
+	go func() {
+		defer wg.Done()
+		runErr2 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream2, WireProtoAdapter{})
+	}()
+
+	waitFor := func(label string, ch <-chan ProtoServerEnvelope, pred func(WireServerMessage) bool) {
+		deadline := time.After(2 * time.Second)
+		for {
+			select {
+			case env := <-ch:
+				msg, ok := env.(WireServerMessage)
+				if !ok {
+					t.Fatalf("unexpected envelope type %T", env)
+				}
+				if pred(msg) {
+					return
+				}
+			case <-deadline:
+				t.Fatalf("timed out waiting for %s", label)
+			}
+		}
+	}
+
+	stream1.recvCh <- WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}}
+	stream2.recvCh <- WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d2", DeviceName: "Hall"}}
+	for i := 0; i < 2; i++ {
+		<-stream1.sentCh
+		<-stream2.sentCh
+	}
+
+	stream1.recvCh <- WireClientMessage{Command: &WireCommandRequest{
+		RequestID: "intercom-start",
+		DeviceID:  "d1",
+		Kind:      WireCommandKindManual,
+		Intent:    "intercom",
+	}}
+	waitFor("source intercom start", stream1.sentCh, func(msg WireServerMessage) bool {
+		return msg.CommandResult != nil && msg.CommandResult.ScenarioStart == "intercom"
+	})
+	waitFor("peer intercom route", stream2.sentCh, func(msg WireServerMessage) bool {
+		return msg.RouteStream != nil && msg.RouteStream.StreamID == "route:d1|d2|audio"
+	})
+
+	stream1.recvCh <- WireClientMessage{
+		WebRTCSignal: &WireWebRTCSignal{
+			StreamID:   "route:d1|d2|audio",
+			SignalType: "offer",
+			Payload:    "{\"sdp\":\"v=0-offer\"}",
+		},
+	}
+	waitFor("relayed offer to peer", stream2.sentCh, func(msg WireServerMessage) bool {
+		signal := msg.WebRTCSignal
+		return signal != nil &&
+			signal.StreamID == "route:d1|d2|audio" &&
+			signal.SignalType == "offer" &&
+			signal.Payload == "{\"sdp\":\"v=0-offer\"}"
+	})
+
+	stream2.recvCh <- WireClientMessage{
+		WebRTCSignal: &WireWebRTCSignal{
+			StreamID:   "route:d1|d2|audio",
+			SignalType: "answer",
+			Payload:    "{\"sdp\":\"v=0-answer\"}",
+		},
+	}
+	waitFor("relayed answer to source", stream1.sentCh, func(msg WireServerMessage) bool {
+		signal := msg.WebRTCSignal
+		return signal != nil &&
+			signal.StreamID == "route:d1|d2|audio" &&
+			signal.SignalType == "answer" &&
+			signal.Payload == "{\"sdp\":\"v=0-answer\"}"
+	})
+
+	close(stream1.recvCh)
+	close(stream2.recvCh)
+	wg.Wait()
+	if runErr1 != nil {
+		t.Fatalf("session1 RunProtoSession() error = %v", runErr1)
+	}
+	if runErr2 != nil {
+		t.Fatalf("session2 RunProtoSession() error = %v", runErr2)
+	}
+}
