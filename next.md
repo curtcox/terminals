@@ -1,1 +1,1 @@
-Clear PA receiver overlays on pa_system stop by relaying an empty global overlay patch to prior target devices, with transport tests.
+Deliver two-way stream routing updates for PA mode (if needed) and add explicit source/receiver UI transitions for pa_system start/stop via TransitionUI messages.

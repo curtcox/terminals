@@ -441,6 +441,85 @@ func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandPASystemStopClearsReceiverOverlays(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	router := io.NewRouter()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-3", DeviceName: "Office Display"},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-pa-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "pa_system",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command pa_system start) error = %v", err)
+	}
+	if router.RouteCount() != 2 {
+		t.Fatalf("route count after PA start = %d, want 2", router.RouteCount())
+	}
+
+	stopOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-pa-stop",
+			DeviceID:  "device-1",
+			Action:    CommandActionStop,
+			Kind:      "manual",
+			Intent:    "pa_system",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command pa_system stop) error = %v", err)
+	}
+	if router.RouteCount() != 0 {
+		t.Fatalf("route count after PA stop = %d, want 0", router.RouteCount())
+	}
+
+	clearsByTarget := map[string]bool{}
+	for _, msg := range stopOut {
+		if msg.UpdateUI == nil {
+			continue
+		}
+		if msg.UpdateUI.ComponentID != ui.GlobalOverlayComponentID {
+			continue
+		}
+		if msg.UpdateUI.Node.Type != "overlay" || msg.UpdateUI.Node.Props["id"] != ui.GlobalOverlayComponentID {
+			t.Fatalf("unexpected overlay clear patch payload: %+v", msg.UpdateUI.Node)
+		}
+		if len(msg.UpdateUI.Node.Children) != 0 {
+			t.Fatalf("expected empty overlay clear patch, got children=%d", len(msg.UpdateUI.Node.Children))
+		}
+		clearsByTarget[msg.RelayToDeviceID] = true
+	}
+	if !clearsByTarget["device-2"] || !clearsByTarget["device-3"] {
+		t.Fatalf("expected PA overlay clear relays to device-2 and device-3, got %+v", clearsByTarget)
+	}
+}
+
 func TestHandleMessageCommandManualTerminal(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

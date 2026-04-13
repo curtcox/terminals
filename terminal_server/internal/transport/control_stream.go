@@ -384,6 +384,10 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		if len(routeUpdates) > 0 {
 			postResponses = append(postResponses, routeUpdates...)
 		}
+		overlayClears := h.paOverlayClearsForCommand(msg.Command, commandResult, beforeRoutes)
+		if len(overlayClears) > 0 {
+			postResponses = append(postResponses, overlayClears...)
+		}
 		broadcastNotifications := h.broadcastNotificationsForCommand(msg.Command, commandResult, beforeBroadcastEvents)
 		if len(broadcastNotifications) > 0 {
 			postResponses = append(postResponses, broadcastNotifications...)
@@ -468,6 +472,52 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 				})
 			}
 		}
+	}
+	return out
+}
+
+func (h *StreamHandler) paOverlayClearsForCommand(
+	cmd *CommandRequest,
+	commandResult ServerMessage,
+	beforeRoutes []iorouter.Route,
+) []ServerMessage {
+	if cmd == nil {
+		return nil
+	}
+	if commandResult.ScenarioStop != "pa_system" {
+		return nil
+	}
+	if defaultAction(cmd.Action) != CommandActionStop {
+		return nil
+	}
+	sessionDeviceID := strings.TrimSpace(cmd.DeviceID)
+	targets := map[string]struct{}{}
+	for _, route := range beforeRoutes {
+		if route.StreamKind != "pa_audio" {
+			continue
+		}
+		if strings.TrimSpace(route.SourceID) != sessionDeviceID {
+			continue
+		}
+		targetID := strings.TrimSpace(route.TargetID)
+		if targetID == "" || targetID == sessionDeviceID {
+			continue
+		}
+		targets[targetID] = struct{}{}
+	}
+	if len(targets) == 0 {
+		return nil
+	}
+
+	out := make([]ServerMessage, 0, len(targets))
+	for targetID := range targets {
+		out = append(out, ServerMessage{
+			UpdateUI: &UIUpdate{
+				ComponentID: ui.GlobalOverlayComponentID,
+				Node:        ui.GlobalOverlaySlot(),
+			},
+			RelayToDeviceID: targetID,
+		})
 	}
 	return out
 }
