@@ -1,1 +1,1 @@
-Add wire integration coverage for terminal scenario transitions to assert terminal_enter and terminal_exit payloads are preserved through the wire adapter.
+Add generated/wire integration tests for the voice stop alias "stand down" to verify red_alert stop behavior and adapter-level scenario_stop payload preservation.

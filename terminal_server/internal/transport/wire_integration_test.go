@@ -122,6 +122,66 @@ func TestWireSessionSystemDataDeterministicOrder(t *testing.T) {
 	}
 }
 
+func TestWireSessionTerminalTransitions(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			WireClientMessage{Register: &WireRegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "terminal-start",
+				DeviceID:  "device-1",
+				Kind:      WireCommandKindManual,
+				Intent:    "terminal",
+			}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "terminal-stop",
+				DeviceID:  "device-1",
+				Action:    WireCommandActionStop,
+				Kind:      WireCommandKindManual,
+				Intent:    "terminal",
+			}},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, WireProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawEnter bool
+	var sawExit bool
+	for _, sent := range stream.sent {
+		msg, ok := sent.(WireServerMessage)
+		if !ok || msg.TransitionUI == nil {
+			continue
+		}
+		switch msg.TransitionUI.Transition {
+		case "terminal_enter":
+			sawEnter = true
+		case "terminal_exit":
+			sawExit = true
+		}
+	}
+	if !sawEnter {
+		t.Fatalf("expected terminal_enter transition payload")
+	}
+	if !sawExit {
+		t.Fatalf("expected terminal_exit transition payload")
+	}
+}
+
 func TestWireSessionIntercomEmitsRouteStream(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
