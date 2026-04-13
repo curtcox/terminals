@@ -83,3 +83,13 @@ func TestParseVoiceTriggerShowAllCamerasAlias(t *testing.T) {
 		t.Fatalf("Intent = %q, want multi window", got.Intent)
 	}
 }
+
+func TestParseVoiceTriggerPAStopAliases(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	for _, spoken := range []string{"end pa", "stop pa"} {
+		got := ParseVoiceTrigger("device-1", spoken, now)
+		if got.Intent != "pa system" {
+			t.Fatalf("spoken=%q intent = %q, want pa system", spoken, got.Intent)
+		}
+	}
+}

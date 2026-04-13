@@ -384,6 +384,10 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		if len(routeUpdates) > 0 {
 			postResponses = append(postResponses, routeUpdates...)
 		}
+		paTransitions := h.paTransitionsForCommand(msg.Command, commandResult, beforeRoutes, afterRoutes)
+		if len(paTransitions) > 0 {
+			postResponses = append(postResponses, paTransitions...)
+		}
 		overlayClears := h.paOverlayClearsForCommand(msg.Command, commandResult, beforeRoutes)
 		if len(overlayClears) > 0 {
 			postResponses = append(postResponses, overlayClears...)
@@ -515,6 +519,81 @@ func (h *StreamHandler) paOverlayClearsForCommand(
 			UpdateUI: &UIUpdate{
 				ComponentID: ui.GlobalOverlayComponentID,
 				Node:        ui.GlobalOverlaySlot(),
+			},
+			RelayToDeviceID: targetID,
+		})
+	}
+	return out
+}
+
+func (h *StreamHandler) paTransitionsForCommand(
+	cmd *CommandRequest,
+	commandResult ServerMessage,
+	beforeRoutes []iorouter.Route,
+	afterRoutes []iorouter.Route,
+) []ServerMessage {
+	if cmd == nil {
+		return nil
+	}
+	sourceID := strings.TrimSpace(cmd.DeviceID)
+	if sourceID == "" {
+		return nil
+	}
+
+	if commandResult.ScenarioStart == "pa_system" && defaultAction(cmd.Action) == CommandActionStart {
+		targets := paTargetsFromRoutes(afterRoutes, sourceID)
+		return paTransitionMessages(targets, "pa_source_enter", "pa_receive_enter")
+	}
+	if commandResult.ScenarioStop == "pa_system" && defaultAction(cmd.Action) == CommandActionStop {
+		targets := paTargetsFromRoutes(beforeRoutes, sourceID)
+		return paTransitionMessages(targets, "pa_source_exit", "pa_receive_exit")
+	}
+	return nil
+}
+
+func paTargetsFromRoutes(routes []iorouter.Route, sourceID string) []string {
+	set := map[string]struct{}{}
+	for _, route := range routes {
+		if route.StreamKind != "pa_audio" {
+			continue
+		}
+		if strings.TrimSpace(route.SourceID) != sourceID {
+			continue
+		}
+		targetID := strings.TrimSpace(route.TargetID)
+		if targetID == "" || targetID == sourceID {
+			continue
+		}
+		set[targetID] = struct{}{}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(set))
+	for targetID := range set {
+		out = append(out, targetID)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func paTransitionMessages(
+	targetIDs []string,
+	sourceTransition string,
+	receiverTransition string,
+) []ServerMessage {
+	out := make([]ServerMessage, 0, len(targetIDs)+1)
+	out = append(out, ServerMessage{
+		TransitionUI: &UITransition{
+			Transition: sourceTransition,
+			DurationMS: 180,
+		},
+	})
+	for _, targetID := range targetIDs {
+		out = append(out, ServerMessage{
+			TransitionUI: &UITransition{
+				Transition: receiverTransition,
+				DurationMS: 180,
 			},
 			RelayToDeviceID: targetID,
 		})

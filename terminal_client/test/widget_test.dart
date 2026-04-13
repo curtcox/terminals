@@ -285,6 +285,50 @@ void main() {
     expect(find.text('After'), findsOneWidget);
   });
 
+  testWidgets('maps PA transition hints to explicit animations',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'message'
+                ..text = (uiv1.TextWidget()..value = 'PA transition body'),
+            ))),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'pa_source_enter'
+          ..durationMs = 180),
+    );
+    await tester.pump();
+    expect(find.byType(ScaleTransition), findsWidgets);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'pa_receive_enter'
+          ..durationMs = 180),
+    );
+    await tester.pump();
+    expect(find.byType(SlideTransition), findsWidgets);
+  });
+
   testWidgets('renders grid, padding, and progress primitives',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));

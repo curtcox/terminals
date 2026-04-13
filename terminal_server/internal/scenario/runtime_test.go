@@ -111,6 +111,53 @@ func TestRuntimeStopVoiceTextStandDownStopsRedAlert(t *testing.T) {
 	}
 }
 
+func TestRuntimeStopVoiceTextEndPAStopsPASystem(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: &PASystemScenario{},
+		Priority: PriorityHigh,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"pa mode",
+		time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC),
+	); err != nil {
+		t.Fatalf("HandleVoiceText(pa mode) error = %v", err)
+	}
+	if router.RouteCount() != 1 {
+		t.Fatalf("route count after pa start = %d, want 1", router.RouteCount())
+	}
+
+	stopped, err := runtime.StopVoiceText(
+		context.Background(),
+		"d1",
+		"end pa",
+		time.Date(2026, 4, 11, 21, 1, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("StopVoiceText(end pa) error = %v", err)
+	}
+	if stopped != "pa_system" {
+		t.Fatalf("stopped scenario = %q, want pa_system", stopped)
+	}
+	if _, ok := engine.Active("d1"); ok {
+		t.Fatalf("expected no active scenario after end pa stop")
+	}
+}
+
 func TestRuntimeNoMatch(t *testing.T) {
 	runtime := NewRuntime(NewEngine(), &Environment{})
 	if _, err := runtime.HandleTrigger(context.Background(), Trigger{Intent: "unknown"}); err != ErrNoMatchingScenario {

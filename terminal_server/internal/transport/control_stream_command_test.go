@@ -89,6 +89,66 @@ func TestHandleMessageCommandVoice(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandVoiceStopPAAliases(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-pa-start",
+			DeviceID:  "device-1",
+			Kind:      "voice",
+			Text:      "pa mode",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command voice pa start) error = %v", err)
+	}
+
+	stopOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-pa-stop",
+			DeviceID:  "device-1",
+			Action:    CommandActionStop,
+			Kind:      "voice",
+			Text:      "end pa",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command voice pa stop) error = %v", err)
+	}
+
+	sawStop := false
+	for _, msg := range stopOut {
+		if msg.ScenarioStop == "pa_system" {
+			sawStop = true
+			break
+		}
+	}
+	if !sawStop {
+		t.Fatalf("expected pa_system scenario stop in voice stop output: %+v", stopOut)
+	}
+}
+
 func TestHandleMessageWebRTCSignalProducesRelayToPeer(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -416,6 +476,8 @@ func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
 	seenScenarioStart := false
 	seenRelay := map[string]bool{}
 	seenOverlayRelay := map[string]bool{}
+	seenReceiveEnter := map[string]bool{}
+	seenSourceEnter := false
 	for _, msg := range out {
 		if msg.ScenarioStart == "pa_system" {
 			seenScenarioStart = true
@@ -429,6 +491,14 @@ func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
 			msg.UpdateUI.Node.Props["id"] == ui.GlobalOverlayComponentID {
 			seenOverlayRelay[msg.RelayToDeviceID] = true
 		}
+		if msg.TransitionUI != nil {
+			if msg.TransitionUI.Transition == "pa_source_enter" && msg.RelayToDeviceID == "" {
+				seenSourceEnter = true
+			}
+			if msg.TransitionUI.Transition == "pa_receive_enter" {
+				seenReceiveEnter[msg.RelayToDeviceID] = true
+			}
+		}
 	}
 	if !seenScenarioStart {
 		t.Fatalf("expected pa_system scenario start in command output")
@@ -438,6 +508,12 @@ func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
 	}
 	if !seenOverlayRelay["device-2"] || !seenOverlayRelay["device-3"] {
 		t.Fatalf("expected PA overlay updates relayed to device-2 and device-3, got %+v", seenOverlayRelay)
+	}
+	if !seenSourceEnter {
+		t.Fatalf("expected local pa_source_enter transition")
+	}
+	if !seenReceiveEnter["device-2"] || !seenReceiveEnter["device-3"] {
+		t.Fatalf("expected pa_receive_enter transitions relayed to device-2 and device-3, got %+v", seenReceiveEnter)
 	}
 }
 
@@ -500,7 +576,17 @@ func TestHandleMessageCommandPASystemStopClearsReceiverOverlays(t *testing.T) {
 	}
 
 	clearsByTarget := map[string]bool{}
+	seenSourceExit := false
+	seenReceiveExit := map[string]bool{}
 	for _, msg := range stopOut {
+		if msg.TransitionUI != nil {
+			if msg.TransitionUI.Transition == "pa_source_exit" && msg.RelayToDeviceID == "" {
+				seenSourceExit = true
+			}
+			if msg.TransitionUI.Transition == "pa_receive_exit" {
+				seenReceiveExit[msg.RelayToDeviceID] = true
+			}
+		}
 		if msg.UpdateUI == nil {
 			continue
 		}
@@ -517,6 +603,12 @@ func TestHandleMessageCommandPASystemStopClearsReceiverOverlays(t *testing.T) {
 	}
 	if !clearsByTarget["device-2"] || !clearsByTarget["device-3"] {
 		t.Fatalf("expected PA overlay clear relays to device-2 and device-3, got %+v", clearsByTarget)
+	}
+	if !seenSourceExit {
+		t.Fatalf("expected local pa_source_exit transition")
+	}
+	if !seenReceiveExit["device-2"] || !seenReceiveExit["device-3"] {
+		t.Fatalf("expected pa_receive_exit transitions relayed to device-2 and device-3, got %+v", seenReceiveExit)
 	}
 }
 

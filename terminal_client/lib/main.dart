@@ -833,11 +833,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     switch (_activeTransition) {
       case 'fade':
         return FadeTransition(opacity: animation, child: child);
+      case 'pa_source_enter':
+        return ScaleTransition(scale: animation, child: child);
+      case 'pa_source_exit':
+        return FadeTransition(opacity: animation, child: child);
       case 'scale':
         return ScaleTransition(scale: animation, child: child);
       case 'slide':
       case 'slide_left':
       case 'slide-left':
+      case 'pa_receive_enter':
         return _buildSlideTransition(
           child: child,
           animation: animation,
@@ -859,6 +864,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         );
       case 'slide_down':
       case 'slide-down':
+      case 'pa_receive_exit':
         return _buildSlideTransition(
           child: child,
           animation: animation,
