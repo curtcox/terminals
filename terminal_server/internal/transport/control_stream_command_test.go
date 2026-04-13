@@ -134,6 +134,76 @@ func TestHandleMessageCommandManual(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandIntercomEmitsRouteStreams(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-intercom-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command intercom) error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[0].ScenarioStart != "intercom" {
+		t.Fatalf("ScenarioStart = %q, want intercom", out[0].ScenarioStart)
+	}
+	if out[1].RouteStream == nil {
+		t.Fatalf("expected route_stream response after intercom start")
+	}
+	if out[1].RouteStream.SourceDeviceID != "device-1" || out[1].RouteStream.TargetDeviceID != "device-2" {
+		t.Fatalf("unexpected route stream devices: %+v", out[1].RouteStream)
+	}
+	if out[1].RouteStream.Kind != "audio" {
+		t.Fatalf("route stream kind = %q, want audio", out[1].RouteStream.Kind)
+	}
+
+	// Starting intercom again should not emit duplicate route stream messages.
+	out, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-intercom-2",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command intercom duplicate) error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out duplicate) = %d, want 1", len(out))
+	}
+	if out[0].ScenarioStart != "intercom" {
+		t.Fatalf("duplicate ScenarioStart = %q, want intercom", out[0].ScenarioStart)
+	}
+}
+
 func TestHandleMessageCommandManualTerminal(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -409,11 +479,22 @@ func TestHandleMessageHeartbeatFlushesTerminalOutput(t *testing.T) {
 
 	time.Sleep(1200 * time.Millisecond)
 
-	heartbeatOut, err := handler.HandleMessage(context.Background(), ClientMessage{
-		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
-	})
-	if err != nil {
-		t.Fatalf("HandleMessage(heartbeat) error = %v", err)
+	var heartbeatOut []ServerMessage
+	var heartbeatValue string
+	for i := 0; i < 10; i++ {
+		heartbeatOut, err = handler.HandleMessage(context.Background(), ClientMessage{
+			Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+		})
+		if err != nil {
+			t.Fatalf("HandleMessage(heartbeat) error = %v", err)
+		}
+		if len(heartbeatOut) == 1 && heartbeatOut[0].UpdateUI != nil {
+			heartbeatValue = heartbeatOut[0].UpdateUI.Node.Props["value"]
+			if strings.Contains(heartbeatValue, "hb-delayed-42") {
+				break
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 	if len(heartbeatOut) != 1 || heartbeatOut[0].UpdateUI == nil {
 		t.Fatalf("expected UpdateUI from heartbeat flush, got %+v", heartbeatOut)
@@ -421,7 +502,9 @@ func TestHandleMessageHeartbeatFlushesTerminalOutput(t *testing.T) {
 	if heartbeatOut[0].UpdateUI.ComponentID != "terminal_output" {
 		t.Fatalf("update component_id = %q, want terminal_output", heartbeatOut[0].UpdateUI.ComponentID)
 	}
-	heartbeatValue := heartbeatOut[0].UpdateUI.Node.Props["value"]
+	if heartbeatValue == "" {
+		heartbeatValue = heartbeatOut[0].UpdateUI.Node.Props["value"]
+	}
 	if !strings.Contains(heartbeatValue, "hb-delayed-42") {
 		t.Fatalf("heartbeat output did not include delayed command result: %+v", heartbeatOut[0].UpdateUI.Node.Props)
 	}

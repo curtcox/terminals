@@ -55,6 +55,14 @@ type StreamReadyRequest struct {
 	StreamID string
 }
 
+// RouteStreamResponse instructs clients to establish or acknowledge media routing.
+type RouteStreamResponse struct {
+	StreamID       string
+	SourceDeviceID string
+	TargetDeviceID string
+	Kind           string
+}
+
 // InputRequest carries client input events relevant to active scenarios.
 type InputRequest struct {
 	DeviceID    string
@@ -91,6 +99,7 @@ type ServerMessage struct {
 	CommandAck    string
 	SetUI         *ui.Descriptor
 	UpdateUI      *UIUpdate
+	RouteStream   *RouteStreamResponse
 	TransitionUI  *UITransition
 	Notification  string
 	ScenarioStart string
@@ -268,6 +277,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			}
 			h.mu.Unlock()
 		}
+		beforeRoutes := h.routeSnapshotForDevice(msg.Command.DeviceID)
 		commandResult, err := h.handleCommand(ctx, msg.Command)
 		if err != nil {
 			h.metrics.commandErrors.Add(1)
@@ -308,6 +318,11 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.mu.Unlock()
 		}
 		postResponses := h.commandResponses(ctx, msg.Command, commandResult)
+		afterRoutes := h.routeSnapshotForDevice(msg.Command.DeviceID)
+		routeUpdates := h.routeUpdatesForCommand(msg.Command, commandResult, beforeRoutes, afterRoutes)
+		if len(routeUpdates) > 0 {
+			postResponses = append(postResponses, routeUpdates...)
+		}
 		return postResponses, nil
 	default:
 		h.metrics.protocolErrors.Add(1)
@@ -357,6 +372,68 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		},
 	})
 	return responses
+}
+
+func (h *StreamHandler) routeUpdatesForCommand(
+	cmd *CommandRequest,
+	commandResult ServerMessage,
+	before []iorouter.Route,
+	after []iorouter.Route,
+) []ServerMessage {
+	if cmd == nil {
+		return nil
+	}
+	if commandResult.ScenarioStart == "" {
+		return nil
+	}
+	action := defaultAction(cmd.Action)
+	if action != CommandActionStart {
+		return nil
+	}
+	if len(after) == 0 {
+		return nil
+	}
+	beforeSet := map[string]struct{}{}
+	for _, route := range before {
+		beforeSet[routeStreamID(route)] = struct{}{}
+	}
+	out := make([]ServerMessage, 0, len(after))
+	for _, route := range after {
+		routeID := routeStreamID(route)
+		if _, exists := beforeSet[routeID]; exists {
+			continue
+		}
+		out = append(out, ServerMessage{
+			RouteStream: &RouteStreamResponse{
+				StreamID:       routeID,
+				SourceDeviceID: route.SourceID,
+				TargetDeviceID: route.TargetID,
+				Kind:           route.StreamKind,
+			},
+		})
+	}
+	return out
+}
+
+func (h *StreamHandler) routeSnapshotForDevice(deviceID string) []iorouter.Route {
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+		return nil
+	}
+	routeProvider, ok := h.runtime.Env.IO.(interface {
+		RoutesForDevice(deviceID string) []iorouter.Route
+	})
+	if !ok {
+		return nil
+	}
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil
+	}
+	return routeProvider.RoutesForDevice(deviceID)
+}
+
+func routeStreamID(route iorouter.Route) string {
+	return "route:" + route.SourceID + "|" + route.TargetID + "|" + route.StreamKind
 }
 
 func (h *StreamHandler) commandTerminalRefresh(_ context.Context, cmd *CommandRequest) (ServerMessage, bool) {

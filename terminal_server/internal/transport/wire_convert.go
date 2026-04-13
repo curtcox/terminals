@@ -128,6 +128,14 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 			Node:        wireDescriptorFromUI(msg.UpdateUI.Node),
 		}
 	}
+	if msg.RouteStream != nil {
+		out.RouteStream = &WireRouteStream{
+			StreamID:       msg.RouteStream.StreamID,
+			SourceDeviceID: msg.RouteStream.SourceDeviceID,
+			TargetDeviceID: msg.RouteStream.TargetDeviceID,
+			Kind:           msg.RouteStream.Kind,
+		}
+	}
 	if msg.TransitionUI != nil {
 		out.TransitionUI = &uiWireTransition{
 			Transition: msg.TransitionUI.Transition,

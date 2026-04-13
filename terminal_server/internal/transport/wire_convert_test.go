@@ -35,6 +35,12 @@ func TestWireFromInternalServer(t *testing.T) {
 				Props: map[string]string{"value": "patched"},
 			},
 		},
+		RouteStream: &RouteStreamResponse{
+			StreamID:       "route:d1|d2|audio",
+			SourceDeviceID: "d1",
+			TargetDeviceID: "d2",
+			Kind:           "audio",
+		},
 		TransitionUI: &UITransition{
 			Transition: "fade",
 			DurationMS: 150,
@@ -60,6 +66,12 @@ func TestWireFromInternalServer(t *testing.T) {
 	}
 	if wire.UpdateUI.Node.Type != "text" || DecodeDataEntries(wire.UpdateUI.Node.Props)["value"] != "patched" {
 		t.Fatalf("unexpected update_ui node mapping: %+v", wire.UpdateUI.Node)
+	}
+	if wire.RouteStream == nil || wire.RouteStream.StreamID != "route:d1|d2|audio" {
+		t.Fatalf("unexpected route_stream mapping: %+v", wire.RouteStream)
+	}
+	if wire.RouteStream.SourceDeviceID != "d1" || wire.RouteStream.TargetDeviceID != "d2" || wire.RouteStream.Kind != "audio" {
+		t.Fatalf("unexpected route_stream fields: %+v", wire.RouteStream)
 	}
 	if wire.TransitionUI == nil || wire.TransitionUI.Transition != "fade" || wire.TransitionUI.DurationMS != 150 {
 		t.Fatalf("unexpected transition_ui mapping: %+v", wire.TransitionUI)

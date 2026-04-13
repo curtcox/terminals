@@ -3,9 +3,12 @@ package scenario
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
+
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 )
 
 // AlertScenario broadcasts a critical alert across targeted devices.
@@ -378,7 +381,7 @@ func (s *MultiWindowScenario) Start(ctx context.Context, env *Environment) error
 			if peer == "" || peer == source {
 				continue
 			}
-			if err := env.IO.Connect(peer, source, "video"); err != nil {
+			if err := env.IO.Connect(peer, source, "video"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 				return err
 			}
 		}
@@ -422,7 +425,7 @@ func connectSourceToPeers(_ context.Context, env *Environment, sourceID, streamK
 		if targetID == "" || targetID == sourceID {
 			continue
 		}
-		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil {
+		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 			return err
 		}
 	}

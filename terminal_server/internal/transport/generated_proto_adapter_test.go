@@ -235,6 +235,37 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	}
 
 	envelope, err = adapter.FromInternal(ServerMessage{
+		RouteStream: &RouteStreamResponse{
+			StreamID:       "route:d1|d2|audio",
+			SourceDeviceID: "d1",
+			TargetDeviceID: "d2",
+			Kind:           "audio",
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() route_stream error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("route_stream envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if resp.GetRouteStream() == nil {
+		t.Fatalf("expected route_stream payload")
+	}
+	if got := resp.GetRouteStream().GetStreamId(); got != "route:d1|d2|audio" {
+		t.Fatalf("route_stream stream_id = %q, want route:d1|d2|audio", got)
+	}
+	if got := resp.GetRouteStream().GetSourceDeviceId(); got != "d1" {
+		t.Fatalf("route_stream source_device_id = %q, want d1", got)
+	}
+	if got := resp.GetRouteStream().GetTargetDeviceId(); got != "d2" {
+		t.Fatalf("route_stream target_device_id = %q, want d2", got)
+	}
+	if got := resp.GetRouteStream().GetKind(); got != "audio" {
+		t.Fatalf("route_stream kind = %q, want audio", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
 		TransitionUI: &UITransition{
 			Transition: "fade",
 			DurationMS: 250,

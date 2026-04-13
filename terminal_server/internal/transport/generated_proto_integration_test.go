@@ -243,3 +243,65 @@ func TestGeneratedSessionTerminalTransitions(t *testing.T) {
 		t.Fatalf("expected terminal_exit transition payload")
 	}
 }
+
+func TestGeneratedSessionIntercomEmitsRouteStream(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "device-1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "intercom-start",
+						DeviceId:  "device-1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
+						Intent:    "intercom",
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawRoute bool
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok || resp.GetRouteStream() == nil {
+			continue
+		}
+		if resp.GetRouteStream().GetSourceDeviceId() == "device-1" &&
+			resp.GetRouteStream().GetTargetDeviceId() == "device-2" &&
+			resp.GetRouteStream().GetKind() == "audio" {
+			sawRoute = true
+		}
+	}
+	if !sawRoute {
+		t.Fatalf("expected route_stream payload for intercom start")
+	}
+}

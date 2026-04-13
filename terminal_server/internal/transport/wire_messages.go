@@ -119,8 +119,17 @@ type WireServerMessage struct {
 	CommandResult *WireCommandResult
 	SetUI         *uiWireDescriptor
 	UpdateUI      *uiWireUpdate
+	RouteStream   *WireRouteStream
 	TransitionUI  *uiWireTransition
 	Error         *WireControlError
+}
+
+// WireRouteStream is a protobuf-adapter-friendly route stream payload.
+type WireRouteStream struct {
+	StreamID       string
+	SourceDeviceID string
+	TargetDeviceID string
+	Kind           string
 }
 
 // uiWireDescriptor is a compact wire representation for UI descriptors.

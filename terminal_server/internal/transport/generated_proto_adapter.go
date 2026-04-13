@@ -7,6 +7,7 @@ import (
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	uiv1 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
@@ -138,6 +139,17 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 				UpdateUi: &uiv1.UpdateUI{
 					ComponentId: msg.UpdateUI.ComponentID,
 					Node:        descriptorToUINode(msg.UpdateUI.Node),
+				},
+			},
+		}
+	case msg.RouteStream != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_RouteStream{
+				RouteStream: &iov1.RouteStream{
+					StreamId:       msg.RouteStream.StreamID,
+					SourceDeviceId: msg.RouteStream.SourceDeviceID,
+					TargetDeviceId: msg.RouteStream.TargetDeviceID,
+					Kind:           msg.RouteStream.Kind,
 				},
 			},
 		}
