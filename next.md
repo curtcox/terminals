@@ -1,1 +1,1 @@
-Implement periodic sensor telemetry reporting from terminal_client (baseline battery/connectivity/time values) via ConnectRequest.sensor and validate server runtime/device status reflects live updates.
+Surface client telemetry health in UI: show last sensor send time, sensor send count, and stream-ready ack count to support manual validation workflows.

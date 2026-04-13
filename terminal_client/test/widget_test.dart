@@ -36,6 +36,34 @@ void main() {
     expect(requests.where((r) => r.hasRegister()).length, 1);
   });
 
+  testWidgets('sends periodic sensor telemetry while connected', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        heartbeatInterval: const Duration(seconds: 60),
+        sensorTelemetryInterval: const Duration(milliseconds: 40),
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 140));
+
+    final requests = harness.lastClient.requests;
+    final sensorRequests = requests.where((r) => r.hasSensor()).toList();
+    expect(sensorRequests.length, greaterThanOrEqualTo(2));
+    expect(
+      sensorRequests.every((request) =>
+          request.sensor.values.containsKey('battery.level') &&
+          request.sensor.values.containsKey('connectivity.online') &&
+          request.sensor.values.containsKey('time.utc_hour')),
+      isTrue,
+    );
+  });
+
   testWidgets('reconnect creates a new control client after stream failure', (
     WidgetTester tester,
   ) async {

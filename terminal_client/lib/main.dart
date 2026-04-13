@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
@@ -34,12 +35,14 @@ class TerminalClientApp extends StatelessWidget {
     super.key,
     this.clientFactory = TerminalControlGrpcClient.new,
     this.heartbeatInterval = const Duration(seconds: 10),
+    this.sensorTelemetryInterval = const Duration(seconds: 15),
     this.reconnectDelayBase = const Duration(seconds: 2),
     this.reconnectDelayMaxSeconds = 30,
   });
 
   final TerminalControlClientFactory clientFactory;
   final Duration heartbeatInterval;
+  final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
   final int reconnectDelayMaxSeconds;
 
@@ -50,6 +53,7 @@ class TerminalClientApp extends StatelessWidget {
       home: _ControlStreamScaffold(
         clientFactory: clientFactory,
         heartbeatInterval: heartbeatInterval,
+        sensorTelemetryInterval: sensorTelemetryInterval,
         reconnectDelayBase: reconnectDelayBase,
         reconnectDelayMaxSeconds: reconnectDelayMaxSeconds,
       ),
@@ -61,12 +65,14 @@ class _ControlStreamScaffold extends StatefulWidget {
   const _ControlStreamScaffold({
     required this.clientFactory,
     required this.heartbeatInterval,
+    required this.sensorTelemetryInterval,
     required this.reconnectDelayBase,
     required this.reconnectDelayMaxSeconds,
   });
 
   final TerminalControlClientFactory clientFactory;
   final Duration heartbeatInterval;
+  final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
   final int reconnectDelayMaxSeconds;
 
@@ -111,6 +117,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   List<DiscoveredServer> _discoveredServers = [];
   String? _selectedDiscoveredServer;
   Timer? _heartbeatTimer;
+  Timer? _sensorTimer;
   Timer? _reconnectTimer;
   bool _shouldStayConnected = false;
   bool _isConnecting = false;
@@ -219,6 +226,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       );
 
       _startHeartbeatLoop();
+      _startSensorTelemetryLoop();
       _outgoing.add(
         TerminalControlGrpcClient.registerRequest(
           deviceId: _deviceId,
@@ -237,6 +245,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           unixMs: DateTime.now().millisecondsSinceEpoch,
         ),
       );
+      _outgoing.add(_buildSensorTelemetryRequest());
     } catch (error) {
       await _handleStreamClosed('Connection error: $error');
     } finally {
@@ -259,9 +268,42 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     });
   }
 
+  void _startSensorTelemetryLoop() {
+    _sensorTimer?.cancel();
+    _sensorTimer = Timer.periodic(widget.sensorTelemetryInterval, (_) {
+      if (!_shouldStayConnected || _deviceId.isEmpty) {
+        return;
+      }
+      _outgoing.add(_buildSensorTelemetryRequest());
+    });
+  }
+
+  ConnectRequest _buildSensorTelemetryRequest() {
+    final now = DateTime.now().toUtc();
+    final values = <String, double>{
+      'battery.level': 1.0,
+      'battery.charging': 1.0,
+      'connectivity.online': 1.0,
+      'connectivity.reconnect_attempt': _reconnectAttempt.toDouble(),
+      'time.utc_hour': now.hour.toDouble(),
+      'time.utc_weekday': now.weekday.toDouble(),
+      'time.utc_minute': now.minute.toDouble(),
+    };
+    return ConnectRequest()
+      ..sensor = (iov1.SensorData()
+        ..deviceId = _deviceId
+        ..unixMs = Int64(now.millisecondsSinceEpoch)
+        ..values.addAll(values));
+  }
+
   void _stopHeartbeatLoop() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+  }
+
+  void _stopSensorTelemetryLoop() {
+    _sensorTimer?.cancel();
+    _sensorTimer = null;
   }
 
   void _cancelReconnectTimer() {
@@ -271,6 +313,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
 
   Future<void> _handleStreamClosed(String status) async {
     _stopHeartbeatLoop();
+    _stopSensorTelemetryLoop();
     _incoming = null;
     final existingClient = _client;
     _client = null;
@@ -371,6 +414,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _reconnectAttempt = 0;
     _cancelReconnectTimer();
     _stopHeartbeatLoop();
+    _stopSensorTelemetryLoop();
     await _incoming?.cancel();
     _incoming = null;
     final existingClient = _client;
@@ -391,6 +435,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _shouldStayConnected = false;
     _cancelReconnectTimer();
     _stopHeartbeatLoop();
+    _stopSensorTelemetryLoop();
     final incoming = _incoming;
     if (incoming != null) {
       unawaited(incoming.cancel());
