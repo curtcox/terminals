@@ -158,6 +158,17 @@ type StreamHandler struct {
 	terminalReadDeadline   time.Duration
 	terminalReadInterval   time.Duration
 	terminalUIInterval     time.Duration
+
+	mediaStreams map[string]mediaStreamState
+}
+
+type mediaStreamState struct {
+	StreamID       string
+	Kind           string
+	SourceDeviceID string
+	TargetDeviceID string
+	Metadata       map[string]string
+	Ready          bool
 }
 
 const (
@@ -195,6 +206,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalReadDeadline:   defaultTerminalReadDeadline,
 		terminalReadInterval:   defaultTerminalReadInterval,
 		terminalUIInterval:     defaultTerminalUIInterval,
+		mediaStreams:           map[string]mediaStreamState{},
 	}
 }
 
@@ -217,6 +229,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalReadDeadline:   defaultTerminalReadDeadline,
 		terminalReadInterval:   defaultTerminalReadInterval,
 		terminalUIInterval:     defaultTerminalUIInterval,
+		mediaStreams:           map[string]mediaStreamState{},
 	}
 }
 
@@ -263,6 +276,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		return nil, nil
 	case msg.StreamReady != nil:
 		h.metrics.streamReadyReceived.Add(1)
+		h.markStreamReady(msg.StreamReady.StreamID)
 		return nil, nil
 	case msg.Input != nil:
 		out, err := h.handleInput(ctx, msg.Input)
@@ -435,6 +449,15 @@ func (h *StreamHandler) routeUpdatesForCommand(
 					},
 				},
 			})
+			h.registerMediaStream(StartStreamResponse{
+				StreamID:       routeID,
+				Kind:           route.StreamKind,
+				SourceDeviceID: route.SourceID,
+				TargetDeviceID: route.TargetID,
+				Metadata: map[string]string{
+					"origin": "route_delta",
+				},
+			})
 			out = append(out, ServerMessage{
 				RouteStream: &RouteStreamResponse{
 					StreamID:       routeID,
@@ -456,6 +479,7 @@ func (h *StreamHandler) routeUpdatesForCommand(
 					StreamID: routeID,
 				},
 			})
+			h.unregisterMediaStream(routeID)
 		}
 	}
 	return out
@@ -480,6 +504,91 @@ func (h *StreamHandler) routeSnapshotForDevice(deviceID string) []iorouter.Route
 
 func routeStreamID(route iorouter.Route) string {
 	return "route:" + route.SourceID + "|" + route.TargetID + "|" + route.StreamKind
+}
+
+func (h *StreamHandler) registerMediaStream(start StartStreamResponse) {
+	streamID := strings.TrimSpace(start.StreamID)
+	if streamID == "" {
+		return
+	}
+	metadata := map[string]string{}
+	for k, v := range start.Metadata {
+		metadata[k] = v
+	}
+	h.mu.Lock()
+	h.mediaStreams[streamID] = mediaStreamState{
+		StreamID:       streamID,
+		Kind:           start.Kind,
+		SourceDeviceID: start.SourceDeviceID,
+		TargetDeviceID: start.TargetDeviceID,
+		Metadata:       metadata,
+		Ready:          false,
+	}
+	h.mu.Unlock()
+}
+
+func (h *StreamHandler) unregisterMediaStream(streamID string) {
+	streamID = strings.TrimSpace(streamID)
+	if streamID == "" {
+		return
+	}
+	h.mu.Lock()
+	delete(h.mediaStreams, streamID)
+	h.mu.Unlock()
+}
+
+func (h *StreamHandler) markStreamReady(streamID string) {
+	streamID = strings.TrimSpace(streamID)
+	if streamID == "" {
+		return
+	}
+	h.mu.Lock()
+	state, ok := h.mediaStreams[streamID]
+	if !ok {
+		state = mediaStreamState{
+			StreamID: streamID,
+			Kind:     "unknown",
+		}
+	}
+	state.Ready = true
+	h.mediaStreams[streamID] = state
+	h.mu.Unlock()
+}
+
+func (h *StreamHandler) mediaStreamStatusData() map[string]string {
+	h.mu.Lock()
+	streams := make([]mediaStreamState, 0, len(h.mediaStreams))
+	for _, state := range h.mediaStreams {
+		streams = append(streams, state)
+	}
+	h.mu.Unlock()
+
+	sort.Slice(streams, func(i, j int) bool {
+		return streams[i].StreamID < streams[j].StreamID
+	})
+
+	ready := 0
+	details := make([]string, 0, len(streams))
+	for _, state := range streams {
+		if state.Ready {
+			ready++
+		}
+		details = append(details, fmt.Sprintf(
+			"%s|%s|%s->%s|ready=%t",
+			state.StreamID,
+			state.Kind,
+			state.SourceDeviceID,
+			state.TargetDeviceID,
+			state.Ready,
+		))
+	}
+
+	return map[string]string{
+		"media_streams_active":  strconv.Itoa(len(streams)),
+		"media_streams_ready":   strconv.Itoa(ready),
+		"media_streams_pending": strconv.Itoa(len(streams) - ready),
+		"media_streams":         strings.Join(details, ";"),
+	}
 }
 
 func (h *StreamHandler) disconnectScenarioRoutes(deviceID, scenarioName string) {
@@ -1046,6 +1155,9 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			for k, v := range h.runtime.StatusData() {
 				data[k] = v
 			}
+		}
+		for k, v := range h.mediaStreamStatusData() {
+			data[k] = v
 		}
 		return ServerMessage{
 			Notification: "System query: runtime_status",

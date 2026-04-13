@@ -1,1 +1,1 @@
-Implement server-side media stream registry in transport: track StartStream lifecycles via StreamReady/StopStream and expose active stream metadata through system_runtime_status data.
+Persist latest sensor telemetry per device in transport and expose summarized sensor metadata via system_device_status and system_runtime_status responses.

@@ -1461,6 +1461,143 @@ func TestHandleMessageSystemRuntimeStatus(t *testing.T) {
 	if out[0].Data["pending_timers"] == "" {
 		t.Fatalf("expected pending_timers in runtime_status")
 	}
+	if out[0].Data["media_streams_active"] != "0" {
+		t.Fatalf("media_streams_active = %q, want 0", out[0].Data["media_streams_active"])
+	}
+	if out[0].Data["media_streams_ready"] != "0" {
+		t.Fatalf("media_streams_ready = %q, want 0", out[0].Data["media_streams_ready"])
+	}
+	if out[0].Data["media_streams_pending"] != "0" {
+		t.Fatalf("media_streams_pending = %q, want 0", out[0].Data["media_streams_pending"])
+	}
+}
+
+func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	routes := io.NewRouter()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+		IO:      routes,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+
+	startOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "intercom-start-runtime-status",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("intercom start error = %v", err)
+	}
+	streamID := ""
+	for _, msg := range startOut {
+		if msg.StartStream != nil {
+			streamID = msg.StartStream.StreamID
+			break
+		}
+	}
+	if streamID == "" {
+		t.Fatalf("expected start_stream message in start output")
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-runtime-pre-ready",
+			Kind:      "system",
+			Intent:    "runtime_status",
+		},
+	})
+	if err != nil {
+		t.Fatalf("runtime_status pre-ready error = %v", err)
+	}
+	if out[0].Data["media_streams_active"] != "1" {
+		t.Fatalf("media_streams_active pre-ready = %q, want 1", out[0].Data["media_streams_active"])
+	}
+	if out[0].Data["media_streams_ready"] != "0" {
+		t.Fatalf("media_streams_ready pre-ready = %q, want 0", out[0].Data["media_streams_ready"])
+	}
+	if out[0].Data["media_streams_pending"] != "1" {
+		t.Fatalf("media_streams_pending pre-ready = %q, want 1", out[0].Data["media_streams_pending"])
+	}
+
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		StreamReady: &StreamReadyRequest{StreamID: streamID},
+	})
+	if err != nil {
+		t.Fatalf("stream_ready error = %v", err)
+	}
+
+	out, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-runtime-ready",
+			Kind:      "system",
+			Intent:    "runtime_status",
+		},
+	})
+	if err != nil {
+		t.Fatalf("runtime_status ready error = %v", err)
+	}
+	if out[0].Data["media_streams_active"] != "1" {
+		t.Fatalf("media_streams_active ready = %q, want 1", out[0].Data["media_streams_active"])
+	}
+	if out[0].Data["media_streams_ready"] != "1" {
+		t.Fatalf("media_streams_ready = %q, want 1", out[0].Data["media_streams_ready"])
+	}
+	if out[0].Data["media_streams_pending"] != "0" {
+		t.Fatalf("media_streams_pending ready = %q, want 0", out[0].Data["media_streams_pending"])
+	}
+	if !strings.Contains(out[0].Data["media_streams"], "ready=true") {
+		t.Fatalf("media_streams details should contain ready=true, got %q", out[0].Data["media_streams"])
+	}
+
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "intercom-stop-runtime-status",
+			DeviceID:  "device-1",
+			Action:    CommandActionStop,
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("intercom stop error = %v", err)
+	}
+
+	out, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-runtime-post-stop",
+			Kind:      "system",
+			Intent:    "runtime_status",
+		},
+	})
+	if err != nil {
+		t.Fatalf("runtime_status post-stop error = %v", err)
+	}
+	if out[0].Data["media_streams_active"] != "0" {
+		t.Fatalf("media_streams_active post-stop = %q, want 0", out[0].Data["media_streams_active"])
+	}
+	if out[0].Data["media_streams_ready"] != "0" {
+		t.Fatalf("media_streams_ready post-stop = %q, want 0", out[0].Data["media_streams_ready"])
+	}
+	if out[0].Data["media_streams_pending"] != "0" {
+		t.Fatalf("media_streams_pending post-stop = %q, want 0", out[0].Data["media_streams_pending"])
+	}
+	if out[0].Data["media_streams"] != "" {
+		t.Fatalf("media_streams post-stop = %q, want empty", out[0].Data["media_streams"])
+	}
 }
 
 func TestHandleMessageSystemScenarioRegistry(t *testing.T) {
