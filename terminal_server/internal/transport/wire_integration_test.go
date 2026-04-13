@@ -944,3 +944,63 @@ func TestWireSessionWebRTCSignalRelayAcrossSessions(t *testing.T) {
 		t.Fatalf("session2 RunProtoSession() error = %v", runErr2)
 	}
 }
+
+func TestWireSessionVoiceStandDownStopsRedAlert(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			WireClientMessage{Register: &WireRegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "red-alert-start",
+				DeviceID:  "device-1",
+				Kind:      WireCommandKindVoice,
+				Text:      "red alert",
+			}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "red-alert-stop-stand-down",
+				DeviceID:  "device-1",
+				Action:    WireCommandActionStop,
+				Kind:      WireCommandKindVoice,
+				Text:      "stand down",
+			}},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, WireProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawStart bool
+	var sawStop bool
+	for _, sent := range stream.sent {
+		msg, ok := sent.(WireServerMessage)
+		if !ok || msg.CommandResult == nil {
+			continue
+		}
+		switch {
+		case msg.CommandResult.ScenarioStart == "red_alert":
+			sawStart = true
+		case msg.CommandResult.ScenarioStop == "red_alert":
+			sawStop = true
+		}
+	}
+	if !sawStart {
+		t.Fatalf("expected scenario_start=red_alert command result")
+	}
+	if !sawStop {
+		t.Fatalf("expected scenario_stop=red_alert command result via stand down")
+	}
+}
