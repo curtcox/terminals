@@ -1,1 +1,1 @@
-Add generated/wire integration tests for voice start alias "pa mode" to verify adapter-level pa_system scenario_start payload preservation.
+Add generated/wire integration tests for voice alias "show all cameras" to verify adapter-level multi_window scenario_start payload preservation.
