@@ -1,1 +1,1 @@
-Add dual-session generated/wire integration tests that assert relayed start_stream metadata (origin=route_delta) is preserved for peer sessions.
+Add wire integration coverage for terminal scenario transitions to assert terminal_enter and terminal_exit payloads are preserved through the wire adapter.

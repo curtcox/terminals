@@ -485,11 +485,15 @@ func TestGeneratedSessionIntercomFanOutRelaysMediaToPeerSession(t *testing.T) {
 		"route:d2|d1|audio": false,
 	}
 	startSeen := map[string]bool{}
+	startMetadataSeen := map[string]bool{}
 	routeSeen := map[string]bool{}
 	waitFor("peer intercom start+route fan-out", stream2.sentCh, func(resp *controlv1.ConnectResponse) bool {
 		if start := resp.GetStartStream(); start != nil {
 			if _, ok := expected[start.GetStreamId()]; ok {
 				startSeen[start.GetStreamId()] = true
+				if start.GetMetadata()["origin"] == "route_delta" {
+					startMetadataSeen[start.GetStreamId()] = true
+				}
 			}
 		}
 		if route := resp.GetRouteStream(); route != nil {
@@ -498,7 +502,7 @@ func TestGeneratedSessionIntercomFanOutRelaysMediaToPeerSession(t *testing.T) {
 			}
 		}
 		for streamID := range expected {
-			if !startSeen[streamID] || !routeSeen[streamID] {
+			if !startSeen[streamID] || !startMetadataSeen[streamID] || !routeSeen[streamID] {
 				return false
 			}
 		}
