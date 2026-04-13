@@ -1111,3 +1111,50 @@ func TestWireSessionVoicePAModeStartsPASystem(t *testing.T) {
 		t.Fatalf("expected scenario_start=pa_system command result via pa mode")
 	}
 }
+
+func TestWireSessionVoiceShowAllCamerasStartsMultiWindow(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			WireClientMessage{Register: &WireRegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "show-all-cameras-start",
+				DeviceID:  "device-1",
+				Kind:      WireCommandKindVoice,
+				Text:      "show all cameras",
+			}},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, WireProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawStart bool
+	for _, sent := range stream.sent {
+		msg, ok := sent.(WireServerMessage)
+		if !ok || msg.CommandResult == nil {
+			continue
+		}
+		if msg.CommandResult.ScenarioStart == "multi_window" {
+			sawStart = true
+			break
+		}
+	}
+	if !sawStart {
+		t.Fatalf("expected scenario_start=multi_window command result via show all cameras")
+	}
+}
