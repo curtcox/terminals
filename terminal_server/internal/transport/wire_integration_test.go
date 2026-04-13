@@ -627,3 +627,134 @@ func TestWireSessionRedAlertRelaysBroadcastNotification(t *testing.T) {
 		t.Fatalf("session2 RunProtoSession() error = %v", runErr2)
 	}
 }
+
+func TestWireSessionPASystemVoiceStopAliasesRelayCleanup(t *testing.T) {
+	for _, spoken := range []string{"end pa", "stop pa"} {
+		t.Run(spoken, func(t *testing.T) {
+			globalSessionRelayRegistry = newSessionRelayRegistry()
+			t.Cleanup(func() {
+				globalSessionRelayRegistry = newSessionRelayRegistry()
+			})
+
+			devices := device.NewManager()
+			control := NewControlService("srv-1", devices)
+			engine := scenario.NewEngine()
+			scenario.RegisterBuiltins(engine)
+			runtime := scenario.NewRuntime(engine, &scenario.Environment{
+				Devices:   devices,
+				IO:        io.NewRouter(),
+				Storage:   storage.NewMemoryStore(),
+				Scheduler: storage.NewMemoryScheduler(),
+				Telephony: telephony.NoopBridge{},
+				Broadcast: ui.NewMemoryBroadcaster(),
+			})
+
+			stream1 := &asyncFakeProtoStream{
+				ctx:    context.Background(),
+				recvCh: make(chan ProtoClientEnvelope, 8),
+				sentCh: make(chan ProtoServerEnvelope, 24),
+			}
+			stream2 := &asyncFakeProtoStream{
+				ctx:    context.Background(),
+				recvCh: make(chan ProtoClientEnvelope, 8),
+				sentCh: make(chan ProtoServerEnvelope, 24),
+			}
+
+			var wg sync.WaitGroup
+			wg.Add(2)
+			var runErr1 error
+			var runErr2 error
+			go func() {
+				defer wg.Done()
+				runErr1 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream1, WireProtoAdapter{})
+			}()
+			go func() {
+				defer wg.Done()
+				runErr2 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream2, WireProtoAdapter{})
+			}()
+
+			waitFor := func(label string, ch <-chan ProtoServerEnvelope, pred func(WireServerMessage) bool) {
+				deadline := time.After(2 * time.Second)
+				for {
+					select {
+					case env := <-ch:
+						msg, ok := env.(WireServerMessage)
+						if !ok {
+							t.Fatalf("unexpected envelope type %T", env)
+						}
+						if pred(msg) {
+							return
+						}
+					case <-deadline:
+						t.Fatalf("timed out waiting for %s", label)
+					}
+				}
+			}
+
+			stream1.recvCh <- WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}}
+			stream2.recvCh <- WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d2", DeviceName: "Hall"}}
+			for i := 0; i < 2; i++ {
+				<-stream1.sentCh
+				<-stream2.sentCh
+			}
+
+			stream1.recvCh <- WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "pa-start",
+				DeviceID:  "d1",
+				Kind:      WireCommandKindManual,
+				Intent:    "pa_system",
+			}}
+
+			waitFor("source pa start", stream1.sentCh, func(msg WireServerMessage) bool {
+				return msg.CommandResult != nil && msg.CommandResult.ScenarioStart == "pa_system"
+			})
+			waitFor("peer pa start route", stream2.sentCh, func(msg WireServerMessage) bool {
+				return msg.StartStream != nil && msg.StartStream.StreamID == "route:d1|d2|pa_audio"
+			})
+
+			stream1.recvCh <- WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "pa-stop-voice",
+				DeviceID:  "d1",
+				Action:    WireCommandActionStop,
+				Kind:      WireCommandKindVoice,
+				Text:      spoken,
+			}}
+
+			waitFor("source pa stop via voice alias", stream1.sentCh, func(msg WireServerMessage) bool {
+				return msg.CommandResult != nil && msg.CommandResult.ScenarioStop == "pa_system"
+			})
+			waitFor("source pa source_exit transition", stream1.sentCh, func(msg WireServerMessage) bool {
+				return msg.TransitionUI != nil && msg.TransitionUI.Transition == "pa_source_exit"
+			})
+
+			peerStopSeen := false
+			peerOverlayClearSeen := false
+			peerReceiveExitSeen := false
+			waitFor("peer pa stop cleanup relays", stream2.sentCh, func(msg WireServerMessage) bool {
+				if stop := msg.StopStream; stop != nil && stop.StreamID == "route:d1|d2|pa_audio" {
+					peerStopSeen = true
+				}
+				if update := msg.UpdateUI; update != nil && update.ComponentID == ui.GlobalOverlayComponentID {
+					nodeProps := DecodeDataEntries(update.Node.Props)
+					if nodeProps["id"] == ui.GlobalOverlayComponentID && len(update.Node.Children) == 0 {
+						peerOverlayClearSeen = true
+					}
+				}
+				if transition := msg.TransitionUI; transition != nil && transition.Transition == "pa_receive_exit" {
+					peerReceiveExitSeen = true
+				}
+				return peerStopSeen && peerOverlayClearSeen && peerReceiveExitSeen
+			})
+
+			close(stream1.recvCh)
+			close(stream2.recvCh)
+			wg.Wait()
+			if runErr1 != nil {
+				t.Fatalf("session1 RunProtoSession() error = %v", runErr1)
+			}
+			if runErr2 != nil {
+				t.Fatalf("session2 RunProtoSession() error = %v", runErr2)
+			}
+		})
+	}
+}
