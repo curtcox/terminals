@@ -1470,6 +1470,18 @@ func TestHandleMessageSystemRuntimeStatus(t *testing.T) {
 	if out[0].Data["media_streams_pending"] != "0" {
 		t.Fatalf("media_streams_pending = %q, want 0", out[0].Data["media_streams_pending"])
 	}
+	if out[0].Data["sensor_devices_reporting"] != "0" {
+		t.Fatalf("sensor_devices_reporting = %q, want 0", out[0].Data["sensor_devices_reporting"])
+	}
+	if out[0].Data["sensor_latest_unix_ms"] != "0" {
+		t.Fatalf("sensor_latest_unix_ms = %q, want 0", out[0].Data["sensor_latest_unix_ms"])
+	}
+	if out[0].Data["sensor_device_ids"] != "" {
+		t.Fatalf("sensor_device_ids = %q, want empty", out[0].Data["sensor_device_ids"])
+	}
+	if out[0].Data["sensor_summaries"] != "" {
+		t.Fatalf("sensor_summaries = %q, want empty", out[0].Data["sensor_summaries"])
+	}
 }
 
 func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T) {
@@ -1874,6 +1886,16 @@ func TestHandleMessageSystemDeviceStatus(t *testing.T) {
 			},
 		},
 	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Sensor: &SensorDataRequest{
+			DeviceID: "device-1",
+			UnixMS:   1713000000000,
+			Values: map[string]float64{
+				"accelerometer.x": 0.25,
+				"accelerometer.y": -0.75,
+			},
+		},
+	})
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		Command: &CommandRequest{
 			RequestID: "sys-device-1",
@@ -1889,6 +1911,73 @@ func TestHandleMessageSystemDeviceStatus(t *testing.T) {
 	}
 	if out[0].Data["cap.screen.width"] != "1920" {
 		t.Fatalf("cap.screen.width = %q, want 1920", out[0].Data["cap.screen.width"])
+	}
+	if out[0].Data["sensor.unix_ms"] != "1713000000000" {
+		t.Fatalf("sensor.unix_ms = %q, want 1713000000000", out[0].Data["sensor.unix_ms"])
+	}
+	if out[0].Data["sensor.accelerometer.x"] != "0.25" {
+		t.Fatalf("sensor.accelerometer.x = %q, want 0.25", out[0].Data["sensor.accelerometer.x"])
+	}
+	if out[0].Data["sensor.accelerometer.y"] != "-0.75" {
+		t.Fatalf("sensor.accelerometer.y = %q, want -0.75", out[0].Data["sensor.accelerometer.y"])
+	}
+}
+
+func TestHandleMessageSystemRuntimeStatusIncludesSensorSummary(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Sensor: &SensorDataRequest{
+			DeviceID: "device-1",
+			UnixMS:   1713000000123,
+			Values: map[string]float64{
+				"temperature.c": 22.4,
+			},
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Sensor: &SensorDataRequest{
+			DeviceID: "device-2",
+			UnixMS:   1713000000456,
+			Values: map[string]float64{
+				"temperature.c": 23.1,
+				"humidity.pct":  45.5,
+			},
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-runtime-sensor-summary",
+			Kind:      "system",
+			Intent:    "runtime_status",
+		},
+	})
+	if err != nil {
+		t.Fatalf("runtime_status error = %v", err)
+	}
+	if out[0].Data["sensor_devices_reporting"] != "2" {
+		t.Fatalf("sensor_devices_reporting = %q, want 2", out[0].Data["sensor_devices_reporting"])
+	}
+	if out[0].Data["sensor_latest_unix_ms"] != "1713000000456" {
+		t.Fatalf("sensor_latest_unix_ms = %q, want 1713000000456", out[0].Data["sensor_latest_unix_ms"])
+	}
+	if out[0].Data["sensor_device_ids"] != "device-1,device-2" {
+		t.Fatalf("sensor_device_ids = %q, want device-1,device-2", out[0].Data["sensor_device_ids"])
+	}
+	if !strings.Contains(out[0].Data["sensor_summaries"], "device-1|unix_ms=1713000000123|keys=temperature.c") {
+		t.Fatalf("sensor_summaries missing device-1 detail: %q", out[0].Data["sensor_summaries"])
+	}
+	if !strings.Contains(out[0].Data["sensor_summaries"], "device-2|unix_ms=1713000000456|keys=humidity.pct,temperature.c") {
+		t.Fatalf("sensor_summaries missing device-2 detail: %q", out[0].Data["sensor_summaries"])
 	}
 }
 

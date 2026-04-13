@@ -1,1 +1,1 @@
-Persist latest sensor telemetry per device in transport and expose summarized sensor metadata via system_device_status and system_runtime_status responses.
+Implement periodic sensor telemetry reporting from terminal_client (baseline battery/connectivity/time values) via ConnectRequest.sensor and validate server runtime/device status reflects live updates.
