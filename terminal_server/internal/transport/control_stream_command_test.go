@@ -210,6 +210,73 @@ func TestHandleMessageCommandIntercomEmitsRouteStreams(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandIntercomStopEmitsStopStream(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	router := io.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-intercom-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command intercom start) error = %v", err)
+	}
+	if router.RouteCount() != 1 {
+		t.Fatalf("route count after start = %d, want 1", router.RouteCount())
+	}
+
+	stopOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-intercom-stop",
+			DeviceID:  "device-1",
+			Action:    CommandActionStop,
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command intercom stop) error = %v", err)
+	}
+	if len(stopOut) != 2 {
+		t.Fatalf("len(stopOut) = %d, want 2", len(stopOut))
+	}
+	if stopOut[0].ScenarioStop != "intercom" {
+		t.Fatalf("ScenarioStop = %q, want intercom", stopOut[0].ScenarioStop)
+	}
+	if stopOut[1].StopStream == nil {
+		t.Fatalf("expected stop_stream response after intercom stop")
+	}
+	if stopOut[1].StopStream.StreamID != "route:device-1|device-2|audio" {
+		t.Fatalf("stop_stream stream_id = %q, want route:device-1|device-2|audio", stopOut[1].StopStream.StreamID)
+	}
+	if router.RouteCount() != 0 {
+		t.Fatalf("route count after stop = %d, want 0", router.RouteCount())
+	}
+}
+
 func TestHandleMessageCommandManualTerminal(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

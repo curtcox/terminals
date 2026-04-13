@@ -168,3 +168,57 @@ func TestWireSessionIntercomEmitsRouteStream(t *testing.T) {
 		t.Fatalf("expected route_stream payload for intercom start")
 	}
 }
+
+func TestWireSessionIntercomStopEmitsStopStream(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			WireClientMessage{Register: &WireRegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "intercom-start",
+				DeviceID:  "device-1",
+				Kind:      WireCommandKindManual,
+				Intent:    "intercom",
+			}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "intercom-stop",
+				DeviceID:  "device-1",
+				Action:    WireCommandActionStop,
+				Kind:      WireCommandKindManual,
+				Intent:    "intercom",
+			}},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, WireProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawStop bool
+	for _, sent := range stream.sent {
+		msg, ok := sent.(WireServerMessage)
+		if !ok || msg.StopStream == nil {
+			continue
+		}
+		if msg.StopStream.StreamID == "route:device-1|device-2|audio" {
+			sawStop = true
+		}
+	}
+	if !sawStop {
+		t.Fatalf("expected stop_stream payload for intercom stop")
+	}
+}

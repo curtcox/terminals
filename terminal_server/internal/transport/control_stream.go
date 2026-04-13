@@ -351,6 +351,9 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	if cmd == nil {
 		return responses
 	}
+	if commandResult.ScenarioStop != "" {
+		h.disconnectScenarioRoutes(cmd.DeviceID, commandResult.ScenarioStop)
+	}
 	if refresh, ok := h.commandTerminalRefresh(ctx, cmd); ok {
 		responses = append(responses, refresh)
 		return responses
@@ -399,45 +402,61 @@ func (h *StreamHandler) routeUpdatesForCommand(
 	if cmd == nil {
 		return nil
 	}
-	if commandResult.ScenarioStart == "" {
+	if commandResult.ScenarioStart == "" && commandResult.ScenarioStop == "" {
 		return nil
 	}
 	action := defaultAction(cmd.Action)
-	if action != CommandActionStart {
-		return nil
-	}
-	if len(after) == 0 {
+	if action != CommandActionStart && action != CommandActionStop {
 		return nil
 	}
 	beforeSet := map[string]struct{}{}
 	for _, route := range before {
 		beforeSet[routeStreamID(route)] = struct{}{}
 	}
-	out := make([]ServerMessage, 0, len(after))
+	afterSet := map[string]iorouter.Route{}
 	for _, route := range after {
-		routeID := routeStreamID(route)
-		if _, exists := beforeSet[routeID]; exists {
-			continue
-		}
-		out = append(out, ServerMessage{
-			StartStream: &StartStreamResponse{
-				StreamID:       routeID,
-				Kind:           route.StreamKind,
-				SourceDeviceID: route.SourceID,
-				TargetDeviceID: route.TargetID,
-				Metadata: map[string]string{
-					"origin": "route_delta",
+		afterSet[routeStreamID(route)] = route
+	}
+	out := make([]ServerMessage, 0, len(after))
+	if action == CommandActionStart {
+		for _, route := range after {
+			routeID := routeStreamID(route)
+			if _, exists := beforeSet[routeID]; exists {
+				continue
+			}
+			out = append(out, ServerMessage{
+				StartStream: &StartStreamResponse{
+					StreamID:       routeID,
+					Kind:           route.StreamKind,
+					SourceDeviceID: route.SourceID,
+					TargetDeviceID: route.TargetID,
+					Metadata: map[string]string{
+						"origin": "route_delta",
+					},
 				},
-			},
-		})
-		out = append(out, ServerMessage{
-			RouteStream: &RouteStreamResponse{
-				StreamID:       routeID,
-				SourceDeviceID: route.SourceID,
-				TargetDeviceID: route.TargetID,
-				Kind:           route.StreamKind,
-			},
-		})
+			})
+			out = append(out, ServerMessage{
+				RouteStream: &RouteStreamResponse{
+					StreamID:       routeID,
+					SourceDeviceID: route.SourceID,
+					TargetDeviceID: route.TargetID,
+					Kind:           route.StreamKind,
+				},
+			})
+		}
+	}
+	if action == CommandActionStop {
+		for _, route := range before {
+			routeID := routeStreamID(route)
+			if _, exists := afterSet[routeID]; exists {
+				continue
+			}
+			out = append(out, ServerMessage{
+				StopStream: &StopStreamResponse{
+					StreamID: routeID,
+				},
+			})
+		}
 	}
 	return out
 }
@@ -461,6 +480,43 @@ func (h *StreamHandler) routeSnapshotForDevice(deviceID string) []iorouter.Route
 
 func routeStreamID(route iorouter.Route) string {
 	return "route:" + route.SourceID + "|" + route.TargetID + "|" + route.StreamKind
+}
+
+func (h *StreamHandler) disconnectScenarioRoutes(deviceID, scenarioName string) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return
+	}
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+		return
+	}
+	routeProvider, ok := h.runtime.Env.IO.(interface {
+		RoutesForDevice(deviceID string) []iorouter.Route
+		Disconnect(sourceID, targetID, streamKind string) error
+	})
+	if !ok {
+		return
+	}
+
+	for _, route := range routeProvider.RoutesForDevice(deviceID) {
+		if !isScenarioOwnedRoute(deviceID, scenarioName, route) {
+			continue
+		}
+		_ = routeProvider.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
+	}
+}
+
+func isScenarioOwnedRoute(deviceID, scenarioName string, route iorouter.Route) bool {
+	switch scenarioName {
+	case "intercom":
+		return route.SourceID == deviceID && route.StreamKind == "audio"
+	case "pa_system":
+		return route.SourceID == deviceID && route.StreamKind == "pa_audio"
+	case "multi_window":
+		return route.TargetID == deviceID && route.StreamKind == "video"
+	default:
+		return false
+	}
 }
 
 func (h *StreamHandler) commandTerminalRefresh(_ context.Context, cmd *CommandRequest) (ServerMessage, bool) {
