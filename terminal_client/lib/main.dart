@@ -127,6 +127,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   final Map<String, iov1.RouteStream> _routesByStreamID =
       <String, iov1.RouteStream>{};
   final List<WebRTCSignal> _recentWebRTCSignals = <WebRTCSignal>[];
+  int _sensorSendCount = 0;
+  int _streamReadyAckCount = 0;
+  int _lastSensorSendUnixMs = 0;
 
   Future<void> _startStream({bool userInitiated = true}) async {
     if (_isConnecting) {
@@ -245,7 +248,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           unixMs: DateTime.now().millisecondsSinceEpoch,
         ),
       );
-      _outgoing.add(_buildSensorTelemetryRequest());
+      _sendSensorTelemetry();
     } catch (error) {
       await _handleStreamClosed('Connection error: $error');
     } finally {
@@ -274,7 +277,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       if (!_shouldStayConnected || _deviceId.isEmpty) {
         return;
       }
-      _outgoing.add(_buildSensorTelemetryRequest());
+      _sendSensorTelemetry();
     });
   }
 
@@ -294,6 +297,24 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         ..deviceId = _deviceId
         ..unixMs = Int64(now.millisecondsSinceEpoch)
         ..values.addAll(values));
+  }
+
+  void _sendSensorTelemetry() {
+    if (_deviceId.isEmpty) {
+      return;
+    }
+    final request = _buildSensorTelemetryRequest();
+    _outgoing.add(request);
+    final unixMs = request.sensor.unixMs.toInt();
+    if (mounted) {
+      setState(() {
+        _sensorSendCount += 1;
+        _lastSensorSendUnixMs = unixMs;
+      });
+      return;
+    }
+    _sensorSendCount += 1;
+    _lastSensorSendUnixMs = unixMs;
   }
 
   void _stopHeartbeatLoop() {
@@ -458,125 +479,130 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _hostController,
-                decoration: const InputDecoration(
-                  labelText: 'Server Host',
-                  hintText: '127.0.0.1',
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  ElevatedButton(
-                    onPressed: _isScanning ? null : _scanForServers,
-                    child: Text(_isScanning ? 'Scanning...' : 'Scan LAN'),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _hostController,
+                  decoration: const InputDecoration(
+                    labelText: 'Server Host',
+                    hintText: '127.0.0.1',
                   ),
-                ],
-              ),
-              if (_discoveredServers.isNotEmpty) ...[
+                ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  key: ValueKey<String?>(_selectedDiscoveredServer),
-                  initialValue: _selectedDiscoveredServer,
-                  decoration:
-                      const InputDecoration(labelText: 'Discovered Server'),
-                  items: _discoveredServers
-                      .map(
-                        (server) => DropdownMenuItem<String>(
-                          value: '${server.host}:${server.port}',
-                          child: Text(
-                            '${server.name} (${server.host}:${server.port})',
+                Row(
+                  children: [
+                    ElevatedButton(
+                      onPressed: _isScanning ? null : _scanForServers,
+                      child: Text(_isScanning ? 'Scanning...' : 'Scan LAN'),
+                    ),
+                  ],
+                ),
+                if (_discoveredServers.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String?>(_selectedDiscoveredServer),
+                    initialValue: _selectedDiscoveredServer,
+                    decoration:
+                        const InputDecoration(labelText: 'Discovered Server'),
+                    items: _discoveredServers
+                        .map(
+                          (server) => DropdownMenuItem<String>(
+                            value: '${server.host}:${server.port}',
+                            child: Text(
+                              '${server.name} (${server.host}:${server.port})',
+                            ),
                           ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) {
-                      return;
-                    }
-                    final parts = value.split(':');
-                    if (parts.length != 2) {
-                      return;
-                    }
-                    setState(() {
-                      _selectedDiscoveredServer = value;
-                      _hostController.text = parts[0];
-                      _portController.text = parts[1];
-                    });
-                  },
-                ),
-              ],
-              const SizedBox(height: 12),
-              TextField(
-                controller: _portController,
-                decoration: const InputDecoration(labelText: 'Server Port'),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _deviceNameController,
-                decoration: const InputDecoration(labelText: 'Device Name'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _deviceTypeController,
-                decoration: const InputDecoration(labelText: 'Device Type'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _platformController,
-                decoration: const InputDecoration(labelText: 'Platform'),
-              ),
-              const SizedBox(height: 20),
-              Text('Control Stream: $_status'),
-              const SizedBox(height: 12),
-              Text('Responses: $_responses'),
-              Text(
-                'Media routes: ${_routesByStreamID.length}  Active streams: ${_activeStreamsByID.length}  Signals: ${_recentWebRTCSignals.length}',
-              ),
-              if (_lastNotification.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text('Notification: $_lastNotification'),
-              ],
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 12,
-                children: [
-                  ElevatedButton(
-                    onPressed: _startStream,
-                    child: const Text('Connect Stream'),
-                  ),
-                  OutlinedButton(
-                    onPressed: _stopStream,
-                    child: const Text('Disconnect'),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      final parts = value.split(':');
+                      if (parts.length != 2) {
+                        return;
+                      }
+                      setState(() {
+                        _selectedDiscoveredServer = value;
+                        _hostController.text = parts[0];
+                        _portController.text = parts[1];
+                      });
+                    },
                   ),
                 ],
-              ),
-              if (_activeRoot != null) ...[
-                const SizedBox(height: 24),
-                const Divider(),
                 const SizedBox(height: 12),
-                SizedBox(
-                  height: 320,
-                  child: AnimatedSwitcher(
-                    duration: _activeTransitionDuration,
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    transitionBuilder: _buildTransition,
-                    child: KeyedSubtree(
-                      key: ValueKey<int>(_activeRootRevision),
-                      child: _renderNode(_activeRoot!),
+                TextField(
+                  controller: _portController,
+                  decoration: const InputDecoration(labelText: 'Server Port'),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _deviceNameController,
+                  decoration: const InputDecoration(labelText: 'Device Name'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _deviceTypeController,
+                  decoration: const InputDecoration(labelText: 'Device Type'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _platformController,
+                  decoration: const InputDecoration(labelText: 'Platform'),
+                ),
+                const SizedBox(height: 20),
+                Text('Control Stream: $_status'),
+                const SizedBox(height: 12),
+                Text('Responses: $_responses'),
+                Text(
+                  'Media routes: ${_routesByStreamID.length}  Active streams: ${_activeStreamsByID.length}  Signals: ${_recentWebRTCSignals.length}',
+                ),
+                Text(
+                  'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount',
+                ),
+                if (_lastNotification.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text('Notification: $_lastNotification'),
+                ],
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 12,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _startStream,
+                      child: const Text('Connect Stream'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _stopStream,
+                      child: const Text('Disconnect'),
+                    ),
+                  ],
+                ),
+                if (_activeRoot != null) ...[
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 320,
+                    child: AnimatedSwitcher(
+                      duration: _activeTransitionDuration,
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      transitionBuilder: _buildTransition,
+                      child: KeyedSubtree(
+                        key: ValueKey<int>(_activeRootRevision),
+                        child: _renderNode(_activeRoot!),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -626,6 +652,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           ConnectRequest()
             ..streamReady = (StreamReady()..streamId = start.streamId),
         );
+        _streamReadyAckCount += 1;
       }
       if (start.kind.isNotEmpty) {
         _lastNotification = 'Start stream: ${start.kind} (${start.streamId})';

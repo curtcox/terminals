@@ -62,6 +62,9 @@ void main() {
           request.sensor.values.containsKey('time.utc_hour')),
       isTrue,
     );
+    expect(find.textContaining('Sensor sends: '), findsOneWidget);
+    expect(find.textContaining('Last sensor unix_ms: '), findsOneWidget);
+    expect(find.textContaining('Stream-ready acks: 0'), findsOneWidget);
   });
 
   testWidgets('reconnect creates a new control client after stream failure', (
@@ -722,6 +725,7 @@ void main() {
       expect(find.textContaining('Active streams: 1'), findsOneWidget);
       expect(find.textContaining('Start stream: audio (stream-a)'),
           findsOneWidget);
+      expect(find.textContaining('Stream-ready acks: 1'), findsOneWidget);
 
       final readyRequests = harness.lastClient.requests
           .where((request) => request.hasStreamReady())
