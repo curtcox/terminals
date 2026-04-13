@@ -235,6 +235,54 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	}
 
 	envelope, err = adapter.FromInternal(ServerMessage{
+		StartStream: &StartStreamResponse{
+			StreamID:       "stream-1",
+			Kind:           "audio",
+			SourceDeviceID: "d1",
+			TargetDeviceID: "d2",
+			Metadata: map[string]string{"codec": "opus"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() start_stream error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("start_stream envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if resp.GetStartStream() == nil {
+		t.Fatalf("expected start_stream payload")
+	}
+	if got := resp.GetStartStream().GetStreamId(); got != "stream-1" {
+		t.Fatalf("start_stream stream_id = %q, want stream-1", got)
+	}
+	if got := resp.GetStartStream().GetKind(); got != "audio" {
+		t.Fatalf("start_stream kind = %q, want audio", got)
+	}
+	if got := resp.GetStartStream().GetMetadata()["codec"]; got != "opus" {
+		t.Fatalf("start_stream metadata codec = %q, want opus", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		StopStream: &StopStreamResponse{
+			StreamID: "stream-1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() stop_stream error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("stop_stream envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if resp.GetStopStream() == nil {
+		t.Fatalf("expected stop_stream payload")
+	}
+	if got := resp.GetStopStream().GetStreamId(); got != "stream-1" {
+		t.Fatalf("stop_stream stream_id = %q, want stream-1", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
 		RouteStream: &RouteStreamResponse{
 			StreamID:       "route:d1|d2|audio",
 			SourceDeviceID: "d1",

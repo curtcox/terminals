@@ -128,6 +128,20 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 			Node:        wireDescriptorFromUI(msg.UpdateUI.Node),
 		}
 	}
+	if msg.StartStream != nil {
+		out.StartStream = &WireStartStream{
+			StreamID:       msg.StartStream.StreamID,
+			Kind:           msg.StartStream.Kind,
+			SourceDeviceID: msg.StartStream.SourceDeviceID,
+			TargetDeviceID: msg.StartStream.TargetDeviceID,
+			Metadata:       EncodeDataMap(msg.StartStream.Metadata),
+		}
+	}
+	if msg.StopStream != nil {
+		out.StopStream = &WireStopStream{
+			StreamID: msg.StopStream.StreamID,
+		}
+	}
 	if msg.RouteStream != nil {
 		out.RouteStream = &WireRouteStream{
 			StreamID:       msg.RouteStream.StreamID,

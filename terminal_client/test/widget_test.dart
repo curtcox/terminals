@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:grpc/grpc.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/main.dart';
 
@@ -665,6 +666,84 @@ void main() {
     expect(find.text('Awake body'), findsOneWidget);
     expect(find.text('Brightness body'), findsOneWidget);
   });
+
+  testWidgets(
+    'handles media control responses and acknowledges started streams',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final harness = _FakeClientHarness();
+      await tester.pumpWidget(
+        TerminalClientApp(clientFactory: harness.createClient),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..startStream = (iov1.StartStream()
+            ..streamId = 'stream-a'
+            ..kind = 'audio'
+            ..sourceDeviceId = 'device-1'
+            ..targetDeviceId = 'device-2'),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('Control Stream: Stream started'),
+          findsOneWidget);
+      expect(find.textContaining('Active streams: 1'), findsOneWidget);
+      expect(find.textContaining('Start stream: audio (stream-a)'),
+          findsOneWidget);
+
+      final readyRequests = harness.lastClient.requests
+          .where((request) => request.hasStreamReady())
+          .toList();
+      expect(readyRequests.length, 1);
+      expect(readyRequests.first.streamReady.streamId, 'stream-a');
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..routeStream = (iov1.RouteStream()
+            ..streamId = 'stream-a'
+            ..sourceDeviceId = 'device-1'
+            ..targetDeviceId = 'device-2'
+            ..kind = 'audio'),
+      );
+      await tester.pump();
+      expect(
+          find.textContaining('Control Stream: Route updated'), findsOneWidget);
+      expect(find.textContaining('Media routes: 1'), findsOneWidget);
+      expect(
+        find.textContaining('Route: device-1 -> device-2 (audio)'),
+        findsOneWidget,
+      );
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..webrtcSignal = (WebRTCSignal()
+            ..streamId = 'stream-a'
+            ..signalType = 'offer'
+            ..payload = 'sdp-offer'),
+      );
+      await tester.pump();
+      expect(
+          find.textContaining('Control Stream: WebRTC signal'), findsOneWidget);
+      expect(find.textContaining('Signals: 1'), findsOneWidget);
+      expect(find.textContaining('WebRTC signal: offer (stream-a)'),
+          findsOneWidget);
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..stopStream = (iov1.StopStream()..streamId = 'stream-a'),
+      );
+      await tester.pump();
+      expect(find.textContaining('Control Stream: Stream stopped'),
+          findsOneWidget);
+      expect(find.textContaining('Active streams: 0'), findsOneWidget);
+      expect(find.textContaining('Media routes: 0'), findsOneWidget);
+      expect(find.textContaining('Stop stream: stream-a'), findsOneWidget);
+    },
+  );
 }
 
 class _FakeClientHarness {

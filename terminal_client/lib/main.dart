@@ -115,6 +115,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   bool _shouldStayConnected = false;
   bool _isConnecting = false;
   int _reconnectAttempt = 0;
+  final Map<String, iov1.StartStream> _activeStreamsByID =
+      <String, iov1.StartStream>{};
+  final Map<String, iov1.RouteStream> _routesByStreamID =
+      <String, iov1.RouteStream>{};
+  final List<WebRTCSignal> _recentWebRTCSignals = <WebRTCSignal>[];
 
   Future<void> _startStream({bool userInitiated = true}) async {
     if (_isConnecting) {
@@ -202,6 +207,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             if (response.hasError()) {
               _lastNotification = response.error.message;
             }
+            _applyMediaControlResponse(response);
           });
         },
         onError: (Object error) {
@@ -486,6 +492,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
               Text('Control Stream: $_status'),
               const SizedBox(height: 12),
               Text('Responses: $_responses'),
+              Text(
+                'Media routes: ${_routesByStreamID.length}  Active streams: ${_activeStreamsByID.length}  Signals: ${_recentWebRTCSignals.length}',
+              ),
               if (_lastNotification.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text('Notification: $_lastNotification'),
@@ -536,6 +545,18 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (response.hasTransitionUi()) {
       return 'UI transition';
     }
+    if (response.hasStartStream()) {
+      return 'Stream started';
+    }
+    if (response.hasStopStream()) {
+      return 'Stream stopped';
+    }
+    if (response.hasRouteStream()) {
+      return 'Route updated';
+    }
+    if (response.hasWebrtcSignal()) {
+      return 'WebRTC signal';
+    }
     if (response.hasUpdateUi()) {
       return 'UI patched';
     }
@@ -549,6 +570,50 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       return 'UI updated';
     }
     return 'Connected';
+  }
+
+  void _applyMediaControlResponse(ConnectResponse response) {
+    if (response.hasStartStream()) {
+      final start = response.startStream;
+      if (start.streamId.isNotEmpty) {
+        _activeStreamsByID[start.streamId] = start.deepCopy();
+        _outgoing.add(
+          ConnectRequest()
+            ..streamReady = (StreamReady()..streamId = start.streamId),
+        );
+      }
+      if (start.kind.isNotEmpty) {
+        _lastNotification = 'Start stream: ${start.kind} (${start.streamId})';
+      }
+    }
+    if (response.hasStopStream()) {
+      final streamID = response.stopStream.streamId;
+      if (streamID.isNotEmpty) {
+        _activeStreamsByID.remove(streamID);
+        _routesByStreamID.remove(streamID);
+        _lastNotification = 'Stop stream: $streamID';
+      }
+    }
+    if (response.hasRouteStream()) {
+      final route = response.routeStream;
+      if (route.streamId.isNotEmpty) {
+        _routesByStreamID[route.streamId] = route.deepCopy();
+      }
+      _lastNotification =
+          'Route: ${route.sourceDeviceId} -> ${route.targetDeviceId} (${route.kind})';
+    }
+    if (response.hasWebrtcSignal()) {
+      _recentWebRTCSignals.add(response.webrtcSignal.deepCopy());
+      const maxSignals = 50;
+      if (_recentWebRTCSignals.length > maxSignals) {
+        _recentWebRTCSignals.removeRange(
+          0,
+          _recentWebRTCSignals.length - maxSignals,
+        );
+      }
+      _lastNotification =
+          'WebRTC signal: ${response.webrtcSignal.signalType} (${response.webrtcSignal.streamId})';
+    }
   }
 
   void _applyTransitionHint(uiv1.TransitionUI transitionUi) {

@@ -63,6 +63,20 @@ type RouteStreamResponse struct {
 	Kind           string
 }
 
+// StartStreamResponse instructs clients to start an underlying media stream.
+type StartStreamResponse struct {
+	StreamID       string
+	Kind           string
+	SourceDeviceID string
+	TargetDeviceID string
+	Metadata       map[string]string
+}
+
+// StopStreamResponse instructs clients to stop an underlying media stream.
+type StopStreamResponse struct {
+	StreamID string
+}
+
 // InputRequest carries client input events relevant to active scenarios.
 type InputRequest struct {
 	DeviceID    string
@@ -99,6 +113,8 @@ type ServerMessage struct {
 	CommandAck    string
 	SetUI         *ui.Descriptor
 	UpdateUI      *UIUpdate
+	StartStream   *StartStreamResponse
+	StopStream    *StopStreamResponse
 	RouteStream   *RouteStreamResponse
 	TransitionUI  *UITransition
 	Notification  string
@@ -403,6 +419,17 @@ func (h *StreamHandler) routeUpdatesForCommand(
 		if _, exists := beforeSet[routeID]; exists {
 			continue
 		}
+		out = append(out, ServerMessage{
+			StartStream: &StartStreamResponse{
+				StreamID:       routeID,
+				Kind:           route.StreamKind,
+				SourceDeviceID: route.SourceID,
+				TargetDeviceID: route.TargetID,
+				Metadata: map[string]string{
+					"origin": "route_delta",
+				},
+			},
+		})
 		out = append(out, ServerMessage{
 			RouteStream: &RouteStreamResponse{
 				StreamID:       routeID,

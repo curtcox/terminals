@@ -119,9 +119,25 @@ type WireServerMessage struct {
 	CommandResult *WireCommandResult
 	SetUI         *uiWireDescriptor
 	UpdateUI      *uiWireUpdate
+	StartStream   *WireStartStream
+	StopStream    *WireStopStream
 	RouteStream   *WireRouteStream
 	TransitionUI  *uiWireTransition
 	Error         *WireControlError
+}
+
+// WireStartStream is a protobuf-adapter-friendly start stream payload.
+type WireStartStream struct {
+	StreamID       string
+	Kind           string
+	SourceDeviceID string
+	TargetDeviceID string
+	Metadata       []DataEntry
+}
+
+// WireStopStream is a protobuf-adapter-friendly stop stream payload.
+type WireStopStream struct {
+	StreamID string
 }
 
 // WireRouteStream is a protobuf-adapter-friendly route stream payload.

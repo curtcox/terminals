@@ -35,6 +35,18 @@ func TestWireFromInternalServer(t *testing.T) {
 				Props: map[string]string{"value": "patched"},
 			},
 		},
+		StartStream: &StartStreamResponse{
+			StreamID:       "stream-1",
+			Kind:           "audio",
+			SourceDeviceID: "d1",
+			TargetDeviceID: "d2",
+			Metadata: map[string]string{
+				"codec": "opus",
+			},
+		},
+		StopStream: &StopStreamResponse{
+			StreamID: "stream-2",
+		},
 		RouteStream: &RouteStreamResponse{
 			StreamID:       "route:d1|d2|audio",
 			SourceDeviceID: "d1",
@@ -66,6 +78,15 @@ func TestWireFromInternalServer(t *testing.T) {
 	}
 	if wire.UpdateUI.Node.Type != "text" || DecodeDataEntries(wire.UpdateUI.Node.Props)["value"] != "patched" {
 		t.Fatalf("unexpected update_ui node mapping: %+v", wire.UpdateUI.Node)
+	}
+	if wire.StartStream == nil || wire.StartStream.StreamID != "stream-1" || wire.StartStream.Kind != "audio" {
+		t.Fatalf("unexpected start_stream mapping: %+v", wire.StartStream)
+	}
+	if DecodeDataEntries(wire.StartStream.Metadata)["codec"] != "opus" {
+		t.Fatalf("unexpected start_stream metadata: %+v", wire.StartStream.Metadata)
+	}
+	if wire.StopStream == nil || wire.StopStream.StreamID != "stream-2" {
+		t.Fatalf("unexpected stop_stream mapping: %+v", wire.StopStream)
 	}
 	if wire.RouteStream == nil || wire.RouteStream.StreamID != "route:d1|d2|audio" {
 		t.Fatalf("unexpected route_stream mapping: %+v", wire.RouteStream)

@@ -142,6 +142,26 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 				},
 			},
 		}
+	case msg.StartStream != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_StartStream{
+				StartStream: &iov1.StartStream{
+					StreamId:       msg.StartStream.StreamID,
+					Kind:           msg.StartStream.Kind,
+					SourceDeviceId: msg.StartStream.SourceDeviceID,
+					TargetDeviceId: msg.StartStream.TargetDeviceID,
+					Metadata:       msg.StartStream.Metadata,
+				},
+			},
+		}
+	case msg.StopStream != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_StopStream{
+				StopStream: &iov1.StopStream{
+					StreamId: msg.StopStream.StreamID,
+				},
+			},
+		}
 	case msg.RouteStream != nil:
 		return &controlv1.ConnectResponse{
 			Payload: &controlv1.ConnectResponse_RouteStream{

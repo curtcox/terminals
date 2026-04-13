@@ -168,20 +168,26 @@ func TestHandleMessageCommandIntercomEmitsRouteStreams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command intercom) error = %v", err)
 	}
-	if len(out) != 2 {
-		t.Fatalf("len(out) = %d, want 2", len(out))
+	if len(out) != 3 {
+		t.Fatalf("len(out) = %d, want 3", len(out))
 	}
 	if out[0].ScenarioStart != "intercom" {
 		t.Fatalf("ScenarioStart = %q, want intercom", out[0].ScenarioStart)
 	}
-	if out[1].RouteStream == nil {
-		t.Fatalf("expected route_stream response after intercom start")
+	if out[1].StartStream == nil {
+		t.Fatalf("expected start_stream response after intercom start")
 	}
-	if out[1].RouteStream.SourceDeviceID != "device-1" || out[1].RouteStream.TargetDeviceID != "device-2" {
-		t.Fatalf("unexpected route stream devices: %+v", out[1].RouteStream)
+	if out[1].StartStream.SourceDeviceID != "device-1" || out[1].StartStream.TargetDeviceID != "device-2" {
+		t.Fatalf("unexpected start stream devices: %+v", out[1].StartStream)
 	}
-	if out[1].RouteStream.Kind != "audio" {
-		t.Fatalf("route stream kind = %q, want audio", out[1].RouteStream.Kind)
+	if out[1].StartStream.Kind != "audio" {
+		t.Fatalf("start stream kind = %q, want audio", out[1].StartStream.Kind)
+	}
+	if out[2].RouteStream == nil {
+		t.Fatalf("expected route_stream response after start_stream")
+	}
+	if out[2].RouteStream.SourceDeviceID != "device-1" || out[2].RouteStream.TargetDeviceID != "device-2" {
+		t.Fatalf("unexpected route stream devices: %+v", out[2].RouteStream)
 	}
 
 	// Starting intercom again should not emit duplicate route stream messages.

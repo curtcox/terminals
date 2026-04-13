@@ -1,1 +1,1 @@
-Handle RouteStream/StartStream/StopStream/WebRTCSignal control responses in terminal_client to begin media-plane plumbing from server directives.
+Emit StopStream control responses and disconnect scenario-owned IO routes when intercom/pa_system/multi_window scenarios are stopped.
