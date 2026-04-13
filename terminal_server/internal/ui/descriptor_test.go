@@ -7,11 +7,14 @@ func TestHelloWorld(t *testing.T) {
 	if d.Type != "stack" {
 		t.Fatalf("Type = %q, want stack", d.Type)
 	}
-	if len(d.Children) != 1 {
-		t.Fatalf("children = %d, want 1", len(d.Children))
+	if len(d.Children) != 2 {
+		t.Fatalf("children = %d, want 2", len(d.Children))
 	}
 	if d.Children[0].Type != "text" {
 		t.Fatalf("child type = %q, want text", d.Children[0].Type)
+	}
+	if d.Children[1].Type != "overlay" || d.Children[1].Props["id"] != GlobalOverlayComponentID {
+		t.Fatalf("second child should be global overlay slot, got %+v", d.Children[1])
 	}
 }
 
@@ -51,5 +54,24 @@ func TestTerminalViewIncludesRefreshButton(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected terminal refresh button descriptor")
+	}
+}
+
+func TestPAReceiverOverlayPatch(t *testing.T) {
+	d := PAReceiverOverlayPatch("PA from device-1")
+	if d.Type != "overlay" {
+		t.Fatalf("Type = %q, want overlay", d.Type)
+	}
+	if d.Props["id"] != GlobalOverlayComponentID {
+		t.Fatalf("id = %q, want %q", d.Props["id"], GlobalOverlayComponentID)
+	}
+	if len(d.Children) == 0 || d.Children[0].Type != "stack" {
+		t.Fatalf("expected stack child in PA overlay patch, got %+v", d.Children)
+	}
+	if len(d.Children[0].Children) == 0 || d.Children[0].Children[0].Type != "text" {
+		t.Fatalf("expected text child in PA overlay patch, got %+v", d.Children[0].Children)
+	}
+	if d.Children[0].Children[0].Props["value"] != "PA from device-1" {
+		t.Fatalf("overlay text value = %q, want PA from device-1", d.Children[0].Children[0].Props["value"])
 	}
 }

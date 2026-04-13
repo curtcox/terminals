@@ -415,6 +415,7 @@ func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
 
 	seenScenarioStart := false
 	seenRelay := map[string]bool{}
+	seenOverlayRelay := map[string]bool{}
 	for _, msg := range out {
 		if msg.ScenarioStart == "pa_system" {
 			seenScenarioStart = true
@@ -422,12 +423,21 @@ func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
 		if msg.Notification == "PA from device-1" {
 			seenRelay[msg.RelayToDeviceID] = true
 		}
+		if msg.UpdateUI != nil &&
+			msg.UpdateUI.ComponentID == ui.GlobalOverlayComponentID &&
+			msg.UpdateUI.Node.Type == "overlay" &&
+			msg.UpdateUI.Node.Props["id"] == ui.GlobalOverlayComponentID {
+			seenOverlayRelay[msg.RelayToDeviceID] = true
+		}
 	}
 	if !seenScenarioStart {
 		t.Fatalf("expected pa_system scenario start in command output")
 	}
 	if !seenRelay["device-2"] || !seenRelay["device-3"] {
 		t.Fatalf("expected PA receiver notifications relayed to device-2 and device-3, got %+v", seenRelay)
+	}
+	if !seenOverlayRelay["device-2"] || !seenOverlayRelay["device-3"] {
+		t.Fatalf("expected PA overlay updates relayed to device-2 and device-3, got %+v", seenOverlayRelay)
 	}
 }
 

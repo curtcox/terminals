@@ -1,5 +1,10 @@
 package ui
 
+const (
+	// GlobalOverlayComponentID is the stable component id used for transient overlays.
+	GlobalOverlayComponentID = "global_overlay"
+)
+
 // Descriptor is a generic server-driven UI node.
 type Descriptor struct {
 	ID       string            `json:"id,omitempty"`
@@ -28,7 +33,7 @@ func HelloWorld(deviceName string) Descriptor {
 		"value": "Connected: " + deviceName,
 		"style": "headline",
 		"color": "#E7F0F7",
-	}))
+	}), GlobalOverlaySlot())
 }
 
 // TerminalView returns a simple server-driven terminal layout.
@@ -61,7 +66,7 @@ func TerminalViewWithOutput(deviceID, output string) Descriptor {
 		"id":     "terminal_refresh_button",
 		"label":  "Refresh",
 		"action": "terminal_refresh",
-	}))
+	}), GlobalOverlaySlot())
 }
 
 // TerminalOutputPatch returns a descriptor for updating terminal output text only.
@@ -72,4 +77,24 @@ func TerminalOutputPatch(output string) Descriptor {
 		"style": "monospace",
 		"color": "#E8E8E8",
 	})
+}
+
+// GlobalOverlaySlot returns an empty overlay node used as a stable update target.
+func GlobalOverlaySlot() Descriptor {
+	return New("overlay", map[string]string{
+		"id": GlobalOverlayComponentID,
+	})
+}
+
+// PAReceiverOverlayPatch returns a global overlay descriptor for PA receive indicators.
+func PAReceiverOverlayPatch(message string) Descriptor {
+	return New("overlay", map[string]string{
+		"id": GlobalOverlayComponentID,
+	}, New("stack", map[string]string{
+		"background": "#6A1B1A",
+	}, New("text", map[string]string{
+		"value": message,
+		"style": "headline",
+		"color": "#FFFFFF",
+	})))
 }

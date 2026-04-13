@@ -577,6 +577,54 @@ void main() {
     expect(find.text('Overlay content'), findsOneWidget);
   });
 
+  testWidgets('renders PA overlay when global overlay slot is patched',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.addAll([
+              uiv1.Node()..text = (uiv1.TextWidget()..value = 'Base content'),
+              uiv1.Node()
+                ..id = 'global_overlay'
+                ..overlay = (uiv1.OverlayWidget()),
+            ]))),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'global_overlay'
+          ..node = (uiv1.Node()
+            ..id = 'global_overlay'
+            ..overlay = (uiv1.OverlayWidget())
+            ..children.add(
+              uiv1.Node()
+                ..text = (uiv1.TextWidget()..value = 'PA from device-1'),
+            ))),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey<String>('ui-overlay-global_overlay')),
+      findsOneWidget,
+    );
+    expect(find.text('Base content'), findsOneWidget);
+    expect(find.text('PA from device-1'), findsOneWidget);
+  });
+
   testWidgets('wires gesture area tap to UIAction',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));

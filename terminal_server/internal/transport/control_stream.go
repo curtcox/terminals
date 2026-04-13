@@ -458,6 +458,15 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 				Notification:   event.Message,
 				RelayToDeviceID: targetDeviceID,
 			})
+			if strings.HasPrefix(event.Message, "PA from ") {
+				out = append(out, ServerMessage{
+					UpdateUI: &UIUpdate{
+						ComponentID: ui.GlobalOverlayComponentID,
+						Node:        ui.PAReceiverOverlayPatch(event.Message),
+					},
+					RelayToDeviceID: targetDeviceID,
+				})
+			}
 		}
 	}
 	return out
