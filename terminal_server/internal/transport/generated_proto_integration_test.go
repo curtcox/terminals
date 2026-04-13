@@ -379,6 +379,176 @@ func TestGeneratedSessionIntercomStopEmitsStopStream(t *testing.T) {
 	}
 }
 
+func TestGeneratedSessionIntercomFanOutRelaysMediaToPeerSession(t *testing.T) {
+	globalSessionRelayRegistry = newSessionRelayRegistry()
+	t.Cleanup(func() {
+		globalSessionRelayRegistry = newSessionRelayRegistry()
+	})
+
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	stream1 := &asyncFakeProtoStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ProtoClientEnvelope, 8),
+		sentCh: make(chan ProtoServerEnvelope, 24),
+	}
+	stream2 := &asyncFakeProtoStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ProtoClientEnvelope, 8),
+		sentCh: make(chan ProtoServerEnvelope, 24),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var runErr1 error
+	var runErr2 error
+	go func() {
+		defer wg.Done()
+		runErr1 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream1, GeneratedProtoAdapter{})
+	}()
+	go func() {
+		defer wg.Done()
+		runErr2 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream2, GeneratedProtoAdapter{})
+	}()
+
+	waitFor := func(label string, ch <-chan ProtoServerEnvelope, pred func(*controlv1.ConnectResponse) bool) {
+		deadline := time.After(2 * time.Second)
+		for {
+			select {
+			case env := <-ch:
+				resp, ok := env.(*controlv1.ConnectResponse)
+				if !ok {
+					t.Fatalf("unexpected envelope type %T", env)
+				}
+				if pred(resp) {
+					return
+				}
+			case <-deadline:
+				t.Fatalf("timed out waiting for %s", label)
+			}
+		}
+	}
+
+	stream1.recvCh <- &controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Register{
+			Register: &controlv1.RegisterDevice{
+				Capabilities: &capabilitiesv1.DeviceCapabilities{
+					DeviceId: "d1",
+					Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+				},
+			},
+		},
+	}
+	stream2.recvCh <- &controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Register{
+			Register: &controlv1.RegisterDevice{
+				Capabilities: &capabilitiesv1.DeviceCapabilities{
+					DeviceId: "d2",
+					Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Hall"},
+				},
+			},
+		},
+	}
+	for i := 0; i < 2; i++ {
+		<-stream1.sentCh
+		<-stream2.sentCh
+	}
+
+	stream1.recvCh <- &controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Command{
+			Command: &controlv1.CommandRequest{
+				RequestId: "intercom-start",
+				DeviceId:  "d1",
+				Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
+				Intent:    "intercom",
+			},
+		},
+	}
+
+	waitFor("source intercom scenario start", stream1.sentCh, func(resp *controlv1.ConnectResponse) bool {
+		return resp.GetCommandResult() != nil && resp.GetCommandResult().GetScenarioStart() == "intercom"
+	})
+
+	expected := map[string]bool{
+		"route:d1|d2|audio": false,
+		"route:d2|d1|audio": false,
+	}
+	startSeen := map[string]bool{}
+	routeSeen := map[string]bool{}
+	waitFor("peer intercom start+route fan-out", stream2.sentCh, func(resp *controlv1.ConnectResponse) bool {
+		if start := resp.GetStartStream(); start != nil {
+			if _, ok := expected[start.GetStreamId()]; ok {
+				startSeen[start.GetStreamId()] = true
+			}
+		}
+		if route := resp.GetRouteStream(); route != nil {
+			if _, ok := expected[route.GetStreamId()]; ok {
+				routeSeen[route.GetStreamId()] = true
+			}
+		}
+		for streamID := range expected {
+			if !startSeen[streamID] || !routeSeen[streamID] {
+				return false
+			}
+		}
+		return true
+	})
+
+	stream1.recvCh <- &controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Command{
+			Command: &controlv1.CommandRequest{
+				RequestId: "intercom-stop",
+				DeviceId:  "d1",
+				Action:    controlv1.CommandAction_COMMAND_ACTION_STOP,
+				Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
+				Intent:    "intercom",
+			},
+		},
+	}
+
+	waitFor("source intercom scenario stop", stream1.sentCh, func(resp *controlv1.ConnectResponse) bool {
+		return resp.GetCommandResult() != nil && resp.GetCommandResult().GetScenarioStop() == "intercom"
+	})
+
+	stopSeen := map[string]bool{}
+	waitFor("peer intercom stop fan-out", stream2.sentCh, func(resp *controlv1.ConnectResponse) bool {
+		stop := resp.GetStopStream()
+		if stop == nil {
+			return false
+		}
+		if _, ok := expected[stop.GetStreamId()]; ok {
+			stopSeen[stop.GetStreamId()] = true
+		}
+		for streamID := range expected {
+			if !stopSeen[streamID] {
+				return false
+			}
+		}
+		return true
+	})
+
+	close(stream1.recvCh)
+	close(stream2.recvCh)
+	wg.Wait()
+	if runErr1 != nil {
+		t.Fatalf("session1 RunProtoSession() error = %v", runErr1)
+	}
+	if runErr2 != nil {
+		t.Fatalf("session2 RunProtoSession() error = %v", runErr2)
+	}
+}
+
 func TestGeneratedSessionPASystemRelaysReceiverOverlayAndTransitions(t *testing.T) {
 	globalSessionRelayRegistry = newSessionRelayRegistry()
 	t.Cleanup(func() {

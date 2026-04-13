@@ -225,6 +225,150 @@ func TestWireSessionIntercomStopEmitsStopStream(t *testing.T) {
 	}
 }
 
+func TestWireSessionIntercomFanOutRelaysMediaToPeerSession(t *testing.T) {
+	globalSessionRelayRegistry = newSessionRelayRegistry()
+	t.Cleanup(func() {
+		globalSessionRelayRegistry = newSessionRelayRegistry()
+	})
+
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	stream1 := &asyncFakeProtoStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ProtoClientEnvelope, 8),
+		sentCh: make(chan ProtoServerEnvelope, 24),
+	}
+	stream2 := &asyncFakeProtoStream{
+		ctx:    context.Background(),
+		recvCh: make(chan ProtoClientEnvelope, 8),
+		sentCh: make(chan ProtoServerEnvelope, 24),
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var runErr1 error
+	var runErr2 error
+	go func() {
+		defer wg.Done()
+		runErr1 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream1, WireProtoAdapter{})
+	}()
+	go func() {
+		defer wg.Done()
+		runErr2 = RunProtoSession(NewStreamHandlerWithRuntime(control, runtime), control, stream2, WireProtoAdapter{})
+	}()
+
+	waitFor := func(label string, ch <-chan ProtoServerEnvelope, pred func(WireServerMessage) bool) {
+		deadline := time.After(2 * time.Second)
+		for {
+			select {
+			case env := <-ch:
+				msg, ok := env.(WireServerMessage)
+				if !ok {
+					t.Fatalf("unexpected envelope type %T", env)
+				}
+				if pred(msg) {
+					return
+				}
+			case <-deadline:
+				t.Fatalf("timed out waiting for %s", label)
+			}
+		}
+	}
+
+	stream1.recvCh <- WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}}
+	stream2.recvCh <- WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d2", DeviceName: "Hall"}}
+	for i := 0; i < 2; i++ {
+		<-stream1.sentCh
+		<-stream2.sentCh
+	}
+
+	stream1.recvCh <- WireClientMessage{Command: &WireCommandRequest{
+		RequestID: "intercom-start",
+		DeviceID:  "d1",
+		Kind:      WireCommandKindManual,
+		Intent:    "intercom",
+	}}
+
+	waitFor("source intercom scenario start", stream1.sentCh, func(msg WireServerMessage) bool {
+		return msg.CommandResult != nil && msg.CommandResult.ScenarioStart == "intercom"
+	})
+
+	expected := map[string]bool{
+		"route:d1|d2|audio": false,
+		"route:d2|d1|audio": false,
+	}
+	startSeen := map[string]bool{}
+	routeSeen := map[string]bool{}
+	waitFor("peer intercom start+route fan-out", stream2.sentCh, func(msg WireServerMessage) bool {
+		if start := msg.StartStream; start != nil {
+			if _, ok := expected[start.StreamID]; ok {
+				startSeen[start.StreamID] = true
+			}
+		}
+		if route := msg.RouteStream; route != nil {
+			if _, ok := expected[route.StreamID]; ok {
+				routeSeen[route.StreamID] = true
+			}
+		}
+		for streamID := range expected {
+			if !startSeen[streamID] || !routeSeen[streamID] {
+				return false
+			}
+		}
+		return true
+	})
+
+	stream1.recvCh <- WireClientMessage{Command: &WireCommandRequest{
+		RequestID: "intercom-stop",
+		DeviceID:  "d1",
+		Action:    WireCommandActionStop,
+		Kind:      WireCommandKindManual,
+		Intent:    "intercom",
+	}}
+
+	waitFor("source intercom scenario stop", stream1.sentCh, func(msg WireServerMessage) bool {
+		return msg.CommandResult != nil && msg.CommandResult.ScenarioStop == "intercom"
+	})
+
+	stopSeen := map[string]bool{}
+	waitFor("peer intercom stop fan-out", stream2.sentCh, func(msg WireServerMessage) bool {
+		stop := msg.StopStream
+		if stop == nil {
+			return false
+		}
+		if _, ok := expected[stop.StreamID]; ok {
+			stopSeen[stop.StreamID] = true
+		}
+		for streamID := range expected {
+			if !stopSeen[streamID] {
+				return false
+			}
+		}
+		return true
+	})
+
+	close(stream1.recvCh)
+	close(stream2.recvCh)
+	wg.Wait()
+	if runErr1 != nil {
+		t.Fatalf("session1 RunProtoSession() error = %v", runErr1)
+	}
+	if runErr2 != nil {
+		t.Fatalf("session2 RunProtoSession() error = %v", runErr2)
+	}
+}
+
 func TestWireSessionPASystemRelaysReceiverOverlayAndTransitions(t *testing.T) {
 	globalSessionRelayRegistry = newSessionRelayRegistry()
 	t.Cleanup(func() {

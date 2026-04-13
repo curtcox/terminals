@@ -1,1 +1,1 @@
-Add dual-session generated/wire integration tests for intercom peer fan-out (start_stream, route_stream, stop_stream) to validate adapter-level relay delivery for media commands.
+Add generated/wire integration tests that exercise pa_system voice stop aliases ("end pa", "stop pa") to verify adapter-level scenario stop + receiver cleanup behavior.
