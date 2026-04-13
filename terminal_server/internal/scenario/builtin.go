@@ -347,7 +347,17 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 	if err := connectSourceToPeers(ctx, env, s.trigger.SourceID, "pa_audio"); err != nil {
 		return err
 	}
-	return notifySource(ctx, env, s.trigger.SourceID, "PA system active")
+	if err := notifySource(ctx, env, s.trigger.SourceID, "PA system active"); err != nil {
+		return err
+	}
+	if env.Broadcast != nil {
+		sourceID := strings.TrimSpace(s.trigger.SourceID)
+		peerIDs := nonSourceDeviceIDs(env, sourceID)
+		if len(peerIDs) > 0 {
+			return env.Broadcast.Notify(ctx, peerIDs, "PA from "+sourceID)
+		}
+	}
+	return nil
 }
 
 // Stop ends PA mode and currently has no side effects.
@@ -452,4 +462,20 @@ func connectBidirectionalSourcePeers(_ context.Context, env *Environment, source
 		}
 	}
 	return nil
+}
+
+func nonSourceDeviceIDs(env *Environment, sourceID string) []string {
+	if env == nil || env.Devices == nil {
+		return nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	peers := make([]string, 0)
+	for _, deviceID := range env.Devices.ListDeviceIDs() {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" || deviceID == sourceID {
+			continue
+		}
+		peers = append(peers, deviceID)
+	}
+	return peers
 }

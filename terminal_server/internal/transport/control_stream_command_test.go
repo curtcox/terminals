@@ -375,6 +375,62 @@ func TestHandleMessageCommandIntercomStopEmitsStopStream(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-3", DeviceName: "Office Display"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-pa-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "pa_system",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command pa_system) error = %v", err)
+	}
+
+	seenLocalActive := false
+	seenRelay := map[string]bool{}
+	for _, msg := range out {
+		if msg.Notification == "PA system active" && msg.RelayToDeviceID == "" {
+			seenLocalActive = true
+		}
+		if msg.Notification == "PA from device-1" {
+			seenRelay[msg.RelayToDeviceID] = true
+		}
+	}
+	if !seenLocalActive {
+		t.Fatalf("expected local PA system active notification in command output")
+	}
+	if !seenRelay["device-2"] || !seenRelay["device-3"] {
+		t.Fatalf("expected PA receiver notifications relayed to device-2 and device-3, got %+v", seenRelay)
+	}
+}
+
 func TestHandleMessageCommandManualTerminal(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

@@ -70,6 +70,47 @@ func TestRuntimeHandleTrigger(t *testing.T) {
 	}
 }
 
+func TestRuntimeStopVoiceTextStandDownStopsRedAlert(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: AlertScenario{},
+		Priority: PriorityCritical,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"red alert",
+		time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC),
+	); err != nil {
+		t.Fatalf("HandleVoiceText(red alert) error = %v", err)
+	}
+
+	stopped, err := runtime.StopVoiceText(
+		context.Background(),
+		"d1",
+		"stand down",
+		time.Date(2026, 4, 11, 21, 1, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("StopVoiceText(stand down) error = %v", err)
+	}
+	if stopped != "red_alert" {
+		t.Fatalf("stopped scenario = %q, want red_alert", stopped)
+	}
+	if _, ok := engine.Active("d1"); ok {
+		t.Fatalf("expected no active scenario after stand down stop")
+	}
+}
+
 func TestRuntimeNoMatch(t *testing.T) {
 	runtime := NewRuntime(NewEngine(), &Environment{})
 	if _, err := runtime.HandleTrigger(context.Background(), Trigger{Intent: "unknown"}); err != ErrNoMatchingScenario {
@@ -458,8 +499,8 @@ func TestRuntimeManualAudioSchedulePAAndMultiWindow(t *testing.T) {
 		t.Fatalf("route count = %d, want 4", router.RouteCount())
 	}
 	events := broadcaster.Events()
-	if len(events) != 4 {
-		t.Fatalf("len(events) = %d, want 4", len(events))
+	if len(events) != 5 {
+		t.Fatalf("len(events) = %d, want 5", len(events))
 	}
 	if events[0].Message != "Audio monitor armed: dishwasher" {
 		t.Fatalf("event0 message = %q", events[0].Message)
@@ -470,8 +511,14 @@ func TestRuntimeManualAudioSchedulePAAndMultiWindow(t *testing.T) {
 	if events[2].Message != "PA system active" {
 		t.Fatalf("event2 message = %q", events[2].Message)
 	}
-	if events[3].Message != "Multi-window active" {
-		t.Fatalf("event3 message = %q", events[3].Message)
+	if events[3].Message != "PA from d1" {
+		t.Fatalf("event3 message = %q, want PA from d1", events[3].Message)
+	}
+	if len(events[3].DeviceIDs) != 2 || events[3].DeviceIDs[0] != "d2" || events[3].DeviceIDs[1] != "d3" {
+		t.Fatalf("event3 device IDs = %+v, want [d2 d3]", events[3].DeviceIDs)
+	}
+	if events[4].Message != "Multi-window active" {
+		t.Fatalf("event4 message = %q", events[4].Message)
 	}
 }
 
@@ -512,13 +559,19 @@ func TestRuntimeManualAliasIntentsForPAAndMultiWindow(t *testing.T) {
 		t.Fatalf("route count = %d, want 4", router.RouteCount())
 	}
 	events := broadcaster.Events()
-	if len(events) != 2 {
-		t.Fatalf("len(events) = %d, want 2", len(events))
+	if len(events) != 3 {
+		t.Fatalf("len(events) = %d, want 3", len(events))
 	}
 	if events[0].Message != "PA system active" {
 		t.Fatalf("event0 message = %q, want PA system active", events[0].Message)
 	}
-	if events[1].Message != "Multi-window active" {
-		t.Fatalf("event1 message = %q, want Multi-window active", events[1].Message)
+	if events[1].Message != "PA from d1" {
+		t.Fatalf("event1 message = %q, want PA from d1", events[1].Message)
+	}
+	if len(events[1].DeviceIDs) != 2 || events[1].DeviceIDs[0] != "d2" || events[1].DeviceIDs[1] != "d3" {
+		t.Fatalf("event1 device IDs = %+v, want [d2 d3]", events[1].DeviceIDs)
+	}
+	if events[2].Message != "Multi-window active" {
+		t.Fatalf("event2 message = %q, want Multi-window active", events[2].Message)
 	}
 }

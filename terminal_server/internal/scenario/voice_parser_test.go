@@ -16,6 +16,14 @@ func TestParseVoiceTriggerRedAlert(t *testing.T) {
 	}
 }
 
+func TestParseVoiceTriggerStandDownMapsToRedAlert(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "stand down", now)
+	if got.Intent != "red alert" {
+		t.Fatalf("Intent = %q, want red alert", got.Intent)
+	}
+}
+
 func TestParseVoiceTriggerTimer(t *testing.T) {
 	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
 	got := ParseVoiceTrigger("device-1", "set a timer for 10 minutes", now)
