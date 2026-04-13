@@ -19,7 +19,7 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 	switch {
 	case normalized == "red alert":
 		trigger.Intent = "red alert"
-	case normalized == "stand down":
+	case normalized == "stand down" || normalized == "stop red alert":
 		trigger.Intent = "red alert"
 	case normalized == "photo frame":
 		trigger.Intent = "photo frame"

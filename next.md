@@ -1,1 +1,1 @@
-Add generated/wire integration tests for voice stop phrase "stop red alert" to verify adapter-level red_alert scenario_stop payload preservation.
+Add generated/wire integration tests for voice start alias "pa mode" to verify adapter-level pa_system scenario_start payload preservation.

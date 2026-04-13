@@ -1242,3 +1242,80 @@ func TestGeneratedSessionVoiceStandDownStopsRedAlert(t *testing.T) {
 		t.Fatalf("expected scenario_stop=red_alert command result via stand down")
 	}
 }
+
+func TestGeneratedSessionVoiceStopRedAlertStopsRedAlert(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "device-1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "red-alert-start",
+						DeviceId:  "device-1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "red alert",
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "red-alert-stop-stop-red-alert",
+						DeviceId:  "device-1",
+						Action:    controlv1.CommandAction_COMMAND_ACTION_STOP,
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "stop red alert",
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawStart bool
+	var sawStop bool
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok || resp.GetCommandResult() == nil {
+			continue
+		}
+		switch {
+		case resp.GetCommandResult().GetScenarioStart() == "red_alert":
+			sawStart = true
+		case resp.GetCommandResult().GetScenarioStop() == "red_alert":
+			sawStop = true
+		}
+	}
+	if !sawStart {
+		t.Fatalf("expected scenario_start=red_alert command result")
+	}
+	if !sawStop {
+		t.Fatalf("expected scenario_stop=red_alert command result via stop red alert")
+	}
+}
