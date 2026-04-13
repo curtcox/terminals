@@ -776,6 +776,73 @@ void main() {
       expect(find.textContaining('Stop stream: stream-a'), findsOneWidget);
     },
   );
+
+  testWidgets('sends system status debug commands and renders diagnostics data',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    expect(find.textContaining('Diagnostics: none'), findsOneWidget);
+
+    await tester.tap(find.text('Runtime Status'));
+    await tester.pump();
+    final runtimeRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_SYSTEM &&
+          request.command.intent == 'runtime_status',
+    );
+    final runtimeRequestID = runtimeRequest.command.requestId;
+    expect(runtimeRequestID, isNotEmpty);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = runtimeRequestID
+          ..notification = 'System query: runtime_status'
+          ..data.addAll({
+            'active_routes': '1',
+            'media_streams_active': '2',
+          })),
+    );
+    await tester.pump();
+    expect(find.textContaining('Diagnostics: runtime_status'), findsOneWidget);
+    expect(find.textContaining('active_routes=1'), findsOneWidget);
+    expect(find.textContaining('media_streams_active=2'), findsOneWidget);
+
+    await tester.tap(find.text('Device Status'));
+    await tester.pump();
+    final deviceRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_SYSTEM &&
+          request.command.intent.startsWith('device_status '),
+    );
+    final deviceRequestID = deviceRequest.command.requestId;
+    expect(deviceRequestID, isNotEmpty);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = deviceRequestID
+          ..notification = 'System query: device_status'
+          ..data.addAll({
+            'device_id': 'flutter-test-device',
+            'sensor.unix_ms': '1713000009999',
+          })),
+    );
+    await tester.pump();
+    expect(find.textContaining('Diagnostics: device_status'), findsOneWidget);
+    expect(
+        find.textContaining('device_id=flutter-test-device'), findsOneWidget);
+    expect(find.textContaining('sensor.unix_ms=1713000009999'), findsOneWidget);
+  });
 }
 
 class _FakeClientHarness {

@@ -1,1 +1,1 @@
-Add client debug controls for system runtime_status/device_status queries and render returned status key-values in a compact diagnostics panel.
+Implement client-to-server WebRTC signaling input path: send WebRTCSignal messages from client for offer/answer/candidate actions and validate transport adapters handle round-trip signal payloads.

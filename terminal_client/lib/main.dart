@@ -130,6 +130,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   int _sensorSendCount = 0;
   int _streamReadyAckCount = 0;
   int _lastSensorSendUnixMs = 0;
+  int _debugCommandSeq = 0;
+  String _pendingRuntimeStatusRequestID = '';
+  String _pendingDeviceStatusRequestID = '';
+  String _diagnosticsTitle = 'none';
+  Map<String, String> _diagnosticsData = <String, String>{};
 
   Future<void> _startStream({bool userInitiated = true}) async {
     if (_isConnecting) {
@@ -214,6 +219,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                 response.commandResult.notification.isNotEmpty) {
               _lastNotification = response.commandResult.notification;
             }
+            _applyDiagnosticsResponse(response);
             if (response.hasError()) {
               _lastNotification = response.error.message;
             }
@@ -315,6 +321,64 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     }
     _sensorSendCount += 1;
     _lastSensorSendUnixMs = unixMs;
+  }
+
+  String _nextDebugRequestID(String prefix) {
+    _debugCommandSeq += 1;
+    return '$prefix-$_debugCommandSeq';
+  }
+
+  void _sendRuntimeStatusQuery() {
+    final requestID = _nextDebugRequestID('debug-runtime-status');
+    _pendingRuntimeStatusRequestID = requestID;
+    _outgoing.add(
+      ConnectRequest()
+        ..command = (CommandRequest()
+          ..requestId = requestID
+          ..kind = CommandKind.COMMAND_KIND_SYSTEM
+          ..intent = 'runtime_status'),
+    );
+  }
+
+  void _sendDeviceStatusQuery() {
+    final requestID = _nextDebugRequestID('debug-device-status');
+    _pendingDeviceStatusRequestID = requestID;
+    _outgoing.add(
+      ConnectRequest()
+        ..command = (CommandRequest()
+          ..requestId = requestID
+          ..kind = CommandKind.COMMAND_KIND_SYSTEM
+          ..intent = 'device_status $_deviceId'),
+    );
+  }
+
+  void _applyDiagnosticsResponse(ConnectResponse response) {
+    if (!response.hasCommandResult()) {
+      return;
+    }
+    final result = response.commandResult;
+    if (result.data.isEmpty) {
+      return;
+    }
+
+    final requestID = result.requestId;
+    var diagnosticsTitle = '';
+    if (requestID.isNotEmpty && requestID == _pendingRuntimeStatusRequestID) {
+      diagnosticsTitle = 'runtime_status';
+    } else if (requestID.isNotEmpty &&
+        requestID == _pendingDeviceStatusRequestID) {
+      diagnosticsTitle = 'device_status';
+    } else if (result.notification == 'System query: runtime_status') {
+      diagnosticsTitle = 'runtime_status';
+    } else if (result.notification == 'System query: device_status') {
+      diagnosticsTitle = 'device_status';
+    } else {
+      return;
+    }
+
+    final data = Map<String, String>.from(result.data);
+    _diagnosticsTitle = diagnosticsTitle;
+    _diagnosticsData = data;
   }
 
   void _stopHeartbeatLoop() {
@@ -581,8 +645,18 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                       onPressed: _stopStream,
                       child: const Text('Disconnect'),
                     ),
+                    OutlinedButton(
+                      onPressed: _sendRuntimeStatusQuery,
+                      child: const Text('Runtime Status'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _sendDeviceStatusQuery,
+                      child: const Text('Device Status'),
+                    ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                _buildDiagnosticsPanel(),
                 if (_activeRoot != null) ...[
                   const SizedBox(height: 24),
                   const Divider(),
@@ -605,6 +679,34 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDiagnosticsPanel() {
+    final keys = _diagnosticsData.keys.toList()..sort();
+    final displayKeys = keys.take(16).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blueGrey.shade200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Diagnostics: $_diagnosticsTitle'),
+          if (displayKeys.isEmpty)
+            const Text('No diagnostics data yet')
+          else
+            ...displayKeys.map(
+              (key) => Text(
+                '$key=${_diagnosticsData[key]}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+        ],
       ),
     );
   }
