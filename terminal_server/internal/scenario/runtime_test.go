@@ -2,11 +2,12 @@ package scenario
 
 import (
 	"context"
-	"io"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/audio"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
@@ -56,8 +57,8 @@ func TestRuntimeAudioMonitorNotifiesWhenTargetDetected(t *testing.T) {
 			if len(events[1].DeviceIDs) != 1 || events[1].DeviceIDs[0] != "d1" {
 				t.Fatalf("event1 device IDs = %+v, want [d1]", events[1].DeviceIDs)
 			}
-			if len(classifier.capturedBuf) != 0 {
-				t.Fatalf("expected silence source to immediately EOF, got bytes = %d", len(classifier.capturedBuf))
+			if got := classifier.captured(); len(got) != 0 {
+				t.Fatalf("expected silence source to immediately EOF, got bytes = %d", len(got))
 			}
 			return
 		}
@@ -65,6 +66,67 @@ func TestRuntimeAudioMonitorNotifiesWhenTargetDetected(t *testing.T) {
 	}
 
 	t.Fatalf("expected audio monitor detection notification; events = %+v", broadcaster.Events())
+}
+
+func TestRuntimeAudioMonitorConsumesLiveDeviceAudio(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	deviceAudio := newFakeDeviceAudio()
+	classifier := &testSoundClassifier{}
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &AudioMonitorScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:     devices,
+		Broadcast:   broadcaster,
+		Sound:       classifier,
+		DeviceAudio: deviceAudio,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "audio_monitor",
+		Arguments: map[string]string{
+			"target": "dishwasher",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(audio_monitor) error = %v", err)
+	}
+
+	// Wait for the scenario to register a live subscription.
+	if !waitFor(func() bool { return deviceAudio.subscriberCount("d1") == 1 }, 200*time.Millisecond) {
+		t.Fatalf("expected DeviceAudio subscriber count for d1 = 1, got %d", deviceAudio.subscriberCount("d1"))
+	}
+
+	// Simulate live mic audio arriving from the transport layer. The
+	// scenario should forward it into the sound classifier.
+	deviceAudio.publish("d1", []byte("dishwasher-audio-chunk"))
+
+	if !waitFor(func() bool { return len(classifier.captured()) >= len("dishwasher-audio-chunk") }, 300*time.Millisecond) {
+		t.Fatalf("classifier never received live audio; captured = %q", string(classifier.captured()))
+	}
+	if got := string(classifier.captured()); got != "dishwasher-audio-chunk" {
+		t.Fatalf("classifier captured = %q, want dishwasher-audio-chunk", got)
+	}
+
+	// Emit a matching event and confirm the scenario notifies the source device.
+	classifier.emit(SoundEvent{Label: "dishwasher_stopped", Confidence: 0.9, AtMS: 101})
+
+	if !waitFor(func() bool { return len(broadcaster.Events()) >= 2 }, 300*time.Millisecond) {
+		t.Fatalf("expected detection broadcast, got events = %+v", broadcaster.Events())
+	}
+	events := broadcaster.Events()
+	if events[1].Message != "Audio monitor detected: dishwasher_stopped" {
+		t.Fatalf("detection message = %q, want Audio monitor detected: dishwasher_stopped", events[1].Message)
+	}
+
+	// After detection, the scenario closes the subscription.
+	classifier.close()
+	if !waitFor(func() bool { return deviceAudio.subscriberCount("d1") == 0 }, 200*time.Millisecond) {
+		t.Fatalf("expected subscription to be closed after detection, count = %d", deviceAudio.subscriberCount("d1"))
+	}
 }
 
 func TestRuntimeAudioMonitorIgnoresNonMatchingEvents(t *testing.T) {
@@ -121,20 +183,76 @@ func (t *testTelephonyBridge) Hangup(context.Context, string) error {
 }
 
 type testSoundClassifier struct {
-	events      []SoundEvent
-	capturedBuf []byte
+	events []SoundEvent
+
+	mu     sync.Mutex
+	buf    []byte
+	out    chan SoundEvent
+	closed bool
 }
 
-func (t *testSoundClassifier) Classify(_ context.Context, audio AudioSource) (SoundEventStream, error) {
-	if audio != nil {
-		t.capturedBuf, _ = io.ReadAll(audio)
-	}
-	out := make(chan SoundEvent, len(t.events))
+func (t *testSoundClassifier) Classify(_ context.Context, audioSrc AudioSource) (SoundEventStream, error) {
+	t.mu.Lock()
+	out := make(chan SoundEvent, len(t.events)+8)
 	for _, event := range t.events {
 		out <- event
 	}
-	close(out)
+	autoClose := len(t.events) > 0
+	t.out = out
+	if autoClose {
+		close(out)
+		t.closed = true
+	}
+	t.mu.Unlock()
+
+	if audioSrc != nil {
+		go func() {
+			buf := make([]byte, 256)
+			for {
+				n, err := audioSrc.Read(buf)
+				if n > 0 {
+					t.mu.Lock()
+					t.buf = append(t.buf, buf[:n]...)
+					t.mu.Unlock()
+				}
+				if err != nil {
+					return
+				}
+			}
+		}()
+	}
+
 	return out, nil
+}
+
+// captured returns a snapshot of bytes read from the audio source.
+func (t *testSoundClassifier) captured() []byte {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return append([]byte(nil), t.buf...)
+}
+
+// emit pushes a runtime event onto an open event stream. No-op if closed.
+func (t *testSoundClassifier) emit(event SoundEvent) {
+	t.mu.Lock()
+	out := t.out
+	closed := t.closed
+	t.mu.Unlock()
+	if closed || out == nil {
+		return
+	}
+	out <- event
+}
+
+// close shuts down the event stream so range-reading consumers can exit.
+func (t *testSoundClassifier) close() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed || t.out == nil {
+		return
+	}
+	close(t.out)
+	t.closed = true
 }
 
 func TestRuntimeHandleTrigger(t *testing.T) {
@@ -825,4 +943,38 @@ func TestRuntimeMultiWindowFocusRoutesSingleAudioSource(t *testing.T) {
 	if hasAudioMix {
 		t.Fatalf("did not expect audio_mix routes when focus is selected")
 	}
+}
+
+// fakeDeviceAudio wraps an audio.Hub so scenario tests can exercise the
+// DeviceAudioSubscriber interface end-to-end.
+type fakeDeviceAudio struct {
+	hub *audio.Hub
+}
+
+func newFakeDeviceAudio() *fakeDeviceAudio {
+	return &fakeDeviceAudio{hub: audio.NewHub()}
+}
+
+func (f *fakeDeviceAudio) SubscribeAudio(ctx context.Context, deviceID string) (AudioSubscription, error) {
+	return f.hub.Subscribe(ctx, deviceID), nil
+}
+
+func (f *fakeDeviceAudio) publish(deviceID string, chunk []byte) {
+	f.hub.Publish(deviceID, chunk)
+}
+
+func (f *fakeDeviceAudio) subscriberCount(deviceID string) int {
+	return f.hub.SubscriberCount(deviceID)
+}
+
+// waitFor polls condition until it returns true or timeout elapses.
+func waitFor(condition func() bool, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return true
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return condition()
 }

@@ -247,6 +247,14 @@ type UITransition struct {
 	DurationMS int32
 }
 
+// DeviceAudioPublisher receives live mic-audio chunks keyed by device id so
+// scenarios subscribed via scenario.Environment.DeviceAudio can analyze the
+// live stream alongside any voice-command pipeline already consuming the
+// buffered audio.
+type DeviceAudioPublisher interface {
+	Publish(deviceID string, chunk []byte)
+}
+
 // StreamHandler processes control stream messages.
 type StreamHandler struct {
 	control     *ControlService
@@ -274,6 +282,8 @@ type StreamHandler struct {
 	mediaStreams      map[string]mediaStreamState
 	sensorsByDevice   map[string]sensorSnapshot
 	voiceAudioBuffers map[string][]byte
+
+	deviceAudio DeviceAudioPublisher
 }
 
 type mediaStreamState struct {
@@ -337,6 +347,16 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		sensorsByDevice:        map[string]sensorSnapshot{},
 		voiceAudioBuffers:      map[string][]byte{},
 	}
+}
+
+// SetDeviceAudioPublisher wires a live audio publisher so incoming VoiceAudio
+// chunks are fanned out to scenarios that need to analyze the device's
+// mic stream in real time. Safe to call once before any control streams are
+// handled; subsequent calls replace the publisher.
+func (h *StreamHandler) SetDeviceAudioPublisher(pub DeviceAudioPublisher) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.deviceAudio = pub
 }
 
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
@@ -1780,13 +1800,21 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 	buf := make([]byte, 0, len(existing)+len(va.Audio))
 	buf = append(buf, existing...)
 	buf = append(buf, va.Audio...)
+	publisher := h.deviceAudio
 	if !va.IsFinal {
 		h.voiceAudioBuffers[deviceID] = buf
 		h.mu.Unlock()
+		if publisher != nil && len(va.Audio) > 0 {
+			publisher.Publish(deviceID, va.Audio)
+		}
 		return nil, nil
 	}
 	delete(h.voiceAudioBuffers, deviceID)
 	h.mu.Unlock()
+
+	if publisher != nil && len(va.Audio) > 0 {
+		publisher.Publish(deviceID, va.Audio)
+	}
 
 	if h.runtime == nil || h.runtime.Env == nil {
 		return nil, errors.New("scenario runtime not configured")

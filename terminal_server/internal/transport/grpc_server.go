@@ -13,11 +13,12 @@ var ErrControlNotConfigured = errors.New("control service not configured")
 
 // Server is a small lifecycle wrapper for the future gRPC control server.
 type Server struct {
-	addr    string
-	running atomic.Bool
-	control *ControlService
-	adapter ProtoAdapter
-	runtime *scenario.Runtime
+	addr        string
+	running     atomic.Bool
+	control     *ControlService
+	adapter     ProtoAdapter
+	runtime     *scenario.Runtime
+	deviceAudio DeviceAudioPublisher
 }
 
 // NewServer returns a lifecycle-managed transport server placeholder.
@@ -58,11 +59,21 @@ func (s *Server) ConfigureRuntime(runtime *scenario.Runtime) {
 	s.runtime = runtime
 }
 
+// ConfigureDeviceAudio wires a live device-audio publisher so every control
+// stream created by Connect forwards inbound VoiceAudio chunks to scenarios
+// subscribed via the scenario.Environment's DeviceAudio hub.
+func (s *Server) ConfigureDeviceAudio(pub DeviceAudioPublisher) {
+	s.deviceAudio = pub
+}
+
 // Connect handles a single bidirectional control stream session.
 func (s *Server) Connect(stream ProtoStream) error {
 	if s.control == nil || s.adapter == nil {
 		return ErrControlNotConfigured
 	}
 	handler := NewStreamHandlerWithRuntime(s.control, s.runtime)
+	if s.deviceAudio != nil {
+		handler.SetDeviceAudioPublisher(s.deviceAudio)
+	}
 	return RunProtoSession(handler, s.control, stream, s.adapter)
 }

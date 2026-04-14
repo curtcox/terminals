@@ -6,8 +6,23 @@ import (
 	"io"
 
 	"github.com/curtcox/terminals/terminal_server/internal/ai"
+	"github.com/curtcox/terminals/terminal_server/internal/audio"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
+
+// scenarioDeviceAudio adapts an *audio.Hub to scenario.DeviceAudioSubscriber
+// so scenarios can subscribe to live device mic audio without depending on
+// the audio package directly.
+type scenarioDeviceAudio struct {
+	hub *audio.Hub
+}
+
+func (a scenarioDeviceAudio) SubscribeAudio(
+	ctx context.Context,
+	deviceID string,
+) (scenario.AudioSubscription, error) {
+	return a.hub.Subscribe(ctx, deviceID), nil
+}
 
 // scenarioLLM adapts an ai.LLM to scenario.LLM so the runtime can invoke
 // the configured backend without depending on the ai package.

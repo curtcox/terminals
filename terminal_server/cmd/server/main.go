@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/ai"
+	"github.com/curtcox/terminals/terminal_server/internal/audio"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
@@ -31,6 +32,7 @@ func main() {
 
 	deviceManager := device.NewManager()
 	ioRouter := io.NewRouter()
+	audioHub := audio.NewHub()
 	scenarioEngine := scenario.NewEngine()
 	controlService := transport.NewControlService(cfg.MDNSName, deviceManager)
 	store := storage.NewMemoryStore()
@@ -43,19 +45,20 @@ func main() {
 	}
 	aiBackends := ai.NewNoopBackends()
 	environment := &scenario.Environment{
-		Devices:   deviceManager,
-		IO:        ioRouter,
-		AI:        ai.LLMQueryAdapter{LLM: aiBackends.LLM},
-		LLM:       scenarioLLM{backend: aiBackends.LLM},
-		Vision:    scenarioVisionAnalyzer{backend: aiBackends.Vision},
-		Sound:     scenarioSoundClassifier{backend: aiBackends.Sound},
-		STT:       scenarioSTT{backend: aiBackends.STT},
-		WakeWord:  scenario.PrefixWakeWordDetector{Prefixes: cfg.WakeWordPrefixes},
-		TTS:       scenarioTTS{backend: aiBackends.TTS},
-		Telephony: telephonyBridge,
-		Storage:   store,
-		Scheduler: scheduler,
-		Broadcast: broadcaster,
+		Devices:     deviceManager,
+		IO:          ioRouter,
+		AI:          ai.LLMQueryAdapter{LLM: aiBackends.LLM},
+		LLM:         scenarioLLM{backend: aiBackends.LLM},
+		Vision:      scenarioVisionAnalyzer{backend: aiBackends.Vision},
+		Sound:       scenarioSoundClassifier{backend: aiBackends.Sound},
+		STT:         scenarioSTT{backend: aiBackends.STT},
+		WakeWord:    scenario.PrefixWakeWordDetector{Prefixes: cfg.WakeWordPrefixes},
+		TTS:         scenarioTTS{backend: aiBackends.TTS},
+		Telephony:   telephonyBridge,
+		Storage:     store,
+		Scheduler:   scheduler,
+		Broadcast:   broadcaster,
+		DeviceAudio: scenarioDeviceAudio{hub: audioHub},
 	}
 	scenario.RegisterBuiltins(scenarioEngine)
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
@@ -63,6 +66,7 @@ func main() {
 	grpcServer := transport.NewServer(cfg.GRPCAddress())
 	grpcServer.ConfigureControl(controlService, transport.GeneratedProtoAdapter{})
 	grpcServer.ConfigureRuntime(scenarioRuntime)
+	grpcServer.ConfigureDeviceAudio(audioHub)
 	mdns := discovery.NewMDNSAdvertiser()
 
 	log.Printf("terminal server starting at %s", grpcServer.Address())

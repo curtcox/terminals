@@ -384,13 +384,25 @@ func (s *AudioMonitorScenario) Start(ctx context.Context, env *Environment) erro
 		return nil
 	}
 
-	stream, err := env.Sound.Classify(ctx, audioMonitorSilenceSource{})
+	sourceID := strings.TrimSpace(s.trigger.SourceID)
+
+	audioCtx, cancelAudio := context.WithCancel(ctx)
+	audio, closeAudio, err := openAudioMonitorSource(audioCtx, env, sourceID)
 	if err != nil {
+		cancelAudio()
 		return err
 	}
 
-	sourceID := s.trigger.SourceID
+	stream, err := env.Sound.Classify(audioCtx, audio)
+	if err != nil {
+		closeAudio()
+		cancelAudio()
+		return err
+	}
+
 	go func() {
+		defer cancelAudio()
+		defer closeAudio()
 		for event := range stream {
 			if !audioMonitorEventMatchesTarget(target, event.Label) {
 				continue
@@ -405,6 +417,20 @@ func (s *AudioMonitorScenario) Start(ctx context.Context, env *Environment) erro
 	}()
 
 	return nil
+}
+
+// openAudioMonitorSource returns a live audio source for the monitored
+// device, falling back to an immediate-EOF silence source when the runtime
+// is not configured with a DeviceAudioSubscriber or no source device is set.
+func openAudioMonitorSource(ctx context.Context, env *Environment, sourceID string) (AudioSource, func(), error) {
+	if env != nil && env.DeviceAudio != nil && sourceID != "" {
+		sub, err := env.DeviceAudio.SubscribeAudio(ctx, sourceID)
+		if err != nil {
+			return nil, nil, err
+		}
+		return sub, func() { _ = sub.Close() }, nil
+	}
+	return audioMonitorSilenceSource{}, func() {}, nil
 }
 
 // Stop ends monitor mode and currently has no side effects.

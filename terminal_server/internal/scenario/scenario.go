@@ -86,6 +86,22 @@ type AudioSource interface {
 	Read(p []byte) (int, error)
 }
 
+// AudioSubscription is a scenario-facing handle to a live audio stream.
+// Close releases the subscription and causes subsequent Reads to return EOF
+// after any buffered data has been drained.
+type AudioSubscription interface {
+	AudioSource
+	Close() error
+}
+
+// DeviceAudioSubscriber exposes live, per-device mic audio to scenarios.
+// Scenarios that need to continuously analyze device audio (for example,
+// AudioMonitorScenario) call SubscribeAudio to obtain an AudioSubscription
+// that is fed by the transport layer as audio chunks arrive.
+type DeviceAudioSubscriber interface {
+	SubscribeAudio(ctx context.Context, deviceID string) (AudioSubscription, error)
+}
+
 // Transcript is a single recognition result.
 type Transcript struct {
 	Text       string
@@ -177,19 +193,20 @@ type Broadcaster interface {
 
 // Environment is the dependency bag scenarios receive at runtime.
 type Environment struct {
-	Devices   DeviceManager
-	IO        IORouter
-	AI        AIBackend
-	LLM       LLM
-	Vision    VisionAnalyzer
-	Sound     SoundClassifier
-	STT       SpeechToText
-	WakeWord  WakeWordDetector
-	TTS       TextToSpeech
-	Telephony TelephonyBridge
-	Storage   StorageManager
-	Scheduler Scheduler
-	Broadcast Broadcaster
+	Devices     DeviceManager
+	IO          IORouter
+	AI          AIBackend
+	LLM         LLM
+	Vision      VisionAnalyzer
+	Sound       SoundClassifier
+	STT         SpeechToText
+	WakeWord    WakeWordDetector
+	TTS         TextToSpeech
+	Telephony   TelephonyBridge
+	Storage     StorageManager
+	Scheduler   Scheduler
+	Broadcast   Broadcaster
+	DeviceAudio DeviceAudioSubscriber
 }
 
 // Scenario is the runtime contract for all server-side behaviors.
