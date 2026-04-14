@@ -75,3 +75,47 @@ func TestPAReceiverOverlayPatch(t *testing.T) {
 		t.Fatalf("overlay text value = %q, want PA from device-1", d.Children[0].Children[0].Props["value"])
 	}
 }
+
+func TestMultiWindowViewUsesAdaptiveGridAndFocusActions(t *testing.T) {
+	d := MultiWindowView("viewer", []string{"cam-a", "cam-b", "cam-c"}, "cam-b")
+	if d.Type != "stack" {
+		t.Fatalf("Type = %q, want stack", d.Type)
+	}
+	if len(d.Children) < 3 {
+		t.Fatalf("children = %d, want at least 3", len(d.Children))
+	}
+	grid := d.Children[1]
+	if grid.Type != "grid" {
+		t.Fatalf("grid type = %q, want grid", grid.Type)
+	}
+	if grid.Props["columns"] != "2" {
+		t.Fatalf("grid columns = %q, want 2", grid.Props["columns"])
+	}
+	if len(grid.Children) != 3 {
+		t.Fatalf("grid children = %d, want 3", len(grid.Children))
+	}
+
+	foundFocusAction := false
+	foundFocusedLabel := false
+	for _, tile := range grid.Children {
+		if tile.Type != "stack" || len(tile.Children) < 3 {
+			continue
+		}
+		button := tile.Children[2]
+		if button.Type != "button" {
+			continue
+		}
+		if button.Props["action"] == "multi_window_focus:cam-b" {
+			foundFocusAction = true
+			if button.Props["label"] == "Hearing cam-b" {
+				foundFocusedLabel = true
+			}
+		}
+	}
+	if !foundFocusAction {
+		t.Fatalf("expected focus button action multi_window_focus:cam-b")
+	}
+	if !foundFocusedLabel {
+		t.Fatalf("expected focused peer button label Hearing cam-b")
+	}
+}

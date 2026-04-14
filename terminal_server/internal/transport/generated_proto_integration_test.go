@@ -9,6 +9,8 @@ import (
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
+	uiv1 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
@@ -1633,5 +1635,134 @@ func TestGeneratedSessionMultiWindowAudioMixAndFocusSelection(t *testing.T) {
 	}
 	if sawFocusedAudioMix {
 		t.Fatalf("did not expect audio_mix start routes after focused restart")
+	}
+}
+
+func TestGeneratedSessionMultiWindowSetUIAndFocusActionRouting(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "d1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "all-cameras-start",
+						DeviceId:  "d1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "all cameras",
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Input{
+					Input: &iov1.InputEvent{
+						DeviceId: "d1",
+						Payload: &iov1.InputEvent_UiAction{
+							UiAction: &iov1.UIAction{
+								ComponentId: "multi_window_focus_d2",
+								Action:      "multi_window_focus:d2",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawGridColumns bool
+	var sawFocusAction bool
+	var sawFocusedLabel bool
+	walkNode := func(node *uiv1.Node, fn func(*uiv1.Node)) {}
+	walkNode = func(node *uiv1.Node, fn func(*uiv1.Node)) {
+		if node == nil {
+			return
+		}
+		fn(node)
+		for _, child := range node.GetChildren() {
+			walkNode(child, fn)
+		}
+	}
+
+	scenarioStartCount := 0
+	mixStopCount := 0
+	focusAudioStartCount := 0
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok {
+			continue
+		}
+		if result := resp.GetCommandResult(); result != nil && result.GetScenarioStart() == "multi_window" {
+			scenarioStartCount++
+		}
+		if stop := resp.GetStopStream(); stop != nil {
+			if stop.GetStreamId() == "route:d2|d1|audio_mix" || stop.GetStreamId() == "route:d3|d1|audio_mix" {
+				mixStopCount++
+			}
+		}
+		if start := resp.GetStartStream(); start != nil && start.GetStreamId() == "route:d2|d1|audio" {
+			focusAudioStartCount++
+		}
+		if set := resp.GetSetUi(); set != nil {
+			walkNode(set.GetRoot(), func(node *uiv1.Node) {
+				if node.GetProps()["id"] == "multi_window_grid" && node.GetGrid() != nil && node.GetGrid().GetColumns() == 2 {
+					sawGridColumns = true
+				}
+				if button := node.GetButton(); button != nil {
+					if button.GetAction() == "multi_window_focus:d2" {
+						sawFocusAction = true
+					}
+					if button.GetLabel() == "Hearing d2" {
+						sawFocusedLabel = true
+					}
+				}
+			})
+		}
+	}
+
+	if !sawGridColumns {
+		t.Fatalf("expected multi_window grid columns to be set to 2")
+	}
+	if !sawFocusAction {
+		t.Fatalf("expected multi_window focus button action for d2")
+	}
+	if scenarioStartCount < 2 {
+		t.Fatalf("expected two multi_window starts (voice + focus action), got %d", scenarioStartCount)
+	}
+	if mixStopCount < 2 {
+		t.Fatalf("expected focus action to stop both audio_mix routes, got %d", mixStopCount)
+	}
+	if focusAudioStartCount == 0 {
+		t.Fatalf("expected focus action to start focused audio route")
+	}
+	if !sawFocusedLabel {
+		t.Fatalf("expected re-rendered UI with focused label Hearing d2")
 	}
 }

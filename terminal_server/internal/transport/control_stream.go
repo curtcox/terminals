@@ -623,6 +623,11 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		})
 		return responses
 	}
+	if commandResult.ScenarioStart == "multi_window" {
+		peerIDs, focusedPeerID := h.multiWindowPeersAndFocus(cmd.DeviceID)
+		multiWindowUI := ui.MultiWindowView(cmd.DeviceID, peerIDs, focusedPeerID)
+		responses = append(responses, ServerMessage{SetUI: &multiWindowUI})
+	}
 	if cmd.Action != "" && cmd.Action != CommandActionStart {
 		return responses
 	}
@@ -709,6 +714,19 @@ func (h *StreamHandler) routeUpdatesForCommand(
 				},
 			}
 			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, routeMsg)
+		}
+		for _, route := range before {
+			routeID := routeStreamID(route)
+			if _, exists := afterSet[routeID]; exists {
+				continue
+			}
+			stopMsg := ServerMessage{
+				StopStream: &StopStreamResponse{
+					StreamID: routeID,
+				},
+			}
+			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, stopMsg)
+			h.unregisterMediaStream(routeID)
 		}
 	}
 	if action == CommandActionStop {
@@ -1229,13 +1247,28 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 	if action == "" {
 		return nil, false, nil
 	}
+	beforeRoutes := h.routeSnapshotForDevice(deviceID)
+	beforeBroadcastEvents := h.broadcastEventCount()
 
 	intent := ""
 	commandAction := CommandActionStart
+	triggerArgs := map[string]string{
+		"device_id": deviceID,
+	}
 	switch {
 	case action == "stop_active":
 		intent = activeName
 		commandAction = CommandActionStop
+	case strings.HasPrefix(action, "multi_window_focus:"):
+		if activeName != "multi_window" {
+			return nil, false, nil
+		}
+		focusDeviceID := strings.TrimSpace(strings.TrimPrefix(action, "multi_window_focus:"))
+		if focusDeviceID == "" {
+			return nil, true, nil
+		}
+		intent = "multi_window"
+		triggerArgs["audio_focus_device_id"] = focusDeviceID
 	case strings.HasPrefix(action, "start:"):
 		intent = strings.TrimSpace(strings.TrimPrefix(action, "start:"))
 	case strings.HasPrefix(action, "stop:"):
@@ -1258,9 +1291,7 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		Kind:     scenario.TriggerManual,
 		SourceID: deviceID,
 		Intent:   intent,
-		Arguments: map[string]string{
-			"device_id": deviceID,
-		},
+		Arguments: triggerArgs,
 	}
 	if commandAction == CommandActionStop {
 		name, err := h.runtime.StopTrigger(ctx, trigger)
@@ -1277,7 +1308,25 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 			Kind:     CommandKindManual,
 			Intent:   intent,
 		}
-		return h.commandResponses(ctx, cmd, result), true, nil
+		responses := h.commandResponses(ctx, cmd, result)
+		afterRoutes := h.routeSnapshotForDevice(deviceID)
+		routeUpdates := h.routeUpdatesForCommand(cmd, result, beforeRoutes, afterRoutes)
+		if len(routeUpdates) > 0 {
+			responses = append(responses, routeUpdates...)
+		}
+		paTransitions := h.paTransitionsForCommand(cmd, result, beforeRoutes, afterRoutes)
+		if len(paTransitions) > 0 {
+			responses = append(responses, paTransitions...)
+		}
+		overlayClears := h.paOverlayClearsForCommand(cmd, result, beforeRoutes)
+		if len(overlayClears) > 0 {
+			responses = append(responses, overlayClears...)
+		}
+		broadcastNotifications := h.broadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
+		if len(broadcastNotifications) > 0 {
+			responses = append(responses, broadcastNotifications...)
+		}
+		return responses, true, nil
 	}
 	name, err := h.runtime.HandleTrigger(ctx, trigger)
 	if err != nil {
@@ -1293,7 +1342,52 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		Kind:     CommandKindManual,
 		Intent:   intent,
 	}
-	return h.commandResponses(ctx, cmd, result), true, nil
+	responses := h.commandResponses(ctx, cmd, result)
+	afterRoutes := h.routeSnapshotForDevice(deviceID)
+	routeUpdates := h.routeUpdatesForCommand(cmd, result, beforeRoutes, afterRoutes)
+	if len(routeUpdates) > 0 {
+		responses = append(responses, routeUpdates...)
+	}
+	paTransitions := h.paTransitionsForCommand(cmd, result, beforeRoutes, afterRoutes)
+	if len(paTransitions) > 0 {
+		responses = append(responses, paTransitions...)
+	}
+	overlayClears := h.paOverlayClearsForCommand(cmd, result, beforeRoutes)
+	if len(overlayClears) > 0 {
+		responses = append(responses, overlayClears...)
+	}
+	broadcastNotifications := h.broadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
+	if len(broadcastNotifications) > 0 {
+		responses = append(responses, broadcastNotifications...)
+	}
+	return responses, true, nil
+}
+
+func (h *StreamHandler) multiWindowPeersAndFocus(deviceID string) ([]string, string) {
+	routes := h.routeSnapshotForDevice(deviceID)
+	peers := make([]string, 0)
+	seenPeers := map[string]struct{}{}
+	focusedPeerID := ""
+	for _, route := range routes {
+		if strings.TrimSpace(route.TargetID) != strings.TrimSpace(deviceID) {
+			continue
+		}
+		sourceID := strings.TrimSpace(route.SourceID)
+		if sourceID == "" || sourceID == strings.TrimSpace(deviceID) {
+			continue
+		}
+		if route.StreamKind == "video" {
+			if _, exists := seenPeers[sourceID]; !exists {
+				seenPeers[sourceID] = struct{}{}
+				peers = append(peers, sourceID)
+			}
+		}
+		if route.StreamKind == "audio" {
+			focusedPeerID = sourceID
+		}
+	}
+	sort.Strings(peers)
+	return peers, focusedPeerID
 }
 
 func (h *StreamHandler) isRegisteredScenario(name string) bool {

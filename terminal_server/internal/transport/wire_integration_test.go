@@ -1320,3 +1320,77 @@ func TestWireSessionMultiWindowAudioMixAndFocusSelection(t *testing.T) {
 		t.Fatalf("did not expect audio_mix start routes after focused restart")
 	}
 }
+
+func TestWireSessionMultiWindowSetUIIncludesFocusActions(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "all-cameras-start",
+				DeviceID:  "d1",
+				Kind:      WireCommandKindVoice,
+				Text:      "all cameras",
+			}},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, WireProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawGridColumns bool
+	var sawFocusAction bool
+	var sawFocusButtonID bool
+	var walkNode func(node uiWireDescriptor, fn func(uiWireDescriptor))
+	walkNode = func(node uiWireDescriptor, fn func(uiWireDescriptor)) {
+		fn(node)
+		for _, child := range node.Children {
+			walkNode(child, fn)
+		}
+	}
+
+	for _, sent := range stream.sent {
+		msg, ok := sent.(WireServerMessage)
+		if !ok || msg.SetUI == nil {
+			continue
+		}
+		walkNode(*msg.SetUI, func(node uiWireDescriptor) {
+			props := DecodeDataEntries(node.Props)
+			if props["id"] == "multi_window_grid" && props["columns"] == "2" {
+				sawGridColumns = true
+			}
+			if node.Type == "button" && props["action"] == "multi_window_focus:d2" {
+				sawFocusAction = true
+				if props["id"] == "multi_window_focus_d2" {
+					sawFocusButtonID = true
+				}
+			}
+		})
+	}
+
+	if !sawGridColumns {
+		t.Fatalf("expected wire set_ui grid columns to be 2")
+	}
+	if !sawFocusAction {
+		t.Fatalf("expected wire set_ui focus action multi_window_focus:d2")
+	}
+	if !sawFocusButtonID {
+		t.Fatalf("expected focus button id multi_window_focus_d2")
+	}
+}

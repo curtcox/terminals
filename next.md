@@ -1,1 +1,1 @@
-Implement server-driven multi-window grid UI descriptors (adaptive layout + per-feed labels + focus action IDs) and cover them with scenario/transport tests.
+Implement multi-window session lifecycle polish: add explicit end action in UI, stop-trigger handling from UI, and restore previous UI/transition on exit with transport tests.

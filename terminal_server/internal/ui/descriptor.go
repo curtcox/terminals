@@ -1,5 +1,7 @@
 package ui
 
+import "strconv"
+
 const (
 	// GlobalOverlayComponentID is the stable component id used for transient overlays.
 	GlobalOverlayComponentID = "global_overlay"
@@ -97,4 +99,60 @@ func PAReceiverOverlayPatch(message string) Descriptor {
 		"style": "headline",
 		"color": "#FFFFFF",
 	})))
+}
+
+// MultiWindowView renders an adaptive camera-grid descriptor for a viewer device.
+func MultiWindowView(viewerDeviceID string, peerDeviceIDs []string, focusedPeerID string) Descriptor {
+	gridChildren := make([]Descriptor, 0, len(peerDeviceIDs))
+	for _, peerDeviceID := range peerDeviceIDs {
+		if peerDeviceID == "" {
+			continue
+		}
+		videoTrackID := "route:" + peerDeviceID + "|" + viewerDeviceID + "|video"
+		focusLabel := "Hear " + peerDeviceID
+		if focusedPeerID == peerDeviceID {
+			focusLabel = "Hearing " + peerDeviceID
+		}
+		gridChildren = append(gridChildren, New("stack", map[string]string{
+			"id":         "multi_window_tile_" + peerDeviceID,
+			"background": "#111111",
+		}, New("text", map[string]string{
+			"id":    "multi_window_label_" + peerDeviceID,
+			"value": peerDeviceID,
+			"style": "headline",
+			"color": "#FFFFFF",
+		}), New("video_surface", map[string]string{
+			"id":       "multi_window_video_" + peerDeviceID,
+			"track_id": videoTrackID,
+		}), New("button", map[string]string{
+			"id":     "multi_window_focus_" + peerDeviceID,
+			"label":  focusLabel,
+			"action": "multi_window_focus:" + peerDeviceID,
+		})))
+	}
+
+	columns := 1
+	switch count := len(gridChildren); {
+	case count <= 1:
+		columns = 1
+	case count <= 4:
+		columns = 2
+	case count <= 9:
+		columns = 3
+	default:
+		columns = 4
+	}
+
+	return New("stack", map[string]string{
+		"id":         "multi_window_root",
+		"background": "#090C10",
+	}, New("text", map[string]string{
+		"id":    "multi_window_title",
+		"value": "Multi-window view",
+		"style": "headline",
+		"color": "#E7F0F7",
+	}), New("grid", map[string]string{
+		"id":      "multi_window_grid",
+		"columns": strconv.Itoa(columns),
+	}, gridChildren...), GlobalOverlaySlot())
 }

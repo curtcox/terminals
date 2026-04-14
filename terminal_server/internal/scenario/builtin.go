@@ -14,6 +14,35 @@ import (
 // AlertScenario broadcasts a critical alert across targeted devices.
 type AlertScenario struct{}
 
+func clearMultiWindowAudioRoutes(env *Environment, targetID string) error {
+	if env == nil || env.IO == nil {
+		return nil
+	}
+	routeIO, ok := env.IO.(interface {
+		RoutesForDevice(string) []iorouter.Route
+		Disconnect(sourceID, targetID, streamKind string) error
+	})
+	if !ok {
+		return nil
+	}
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return nil
+	}
+	for _, route := range routeIO.RoutesForDevice(targetID) {
+		if route.TargetID != targetID {
+			continue
+		}
+		if route.StreamKind != "audio_mix" && route.StreamKind != "audio" {
+			continue
+		}
+		if err := routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind); err != nil && !errors.Is(err, iorouter.ErrRouteNotFound) {
+			return err
+		}
+	}
+	return nil
+}
+
 // Name returns the stable scenario identifier.
 func (AlertScenario) Name() string { return "red_alert" }
 
@@ -396,6 +425,9 @@ func (s *MultiWindowScenario) Start(ctx context.Context, env *Environment) error
 			if err := env.IO.Connect(peer, source, "video"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 				return err
 			}
+		}
+		if err := clearMultiWindowAudioRoutes(env, source); err != nil {
+			return err
 		}
 		focusedPeer := strings.TrimSpace(s.trigger.Arguments["audio_focus_device_id"])
 		if focusedPeer != "" {
