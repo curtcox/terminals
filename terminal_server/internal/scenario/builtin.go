@@ -737,6 +737,83 @@ func (s *PASystemScenario) Resume(_ context.Context, env *Environment) error {
 	return reconnectOwnedRoutes(env, routes)
 }
 
+// AnnouncementScenario fans out source audio one-way for whole-house announcements.
+type AnnouncementScenario struct {
+	trigger Trigger
+
+	mu          sync.Mutex
+	env         *Environment
+	ownedRoutes []ioRoute
+}
+
+// Name returns the stable scenario identifier.
+func (s *AnnouncementScenario) Name() string { return "announcement" }
+
+// Match records trigger metadata when announcement mode is requested.
+func (s *AnnouncementScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "announcement", "announce", "whole house announcement") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start routes source audio to peers and announces announcement mode.
+func (s *AnnouncementScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil {
+		return nil
+	}
+	targets := peerTargetDeviceIDs(env, s.trigger.SourceID, s.trigger.Arguments)
+	ownedRoutes, err := connectSourceToTargetsOwned(ctx, env, s.trigger.SourceID, targets, "announcement_audio")
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.env = env
+	s.ownedRoutes = ownedRoutes
+	s.mu.Unlock()
+	if err := notifySource(ctx, env, s.trigger.SourceID, "Announcement active"); err != nil {
+		return err
+	}
+	if env.Broadcast != nil {
+		sourceID := strings.TrimSpace(s.trigger.SourceID)
+		peerIDs := nonSourceDeviceIDs(env, sourceID)
+		if len(peerIDs) > 0 {
+			return env.Broadcast.Notify(ctx, peerIDs, "Announcement from "+sourceID)
+		}
+	}
+	return nil
+}
+
+// Stop ends announcement mode and releases any owned routes.
+func (s *AnnouncementScenario) Stop() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = nil
+	s.ownedRoutes = nil
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Suspend releases announcement-owned routes while preempted.
+func (s *AnnouncementScenario) Suspend() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Resume reacquires announcement-owned routes after preemption.
+func (s *AnnouncementScenario) Resume(_ context.Context, env *Environment) error {
+	s.mu.Lock()
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = env
+	s.mu.Unlock()
+	return reconnectOwnedRoutes(env, routes)
+}
+
 // MultiWindowScenario routes all peer cameras to source display.
 type MultiWindowScenario struct {
 	trigger Trigger

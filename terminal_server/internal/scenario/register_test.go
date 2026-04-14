@@ -24,6 +24,7 @@ func TestRegisterBuiltinsIncludesMasterplanScenarios(t *testing.T) {
 		"timer_reminder",
 		"terminal",
 		"pa_system",
+		"announcement",
 		"red_alert",
 	}
 	for _, name := range want {

@@ -11,12 +11,12 @@ Add AI-powered voice interaction.
 
 ## Deliverables
 
-- [ ] **AI backend interfaces**: Define and implement the pluggable AI interfaces (`SpeechToText`, `TextToSpeech`, `LLM`, `VisionAnalyzer`, `SoundClassifier`). See [technology.md](technology.md#ai-backend-pluggable).
-- [ ] **Wake word detection**: Continuous low-power audio monitoring on idle devices.
-- [ ] **STT pipeline**: Mic → server → speech-to-text.
-- [ ] **LLM query pipeline**: Transcribed text → LLM → response text.
-- [ ] **TTS pipeline**: Response text → TTS → speaker.
-- [ ] **Rich responses**: Voice response + accompanying visual UI on the device screen. See [use-case-flows.md](use-case-flows.md#smart-speaker--voice-assistant).
+- [x] **AI backend interfaces**: Define and implement the pluggable AI interfaces (`SpeechToText`, `TextToSpeech`, `LLM`, `VisionAnalyzer`, `SoundClassifier`). See [technology.md](technology.md#ai-backend-pluggable).
+- [x] **Wake word detection**: Continuous low-power audio monitoring on idle devices.
+- [x] **STT pipeline**: Mic → server → speech-to-text.
+- [x] **LLM query pipeline**: Transcribed text → LLM → response text.
+- [x] **TTS pipeline**: Response text → TTS → speaker.
+- [x] **Rich responses**: Voice response + accompanying visual UI on the device screen. See [use-case-flows.md](use-case-flows.md#smart-speaker--voice-assistant).
 
 ## Milestone
 

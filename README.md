@@ -34,7 +34,33 @@ make proto-lint
 make all-check
 ```
 
+Run the server locally:
+
+```bash
+make run-server
+```
+
 ## Architecture Rule
 
 Add behavior on the server, not the client. The client remains a generic terminal.
 
+## Photo Frame Configuration
+
+The photo-frame scenario is configured entirely on the server.
+
+Environment variables:
+
+- `TERMINALS_PHOTO_FRAME_DIR`: Directory containing photo assets (`.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`).
+- `TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS`: Slide rotation interval (default `12`).
+- `TERMINALS_PHOTO_FRAME_HTTP_HOST`: Bind host for the built-in asset server (default `0.0.0.0`).
+- `TERMINALS_PHOTO_FRAME_HTTP_PORT`: Bind port for the built-in asset server (default `50052`).
+- `TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL`: Optional externally hosted base URL. When set, the built-in photo asset server is not started.
+
+Metadata contract:
+
+- On connect, the server sends `RegisterAck.metadata["photo_frame_asset_base_url"]`.
+- Clients treat this value as the canonical base URL for photo-frame slide assets.
+- If `TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL` is set, that exact value (trailing slash trimmed) is published in metadata.
+- Otherwise the server publishes `http://<mdns_name>.local:<photo_frame_http_port>/photo-frame`.
+
+Example env config is in [`terminal_server/configs/server.env.example`](/Users/curtcox/me/terminals/terminal_server/configs/server.env.example).

@@ -1320,7 +1320,7 @@ func TestRuntimeManualAudioSchedulePAAndMultiWindow(t *testing.T) {
 	}
 }
 
-func TestRuntimeManualAliasIntentsForPAAndMultiWindow(t *testing.T) {
+func TestRuntimeManualAliasIntentsForPAAnnouncementAndMultiWindow(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
 	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
@@ -1330,6 +1330,7 @@ func TestRuntimeManualAliasIntentsForPAAndMultiWindow(t *testing.T) {
 
 	engine := NewEngine()
 	engine.Register(Registration{Scenario: &PASystemScenario{}, Priority: PriorityHigh})
+	engine.Register(Registration{Scenario: &AnnouncementScenario{}, Priority: PriorityHigh})
 	engine.Register(Registration{Scenario: &MultiWindowScenario{}, Priority: PriorityNormal})
 	runtime := NewRuntime(engine, &Environment{
 		Devices:   devices,
@@ -1353,12 +1354,20 @@ func TestRuntimeManualAliasIntentsForPAAndMultiWindow(t *testing.T) {
 		t.Fatalf("HandleTrigger(show all cameras) error = %v", err)
 	}
 
-	if router.RouteCount() != 6 {
-		t.Fatalf("route count = %d, want 6", router.RouteCount())
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "announce",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(announce) error = %v", err)
+	}
+
+	if router.RouteCount() != 8 {
+		t.Fatalf("route count = %d, want 8", router.RouteCount())
 	}
 	events := broadcaster.Events()
-	if len(events) != 3 {
-		t.Fatalf("len(events) = %d, want 3", len(events))
+	if len(events) != 5 {
+		t.Fatalf("len(events) = %d, want 5", len(events))
 	}
 	if events[0].Message != "PA system active" {
 		t.Fatalf("event0 message = %q, want PA system active", events[0].Message)
@@ -1371,6 +1380,15 @@ func TestRuntimeManualAliasIntentsForPAAndMultiWindow(t *testing.T) {
 	}
 	if events[2].Message != "Multi-window active" {
 		t.Fatalf("event2 message = %q, want Multi-window active", events[2].Message)
+	}
+	if events[3].Message != "Announcement active" {
+		t.Fatalf("event3 message = %q, want Announcement active", events[3].Message)
+	}
+	if events[4].Message != "Announcement from d1" {
+		t.Fatalf("event4 message = %q, want Announcement from d1", events[4].Message)
+	}
+	if len(events[4].DeviceIDs) != 2 || events[4].DeviceIDs[0] != "d2" || events[4].DeviceIDs[1] != "d3" {
+		t.Fatalf("event4 device IDs = %+v, want [d2 d3]", events[4].DeviceIDs)
 	}
 }
 

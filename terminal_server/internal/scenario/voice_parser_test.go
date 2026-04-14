@@ -97,6 +97,16 @@ func TestParseVoiceTriggerPAModeAlias(t *testing.T) {
 	}
 }
 
+func TestParseVoiceTriggerAnnouncementAliases(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	for _, spoken := range []string{"announcement", "announce", "start announcement"} {
+		got := ParseVoiceTrigger("device-1", spoken, now)
+		if got.Intent != "announcement" {
+			t.Fatalf("spoken=%q intent = %q, want announcement", spoken, got.Intent)
+		}
+	}
+}
+
 func TestParseVoiceTriggerShowAllCamerasAlias(t *testing.T) {
 	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
 	got := ParseVoiceTrigger("device-1", "show all cameras", now)

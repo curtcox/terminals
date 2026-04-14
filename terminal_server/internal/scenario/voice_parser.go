@@ -27,6 +27,8 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		trigger.Intent = "terminal"
 	case normalized == "intercom" || normalized == "start intercom":
 		trigger.Intent = "intercom"
+	case normalized == "announcement" || normalized == "announce" || normalized == "start announcement":
+		trigger.Intent = "announcement"
 	case normalized == "pa system" || normalized == "pa mode" || normalized == "end pa" || normalized == "stop pa":
 		trigger.Intent = "pa system"
 	case strings.HasPrefix(normalized, "multi window focus ") ||

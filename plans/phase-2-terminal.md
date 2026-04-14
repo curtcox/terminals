@@ -10,10 +10,10 @@ First real use case. Validates keyboard input forwarding and text-based server-d
 
 ## Deliverables
 
-- [ ] **PTY management**: Server spawns and manages pseudo-terminal sessions.
-- [ ] **Terminal UI descriptor**: Monospace scrollable text output + text input. Composed from existing primitives (see [server-driven-ui.md](server-driven-ui.md)).
-- [ ] **Keyboard forwarding**: Client sends key events, server feeds them to PTY. See `InputEvent` in [protocol.md](protocol.md).
-- [ ] **Terminal output**: Server captures PTY output, sends UI updates to client.
+- [x] **PTY management**: Server spawns and manages pseudo-terminal sessions.
+- [x] **Terminal UI descriptor**: Monospace scrollable text output + text input. Composed from existing primitives (see [server-driven-ui.md](server-driven-ui.md)).
+- [x] **Keyboard forwarding**: Client sends key events, server feeds them to PTY. See `InputEvent` in [protocol.md](protocol.md).
+- [x] **Terminal output**: Server captures PTY output, sends UI updates to client.
 
 ## Milestone
 

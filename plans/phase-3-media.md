@@ -12,9 +12,9 @@ Enable audio and video streaming between clients and server.
 
 - [ ] **WebRTC integration (server)**: Pion-based SFU — accept, forward, and process media streams. See [protocol.md](protocol.md#media-plane-webrtc).
 - [ ] **WebRTC integration (client)**: `flutter_webrtc` — send/receive audio and video.
-- [ ] **Signaling over gRPC**: SDP and ICE candidate exchange through the existing control channel (`WebRTCSignal` messages in [protocol.md](protocol.md)).
-- [ ] **IO Router**: Server-side routing of media streams between devices. See [io-abstraction.md](io-abstraction.md).
-- [ ] **Audio playback**: Server sends audio clips (TTS, alerts) to specific devices.
+- [x] **Signaling over gRPC**: SDP and ICE candidate exchange through the existing control channel (`WebRTCSignal` messages in [protocol.md](protocol.md)).
+- [x] **IO Router**: Server-side routing of media streams between devices. See [io-abstraction.md](io-abstraction.md).
+- [x] **Audio playback**: Server sends audio clips (TTS, alerts) to specific devices.
 
 ## Milestone
 

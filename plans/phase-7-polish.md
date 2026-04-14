@@ -10,12 +10,12 @@ Refinement, additional scenarios, and robustness.
 
 ## Deliverables
 
-- [ ] **Photo frame scenario**: Idle-screen photo rotation with preemption support. See [use-case-flows.md](use-case-flows.md#smart-photo-frame).
-- [ ] **Scenario priority and preemption**: Robust suspend/resume of scenarios across devices. See [scenario-engine.md](scenario-engine.md#scenario-priority-and-preemption).
-- [ ] **Multi-device scenario coordination**: Single scenario spanning multiple devices.
-- [ ] **Sensor data streaming**: Accelerometer, gyroscope, compass data to server for future scenarios. See [io-abstraction.md](io-abstraction.md).
+- [x] **Photo frame scenario**: Idle-screen photo rotation with preemption support. See [use-case-flows.md](use-case-flows.md#smart-photo-frame).
+- [x] **Scenario priority and preemption**: Robust suspend/resume of scenarios across devices. See [scenario-engine.md](scenario-engine.md#scenario-priority-and-preemption).
+- [x] **Multi-device scenario coordination**: Single scenario spanning multiple devices.
+- [x] **Sensor data streaming**: Accelerometer, gyroscope, compass data to server for future scenarios. See [io-abstraction.md](io-abstraction.md).
 - [ ] **Bluetooth and USB passthrough**: Server-directed BLE scanning and USB device access.
-- [ ] **Recording and playback**: Server records streams to disk, plays back on demand.
+- [x] **Recording and playback**: Server records streams to disk, plays back on demand.
 - [ ] **Admin UI**: Web-based dashboard for server configuration, device management, and scenario control.
 
 ## Milestone
