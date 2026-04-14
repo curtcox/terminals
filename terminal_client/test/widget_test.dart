@@ -897,6 +897,38 @@ void main() {
     },
   );
 
+  testWidgets('handles play_audio responses and tracks playback status',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(clientFactory: harness.createClient),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..playAudio = (iov1.PlayAudio()
+          ..requestId = 'playback-1'
+          ..deviceId = 'hall-display'
+          ..pcmData = <int>[1, 2, 3, 4, 5]),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('Control Stream: Play audio'), findsOneWidget);
+    expect(find.textContaining('Play audio msgs: 1'), findsOneWidget);
+    expect(find.textContaining('Last play bytes: 5'), findsOneWidget);
+    expect(
+        find.textContaining('Last play target: hall-display'), findsOneWidget);
+    expect(find.textContaining('Last play source: pcm_data'), findsOneWidget);
+    expect(
+      find.textContaining('Play audio: hall-display (pcm_data, 5 bytes)'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('sends system status debug commands and renders diagnostics data',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));

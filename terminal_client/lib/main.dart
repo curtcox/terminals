@@ -130,6 +130,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   int _sensorSendCount = 0;
   int _streamReadyAckCount = 0;
   int _lastSensorSendUnixMs = 0;
+  int _playAudioCount = 0;
+  int _lastPlayAudioBytes = 0;
+  String _lastPlayAudioDeviceID = 'none';
+  String _lastPlayAudioSource = 'none';
   int _debugCommandSeq = 0;
   String _pendingRuntimeStatusRequestID = '';
   String _pendingDeviceStatusRequestID = '';
@@ -542,7 +546,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
+      body: Align(
+        alignment: Alignment.topCenter,
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -629,6 +634,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                 Text(
                   'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount',
                 ),
+                if (_playAudioCount > 0)
+                  Text(
+                    'Play audio msgs: $_playAudioCount  Last play bytes: $_lastPlayAudioBytes  Last play target: $_lastPlayAudioDeviceID  Last play source: $_lastPlayAudioSource',
+                  ),
                 if (_lastNotification.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text('Notification: $_lastNotification'),
@@ -730,6 +739,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (response.hasWebrtcSignal()) {
       return 'WebRTC signal';
     }
+    if (response.hasPlayAudio()) {
+      return 'Play audio';
+    }
     if (response.hasUpdateUi()) {
       return 'UI patched';
     }
@@ -814,6 +826,36 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
               '{"type":"candidate","stream_id":"${response.webrtcSignal.streamId}","candidate":"candidate:local-2"}',
         );
       }
+    }
+    if (response.hasPlayAudio()) {
+      final playAudio = response.playAudio;
+      var source = 'unknown';
+      var bytes = 0;
+      switch (playAudio.whichSource()) {
+        case iov1.PlayAudio_Source.pcmData:
+          source = 'pcm_data';
+          bytes = playAudio.pcmData.length;
+          break;
+        case iov1.PlayAudio_Source.url:
+          source = 'url';
+          bytes = 0;
+          break;
+        case iov1.PlayAudio_Source.ttsText:
+          source = 'tts_text';
+          bytes = 0;
+          break;
+        case iov1.PlayAudio_Source.notSet:
+          source = 'not_set';
+          bytes = 0;
+          break;
+      }
+      _playAudioCount += 1;
+      _lastPlayAudioBytes = bytes;
+      _lastPlayAudioDeviceID =
+          playAudio.deviceId.isNotEmpty ? playAudio.deviceId : 'unknown';
+      _lastPlayAudioSource = source;
+      _lastNotification =
+          'Play audio: $_lastPlayAudioDeviceID ($source, $bytes bytes)';
     }
   }
 
