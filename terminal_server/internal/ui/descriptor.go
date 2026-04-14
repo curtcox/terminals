@@ -176,12 +176,12 @@ func MultiWindowView(viewerDeviceID string, peerDeviceIDs []string, focusedPeerI
 		"value": "Multi-window view",
 		"style": "headline",
 		"color": "#E7F0F7",
-	}), New("button", map[string]string{
-		"id":     "multi_window_end",
-		"label":  "End multi-window",
-		"action": "multi_window_end",
 	}), New("grid", map[string]string{
 		"id":      "multi_window_grid",
 		"columns": strconv.Itoa(columns),
-	}, gridChildren...), GlobalOverlaySlot())
+	}, gridChildren...), New("button", map[string]string{
+		"id":     "multi_window_end",
+		"label":  "End multi-window",
+		"action": "multi_window_end",
+	}), GlobalOverlaySlot())
 }
