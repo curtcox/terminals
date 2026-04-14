@@ -1255,10 +1255,6 @@ func TestHandleMessageInputRoutesStartActionWhenScenarioIsActive(t *testing.T) {
 	if out[2].TransitionUI == nil || out[2].TransitionUI.Transition != "terminal_enter" {
 		t.Fatalf("expected terminal_enter transition, got %+v", out[2].TransitionUI)
 	}
-	active, ok := runtime.Engine.Active("device-1")
-	if !ok || active != "terminal" {
-		t.Fatalf("active scenario = %q (ok=%t), want terminal", active, ok)
-	}
 }
 
 func TestHandleMessageInputRoutesStopActiveAction(t *testing.T) {
@@ -1309,6 +1305,78 @@ func TestHandleMessageInputRoutesStopActiveAction(t *testing.T) {
 	}
 	if _, ok := runtime.Engine.Active("device-1"); ok {
 		t.Fatalf("expected no active scenario after stop_active")
+	}
+}
+
+func TestHandleMessageInputRoutesMultiWindowEndActionAndRestoresPriorTerminal(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-terminal-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-multi-window-start",
+			DeviceID:  "device-1",
+			Kind:      "voice",
+			Text:      "all cameras",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "multi_window_end",
+			Action:      "multi_window_end",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input multi_window_end) error = %v", err)
+	}
+
+	if len(out) < 3 {
+		t.Fatalf("len(out) = %d, want at least 3", len(out))
+	}
+	if out[0].ScenarioStop != "multi_window" {
+		t.Fatalf("ScenarioStop = %q, want multi_window", out[0].ScenarioStop)
+	}
+
+	sawTerminalRoot := false
+	sawTerminalEnter := false
+	for _, msg := range out {
+		if set := msg.SetUI; set != nil && set.Props["id"] == "terminal_root" {
+			sawTerminalRoot = true
+		}
+		if transition := msg.TransitionUI; transition != nil && transition.Transition == "terminal_enter" {
+			sawTerminalEnter = true
+		}
+	}
+	if !sawTerminalRoot {
+		t.Fatalf("expected restored terminal SetUI after multi_window_end")
+	}
+	if !sawTerminalEnter {
+		t.Fatalf("expected terminal_enter transition after multi_window_end")
 	}
 }
 

@@ -1700,6 +1700,7 @@ func TestGeneratedSessionMultiWindowSetUIAndFocusActionRouting(t *testing.T) {
 	var sawGridColumns bool
 	var sawFocusAction bool
 	var sawFocusedLabel bool
+	var sawEndAction bool
 	walkNode := func(node *uiv1.Node, fn func(*uiv1.Node)) {}
 	walkNode = func(node *uiv1.Node, fn func(*uiv1.Node)) {
 		if node == nil {
@@ -1736,6 +1737,9 @@ func TestGeneratedSessionMultiWindowSetUIAndFocusActionRouting(t *testing.T) {
 					sawGridColumns = true
 				}
 				if button := node.GetButton(); button != nil {
+					if button.GetAction() == "multi_window_end" {
+						sawEndAction = true
+					}
 					if button.GetAction() == "multi_window_focus:d2" {
 						sawFocusAction = true
 					}
@@ -1753,6 +1757,9 @@ func TestGeneratedSessionMultiWindowSetUIAndFocusActionRouting(t *testing.T) {
 	if !sawFocusAction {
 		t.Fatalf("expected multi_window focus button action for d2")
 	}
+	if !sawEndAction {
+		t.Fatalf("expected multi_window end button action")
+	}
 	if scenarioStartCount < 2 {
 		t.Fatalf("expected two multi_window starts (voice + focus action), got %d", scenarioStartCount)
 	}
@@ -1764,5 +1771,112 @@ func TestGeneratedSessionMultiWindowSetUIAndFocusActionRouting(t *testing.T) {
 	}
 	if !sawFocusedLabel {
 		t.Fatalf("expected re-rendered UI with focused label Hearing d2")
+	}
+}
+
+func TestGeneratedSessionMultiWindowEndActionRestoresPriorUIAndTransition(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "d1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "terminal-start",
+						DeviceId:  "d1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
+						Intent:    "terminal",
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "multi-window-start",
+						DeviceId:  "d1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "all cameras",
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Input{
+					Input: &iov1.InputEvent{
+						DeviceId: "d1",
+						Payload: &iov1.InputEvent_UiAction{
+							UiAction: &iov1.UIAction{
+								ComponentId: "multi_window_end",
+								Action:      "multi_window_end",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawMultiWindowStop bool
+	var sawRestoredTerminalUI bool
+	var sawTerminalEnterTransition bool
+	var sawVideoStop bool
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok {
+			continue
+		}
+		if result := resp.GetCommandResult(); result != nil && result.GetScenarioStop() == "multi_window" {
+			sawMultiWindowStop = true
+		}
+		if set := resp.GetSetUi(); set != nil {
+			if root := set.GetRoot(); root != nil && root.GetProps()["id"] == "terminal_root" {
+				sawRestoredTerminalUI = true
+			}
+		}
+		if transition := resp.GetTransitionUi(); transition != nil && transition.GetTransition() == "terminal_enter" {
+			sawTerminalEnterTransition = true
+		}
+		if stop := resp.GetStopStream(); stop != nil && stop.GetStreamId() == "route:d2|d1|video" {
+			sawVideoStop = true
+		}
+	}
+
+	if !sawMultiWindowStop {
+		t.Fatalf("expected multi_window scenario stop from UI end action")
+	}
+	if !sawRestoredTerminalUI {
+		t.Fatalf("expected restored terminal SetUI after multi-window end")
+	}
+	if !sawTerminalEnterTransition {
+		t.Fatalf("expected terminal_enter transition restored after multi-window end")
+	}
+	if !sawVideoStop {
+		t.Fatalf("expected video stop_stream for multi-window teardown")
 	}
 }

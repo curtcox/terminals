@@ -1357,6 +1357,7 @@ func TestWireSessionMultiWindowSetUIIncludesFocusActions(t *testing.T) {
 	var sawGridColumns bool
 	var sawFocusAction bool
 	var sawFocusButtonID bool
+	var sawEndAction bool
 	var walkNode func(node uiWireDescriptor, fn func(uiWireDescriptor))
 	walkNode = func(node uiWireDescriptor, fn func(uiWireDescriptor)) {
 		fn(node)
@@ -1375,6 +1376,9 @@ func TestWireSessionMultiWindowSetUIIncludesFocusActions(t *testing.T) {
 			if props["id"] == "multi_window_grid" && props["columns"] == "2" {
 				sawGridColumns = true
 			}
+			if node.Type == "button" && props["action"] == "multi_window_end" {
+				sawEndAction = true
+			}
 			if node.Type == "button" && props["action"] == "multi_window_focus:d2" {
 				sawFocusAction = true
 				if props["id"] == "multi_window_focus_d2" {
@@ -1390,7 +1394,11 @@ func TestWireSessionMultiWindowSetUIIncludesFocusActions(t *testing.T) {
 	if !sawFocusAction {
 		t.Fatalf("expected wire set_ui focus action multi_window_focus:d2")
 	}
+	if !sawEndAction {
+		t.Fatalf("expected wire set_ui end action multi_window_end")
+	}
 	if !sawFocusButtonID {
 		t.Fatalf("expected focus button id multi_window_focus_d2")
 	}
 }
+

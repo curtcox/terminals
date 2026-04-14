@@ -38,6 +38,77 @@ type CapabilityUpdateRequest struct {
 	Capabilities map[string]string
 }
 
+func (h *StreamHandler) activeScenarioName(deviceID string) string {
+	if h.runtime == nil || h.runtime.Engine == nil {
+		return ""
+	}
+	name, ok := h.runtime.Engine.Active(strings.TrimSpace(deviceID))
+	if !ok {
+		return ""
+	}
+	return name
+}
+
+func (h *StreamHandler) captureMultiWindowResume(deviceID, priorScenario string) {
+	deviceID = strings.TrimSpace(deviceID)
+	priorScenario = strings.TrimSpace(priorScenario)
+	if deviceID == "" || priorScenario == "multi_window" {
+		return
+	}
+
+	h.mu.Lock()
+	if _, exists := h.multiWindowResume[deviceID]; exists {
+		h.mu.Unlock()
+		return
+	}
+	storedUI, hasUI := h.lastSetUIByDevice[deviceID]
+	h.multiWindowResume[deviceID] = multiWindowResumeState{
+		PriorScenario: priorScenario,
+		PriorUI:       storedUI,
+		HasPriorUI:    hasUI,
+	}
+	h.mu.Unlock()
+}
+
+func (h *StreamHandler) restoreMultiWindowResume(deviceID string) (*ui.Descriptor, *UITransition, bool) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil, nil, false
+	}
+
+	h.mu.Lock()
+	state, exists := h.multiWindowResume[deviceID]
+	if exists {
+		delete(h.multiWindowResume, deviceID)
+	}
+	h.mu.Unlock()
+	if !exists {
+		return nil, nil, false
+	}
+
+	var restoredUI *ui.Descriptor
+	if state.HasPriorUI {
+		copyUI := state.PriorUI
+		restoredUI = &copyUI
+	}
+
+	var restoredTransition *UITransition
+	if transition, ok := enterTransitionForScenario(state.PriorScenario); ok {
+		copyTransition := transition
+		restoredTransition = &copyTransition
+	}
+	return restoredUI, restoredTransition, true
+}
+
+func enterTransitionForScenario(name string) (UITransition, bool) {
+	switch strings.TrimSpace(name) {
+	case "terminal":
+		return UITransition{Transition: "terminal_enter", DurationMS: 220}, true
+	default:
+		return UITransition{}, false
+	}
+}
+
 // HeartbeatRequest is a transport-neutral heartbeat payload.
 type HeartbeatRequest struct {
 	DeviceID string
@@ -176,6 +247,8 @@ type StreamHandler struct {
 	terminalReadDeadline   time.Duration
 	terminalReadInterval   time.Duration
 	terminalUIInterval     time.Duration
+	lastSetUIByDevice      map[string]ui.Descriptor
+	multiWindowResume      map[string]multiWindowResumeState
 
 	mediaStreams    map[string]mediaStreamState
 	sensorsByDevice map[string]sensorSnapshot
@@ -188,6 +261,12 @@ type mediaStreamState struct {
 	TargetDeviceID string
 	Metadata       map[string]string
 	Ready          bool
+}
+
+type multiWindowResumeState struct {
+	PriorScenario string
+	PriorUI       ui.Descriptor
+	HasPriorUI    bool
 }
 
 type sensorSnapshot struct {
@@ -230,6 +309,8 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalReadDeadline:   defaultTerminalReadDeadline,
 		terminalReadInterval:   defaultTerminalReadInterval,
 		terminalUIInterval:     defaultTerminalUIInterval,
+		lastSetUIByDevice:      map[string]ui.Descriptor{},
+		multiWindowResume:      map[string]multiWindowResumeState{},
 		mediaStreams:           map[string]mediaStreamState{},
 		sensorsByDevice:        map[string]sensorSnapshot{},
 	}
@@ -254,6 +335,8 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalReadDeadline:   defaultTerminalReadDeadline,
 		terminalReadInterval:   defaultTerminalReadInterval,
 		terminalUIInterval:     defaultTerminalUIInterval,
+		lastSetUIByDevice:      map[string]ui.Descriptor{},
+		multiWindowResume:      map[string]multiWindowResumeState{},
 		mediaStreams:           map[string]mediaStreamState{},
 		sensorsByDevice:        map[string]sensorSnapshot{},
 	}
@@ -269,10 +352,12 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
-		return []ServerMessage{
+		out := []ServerMessage{
 			{RegisterAck: &resp},
 			{SetUI: &resp.Initial},
-		}, nil
+		}
+		h.rememberSetUI(msg.Register.DeviceID, out)
+		return out, nil
 	case msg.Capability != nil:
 		h.metrics.capabilityReceived.Add(1)
 		err := h.control.UpdateCapabilities(ctx, msg.Capability.DeviceID, msg.Capability.Capabilities)
@@ -314,9 +399,11 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
+		h.rememberSetUI(msg.Input.DeviceID, out)
 		return out, nil
 	case msg.Command != nil:
 		h.metrics.commandReceived.Add(1)
+		priorActiveScenario := h.activeScenarioName(msg.Command.DeviceID)
 		if msg.Command.RequestID != "" {
 			h.mu.Lock()
 			if prior, ok := h.seen[msg.Command.RequestID]; ok {
@@ -366,6 +453,9 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			WhenUnix:  h.control.now().UTC().UnixMilli(),
 		})
 		h.mu.Unlock()
+		if commandResult.ScenarioStart == "multi_window" && defaultAction(msg.Command.Action) == CommandActionStart {
+			h.captureMultiWindowResume(msg.Command.DeviceID, priorActiveScenario)
+		}
 		if msg.Command.RequestID != "" {
 			commandResult.CommandAck = msg.Command.RequestID
 			h.mu.Lock()
@@ -396,6 +486,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		if len(broadcastNotifications) > 0 {
 			postResponses = append(postResponses, broadcastNotifications...)
 		}
+		h.rememberSetUI(msg.Command.DeviceID, postResponses)
 		return postResponses, nil
 	default:
 		h.metrics.protocolErrors.Add(1)
@@ -621,6 +712,17 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 				DurationMS: 220,
 			},
 		})
+		return responses
+	}
+	if commandResult.ScenarioStop == "multi_window" {
+		if restoredUI, restoredTransition, ok := h.restoreMultiWindowResume(cmd.DeviceID); ok {
+			if restoredUI != nil {
+				responses = append(responses, ServerMessage{SetUI: restoredUI})
+			}
+			if restoredTransition != nil {
+				responses = append(responses, ServerMessage{TransitionUI: restoredTransition})
+			}
+		}
 		return responses
 	}
 	if commandResult.ScenarioStart == "multi_window" {
@@ -1259,6 +1361,12 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 	case action == "stop_active":
 		intent = activeName
 		commandAction = CommandActionStop
+	case action == "multi_window_end":
+		if activeName != "multi_window" {
+			return nil, false, nil
+		}
+		intent = "multi_window"
+		commandAction = CommandActionStop
 	case strings.HasPrefix(action, "multi_window_focus:"):
 		if activeName != "multi_window" {
 			return nil, false, nil
@@ -1336,6 +1444,9 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		ScenarioStart: name,
 		Notification:  "Scenario started: " + name,
 	}
+	if result.ScenarioStart == "multi_window" && commandAction == CommandActionStart {
+		h.captureMultiWindowResume(deviceID, activeName)
+	}
 	cmd := &CommandRequest{
 		DeviceID: deviceID,
 		Action:   commandAction,
@@ -1400,6 +1511,25 @@ func (h *StreamHandler) isRegisteredScenario(name string) bool {
 		}
 	}
 	return false
+}
+
+func (h *StreamHandler) rememberSetUI(deviceID string, responses []ServerMessage) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" || len(responses) == 0 {
+		return
+	}
+
+	for _, response := range responses {
+		if response.SetUI == nil {
+			continue
+		}
+		if relayTarget := strings.TrimSpace(response.RelayToDeviceID); relayTarget != "" {
+			continue
+		}
+		h.mu.Lock()
+		h.lastSetUIByDevice[deviceID] = *response.SetUI
+		h.mu.Unlock()
+	}
 }
 
 func (h *StreamHandler) renderTerminalUIAction(deviceID, componentID, action, value string) (*UIUpdate, bool) {
