@@ -1,5 +1,9 @@
 # Terminals
 
+[![Server CI](https://github.com/curtcox/terminals/actions/workflows/server-ci.yml/badge.svg)](https://github.com/curtcox/terminals/actions/workflows/server-ci.yml)
+[![Client CI](https://github.com/curtcox/terminals/actions/workflows/client-ci.yml/badge.svg)](https://github.com/curtcox/terminals/actions/workflows/client-ci.yml)
+[![Proto CI](https://github.com/curtcox/terminals/actions/workflows/proto-ci.yml/badge.svg)](https://github.com/curtcox/terminals/actions/workflows/proto-ci.yml)
+
 Terminals is a client/server home system where thin clients act as generic IO surfaces and the server owns all behavior.
 
 ## Repository Layout
