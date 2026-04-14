@@ -15,6 +15,7 @@ type Config struct {
 	MDNSService                   string
 	MDNSName                      string
 	Version                       string
+	WakeWordPrefixes              []string
 	HeartbeatTimeoutSeconds       int
 	LivenessReconcileIntervalSecs int
 	DueTimerProcessIntervalSecs   int
@@ -39,9 +40,14 @@ func Load() (Config, error) {
 		MDNSService:                   getenv("TERMINALS_MDNS_SERVICE", "_terminals._tcp.local."),
 		MDNSName:                      getenv("TERMINALS_MDNS_NAME", "HomeServer"),
 		Version:                       getenv("TERMINALS_VERSION", "1"),
+		WakeWordPrefixes:              []string{"assistant", "hey terminal"},
 		HeartbeatTimeoutSeconds:       120,
 		LivenessReconcileIntervalSecs: 30,
 		DueTimerProcessIntervalSecs:   5,
+	}
+
+	if prefixes := parseCSVStrings(os.Getenv("TERMINALS_WAKE_WORD_PREFIXES")); len(prefixes) > 0 {
+		cfg.WakeWordPrefixes = prefixes
 	}
 
 	if rawPort := os.Getenv("TERMINALS_GRPC_PORT"); rawPort != "" {
@@ -134,4 +140,17 @@ func parseOptionalBool(env string) (bool, error) {
 		return false, fmt.Errorf("parse %s: %w", env, err)
 	}
 	return v, nil
+}
+
+func parseCSVStrings(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		out = append(out, trimmed)
+	}
+	return out
 }

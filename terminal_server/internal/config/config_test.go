@@ -10,6 +10,7 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_MDNS_SERVICE", "")
 	t.Setenv("TERMINALS_MDNS_NAME", "")
 	t.Setenv("TERMINALS_VERSION", "")
+	t.Setenv("TERMINALS_WAKE_WORD_PREFIXES", "")
 	t.Setenv("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS", "")
 	t.Setenv("TERMINALS_LIVENESS_RECONCILE_INTERVAL_SECONDS", "")
 	t.Setenv("TERMINALS_DUE_TIMER_PROCESS_INTERVAL_SECONDS", "")
@@ -32,6 +33,26 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.DueTimerProcessIntervalSecs != 5 {
 		t.Fatalf("DueTimerProcessIntervalSecs = %d", cfg.DueTimerProcessIntervalSecs)
+	}
+	if len(cfg.WakeWordPrefixes) != 2 || cfg.WakeWordPrefixes[0] != "assistant" || cfg.WakeWordPrefixes[1] != "hey terminal" {
+		t.Fatalf("WakeWordPrefixes = %+v, want default assistant/hey terminal", cfg.WakeWordPrefixes)
+	}
+}
+
+func TestLoadWakeWordPrefixesFromEnv(t *testing.T) {
+	t.Setenv("TERMINALS_WAKE_WORD_PREFIXES", "jarvis, computer ,   ,hey house")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if len(cfg.WakeWordPrefixes) != 3 {
+		t.Fatalf("WakeWordPrefixes len = %d, want 3", len(cfg.WakeWordPrefixes))
+	}
+	if cfg.WakeWordPrefixes[0] != "jarvis" ||
+		cfg.WakeWordPrefixes[1] != "computer" ||
+		cfg.WakeWordPrefixes[2] != "hey house" {
+		t.Fatalf("WakeWordPrefixes = %+v, want [jarvis computer hey house]", cfg.WakeWordPrefixes)
 	}
 }
 

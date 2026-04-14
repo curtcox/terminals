@@ -1,1 +1,1 @@
-Make wake-word prefixes configurable in server config (instead of hardcoded), then thread them into `scenario.PrefixWakeWordDetector` and add config coverage tests.
+Add `SoundClassifier` and `VisionAnalyzer` to `terminal_server/internal/scenario` environment interfaces, wire adapters in `cmd/server`, and add focused tests so Phase 5 AI capability interfaces are fully represented.
