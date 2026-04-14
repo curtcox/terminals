@@ -44,6 +44,10 @@ func main() {
 		return
 	}
 	aiBackends := ai.NewNoopBackends()
+	// Swap the noop sound classifier for a real RMS-based silence detector
+	// so Phase-6 "tell me when X stops" scenarios work without an external
+	// model. Other noop backends remain until real providers are selected.
+	aiBackends.Sound = ai.NewSilenceClassifier(ai.SilenceClassifierConfig{})
 	environment := &scenario.Environment{
 		Devices:     deviceManager,
 		IO:          ioRouter,
