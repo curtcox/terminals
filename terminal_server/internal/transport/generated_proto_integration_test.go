@@ -1439,3 +1439,63 @@ func TestGeneratedSessionVoiceShowAllCamerasStartsMultiWindow(t *testing.T) {
 		t.Fatalf("expected scenario_start=multi_window command result via show all cameras")
 	}
 }
+
+func TestGeneratedSessionVoiceAllCamerasStartsMultiWindow(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "device-1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "all-cameras-start",
+						DeviceId:  "device-1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "all cameras",
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawStart bool
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok || resp.GetCommandResult() == nil {
+			continue
+		}
+		if resp.GetCommandResult().GetScenarioStart() == "multi_window" {
+			sawStart = true
+			break
+		}
+	}
+	if !sawStart {
+		t.Fatalf("expected scenario_start=multi_window command result via all cameras")
+	}
+}

@@ -1,1 +1,1 @@
-Add generated/wire integration tests for voice alias "all cameras" to verify adapter-level multi_window scenario_start payload preservation.
+Implement multi-window mixed-audio routing (N source mics -> 1 viewer track) and add wire/generated integration tests for selectable single-source audio focus.
