@@ -128,6 +128,25 @@ func targetDevices(env *Environment, trigger Trigger) []string {
 	if env == nil || env.Devices == nil {
 		return nil
 	}
+	if explicitMany, ok := trigger.Arguments["device_ids"]; ok && strings.TrimSpace(explicitMany) != "" {
+		parts := strings.Split(explicitMany, ",")
+		out := make([]string, 0, len(parts))
+		seen := map[string]struct{}{}
+		for _, part := range parts {
+			deviceID := strings.TrimSpace(part)
+			if deviceID == "" {
+				continue
+			}
+			if _, exists := seen[deviceID]; exists {
+				continue
+			}
+			seen[deviceID] = struct{}{}
+			out = append(out, deviceID)
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
 	if explicit, ok := trigger.Arguments["device_id"]; ok && explicit != "" {
 		return []string{explicit}
 	}

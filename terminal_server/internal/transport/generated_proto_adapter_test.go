@@ -94,6 +94,32 @@ func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
 	}
 }
 
+func TestGeneratedProtoAdapterToInternalCommandArguments(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Command{
+			Command: &controlv1.CommandRequest{
+				RequestId: "cmd-args-1",
+				DeviceId:  "device-1",
+				Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
+				Intent:    "photo frame",
+				Arguments: map[string]string{
+					"device_ids": "device-1,device-2",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(command arguments) error = %v", err)
+	}
+	if msg.Command == nil {
+		t.Fatalf("expected command message")
+	}
+	if got := msg.Command.Arguments["device_ids"]; got != "device-1,device-2" {
+		t.Fatalf("device_ids argument = %q, want device-1,device-2", got)
+	}
+}
+
 func TestGeneratedProtoAdapterToInternalSensorAndStreamReady(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 

@@ -192,6 +192,7 @@ type CommandRequest struct {
 	Kind      string // "voice" or "manual"
 	Text      string // voice transcript
 	Intent    string // explicit scenario intent
+	Arguments map[string]string
 }
 
 // VoiceAudioRequest carries a chunk of raw microphone audio from a device.
@@ -802,13 +803,28 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		return responses
 	}
 	if commandResult.ScenarioStop == "photo_frame" {
-		h.clearPhotoFrameState(cmd.DeviceID)
+		for _, deviceID := range h.commandTargetDeviceIDs(cmd) {
+			h.clearPhotoFrameState(deviceID)
+		}
 		responses = append(responses, ServerMessage{
 			TransitionUI: &UITransition{
 				Transition: "photo_frame_exit",
 				DurationMS: 220,
 			},
 		})
+		for _, targetDeviceID := range h.commandTargetDeviceIDs(cmd) {
+			targetDeviceID = strings.TrimSpace(targetDeviceID)
+			if targetDeviceID == "" || targetDeviceID == strings.TrimSpace(cmd.DeviceID) {
+				continue
+			}
+			responses = append(responses, ServerMessage{
+				TransitionUI: &UITransition{
+					Transition: "photo_frame_exit",
+					DurationMS: 220,
+				},
+				RelayToDeviceID: targetDeviceID,
+			})
+		}
 		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "photo_frame"); len(restored) > 0 {
 			responses = append(responses, restored...)
 		}
@@ -851,6 +867,24 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 				DurationMS: 220,
 			},
 		})
+		for _, targetDeviceID := range h.commandTargetDeviceIDs(cmd) {
+			targetDeviceID = strings.TrimSpace(targetDeviceID)
+			if targetDeviceID == "" || targetDeviceID == strings.TrimSpace(cmd.DeviceID) {
+				continue
+			}
+			peerUI := h.photoFrameSetUI(targetDeviceID, true)
+			responses = append(responses, ServerMessage{
+				SetUI:          &peerUI,
+				RelayToDeviceID: targetDeviceID,
+			})
+			responses = append(responses, ServerMessage{
+				TransitionUI: &UITransition{
+					Transition: "photo_frame_enter",
+					DurationMS: 220,
+				},
+				RelayToDeviceID: targetDeviceID,
+			})
+		}
 		return responses
 	}
 	if commandResult.ScenarioStart == "internal_video_call" {
@@ -1100,6 +1134,50 @@ func (h *StreamHandler) photoFrameHeartbeatUpdate(deviceID string) *ServerMessag
 
 	view := ui.PhotoFrameView(slides[index], "Photo frame: "+deviceID, index, len(slides))
 	return &ServerMessage{SetUI: &view}
+}
+
+func (h *StreamHandler) commandTargetDeviceIDs(cmd *CommandRequest) []string {
+	if cmd == nil {
+		return nil
+	}
+
+	args := cmd.Arguments
+	if len(args) > 0 {
+		if rawList := strings.TrimSpace(args["device_ids"]); rawList != "" {
+			parts := strings.Split(rawList, ",")
+			out := make([]string, 0, len(parts))
+			seen := map[string]struct{}{}
+			for _, part := range parts {
+				deviceID := strings.TrimSpace(part)
+				if deviceID == "" {
+					continue
+				}
+				if _, exists := seen[deviceID]; exists {
+					continue
+				}
+				seen[deviceID] = struct{}{}
+				out = append(out, deviceID)
+			}
+			if len(out) > 0 {
+				return out
+			}
+		}
+		if one := strings.TrimSpace(args["device_id"]); one != "" {
+			return []string{one}
+		}
+	}
+
+	if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Devices != nil {
+		all := h.runtime.Env.Devices.ListDeviceIDs()
+		if len(all) > 0 {
+			return all
+		}
+	}
+
+	if source := strings.TrimSpace(cmd.DeviceID); source != "" {
+		return []string{source}
+	}
+	return nil
 }
 
 func (h *StreamHandler) appendRouteMessageForPeers(
@@ -1679,6 +1757,7 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 			Action:   commandAction,
 			Kind:     CommandKindManual,
 			Intent:   intent,
+			Arguments: copyStringMap(triggerArgs),
 		}
 		responses := h.commandResponses(ctx, cmd, result)
 		afterRoutes := h.routeSnapshotForDevice(deviceID)
@@ -1716,6 +1795,7 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		Action:   commandAction,
 		Kind:     CommandKindManual,
 		Intent:   intent,
+		Arguments: copyStringMap(triggerArgs),
 	}
 	responses := h.commandResponses(ctx, cmd, result)
 	afterRoutes := h.routeSnapshotForDevice(deviceID)
@@ -1925,6 +2005,17 @@ func normalizeTerminalKeyText(text string) string {
 	}
 	// PTY line discipline typically expects DEL (0x7f) for backward delete.
 	return strings.ReplaceAll(text, "\b", "\x7f")
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }
 
 func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
@@ -2219,7 +2310,7 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			Kind:      scenario.TriggerManual,
 			SourceID:  cmd.DeviceID,
 			Intent:    cmd.Intent,
-			Arguments: map[string]string{},
+			Arguments: copyStringMap(cmd.Arguments),
 		}
 		if action == CommandActionStop {
 			name, err := h.runtime.StopTrigger(ctx, trigger)

@@ -254,6 +254,77 @@ func TestHandleMessageCommandManual(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandManualWithDeviceIDsRelaysPhotoFrameUI(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-photo-targeted",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+			Arguments: map[string]string{
+				"device_ids": "device-1,device-2",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(targeted photo frame) error = %v", err)
+	}
+
+	var localSetUI bool
+	var relayedSetUI bool
+	var relayedTransition bool
+	for _, msg := range out {
+		if msg.SetUI != nil && msg.RelayToDeviceID == "" && msg.SetUI.Props["id"] == "photo_frame_root" {
+			localSetUI = true
+		}
+		if msg.SetUI != nil && msg.RelayToDeviceID == "device-2" && msg.SetUI.Props["id"] == "photo_frame_root" {
+			relayedSetUI = true
+		}
+		if msg.TransitionUI != nil && msg.RelayToDeviceID == "device-2" && msg.TransitionUI.Transition == "photo_frame_enter" {
+			relayedTransition = true
+		}
+	}
+	if !localSetUI {
+		t.Fatalf("expected local photo frame SetUI in command responses: %+v", out)
+	}
+	if !relayedSetUI {
+		t.Fatalf("expected relayed photo frame SetUI for device-2: %+v", out)
+	}
+	if !relayedTransition {
+		t.Fatalf("expected relayed photo_frame_enter transition for device-2: %+v", out)
+	}
+
+	if active, ok := runtime.Engine.Active("device-1"); !ok || active != "photo_frame" {
+		t.Fatalf("device-1 active = %q (ok=%t), want photo_frame", active, ok)
+	}
+	if active, ok := runtime.Engine.Active("device-2"); !ok || active != "photo_frame" {
+		t.Fatalf("device-2 active = %q (ok=%t), want photo_frame", active, ok)
+	}
+}
+
 func TestHandleMessageCommandIntercomEmitsRouteStreams(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

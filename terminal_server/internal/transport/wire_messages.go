@@ -28,6 +28,7 @@ type WireCommandRequest struct {
 	Kind      WireCommandKind
 	Text      string
 	Intent    string
+	Arguments []DataEntry
 }
 
 // WireCommandAction mirrors control.proto CommandAction.

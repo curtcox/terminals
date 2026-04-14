@@ -52,6 +52,7 @@ func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
 				Kind:      internalKindFromWire(w.Command.Kind),
 				Text:      w.Command.Text,
 				Intent:    w.Command.Intent,
+				Arguments: DecodeDataEntries(w.Command.Arguments),
 			},
 		}, nil
 	case w.VoiceAudio != nil:

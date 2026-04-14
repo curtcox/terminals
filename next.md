@@ -1,1 +1,1 @@
-Implement Phase 7 multi-device scenario coordination beyond current single-device control flow.
+Implement Phase 7 sensor data streaming scenario hook(s) that consume existing SensorData telemetry for actionable behavior.

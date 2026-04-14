@@ -89,6 +89,7 @@ message CommandRequest {
   CommandKind kind = 4;
   string text = 5; // voice transcript
   string intent = 6; // intent name or system intent
+  map<string, string> arguments = 7; // optional trigger/system arguments (e.g. device_ids)
 }
 
 message CommandResult {

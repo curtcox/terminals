@@ -621,6 +621,47 @@ func TestRuntimeStopTrigger(t *testing.T) {
 	}
 }
 
+func TestRuntimeHandleTriggerTargetsExplicitDeviceIDs(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: PhotoFrameScenario{},
+		Priority: PriorityLow,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices: devices,
+	})
+
+	name, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "photo frame",
+		Arguments: map[string]string{
+			"device_ids": "d1,d3",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger() error = %v", err)
+	}
+	if name != "photo_frame" {
+		t.Fatalf("name = %q, want photo_frame", name)
+	}
+
+	if active, ok := engine.Active("d1"); !ok || active != "photo_frame" {
+		t.Fatalf("d1 active scenario = %q (ok=%t), want photo_frame", active, ok)
+	}
+	if _, ok := engine.Active("d2"); ok {
+		t.Fatalf("expected d2 to remain inactive")
+	}
+	if active, ok := engine.Active("d3"); !ok || active != "photo_frame" {
+		t.Fatalf("d3 active scenario = %q (ok=%t), want photo_frame", active, ok)
+	}
+}
+
 func TestRuntimeHandleVoiceTerminalTargetsSourceDevice(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
