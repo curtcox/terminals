@@ -93,6 +93,18 @@ type Transcript struct {
 // TranscriptStream delivers transcripts as they become available.
 type TranscriptStream <-chan Transcript
 
+// WakeWordDetection is the result of checking recognized speech for a wake word.
+type WakeWordDetection struct {
+	Detected bool
+	Command  string
+}
+
+// WakeWordDetector checks recognized speech for activation phrases and can
+// optionally normalize the command text that should be routed to scenarios.
+type WakeWordDetector interface {
+	Detect(ctx context.Context, spoken string) (WakeWordDetection, error)
+}
+
 // TextToSpeech synthesizes audio from text.
 type TextToSpeech interface {
 	Synthesize(ctx context.Context, text string, opts TTSOptions) (AudioPlayback, error)
@@ -141,6 +153,7 @@ type Environment struct {
 	AI        AIBackend
 	LLM       LLM
 	STT       SpeechToText
+	WakeWord  WakeWordDetector
 	TTS       TextToSpeech
 	Telephony TelephonyBridge
 	Storage   StorageManager

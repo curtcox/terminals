@@ -1812,6 +1812,18 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 	if spoken == "" {
 		return nil, ErrMissingCommandText
 	}
+	if h.runtime.Env.WakeWord != nil {
+		detection, err := h.runtime.Env.WakeWord.Detect(ctx, spoken)
+		if err != nil {
+			return nil, err
+		}
+		if !detection.Detected {
+			return nil, nil
+		}
+		if normalized := strings.TrimSpace(detection.Command); normalized != "" {
+			spoken = normalized
+		}
+	}
 
 	beforeCount := h.broadcastEventCount()
 	scenarioName, err := h.runtime.HandleVoiceText(ctx, deviceID, spoken, h.control.now().UTC())

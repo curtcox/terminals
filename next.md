@@ -1,1 +1,1 @@
-Implement Phase 5 wake-word detection: add a low-power detector interface in `terminal_server/internal/scenario`, wire it into the voice pipeline trigger path, and cover activation/non-activation behavior with integration tests.
+Make wake-word prefixes configurable in server config (instead of hardcoded), then thread them into `scenario.PrefixWakeWordDetector` and add config coverage tests.

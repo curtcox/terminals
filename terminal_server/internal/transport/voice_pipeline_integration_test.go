@@ -70,6 +70,20 @@ type pipelineTTS struct {
 	audio []byte
 }
 
+type pipelineWakeWord struct {
+	detection scenario.WakeWordDetection
+	calls     []string
+	failWith  error
+}
+
+func (w *pipelineWakeWord) Detect(_ context.Context, spoken string) (scenario.WakeWordDetection, error) {
+	if w.failWith != nil {
+		return scenario.WakeWordDetection{}, w.failWith
+	}
+	w.calls = append(w.calls, spoken)
+	return w.detection, nil
+}
+
 func (t *pipelineTTS) Synthesize(
 	_ context.Context,
 	text string,
@@ -226,6 +240,117 @@ func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 	}
 	if play.Format == "" {
 		t.Fatalf("PlayAudio.Format should be set")
+	}
+}
+
+func TestControlStreamVoiceAudioWakeWordDetectedActivatesScenario(t *testing.T) {
+	stt := &pipelineSTT{transcribed: "hey terminal what is the weather"}
+	llm := &pipelineLLM{response: "It is sunny in Test City"}
+	wakeWord := &pipelineWakeWord{detection: scenario.WakeWordDetection{
+		Detected: true,
+		Command:  "assistant what is the weather",
+	}}
+
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        iorouter.NewRouter(),
+		LLM:       llm,
+		STT:       stt,
+		WakeWord:  wakeWord,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	}); err != nil {
+		t.Fatalf("register error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		VoiceAudio: &VoiceAudioRequest{DeviceID: "device-1", Audio: []byte("audio"), SampleRate: 16000, IsFinal: true},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(final voice_audio) error = %v", err)
+	}
+	if len(wakeWord.calls) != 1 || wakeWord.calls[0] != "hey terminal what is the weather" {
+		t.Fatalf("wake-word detector calls = %+v, want transcribed phrase", wakeWord.calls)
+	}
+	if len(llm.queries) != 1 {
+		t.Fatalf("LLM query count = %d, want 1", len(llm.queries))
+	}
+
+	sawAssistantStart := false
+	for _, msg := range out {
+		if msg.ScenarioStart == "voice_assistant" {
+			sawAssistantStart = true
+			break
+		}
+	}
+	if !sawAssistantStart {
+		t.Fatalf("expected voice_assistant scenario start, got %+v", out)
+	}
+}
+
+func TestControlStreamVoiceAudioWakeWordNotDetectedReturnsNoOutput(t *testing.T) {
+	stt := &pipelineSTT{transcribed: "what is the weather"}
+	llm := &pipelineLLM{response: "It is sunny in Test City"}
+	tts := &pipelineTTS{audio: []byte{0x01}}
+	wakeWord := &pipelineWakeWord{detection: scenario.WakeWordDetection{Detected: false}}
+
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        iorouter.NewRouter(),
+		LLM:       llm,
+		STT:       stt,
+		WakeWord:  wakeWord,
+		TTS:       tts,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	}); err != nil {
+		t.Fatalf("register error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		VoiceAudio: &VoiceAudioRequest{DeviceID: "device-1", Audio: []byte("audio"), SampleRate: 16000, IsFinal: true},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(final voice_audio) error = %v", err)
+	}
+	if len(wakeWord.calls) != 1 || wakeWord.calls[0] != "what is the weather" {
+		t.Fatalf("wake-word detector calls = %+v, want transcribed phrase", wakeWord.calls)
+	}
+	if len(out) != 0 {
+		t.Fatalf("expected no server output when wake word not detected, got %+v", out)
+	}
+	if len(llm.queries) != 0 {
+		t.Fatalf("expected no LLM calls when wake word not detected, got %d", len(llm.queries))
+	}
+	if len(tts.calls) != 0 {
+		t.Fatalf("expected no TTS calls when wake word not detected, got %+v", tts.calls)
+	}
+	if len(broadcaster.Events()) != 0 {
+		t.Fatalf("expected no broadcast events when wake word not detected")
 	}
 }
 

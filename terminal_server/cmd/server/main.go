@@ -48,6 +48,7 @@ func main() {
 		AI:        ai.LLMQueryAdapter{LLM: aiBackends.LLM},
 		LLM:       scenarioLLM{backend: aiBackends.LLM},
 		STT:       scenarioSTT{backend: aiBackends.STT},
+		WakeWord:  scenario.PrefixWakeWordDetector{Prefixes: []string{"assistant", "hey terminal"}},
 		TTS:       scenarioTTS{backend: aiBackends.TTS},
 		Telephony: telephonyBridge,
 		Storage:   store,
