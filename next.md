@@ -1,1 +1,1 @@
-Implement playback control scaffolding: add a system/manual command to list playable recording artifacts and request playback metadata for a target device.
+Implement playback dispatch scaffolding: add a manual command that uses playback metadata to send a PlayAudio response to the requested target device.

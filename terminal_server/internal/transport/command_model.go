@@ -30,4 +30,10 @@ const (
 	SystemIntentDeviceStatus      = "device_status"
 	SystemIntentTerminalRefresh   = "terminal_refresh"
 	SystemIntentRecordingEvents   = "recording_events"
+	SystemIntentListPlaybackFiles = "list_playback_artifacts"
+)
+
+// Manual command intents that are handled by transport scaffolding.
+const (
+	ManualIntentPlaybackMetadata = "playback_metadata"
 )

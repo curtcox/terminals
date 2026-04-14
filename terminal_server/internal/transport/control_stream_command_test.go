@@ -2454,6 +2454,113 @@ func TestHandleMessageSystemRecordingEvents(t *testing.T) {
 	}
 }
 
+func TestHandleMessageSystemListPlaybackArtifacts(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	recorder, err := recording.NewDiskManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	handler.SetRecordingManager(recorder)
+	if err := recorder.Start(context.Background(), recording.Stream{
+		StreamID:       "route:device-1|device-2|audio",
+		Kind:           "audio",
+		SourceDeviceID: "device-1",
+		TargetDeviceID: "device-2",
+	}); err != nil {
+		t.Fatalf("recorder.Start() error = %v", err)
+	}
+	if err := recorder.WriteDeviceAudio("device-1", []byte{0x01, 0x02}); err != nil {
+		t.Fatalf("recorder.WriteDeviceAudio() error = %v", err)
+	}
+	if err := recorder.Stop(context.Background(), "route:device-1|device-2|audio"); err != nil {
+		t.Fatalf("recorder.Stop() error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-playback-artifacts",
+			Kind:      "system",
+			Intent:    SystemIntentListPlaybackFiles,
+		},
+	})
+	if err != nil {
+		t.Fatalf("list_playback_artifacts query error = %v", err)
+	}
+	if out[0].Notification != "System query: list_playback_artifacts" {
+		t.Fatalf("notification = %q, want list_playback_artifacts", out[0].Notification)
+	}
+	if len(out[0].Data) != 1 {
+		t.Fatalf("len(Data) = %d, want 1", len(out[0].Data))
+	}
+	row := out[0].Data["000"]
+	if !strings.Contains(row, "route:device-1|device-2|audio") {
+		t.Fatalf("row = %q, want stream id", row)
+	}
+	if !strings.Contains(row, "|audio|device-1|device-2|") {
+		t.Fatalf("row = %q, want kind/source/target columns", row)
+	}
+}
+
+func TestHandleMessageManualPlaybackMetadata(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	recorder, err := recording.NewDiskManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	handler.SetRecordingManager(recorder)
+	if err := recorder.Start(context.Background(), recording.Stream{
+		StreamID:       "route:device-a|device-b|audio",
+		Kind:           "audio",
+		SourceDeviceID: "device-a",
+		TargetDeviceID: "device-b",
+	}); err != nil {
+		t.Fatalf("recorder.Start() error = %v", err)
+	}
+	if err := recorder.WriteDeviceAudio("device-a", []byte{0xAA, 0xBB, 0xCC}); err != nil {
+		t.Fatalf("recorder.WriteDeviceAudio() error = %v", err)
+	}
+	if err := recorder.Stop(context.Background(), "route:device-a|device-b|audio"); err != nil {
+		t.Fatalf("recorder.Stop() error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "manual-playback-metadata",
+			DeviceID:  "device-a",
+			Kind:      "manual",
+			Intent:    ManualIntentPlaybackMetadata,
+			Arguments: map[string]string{
+				"artifact_id":      "route:device-a|device-b|audio",
+				"target_device_id": "hall-display",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual playback_metadata error = %v", err)
+	}
+	if out[0].Notification != "Playback metadata ready" {
+		t.Fatalf("notification = %q, want playback metadata ready", out[0].Notification)
+	}
+	if out[0].Data["artifact_id"] != "route:device-a|device-b|audio" {
+		t.Fatalf("artifact_id = %q, want route:device-a|device-b|audio", out[0].Data["artifact_id"])
+	}
+	if out[0].Data["target_device_id"] != "hall-display" {
+		t.Fatalf("target_device_id = %q, want hall-display", out[0].Data["target_device_id"])
+	}
+	if out[0].Data["size_bytes"] != "3" {
+		t.Fatalf("size_bytes = %q, want 3", out[0].Data["size_bytes"])
+	}
+	if out[0].CommandAck != "manual-playback-metadata" {
+		t.Fatalf("CommandAck = %q, want manual-playback-metadata", out[0].CommandAck)
+	}
+}
+
 func TestHandleMessageSystemScenarioRegistry(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -2709,6 +2816,9 @@ func TestHandleMessageSystemHelp(t *testing.T) {
 	}
 	if !contains(out[0].Data["system_intents"], "recent_commands") {
 		t.Fatalf("system_help missing recent_commands intent: %+v", out[0].Data)
+	}
+	if !contains(out[0].Data["system_intents"], SystemIntentListPlaybackFiles) {
+		t.Fatalf("system_help missing list_playback_artifacts intent: %+v", out[0].Data)
 	}
 }
 

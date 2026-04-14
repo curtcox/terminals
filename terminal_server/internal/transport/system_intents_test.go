@@ -16,6 +16,9 @@ func TestSystemHelpIntentsString(t *testing.T) {
 	if !strings.Contains(s, SystemIntentRecordingEvents) {
 		t.Fatalf("SystemHelpIntentsString() missing %q", SystemIntentRecordingEvents)
 	}
+	if !strings.Contains(s, SystemIntentListPlaybackFiles) {
+		t.Fatalf("SystemHelpIntentsString() missing %q", SystemIntentListPlaybackFiles)
+	}
 }
 
 func TestParseSystemIntent(t *testing.T) {
@@ -49,6 +52,14 @@ func TestParseSystemIntent(t *testing.T) {
 	}
 	if refresh.Name != SystemIntentTerminalRefresh || refresh.Arg != "device-1" {
 		t.Fatalf("unexpected parsed terminal_refresh intent: %+v", refresh)
+	}
+
+	playbackList, err := ParseSystemIntent(SystemIntentListPlaybackFiles)
+	if err != nil {
+		t.Fatalf("ParseSystemIntent(list_playback_artifacts) error = %v", err)
+	}
+	if playbackList.Name != SystemIntentListPlaybackFiles {
+		t.Fatalf("unexpected parsed playback list intent: %+v", playbackList)
 	}
 }
 

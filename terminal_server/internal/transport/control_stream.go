@@ -302,7 +302,7 @@ type StreamHandler struct {
 	voiceAudioBuffers map[string][]byte
 
 	deviceAudio DeviceAudioPublisher
-	recording  recording.Manager
+	recording   recording.Manager
 }
 
 type mediaStreamState struct {
@@ -924,7 +924,7 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 			}
 			peerUI := h.photoFrameSetUI(targetDeviceID, true)
 			responses = append(responses, ServerMessage{
-				SetUI:          &peerUI,
+				SetUI:           &peerUI,
 				RelayToDeviceID: targetDeviceID,
 			})
 			responses = append(responses, ServerMessage{
@@ -1842,10 +1842,10 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 			Notification: "Scenario stopped: " + name,
 		}
 		cmd := &CommandRequest{
-			DeviceID: deviceID,
-			Action:   commandAction,
-			Kind:     CommandKindManual,
-			Intent:   intent,
+			DeviceID:  deviceID,
+			Action:    commandAction,
+			Kind:      CommandKindManual,
+			Intent:    intent,
 			Arguments: copyStringMap(triggerArgs),
 		}
 		responses := h.commandResponses(ctx, cmd, result)
@@ -1880,10 +1880,10 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		h.captureMultiWindowResume(deviceID, activeName)
 	}
 	cmd := &CommandRequest{
-		DeviceID: deviceID,
-		Action:   commandAction,
-		Kind:     CommandKindManual,
-		Intent:   intent,
+		DeviceID:  deviceID,
+		Action:    commandAction,
+		Kind:      CommandKindManual,
+		Intent:    intent,
 		Arguments: copyStringMap(triggerArgs),
 	}
 	responses := h.commandResponses(ctx, cmd, result)
@@ -2362,9 +2362,6 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	if strings.TrimSpace(cmd.DeviceID) == "" {
 		return ServerMessage{}, ErrMissingCommandDeviceID
 	}
-	if h.runtime == nil {
-		return ServerMessage{}, errors.New("scenario runtime not configured")
-	}
 
 	action := cmd.Action
 	if action == "" {
@@ -2372,6 +2369,13 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	}
 	if action != CommandActionStart && action != CommandActionStop {
 		return ServerMessage{}, ErrInvalidCommandAction
+	}
+	manualIntent := strings.TrimSpace(cmd.Intent)
+	if h.runtime == nil {
+		if kind != CommandKindManual ||
+			(manualIntent != SystemIntentTerminalRefresh && manualIntent != ManualIntentPlaybackMetadata) {
+			return ServerMessage{}, errors.New("scenario runtime not configured")
+		}
 	}
 
 	switch kind {
@@ -2398,10 +2402,10 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			Notification:  "Scenario started: " + name,
 		}, nil
 	case CommandKindManual:
-		if strings.TrimSpace(cmd.Intent) == "" {
+		if manualIntent == "" {
 			return ServerMessage{}, ErrMissingCommandIntent
 		}
-		if strings.TrimSpace(cmd.Intent) == SystemIntentTerminalRefresh {
+		if manualIntent == SystemIntentTerminalRefresh {
 			if action == CommandActionStop {
 				return ServerMessage{}, ErrInvalidCommandAction
 			}
@@ -2410,6 +2414,30 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 				Data: map[string]string{
 					"device_id": cmd.DeviceID,
 				},
+			}, nil
+		}
+		if manualIntent == ManualIntentPlaybackMetadata {
+			if action == CommandActionStop {
+				return ServerMessage{}, ErrInvalidCommandAction
+			}
+			artifactID := strings.TrimSpace(cmd.Arguments["artifact_id"])
+			if artifactID == "" {
+				return ServerMessage{}, fmt.Errorf("playback_metadata requires artifact_id")
+			}
+			targetDeviceID := strings.TrimSpace(cmd.Arguments["target_device_id"])
+			if targetDeviceID == "" {
+				targetDeviceID = strings.TrimSpace(cmd.DeviceID)
+			}
+			if targetDeviceID == "" {
+				return ServerMessage{}, ErrMissingCommandDeviceID
+			}
+			metadata, ok := h.playbackMetadataForTarget(artifactID, targetDeviceID)
+			if !ok {
+				return ServerMessage{}, fmt.Errorf("playback artifact not found: %s", artifactID)
+			}
+			return ServerMessage{
+				Notification: "Playback metadata ready",
+				Data:         metadata,
 			}, nil
 		}
 		trigger := scenario.Trigger{
@@ -2623,6 +2651,25 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: recording_events",
 			Data:         data,
 		}, nil
+	case SystemIntentListPlaybackFiles:
+		data := map[string]string{}
+		for i, artifact := range h.listPlaybackArtifacts() {
+			key := fmt.Sprintf("%03d", i)
+			data[key] = strings.Join([]string{
+				artifact.ArtifactID,
+				artifact.StreamID,
+				artifact.Kind,
+				artifact.SourceDeviceID,
+				artifact.TargetDeviceID,
+				strconv.FormatInt(artifact.SizeBytes, 10),
+				strconv.FormatInt(artifact.UpdatedUnixMS, 10),
+				artifact.AudioPath,
+			}, "|")
+		}
+		return ServerMessage{
+			Notification: "System query: list_playback_artifacts",
+			Data:         data,
+		}, nil
 	case SystemIntentTerminalRefresh:
 		targetDeviceID := strings.TrimSpace(parsed.Arg)
 		if targetDeviceID == "" {
@@ -2671,6 +2718,54 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		}
 		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", cmd.Intent)
 	}
+}
+
+func (h *StreamHandler) listPlaybackArtifacts() []recording.Artifact {
+	h.mu.Lock()
+	recorder := h.recording
+	h.mu.Unlock()
+	lister, ok := recorder.(interface {
+		ListPlayableArtifacts() []recording.Artifact
+	})
+	if !ok {
+		return nil
+	}
+	artifacts := lister.ListPlayableArtifacts()
+	out := make([]recording.Artifact, len(artifacts))
+	copy(out, artifacts)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].UpdatedUnixMS == out[j].UpdatedUnixMS {
+			return out[i].ArtifactID < out[j].ArtifactID
+		}
+		return out[i].UpdatedUnixMS > out[j].UpdatedUnixMS
+	})
+	return out
+}
+
+func (h *StreamHandler) playbackMetadataForTarget(artifactID, targetDeviceID string) (map[string]string, bool) {
+	h.mu.Lock()
+	recorder := h.recording
+	h.mu.Unlock()
+	provider, ok := recorder.(interface {
+		PlaybackMetadata(artifactID, targetDeviceID string) (recording.PlaybackMetadata, bool)
+	})
+	if !ok {
+		return nil, false
+	}
+	metadata, ok := provider.PlaybackMetadata(artifactID, targetDeviceID)
+	if !ok {
+		return nil, false
+	}
+	return map[string]string{
+		"artifact_id":      metadata.Artifact.ArtifactID,
+		"stream_id":        metadata.Artifact.StreamID,
+		"kind":             metadata.Artifact.Kind,
+		"source_device_id": metadata.Artifact.SourceDeviceID,
+		"target_device_id": metadata.TargetDeviceID,
+		"audio_path":       metadata.Artifact.AudioPath,
+		"size_bytes":       strconv.FormatInt(metadata.Artifact.SizeBytes, 10),
+		"updated_unix_ms":  strconv.FormatInt(metadata.Artifact.UpdatedUnixMS, 10),
+	}, true
 }
 
 // NoteProtocolError increments protocol error counters from session-level validation.

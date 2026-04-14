@@ -6,6 +6,24 @@ import (
 	"sync"
 )
 
+// Artifact describes one playable recording artifact discovered on disk.
+type Artifact struct {
+	ArtifactID     string
+	StreamID       string
+	Kind           string
+	SourceDeviceID string
+	TargetDeviceID string
+	AudioPath      string
+	SizeBytes      int64
+	UpdatedUnixMS  int64
+}
+
+// PlaybackMetadata contains transport-ready metadata for requesting playback.
+type PlaybackMetadata struct {
+	Artifact       Artifact
+	TargetDeviceID string
+}
+
 // Stream describes one active media route eligible for recording.
 type Stream struct {
 	StreamID       string
@@ -88,4 +106,14 @@ func (m *MemoryManager) Active() map[string]Stream {
 		out[streamID] = copyStream
 	}
 	return out
+}
+
+// ListPlayableArtifacts returns no artifacts for the in-memory manager.
+func (m *MemoryManager) ListPlayableArtifacts() []Artifact {
+	return nil
+}
+
+// PlaybackMetadata reports no playback metadata for the in-memory manager.
+func (m *MemoryManager) PlaybackMetadata(string, string) (PlaybackMetadata, bool) {
+	return PlaybackMetadata{}, false
 }

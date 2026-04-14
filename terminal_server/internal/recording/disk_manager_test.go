@@ -125,3 +125,53 @@ func TestDiskManagerWriteDeviceAudio(t *testing.T) {
 		t.Fatalf("audio bytes = %v, want %v", got, chunk)
 	}
 }
+
+func TestDiskManagerListPlayableArtifactsAndPlaybackMetadata(t *testing.T) {
+	dir := t.TempDir()
+	mgr, err := NewDiskManager(dir)
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	if err := mgr.Start(context.Background(), Stream{
+		StreamID:       "route:d3|d4|audio",
+		Kind:           "audio",
+		SourceDeviceID: "d3",
+		TargetDeviceID: "d4",
+	}); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	if err := mgr.WriteDeviceAudio("d3", []byte{0x10, 0x20, 0x30}); err != nil {
+		t.Fatalf("WriteDeviceAudio() error = %v", err)
+	}
+	if err := mgr.Stop(context.Background(), "route:d3|d4|audio"); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+
+	artifacts := mgr.ListPlayableArtifacts()
+	if len(artifacts) != 1 {
+		t.Fatalf("len(ListPlayableArtifacts()) = %d, want 1", len(artifacts))
+	}
+	if artifacts[0].ArtifactID != "route:d3|d4|audio" {
+		t.Fatalf("ArtifactID = %q, want route:d3|d4|audio", artifacts[0].ArtifactID)
+	}
+	if artifacts[0].SizeBytes != 3 {
+		t.Fatalf("SizeBytes = %d, want 3", artifacts[0].SizeBytes)
+	}
+	if artifacts[0].AudioPath == "" {
+		t.Fatalf("AudioPath should not be empty")
+	}
+
+	metadata, ok := mgr.PlaybackMetadata("route:d3|d4|audio", "kitchen-display")
+	if !ok {
+		t.Fatalf("PlaybackMetadata() should resolve known artifact")
+	}
+	if metadata.TargetDeviceID != "kitchen-display" {
+		t.Fatalf("TargetDeviceID = %q, want kitchen-display", metadata.TargetDeviceID)
+	}
+	if metadata.Artifact.StreamID != "route:d3|d4|audio" {
+		t.Fatalf("StreamID = %q, want route:d3|d4|audio", metadata.Artifact.StreamID)
+	}
+	if _, ok := mgr.PlaybackMetadata("missing-artifact", "kitchen-display"); ok {
+		t.Fatalf("PlaybackMetadata() should not resolve missing artifact")
+	}
+}
