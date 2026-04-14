@@ -14,6 +14,8 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS", "")
 	t.Setenv("TERMINALS_LIVENESS_RECONCILE_INTERVAL_SECONDS", "")
 	t.Setenv("TERMINALS_DUE_TIMER_PROCESS_INTERVAL_SECONDS", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -27,6 +29,12 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.RecordingDir != "recordings" {
 		t.Fatalf("RecordingDir = %q, want recordings", cfg.RecordingDir)
+	}
+	if cfg.PhotoFrameDir != "" {
+		t.Fatalf("PhotoFrameDir = %q, want empty", cfg.PhotoFrameDir)
+	}
+	if cfg.PhotoFrameIntervalSeconds != 12 {
+		t.Fatalf("PhotoFrameIntervalSeconds = %d, want 12", cfg.PhotoFrameIntervalSeconds)
 	}
 	if cfg.HeartbeatTimeoutSeconds != 120 {
 		t.Fatalf("HeartbeatTimeoutSeconds = %d", cfg.HeartbeatTimeoutSeconds)
@@ -71,6 +79,22 @@ func TestLoadRecordingDirFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
+	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "/tmp/terminals-photos")
+	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "30")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.PhotoFrameDir != "/tmp/terminals-photos" {
+		t.Fatalf("PhotoFrameDir = %q, want /tmp/terminals-photos", cfg.PhotoFrameDir)
+	}
+	if cfg.PhotoFrameIntervalSeconds != 30 {
+		t.Fatalf("PhotoFrameIntervalSeconds = %d, want 30", cfg.PhotoFrameIntervalSeconds)
+	}
+}
+
 func TestLoadInvalidPort(t *testing.T) {
 	t.Setenv("TERMINALS_GRPC_PORT", "bad")
 	if _, err := Load(); err == nil {
@@ -102,6 +126,13 @@ func TestLoadInvalidInterval(t *testing.T) {
 	t.Setenv("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS", "abc")
 	if _, err := Load(); err == nil {
 		t.Fatalf("Load() expected error for invalid interval")
+	}
+}
+
+func TestLoadInvalidPhotoFrameInterval(t *testing.T) {
+	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "nope")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid photo frame interval")
 	}
 }
 

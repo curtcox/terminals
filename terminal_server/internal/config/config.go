@@ -13,6 +13,8 @@ type Config struct {
 	GRPCHost                      string
 	GRPCPort                      int
 	RecordingDir                  string
+	PhotoFrameDir                 string
+	PhotoFrameIntervalSeconds     int
 	MDNSService                   string
 	MDNSName                      string
 	Version                       string
@@ -39,6 +41,8 @@ func Load() (Config, error) {
 		GRPCHost:                      getenv("TERMINALS_GRPC_HOST", "0.0.0.0"),
 		GRPCPort:                      50051,
 		RecordingDir:                  getenv("TERMINALS_RECORDING_DIR", "recordings"),
+		PhotoFrameDir:                 getenv("TERMINALS_PHOTO_FRAME_DIR", ""),
+		PhotoFrameIntervalSeconds:     12,
 		MDNSService:                   getenv("TERMINALS_MDNS_SERVICE", "_terminals._tcp.local."),
 		MDNSName:                      getenv("TERMINALS_MDNS_NAME", "HomeServer"),
 		Version:                       getenv("TERMINALS_VERSION", "1"),
@@ -73,6 +77,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	} else if ok {
 		cfg.DueTimerProcessIntervalSecs = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.PhotoFrameIntervalSeconds = v
 	}
 
 	sip, err := loadSIPConfig()

@@ -3,8 +3,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/url"
+	"os"
 	"os/signal"
+	"path/filepath"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -68,6 +74,7 @@ func main() {
 	scenario.RegisterBuiltins(scenarioEngine)
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
 	controlStream := transport.NewStreamHandler(controlService)
+	configurePhotoFrame(controlStream, cfg)
 	recordingManager, err := recording.NewDiskManager(cfg.RecordingDir)
 	if err != nil {
 		log.Printf("configure recording manager: %v", err)
@@ -221,4 +228,58 @@ func runLivenessLoop(ctx context.Context, control *transport.ControlService, tim
 			}
 		}
 	}
+}
+
+func configurePhotoFrame(handler *transport.StreamHandler, cfg config.Config) {
+	if handler == nil {
+		return
+	}
+	interval := time.Duration(cfg.PhotoFrameIntervalSeconds) * time.Second
+	slides, err := loadPhotoFrameSlides(cfg.PhotoFrameDir)
+	if err != nil {
+		log.Printf("photo frame slide discovery failed dir=%q err=%v", cfg.PhotoFrameDir, err)
+	}
+	handler.SetPhotoFrameSettings(slides, interval)
+	log.Printf(
+		"photo frame configured slides=%d dir=%q interval=%ds",
+		len(slides),
+		cfg.PhotoFrameDir,
+		cfg.PhotoFrameIntervalSeconds,
+	)
+}
+
+func loadPhotoFrameSlides(dir string) ([]string, error) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return nil, nil
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	slides := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := strings.TrimSpace(entry.Name())
+		if name == "" {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		switch ext {
+		case ".jpg", ".jpeg", ".png", ".webp", ".gif":
+		default:
+			continue
+		}
+		absPath := filepath.Join(dir, name)
+		absPath, err = filepath.Abs(absPath)
+		if err != nil {
+			return nil, fmt.Errorf("resolve photo frame slide %q: %w", absPath, err)
+		}
+		fileURL := url.URL{Scheme: "file", Path: filepath.ToSlash(absPath)}
+		slides = append(slides, fileURL.String())
+	}
+	sort.Strings(slides)
+	return slides, nil
 }

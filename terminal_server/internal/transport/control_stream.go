@@ -429,6 +429,19 @@ func (h *StreamHandler) SetRecordingManager(mgr recording.Manager) {
 	h.recording = mgr
 }
 
+// SetPhotoFrameSettings overrides photo-frame slide URLs and rotation
+// interval. Empty slide input preserves existing/default slides.
+func (h *StreamHandler) SetPhotoFrameSettings(slides []string, interval time.Duration) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(slides) > 0 {
+		h.photoFrameSlides = append([]string(nil), slides...)
+	}
+	if interval > 0 {
+		h.photoFrameInterval = interval
+	}
+}
+
 // HandleMessage processes one incoming control message and returns responses.
 func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([]ServerMessage, error) {
 	switch {
@@ -957,7 +970,7 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	}
 	if cmd.Action != "" && cmd.Action != CommandActionStart {
 		if commandResult.ScenarioStop != "" {
-			if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, commandResult.ScenarioStop); len(restored) > 0 {
+			if restored := h.resumedScenarioUIForTargets(ctx, cmd, commandResult.ScenarioStop); len(restored) > 0 {
 				responses = append(responses, restored...)
 			}
 		}
@@ -1154,6 +1167,41 @@ func (h *StreamHandler) resumedScenarioUI(ctx context.Context, deviceID, stopped
 	default:
 		return nil
 	}
+}
+
+func (h *StreamHandler) resumedScenarioUIForTargets(
+	ctx context.Context,
+	cmd *CommandRequest,
+	stoppedScenario string,
+) []ServerMessage {
+	if cmd == nil {
+		return nil
+	}
+	targets := h.commandTargetDeviceIDs(cmd)
+	if len(targets) == 0 {
+		return h.resumedScenarioUI(ctx, cmd.DeviceID, stoppedScenario)
+	}
+	sourceDeviceID := strings.TrimSpace(cmd.DeviceID)
+	out := make([]ServerMessage, 0, len(targets)*2)
+	seen := map[string]struct{}{}
+	for _, targetDeviceID := range targets {
+		targetDeviceID = strings.TrimSpace(targetDeviceID)
+		if targetDeviceID == "" {
+			continue
+		}
+		if _, exists := seen[targetDeviceID]; exists {
+			continue
+		}
+		seen[targetDeviceID] = struct{}{}
+		resumed := h.resumedScenarioUI(ctx, targetDeviceID, stoppedScenario)
+		for _, msg := range resumed {
+			if targetDeviceID != sourceDeviceID {
+				msg.RelayToDeviceID = targetDeviceID
+			}
+			out = append(out, msg)
+		}
+	}
+	return out
 }
 
 func (h *StreamHandler) clearPhotoFrameState(deviceID string) {

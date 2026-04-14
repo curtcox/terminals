@@ -1956,6 +1956,104 @@ func TestHandleMessageCommandStopRedAlertRestoresPhotoFrameUI(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandStopRedAlertRestoresPhotoFrameUIForTargetedDevices(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Tablet"},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-photo-start-targeted",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+			Arguments: map[string]string{
+				"device_ids": "device-1,device-2",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("photo frame targeted start error = %v", err)
+	}
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-alert-start-targeted",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "red alert",
+			Arguments: map[string]string{
+				"device_ids": "device-1,device-2",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("red alert targeted start error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-alert-stop-targeted",
+			DeviceID:  "device-1",
+			Action:    "stop",
+			Kind:      "manual",
+			Intent:    "red alert",
+			Arguments: map[string]string{
+				"device_ids": "device-1,device-2",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("red alert targeted stop error = %v", err)
+	}
+
+	foundLocalPhotoUI := false
+	foundLocalPhotoTransition := false
+	foundPeerPhotoUI := false
+	foundPeerPhotoTransition := false
+	for _, msg := range out {
+		if msg.SetUI != nil && msg.SetUI.Props["id"] == "photo_frame_root" {
+			if msg.RelayToDeviceID == "" {
+				foundLocalPhotoUI = true
+			}
+			if msg.RelayToDeviceID == "device-2" {
+				foundPeerPhotoUI = true
+			}
+		}
+		if msg.TransitionUI != nil && msg.TransitionUI.Transition == "photo_frame_enter" {
+			if msg.RelayToDeviceID == "" {
+				foundLocalPhotoTransition = true
+			}
+			if msg.RelayToDeviceID == "device-2" {
+				foundPeerPhotoTransition = true
+			}
+		}
+	}
+	if !foundLocalPhotoUI || !foundLocalPhotoTransition {
+		t.Fatalf("expected local resumed photo frame UI+transition; out=%+v", out)
+	}
+	if !foundPeerPhotoUI || !foundPeerPhotoTransition {
+		t.Fatalf("expected relayed resumed photo frame UI+transition for device-2; out=%+v", out)
+	}
+}
+
 func TestHandleMessageCommandDedupesRequestID(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

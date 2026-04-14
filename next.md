@@ -1,1 +1,1 @@
-Implement photo frame scenario idle rotation with suspend/resume preemption support.
+Serve configured photo-frame directory assets over HTTP so web clients can render local server photos without file:// URLs.
