@@ -31,6 +31,7 @@ message PlayAudio {
     bytes pcm_data = 4;
     string tts_text = 5;
   }
+  string format = 6;
 }
 
 message ShowMedia {

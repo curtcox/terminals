@@ -118,6 +118,17 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				Payload:    signal.GetPayload(),
 			},
 		}, nil
+	case *controlv1.ConnectRequest_VoiceAudio:
+		voice := payload.VoiceAudio
+		audio := append([]byte(nil), voice.GetAudio()...)
+		return ClientMessage{
+			VoiceAudio: &VoiceAudioRequest{
+				DeviceID:   voice.GetDeviceId(),
+				Audio:      audio,
+				SampleRate: voice.GetSampleRate(),
+				IsFinal:    voice.GetIsFinal(),
+			},
+		}, nil
 	default:
 		return ClientMessage{}, nil
 	}
@@ -198,6 +209,20 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 				TransitionUi: &uiv1.TransitionUI{
 					Transition: msg.TransitionUI.Transition,
 					DurationMs: msg.TransitionUI.DurationMS,
+				},
+			},
+		}
+	case msg.PlayAudio != nil:
+		audio := append([]byte(nil), msg.PlayAudio.Audio...)
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_PlayAudio{
+				PlayAudio: &iov1.PlayAudio{
+					RequestId: msg.PlayAudio.RequestID,
+					DeviceId:  msg.PlayAudio.DeviceID,
+					Source: &iov1.PlayAudio_PcmData{
+						PcmData: audio,
+					},
+					Format: msg.PlayAudio.Format,
 				},
 			},
 		}

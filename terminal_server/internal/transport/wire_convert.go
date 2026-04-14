@@ -54,6 +54,16 @@ func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
 				Intent:    w.Command.Intent,
 			},
 		}, nil
+	case w.VoiceAudio != nil:
+		audio := append([]byte(nil), w.VoiceAudio.Audio...)
+		return ClientMessage{
+			VoiceAudio: &VoiceAudioRequest{
+				DeviceID:   w.VoiceAudio.DeviceID,
+				Audio:      audio,
+				SampleRate: w.VoiceAudio.SampleRate,
+				IsFinal:    w.VoiceAudio.IsFinal,
+			},
+		}, nil
 	default:
 		return ClientMessage{}, ErrInvalidWireMessage
 	}
@@ -169,6 +179,15 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 		out.TransitionUI = &uiWireTransition{
 			Transition: msg.TransitionUI.Transition,
 			DurationMS: msg.TransitionUI.DurationMS,
+		}
+	}
+	if msg.PlayAudio != nil {
+		audio := append([]byte(nil), msg.PlayAudio.Audio...)
+		out.PlayAudio = &WirePlayAudio{
+			RequestID: msg.PlayAudio.RequestID,
+			DeviceID:  msg.PlayAudio.DeviceID,
+			Audio:     audio,
+			Format:    msg.PlayAudio.Format,
 		}
 	}
 	if msg.ErrorCode != "" || msg.Error != "" {

@@ -60,6 +60,14 @@ const (
 	WireCommandKindSystem WireCommandKind = 3
 )
 
+// WireVoiceAudio is a protobuf-adapter-friendly voice-audio chunk payload.
+type WireVoiceAudio struct {
+	DeviceID   string
+	Audio      []byte
+	SampleRate int32
+	IsFinal    bool
+}
+
 // WireClientMessage is a protobuf-adapter-friendly oneof shape.
 type WireClientMessage struct {
 	Register     *WireRegisterRequest
@@ -67,6 +75,7 @@ type WireClientMessage struct {
 	Heartbeat    *WireHeartbeatRequest
 	WebRTCSignal *WireWebRTCSignal
 	Command      *WireCommandRequest
+	VoiceAudio   *WireVoiceAudio
 }
 
 // WireRegisterResponse is a protobuf-adapter-friendly register response.
@@ -125,7 +134,16 @@ type WireServerMessage struct {
 	RouteStream   *WireRouteStream
 	WebRTCSignal  *WireWebRTCSignal
 	TransitionUI  *uiWireTransition
+	PlayAudio     *WirePlayAudio
 	Error         *WireControlError
+}
+
+// WirePlayAudio is a protobuf-adapter-friendly play-audio payload.
+type WirePlayAudio struct {
+	RequestID string
+	DeviceID  string
+	Audio     []byte
+	Format    string
 }
 
 // WireStartStream is a protobuf-adapter-friendly start stream payload.

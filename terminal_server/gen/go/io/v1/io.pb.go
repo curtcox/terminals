@@ -219,6 +219,7 @@ type PlayAudio struct {
 	//	*PlayAudio_PcmData
 	//	*PlayAudio_TtsText
 	Source        isPlayAudio_Source `protobuf_oneof:"source"`
+	Format        string             `protobuf:"bytes,6,opt,name=format,proto3" json:"format,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -297,6 +298,13 @@ func (x *PlayAudio) GetTtsText() string {
 		if x, ok := x.Source.(*PlayAudio_TtsText); ok {
 			return x.TtsText
 		}
+	}
+	return ""
+}
+
+func (x *PlayAudio) GetFormat() string {
+	if x != nil {
+		return x.Format
 	}
 	return ""
 }
@@ -918,14 +926,15 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12(\n" +
 	"\x10source_device_id\x18\x02 \x01(\tR\x0esourceDeviceId\x12(\n" +
 	"\x10target_device_id\x18\x03 \x01(\tR\x0etargetDeviceId\x12\x12\n" +
-	"\x04kind\x18\x04 \x01(\tR\x04kind\"\x9f\x01\n" +
+	"\x04kind\x18\x04 \x01(\tR\x04kind\"\xb7\x01\n" +
 	"\tPlayAudio\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12\x12\n" +
 	"\x03url\x18\x03 \x01(\tH\x00R\x03url\x12\x1b\n" +
 	"\bpcm_data\x18\x04 \x01(\fH\x00R\apcmData\x12\x1b\n" +
-	"\btts_text\x18\x05 \x01(\tH\x00R\attsTextB\b\n" +
+	"\btts_text\x18\x05 \x01(\tH\x00R\attsText\x12\x16\n" +
+	"\x06format\x18\x06 \x01(\tR\x06formatB\b\n" +
 	"\x06source\"\x83\x01\n" +
 	"\tShowMedia\x12\x1d\n" +
 	"\n" +

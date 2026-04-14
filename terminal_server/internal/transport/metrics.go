@@ -14,6 +14,7 @@ type Metrics struct {
 	commandErrors        atomic.Int64
 	protocolErrors       atomic.Int64
 	dedupeHits           atomic.Int64
+	voiceAudioReceived   atomic.Int64
 }
 
 // Snapshot returns a stable map of metric values.
@@ -29,5 +30,6 @@ func (m *Metrics) Snapshot() map[string]string {
 		"command_errors":         toString(m.commandErrors.Load()),
 		"protocol_errors":        toString(m.protocolErrors.Load()),
 		"dedupe_hits":            toString(m.dedupeHits.Load()),
+		"voice_audio_received":   toString(m.voiceAudioReceived.Load()),
 	}
 }

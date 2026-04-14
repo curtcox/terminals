@@ -22,7 +22,15 @@ message ConnectRequest {
     CommandRequest command = 6;
     Heartbeat heartbeat = 7;
     WebRTCSignal webrtc_signal = 8;
+    VoiceAudio voice_audio = 9;
   }
+}
+
+message VoiceAudio {
+  string device_id = 1;
+  bytes audio = 2;
+  int32 sample_rate = 3;
+  bool is_final = 4;
 }
 
 message ConnectResponse {
