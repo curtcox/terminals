@@ -281,6 +281,108 @@ func TestRuntimeAudioMonitorPreemptedByRedAlertSuspendsAndResumes(t *testing.T) 
 	}
 }
 
+func TestRuntimeIntercomPreemptedByRedAlertSuspendsAndResumesRoutes(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &IntercomScenario{}, Priority: PriorityHigh})
+	engine.Register(Registration{Scenario: AlertScenario{}, Priority: PriorityCritical})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "intercom",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(intercom) error = %v", err)
+	}
+	if got := router.RouteCount(); got != 4 {
+		t.Fatalf("route count after intercom start = %d, want 4", got)
+	}
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "red_alert",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(red_alert) error = %v", err)
+	}
+	if got := router.RouteCount(); got != 0 {
+		t.Fatalf("route count after red_alert preemption = %d, want 0", got)
+	}
+
+	if _, err := runtime.StopTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "red_alert",
+	}); err != nil {
+		t.Fatalf("StopTrigger(red_alert) error = %v", err)
+	}
+	if got := router.RouteCount(); got != 4 {
+		t.Fatalf("route count after red_alert stop resume = %d, want 4", got)
+	}
+}
+
+func TestRuntimePAPreemptedByRedAlertSuspendsAndResumesRoutes(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &PASystemScenario{}, Priority: PriorityHigh})
+	engine.Register(Registration{Scenario: AlertScenario{}, Priority: PriorityCritical})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "pa_system",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(pa_system) error = %v", err)
+	}
+	if got := router.RouteCount(); got != 2 {
+		t.Fatalf("route count after pa start = %d, want 2", got)
+	}
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "red_alert",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(red_alert) error = %v", err)
+	}
+	if got := router.RouteCount(); got != 0 {
+		t.Fatalf("route count after red_alert preemption = %d, want 0", got)
+	}
+
+	if _, err := runtime.StopTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "red_alert",
+	}); err != nil {
+		t.Fatalf("StopTrigger(red_alert) error = %v", err)
+	}
+	if got := router.RouteCount(); got != 2 {
+		t.Fatalf("route count after red_alert stop resume = %d, want 2", got)
+	}
+}
+
 // TestRuntimeAudioMonitorVoiceTriggerArmsWithParsedTarget verifies that the
 // Phase-6 milestone phrasing ("tell me when the dishwasher stops") is parsed
 // by ParseVoiceTrigger and routed through the runtime to AudioMonitorScenario
@@ -761,6 +863,79 @@ func TestRuntimeHandleTriggerTargetsExplicitDeviceIDs(t *testing.T) {
 	}
 	if active, ok := engine.Active("d3"); !ok || active != "photo_frame" {
 		t.Fatalf("d3 active scenario = %q (ok=%t), want photo_frame", active, ok)
+	}
+}
+
+func TestRuntimeIntercomTargetsExplicitDeviceIDs(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	router := iorouter.NewRouter()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &IntercomScenario{}, Priority: PriorityHigh})
+	runtime := NewRuntime(engine, &Environment{
+		Devices: devices,
+		IO:      router,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "intercom",
+		Arguments: map[string]string{
+			"device_ids": "d1,d3",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(intercom targeted) error = %v", err)
+	}
+
+	if got := router.RouteCount(); got != 2 {
+		t.Fatalf("route count = %d, want 2", got)
+	}
+	routes := router.Routes()
+	for _, route := range routes {
+		if route.SourceID == "d2" || route.TargetID == "d2" {
+			t.Fatalf("unexpected route involving d2: %+v", route)
+		}
+	}
+}
+
+func TestRuntimePATargetsExplicitDeviceIDs(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	router := iorouter.NewRouter()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &PASystemScenario{}, Priority: PriorityHigh})
+	runtime := NewRuntime(engine, &Environment{
+		Devices: devices,
+		IO:      router,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "pa_system",
+		Arguments: map[string]string{
+			"device_ids": "d1,d3",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(pa targeted) error = %v", err)
+	}
+
+	if got := router.RouteCount(); got != 1 {
+		t.Fatalf("route count = %d, want 1", got)
+	}
+	routes := router.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("len(routes) = %d, want 1", len(routes))
+	}
+	if routes[0].SourceID != "d1" || routes[0].TargetID != "d3" || routes[0].StreamKind != "pa_audio" {
+		t.Fatalf("route = %+v, want d1->d3 pa_audio", routes[0])
 	}
 }
 
@@ -1246,6 +1421,44 @@ func TestRuntimeMultiWindowFocusRoutesSingleAudioSource(t *testing.T) {
 	}
 	if hasAudioMix {
 		t.Fatalf("did not expect audio_mix routes when focus is selected")
+	}
+}
+
+func TestRuntimeMultiWindowTargetsExplicitDeviceIDs(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	router := iorouter.NewRouter()
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &MultiWindowScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "multi_window",
+		Arguments: map[string]string{
+			"device_ids": "d1,d3",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(multi_window targeted) error = %v", err)
+	}
+
+	if got := router.RouteCount(); got != 2 {
+		t.Fatalf("route count = %d, want 2", got)
+	}
+	routes := router.RoutesForDevice("d1")
+	for _, route := range routes {
+		if route.SourceID == "d2" || route.TargetID == "d2" {
+			t.Fatalf("unexpected route involving d2: %+v", route)
+		}
 	}
 }
 

@@ -172,6 +172,10 @@ func (s *TerminalScenario) Stop() error { return nil }
 // IntercomScenario connects source device audio to all peer devices.
 type IntercomScenario struct {
 	trigger Trigger
+
+	mu          sync.Mutex
+	env         *Environment
+	ownedRoutes []ioRoute
 }
 
 // Name returns the stable scenario identifier.
@@ -191,16 +195,49 @@ func (s *IntercomScenario) Start(ctx context.Context, env *Environment) error {
 	if env == nil {
 		return nil
 	}
-	if err := connectBidirectionalSourcePeers(ctx, env, s.trigger.SourceID, "audio"); err != nil {
+	targets := peerTargetDeviceIDs(env, s.trigger.SourceID, s.trigger.Arguments)
+	ownedRoutes, err := connectBidirectionalSourceTargetsOwned(ctx, env, s.trigger.SourceID, targets, "audio")
+	if err != nil {
 		return err
 	}
-	return notifySource(ctx, env, s.trigger.SourceID, "Intercom active")
+	s.mu.Lock()
+	s.env = env
+	s.ownedRoutes = ownedRoutes
+	s.mu.Unlock()
+	if err := notifySource(ctx, env, s.trigger.SourceID, "Intercom active"); err != nil {
+		return err
+	}
+	return nil
 }
 
-// Stop ends intercom mode and currently has no side effects.
-// TODO(phase-7): evaluate Suspend/Resume hooks if intercom begins owning
-// long-lived subscriptions that must be explicitly torn down on preemption.
-func (s *IntercomScenario) Stop() error { return nil }
+// Stop ends intercom mode and releases any owned routes.
+func (s *IntercomScenario) Stop() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = nil
+	s.ownedRoutes = nil
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Suspend releases owned routes while preempted.
+func (s *IntercomScenario) Suspend() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Resume reacquires owned routes after preemption.
+func (s *IntercomScenario) Resume(_ context.Context, env *Environment) error {
+	s.mu.Lock()
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = env
+	s.mu.Unlock()
+	return reconnectOwnedRoutes(env, routes)
+}
 
 // InternalVideoCallScenario connects source and target with bidirectional audio/video.
 type InternalVideoCallScenario struct {
@@ -626,6 +663,10 @@ func sensorMotionMagnitude(values map[string]float64) (float64, bool) {
 // PASystemScenario fans out source audio to peers with PA semantics.
 type PASystemScenario struct {
 	trigger Trigger
+
+	mu          sync.Mutex
+	env         *Environment
+	ownedRoutes []ioRoute
 }
 
 // Name returns the stable scenario identifier.
@@ -645,9 +686,15 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 	if env == nil {
 		return nil
 	}
-	if err := connectSourceToPeers(ctx, env, s.trigger.SourceID, "pa_audio"); err != nil {
+	targets := peerTargetDeviceIDs(env, s.trigger.SourceID, s.trigger.Arguments)
+	ownedRoutes, err := connectSourceToTargetsOwned(ctx, env, s.trigger.SourceID, targets, "pa_audio")
+	if err != nil {
 		return err
 	}
+	s.mu.Lock()
+	s.env = env
+	s.ownedRoutes = ownedRoutes
+	s.mu.Unlock()
 	if err := notifySource(ctx, env, s.trigger.SourceID, "PA system active"); err != nil {
 		return err
 	}
@@ -661,10 +708,34 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 	return nil
 }
 
-// Stop ends PA mode and currently has no side effects.
-// TODO(phase-7): evaluate Suspend/Resume hooks if PA mode moves to explicit
-// resource ownership with lifecycle distinct from Start/Stop.
-func (s *PASystemScenario) Stop() error { return nil }
+// Stop ends PA mode and releases any owned routes.
+func (s *PASystemScenario) Stop() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = nil
+	s.ownedRoutes = nil
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Suspend releases PA-owned routes while preempted.
+func (s *PASystemScenario) Suspend() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Resume reacquires PA-owned routes after preemption.
+func (s *PASystemScenario) Resume(_ context.Context, env *Environment) error {
+	s.mu.Lock()
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = env
+	s.mu.Unlock()
+	return reconnectOwnedRoutes(env, routes)
+}
 
 // MultiWindowScenario routes all peer cameras to source display.
 type MultiWindowScenario struct {
@@ -690,12 +761,8 @@ func (s *MultiWindowScenario) Start(ctx context.Context, env *Environment) error
 	}
 	if env.IO != nil && env.Devices != nil && strings.TrimSpace(s.trigger.SourceID) != "" {
 		source := strings.TrimSpace(s.trigger.SourceID)
-		peers := make([]string, 0, len(env.Devices.ListDeviceIDs()))
-		for _, peer := range env.Devices.ListDeviceIDs() {
-			if peer == "" || peer == source {
-				continue
-			}
-			peers = append(peers, peer)
+		peers := peerTargetDeviceIDs(env, source, s.trigger.Arguments)
+		for _, peer := range peers {
 			if err := env.IO.Connect(peer, source, "video"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 				return err
 			}
@@ -755,41 +822,117 @@ func notifySource(ctx context.Context, env *Environment, sourceID, message strin
 	return env.Broadcast.Notify(ctx, deviceIDs, message)
 }
 
-func connectSourceToPeers(_ context.Context, env *Environment, sourceID, streamKind string) error {
+type ioRoute struct {
+	sourceID   string
+	targetID   string
+	streamKind string
+}
+
+func connectSourceToTargetsOwned(
+	_ context.Context,
+	env *Environment,
+	sourceID string,
+	targetIDs []string,
+	streamKind string,
+) ([]ioRoute, error) {
 	if env == nil || env.IO == nil || env.Devices == nil {
-		return nil
+		return nil, nil
 	}
 	sourceID = strings.TrimSpace(sourceID)
 	if sourceID == "" {
-		return nil
+		return nil, nil
 	}
-	for _, targetID := range env.Devices.ListDeviceIDs() {
+	if targetIDs == nil {
+		targetIDs = nonSourceDeviceIDs(env, sourceID)
+	}
+	routes := make([]ioRoute, 0)
+	for _, targetID := range targetIDs {
 		if targetID == "" || targetID == sourceID {
 			continue
 		}
-		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil {
+			if errors.Is(err, iorouter.ErrRouteExists) {
+				continue
+			}
+			return nil, err
+		}
+		routes = append(routes, ioRoute{
+			sourceID:   sourceID,
+			targetID:   targetID,
+			streamKind: streamKind,
+		})
+	}
+	return routes, nil
+}
+
+func connectBidirectionalSourceTargetsOwned(
+	_ context.Context,
+	env *Environment,
+	sourceID string,
+	targetIDs []string,
+	streamKind string,
+) ([]ioRoute, error) {
+	if env == nil || env.IO == nil || env.Devices == nil {
+		return nil, nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	if sourceID == "" {
+		return nil, nil
+	}
+	if targetIDs == nil {
+		targetIDs = nonSourceDeviceIDs(env, sourceID)
+	}
+	routes := make([]ioRoute, 0)
+	for _, peerID := range targetIDs {
+		if peerID == "" || peerID == sourceID {
+			continue
+		}
+		if err := env.IO.Connect(sourceID, peerID, streamKind); err != nil {
+			if !errors.Is(err, iorouter.ErrRouteExists) {
+				return nil, err
+			}
+		} else {
+			routes = append(routes, ioRoute{
+				sourceID:   sourceID,
+				targetID:   peerID,
+				streamKind: streamKind,
+			})
+		}
+		if err := env.IO.Connect(peerID, sourceID, streamKind); err != nil {
+			if !errors.Is(err, iorouter.ErrRouteExists) {
+				return nil, err
+			}
+		} else {
+			routes = append(routes, ioRoute{
+				sourceID:   peerID,
+				targetID:   sourceID,
+				streamKind: streamKind,
+			})
+		}
+	}
+	return routes, nil
+}
+
+func disconnectOwnedRoutes(env *Environment, routes []ioRoute) error {
+	if env == nil || env.IO == nil || len(routes) == 0 {
+		return nil
+	}
+	for _, route := range routes {
+		err := env.IO.Disconnect(route.sourceID, route.targetID, route.streamKind)
+		if err != nil && !errors.Is(err, iorouter.ErrRouteNotFound) {
 			return err
 		}
 	}
 	return nil
 }
 
-func connectBidirectionalSourcePeers(_ context.Context, env *Environment, sourceID, streamKind string) error {
-	if env == nil || env.IO == nil || env.Devices == nil {
+func reconnectOwnedRoutes(env *Environment, routes []ioRoute) error {
+	if env == nil || env.IO == nil || len(routes) == 0 {
 		return nil
 	}
-	sourceID = strings.TrimSpace(sourceID)
-	if sourceID == "" {
-		return nil
-	}
-	for _, peerID := range env.Devices.ListDeviceIDs() {
-		if peerID == "" || peerID == sourceID {
-			continue
-		}
-		if err := env.IO.Connect(sourceID, peerID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
-			return err
-		}
-		if err := env.IO.Connect(peerID, sourceID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+	for _, route := range routes {
+		err := env.IO.Connect(route.sourceID, route.targetID, route.streamKind)
+		if err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 			return err
 		}
 	}
@@ -810,4 +953,46 @@ func nonSourceDeviceIDs(env *Environment, sourceID string) []string {
 		peers = append(peers, deviceID)
 	}
 	return peers
+}
+
+func peerTargetDeviceIDs(env *Environment, sourceID string, args map[string]string) []string {
+	if env == nil || env.Devices == nil {
+		return nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	raw := ""
+	if args != nil {
+		raw = strings.TrimSpace(args["device_ids"])
+	}
+	if raw == "" {
+		return nonSourceDeviceIDs(env, sourceID)
+	}
+
+	validSet := map[string]struct{}{}
+	for _, deviceID := range env.Devices.ListDeviceIDs() {
+		trimmed := strings.TrimSpace(deviceID)
+		if trimmed == "" || trimmed == sourceID {
+			continue
+		}
+		validSet[trimmed] = struct{}{}
+	}
+
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		deviceID := strings.TrimSpace(part)
+		if deviceID == "" || deviceID == sourceID {
+			continue
+		}
+		if _, ok := validSet[deviceID]; !ok {
+			continue
+		}
+		if _, exists := seen[deviceID]; exists {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		out = append(out, deviceID)
+	}
+	return out
 }
