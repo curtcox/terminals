@@ -1,1 +1,1 @@
-Implement multi-window mixed-audio routing (N source mics -> 1 viewer track) and add wire/generated integration tests for selectable single-source audio focus.
+Implement server-driven multi-window grid UI descriptors (adaptive layout + per-feed labels + focus action IDs) and cover them with scenario/transport tests.

@@ -1499,3 +1499,139 @@ func TestGeneratedSessionVoiceAllCamerasStartsMultiWindow(t *testing.T) {
 		t.Fatalf("expected scenario_start=multi_window command result via all cameras")
 	}
 }
+
+func TestGeneratedSessionMultiWindowAudioMixAndFocusSelection(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "d1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "all-cameras-start",
+						DeviceId:  "d1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "all cameras",
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "all-cameras-stop",
+						DeviceId:  "d1",
+						Action:    controlv1.CommandAction_COMMAND_ACTION_STOP,
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "all cameras",
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "all-cameras-focus-start",
+						DeviceId:  "d1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "all cameras focus d2",
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	sawMixD2 := false
+	sawMixD3 := false
+	sawMixStopD2 := false
+	sawMixStopD3 := false
+	focusStartIdx := -1
+	for idx, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok {
+			continue
+		}
+		if start := resp.GetStartStream(); start != nil {
+			switch start.GetStreamId() {
+			case "route:d2|d1|audio_mix":
+				sawMixD2 = true
+			case "route:d3|d1|audio_mix":
+				sawMixD3 = true
+			}
+		}
+		if stop := resp.GetStopStream(); stop != nil {
+			switch stop.GetStreamId() {
+			case "route:d2|d1|audio_mix":
+				sawMixStopD2 = true
+			case "route:d3|d1|audio_mix":
+				sawMixStopD3 = true
+			}
+		}
+		if result := resp.GetCommandResult(); result != nil &&
+			result.GetRequestId() == "all-cameras-focus-start" &&
+			result.GetScenarioStart() == "multi_window" {
+			focusStartIdx = idx
+		}
+	}
+
+	if !sawMixD2 || !sawMixD3 {
+		t.Fatalf("expected initial audio_mix start routes for d2 and d3")
+	}
+	if !sawMixStopD2 || !sawMixStopD3 {
+		t.Fatalf("expected multi_window stop to emit stop_stream for both audio_mix routes")
+	}
+	if focusStartIdx == -1 {
+		t.Fatalf("expected focused multi_window command_result")
+	}
+
+	sawFocusedAudio := false
+	sawFocusedAudioMix := false
+	for _, sent := range stream.sent[focusStartIdx+1:] {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok {
+			continue
+		}
+		start := resp.GetStartStream()
+		if start == nil {
+			continue
+		}
+		if start.GetStreamId() == "route:d2|d1|audio" {
+			sawFocusedAudio = true
+		}
+		if start.GetStreamId() == "route:d2|d1|audio_mix" || start.GetStreamId() == "route:d3|d1|audio_mix" {
+			sawFocusedAudioMix = true
+		}
+	}
+	if !sawFocusedAudio {
+		t.Fatalf("expected focused audio start route route:d2|d1|audio")
+	}
+	if sawFocusedAudioMix {
+		t.Fatalf("did not expect audio_mix start routes after focused restart")
+	}
+}

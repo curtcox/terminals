@@ -29,6 +29,13 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		trigger.Intent = "intercom"
 	case normalized == "pa system" || normalized == "pa mode" || normalized == "end pa" || normalized == "stop pa":
 		trigger.Intent = "pa system"
+	case strings.HasPrefix(normalized, "multi window focus ") ||
+		strings.HasPrefix(normalized, "show all cameras focus ") ||
+		strings.HasPrefix(normalized, "all cameras focus "):
+		trigger.Intent = "multi window"
+		if focusDeviceID, ok := parseMultiWindowFocus(normalized); ok {
+			trigger.Arguments["audio_focus_device_id"] = focusDeviceID
+		}
 	case normalized == "multi window" || normalized == "show all cameras" || normalized == "all cameras":
 		trigger.Intent = "multi window"
 	case normalized == "audio monitor":
@@ -53,6 +60,23 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 	}
 
 	return trigger
+}
+
+func parseMultiWindowFocus(normalized string) (string, bool) {
+	for _, prefix := range []string{
+		"multi window focus ",
+		"show all cameras focus ",
+		"all cameras focus ",
+	} {
+		if strings.HasPrefix(normalized, prefix) {
+			focusDeviceID := strings.TrimSpace(strings.TrimPrefix(normalized, prefix))
+			if focusDeviceID == "" {
+				return "", false
+			}
+			return focusDeviceID, true
+		}
+	}
+	return "", false
 }
 
 func parseTimerMinutes(args map[string]string, normalized string, now time.Time) {

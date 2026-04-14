@@ -94,6 +94,17 @@ func TestParseVoiceTriggerAllCamerasAlias(t *testing.T) {
 	}
 }
 
+func TestParseVoiceTriggerAllCamerasFocusAlias(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "all cameras focus d2", now)
+	if got.Intent != "multi window" {
+		t.Fatalf("Intent = %q, want multi window", got.Intent)
+	}
+	if got.Arguments["audio_focus_device_id"] != "d2" {
+		t.Fatalf("audio_focus_device_id = %q, want d2", got.Arguments["audio_focus_device_id"])
+	}
+}
+
 func TestParseVoiceTriggerPAStopAliases(t *testing.T) {
 	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
 	for _, spoken := range []string{"end pa", "stop pa"} {

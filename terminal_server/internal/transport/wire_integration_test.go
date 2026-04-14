@@ -1205,3 +1205,118 @@ func TestWireSessionVoiceAllCamerasStartsMultiWindow(t *testing.T) {
 		t.Fatalf("expected scenario_start=multi_window command result via all cameras")
 	}
 }
+
+func TestWireSessionMultiWindowAudioMixAndFocusSelection(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			WireClientMessage{Register: &WireRegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "all-cameras-start",
+				DeviceID:  "d1",
+				Kind:      WireCommandKindVoice,
+				Text:      "all cameras",
+			}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "all-cameras-stop",
+				DeviceID:  "d1",
+				Action:    WireCommandActionStop,
+				Kind:      WireCommandKindVoice,
+				Text:      "all cameras",
+			}},
+			WireClientMessage{Command: &WireCommandRequest{
+				RequestID: "all-cameras-focus-start",
+				DeviceID:  "d1",
+				Kind:      WireCommandKindVoice,
+				Text:      "all cameras focus d2",
+			}},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, WireProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	sawMixD2 := false
+	sawMixD3 := false
+	sawMixStopD2 := false
+	sawMixStopD3 := false
+	focusStartIdx := -1
+	for idx, sent := range stream.sent {
+		msg, ok := sent.(WireServerMessage)
+		if !ok {
+			continue
+		}
+		if start := msg.StartStream; start != nil {
+			switch start.StreamID {
+			case "route:d2|d1|audio_mix":
+				sawMixD2 = true
+			case "route:d3|d1|audio_mix":
+				sawMixD3 = true
+			}
+		}
+		if stop := msg.StopStream; stop != nil {
+			switch stop.StreamID {
+			case "route:d2|d1|audio_mix":
+				sawMixStopD2 = true
+			case "route:d3|d1|audio_mix":
+				sawMixStopD3 = true
+			}
+		}
+		if result := msg.CommandResult; result != nil &&
+			result.RequestID == "all-cameras-focus-start" &&
+			result.ScenarioStart == "multi_window" {
+			focusStartIdx = idx
+		}
+	}
+
+	if !sawMixD2 || !sawMixD3 {
+		t.Fatalf("expected initial audio_mix start routes for d2 and d3")
+	}
+	if !sawMixStopD2 || !sawMixStopD3 {
+		t.Fatalf("expected multi_window stop to emit stop_stream for both audio_mix routes")
+	}
+	if focusStartIdx == -1 {
+		t.Fatalf("expected focused multi_window command_result")
+	}
+
+	sawFocusedAudio := false
+	sawFocusedAudioMix := false
+	for _, sent := range stream.sent[focusStartIdx+1:] {
+		msg, ok := sent.(WireServerMessage)
+		if !ok {
+			continue
+		}
+		start := msg.StartStream
+		if start == nil {
+			continue
+		}
+		if start.StreamID == "route:d2|d1|audio" {
+			sawFocusedAudio = true
+		}
+		if start.StreamID == "route:d2|d1|audio_mix" || start.StreamID == "route:d3|d1|audio_mix" {
+			sawFocusedAudioMix = true
+		}
+	}
+	if !sawFocusedAudio {
+		t.Fatalf("expected focused audio start route route:d2|d1|audio")
+	}
+	if sawFocusedAudioMix {
+		t.Fatalf("did not expect audio_mix start routes after focused restart")
+	}
+}

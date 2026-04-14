@@ -542,8 +542,8 @@ func TestRuntimeManualAudioSchedulePAAndMultiWindow(t *testing.T) {
 		t.Fatalf("HandleTrigger(multi_window) error = %v", err)
 	}
 
-	if router.RouteCount() != 4 {
-		t.Fatalf("route count = %d, want 4", router.RouteCount())
+	if router.RouteCount() != 6 {
+		t.Fatalf("route count = %d, want 6", router.RouteCount())
 	}
 	events := broadcaster.Events()
 	if len(events) != 5 {
@@ -602,8 +602,8 @@ func TestRuntimeManualAliasIntentsForPAAndMultiWindow(t *testing.T) {
 		t.Fatalf("HandleTrigger(show all cameras) error = %v", err)
 	}
 
-	if router.RouteCount() != 4 {
-		t.Fatalf("route count = %d, want 4", router.RouteCount())
+	if router.RouteCount() != 6 {
+		t.Fatalf("route count = %d, want 6", router.RouteCount())
 	}
 	events := broadcaster.Events()
 	if len(events) != 3 {
@@ -620,5 +620,55 @@ func TestRuntimeManualAliasIntentsForPAAndMultiWindow(t *testing.T) {
 	}
 	if events[2].Message != "Multi-window active" {
 		t.Fatalf("event2 message = %q, want Multi-window active", events[2].Message)
+	}
+}
+
+func TestRuntimeMultiWindowFocusRoutesSingleAudioSource(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Office"})
+	router := iorouter.NewRouter()
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &MultiWindowScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "multi_window",
+		Arguments: map[string]string{
+			"audio_focus_device_id": "d2",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(multi_window focus) error = %v", err)
+	}
+
+	if router.RouteCount() != 3 {
+		t.Fatalf("route count = %d, want 3", router.RouteCount())
+	}
+
+	routes := router.RoutesForDevice("d1")
+	hasFocusedAudio := false
+	hasAudioMix := false
+	for _, route := range routes {
+		if route.SourceID == "d2" && route.TargetID == "d1" && route.StreamKind == "audio" {
+			hasFocusedAudio = true
+		}
+		if route.StreamKind == "audio_mix" {
+			hasAudioMix = true
+		}
+	}
+	if !hasFocusedAudio {
+		t.Fatalf("expected focused audio route d2->d1 audio")
+	}
+	if hasAudioMix {
+		t.Fatalf("did not expect audio_mix routes when focus is selected")
 	}
 }

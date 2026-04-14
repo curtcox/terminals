@@ -387,12 +387,38 @@ func (s *MultiWindowScenario) Start(ctx context.Context, env *Environment) error
 	}
 	if env.IO != nil && env.Devices != nil && strings.TrimSpace(s.trigger.SourceID) != "" {
 		source := strings.TrimSpace(s.trigger.SourceID)
+		peers := make([]string, 0, len(env.Devices.ListDeviceIDs()))
 		for _, peer := range env.Devices.ListDeviceIDs() {
 			if peer == "" || peer == source {
 				continue
 			}
+			peers = append(peers, peer)
 			if err := env.IO.Connect(peer, source, "video"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 				return err
+			}
+		}
+		focusedPeer := strings.TrimSpace(s.trigger.Arguments["audio_focus_device_id"])
+		if focusedPeer != "" {
+			focusMatched := false
+			for _, peer := range peers {
+				if peer != focusedPeer {
+					continue
+				}
+				if err := env.IO.Connect(peer, source, "audio"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+					return err
+				}
+				focusMatched = true
+				break
+			}
+			if !focusMatched {
+				focusedPeer = ""
+			}
+		}
+		if focusedPeer == "" {
+			for _, peer := range peers {
+				if err := env.IO.Connect(peer, source, "audio_mix"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+					return err
+				}
 			}
 		}
 	}

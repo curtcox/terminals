@@ -1038,7 +1038,10 @@ func isScenarioOwnedRoute(deviceID, scenarioName string, route iorouter.Route) b
 	case "pa_system":
 		return route.SourceID == deviceID && route.StreamKind == "pa_audio"
 	case "multi_window":
-		return route.TargetID == deviceID && route.StreamKind == "video"
+		if route.TargetID != deviceID {
+			return false
+		}
+		return route.StreamKind == "video" || route.StreamKind == "audio_mix" || route.StreamKind == "audio"
 	default:
 		return false
 	}
