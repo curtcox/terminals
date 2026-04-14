@@ -384,13 +384,34 @@ const RegisterAck$json = {
   '2': [
     {'1': 'server_id', '3': 1, '4': 1, '5': 9, '10': 'serverId'},
     {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
+    {
+      '1': 'metadata',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.control.v1.RegisterAck.MetadataEntry',
+      '10': 'metadata'
+    },
   ],
+  '3': [RegisterAck_MetadataEntry$json],
+};
+
+@$core.Deprecated('Use registerAckDescriptor instead')
+const RegisterAck_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
 };
 
 /// Descriptor for `RegisterAck`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List registerAckDescriptor = $convert.base64Decode(
     'CgtSZWdpc3RlckFjaxIbCglzZXJ2ZXJfaWQYASABKAlSCHNlcnZlcklkEhgKB21lc3NhZ2UYAi'
-    'ABKAlSB21lc3NhZ2U=');
+    'ABKAlSB21lc3NhZ2USSwoIbWV0YWRhdGEYAyADKAsyLy50ZXJtaW5hbHMuY29udHJvbC52MS5S'
+    'ZWdpc3RlckFjay5NZXRhZGF0YUVudHJ5UghtZXRhZGF0YRo7Cg1NZXRhZGF0YUVudHJ5EhAKA2'
+    'tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAE=');
 
 @$core.Deprecated('Use capabilityUpdateDescriptor instead')
 const CapabilityUpdate$json = {
@@ -621,6 +642,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.control.v1.VoiceAudio': VoiceAudio$json,
   '.terminals.control.v1.ConnectResponse': ConnectResponse$json,
   '.terminals.control.v1.RegisterAck': RegisterAck$json,
+  '.terminals.control.v1.RegisterAck.MetadataEntry':
+      RegisterAck_MetadataEntry$json,
   '.terminals.ui.v1.SetUI': $1.SetUI$json,
   '.terminals.ui.v1.Node': $1.Node$json,
   '.terminals.ui.v1.Node.PropsEntry': $1.Node_PropsEntry$json,

@@ -83,6 +83,7 @@ type WireClientMessage struct {
 type WireRegisterResponse struct {
 	ServerID string
 	Message  string
+	Metadata []DataEntry
 }
 
 // WireCommandResult is a protobuf-adapter-friendly command result payload.

@@ -145,6 +145,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _pendingPlaybackMetadataRequestID = '';
   String _diagnosticsTitle = 'none';
   Map<String, String> _diagnosticsData = <String, String>{};
+  String _photoFrameAssetBaseURL = '';
 
   Future<void> _startStream({bool userInitiated = true}) async {
     if (_isConnecting) {
@@ -233,6 +234,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             if (response.hasError()) {
               _lastNotification = response.error.message;
             }
+            _applyRegisterMetadata(response);
             _applyMediaControlResponse(response);
           });
         },
@@ -455,6 +457,23 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       if (firstArtifactID.isNotEmpty) {
         _playbackArtifactIdController.text = firstArtifactID;
       }
+    }
+  }
+
+  void _applyRegisterMetadata(ConnectResponse response) {
+    if (!response.hasRegisterAck()) {
+      return;
+    }
+    final metadata = Map<String, String>.from(response.registerAck.metadata);
+    if (metadata.isEmpty) {
+      return;
+    }
+    _diagnosticsTitle = 'register_ack';
+    _diagnosticsData = metadata;
+    final photoBaseURL = metadata['photo_frame_asset_base_url']?.trim() ?? '';
+    if (photoBaseURL.isNotEmpty) {
+      _photoFrameAssetBaseURL = photoBaseURL;
+      _lastNotification = 'Photo frame asset base URL configured';
     }
   }
 
@@ -713,6 +732,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                   Text(
                     'Play audio msgs: $_playAudioCount  Last play bytes: $_lastPlayAudioBytes  Last play target: $_lastPlayAudioDeviceID  Last play source: $_lastPlayAudioSource',
                   ),
+                if (_photoFrameAssetBaseURL.isNotEmpty)
+                  Text('Photo frame assets: $_photoFrameAssetBaseURL'),
                 if (_lastNotification.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text('Notification: $_lastNotification'),

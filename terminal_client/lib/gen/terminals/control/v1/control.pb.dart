@@ -727,10 +727,12 @@ class RegisterAck extends $pb.GeneratedMessage {
   factory RegisterAck({
     $core.String? serverId,
     $core.String? message,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
   }) {
     final result = create();
     if (serverId != null) result.serverId = serverId;
     if (message != null) result.message = message;
+    if (metadata != null) result.metadata.addEntries(metadata);
     return result;
   }
 
@@ -750,6 +752,11 @@ class RegisterAck extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'serverId')
     ..aOS(2, _omitFieldNames ? '' : 'message')
+    ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'metadata',
+        entryClassName: 'RegisterAck.MetadataEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('terminals.control.v1'))
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -788,6 +795,9 @@ class RegisterAck extends $pb.GeneratedMessage {
   $core.bool hasMessage() => $_has(1);
   @$pb.TagNumber(2)
   void clearMessage() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(2);
 }
 
 class CapabilityUpdate extends $pb.GeneratedMessage {

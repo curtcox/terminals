@@ -59,6 +59,7 @@ message RegisterDevice {
 message RegisterAck {
   string server_id = 1;
   string message = 2;
+  map<string, string> metadata = 3;
 }
 
 message CapabilityUpdate {

@@ -39,6 +39,9 @@ func TestServerConnectRequiresConfiguration(t *testing.T) {
 func TestServerConnectRunsSession(t *testing.T) {
 	manager := device.NewManager()
 	control := NewControlService("srv-1", manager)
+	control.SetRegisterMetadata(map[string]string{
+		"photo_frame_asset_base_url": "http://home.local:50052/photo-frame",
+	})
 	s := NewServer("127.0.0.1:50051")
 	s.ConfigureControl(control, PassthroughProtoAdapter{})
 
@@ -124,6 +127,9 @@ func TestServerConnectRunsSessionWithWireAdapter(t *testing.T) {
 func TestServerConnectRunsSessionWithGeneratedAdapter(t *testing.T) {
 	manager := device.NewManager()
 	control := NewControlService("srv-1", manager)
+	control.SetRegisterMetadata(map[string]string{
+		"photo_frame_asset_base_url": "http://home.local:50052/photo-frame",
+	})
 	s := NewServer("127.0.0.1:50051")
 	s.ConfigureControl(control, GeneratedProtoAdapter{})
 
@@ -162,6 +168,9 @@ func TestServerConnectRunsSessionWithGeneratedAdapter(t *testing.T) {
 	}
 	if first.GetRegisterAck() == nil || first.GetRegisterAck().GetServerId() != "srv-1" {
 		t.Fatalf("unexpected register ack payload: %+v", first.GetRegisterAck())
+	}
+	if got := first.GetRegisterAck().GetMetadata()["photo_frame_asset_base_url"]; got != "http://home.local:50052/photo-frame" {
+		t.Fatalf("register ack metadata photo_frame_asset_base_url = %q, want configured value", got)
 	}
 
 	got, ok := manager.Get("device-1")

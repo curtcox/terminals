@@ -126,6 +126,7 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 		out.RegisterAck = &WireRegisterResponse{
 			ServerID: msg.RegisterAck.ServerID,
 			Message:  msg.RegisterAck.Message,
+			Metadata: EncodeDataMap(msg.RegisterAck.Metadata),
 		}
 	}
 	if msg.CommandAck != "" || msg.Notification != "" || msg.ScenarioStart != "" || msg.ScenarioStop != "" || len(msg.Data) > 0 {

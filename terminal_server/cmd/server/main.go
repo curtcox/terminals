@@ -83,6 +83,9 @@ func main() {
 		log.Printf("start photo frame asset server: %v", err)
 		return
 	}
+	controlService.SetRegisterMetadata(map[string]string{
+		"photo_frame_asset_base_url": photoBaseURL,
+	})
 	configurePhotoFrame(controlStream, cfg, photoBaseURL)
 	recordingManager, err := recording.NewDiskManager(cfg.RecordingDir)
 	if err != nil {

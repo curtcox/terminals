@@ -68,8 +68,12 @@ func TestInternalFromWireClient(t *testing.T) {
 
 func TestWireFromInternalServer(t *testing.T) {
 	wire := WireFromInternalServer(ServerMessage{
-		RegisterAck: &RegisterResponse{ServerID: "srv-1", Message: "ok"},
-		CommandAck:  "cmd-1",
+		RegisterAck: &RegisterResponse{
+			ServerID: "srv-1",
+			Message:  "ok",
+			Metadata: map[string]string{"photo_frame_asset_base_url": "http://home.local:50052/photo-frame"},
+		},
+		CommandAck: "cmd-1",
 		UpdateUI: &UIUpdate{
 			ComponentID: "terminal_output",
 			Node: ui.Descriptor{
@@ -113,6 +117,9 @@ func TestWireFromInternalServer(t *testing.T) {
 	})
 	if wire.RegisterAck == nil || wire.RegisterAck.ServerID != "srv-1" {
 		t.Fatalf("unexpected register ack mapping: %+v", wire.RegisterAck)
+	}
+	if got := DecodeDataEntries(wire.RegisterAck.Metadata)["photo_frame_asset_base_url"]; got != "http://home.local:50052/photo-frame" {
+		t.Fatalf("unexpected register ack metadata mapping: %+v", wire.RegisterAck.Metadata)
 	}
 	if wire.CommandResult == nil || wire.CommandResult.RequestID != "cmd-1" {
 		t.Fatalf("unexpected command result mapping: %+v", wire.CommandResult)

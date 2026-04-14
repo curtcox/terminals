@@ -414,3 +414,31 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 		t.Fatalf("transition_ui duration_ms = %d, want 250", got)
 	}
 }
+
+func TestGeneratedProtoAdapterFromInternalRegisterAckMetadata(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	envelope, err := adapter.FromInternal(ServerMessage{
+		RegisterAck: &RegisterResponse{
+			ServerID: "srv-1",
+			Message:  "registered",
+			Metadata: map[string]string{
+				"photo_frame_asset_base_url": "http://home.local:50052/photo-frame",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(register ack) error = %v", err)
+	}
+
+	resp, ok := envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("response envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	ack := resp.GetRegisterAck()
+	if ack == nil {
+		t.Fatalf("expected register_ack payload")
+	}
+	if got := ack.GetMetadata()["photo_frame_asset_base_url"]; got != "http://home.local:50052/photo-frame" {
+		t.Fatalf("register_ack metadata photo_frame_asset_base_url = %q, want configured value", got)
+	}
+}

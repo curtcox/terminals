@@ -1,1 +1,1 @@
-Expose the photo-frame public asset base URL through control metadata so clients do not rely on inferred mDNS hostnames.
+Document photo-frame HTTP and metadata settings in README and sample server config (env vars + metadata key contract).
