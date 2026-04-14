@@ -1,11 +1,24 @@
-Teach `scenario.ParseVoiceTrigger` to recognize the Phase-6 milestone phrasing
-"tell me when X stops" (and close variants) and route it to the
-`AudioMonitorScenario` with `target = X` extracted as a trigger argument.
-This is the phrasing that `plans/phase-6-monitoring.md` pins as the
-end-to-end milestone — with the classifier + hub wiring and explicit stop
-already in place, the remaining gap is the voice-trigger parse path.
+Add a real silence-detecting `ai.SoundClassifier` implementation that
+watches a PCM audio stream and emits a `SoundEvent{Label: "silence_after_sound"}`
+(or similarly-named event) the first time the stream transitions from
+"loud" to "quiet" for a configurable hold duration. This closes the Phase-6
+sound-classification deliverable end-to-end: the monitor scenario already
+consumes live hub audio, so a real silence detector lights up the
+"tell me when the dishwasher stops" milestone without needing an external
+model.
 
-Add voice-parser tests that cover the phrasing and at least one negative
-case, plus a runtime-level test that spoken text activates
-`audio_monitor` with the parsed target surfaced in the arming broadcast
-("Audio monitor armed: dishwasher").
+Implement in `internal/ai/silence_classifier.go` behind the existing
+`ai.SoundClassifier` interface. RMS-energy threshold + hysteresis is fine;
+keep the thresholds configurable so tests can drive transitions with short
+PCM fixtures. Add focused unit tests for:
+
+- loud-then-quiet transition emits one event and stops
+- sustained quiet below the hold duration does not emit
+- sustained loud never emits
+
+Then add a scenario-level test that feeds PCM through the existing audio
+hub and asserts `AudioMonitorScenario` notifies the source device.
+
+Wiring: swap `ai.NewNoopBackends()` in `cmd/server/main.go` to plumb the
+silence classifier as the `Sound` backend (keep noops for everything else
+until those backends are chosen).

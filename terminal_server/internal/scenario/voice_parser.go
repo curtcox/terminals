@@ -38,6 +38,12 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		}
 	case normalized == "multi window" || normalized == "show all cameras" || normalized == "all cameras":
 		trigger.Intent = "multi window"
+	case strings.HasPrefix(normalized, "tell me when ") ||
+		strings.HasPrefix(normalized, "notify me when "):
+		if target, ok := parseAudioMonitorTarget(normalized); ok {
+			trigger.Intent = "audio monitor"
+			trigger.Arguments["target"] = target
+		}
 	case normalized == "audio monitor":
 		trigger.Intent = "audio monitor"
 	case normalized == "schedule monitor":
@@ -83,6 +89,54 @@ func parseMultiWindowFocus(normalized string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// parseAudioMonitorTarget extracts the monitored subject from a
+// "tell me when X …" or "notify me when X …" phrase. It strips one
+// leading article ("the ", "a ", "an ", "my ") and one trailing
+// action-verb phrase ("stops", "beeps", "is done", etc.) so the caller
+// receives just the subject (e.g. "dishwasher", "dryer", "laundry").
+// Returns false when no subject remains after trimming.
+func parseAudioMonitorTarget(normalized string) (string, bool) {
+	rest := normalized
+	for _, prefix := range []string{"tell me when ", "notify me when "} {
+		if strings.HasPrefix(rest, prefix) {
+			rest = strings.TrimPrefix(rest, prefix)
+			break
+		}
+	}
+	for _, article := range []string{"the ", "a ", "an ", "my "} {
+		if strings.HasPrefix(rest, article) {
+			rest = strings.TrimPrefix(rest, article)
+			break
+		}
+	}
+	for _, suffix := range []string{
+		" stops",
+		" stop",
+		" beeps",
+		" beep",
+		" is done",
+		" is finished",
+		" finishes",
+		" finish",
+		" goes off",
+	} {
+		if strings.HasSuffix(rest, suffix) {
+			rest = strings.TrimSuffix(rest, suffix)
+			break
+		}
+	}
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return "", false
+	}
+	for _, article := range []string{"the", "a", "an", "my"} {
+		if rest == article {
+			return "", false
+		}
+	}
+	return rest, true
 }
 
 func parseInternalVideoCallTarget(normalized string) (string, bool) {

@@ -218,6 +218,50 @@ func TestRuntimeAudioMonitorStopReleasesSubscription(t *testing.T) {
 	}
 }
 
+// TestRuntimeAudioMonitorVoiceTriggerArmsWithParsedTarget verifies that the
+// Phase-6 milestone phrasing ("tell me when the dishwasher stops") is parsed
+// by ParseVoiceTrigger and routed through the runtime to AudioMonitorScenario
+// with the parsed target surfaced in the arming broadcast.
+func TestRuntimeAudioMonitorVoiceTriggerArmsWithParsedTarget(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	classifier := &testSoundClassifier{}
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &AudioMonitorScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+		Sound:     classifier,
+	})
+
+	now := time.Date(2026, 4, 14, 10, 0, 0, 0, time.UTC)
+	started, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"tell me when the dishwasher stops",
+		now,
+	)
+	if err != nil {
+		t.Fatalf("HandleVoiceText error = %v", err)
+	}
+	if started != "audio_monitor" {
+		t.Fatalf("started scenario = %q, want audio_monitor", started)
+	}
+
+	if !waitFor(func() bool { return len(broadcaster.Events()) >= 1 }, 200*time.Millisecond) {
+		t.Fatalf("expected arming broadcast, got events = %+v", broadcaster.Events())
+	}
+	events := broadcaster.Events()
+	if events[0].Message != "Audio monitor armed: dishwasher" {
+		t.Fatalf("arming message = %q, want Audio monitor armed: dishwasher", events[0].Message)
+	}
+	if len(events[0].DeviceIDs) != 1 || events[0].DeviceIDs[0] != "d1" {
+		t.Fatalf("arming device IDs = %+v, want [d1]", events[0].DeviceIDs)
+	}
+}
+
 func (t *testAIBackend) Query(_ context.Context, input string) (string, error) {
 	t.lastInput = input
 	return t.response, nil
