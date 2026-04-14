@@ -68,3 +68,72 @@ func TestLoadInvalidInterval(t *testing.T) {
 		t.Fatalf("Load() expected error for invalid interval")
 	}
 }
+
+func TestLoadSIPDisabledByDefault(t *testing.T) {
+	t.Setenv("TERMINALS_SIP_ENABLED", "")
+	t.Setenv("TERMINALS_SIP_SERVER_URI", "")
+	t.Setenv("TERMINALS_SIP_USERNAME", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.SIP.Enabled {
+		t.Fatalf("SIP.Enabled = true, want false")
+	}
+}
+
+func TestLoadSIPEnabledRequiresServer(t *testing.T) {
+	t.Setenv("TERMINALS_SIP_ENABLED", "true")
+	t.Setenv("TERMINALS_SIP_SERVER_URI", "")
+	t.Setenv("TERMINALS_SIP_USERNAME", "alice")
+
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for missing SIP server")
+	}
+}
+
+func TestLoadSIPEnabledRequiresUsername(t *testing.T) {
+	t.Setenv("TERMINALS_SIP_ENABLED", "true")
+	t.Setenv("TERMINALS_SIP_SERVER_URI", "sip:home.example")
+	t.Setenv("TERMINALS_SIP_USERNAME", "")
+
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for missing SIP username")
+	}
+}
+
+func TestLoadSIPEnabledPopulatesConfig(t *testing.T) {
+	t.Setenv("TERMINALS_SIP_ENABLED", "1")
+	t.Setenv("TERMINALS_SIP_SERVER_URI", "sip:home.example")
+	t.Setenv("TERMINALS_SIP_USERNAME", "alice")
+	t.Setenv("TERMINALS_SIP_DISPLAY_NAME", "Alice")
+	t.Setenv("TERMINALS_SIP_PASSWORD", "secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !cfg.SIP.Enabled {
+		t.Fatalf("SIP.Enabled = false, want true")
+	}
+	if cfg.SIP.ServerURI != "sip:home.example" {
+		t.Fatalf("SIP.ServerURI = %q", cfg.SIP.ServerURI)
+	}
+	if cfg.SIP.Username != "alice" {
+		t.Fatalf("SIP.Username = %q", cfg.SIP.Username)
+	}
+	if cfg.SIP.DisplayName != "Alice" {
+		t.Fatalf("SIP.DisplayName = %q", cfg.SIP.DisplayName)
+	}
+	if cfg.SIP.Password != "secret" {
+		t.Fatalf("SIP.Password = %q", cfg.SIP.Password)
+	}
+}
+
+func TestLoadSIPInvalidEnabledValue(t *testing.T) {
+	t.Setenv("TERMINALS_SIP_ENABLED", "bogus")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid SIP enabled flag")
+	}
+}

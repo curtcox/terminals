@@ -36,11 +36,16 @@ func main() {
 	store := storage.NewMemoryStore()
 	scheduler := storage.NewMemoryScheduler()
 	broadcaster := ui.NewMemoryBroadcaster()
+	telephonyBridge, err := buildTelephonyBridge(ctx, cfg.SIP)
+	if err != nil {
+		log.Printf("configure telephony bridge: %v", err)
+		return
+	}
 	environment := &scenario.Environment{
 		Devices:   deviceManager,
 		IO:        ioRouter,
 		AI:        ai.NoopBackend{},
-		Telephony: telephony.NoopBridge{},
+		Telephony: telephonyBridge,
 		Storage:   store,
 		Scheduler: scheduler,
 		Broadcast: broadcaster,
@@ -113,6 +118,37 @@ func main() {
 	if err := mdns.Stop(shutdownCtx); err != nil {
 		log.Printf("stop mDNS: %v", err)
 	}
+	if bridge, ok := telephonyBridge.(*telephony.SIPBridge); ok {
+		if err := bridge.Stop(shutdownCtx); err != nil {
+			log.Printf("stop telephony bridge: %v", err)
+		}
+	}
+}
+
+// buildTelephonyBridge returns the configured telephony bridge for the
+// server runtime. When SIP is disabled a NoopBridge is returned so
+// scenarios continue to function without a SIP provider.
+func buildTelephonyBridge(ctx context.Context, cfg config.SIPConfig) (scenario.TelephonyBridge, error) {
+	if !cfg.Enabled {
+		log.Printf("telephony bridge disabled; using noop bridge")
+		return telephony.NoopBridge{}, nil
+	}
+	bridge := telephony.NewSIPBridge(telephony.Registration{
+		ServerURI:   cfg.ServerURI,
+		Username:    cfg.Username,
+		DisplayName: cfg.DisplayName,
+		Password:    cfg.Password,
+	}, telephony.LogTransport{Logf: log.Printf})
+	if err := bridge.Start(ctx); err != nil {
+		return nil, err
+	}
+	log.Printf(
+		"telephony bridge registered server=%s user=%s display=%s",
+		cfg.ServerURI,
+		cfg.Username,
+		cfg.DisplayName,
+	)
+	return bridge, nil
 }
 
 func runDueTimerLoop(ctx context.Context, runtime *scenario.Runtime, interval time.Duration) {

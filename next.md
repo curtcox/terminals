@@ -1,1 +1,1 @@
-Implement SIP integration: add a configurable telephony bridge implementation (register/call/hangup behavior), wire it into server runtime/config, and cover with focused unit + transport tests.
+Implement the WebRTC–SIP bridge: extend the telephony package to wire an outbound SIP call session to a server-side WebRTC peer so external calls carry audio from a client mic through the SIP bridge. Cover with focused unit tests (bridge allocates WebRTC track on Call, tears it down on Hangup) and a transport test that drives the full voice-call path through the control stream.

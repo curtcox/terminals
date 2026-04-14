@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config captures runtime server settings.
@@ -17,6 +18,17 @@ type Config struct {
 	HeartbeatTimeoutSeconds       int
 	LivenessReconcileIntervalSecs int
 	DueTimerProcessIntervalSecs   int
+	SIP                           SIPConfig
+}
+
+// SIPConfig captures the subset of server configuration relevant to the
+// telephony (SIP) bridge.
+type SIPConfig struct {
+	Enabled     bool
+	ServerURI   string
+	Username    string
+	DisplayName string
+	Password    string
 }
 
 // Load reads config from environment with sane defaults for local development.
@@ -55,6 +67,36 @@ func Load() (Config, error) {
 		cfg.DueTimerProcessIntervalSecs = v
 	}
 
+	sip, err := loadSIPConfig()
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.SIP = sip
+
+	return cfg, nil
+}
+
+func loadSIPConfig() (SIPConfig, error) {
+	cfg := SIPConfig{
+		ServerURI:   os.Getenv("TERMINALS_SIP_SERVER_URI"),
+		Username:    os.Getenv("TERMINALS_SIP_USERNAME"),
+		DisplayName: os.Getenv("TERMINALS_SIP_DISPLAY_NAME"),
+		Password:    os.Getenv("TERMINALS_SIP_PASSWORD"),
+	}
+
+	enabled, err := parseOptionalBool("TERMINALS_SIP_ENABLED")
+	if err != nil {
+		return SIPConfig{}, err
+	}
+	cfg.Enabled = enabled
+
+	if cfg.Enabled && cfg.ServerURI == "" {
+		return SIPConfig{}, fmt.Errorf("TERMINALS_SIP_SERVER_URI is required when TERMINALS_SIP_ENABLED is set")
+	}
+	if cfg.Enabled && cfg.Username == "" {
+		return SIPConfig{}, fmt.Errorf("TERMINALS_SIP_USERNAME is required when TERMINALS_SIP_ENABLED is set")
+	}
+
 	return cfg, nil
 }
 
@@ -80,4 +122,16 @@ func parseOptionalInt(env string) (int, bool, error) {
 		return 0, true, fmt.Errorf("parse %s: %w", env, err)
 	}
 	return v, true, nil
+}
+
+func parseOptionalBool(env string) (bool, error) {
+	raw := strings.TrimSpace(os.Getenv(env))
+	if raw == "" {
+		return false, nil
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("parse %s: %w", env, err)
+	}
+	return v, nil
 }
