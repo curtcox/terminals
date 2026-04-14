@@ -156,7 +156,7 @@ func MultiWindowView(viewerDeviceID string, peerDeviceIDs []string, focusedPeerI
 		})))
 	}
 
-	columns := 1
+	var columns int
 	switch count := len(gridChildren); {
 	case count <= 1:
 		columns = 1

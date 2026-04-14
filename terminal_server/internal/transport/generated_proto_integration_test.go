@@ -1701,7 +1701,7 @@ func TestGeneratedSessionMultiWindowSetUIAndFocusActionRouting(t *testing.T) {
 	var sawFocusAction bool
 	var sawFocusedLabel bool
 	var sawEndAction bool
-	walkNode := func(node *uiv1.Node, fn func(*uiv1.Node)) {}
+	walkNode := func(_ *uiv1.Node, fn func(*uiv1.Node)) {}
 	walkNode = func(node *uiv1.Node, fn func(*uiv1.Node)) {
 		if node == nil {
 			return
@@ -1946,7 +1946,7 @@ func TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow(t *testing.T) 
 	var sawExitTransition bool
 	startStreams := map[string]bool{}
 	stopStreams := map[string]bool{}
-	walkNode := func(node *uiv1.Node, fn func(*uiv1.Node)) {}
+	walkNode := func(_ *uiv1.Node, fn func(*uiv1.Node)) {}
 	walkNode = func(node *uiv1.Node, fn func(*uiv1.Node)) {
 		if node == nil {
 			return
