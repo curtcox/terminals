@@ -92,6 +92,7 @@ const PlayAudio$json = {
     {'1': 'url', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'url'},
     {'1': 'pcm_data', '3': 4, '4': 1, '5': 12, '9': 0, '10': 'pcmData'},
     {'1': 'tts_text', '3': 5, '4': 1, '5': 9, '9': 0, '10': 'ttsText'},
+    {'1': 'format', '3': 6, '4': 1, '5': 9, '10': 'format'},
   ],
   '8': [
     {'1': 'source'},
@@ -102,7 +103,8 @@ const PlayAudio$json = {
 final $typed_data.Uint8List playAudioDescriptor = $convert.base64Decode(
     'CglQbGF5QXVkaW8SHQoKcmVxdWVzdF9pZBgBIAEoCVIJcmVxdWVzdElkEhsKCWRldmljZV9pZB'
     'gCIAEoCVIIZGV2aWNlSWQSEgoDdXJsGAMgASgJSABSA3VybBIbCghwY21fZGF0YRgEIAEoDEgA'
-    'UgdwY21EYXRhEhsKCHR0c190ZXh0GAUgASgJSABSB3R0c1RleHRCCAoGc291cmNl');
+    'UgdwY21EYXRhEhsKCHR0c190ZXh0GAUgASgJSABSB3R0c1RleHQSFgoGZm9ybWF0GAYgASgJUg'
+    'Zmb3JtYXRCCAoGc291cmNl');
 
 @$core.Deprecated('Use showMediaDescriptor instead')
 const ShowMedia$json = {

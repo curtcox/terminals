@@ -272,6 +272,7 @@ class PlayAudio extends $pb.GeneratedMessage {
     $core.String? url,
     $core.List<$core.int>? pcmData,
     $core.String? ttsText,
+    $core.String? format,
   }) {
     final result = create();
     if (requestId != null) result.requestId = requestId;
@@ -279,6 +280,7 @@ class PlayAudio extends $pb.GeneratedMessage {
     if (url != null) result.url = url;
     if (pcmData != null) result.pcmData = pcmData;
     if (ttsText != null) result.ttsText = ttsText;
+    if (format != null) result.format = format;
     return result;
   }
 
@@ -309,6 +311,7 @@ class PlayAudio extends $pb.GeneratedMessage {
     ..a<$core.List<$core.int>>(
         4, _omitFieldNames ? '' : 'pcmData', $pb.PbFieldType.OY)
     ..aOS(5, _omitFieldNames ? '' : 'ttsText')
+    ..aOS(6, _omitFieldNames ? '' : 'format')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -382,6 +385,15 @@ class PlayAudio extends $pb.GeneratedMessage {
   $core.bool hasTtsText() => $_has(4);
   @$pb.TagNumber(5)
   void clearTtsText() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get format => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set format($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasFormat() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFormat() => $_clearField(6);
 }
 
 class ShowMedia extends $pb.GeneratedMessage {

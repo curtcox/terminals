@@ -929,7 +929,8 @@ void main() {
     );
   });
 
-  testWidgets('sends system status debug commands and renders diagnostics data',
+  testWidgets(
+      'sends system and playback debug commands and renders diagnostics data',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -994,6 +995,86 @@ void main() {
     expect(
         find.textContaining('device_id=flutter-test-device'), findsOneWidget);
     expect(find.textContaining('sensor.unix_ms=1713000009999'), findsOneWidget);
+
+    await tester.tap(find.text('List Playback Artifacts'));
+    await tester.pump();
+    final playbackArtifactsRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_SYSTEM &&
+          request.command.intent == 'list_playback_artifacts',
+    );
+    final playbackArtifactsRequestID =
+        playbackArtifactsRequest.command.requestId;
+    expect(playbackArtifactsRequestID, isNotEmpty);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = playbackArtifactsRequestID
+          ..notification = 'System query: list_playback_artifacts'
+          ..data.addAll({
+            '000':
+                'route:device-a|device-b|audio|device-a|device-b|128|1713000011111|/tmp/audio-1.pcm',
+          })),
+    );
+    await tester.pump();
+    expect(find.textContaining('Diagnostics: list_playback_artifacts'),
+        findsOneWidget);
+    expect(
+      find.textContaining(
+          '000=route:device-a|device-b|audio|device-a|device-b|128|1713000011111|/tmp/audio-1.pcm'),
+      findsOneWidget,
+    );
+    expect(find.text('route:device-a'), findsOneWidget);
+
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == 'Playback Target Device ID',
+      ),
+      'kitchen-display',
+    );
+    await tester.pump();
+    await tester.tap(find.text('Playback Metadata'));
+    await tester.pump();
+
+    final playbackMetadataRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_MANUAL &&
+          request.command.intent == 'playback_metadata',
+    );
+    final playbackMetadataRequestID = playbackMetadataRequest.command.requestId;
+    expect(playbackMetadataRequestID, isNotEmpty);
+    expect(playbackMetadataRequest.command.deviceId, isNotEmpty);
+    expect(
+      playbackMetadataRequest.command.arguments['artifact_id'],
+      'route:device-a',
+    );
+    expect(
+      playbackMetadataRequest.command.arguments['target_device_id'],
+      'kitchen-display',
+    );
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = playbackMetadataRequestID
+          ..notification = 'Playback metadata ready'
+          ..data.addAll({
+            'artifact_id': 'route:device-a',
+            'target_device_id': 'kitchen-display',
+            'audio_path': '/tmp/audio-1.pcm',
+          })),
+    );
+    await tester.pump();
+    expect(
+        find.textContaining('Diagnostics: playback_metadata'), findsOneWidget);
+    expect(find.textContaining('artifact_id=route:device-a'), findsOneWidget);
+    expect(find.textContaining('target_device_id=kitchen-display'),
+        findsOneWidget);
   });
 }
 

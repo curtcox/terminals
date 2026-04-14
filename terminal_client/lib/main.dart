@@ -112,6 +112,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _lastNotification = '';
   final TextEditingController _terminalInputController =
       TextEditingController();
+  final TextEditingController _playbackArtifactIdController =
+      TextEditingController();
+  final TextEditingController _playbackTargetDeviceIdController =
+      TextEditingController();
   String _terminalInputShadow = '';
   bool _isScanning = false;
   List<DiscoveredServer> _discoveredServers = [];
@@ -137,6 +141,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   int _debugCommandSeq = 0;
   String _pendingRuntimeStatusRequestID = '';
   String _pendingDeviceStatusRequestID = '';
+  String _pendingPlaybackArtifactsRequestID = '';
+  String _pendingPlaybackMetadataRequestID = '';
   String _diagnosticsTitle = 'none';
   Map<String, String> _diagnosticsData = <String, String>{};
 
@@ -356,6 +362,57 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     );
   }
 
+  void _sendPlaybackArtifactsQuery() {
+    final requestID = _nextDebugRequestID('debug-playback-artifacts');
+    _pendingPlaybackArtifactsRequestID = requestID;
+    _outgoing.add(
+      ConnectRequest()
+        ..command = (CommandRequest()
+          ..requestId = requestID
+          ..kind = CommandKind.COMMAND_KIND_SYSTEM
+          ..intent = 'list_playback_artifacts'),
+    );
+  }
+
+  void _sendPlaybackMetadataQuery() {
+    final artifactID = _playbackArtifactIdController.text.trim();
+    if (artifactID.isEmpty) {
+      setState(() {
+        _status = 'Command error';
+        _lastNotification = 'Playback artifact ID required';
+      });
+      return;
+    }
+    var targetDeviceID = _playbackTargetDeviceIdController.text.trim();
+    if (targetDeviceID.isEmpty) {
+      targetDeviceID = _deviceId;
+      _playbackTargetDeviceIdController.text = targetDeviceID;
+    }
+    final requestID = _nextDebugRequestID('debug-playback-metadata');
+    _pendingPlaybackMetadataRequestID = requestID;
+    _outgoing.add(
+      ConnectRequest()
+        ..command = (CommandRequest()
+          ..requestId = requestID
+          ..deviceId = _deviceId
+          ..kind = CommandKind.COMMAND_KIND_MANUAL
+          ..intent = 'playback_metadata'
+          ..arguments['artifact_id'] = artifactID
+          ..arguments['target_device_id'] = targetDeviceID),
+    );
+  }
+
+  String _firstPlaybackArtifactID(Map<String, String> data) {
+    final keys = data.keys.toList()..sort();
+    for (final key in keys) {
+      final parts = data[key]?.split('|') ?? const <String>[];
+      if (parts.isNotEmpty && parts.first.trim().isNotEmpty) {
+        return parts.first.trim();
+      }
+    }
+    return '';
+  }
+
   void _applyDiagnosticsResponse(ConnectResponse response) {
     if (!response.hasCommandResult()) {
       return;
@@ -372,10 +429,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     } else if (requestID.isNotEmpty &&
         requestID == _pendingDeviceStatusRequestID) {
       diagnosticsTitle = 'device_status';
+    } else if (requestID.isNotEmpty &&
+        requestID == _pendingPlaybackArtifactsRequestID) {
+      diagnosticsTitle = 'list_playback_artifacts';
+    } else if (requestID.isNotEmpty &&
+        requestID == _pendingPlaybackMetadataRequestID) {
+      diagnosticsTitle = 'playback_metadata';
     } else if (result.notification == 'System query: runtime_status') {
       diagnosticsTitle = 'runtime_status';
     } else if (result.notification == 'System query: device_status') {
       diagnosticsTitle = 'device_status';
+    } else if (result.notification == 'System query: list_playback_artifacts') {
+      diagnosticsTitle = 'list_playback_artifacts';
+    } else if (result.notification == 'Playback metadata ready') {
+      diagnosticsTitle = 'playback_metadata';
     } else {
       return;
     }
@@ -383,6 +450,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     final data = Map<String, String>.from(result.data);
     _diagnosticsTitle = diagnosticsTitle;
     _diagnosticsData = data;
+    if (diagnosticsTitle == 'list_playback_artifacts') {
+      final firstArtifactID = _firstPlaybackArtifactID(data);
+      if (firstArtifactID.isNotEmpty) {
+        _playbackArtifactIdController.text = firstArtifactID;
+      }
+    }
   }
 
   void _stopHeartbeatLoop() {
@@ -540,6 +613,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _deviceTypeController.dispose();
     _platformController.dispose();
     _terminalInputController.dispose();
+    _playbackArtifactIdController.dispose();
+    _playbackTargetDeviceIdController.dispose();
     super.dispose();
   }
 
@@ -662,7 +737,30 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                       onPressed: _sendDeviceStatusQuery,
                       child: const Text('Device Status'),
                     ),
+                    OutlinedButton(
+                      onPressed: _sendPlaybackArtifactsQuery,
+                      child: const Text('List Playback Artifacts'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _sendPlaybackMetadataQuery,
+                      child: const Text('Playback Metadata'),
+                    ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _playbackArtifactIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Playback Artifact ID',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _playbackTargetDeviceIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Playback Target Device ID',
+                    hintText: 'Defaults to this device',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildDiagnosticsPanel(),

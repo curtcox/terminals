@@ -154,6 +154,15 @@ const ConnectRequest$json = {
       '9': 0,
       '10': 'webrtcSignal'
     },
+    {
+      '1': 'voice_audio',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.VoiceAudio',
+      '9': 0,
+      '10': 'voiceAudio'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -171,7 +180,26 @@ final $typed_data.Uint8List connectRequestDescriptor = $convert.base64Decode(
     'UmVhZHkSQAoHY29tbWFuZBgGIAEoCzIkLnRlcm1pbmFscy5jb250cm9sLnYxLkNvbW1hbmRSZX'
     'F1ZXN0SABSB2NvbW1hbmQSPwoJaGVhcnRiZWF0GAcgASgLMh8udGVybWluYWxzLmNvbnRyb2wu'
     'djEuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdBJJCg13ZWJydGNfc2lnbmFsGAggASgLMiIudGVybW'
-    'luYWxzLmNvbnRyb2wudjEuV2ViUlRDU2lnbmFsSABSDHdlYnJ0Y1NpZ25hbEIJCgdwYXlsb2Fk');
+    'luYWxzLmNvbnRyb2wudjEuV2ViUlRDU2lnbmFsSABSDHdlYnJ0Y1NpZ25hbBJDCgt2b2ljZV9h'
+    'dWRpbxgJIAEoCzIgLnRlcm1pbmFscy5jb250cm9sLnYxLlZvaWNlQXVkaW9IAFIKdm9pY2VBdW'
+    'Rpb0IJCgdwYXlsb2Fk');
+
+@$core.Deprecated('Use voiceAudioDescriptor instead')
+const VoiceAudio$json = {
+  '1': 'VoiceAudio',
+  '2': [
+    {'1': 'device_id', '3': 1, '4': 1, '5': 9, '10': 'deviceId'},
+    {'1': 'audio', '3': 2, '4': 1, '5': 12, '10': 'audio'},
+    {'1': 'sample_rate', '3': 3, '4': 1, '5': 5, '10': 'sampleRate'},
+    {'1': 'is_final', '3': 4, '4': 1, '5': 8, '10': 'isFinal'},
+  ],
+};
+
+/// Descriptor for `VoiceAudio`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List voiceAudioDescriptor = $convert.base64Decode(
+    'CgpWb2ljZUF1ZGlvEhsKCWRldmljZV9pZBgBIAEoCVIIZGV2aWNlSWQSFAoFYXVkaW8YAiABKA'
+    'xSBWF1ZGlvEh8KC3NhbXBsZV9yYXRlGAMgASgFUgpzYW1wbGVSYXRlEhkKCGlzX2ZpbmFsGAQg'
+    'ASgIUgdpc0ZpbmFs');
 
 @$core.Deprecated('Use connectResponseDescriptor instead')
 const ConnectResponse$json = {
@@ -420,7 +448,26 @@ const CommandRequest$json = {
     },
     {'1': 'text', '3': 5, '4': 1, '5': 9, '10': 'text'},
     {'1': 'intent', '3': 6, '4': 1, '5': 9, '10': 'intent'},
+    {
+      '1': 'arguments',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.control.v1.CommandRequest.ArgumentsEntry',
+      '10': 'arguments'
+    },
   ],
+  '3': [CommandRequest_ArgumentsEntry$json],
+};
+
+@$core.Deprecated('Use commandRequestDescriptor instead')
+const CommandRequest_ArgumentsEntry$json = {
+  '1': 'ArgumentsEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
 };
 
 /// Descriptor for `CommandRequest`. Decode as a `google.protobuf.DescriptorProto`.
@@ -429,7 +476,9 @@ final $typed_data.Uint8List commandRequestDescriptor = $convert.base64Decode(
     'NlX2lkGAIgASgJUghkZXZpY2VJZBI7CgZhY3Rpb24YAyABKA4yIy50ZXJtaW5hbHMuY29udHJv'
     'bC52MS5Db21tYW5kQWN0aW9uUgZhY3Rpb24SNQoEa2luZBgEIAEoDjIhLnRlcm1pbmFscy5jb2'
     '50cm9sLnYxLkNvbW1hbmRLaW5kUgRraW5kEhIKBHRleHQYBSABKAlSBHRleHQSFgoGaW50ZW50'
-    'GAYgASgJUgZpbnRlbnQ=');
+    'GAYgASgJUgZpbnRlbnQSUQoJYXJndW1lbnRzGAcgAygLMjMudGVybWluYWxzLmNvbnRyb2wudj'
+    'EuQ29tbWFuZFJlcXVlc3QuQXJndW1lbnRzRW50cnlSCWFyZ3VtZW50cxo8Cg5Bcmd1bWVudHNF'
+    'bnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgB');
 
 @$core.Deprecated('Use commandResultDescriptor instead')
 const CommandResult$json = {
@@ -565,8 +614,11 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.io.v1.SensorData.ValuesEntry': $0.SensorData_ValuesEntry$json,
   '.terminals.control.v1.StreamReady': StreamReady$json,
   '.terminals.control.v1.CommandRequest': CommandRequest$json,
+  '.terminals.control.v1.CommandRequest.ArgumentsEntry':
+      CommandRequest_ArgumentsEntry$json,
   '.terminals.control.v1.Heartbeat': Heartbeat$json,
   '.terminals.control.v1.WebRTCSignal': WebRTCSignal$json,
+  '.terminals.control.v1.VoiceAudio': VoiceAudio$json,
   '.terminals.control.v1.ConnectResponse': ConnectResponse$json,
   '.terminals.control.v1.RegisterAck': RegisterAck$json,
   '.terminals.ui.v1.SetUI': $1.SetUI$json,
