@@ -310,17 +310,27 @@ func (s *VoiceAssistantScenario) Match(trigger Trigger) bool {
 	return true
 }
 
-// Start queries configured AI backend and notifies the source device.
+// Start queries the configured LLM (preferred) or legacy AIBackend and
+// notifies the source device with the response.
 func (s *VoiceAssistantScenario) Start(ctx context.Context, env *Environment) error {
 	if env == nil {
 		return nil
 	}
+	query := strings.TrimSpace(s.trigger.Arguments["query"])
+	if query == "" {
+		query = "hello"
+	}
 	response := "Voice assistant active"
-	if env.AI != nil {
-		query := strings.TrimSpace(s.trigger.Arguments["query"])
-		if query == "" {
-			query = "hello"
+	switch {
+	case env.LLM != nil:
+		out, err := env.LLM.Query(ctx, []LLMMessage{{Role: "user", Content: query}}, LLMOptions{})
+		if err != nil {
+			return err
 		}
+		if out != nil && strings.TrimSpace(out.Text) != "" {
+			response = out.Text
+		}
+	case env.AI != nil:
 		out, err := env.AI.Query(ctx, query)
 		if err != nil {
 			return err

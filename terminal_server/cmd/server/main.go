@@ -41,10 +41,14 @@ func main() {
 		log.Printf("configure telephony bridge: %v", err)
 		return
 	}
+	aiBackends := ai.NewNoopBackends()
 	environment := &scenario.Environment{
 		Devices:   deviceManager,
 		IO:        ioRouter,
-		AI:        ai.NoopBackend{},
+		AI:        ai.LLMQueryAdapter{LLM: aiBackends.LLM},
+		LLM:       scenarioLLM{backend: aiBackends.LLM},
+		STT:       scenarioSTT{backend: aiBackends.STT},
+		TTS:       scenarioTTS{backend: aiBackends.TTS},
 		Telephony: telephonyBridge,
 		Storage:   store,
 		Scheduler: scheduler,
