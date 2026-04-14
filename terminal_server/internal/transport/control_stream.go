@@ -105,8 +105,20 @@ func enterTransitionForScenario(name string) (UITransition, bool) {
 	switch strings.TrimSpace(name) {
 	case "terminal":
 		return UITransition{Transition: "terminal_enter", DurationMS: 220}, true
+	case "photo_frame":
+		return UITransition{Transition: "photo_frame_enter", DurationMS: 220}, true
 	default:
 		return UITransition{}, false
+	}
+}
+
+func defaultPhotoFrameSlides() []string {
+	return []string{
+		"https://picsum.photos/id/1015/1920/1080",
+		"https://picsum.photos/id/1016/1920/1080",
+		"https://picsum.photos/id/1025/1920/1080",
+		"https://picsum.photos/id/1035/1920/1080",
+		"https://picsum.photos/id/1043/1920/1080",
 	}
 }
 
@@ -278,6 +290,10 @@ type StreamHandler struct {
 	terminalUIInterval     time.Duration
 	lastSetUIByDevice      map[string]ui.Descriptor
 	multiWindowResume      map[string]multiWindowResumeState
+	photoFrameSlides       []string
+	photoFrameIndexByDev   map[string]int
+	photoFrameLastByDev    map[string]time.Time
+	photoFrameInterval     time.Duration
 
 	mediaStreams      map[string]mediaStreamState
 	sensorsByDevice   map[string]sensorSnapshot
@@ -310,6 +326,7 @@ const (
 	defaultTerminalReadDeadline = 180 * time.Millisecond
 	defaultTerminalReadInterval = 10 * time.Millisecond
 	defaultTerminalUIInterval   = 800 * time.Millisecond
+	defaultPhotoFrameInterval   = 12 * time.Second
 )
 
 // CommandEvent is a bounded audit record of command handling.
@@ -343,6 +360,10 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalUIInterval:     defaultTerminalUIInterval,
 		lastSetUIByDevice:      map[string]ui.Descriptor{},
 		multiWindowResume:      map[string]multiWindowResumeState{},
+		photoFrameSlides:       defaultPhotoFrameSlides(),
+		photoFrameIndexByDev:   map[string]int{},
+		photoFrameLastByDev:    map[string]time.Time{},
+		photoFrameInterval:     defaultPhotoFrameInterval,
 		mediaStreams:           map[string]mediaStreamState{},
 		sensorsByDevice:        map[string]sensorSnapshot{},
 		voiceAudioBuffers:      map[string][]byte{},
@@ -380,6 +401,10 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalUIInterval:     defaultTerminalUIInterval,
 		lastSetUIByDevice:      map[string]ui.Descriptor{},
 		multiWindowResume:      map[string]multiWindowResumeState{},
+		photoFrameSlides:       defaultPhotoFrameSlides(),
+		photoFrameIndexByDev:   map[string]int{},
+		photoFrameLastByDev:    map[string]time.Time{},
+		photoFrameInterval:     defaultPhotoFrameInterval,
 		mediaStreams:           map[string]mediaStreamState{},
 		sensorsByDevice:        map[string]sensorSnapshot{},
 		voiceAudioBuffers:      map[string][]byte{},
@@ -417,13 +442,20 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
+		out := make([]ServerMessage, 0, 2)
 		update, pollErr := h.pollTerminalOutput(msg.Heartbeat.DeviceID, false)
 		if pollErr != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(pollErr), Error: pollErr.Error()}}, pollErr
 		}
 		if update != nil {
-			return []ServerMessage{*update}, nil
+			out = append(out, *update)
+		}
+		if photoRotate := h.photoFrameHeartbeatUpdate(msg.Heartbeat.DeviceID); photoRotate != nil {
+			out = append(out, *photoRotate)
+		}
+		if len(out) > 0 {
+			return out, nil
 		}
 		return nil, nil
 	case msg.Sensor != nil:
@@ -764,6 +796,22 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 				DurationMS: 220,
 			},
 		})
+		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "terminal"); len(restored) > 0 {
+			responses = append(responses, restored...)
+		}
+		return responses
+	}
+	if commandResult.ScenarioStop == "photo_frame" {
+		h.clearPhotoFrameState(cmd.DeviceID)
+		responses = append(responses, ServerMessage{
+			TransitionUI: &UITransition{
+				Transition: "photo_frame_exit",
+				DurationMS: 220,
+			},
+		})
+		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "photo_frame"); len(restored) > 0 {
+			responses = append(responses, restored...)
+		}
 		return responses
 	}
 	if commandResult.ScenarioStop == "internal_video_call" {
@@ -773,6 +821,9 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 				DurationMS: 220,
 			},
 		})
+		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "internal_video_call"); len(restored) > 0 {
+			responses = append(responses, restored...)
+		}
 		return responses
 	}
 	if commandResult.ScenarioStop == "multi_window" {
@@ -791,6 +842,17 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		multiWindowUI := ui.MultiWindowView(cmd.DeviceID, peerIDs, focusedPeerID)
 		responses = append(responses, ServerMessage{SetUI: &multiWindowUI})
 	}
+	if commandResult.ScenarioStart == "photo_frame" {
+		photoFrameUI := h.photoFrameSetUI(cmd.DeviceID, true)
+		responses = append(responses, ServerMessage{SetUI: &photoFrameUI})
+		responses = append(responses, ServerMessage{
+			TransitionUI: &UITransition{
+				Transition: "photo_frame_enter",
+				DurationMS: 220,
+			},
+		})
+		return responses
+	}
 	if commandResult.ScenarioStart == "internal_video_call" {
 		if peerID, ok := h.internalVideoCallPeer(cmd.DeviceID); ok {
 			internalVideoCallUI := ui.InternalVideoCallView(cmd.DeviceID, peerID)
@@ -805,6 +867,11 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		return responses
 	}
 	if cmd.Action != "" && cmd.Action != CommandActionStart {
+		if commandResult.ScenarioStop != "" {
+			if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, commandResult.ScenarioStop); len(restored) > 0 {
+				responses = append(responses, restored...)
+			}
+		}
 		return responses
 	}
 	if commandResult.ScenarioStart != "terminal" {
@@ -921,6 +988,118 @@ func (h *StreamHandler) routeUpdatesForCommand(
 		}
 	}
 	return out
+}
+
+func (h *StreamHandler) resumedScenarioUI(ctx context.Context, deviceID, stoppedScenario string) []ServerMessage {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" || h.runtime == nil || h.runtime.Engine == nil {
+		return nil
+	}
+	resumedName, active := h.runtime.Engine.Active(deviceID)
+	if !active || resumedName == "" || resumedName == strings.TrimSpace(stoppedScenario) {
+		return nil
+	}
+
+	switch resumedName {
+	case "photo_frame":
+		view := h.photoFrameSetUI(deviceID, false)
+		return []ServerMessage{
+			{SetUI: &view},
+			{TransitionUI: &UITransition{Transition: "photo_frame_enter", DurationMS: 220}},
+		}
+	case "terminal":
+		output, err := h.ensureTerminalSession(ctx, deviceID)
+		if err != nil {
+			return []ServerMessage{{Notification: "Terminal session failed: " + err.Error()}}
+		}
+		view := ui.TerminalViewWithOutput(deviceID, output)
+		return []ServerMessage{
+			{SetUI: &view},
+			{TransitionUI: &UITransition{Transition: "terminal_enter", DurationMS: 220}},
+		}
+	default:
+		return nil
+	}
+}
+
+func (h *StreamHandler) clearPhotoFrameState(deviceID string) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return
+	}
+	h.mu.Lock()
+	delete(h.photoFrameIndexByDev, deviceID)
+	delete(h.photoFrameLastByDev, deviceID)
+	h.mu.Unlock()
+}
+
+func (h *StreamHandler) photoFrameSetUI(deviceID string, reset bool) ui.Descriptor {
+	deviceID = strings.TrimSpace(deviceID)
+	now := h.nowUTC()
+
+	h.mu.Lock()
+	slides := append([]string(nil), h.photoFrameSlides...)
+	if len(slides) == 0 {
+		slides = defaultPhotoFrameSlides()
+	}
+	index := h.photoFrameIndexByDev[deviceID]
+	if reset {
+		index = 0
+	}
+	if index < 0 || index >= len(slides) {
+		index = 0
+	}
+	h.photoFrameIndexByDev[deviceID] = index
+	h.photoFrameLastByDev[deviceID] = now
+	h.mu.Unlock()
+
+	url := slides[index]
+	caption := "Photo frame: " + deviceID
+	return ui.PhotoFrameView(url, caption, index, len(slides))
+}
+
+func (h *StreamHandler) photoFrameHeartbeatUpdate(deviceID string) *ServerMessage {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil
+	}
+	if h.activeScenarioName(deviceID) != "photo_frame" {
+		return nil
+	}
+
+	now := h.nowUTC()
+	h.mu.Lock()
+	slides := append([]string(nil), h.photoFrameSlides...)
+	if len(slides) == 0 {
+		slides = defaultPhotoFrameSlides()
+	}
+
+	last, hasLast := h.photoFrameLastByDev[deviceID]
+	interval := h.photoFrameInterval
+	if interval <= 0 {
+		interval = defaultPhotoFrameInterval
+	}
+	if !hasLast {
+		h.photoFrameLastByDev[deviceID] = now
+		h.mu.Unlock()
+		return nil
+	}
+	if now.Sub(last) < interval {
+		h.mu.Unlock()
+		return nil
+	}
+
+	index := h.photoFrameIndexByDev[deviceID]
+	if index < 0 || index >= len(slides) {
+		index = 0
+	}
+	index = (index + 1) % len(slides)
+	h.photoFrameIndexByDev[deviceID] = index
+	h.photoFrameLastByDev[deviceID] = now
+	h.mu.Unlock()
+
+	view := ui.PhotoFrameView(slides[index], "Photo frame: "+deviceID, index, len(slides))
+	return &ServerMessage{SetUI: &view}
 }
 
 func (h *StreamHandler) appendRouteMessageForPeers(

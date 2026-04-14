@@ -247,3 +247,50 @@ func MultiWindowView(viewerDeviceID string, peerDeviceIDs []string, focusedPeerI
 		"action": "multi_window_end",
 	}), GlobalOverlaySlot())
 }
+
+// PhotoFrameView renders a fullscreen ambient photo layout with keep-awake hints.
+func PhotoFrameView(photoURL, caption string, index, total int) Descriptor {
+	if photoURL == "" {
+		photoURL = "https://picsum.photos/1920/1080?grayscale"
+	}
+	if caption == "" {
+		caption = "Photo frame"
+	}
+	if total < 1 {
+		total = 1
+	}
+	if index < 0 {
+		index = 0
+	}
+	if index >= total {
+		index = total - 1
+	}
+	progress := strconv.Itoa(index+1) + " / " + strconv.Itoa(total)
+
+	return New("stack", map[string]string{
+		"id":         "photo_frame_root",
+		"background": "#000000",
+	}, New("keep_awake", map[string]string{
+		"id":      "photo_frame_keep_awake",
+		"enabled": "true",
+	}, New("fullscreen", map[string]string{
+		"id":      "photo_frame_fullscreen",
+		"enabled": "true",
+	}, New("image", map[string]string{
+		"id":  "photo_frame_image",
+		"url": photoURL,
+	}))), New("stack", map[string]string{
+		"id":         "photo_frame_overlay",
+		"background": "#00000088",
+	}, New("text", map[string]string{
+		"id":    "photo_frame_caption",
+		"value": caption,
+		"style": "headline",
+		"color": "#FFFFFF",
+	}), New("text", map[string]string{
+		"id":    "photo_frame_progress",
+		"value": progress,
+		"style": "body",
+		"color": "#D7D7D7",
+	})), GlobalOverlaySlot())
+}

@@ -1,1 +1,1 @@
-Implement Phase 7 photo_frame scenario idle rotation with preemption-aware suspend/resume behavior.
+Implement Phase 7 multi-device scenario coordination beyond current single-device control flow.

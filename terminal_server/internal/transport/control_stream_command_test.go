@@ -237,14 +237,20 @@ func TestHandleMessageCommandManual(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command manual) error = %v", err)
 	}
-	if len(out) != 1 {
-		t.Fatalf("len(out) = %d, want 1", len(out))
+	if len(out) != 3 {
+		t.Fatalf("len(out) = %d, want 3", len(out))
 	}
 	if out[0].ScenarioStart != "photo_frame" {
 		t.Fatalf("ScenarioStart = %q, want photo_frame", out[0].ScenarioStart)
 	}
 	if out[0].CommandAck != "cmd-2" {
 		t.Fatalf("CommandAck = %q, want cmd-2", out[0].CommandAck)
+	}
+	if out[1].SetUI == nil || out[1].SetUI.Props["id"] != "photo_frame_root" {
+		t.Fatalf("expected photo frame SetUI, got %+v", out[1].SetUI)
+	}
+	if out[2].TransitionUI == nil || out[2].TransitionUI.Transition != "photo_frame_enter" {
+		t.Fatalf("expected photo_frame_enter transition, got %+v", out[2].TransitionUI)
 	}
 }
 
@@ -993,6 +999,77 @@ func TestHandleMessageHeartbeatCoalescesTerminalOutputUpdates(t *testing.T) {
 	}
 }
 
+func TestHandleMessageHeartbeatRotatesPhotoFrameAfterInterval(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	now := time.Date(2026, 4, 14, 18, 0, 0, 0, time.UTC)
+	control.now = func() time.Time { return now }
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.photoFrameInterval = 5 * time.Second
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	startOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-photo-rotate-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	if err != nil {
+		t.Fatalf("photo frame start error = %v", err)
+	}
+	if len(startOut) < 2 || startOut[1].SetUI == nil {
+		t.Fatalf("expected initial photo frame SetUI, got %+v", startOut)
+	}
+	firstURL := findNodePropValue(startOut[1].SetUI, "photo_frame_image", "url")
+	if firstURL == "" {
+		t.Fatalf("expected initial photo url in SetUI descriptor")
+	}
+
+	now = now.Add(3 * time.Second)
+	firstHeartbeat, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("first heartbeat error = %v", err)
+	}
+	if len(firstHeartbeat) != 0 {
+		t.Fatalf("expected no rotation before interval, got %+v", firstHeartbeat)
+	}
+
+	now = now.Add(3 * time.Second)
+	secondHeartbeat, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("second heartbeat error = %v", err)
+	}
+	if len(secondHeartbeat) != 1 || secondHeartbeat[0].SetUI == nil {
+		t.Fatalf("expected photo frame SetUI after interval, got %+v", secondHeartbeat)
+	}
+	secondURL := findNodePropValue(secondHeartbeat[0].SetUI, "photo_frame_image", "url")
+	if secondURL == "" {
+		t.Fatalf("expected rotated photo url in heartbeat SetUI descriptor")
+	}
+	if secondURL == firstURL {
+		t.Fatalf("expected heartbeat rotation to advance photo url; url stayed %q", firstURL)
+	}
+}
+
 func TestHandleMessageManualRefreshBypassesHeartbeatCoalescing(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -1657,14 +1734,95 @@ func TestHandleMessageCommandStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stop command error = %v", err)
 	}
-	if len(out) != 1 {
-		t.Fatalf("len(out) = %d, want 1", len(out))
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
 	}
 	if out[0].ScenarioStop != "photo_frame" {
 		t.Fatalf("ScenarioStop = %q, want photo_frame", out[0].ScenarioStop)
 	}
 	if out[0].CommandAck != "cmd-3-stop" {
 		t.Fatalf("CommandAck = %q, want cmd-3-stop", out[0].CommandAck)
+	}
+	if out[1].TransitionUI == nil || out[1].TransitionUI.Transition != "photo_frame_exit" {
+		t.Fatalf("expected photo_frame_exit transition, got %+v", out[1].TransitionUI)
+	}
+}
+
+func TestHandleMessageCommandStopRedAlertRestoresPhotoFrameUI(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-photo-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	if err != nil {
+		t.Fatalf("photo frame start error = %v", err)
+	}
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-alert-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "red alert",
+		},
+	})
+	if err != nil {
+		t.Fatalf("red alert start error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-alert-stop",
+			DeviceID:  "device-1",
+			Action:    "stop",
+			Kind:      "manual",
+			Intent:    "red alert",
+		},
+	})
+	if err != nil {
+		t.Fatalf("red alert stop error = %v", err)
+	}
+	if len(out) < 3 {
+		t.Fatalf("expected resumed photo frame UI after red alert stop, got %+v", out)
+	}
+	if out[0].ScenarioStop != "red_alert" {
+		t.Fatalf("ScenarioStop = %q, want red_alert", out[0].ScenarioStop)
+	}
+	foundPhotoUI := false
+	foundPhotoTransition := false
+	for _, msg := range out {
+		if msg.SetUI != nil && msg.SetUI.Props["id"] == "photo_frame_root" {
+			foundPhotoUI = true
+		}
+		if msg.TransitionUI != nil && msg.TransitionUI.Transition == "photo_frame_enter" {
+			foundPhotoTransition = true
+		}
+	}
+	if !foundPhotoUI {
+		t.Fatalf("expected resumed photo frame SetUI after red alert stop: %+v", out)
+	}
+	if !foundPhotoTransition {
+		t.Fatalf("expected photo_frame_enter transition on resume: %+v", out)
 	}
 }
 
@@ -2935,4 +3093,20 @@ func TestHandleMessageRejectsMissingCommandDeviceID(t *testing.T) {
 
 func contains(s, needle string) bool {
 	return strings.Contains(s, needle)
+}
+
+func findNodePropValue(node *ui.Descriptor, nodeID, prop string) string {
+	if node == nil {
+		return ""
+	}
+	if node.Props["id"] == nodeID {
+		return node.Props[prop]
+	}
+	for i := range node.Children {
+		child := &node.Children[i]
+		if got := findNodePropValue(child, nodeID, prop); got != "" {
+			return got
+		}
+	}
+	return ""
 }
