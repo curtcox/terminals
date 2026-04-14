@@ -14,6 +14,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
@@ -67,10 +68,17 @@ func main() {
 	scenario.RegisterBuiltins(scenarioEngine)
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
 	controlStream := transport.NewStreamHandler(controlService)
+	recordingManager, err := recording.NewDiskManager(cfg.RecordingDir)
+	if err != nil {
+		log.Printf("configure recording manager: %v", err)
+		return
+	}
+	controlStream.SetRecordingManager(recordingManager)
 	grpcServer := transport.NewServer(cfg.GRPCAddress())
 	grpcServer.ConfigureControl(controlService, transport.GeneratedProtoAdapter{})
 	grpcServer.ConfigureRuntime(scenarioRuntime)
 	grpcServer.ConfigureDeviceAudio(audioHub)
+	grpcServer.ConfigureRecording(recordingManager)
 	mdns := discovery.NewMDNSAdvertiser()
 
 	log.Printf("terminal server starting at %s", grpcServer.Address())
@@ -109,6 +117,7 @@ func main() {
 	}
 	log.Printf("control service ready for server id %q", cfg.MDNSName)
 	log.Printf("control stream handler initialized")
+	log.Printf("recording manager initialized dir=%s", cfg.RecordingDir)
 	log.Printf("scenario runtime initialized with %d builtin scenarios", 3)
 	log.Printf(
 		"housekeeping configured heartbeat_timeout=%ds liveness_interval=%ds due_timer_interval=%ds",

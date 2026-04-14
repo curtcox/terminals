@@ -12,6 +12,7 @@ import (
 type Config struct {
 	GRPCHost                      string
 	GRPCPort                      int
+	RecordingDir                  string
 	MDNSService                   string
 	MDNSName                      string
 	Version                       string
@@ -37,6 +38,7 @@ func Load() (Config, error) {
 	cfg := Config{
 		GRPCHost:                      getenv("TERMINALS_GRPC_HOST", "0.0.0.0"),
 		GRPCPort:                      50051,
+		RecordingDir:                  getenv("TERMINALS_RECORDING_DIR", "recordings"),
 		MDNSService:                   getenv("TERMINALS_MDNS_SERVICE", "_terminals._tcp.local."),
 		MDNSName:                      getenv("TERMINALS_MDNS_NAME", "HomeServer"),
 		Version:                       getenv("TERMINALS_VERSION", "1"),

@@ -22,6 +22,7 @@ func SystemHelpIntentsString() string {
 		SystemIntentActiveScenarios,
 		SystemIntentPendingTimers,
 		SystemIntentRecentCommands,
+		SystemIntentRecordingEvents,
 		SystemIntentDeviceStatus + " <device_id>",
 		SystemIntentTerminalRefresh + " <device_id>",
 		SystemIntentRunDueTimers,
@@ -47,6 +48,7 @@ func ParseSystemIntent(raw string) (ParsedSystemIntent, error) {
 		SystemIntentActiveScenarios,
 		SystemIntentPendingTimers,
 		SystemIntentRecentCommands,
+		SystemIntentRecordingEvents,
 		SystemIntentTerminalRefresh,
 		SystemIntentRunDueTimers,
 		SystemIntentReconcileLiveness:

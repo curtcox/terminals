@@ -13,6 +13,9 @@ func TestSystemHelpIntentsString(t *testing.T) {
 	if !strings.Contains(s, SystemIntentRecentCommands) {
 		t.Fatalf("SystemHelpIntentsString() missing %q", SystemIntentRecentCommands)
 	}
+	if !strings.Contains(s, SystemIntentRecordingEvents) {
+		t.Fatalf("SystemHelpIntentsString() missing %q", SystemIntentRecordingEvents)
+	}
 }
 
 func TestParseSystemIntent(t *testing.T) {

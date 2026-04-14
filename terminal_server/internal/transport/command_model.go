@@ -29,4 +29,5 @@ const (
 	SystemIntentReconcileLiveness = "reconcile_liveness"
 	SystemIntentDeviceStatus      = "device_status"
 	SystemIntentTerminalRefresh   = "terminal_refresh"
+	SystemIntentRecordingEvents   = "recording_events"
 )

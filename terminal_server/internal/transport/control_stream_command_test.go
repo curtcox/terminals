@@ -8,6 +8,7 @@ import (
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
@@ -86,6 +87,64 @@ func TestHandleMessageCommandVoice(t *testing.T) {
 	events := broadcaster.Events()
 	if len(events) == 0 {
 		t.Fatalf("expected broadcast event")
+	}
+}
+
+func TestHandleMessageIntercomStartStopUpdatesRecordingManager(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	recorder := recording.NewMemoryManager()
+	handler.SetRecordingManager(recorder)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall"},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-intercom-start-recording",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(intercom start) error = %v", err)
+	}
+	active := recorder.Active()
+	if len(active) != 2 {
+		t.Fatalf("len(recorder.Active()) after start = %d, want 2", len(active))
+	}
+
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-intercom-stop-recording",
+			DeviceID:  "device-1",
+			Action:    CommandActionStop,
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(intercom stop) error = %v", err)
+	}
+	if len(recorder.Active()) != 0 {
+		t.Fatalf("len(recorder.Active()) after stop = %d, want 0", len(recorder.Active()))
 	}
 }
 
@@ -2164,6 +2223,12 @@ func TestHandleMessageSystemRuntimeStatus(t *testing.T) {
 	if out[0].Data["sensor_summaries"] != "" {
 		t.Fatalf("sensor_summaries = %q, want empty", out[0].Data["sensor_summaries"])
 	}
+	if out[0].Data["recording_active_streams"] != "0" {
+		t.Fatalf("recording_active_streams = %q, want 0", out[0].Data["recording_active_streams"])
+	}
+	if out[0].Data["recording_stream_ids"] != "" {
+		t.Fatalf("recording_stream_ids = %q, want empty", out[0].Data["recording_stream_ids"])
+	}
 }
 
 func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T) {
@@ -2177,6 +2242,7 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 		IO:      routes,
 	})
 	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.SetRecordingManager(recording.NewMemoryManager())
 
 	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
 		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
@@ -2225,6 +2291,9 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	if out[0].Data["media_streams_pending"] != "2" {
 		t.Fatalf("media_streams_pending pre-ready = %q, want 2", out[0].Data["media_streams_pending"])
 	}
+	if out[0].Data["recording_active_streams"] != "2" {
+		t.Fatalf("recording_active_streams pre-ready = %q, want 2", out[0].Data["recording_active_streams"])
+	}
 
 	for streamID := range streamIDs {
 		_, err = handler.HandleMessage(context.Background(), ClientMessage{
@@ -2253,6 +2322,9 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	}
 	if out[0].Data["media_streams_pending"] != "0" {
 		t.Fatalf("media_streams_pending ready = %q, want 0", out[0].Data["media_streams_pending"])
+	}
+	if out[0].Data["recording_active_streams"] != "2" {
+		t.Fatalf("recording_active_streams ready = %q, want 2", out[0].Data["recording_active_streams"])
 	}
 	if !strings.Contains(out[0].Data["media_streams"], "ready=true") {
 		t.Fatalf("media_streams details should contain ready=true, got %q", out[0].Data["media_streams"])
@@ -2292,6 +2364,93 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	}
 	if out[0].Data["media_streams"] != "" {
 		t.Fatalf("media_streams post-stop = %q, want empty", out[0].Data["media_streams"])
+	}
+	if out[0].Data["recording_active_streams"] != "0" {
+		t.Fatalf("recording_active_streams post-stop = %q, want 0", out[0].Data["recording_active_streams"])
+	}
+	if out[0].Data["recording_stream_ids"] != "" {
+		t.Fatalf("recording_stream_ids post-stop = %q, want empty", out[0].Data["recording_stream_ids"])
+	}
+}
+
+func TestHandleMessageSystemRecordingEvents(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+		IO:      io.NewRouter(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	recorder, err := recording.NewDiskManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	handler.SetRecordingManager(recorder)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "recording-events-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("intercom start error = %v", err)
+	}
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "recording-events-stop",
+			DeviceID:  "device-1",
+			Action:    CommandActionStop,
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("intercom stop error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-recording-events",
+			Kind:      "system",
+			Intent:    SystemIntentRecordingEvents,
+		},
+	})
+	if err != nil {
+		t.Fatalf("recording_events query error = %v", err)
+	}
+	if out[0].Notification != "System query: recording_events" {
+		t.Fatalf("notification = %q, want recording_events", out[0].Notification)
+	}
+	if len(out[0].Data) == 0 {
+		t.Fatalf("expected recording event rows")
+	}
+	foundStart := false
+	foundStop := false
+	for _, row := range out[0].Data {
+		if strings.Contains(row, "|start|") {
+			foundStart = true
+		}
+		if strings.Contains(row, "|stop|") {
+			foundStop = true
+		}
+	}
+	if !foundStart {
+		t.Fatalf("recording event rows missing start action: %+v", out[0].Data)
+	}
+	if !foundStop {
+		t.Fatalf("recording event rows missing stop action: %+v", out[0].Data)
 	}
 }
 

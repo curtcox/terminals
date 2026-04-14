@@ -13,6 +13,7 @@ import (
 	"time"
 
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
@@ -301,6 +302,7 @@ type StreamHandler struct {
 	voiceAudioBuffers map[string][]byte
 
 	deviceAudio DeviceAudioPublisher
+	recording  recording.Manager
 }
 
 type mediaStreamState struct {
@@ -368,6 +370,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		mediaStreams:           map[string]mediaStreamState{},
 		sensorsByDevice:        map[string]sensorSnapshot{},
 		voiceAudioBuffers:      map[string][]byte{},
+		recording:              recording.NoopManager{},
 	}
 }
 
@@ -409,7 +412,20 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		mediaStreams:           map[string]mediaStreamState{},
 		sensorsByDevice:        map[string]sensorSnapshot{},
 		voiceAudioBuffers:      map[string][]byte{},
+		recording:              recording.NoopManager{},
 	}
+}
+
+// SetRecordingManager wires stream recording lifecycle hooks used when routes
+// start and stop. Passing nil restores the no-op manager.
+func (h *StreamHandler) SetRecordingManager(mgr recording.Manager) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if mgr == nil {
+		h.recording = recording.NoopManager{}
+		return
+	}
+	h.recording = mgr
 }
 
 // HandleMessage processes one incoming control message and returns responses.
@@ -1338,7 +1354,17 @@ func (h *StreamHandler) registerMediaStream(start StartStreamResponse) {
 		Metadata:       metadata,
 		Ready:          false,
 	}
+	recorder := h.recording
 	h.mu.Unlock()
+	if recorder != nil {
+		_ = recorder.Start(context.Background(), recording.Stream{
+			StreamID:       streamID,
+			Kind:           start.Kind,
+			SourceDeviceID: start.SourceDeviceID,
+			TargetDeviceID: start.TargetDeviceID,
+			Metadata:       metadata,
+		})
+	}
 }
 
 func (h *StreamHandler) unregisterMediaStream(streamID string) {
@@ -1348,7 +1374,11 @@ func (h *StreamHandler) unregisterMediaStream(streamID string) {
 	}
 	h.mu.Lock()
 	delete(h.mediaStreams, streamID)
+	recorder := h.recording
 	h.mu.Unlock()
+	if recorder != nil {
+		_ = recorder.Stop(context.Background(), streamID)
+	}
 }
 
 func (h *StreamHandler) markStreamReady(streamID string) {
@@ -1489,6 +1519,31 @@ func (h *StreamHandler) sensorStatusData() map[string]string {
 		"sensor_latest_unix_ms":    strconv.FormatInt(latestUnixMS, 10),
 		"sensor_device_ids":        strings.Join(deviceIDs, ","),
 		"sensor_summaries":         strings.Join(details, ";"),
+	}
+}
+
+func (h *StreamHandler) recordingStatusData() map[string]string {
+	h.mu.Lock()
+	recorder := h.recording
+	h.mu.Unlock()
+	activeReader, ok := recorder.(interface {
+		Active() map[string]recording.Stream
+	})
+	if !ok {
+		return map[string]string{
+			"recording_active_streams": "0",
+			"recording_stream_ids":     "",
+		}
+	}
+	active := activeReader.Active()
+	streamIDs := make([]string, 0, len(active))
+	for streamID := range active {
+		streamIDs = append(streamIDs, streamID)
+	}
+	sort.Strings(streamIDs)
+	return map[string]string{
+		"recording_active_streams": strconv.Itoa(len(streamIDs)),
+		"recording_stream_ids":     strings.Join(streamIDs, ","),
 	}
 }
 
@@ -2105,11 +2160,15 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 	buf = append(buf, existing...)
 	buf = append(buf, va.Audio...)
 	publisher := h.deviceAudio
+	recorder := h.recording
 	if !va.IsFinal {
 		h.voiceAudioBuffers[deviceID] = buf
 		h.mu.Unlock()
 		if publisher != nil && len(va.Audio) > 0 {
 			publisher.Publish(deviceID, va.Audio)
+		}
+		if len(va.Audio) > 0 {
+			h.recordVoiceAudioChunk(recorder, deviceID, va.Audio)
 		}
 		return nil, nil
 	}
@@ -2118,6 +2177,9 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 
 	if publisher != nil && len(va.Audio) > 0 {
 		publisher.Publish(deviceID, va.Audio)
+	}
+	if len(va.Audio) > 0 {
+		h.recordVoiceAudioChunk(recorder, deviceID, va.Audio)
 	}
 
 	if h.runtime == nil || h.runtime.Env == nil {
@@ -2199,6 +2261,16 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 		},
 	})
 	return out, nil
+}
+
+func (h *StreamHandler) recordVoiceAudioChunk(recorder recording.Manager, deviceID string, chunk []byte) {
+	writer, ok := recorder.(interface {
+		WriteDeviceAudio(deviceID string, chunk []byte) error
+	})
+	if !ok {
+		return
+	}
+	_ = writer.WriteDeviceAudio(deviceID, chunk)
 }
 
 // latestBroadcastForDevice returns the most recent broadcast message emitted
@@ -2405,6 +2477,9 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		for k, v := range h.sensorStatusData() {
 			data[k] = v
 		}
+		for k, v := range h.recordingStatusData() {
+			data[k] = v
+		}
 		return ServerMessage{
 			Notification: "System query: runtime_status",
 			Data:         data,
@@ -2522,6 +2597,32 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: recent_commands",
 			Data:         data,
 		}, nil
+	case SystemIntentRecordingEvents:
+		data := map[string]string{}
+		h.mu.Lock()
+		recorder := h.recording
+		h.mu.Unlock()
+		eventReader, ok := recorder.(interface {
+			RecentEvents(limit int) []recording.Event
+		})
+		if ok {
+			events := eventReader.RecentEvents(50)
+			for i, event := range events {
+				key := fmt.Sprintf("%03d", i)
+				data[key] = strings.Join([]string{
+					strconv.FormatInt(event.AtUnixMS, 10),
+					event.Action,
+					event.StreamID,
+					event.Kind,
+					event.SourceID,
+					event.TargetID,
+				}, "|")
+			}
+		}
+		return ServerMessage{
+			Notification: "System query: recording_events",
+			Data:         data,
+		}, nil
 	case SystemIntentTerminalRefresh:
 		targetDeviceID := strings.TrimSpace(parsed.Arg)
 		if targetDeviceID == "" {
@@ -2600,6 +2701,7 @@ func (h *StreamHandler) disconnectRoutesForDevice(deviceID string) {
 	routes := routeIO.RoutesForDevice(deviceID)
 	for _, route := range routes {
 		_ = routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
+		h.unregisterMediaStream(routeStreamID(route))
 	}
 }
 

@@ -25,6 +25,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.GRPCPort != 50051 {
 		t.Fatalf("GRPCPort = %d", cfg.GRPCPort)
 	}
+	if cfg.RecordingDir != "recordings" {
+		t.Fatalf("RecordingDir = %q, want recordings", cfg.RecordingDir)
+	}
 	if cfg.HeartbeatTimeoutSeconds != 120 {
 		t.Fatalf("HeartbeatTimeoutSeconds = %d", cfg.HeartbeatTimeoutSeconds)
 	}
@@ -53,6 +56,18 @@ func TestLoadWakeWordPrefixesFromEnv(t *testing.T) {
 		cfg.WakeWordPrefixes[1] != "computer" ||
 		cfg.WakeWordPrefixes[2] != "hey house" {
 		t.Fatalf("WakeWordPrefixes = %+v, want [jarvis computer hey house]", cfg.WakeWordPrefixes)
+	}
+}
+
+func TestLoadRecordingDirFromEnv(t *testing.T) {
+	t.Setenv("TERMINALS_RECORDING_DIR", "/tmp/terminals-recordings")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.RecordingDir != "/tmp/terminals-recordings" {
+		t.Fatalf("RecordingDir = %q, want /tmp/terminals-recordings", cfg.RecordingDir)
 	}
 }
 

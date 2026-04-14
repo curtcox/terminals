@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
 
@@ -19,6 +20,7 @@ type Server struct {
 	adapter     ProtoAdapter
 	runtime     *scenario.Runtime
 	deviceAudio DeviceAudioPublisher
+	recording   recording.Manager
 }
 
 // NewServer returns a lifecycle-managed transport server placeholder.
@@ -66,6 +68,12 @@ func (s *Server) ConfigureDeviceAudio(pub DeviceAudioPublisher) {
 	s.deviceAudio = pub
 }
 
+// ConfigureRecording wires a recording manager so every control stream
+// handler tracks StartStream/StopStream lifecycle for route recording.
+func (s *Server) ConfigureRecording(mgr recording.Manager) {
+	s.recording = mgr
+}
+
 // Connect handles a single bidirectional control stream session.
 func (s *Server) Connect(stream ProtoStream) error {
 	if s.control == nil || s.adapter == nil {
@@ -74,6 +82,9 @@ func (s *Server) Connect(stream ProtoStream) error {
 	handler := NewStreamHandlerWithRuntime(s.control, s.runtime)
 	if s.deviceAudio != nil {
 		handler.SetDeviceAudioPublisher(s.deviceAudio)
+	}
+	if s.recording != nil {
+		handler.SetRecordingManager(s.recording)
 	}
 	return RunProtoSession(handler, s.control, stream, s.adapter)
 }
