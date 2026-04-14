@@ -1,1 +1,1 @@
-Implement the first Phase 6 slice: add an `AudioMonitorScenario` path that starts a `SoundClassifier` stream for a target sound and emits a notification when the condition is detected, with focused integration tests.
+Wire `AudioMonitorScenario` to a real routed audio source (instead of placeholder EOF input) so `SoundClassifier` can continuously monitor live audio from the selected device, with control-stream integration coverage.

@@ -4,6 +4,7 @@ package scenario
 import (
 	"context"
 	"errors"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -376,11 +377,56 @@ func (s *AudioMonitorScenario) Start(ctx context.Context, env *Environment) erro
 			return err
 		}
 	}
-	return notifySource(ctx, env, s.trigger.SourceID, "Audio monitor armed: "+target)
+	if err := notifySource(ctx, env, s.trigger.SourceID, "Audio monitor armed: "+target); err != nil {
+		return err
+	}
+	if env.Sound == nil {
+		return nil
+	}
+
+	stream, err := env.Sound.Classify(ctx, audioMonitorSilenceSource{})
+	if err != nil {
+		return err
+	}
+
+	sourceID := s.trigger.SourceID
+	go func() {
+		for event := range stream {
+			if !audioMonitorEventMatchesTarget(target, event.Label) {
+				continue
+			}
+			messageLabel := strings.TrimSpace(event.Label)
+			if messageLabel == "" {
+				messageLabel = target
+			}
+			_ = notifySource(ctx, env, sourceID, "Audio monitor detected: "+messageLabel)
+			return
+		}
+	}()
+
+	return nil
 }
 
 // Stop ends monitor mode and currently has no side effects.
 func (s *AudioMonitorScenario) Stop() error { return nil }
+
+type audioMonitorSilenceSource struct{}
+
+func (audioMonitorSilenceSource) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+func audioMonitorEventMatchesTarget(target, label string) bool {
+	normalizedTarget := strings.TrimSpace(strings.ToLower(target))
+	normalizedLabel := strings.TrimSpace(strings.ToLower(label))
+	if normalizedLabel == "" {
+		return false
+	}
+	if normalizedTarget == "" || normalizedTarget == "sound" {
+		return true
+	}
+	return strings.Contains(normalizedLabel, normalizedTarget) || strings.Contains(normalizedTarget, normalizedLabel)
+}
 
 // ScheduleMonitorScenario schedules a check and confirms activation.
 type ScheduleMonitorScenario struct {

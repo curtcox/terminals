@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"io"
 	"strconv"
 	"testing"
 	"time"
@@ -15,6 +16,90 @@ import (
 type testAIBackend struct {
 	lastInput string
 	response  string
+}
+
+func TestRuntimeAudioMonitorNotifiesWhenTargetDetected(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	classifier := &testSoundClassifier{events: []SoundEvent{{Label: "dishwasher_stopped", Confidence: 0.92, AtMS: 101}}}
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &AudioMonitorScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+		Sound:     classifier,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "audio_monitor",
+		Arguments: map[string]string{
+			"target": "dishwasher",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(audio_monitor) error = %v", err)
+	}
+
+	deadline := time.Now().Add(300 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		events := broadcaster.Events()
+		if len(events) >= 2 {
+			if events[0].Message != "Audio monitor armed: dishwasher" {
+				t.Fatalf("event0 message = %q, want Audio monitor armed: dishwasher", events[0].Message)
+			}
+			if events[1].Message != "Audio monitor detected: dishwasher_stopped" {
+				t.Fatalf("event1 message = %q, want detection message", events[1].Message)
+			}
+			if len(events[1].DeviceIDs) != 1 || events[1].DeviceIDs[0] != "d1" {
+				t.Fatalf("event1 device IDs = %+v, want [d1]", events[1].DeviceIDs)
+			}
+			if len(classifier.capturedBuf) != 0 {
+				t.Fatalf("expected silence source to immediately EOF, got bytes = %d", len(classifier.capturedBuf))
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	t.Fatalf("expected audio monitor detection notification; events = %+v", broadcaster.Events())
+}
+
+func TestRuntimeAudioMonitorIgnoresNonMatchingEvents(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	classifier := &testSoundClassifier{events: []SoundEvent{{Label: "microwave_beep", Confidence: 0.9, AtMS: 101}}}
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &AudioMonitorScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+		Sound:     classifier,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "audio_monitor",
+		Arguments: map[string]string{
+			"target": "dishwasher",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(audio_monitor) error = %v", err)
+	}
+
+	time.Sleep(40 * time.Millisecond)
+	events := broadcaster.Events()
+	if len(events) != 1 {
+		t.Fatalf("event count = %d, want 1 (armed only)", len(events))
+	}
+	if events[0].Message != "Audio monitor armed: dishwasher" {
+		t.Fatalf("event0 message = %q, want Audio monitor armed: dishwasher", events[0].Message)
+	}
 }
 
 func (t *testAIBackend) Query(_ context.Context, input string) (string, error) {
@@ -33,6 +118,23 @@ func (t *testTelephonyBridge) Call(_ context.Context, target string) error {
 
 func (t *testTelephonyBridge) Hangup(context.Context, string) error {
 	return nil
+}
+
+type testSoundClassifier struct {
+	events      []SoundEvent
+	capturedBuf []byte
+}
+
+func (t *testSoundClassifier) Classify(_ context.Context, audio AudioSource) (SoundEventStream, error) {
+	if audio != nil {
+		t.capturedBuf, _ = io.ReadAll(audio)
+	}
+	out := make(chan SoundEvent, len(t.events))
+	for _, event := range t.events {
+		out <- event
+	}
+	close(out)
+	return out, nil
 }
 
 func TestRuntimeHandleTrigger(t *testing.T) {
