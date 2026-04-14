@@ -47,6 +47,8 @@ func main() {
 		IO:        ioRouter,
 		AI:        ai.LLMQueryAdapter{LLM: aiBackends.LLM},
 		LLM:       scenarioLLM{backend: aiBackends.LLM},
+		Vision:    scenarioVisionAnalyzer{backend: aiBackends.Vision},
+		Sound:     scenarioSoundClassifier{backend: aiBackends.Sound},
 		STT:       scenarioSTT{backend: aiBackends.STT},
 		WakeWord:  scenario.PrefixWakeWordDetector{Prefixes: cfg.WakeWordPrefixes},
 		TTS:       scenarioTTS{backend: aiBackends.TTS},

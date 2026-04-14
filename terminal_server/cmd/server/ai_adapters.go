@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"image"
 	"io"
 
 	"github.com/curtcox/terminals/terminal_server/internal/ai"
@@ -105,4 +106,54 @@ func (a audioPlaybackReader) Read(p []byte) (int, error) {
 		return 0, io.EOF
 	}
 	return a.r.Read(p)
+}
+
+// scenarioVisionAnalyzer adapts an ai.VisionAnalyzer to scenario.VisionAnalyzer.
+type scenarioVisionAnalyzer struct {
+	backend ai.VisionAnalyzer
+}
+
+func (a scenarioVisionAnalyzer) Analyze(
+	ctx context.Context,
+	frame image.Image,
+	prompt string,
+) (*scenario.VisionAnalysis, error) {
+	resp, err := a.backend.Analyze(ctx, frame, prompt)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, nil
+	}
+	labels := make([]string, len(resp.Labels))
+	copy(labels, resp.Labels)
+	return &scenario.VisionAnalysis{Caption: resp.Caption, Labels: labels}, nil
+}
+
+// scenarioSoundClassifier adapts an ai.SoundClassifier to scenario.SoundClassifier.
+type scenarioSoundClassifier struct {
+	backend ai.SoundClassifier
+}
+
+func (a scenarioSoundClassifier) Classify(
+	ctx context.Context,
+	audio scenario.AudioSource,
+) (scenario.SoundEventStream, error) {
+	reader := audioSourceReader{src: audio}
+	ch, err := a.backend.Classify(ctx, reader)
+	if err != nil {
+		return nil, err
+	}
+	out := make(chan scenario.SoundEvent)
+	go func() {
+		defer close(out)
+		for event := range ch {
+			out <- scenario.SoundEvent{
+				Label:      event.Label,
+				Confidence: event.Confidence,
+				AtMS:       event.AtMS,
+			}
+		}
+	}()
+	return out, nil
 }

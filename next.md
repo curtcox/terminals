@@ -1,1 +1,1 @@
-Add `SoundClassifier` and `VisionAnalyzer` to `terminal_server/internal/scenario` environment interfaces, wire adapters in `cmd/server`, and add focused tests so Phase 5 AI capability interfaces are fully represented.
+Implement the first Phase 6 slice: add an `AudioMonitorScenario` path that starts a `SoundClassifier` stream for a target sound and emits a notification when the condition is detected, with focused integration tests.

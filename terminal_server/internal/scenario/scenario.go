@@ -1,6 +1,9 @@
 package scenario
 
-import "context"
+import (
+	"context"
+	"image"
+)
 
 // TriggerKind identifies how a scenario was requested.
 type TriggerKind string
@@ -122,6 +125,32 @@ type AudioPlayback interface {
 	Read(p []byte) (int, error)
 }
 
+// VisionAnalysis describes the result of analyzing a single frame.
+type VisionAnalysis struct {
+	Caption string
+	Labels  []string
+}
+
+// VisionAnalyzer interprets images.
+type VisionAnalyzer interface {
+	Analyze(ctx context.Context, frame image.Image, prompt string) (*VisionAnalysis, error)
+}
+
+// SoundEvent describes a classified audio event.
+type SoundEvent struct {
+	Label      string
+	Confidence float64
+	AtMS       int64
+}
+
+// SoundEventStream delivers sound classification events as they become available.
+type SoundEventStream <-chan SoundEvent
+
+// SoundClassifier streams classified events from audio input.
+type SoundClassifier interface {
+	Classify(ctx context.Context, audio AudioSource) (SoundEventStream, error)
+}
+
 // TelephonyBridge exposes external call controls.
 type TelephonyBridge interface {
 	Call(ctx context.Context, target string) error
@@ -152,6 +181,8 @@ type Environment struct {
 	IO        IORouter
 	AI        AIBackend
 	LLM       LLM
+	Vision    VisionAnalyzer
+	Sound     SoundClassifier
 	STT       SpeechToText
 	WakeWord  WakeWordDetector
 	TTS       TextToSpeech
