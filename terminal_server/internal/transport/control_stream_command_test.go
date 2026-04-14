@@ -2544,6 +2544,9 @@ func TestHandleMessageManualPlaybackMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("manual playback_metadata error = %v", err)
 	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2 (command result + play audio)", len(out))
+	}
 	if out[0].Notification != "Playback metadata ready" {
 		t.Fatalf("notification = %q, want playback metadata ready", out[0].Notification)
 	}
@@ -2558,6 +2561,74 @@ func TestHandleMessageManualPlaybackMetadata(t *testing.T) {
 	}
 	if out[0].CommandAck != "manual-playback-metadata" {
 		t.Fatalf("CommandAck = %q, want manual-playback-metadata", out[0].CommandAck)
+	}
+	if out[1].PlayAudio == nil {
+		t.Fatalf("expected PlayAudio response")
+	}
+	if out[1].PlayAudio.DeviceID != "hall-display" {
+		t.Fatalf("PlayAudio.DeviceID = %q, want hall-display", out[1].PlayAudio.DeviceID)
+	}
+	if out[1].PlayAudio.Format != "pcm16" {
+		t.Fatalf("PlayAudio.Format = %q, want pcm16", out[1].PlayAudio.Format)
+	}
+	if out[1].RelayToDeviceID != "hall-display" {
+		t.Fatalf("RelayToDeviceID = %q, want hall-display", out[1].RelayToDeviceID)
+	}
+	if string(out[1].PlayAudio.Audio) != string([]byte{0xAA, 0xBB, 0xCC}) {
+		t.Fatalf("PlayAudio.Audio = %v, want %v", out[1].PlayAudio.Audio, []byte{0xAA, 0xBB, 0xCC})
+	}
+}
+
+func TestHandleMessageManualPlaybackMetadataDefaultsTargetToCaller(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	recorder, err := recording.NewDiskManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	handler.SetRecordingManager(recorder)
+	if err := recorder.Start(context.Background(), recording.Stream{
+		StreamID:       "route:device-z|device-y|audio",
+		Kind:           "audio",
+		SourceDeviceID: "device-z",
+		TargetDeviceID: "device-y",
+	}); err != nil {
+		t.Fatalf("recorder.Start() error = %v", err)
+	}
+	if err := recorder.WriteDeviceAudio("device-z", []byte{0x01, 0x02, 0x03, 0x04}); err != nil {
+		t.Fatalf("recorder.WriteDeviceAudio() error = %v", err)
+	}
+	if err := recorder.Stop(context.Background(), "route:device-z|device-y|audio"); err != nil {
+		t.Fatalf("recorder.Stop() error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "manual-playback-default-target",
+			DeviceID:  "device-z",
+			Kind:      "manual",
+			Intent:    ManualIntentPlaybackMetadata,
+			Arguments: map[string]string{
+				"artifact_id": "route:device-z|device-y|audio",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual playback_metadata default target error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[1].PlayAudio == nil {
+		t.Fatalf("expected PlayAudio response")
+	}
+	if out[1].PlayAudio.DeviceID != "device-z" {
+		t.Fatalf("PlayAudio.DeviceID = %q, want device-z", out[1].PlayAudio.DeviceID)
+	}
+	if out[1].RelayToDeviceID != "" {
+		t.Fatalf("RelayToDeviceID = %q, want empty for local playback", out[1].RelayToDeviceID)
 	}
 }
 

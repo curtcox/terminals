@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -839,6 +840,10 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		responses = append(responses, refresh)
 		return responses
 	}
+	if playback, ok := h.commandPlaybackDispatch(cmd, commandResult); ok {
+		responses = append(responses, playback)
+		return responses
+	}
 	if commandResult.ScenarioStop == "terminal" {
 		h.terminateTerminalForDevice(cmd.DeviceID)
 		responses = append(responses, ServerMessage{
@@ -978,6 +983,51 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		},
 	})
 	return responses
+}
+
+func (h *StreamHandler) commandPlaybackDispatch(cmd *CommandRequest, commandResult ServerMessage) (ServerMessage, bool) {
+	if cmd == nil {
+		return ServerMessage{}, false
+	}
+	kind := strings.TrimSpace(cmd.Kind)
+	if kind == "" {
+		kind = CommandKindManual
+	}
+	if kind != CommandKindManual {
+		return ServerMessage{}, false
+	}
+	if defaultAction(cmd.Action) != CommandActionStart {
+		return ServerMessage{}, false
+	}
+	if strings.TrimSpace(cmd.Intent) != ManualIntentPlaybackMetadata {
+		return ServerMessage{}, false
+	}
+	audioPath := strings.TrimSpace(commandResult.Data["audio_path"])
+	targetDeviceID := strings.TrimSpace(commandResult.Data["target_device_id"])
+	if audioPath == "" || targetDeviceID == "" {
+		return ServerMessage{}, false
+	}
+	audio, err := os.ReadFile(audioPath)
+	if err != nil || len(audio) == 0 {
+		return ServerMessage{}, false
+	}
+
+	format := strings.TrimSpace(commandResult.Data["format"])
+	if format == "" {
+		format = "pcm16"
+	}
+	playAudio := ServerMessage{
+		PlayAudio: &PlayAudioResponse{
+			RequestID: cmd.RequestID,
+			DeviceID:  targetDeviceID,
+			Audio:     audio,
+			Format:    format,
+		},
+	}
+	if targetDeviceID != strings.TrimSpace(cmd.DeviceID) {
+		playAudio.RelayToDeviceID = targetDeviceID
+	}
+	return playAudio, true
 }
 
 func (h *StreamHandler) routeUpdatesForCommand(
@@ -2763,6 +2813,7 @@ func (h *StreamHandler) playbackMetadataForTarget(artifactID, targetDeviceID str
 		"source_device_id": metadata.Artifact.SourceDeviceID,
 		"target_device_id": metadata.TargetDeviceID,
 		"audio_path":       metadata.Artifact.AudioPath,
+		"format":           "pcm16",
 		"size_bytes":       strconv.FormatInt(metadata.Artifact.SizeBytes, 10),
 		"updated_unix_ms":  strconv.FormatInt(metadata.Artifact.UpdatedUnixMS, 10),
 	}, true

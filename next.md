@@ -1,1 +1,1 @@
-Implement playback dispatch scaffolding: add a manual command that uses playback metadata to send a PlayAudio response to the requested target device.
+Implement client playback handling: process PlayAudio responses in terminal_client, track last playback status, and cover with widget tests.
