@@ -186,13 +186,18 @@ func TestSilenceClassifierCanceledContextStopsImmediately(t *testing.T) {
 	}
 	// Stream should close without emitting.
 	done := make(chan struct{})
+	drained := 0
 	go func() {
 		for range stream {
+			drained++
 		}
 		close(done)
 	}()
 	select {
 	case <-done:
+		if drained != 0 {
+			t.Fatalf("received %d events, want none", drained)
+		}
 	case <-time.After(500 * time.Millisecond):
 		t.Fatalf("expected stream to close on canceled context")
 	}

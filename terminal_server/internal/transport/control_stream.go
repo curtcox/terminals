@@ -461,8 +461,27 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		return nil, nil
 	case msg.Sensor != nil:
 		h.metrics.sensorReceived.Add(1)
+		beforeBroadcastEvents := h.broadcastEventCount()
 		h.recordSensorData(msg.Sensor)
-		return nil, nil
+		if h.runtime != nil {
+			values := map[string]float64{}
+			for key, value := range msg.Sensor.Values {
+				values[key] = value
+			}
+			if err := h.runtime.ProcessSensorReading(ctx, scenario.SensorReading{
+				DeviceID: strings.TrimSpace(msg.Sensor.DeviceID),
+				UnixMS:   msg.Sensor.UnixMS,
+				Values:   values,
+			}); err != nil {
+				h.metrics.protocolErrors.Add(1)
+				return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
+			}
+		}
+		out := h.broadcastNotificationsSince(beforeBroadcastEvents, msg.Sensor.DeviceID, true)
+		if len(out) == 0 {
+			return nil, nil
+		}
+		return out, nil
 	case msg.StreamReady != nil:
 		h.metrics.streamReadyReceived.Add(1)
 		h.markStreamReady(msg.StreamReady.StreamID)
@@ -603,6 +622,14 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 	if commandResult.ScenarioStart == "" && commandResult.ScenarioStop == "" {
 		return nil
 	}
+	return h.broadcastNotificationsSince(beforeCount, cmd.DeviceID, false)
+}
+
+func (h *StreamHandler) broadcastNotificationsSince(
+	beforeCount int,
+	sessionDeviceID string,
+	includeSession bool,
+) []ServerMessage {
 	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.Broadcast == nil {
 		return nil
 	}
@@ -624,8 +651,8 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 		return nil
 	}
 
+	trimmedSessionDeviceID := strings.TrimSpace(sessionDeviceID)
 	out := make([]ServerMessage, 0, len(newEvents))
-	sessionDeviceID := strings.TrimSpace(cmd.DeviceID)
 	for _, event := range newEvents {
 		if len(event.DeviceIDs) == 0 {
 			continue
@@ -635,21 +662,28 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 			if targetDeviceID == "" {
 				continue
 			}
-			if targetDeviceID == sessionDeviceID {
+			if targetDeviceID == trimmedSessionDeviceID && !includeSession {
 				continue
 			}
-			out = append(out, ServerMessage{
-				Notification:    event.Message,
-				RelayToDeviceID: targetDeviceID,
-			})
+			msg := ServerMessage{
+				Notification: event.Message,
+			}
+			if targetDeviceID != trimmedSessionDeviceID {
+				msg.RelayToDeviceID = targetDeviceID
+			}
+			out = append(out, msg)
+
 			if strings.HasPrefix(event.Message, "PA from ") {
-				out = append(out, ServerMessage{
+				overlayMsg := ServerMessage{
 					UpdateUI: &UIUpdate{
 						ComponentID: ui.GlobalOverlayComponentID,
 						Node:        ui.PAReceiverOverlayPatch(event.Message),
 					},
-					RelayToDeviceID: targetDeviceID,
-				})
+				}
+				if targetDeviceID != trimmedSessionDeviceID {
+					overlayMsg.RelayToDeviceID = targetDeviceID
+				}
+				out = append(out, overlayMsg)
 			}
 		}
 	}

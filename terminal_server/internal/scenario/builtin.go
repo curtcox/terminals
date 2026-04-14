@@ -4,7 +4,9 @@ package scenario
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -512,6 +514,9 @@ func audioMonitorEventMatchesTarget(target, label string) bool {
 // ScheduleMonitorScenario schedules a check and confirms activation.
 type ScheduleMonitorScenario struct {
 	trigger Trigger
+
+	mu              sync.Mutex
+	lastAlertUnixMS int64
 }
 
 // Name returns the stable scenario identifier.
@@ -542,11 +547,81 @@ func (s *ScheduleMonitorScenario) Start(ctx context.Context, env *Environment) e
 			return err
 		}
 	}
+	s.mu.Lock()
+	s.lastAlertUnixMS = 0
+	s.mu.Unlock()
 	return notifySource(ctx, env, s.trigger.SourceID, "Schedule monitor active")
 }
 
 // Stop ends schedule monitor mode and currently has no side effects.
 func (s *ScheduleMonitorScenario) Stop() error { return nil }
+
+// HandleSensor consumes live sensor telemetry while schedule monitoring is
+// active and raises an activity alert when movement exceeds threshold.
+func (s *ScheduleMonitorScenario) HandleSensor(ctx context.Context, env *Environment, reading SensorReading) error {
+	if env == nil || env.Broadcast == nil {
+		return nil
+	}
+	if strings.TrimSpace(reading.DeviceID) == "" {
+		return nil
+	}
+	monitorDeviceID := strings.TrimSpace(s.trigger.SourceID)
+	if monitorDeviceID != "" && reading.DeviceID != monitorDeviceID {
+		return nil
+	}
+
+	magnitude, ok := sensorMotionMagnitude(reading.Values)
+	if !ok {
+		return nil
+	}
+	threshold := parseFloatOrDefault(s.trigger.Arguments["motion_threshold"], 1.20)
+	if magnitude < threshold {
+		return nil
+	}
+
+	eventUnixMS := reading.UnixMS
+	if eventUnixMS <= 0 {
+		eventUnixMS = time.Now().UnixMilli()
+	}
+	cooldownMS := int64(parseFloatOrDefault(s.trigger.Arguments["cooldown_ms"], 60_000))
+	if cooldownMS < 0 {
+		cooldownMS = 0
+	}
+
+	s.mu.Lock()
+	if s.lastAlertUnixMS > 0 && eventUnixMS-s.lastAlertUnixMS < cooldownMS {
+		s.mu.Unlock()
+		return nil
+	}
+	s.lastAlertUnixMS = eventUnixMS
+	s.mu.Unlock()
+
+	return notifySource(ctx, env, reading.DeviceID, fmt.Sprintf("Schedule monitor activity detected: magnitude=%.2f", magnitude))
+}
+
+func parseFloatOrDefault(raw string, fallback float64) float64 {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func sensorMotionMagnitude(values map[string]float64) (float64, bool) {
+	if len(values) == 0 {
+		return 0, false
+	}
+	if scalar, ok := values["motion.magnitude"]; ok {
+		return math.Abs(scalar), true
+	}
+	x, hasX := values["accelerometer.x"]
+	y, hasY := values["accelerometer.y"]
+	z, hasZ := values["accelerometer.z"]
+	if hasX || hasY || hasZ {
+		return math.Sqrt((x * x) + (y * y) + (z * z)), true
+	}
+	return 0, false
+}
 
 // PASystemScenario fans out source audio to peers with PA semantics.
 type PASystemScenario struct {

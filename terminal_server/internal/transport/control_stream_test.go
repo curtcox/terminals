@@ -6,6 +6,11 @@ import (
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/scenario"
+	"github.com/curtcox/terminals/terminal_server/internal/storage"
+	"github.com/curtcox/terminals/terminal_server/internal/telephony"
+	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
 func TestHandleMessageRegisterSendsAckAndUI(t *testing.T) {
@@ -115,6 +120,64 @@ func TestHandleMessageSensorAndStreamReady(t *testing.T) {
 	}
 	if len(out) != 0 {
 		t.Fatalf("len(stream_ready out) = %d, want 0", len(out))
+	}
+}
+
+func TestHandleMessageSensorTriggersActiveScenarioHook(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-schedule-monitor",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "schedule monitor",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(command schedule monitor) error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Sensor: &SensorDataRequest{
+			DeviceID: "device-1",
+			UnixMS:   1713000000000,
+			Values: map[string]float64{
+				"motion.magnitude": 1.8,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(sensor) error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(sensor out) = %d, want 1", len(out))
+	}
+	if out[0].Notification != "Schedule monitor activity detected: magnitude=1.80" {
+		t.Fatalf("notification = %q, want schedule monitor activity notification", out[0].Notification)
+	}
+	if out[0].RelayToDeviceID != "" {
+		t.Fatalf("RelayToDeviceID = %q, want empty for local notification", out[0].RelayToDeviceID)
 	}
 }
 

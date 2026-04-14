@@ -1,1 +1,1 @@
-Implement Phase 7 sensor data streaming scenario hook(s) that consume existing SensorData telemetry for actionable behavior.
+Implement explicit Suspend/Resume lifecycle ownership for intercom and PA scenarios (resolve Phase 7 TODOs in builtin.go).

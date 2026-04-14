@@ -167,6 +167,19 @@ type SoundClassifier interface {
 	Classify(ctx context.Context, audio AudioSource) (SoundEventStream, error)
 }
 
+// SensorReading is one telemetry snapshot produced by a device client.
+type SensorReading struct {
+	DeviceID string
+	UnixMS   int64
+	Values   map[string]float64
+}
+
+// SensorConsumer is an optional hook implemented by scenarios that consume
+// device telemetry snapshots while active.
+type SensorConsumer interface {
+	HandleSensor(ctx context.Context, env *Environment, reading SensorReading) error
+}
+
 // TelephonyBridge exposes external call controls.
 type TelephonyBridge interface {
 	Call(ctx context.Context, target string) error

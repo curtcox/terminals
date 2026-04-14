@@ -64,6 +64,23 @@ func (r *Runtime) StopVoiceText(ctx context.Context, sourceID, spoken string, no
 	return r.StopTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
 }
 
+// ProcessSensorReading dispatches telemetry snapshots to the active scenario
+// for the source device when that scenario declares SensorConsumer support.
+func (r *Runtime) ProcessSensorReading(ctx context.Context, reading SensorReading) error {
+	if r == nil || r.Engine == nil || r.Env == nil {
+		return nil
+	}
+	activeScenario, ok := r.Engine.ActiveScenario(strings.TrimSpace(reading.DeviceID))
+	if !ok {
+		return nil
+	}
+	consumer, ok := activeScenario.(SensorConsumer)
+	if !ok {
+		return nil
+	}
+	return consumer.HandleSensor(ctx, r.Env, reading)
+}
+
 // StatusData returns runtime-focused counters for control-plane system queries.
 func (r *Runtime) StatusData() map[string]string {
 	activeScenarios := 0

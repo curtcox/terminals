@@ -186,6 +186,17 @@ func (e *Engine) Active(deviceID string) (string, bool) {
 	return active.name, true
 }
 
+// ActiveScenario returns the active scenario instance for a device.
+func (e *Engine) ActiveScenario(deviceID string) (Scenario, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	active, ok := e.activeByDev[deviceID]
+	if !ok || active.scenario == nil {
+		return nil, false
+	}
+	return active.scenario, true
+}
+
 // ActiveSnapshot returns a copy of active scenario names keyed by device id.
 func (e *Engine) ActiveSnapshot() map[string]string {
 	e.mu.Lock()

@@ -325,6 +325,108 @@ func TestRuntimeAudioMonitorVoiceTriggerArmsWithParsedTarget(t *testing.T) {
 	}
 }
 
+func TestRuntimeScheduleMonitorSensorHookNotifiesOnMotion(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &ScheduleMonitorScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "schedule_monitor",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(schedule_monitor) error = %v", err)
+	}
+
+	err := runtime.ProcessSensorReading(context.Background(), SensorReading{
+		DeviceID: "d1",
+		UnixMS:   1713000000000,
+		Values: map[string]float64{
+			"accelerometer.x": 0.9,
+			"accelerometer.y": 0.9,
+			"accelerometer.z": 0.9,
+		},
+	})
+	if err != nil {
+		t.Fatalf("ProcessSensorReading() error = %v", err)
+	}
+
+	events := broadcaster.Events()
+	if len(events) != 2 {
+		t.Fatalf("event count = %d, want 2", len(events))
+	}
+	if events[0].Message != "Schedule monitor active" {
+		t.Fatalf("arming message = %q, want Schedule monitor active", events[0].Message)
+	}
+	if events[1].Message != "Schedule monitor activity detected: magnitude=1.56" {
+		t.Fatalf("activity message = %q, want motion detection", events[1].Message)
+	}
+	if len(events[1].DeviceIDs) != 1 || events[1].DeviceIDs[0] != "d1" {
+		t.Fatalf("activity device IDs = %+v, want [d1]", events[1].DeviceIDs)
+	}
+}
+
+func TestRuntimeScheduleMonitorSensorHookRespectsCooldown(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &ScheduleMonitorScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "schedule_monitor",
+		Arguments: map[string]string{
+			"cooldown_ms": "60000",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(schedule_monitor) error = %v", err)
+	}
+
+	first := SensorReading{
+		DeviceID: "d1",
+		UnixMS:   1713000000000,
+		Values: map[string]float64{
+			"motion.magnitude": 2.0,
+		},
+	}
+	second := SensorReading{
+		DeviceID: "d1",
+		UnixMS:   1713000005000, // 5s later, still within cooldown.
+		Values: map[string]float64{
+			"motion.magnitude": 3.0,
+		},
+	}
+
+	if err := runtime.ProcessSensorReading(context.Background(), first); err != nil {
+		t.Fatalf("ProcessSensorReading(first) error = %v", err)
+	}
+	if err := runtime.ProcessSensorReading(context.Background(), second); err != nil {
+		t.Fatalf("ProcessSensorReading(second) error = %v", err)
+	}
+
+	events := broadcaster.Events()
+	if len(events) != 2 {
+		t.Fatalf("event count = %d, want 2 (armed + first detection)", len(events))
+	}
+	if events[1].Message != "Schedule monitor activity detected: magnitude=2.00" {
+		t.Fatalf("detection message = %q, want first detection magnitude", events[1].Message)
+	}
+}
+
 func (t *testAIBackend) Query(_ context.Context, input string) (string, error) {
 	t.lastInput = input
 	return t.response, nil
