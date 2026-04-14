@@ -101,6 +101,68 @@ func PAReceiverOverlayPatch(message string) Descriptor {
 	})))
 }
 
+// VoiceAssistantResponseView renders a focused voice-assistant response screen.
+func VoiceAssistantResponseView(deviceID, prompt, response string) Descriptor {
+	prompt = "You said: " + prompt
+	if prompt == "You said: " {
+		prompt = "You said: (no prompt captured)"
+	}
+	if response == "" {
+		response = "No response available"
+	}
+
+	return New("stack", map[string]string{
+		"id":         "voice_assistant_response_root",
+		"background": "#0D1220",
+	}, New("text", map[string]string{
+		"id":    "voice_assistant_response_title",
+		"value": "Voice assistant",
+		"style": "headline",
+		"color": "#E7F0F7",
+	}), New("text", map[string]string{
+		"id":    "voice_assistant_response_device",
+		"value": "Device: " + deviceID,
+		"style": "body",
+		"color": "#9CB4CF",
+	}), New("stack", map[string]string{
+		"id":         "voice_assistant_response_card",
+		"background": "#131D33",
+	}, New("text", map[string]string{
+		"id":    "voice_assistant_response_prompt",
+		"value": prompt,
+		"style": "body",
+		"color": "#CFE1F2",
+	}), New("text", map[string]string{
+		"id":    "voice_assistant_response_text",
+		"value": response,
+		"style": "headline",
+		"color": "#FFFFFF",
+	})), GlobalOverlaySlot())
+}
+
+// VoiceAssistantResponsePatch returns a global overlay patch with assistant text.
+func VoiceAssistantResponsePatch(response string) Descriptor {
+	if response == "" {
+		response = "No response available"
+	}
+	return New("overlay", map[string]string{
+		"id": GlobalOverlayComponentID,
+	}, New("stack", map[string]string{
+		"id":         "voice_assistant_response_overlay",
+		"background": "#131D33",
+	}, New("text", map[string]string{
+		"id":    "voice_assistant_response_overlay_title",
+		"value": "Assistant reply",
+		"style": "headline",
+		"color": "#E7F0F7",
+	}), New("text", map[string]string{
+		"id":    "voice_assistant_response_overlay_text",
+		"value": response,
+		"style": "body",
+		"color": "#FFFFFF",
+	})))
+}
+
 // InternalVideoCallView renders a two-surface video call layout with controls.
 func InternalVideoCallView(sourceDeviceID, targetDeviceID string) Descriptor {
 	remoteTrackID := "route:" + targetDeviceID + "|" + sourceDeviceID + "|video"

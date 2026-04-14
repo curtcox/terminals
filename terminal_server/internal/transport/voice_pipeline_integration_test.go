@@ -97,8 +97,8 @@ func (p playback) Read(buf []byte) (int, error) {
 //   - The STT fake consumed the buffered mic audio.
 //   - The LLM fake received the transcribed user prompt.
 //   - The TTS fake synthesized the LLM response.
-//   - The server emitted a PlayAudio response targeting the source device
-//     with the TTS-generated audio bytes.
+//   - The server emitted both a rich response SetUI descriptor and a
+//     PlayAudio response targeting the source device with the synthesized bytes.
 func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 	stt := &pipelineSTT{transcribed: "assistant what is the weather"}
 	llm := &pipelineLLM{response: "It is sunny in Test City"}
@@ -191,12 +191,16 @@ func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 		t.Fatalf("TTS calls = %+v, want single synthesis of LLM response", tts.calls)
 	}
 
-	// The control stream must reply with the TTS audio as a PlayAudio message.
+	// The control stream must reply with both rich response UI and TTS audio.
 	var play *PlayAudioResponse
+	var setUI *ui.Descriptor
 	sawAssistantStart := false
 	for _, msg := range out {
 		if msg.ScenarioStart == "voice_assistant" {
 			sawAssistantStart = true
+		}
+		if msg.SetUI != nil {
+			setUI = msg.SetUI
 		}
 		if msg.PlayAudio != nil {
 			play = msg.PlayAudio
@@ -204,6 +208,12 @@ func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 	}
 	if !sawAssistantStart {
 		t.Fatalf("expected voice_assistant scenario start, got %+v", out)
+	}
+	if setUI == nil {
+		t.Fatalf("expected SetUI rich response, got %+v", out)
+	}
+	if !descriptorContainsValue(*setUI, "It is sunny in Test City") {
+		t.Fatalf("SetUI descriptor does not include LLM response text: %+v", *setUI)
 	}
 	if play == nil {
 		t.Fatalf("expected PlayAudio reply, got %+v", out)
@@ -215,7 +225,63 @@ func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 		t.Fatalf("PlayAudio.Audio = % x, want % x", play.Audio, []byte{0x01, 0x02, 0x03, 0x04})
 	}
 	if play.Format == "" {
-		t.Fatalf("PlayAudio.Format is empty")
+		t.Fatalf("PlayAudio.Format should be set")
+	}
+}
+
+func TestControlStreamVoiceAudioWithoutTTSEmitsRichResponseUI(t *testing.T) {
+	stt := &pipelineSTT{transcribed: "assistant what is the weather"}
+	llm := &pipelineLLM{response: "It is sunny in Test City"}
+
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        iorouter.NewRouter(),
+		LLM:       llm,
+		STT:       stt,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	}); err != nil {
+		t.Fatalf("register error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		VoiceAudio: &VoiceAudioRequest{
+			DeviceID:   "device-1",
+			Audio:      []byte("encoded-mic-audio"),
+			SampleRate: 16000,
+			IsFinal:    true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(final voice_audio) error = %v", err)
+	}
+
+	var setUI *ui.Descriptor
+	for _, msg := range out {
+		if msg.SetUI != nil {
+			setUI = msg.SetUI
+		}
+		if msg.PlayAudio != nil {
+			t.Fatalf("expected no PlayAudio when TTS backend is not configured, got %+v", msg.PlayAudio)
+		}
+	}
+	if setUI == nil {
+		t.Fatalf("expected SetUI rich response when TTS unavailable, got %+v", out)
+	}
+	if !descriptorContainsValue(*setUI, "It is sunny in Test City") {
+		t.Fatalf("SetUI descriptor does not include LLM response text: %+v", *setUI)
 	}
 }
 
@@ -324,4 +390,16 @@ func TestControlStreamVoiceAudioSurfacesLLMError(t *testing.T) {
 	if !strings.Contains(err.Error(), "llm offline") {
 		t.Fatalf("error = %v, want contains llm offline", err)
 	}
+}
+
+func descriptorContainsValue(node ui.Descriptor, value string) bool {
+	if node.Props["value"] == value {
+		return true
+	}
+	for _, child := range node.Children {
+		if descriptorContainsValue(child, value) {
+			return true
+		}
+	}
+	return false
 }

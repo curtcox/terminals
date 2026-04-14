@@ -76,6 +76,51 @@ func TestPAReceiverOverlayPatch(t *testing.T) {
 	}
 }
 
+func TestVoiceAssistantResponseViewEmbedsPromptAndResponse(t *testing.T) {
+	d := VoiceAssistantResponseView("device-1", "what is the weather", "It is sunny in Test City")
+	if d.Type != "stack" {
+		t.Fatalf("Type = %q, want stack", d.Type)
+	}
+
+	var promptValue string
+	var responseValue string
+	for _, child := range d.Children {
+		if child.Props["id"] != "voice_assistant_response_card" {
+			continue
+		}
+		for _, grandchild := range child.Children {
+			switch grandchild.Props["id"] {
+			case "voice_assistant_response_prompt":
+				promptValue = grandchild.Props["value"]
+			case "voice_assistant_response_text":
+				responseValue = grandchild.Props["value"]
+			}
+		}
+	}
+	if promptValue != "You said: what is the weather" {
+		t.Fatalf("prompt = %q, want user prompt", promptValue)
+	}
+	if responseValue != "It is sunny in Test City" {
+		t.Fatalf("response = %q, want assistant response", responseValue)
+	}
+}
+
+func TestVoiceAssistantResponsePatchEmbedsResponse(t *testing.T) {
+	d := VoiceAssistantResponsePatch("It is sunny in Test City")
+	if d.Type != "overlay" {
+		t.Fatalf("Type = %q, want overlay", d.Type)
+	}
+	if d.Props["id"] != GlobalOverlayComponentID {
+		t.Fatalf("id = %q, want %q", d.Props["id"], GlobalOverlayComponentID)
+	}
+	if len(d.Children) == 0 || len(d.Children[0].Children) < 2 {
+		t.Fatalf("overlay shape unexpected: %+v", d)
+	}
+	if got := d.Children[0].Children[1].Props["value"]; got != "It is sunny in Test City" {
+		t.Fatalf("overlay response = %q, want assistant response", got)
+	}
+}
+
 func TestMultiWindowViewUsesAdaptiveGridAndFocusActions(t *testing.T) {
 	d := MultiWindowView("viewer", []string{"cam-a", "cam-b", "cam-c"}, "cam-b")
 	if d.Type != "stack" {

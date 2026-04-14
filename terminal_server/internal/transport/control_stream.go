@@ -586,7 +586,7 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 				continue
 			}
 			out = append(out, ServerMessage{
-				Notification:   event.Message,
+				Notification:    event.Message,
 				RelayToDeviceID: targetDeviceID,
 			})
 			if strings.HasPrefix(event.Message, "PA from ") {
@@ -1461,9 +1461,9 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 	}
 
 	trigger := scenario.Trigger{
-		Kind:     scenario.TriggerManual,
-		SourceID: deviceID,
-		Intent:   intent,
+		Kind:      scenario.TriggerManual,
+		SourceID:  deviceID,
+		Intent:    intent,
 		Arguments: triggerArgs,
 	}
 	if commandAction == CommandActionStop {
@@ -1824,7 +1824,14 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 	}
 
 	responseText := h.latestBroadcastForDevice(deviceID, beforeCount)
-	if responseText == "" || h.runtime.Env.TTS == nil {
+	if responseText == "" {
+		return out, nil
+	}
+	responseView := ui.VoiceAssistantResponseView(deviceID, spoken, responseText)
+	out = append(out, ServerMessage{
+		SetUI: &responseView,
+	})
+	if h.runtime.Env.TTS == nil {
 		return out, nil
 	}
 
