@@ -6,18 +6,25 @@ import (
 )
 
 type stubScenario struct {
-	name     string
-	match    bool
-	started  int
-	stopped  int
-	startErr error
-	stopErr  error
+	name      string
+	match     bool
+	started   int
+	stopped   int
+	suspended int
+	resumed   int
+	startErr  error
+	stopErr   error
 }
 
 func (s *stubScenario) Name() string                              { return s.name }
 func (s *stubScenario) Match(Trigger) bool                        { return s.match }
 func (s *stubScenario) Start(context.Context, *Environment) error { s.started++; return s.startErr }
 func (s *stubScenario) Stop() error                               { s.stopped++; return s.stopErr }
+func (s *stubScenario) Suspend() error                            { s.suspended++; return nil }
+func (s *stubScenario) Resume(context.Context, *Environment) error {
+	s.resumed++
+	return nil
+}
 
 func TestMatchChoosesHighestPriority(t *testing.T) {
 	e := NewEngine()
@@ -61,14 +68,20 @@ func TestActivatePreemptsLowerPriority(t *testing.T) {
 func TestStopResumesSuspended(t *testing.T) {
 	e := NewEngine()
 	normal := &stubScenario{name: "normal", match: true}
-	high := &stubScenario{name: "high", match: true}
+	critical := &stubScenario{name: "critical", match: true}
 	e.Register(Registration{Scenario: normal, Priority: PriorityNormal})
-	e.Register(Registration{Scenario: high, Priority: PriorityHigh})
+	e.Register(Registration{Scenario: critical, Priority: PriorityCritical})
 
 	_ = e.Activate(context.Background(), &Environment{}, "normal", []string{"device-1"})
-	_ = e.Activate(context.Background(), &Environment{}, "high", []string{"device-1"})
-	if err := e.Stop("high", []string{"device-1"}); err != nil {
-		t.Fatalf("Stop(high) error = %v", err)
+	_ = e.Activate(context.Background(), &Environment{}, "critical", []string{"device-1"})
+	if normal.suspended != 1 {
+		t.Fatalf("normal.Suspend calls = %d, want 1", normal.suspended)
+	}
+	if err := e.Stop(context.Background(), &Environment{}, "critical", []string{"device-1"}); err != nil {
+		t.Fatalf("Stop(critical) error = %v", err)
+	}
+	if normal.resumed != 1 {
+		t.Fatalf("normal.Resume calls = %d, want 1", normal.resumed)
 	}
 
 	active, ok := e.Active("device-1")

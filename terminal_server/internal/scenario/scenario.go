@@ -216,3 +216,15 @@ type Scenario interface {
 	Start(ctx context.Context, env *Environment) error
 	Stop() error
 }
+
+// Suspendable is an optional hook implemented by scenarios that need to
+// release live resources when a higher-priority scenario preempts their IO.
+type Suspendable interface {
+	Suspend() error
+}
+
+// Resumable is an optional hook implemented by scenarios that need to
+// reacquire resources after preemption is lifted.
+type Resumable interface {
+	Resume(ctx context.Context, env *Environment) error
+}

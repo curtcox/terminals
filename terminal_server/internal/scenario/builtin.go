@@ -196,6 +196,8 @@ func (s *IntercomScenario) Start(ctx context.Context, env *Environment) error {
 }
 
 // Stop ends intercom mode and currently has no side effects.
+// TODO(phase-7): evaluate Suspend/Resume hooks if intercom begins owning
+// long-lived subscriptions that must be explicitly torn down on preemption.
 func (s *IntercomScenario) Stop() error { return nil }
 
 // InternalVideoCallScenario connects source and target with bidirectional audio/video.
@@ -384,11 +386,66 @@ func (s *AudioMonitorScenario) Start(ctx context.Context, env *Environment) erro
 	if err := notifySource(ctx, env, s.trigger.SourceID, "Audio monitor armed: "+target); err != nil {
 		return err
 	}
-	if env.Sound == nil {
+	return s.startMonitorLoop(ctx, env, target, strings.TrimSpace(s.trigger.SourceID))
+}
+
+// openAudioMonitorSource returns a live audio source for the monitored
+// device, falling back to an immediate-EOF silence source when the runtime
+// is not configured with a DeviceAudioSubscriber or no source device is set.
+func openAudioMonitorSource(ctx context.Context, env *Environment, sourceID string) (AudioSource, func(), error) {
+	if env != nil && env.DeviceAudio != nil && sourceID != "" {
+		sub, err := env.DeviceAudio.SubscribeAudio(ctx, sourceID)
+		if err != nil {
+			return nil, nil, err
+		}
+		return sub, func() { _ = sub.Close() }, nil
+	}
+	return audioMonitorSilenceSource{}, func() {}, nil
+}
+
+// Stop ends monitor mode by canceling the active classifier goroutine and
+// releasing any live audio subscription opened in Start. Safe to call when
+// the scenario was never started or has already stopped.
+func (s *AudioMonitorScenario) Stop() error {
+	s.clearMonitorLoop()
+	return nil
+}
+
+// Suspend releases live monitor resources while the scenario is preempted.
+func (s *AudioMonitorScenario) Suspend() error {
+	s.clearMonitorLoop()
+	return nil
+}
+
+// Resume reacquires live monitor resources after preemption using the
+// original trigger target and source device.
+func (s *AudioMonitorScenario) Resume(ctx context.Context, env *Environment) error {
+	target := strings.TrimSpace(s.trigger.Arguments["target"])
+	if target == "" {
+		target = "sound"
+	}
+	return s.startMonitorLoop(ctx, env, target, strings.TrimSpace(s.trigger.SourceID))
+}
+
+func (s *AudioMonitorScenario) clearMonitorLoop() {
+	s.mu.Lock()
+	stop := s.stopFn
+	s.stopFn = nil
+	s.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
+}
+
+func (s *AudioMonitorScenario) startMonitorLoop(ctx context.Context, env *Environment, target, sourceID string) error {
+	if env == nil || env.Sound == nil {
 		return nil
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
-	sourceID := strings.TrimSpace(s.trigger.SourceID)
+	s.clearMonitorLoop()
 
 	audioCtx, cancelAudio := context.WithCancel(ctx)
 	audio, closeAudio, err := openAudioMonitorSource(audioCtx, env, sourceID)
@@ -431,34 +488,6 @@ func (s *AudioMonitorScenario) Start(ctx context.Context, env *Environment) erro
 		}
 	}()
 
-	return nil
-}
-
-// openAudioMonitorSource returns a live audio source for the monitored
-// device, falling back to an immediate-EOF silence source when the runtime
-// is not configured with a DeviceAudioSubscriber or no source device is set.
-func openAudioMonitorSource(ctx context.Context, env *Environment, sourceID string) (AudioSource, func(), error) {
-	if env != nil && env.DeviceAudio != nil && sourceID != "" {
-		sub, err := env.DeviceAudio.SubscribeAudio(ctx, sourceID)
-		if err != nil {
-			return nil, nil, err
-		}
-		return sub, func() { _ = sub.Close() }, nil
-	}
-	return audioMonitorSilenceSource{}, func() {}, nil
-}
-
-// Stop ends monitor mode by canceling the active classifier goroutine and
-// releasing any live audio subscription opened in Start. Safe to call when
-// the scenario was never started or has already stopped.
-func (s *AudioMonitorScenario) Stop() error {
-	s.mu.Lock()
-	stop := s.stopFn
-	s.stopFn = nil
-	s.mu.Unlock()
-	if stop != nil {
-		stop()
-	}
 	return nil
 }
 
@@ -558,6 +587,8 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 }
 
 // Stop ends PA mode and currently has no side effects.
+// TODO(phase-7): evaluate Suspend/Resume hooks if PA mode moves to explicit
+// resource ownership with lifecycle distinct from Start/Stop.
 func (s *PASystemScenario) Stop() error { return nil }
 
 // MultiWindowScenario routes all peer cameras to source display.

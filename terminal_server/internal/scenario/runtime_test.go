@@ -218,6 +218,69 @@ func TestRuntimeAudioMonitorStopReleasesSubscription(t *testing.T) {
 	}
 }
 
+func TestRuntimeAudioMonitorPreemptedByRedAlertSuspendsAndResumes(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	deviceAudio := newFakeDeviceAudio()
+	classifier := &testSoundClassifier{}
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &AudioMonitorScenario{}, Priority: PriorityNormal})
+	engine.Register(Registration{Scenario: AlertScenario{}, Priority: PriorityCritical})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:     devices,
+		Broadcast:   broadcaster,
+		Sound:       classifier,
+		DeviceAudio: deviceAudio,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "audio_monitor",
+		Arguments: map[string]string{
+			"target": "dishwasher",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(audio_monitor) error = %v", err)
+	}
+
+	if !waitFor(func() bool { return deviceAudio.subscriberCount("d1") == 1 }, 200*time.Millisecond) {
+		t.Fatalf("expected DeviceAudio subscriber count for d1 = 1, got %d", deviceAudio.subscriberCount("d1"))
+	}
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "red_alert",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(red_alert) error = %v", err)
+	}
+
+	if !waitFor(func() bool { return deviceAudio.subscriberCount("d1") == 0 }, 200*time.Millisecond) {
+		t.Fatalf("expected preemption to close audio monitor subscription, got %d", deviceAudio.subscriberCount("d1"))
+	}
+
+	if _, err := runtime.StopTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "red_alert",
+	}); err != nil {
+		t.Fatalf("StopTrigger(red_alert) error = %v", err)
+	}
+
+	if !waitFor(func() bool { return deviceAudio.subscriberCount("d1") == 1 }, 200*time.Millisecond) {
+		t.Fatalf("expected resume to re-open audio monitor subscription, got %d", deviceAudio.subscriberCount("d1"))
+	}
+
+	before := len(classifier.captured())
+	deviceAudio.publish("d1", []byte("post-resume-audio"))
+	if !waitFor(func() bool { return len(classifier.captured()) > before }, 300*time.Millisecond) {
+		t.Fatalf("classifier did not receive post-resume audio; captured = %q", string(classifier.captured()))
+	}
+}
+
 // TestRuntimeAudioMonitorVoiceTriggerArmsWithParsedTarget verifies that the
 // Phase-6 milestone phrasing ("tell me when the dishwasher stops") is parsed
 // by ParseVoiceTrigger and routed through the runtime to AudioMonitorScenario
