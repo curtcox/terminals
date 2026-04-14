@@ -133,12 +133,16 @@ func buildTelephonyBridge(ctx context.Context, cfg config.SIPConfig) (scenario.T
 		log.Printf("telephony bridge disabled; using noop bridge")
 		return telephony.NoopBridge{}, nil
 	}
-	bridge := telephony.NewSIPBridge(telephony.Registration{
-		ServerURI:   cfg.ServerURI,
-		Username:    cfg.Username,
-		DisplayName: cfg.DisplayName,
-		Password:    cfg.Password,
-	}, telephony.LogTransport{Logf: log.Printf})
+	bridge := telephony.NewSIPBridge(
+		telephony.Registration{
+			ServerURI:   cfg.ServerURI,
+			Username:    cfg.Username,
+			DisplayName: cfg.DisplayName,
+			Password:    cfg.Password,
+		},
+		telephony.LogTransport{Logf: log.Printf},
+		telephony.WithMediaTransport(telephony.LogMediaTransport{Logf: log.Printf}),
+	)
 	if err := bridge.Start(ctx); err != nil {
 		return nil, err
 	}

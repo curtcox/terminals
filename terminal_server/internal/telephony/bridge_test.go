@@ -306,6 +306,191 @@ func TestLogTransportPassesThroughSink(t *testing.T) {
 	}
 }
 
+type recordingMediaTransport struct {
+	mu             sync.Mutex
+	allocations    []Session
+	releases       []MediaPeer
+	failOnAllocate bool
+	failOnRelease  bool
+	stream         string
+	codec          string
+}
+
+func (m *recordingMediaTransport) Allocate(_ context.Context, session Session) (MediaPeer, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.failOnAllocate {
+		return MediaPeer{}, errors.New("allocate failed")
+	}
+	m.allocations = append(m.allocations, session)
+	stream := m.stream
+	if stream == "" {
+		stream = "sip:" + session.ID + ":audio"
+	}
+	codec := m.codec
+	if codec == "" {
+		codec = "opus"
+	}
+	return MediaPeer{SessionID: session.ID, StreamID: stream, Codec: codec}, nil
+}
+
+func (m *recordingMediaTransport) Release(_ context.Context, peer MediaPeer) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.failOnRelease {
+		return errors.New("release failed")
+	}
+	m.releases = append(m.releases, peer)
+	return nil
+}
+
+func TestSIPBridgeCallAllocatesMediaPeer(t *testing.T) {
+	tr := &recordingTransport{}
+	media := &recordingMediaTransport{}
+	bridge := NewSIPBridge(Registration{
+		ServerURI: "sip:home.example",
+		Username:  "alice",
+	}, tr, WithMediaTransport(media))
+	if err := bridge.Start(context.Background()); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	if err := bridge.Call(context.Background(), "5551212"); err != nil {
+		t.Fatalf("Call() error = %v", err)
+	}
+
+	if got := len(media.allocations); got != 1 {
+		t.Fatalf("allocate count = %d, want 1", got)
+	}
+	if got := media.allocations[0].Target; got != "5551212" {
+		t.Fatalf("allocate target = %q, want 5551212", got)
+	}
+
+	peers := bridge.ActivePeers()
+	if len(peers) != 1 {
+		t.Fatalf("active peers = %d, want 1", len(peers))
+	}
+	if peers[0].StreamID == "" {
+		t.Fatalf("media peer stream id should not be empty: %+v", peers[0])
+	}
+	if peers[0].SessionID != bridge.ActiveSessions()[0].ID {
+		t.Fatalf("peer session id = %q, want %q", peers[0].SessionID, bridge.ActiveSessions()[0].ID)
+	}
+}
+
+func TestSIPBridgeHangupReleasesMediaPeer(t *testing.T) {
+	tr := &recordingTransport{}
+	media := &recordingMediaTransport{}
+	bridge := NewSIPBridge(Registration{
+		ServerURI: "sip:home.example",
+		Username:  "alice",
+	}, tr, WithMediaTransport(media))
+	if err := bridge.Start(context.Background()); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	if err := bridge.Call(context.Background(), "5551212"); err != nil {
+		t.Fatalf("Call() error = %v", err)
+	}
+
+	sessionID := bridge.ActiveSessions()[0].ID
+	if err := bridge.Hangup(context.Background(), sessionID); err != nil {
+		t.Fatalf("Hangup() error = %v", err)
+	}
+
+	if got := len(media.releases); got != 1 {
+		t.Fatalf("release count = %d, want 1", got)
+	}
+	if got := media.releases[0].SessionID; got != sessionID {
+		t.Fatalf("release session = %q, want %q", got, sessionID)
+	}
+	if got := len(bridge.ActivePeers()); got != 0 {
+		t.Fatalf("active peers after hangup = %d, want 0", got)
+	}
+}
+
+func TestSIPBridgeAllocateFailureRollsBackSIPSession(t *testing.T) {
+	tr := &recordingTransport{}
+	media := &recordingMediaTransport{failOnAllocate: true}
+	bridge := NewSIPBridge(Registration{
+		ServerURI: "sip:home.example",
+		Username:  "alice",
+	}, tr, WithMediaTransport(media))
+	if err := bridge.Start(context.Background()); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	err := bridge.Call(context.Background(), "5551212")
+	if err == nil {
+		t.Fatalf("Call() expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "media allocate") {
+		t.Fatalf("Call() error = %v, want contains media allocate", err)
+	}
+	if got := len(tr.byes); got != 1 {
+		t.Fatalf("bye count = %d, want 1 (rollback)", got)
+	}
+	if got := len(bridge.ActiveSessions()); got != 0 {
+		t.Fatalf("active sessions = %d, want 0", got)
+	}
+	if got := len(bridge.ActivePeers()); got != 0 {
+		t.Fatalf("active peers = %d, want 0", got)
+	}
+}
+
+func TestSIPBridgeStopReleasesAllMediaPeers(t *testing.T) {
+	tr := &recordingTransport{}
+	media := &recordingMediaTransport{}
+	bridge := NewSIPBridge(Registration{
+		ServerURI: "sip:home.example",
+		Username:  "alice",
+	}, tr, WithMediaTransport(media))
+	if err := bridge.Start(context.Background()); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	if err := bridge.Call(context.Background(), "5551212"); err != nil {
+		t.Fatalf("Call() error = %v", err)
+	}
+	if err := bridge.Call(context.Background(), "5553434"); err != nil {
+		t.Fatalf("Call() error = %v", err)
+	}
+
+	if err := bridge.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+	if got := len(media.releases); got != 2 {
+		t.Fatalf("release count = %d, want 2", got)
+	}
+	if got := len(bridge.ActivePeers()); got != 0 {
+		t.Fatalf("active peers after stop = %d, want 0", got)
+	}
+}
+
+func TestLogMediaTransportProducesPeerPerSession(t *testing.T) {
+	var entries []string
+	tr := LogMediaTransport{Logf: func(format string, _ ...any) {
+		entries = append(entries, format)
+	}}
+	peer, err := tr.Allocate(context.Background(), Session{ID: "alice-1", Target: "5551212"})
+	if err != nil {
+		t.Fatalf("Allocate error = %v", err)
+	}
+	if peer.SessionID != "alice-1" {
+		t.Fatalf("peer.SessionID = %q, want alice-1", peer.SessionID)
+	}
+	if peer.StreamID != "sip:alice-1:audio" {
+		t.Fatalf("peer.StreamID = %q, want sip:alice-1:audio", peer.StreamID)
+	}
+	if peer.Codec != "opus" {
+		t.Fatalf("peer.Codec = %q, want opus", peer.Codec)
+	}
+	if err := tr.Release(context.Background(), peer); err != nil {
+		t.Fatalf("Release error = %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("log entries = %d, want 2", len(entries))
+	}
+}
+
 func TestNoopBridgeReturnsNil(t *testing.T) {
 	b := NoopBridge{}
 	if err := b.Call(context.Background(), "5551212"); err != nil {
