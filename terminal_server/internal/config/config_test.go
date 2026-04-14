@@ -7,6 +7,9 @@ import (
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_GRPC_HOST", "")
 	t.Setenv("TERMINALS_GRPC_PORT", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL", "")
 	t.Setenv("TERMINALS_MDNS_SERVICE", "")
 	t.Setenv("TERMINALS_MDNS_NAME", "")
 	t.Setenv("TERMINALS_VERSION", "")
@@ -26,6 +29,15 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.GRPCPort != 50051 {
 		t.Fatalf("GRPCPort = %d", cfg.GRPCPort)
+	}
+	if cfg.PhotoFrameHTTPHost != "0.0.0.0" {
+		t.Fatalf("PhotoFrameHTTPHost = %q, want 0.0.0.0", cfg.PhotoFrameHTTPHost)
+	}
+	if cfg.PhotoFrameHTTPPort != 50052 {
+		t.Fatalf("PhotoFrameHTTPPort = %d, want 50052", cfg.PhotoFrameHTTPPort)
+	}
+	if cfg.PhotoFramePublicBaseURL != "" {
+		t.Fatalf("PhotoFramePublicBaseURL = %q, want empty", cfg.PhotoFramePublicBaseURL)
 	}
 	if cfg.RecordingDir != "recordings" {
 		t.Fatalf("RecordingDir = %q, want recordings", cfg.RecordingDir)
@@ -82,6 +94,9 @@ func TestLoadRecordingDirFromEnv(t *testing.T) {
 func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
 	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "/tmp/terminals-photos")
 	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "30")
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "127.0.0.1")
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "7001")
+	t.Setenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL", "https://photos.example.test/slides")
 
 	cfg, err := Load()
 	if err != nil {
@@ -92,6 +107,15 @@ func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
 	}
 	if cfg.PhotoFrameIntervalSeconds != 30 {
 		t.Fatalf("PhotoFrameIntervalSeconds = %d, want 30", cfg.PhotoFrameIntervalSeconds)
+	}
+	if cfg.PhotoFrameHTTPHost != "127.0.0.1" {
+		t.Fatalf("PhotoFrameHTTPHost = %q, want 127.0.0.1", cfg.PhotoFrameHTTPHost)
+	}
+	if cfg.PhotoFrameHTTPPort != 7001 {
+		t.Fatalf("PhotoFrameHTTPPort = %d, want 7001", cfg.PhotoFrameHTTPPort)
+	}
+	if cfg.PhotoFramePublicBaseURL != "https://photos.example.test/slides" {
+		t.Fatalf("PhotoFramePublicBaseURL = %q, want configured URL", cfg.PhotoFramePublicBaseURL)
 	}
 }
 
@@ -133,6 +157,13 @@ func TestLoadInvalidPhotoFrameInterval(t *testing.T) {
 	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "nope")
 	if _, err := Load(); err == nil {
 		t.Fatalf("Load() expected error for invalid photo frame interval")
+	}
+}
+
+func TestLoadInvalidPhotoFrameHTTPPort(t *testing.T) {
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "wat")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid photo frame HTTP port")
 	}
 }
 
