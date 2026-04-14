@@ -164,6 +164,60 @@ func TestRuntimeAudioMonitorIgnoresNonMatchingEvents(t *testing.T) {
 	}
 }
 
+// TestRuntimeAudioMonitorStopReleasesSubscription verifies that an explicit
+// StopTrigger for the audio_monitor scenario cancels the classifier
+// goroutine and releases the live DeviceAudio subscription immediately,
+// without waiting for a matching sound event.
+func TestRuntimeAudioMonitorStopReleasesSubscription(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	deviceAudio := newFakeDeviceAudio()
+	classifier := &testSoundClassifier{}
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &AudioMonitorScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:     devices,
+		Broadcast:   broadcaster,
+		Sound:       classifier,
+		DeviceAudio: deviceAudio,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "audio_monitor",
+		Arguments: map[string]string{
+			"target": "dishwasher",
+		},
+	}); err != nil {
+		t.Fatalf("HandleTrigger(audio_monitor) error = %v", err)
+	}
+
+	if !waitFor(func() bool { return deviceAudio.subscriberCount("d1") == 1 }, 200*time.Millisecond) {
+		t.Fatalf("expected 1 DeviceAudio subscriber for d1, got %d", deviceAudio.subscriberCount("d1"))
+	}
+
+	// Explicit stop should cancel the classifier goroutine without needing a
+	// matching sound event.
+	stopped, err := runtime.StopTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "audio_monitor",
+	})
+	if err != nil {
+		t.Fatalf("StopTrigger(audio_monitor) error = %v", err)
+	}
+	if stopped != "audio_monitor" {
+		t.Fatalf("stopped scenario = %q, want audio_monitor", stopped)
+	}
+
+	if !waitFor(func() bool { return deviceAudio.subscriberCount("d1") == 0 }, 200*time.Millisecond) {
+		t.Fatalf("expected subscription to be released after stop, count = %d", deviceAudio.subscriberCount("d1"))
+	}
+}
+
 func (t *testAIBackend) Query(_ context.Context, input string) (string, error) {
 	t.lastInput = input
 	return t.response, nil

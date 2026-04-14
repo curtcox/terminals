@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
@@ -349,6 +350,9 @@ func (s *VoiceAssistantScenario) Stop() error { return nil }
 // AudioMonitorScenario stores monitor intent and confirms arming.
 type AudioMonitorScenario struct {
 	trigger Trigger
+
+	mu     sync.Mutex
+	stopFn func()
 }
 
 // Name returns the stable scenario identifier.
@@ -400,9 +404,20 @@ func (s *AudioMonitorScenario) Start(ctx context.Context, env *Environment) erro
 		return err
 	}
 
+	var stopOnce sync.Once
+	stopFn := func() {
+		stopOnce.Do(func() {
+			cancelAudio()
+			closeAudio()
+		})
+	}
+
+	s.mu.Lock()
+	s.stopFn = stopFn
+	s.mu.Unlock()
+
 	go func() {
-		defer cancelAudio()
-		defer closeAudio()
+		defer stopFn()
 		for event := range stream {
 			if !audioMonitorEventMatchesTarget(target, event.Label) {
 				continue
@@ -433,8 +448,19 @@ func openAudioMonitorSource(ctx context.Context, env *Environment, sourceID stri
 	return audioMonitorSilenceSource{}, func() {}, nil
 }
 
-// Stop ends monitor mode and currently has no side effects.
-func (s *AudioMonitorScenario) Stop() error { return nil }
+// Stop ends monitor mode by canceling the active classifier goroutine and
+// releasing any live audio subscription opened in Start. Safe to call when
+// the scenario was never started or has already stopped.
+func (s *AudioMonitorScenario) Stop() error {
+	s.mu.Lock()
+	stop := s.stopFn
+	s.stopFn = nil
+	s.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
+	return nil
+}
 
 type audioMonitorSilenceSource struct{}
 

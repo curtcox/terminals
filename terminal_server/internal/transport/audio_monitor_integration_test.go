@@ -128,6 +128,78 @@ func TestControlStreamAudioMonitorStreamsLiveMicAudio(t *testing.T) {
 	}
 }
 
+// TestControlStreamAudioMonitorStopReleasesSubscription drives the audio
+// monitor through the control stream and verifies that an explicit stop
+// command tears down the scenario's live audio subscription immediately,
+// without needing a matching sound event. This covers the Phase-6 deliverable
+// that `AudioMonitorScenario.Stop()` cancels the classifier goroutine and
+// releases the DeviceAudio hub subscriber.
+func TestControlStreamAudioMonitorStopReleasesSubscription(t *testing.T) {
+	classifier := newLiveSoundClassifier()
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	hub := audio.NewHub()
+
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:     devices,
+		IO:          iorouter.NewRouter(),
+		Sound:       classifier,
+		Telephony:   telephony.NoopBridge{},
+		Storage:     storage.NewMemoryStore(),
+		Scheduler:   storage.NewMemoryScheduler(),
+		Broadcast:   broadcaster,
+		DeviceAudio: hubSubscriberAdapter{hub: hub},
+	})
+
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.SetDeviceAudioPublisher(hub)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	}); err != nil {
+		t.Fatalf("register error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-armed",
+			DeviceID:  "device-1",
+			Kind:      CommandKindManual,
+			Intent:    "audio_monitor",
+		},
+	}); err != nil {
+		t.Fatalf("activate audio_monitor error = %v", err)
+	}
+
+	if !waitForCondition(func() bool { return hub.SubscriberCount("device-1") == 1 }, 200*time.Millisecond) {
+		t.Fatalf("expected 1 audio subscriber for device-1, got %d", hub.SubscriberCount("device-1"))
+	}
+
+	// Explicit stop command should release the live audio subscription
+	// without needing a matching sound event to arrive.
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-stopped",
+			DeviceID:  "device-1",
+			Kind:      CommandKindManual,
+			Action:    CommandActionStop,
+			Intent:    "audio_monitor",
+		},
+	}); err != nil {
+		t.Fatalf("stop audio_monitor error = %v", err)
+	}
+
+	if !waitForCondition(func() bool { return hub.SubscriberCount("device-1") == 0 }, 200*time.Millisecond) {
+		t.Fatalf("expected subscription to be released after stop, got %d", hub.SubscriberCount("device-1"))
+	}
+}
+
 // hubSubscriberAdapter wraps *audio.Hub so the scenario runtime can use it
 // as a DeviceAudioSubscriber without introducing a dependency on the audio
 // package from the scenario package.
