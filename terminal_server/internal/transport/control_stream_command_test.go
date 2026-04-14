@@ -1380,6 +1380,56 @@ func TestHandleMessageInputRoutesMultiWindowEndActionAndRestoresPriorTerminal(t 
 	}
 }
 
+func TestHandleMessageInputRoutesInternalVideoCallEndAction(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-video-call-start",
+			DeviceID:  "device-1",
+			Kind:      "voice",
+			Text:      "video call device-2",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "internal_video_call_hangup",
+			Action:      "internal_video_call_end",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input internal_video_call_end) error = %v", err)
+	}
+
+	if len(out) < 2 {
+		t.Fatalf("len(out) = %d, want at least 2", len(out))
+	}
+	if out[0].ScenarioStop != "internal_video_call" {
+		t.Fatalf("ScenarioStop = %q, want internal_video_call", out[0].ScenarioStop)
+	}
+	if out[1].TransitionUI == nil || out[1].TransitionUI.Transition != "internal_video_call_exit" {
+		t.Fatalf("expected internal_video_call_exit transition, got %+v", out[1].TransitionUI)
+	}
+}
+
 func TestHandleMessageInputActionIgnoredWithoutActiveScenario(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

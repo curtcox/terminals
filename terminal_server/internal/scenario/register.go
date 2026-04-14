@@ -11,6 +11,10 @@ func RegisterBuiltins(engine *Engine) {
 		Priority: PriorityHigh,
 	})
 	engine.Register(Registration{
+		Scenario: &InternalVideoCallScenario{},
+		Priority: PriorityHigh,
+	})
+	engine.Register(Registration{
 		Scenario: &VoiceAssistantScenario{},
 		Priority: PriorityNormal,
 	})

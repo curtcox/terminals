@@ -1,1 +1,1 @@
-Implement internal video call scenario end-to-end: trigger matching, bidirectional A/V routing, call UI controls, hangup flow, and transport tests.
+Implement SIP integration: add a configurable telephony bridge implementation (register/call/hangup behavior), wire it into server runtime/config, and cover with focused unit + transport tests.

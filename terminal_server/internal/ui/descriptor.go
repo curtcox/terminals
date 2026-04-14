@@ -101,6 +101,31 @@ func PAReceiverOverlayPatch(message string) Descriptor {
 	})))
 }
 
+// InternalVideoCallView renders a two-surface video call layout with controls.
+func InternalVideoCallView(sourceDeviceID, targetDeviceID string) Descriptor {
+	remoteTrackID := "route:" + targetDeviceID + "|" + sourceDeviceID + "|video"
+	localTrackID := "route:" + sourceDeviceID + "|" + targetDeviceID + "|video"
+	return New("stack", map[string]string{
+		"id":         "internal_video_call_root",
+		"background": "#070B12",
+	}, New("text", map[string]string{
+		"id":    "internal_video_call_title",
+		"value": "Video call with " + targetDeviceID,
+		"style": "headline",
+		"color": "#E7F0F7",
+	}), New("video_surface", map[string]string{
+		"id":       "internal_video_call_remote_video",
+		"track_id": remoteTrackID,
+	}), New("video_surface", map[string]string{
+		"id":       "internal_video_call_local_preview",
+		"track_id": localTrackID,
+	}), New("button", map[string]string{
+		"id":     "internal_video_call_hangup",
+		"label":  "Hang up",
+		"action": "internal_video_call_end",
+	}), GlobalOverlaySlot())
+}
+
 // MultiWindowView renders an adaptive camera-grid descriptor for a viewer device.
 func MultiWindowView(viewerDeviceID string, peerDeviceIDs []string, focusedPeerID string) Descriptor {
 	gridChildren := make([]Descriptor, 0, len(peerDeviceIDs))

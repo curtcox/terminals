@@ -59,6 +59,25 @@ func TestParseVoiceTriggerPhoneCallWithTarget(t *testing.T) {
 	}
 }
 
+func TestParseVoiceTriggerInternalVideoCallAlias(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "video call", now)
+	if got.Intent != "internal video call" {
+		t.Fatalf("Intent = %q, want internal video call", got.Intent)
+	}
+}
+
+func TestParseVoiceTriggerInternalVideoCallWithTarget(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "video call d2", now)
+	if got.Intent != "internal video call" {
+		t.Fatalf("Intent = %q, want internal video call", got.Intent)
+	}
+	if got.Arguments["target_device_id"] != "d2" {
+		t.Fatalf("target_device_id = %q, want d2", got.Arguments["target_device_id"])
+	}
+}
+
 func TestParseVoiceTriggerAssistantQuery(t *testing.T) {
 	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
 	got := ParseVoiceTrigger("device-1", "assistant weather tomorrow", now)

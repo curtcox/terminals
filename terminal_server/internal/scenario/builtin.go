@@ -196,6 +196,66 @@ func (s *IntercomScenario) Start(ctx context.Context, env *Environment) error {
 // Stop ends intercom mode and currently has no side effects.
 func (s *IntercomScenario) Stop() error { return nil }
 
+// InternalVideoCallScenario connects source and target with bidirectional audio/video.
+type InternalVideoCallScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *InternalVideoCallScenario) Name() string { return "internal_video_call" }
+
+// Match records trigger metadata when an internal video call is requested.
+func (s *InternalVideoCallScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "internal video call", "internal_video_call", "video call", "start video call") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start routes bidirectional audio/video between source and target devices.
+func (s *InternalVideoCallScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil {
+		return nil
+	}
+
+	sourceID := strings.TrimSpace(s.trigger.SourceID)
+	targetID := strings.TrimSpace(s.trigger.Arguments["target_device_id"])
+	if targetID == "" {
+		peers := nonSourceDeviceIDs(env, sourceID)
+		if len(peers) > 0 {
+			targetID = peers[0]
+		}
+	}
+	if sourceID == "" || targetID == "" {
+		return notifySource(ctx, env, sourceID, "Video call target unavailable")
+	}
+
+	if env.IO != nil {
+		for _, streamKind := range []string{"audio", "video"} {
+			if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+				return err
+			}
+			if err := env.IO.Connect(targetID, sourceID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+				return err
+			}
+		}
+	}
+
+	if err := notifySource(ctx, env, sourceID, "Video call active: "+targetID); err != nil {
+		return err
+	}
+	if env.Broadcast != nil {
+		if err := env.Broadcast.Notify(ctx, []string{targetID}, "Incoming video call: "+sourceID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Stop ends internal video call mode and currently has no side effects.
+func (s *InternalVideoCallScenario) Stop() error { return nil }
+
 // PhoneCallScenario starts an external call through telephony bridge.
 type PhoneCallScenario struct {
 	trigger Trigger

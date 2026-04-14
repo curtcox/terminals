@@ -14,6 +14,7 @@ func TestRegisterBuiltinsIncludesMasterplanScenarios(t *testing.T) {
 
 	want := []string{
 		"intercom",
+		"internal_video_call",
 		"phone_call",
 		"voice_assistant",
 		"audio_monitor",

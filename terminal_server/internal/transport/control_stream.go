@@ -714,6 +714,15 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		})
 		return responses
 	}
+	if commandResult.ScenarioStop == "internal_video_call" {
+		responses = append(responses, ServerMessage{
+			TransitionUI: &UITransition{
+				Transition: "internal_video_call_exit",
+				DurationMS: 220,
+			},
+		})
+		return responses
+	}
 	if commandResult.ScenarioStop == "multi_window" {
 		if restoredUI, restoredTransition, ok := h.restoreMultiWindowResume(cmd.DeviceID); ok {
 			if restoredUI != nil {
@@ -729,6 +738,19 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		peerIDs, focusedPeerID := h.multiWindowPeersAndFocus(cmd.DeviceID)
 		multiWindowUI := ui.MultiWindowView(cmd.DeviceID, peerIDs, focusedPeerID)
 		responses = append(responses, ServerMessage{SetUI: &multiWindowUI})
+	}
+	if commandResult.ScenarioStart == "internal_video_call" {
+		if peerID, ok := h.internalVideoCallPeer(cmd.DeviceID); ok {
+			internalVideoCallUI := ui.InternalVideoCallView(cmd.DeviceID, peerID)
+			responses = append(responses, ServerMessage{SetUI: &internalVideoCallUI})
+		}
+		responses = append(responses, ServerMessage{
+			TransitionUI: &UITransition{
+				Transition: "internal_video_call_enter",
+				DurationMS: 220,
+			},
+		})
+		return responses
 	}
 	if cmd.Action != "" && cmd.Action != CommandActionStart {
 		return responses
@@ -1155,6 +1177,11 @@ func isScenarioOwnedRoute(deviceID, scenarioName string, route iorouter.Route) b
 	switch scenarioName {
 	case "intercom":
 		return route.StreamKind == "audio" && (route.SourceID == deviceID || route.TargetID == deviceID)
+	case "internal_video_call":
+		if route.StreamKind != "audio" && route.StreamKind != "video" {
+			return false
+		}
+		return route.SourceID == deviceID || route.TargetID == deviceID
 	case "pa_system":
 		return route.SourceID == deviceID && route.StreamKind == "pa_audio"
 	case "multi_window":
@@ -1361,6 +1388,12 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 	case action == "stop_active":
 		intent = activeName
 		commandAction = CommandActionStop
+	case action == "internal_video_call_end":
+		if activeName != "internal_video_call" {
+			return nil, false, nil
+		}
+		intent = "internal_video_call"
+		commandAction = CommandActionStop
 	case action == "multi_window_end":
 		if activeName != "multi_window" {
 			return nil, false, nil
@@ -1499,6 +1532,28 @@ func (h *StreamHandler) multiWindowPeersAndFocus(deviceID string) ([]string, str
 	}
 	sort.Strings(peers)
 	return peers, focusedPeerID
+}
+
+func (h *StreamHandler) internalVideoCallPeer(deviceID string) (string, bool) {
+	selfID := strings.TrimSpace(deviceID)
+	if selfID == "" {
+		return "", false
+	}
+	routes := h.routeSnapshotForDevice(selfID)
+	for _, route := range routes {
+		if route.StreamKind != "video" {
+			continue
+		}
+		sourceID := strings.TrimSpace(route.SourceID)
+		targetID := strings.TrimSpace(route.TargetID)
+		if sourceID == selfID && targetID != "" {
+			return targetID, true
+		}
+		if targetID == selfID && sourceID != "" {
+			return sourceID, true
+		}
+	}
+	return "", false
 }
 
 func (h *StreamHandler) isRegisteredScenario(name string) bool {

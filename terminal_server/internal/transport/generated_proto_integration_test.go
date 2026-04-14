@@ -1880,3 +1880,145 @@ func TestGeneratedSessionMultiWindowEndActionRestoresPriorUIAndTransition(t *tes
 		t.Fatalf("expected video stop_stream for multi-window teardown")
 	}
 }
+
+func TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "d1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Command{
+					Command: &controlv1.CommandRequest{
+						RequestId: "video-call-start",
+						DeviceId:  "d1",
+						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
+						Text:      "video call d2",
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Input{
+					Input: &iov1.InputEvent{
+						DeviceId: "d1",
+						Payload: &iov1.InputEvent_UiAction{
+							UiAction: &iov1.UIAction{
+								ComponentId: "internal_video_call_hangup",
+								Action:      "internal_video_call_end",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	var sawScenarioStart bool
+	var sawScenarioStop bool
+	var sawHangupAction bool
+	var sawEnterTransition bool
+	var sawExitTransition bool
+	startStreams := map[string]bool{}
+	stopStreams := map[string]bool{}
+	walkNode := func(node *uiv1.Node, fn func(*uiv1.Node)) {}
+	walkNode = func(node *uiv1.Node, fn func(*uiv1.Node)) {
+		if node == nil {
+			return
+		}
+		fn(node)
+		for _, child := range node.GetChildren() {
+			walkNode(child, fn)
+		}
+	}
+
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok {
+			continue
+		}
+		if result := resp.GetCommandResult(); result != nil {
+			if result.GetScenarioStart() == "internal_video_call" {
+				sawScenarioStart = true
+			}
+			if result.GetScenarioStop() == "internal_video_call" {
+				sawScenarioStop = true
+			}
+		}
+		if start := resp.GetStartStream(); start != nil {
+			startStreams[start.GetStreamId()] = true
+		}
+		if stop := resp.GetStopStream(); stop != nil {
+			stopStreams[stop.GetStreamId()] = true
+		}
+		if set := resp.GetSetUi(); set != nil {
+			walkNode(set.GetRoot(), func(node *uiv1.Node) {
+				if button := node.GetButton(); button != nil && button.GetAction() == "internal_video_call_end" {
+					sawHangupAction = true
+				}
+			})
+		}
+		if transition := resp.GetTransitionUi(); transition != nil {
+			if transition.GetTransition() == "internal_video_call_enter" {
+				sawEnterTransition = true
+			}
+			if transition.GetTransition() == "internal_video_call_exit" {
+				sawExitTransition = true
+			}
+		}
+	}
+
+	if !sawScenarioStart {
+		t.Fatalf("expected internal_video_call scenario start")
+	}
+	if !sawScenarioStop {
+		t.Fatalf("expected internal_video_call scenario stop from hangup action")
+	}
+	if !sawHangupAction {
+		t.Fatalf("expected internal video call SetUI to include hangup action")
+	}
+	if !sawEnterTransition {
+		t.Fatalf("expected internal_video_call_enter transition")
+	}
+	if !sawExitTransition {
+		t.Fatalf("expected internal_video_call_exit transition")
+	}
+	for _, streamID := range []string{
+		"route:d1|d2|audio",
+		"route:d2|d1|audio",
+		"route:d1|d2|video",
+		"route:d2|d1|video",
+	} {
+		if !startStreams[streamID] {
+			t.Fatalf("expected start_stream for %s", streamID)
+		}
+		if !stopStreams[streamID] {
+			t.Fatalf("expected stop_stream for %s", streamID)
+		}
+	}
+}

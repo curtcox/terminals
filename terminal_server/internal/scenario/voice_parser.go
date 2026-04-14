@@ -52,6 +52,12 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		if strings.HasPrefix(normalized, "call ") {
 			trigger.Arguments["target"] = strings.TrimSpace(strings.TrimPrefix(normalized, "call "))
 		}
+	case normalized == "video call" || normalized == "start video call" ||
+		strings.HasPrefix(normalized, "video call ") || strings.HasPrefix(normalized, "start video call "):
+		trigger.Intent = "internal video call"
+		if targetDeviceID, ok := parseInternalVideoCallTarget(normalized); ok {
+			trigger.Arguments["target_device_id"] = targetDeviceID
+		}
 	case strings.HasPrefix(normalized, "set a timer for "):
 		trigger.Intent = "set timer"
 		parseTimerMinutes(trigger.Arguments, normalized, now)
@@ -74,6 +80,22 @@ func parseMultiWindowFocus(normalized string) (string, bool) {
 				return "", false
 			}
 			return focusDeviceID, true
+		}
+	}
+	return "", false
+}
+
+func parseInternalVideoCallTarget(normalized string) (string, bool) {
+	for _, prefix := range []string{
+		"video call ",
+		"start video call ",
+	} {
+		if strings.HasPrefix(normalized, prefix) {
+			targetDeviceID := strings.TrimSpace(strings.TrimPrefix(normalized, prefix))
+			if targetDeviceID == "" {
+				return "", false
+			}
+			return targetDeviceID, true
 		}
 	}
 	return "", false
