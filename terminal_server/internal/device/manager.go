@@ -4,6 +4,7 @@ package device
 import (
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -48,6 +49,7 @@ func (m *Manager) Register(manifest Manifest) (Device, error) {
 	current.DeviceType = manifest.DeviceType
 	current.Platform = manifest.Platform
 	current.Capabilities = cloneCapabilities(manifest.Capabilities)
+	current.Placement = clonePlacementMetadata(current.Placement)
 	current.State = StateConnected
 	current.LastHeartbeat = m.now().UTC()
 	m.devices[manifest.DeviceID] = current
@@ -108,6 +110,7 @@ func (m *Manager) Get(deviceID string) (Device, bool) {
 		return Device{}, false
 	}
 	current.Capabilities = cloneCapabilities(current.Capabilities)
+	current.Placement = clonePlacementMetadata(current.Placement)
 	return current, true
 }
 
@@ -119,6 +122,7 @@ func (m *Manager) List() []Device {
 	result := make([]Device, 0, len(m.devices))
 	for _, d := range m.devices {
 		d.Capabilities = cloneCapabilities(d.Capabilities)
+		d.Placement = clonePlacementMetadata(d.Placement)
 		result = append(result, d)
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -158,6 +162,20 @@ func (m *Manager) MarkStaleDisconnected(cutoff time.Time) int {
 	return updated
 }
 
+// UpdatePlacement replaces semantic placement metadata for an existing device.
+func (m *Manager) UpdatePlacement(deviceID string, placement PlacementMetadata) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	current, exists := m.devices[strings.TrimSpace(deviceID)]
+	if !exists {
+		return ErrDeviceNotFound
+	}
+	current.Placement = clonePlacementMetadata(placement)
+	m.devices[current.DeviceID] = current
+	return nil
+}
+
 func cloneCapabilities(caps CapabilitySet) CapabilitySet {
 	if caps == nil {
 		return CapabilitySet{}
@@ -166,5 +184,32 @@ func cloneCapabilities(caps CapabilitySet) CapabilitySet {
 	for k, v := range caps {
 		out[k] = v
 	}
+	return out
+}
+
+func clonePlacementMetadata(in PlacementMetadata) PlacementMetadata {
+	out := PlacementMetadata{
+		Zone:     strings.TrimSpace(in.Zone),
+		Mobility: strings.TrimSpace(in.Mobility),
+		Affinity: strings.TrimSpace(in.Affinity),
+	}
+	if len(in.Roles) == 0 {
+		out.Roles = []string{}
+		return out
+	}
+	seen := make(map[string]struct{}, len(in.Roles))
+	out.Roles = make([]string, 0, len(in.Roles))
+	for _, role := range in.Roles {
+		role = strings.TrimSpace(role)
+		if role == "" {
+			continue
+		}
+		if _, exists := seen[role]; exists {
+			continue
+		}
+		seen[role] = struct{}{}
+		out.Roles = append(out.Roles, role)
+	}
+	sort.Strings(out.Roles)
 	return out
 }

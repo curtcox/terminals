@@ -218,6 +218,133 @@ func TestRuntimeAudioMonitorStopReleasesSubscription(t *testing.T) {
 	}
 }
 
+func TestRuntimeTargetDevicesUsesPlacementZoneScope(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen mic"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Kitchen display"})
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	placement := &fakePlacement{
+		findRefs: []DeviceRef{{DeviceID: "d2"}},
+	}
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+		Placement: placement,
+	})
+
+	matched, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "terminal",
+		Arguments: map[string]string{
+			"zone": "kitchen",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger(terminal+zone) error = %v", err)
+	}
+	if matched != "terminal" {
+		t.Fatalf("matched scenario = %q, want terminal", matched)
+	}
+
+	if active, ok := engine.Active("d2"); !ok || active != "terminal" {
+		t.Fatalf("active(d2) = (%q, %v), want (terminal, true)", active, ok)
+	}
+	if _, ok := engine.Active("d1"); ok {
+		t.Fatalf("d1 should remain inactive when placement scopes to d2")
+	}
+	if placement.findCalls != 1 {
+		t.Fatalf("placement.Find calls = %d, want 1", placement.findCalls)
+	}
+	if placement.lastQuery.Scope.Zone != "kitchen" {
+		t.Fatalf("placement query zone = %q, want kitchen", placement.lastQuery.Scope.Zone)
+	}
+}
+
+func TestRuntimeTargetDevicesUsesPlacementNearest(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Origin"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d3", DeviceName: "Nearest screen"})
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	placement := &fakePlacement{
+		nearestRef: DeviceRef{DeviceID: "d3"},
+	}
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+		Placement: placement,
+	})
+
+	_, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "terminal",
+		Arguments: map[string]string{
+			"nearest":            "true",
+			"nearest_capability": "screen",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger(terminal+nearest) error = %v", err)
+	}
+
+	if active, ok := engine.Active("d3"); !ok || active != "terminal" {
+		t.Fatalf("active(d3) = (%q, %v), want (terminal, true)", active, ok)
+	}
+	if placement.nearestCalls != 1 {
+		t.Fatalf("placement.NearestWith calls = %d, want 1", placement.nearestCalls)
+	}
+	if placement.lastNearestCap != "screen" {
+		t.Fatalf("placement nearest capability = %q, want screen", placement.lastNearestCap)
+	}
+}
+
+type fakePlacement struct {
+	findRefs []DeviceRef
+	findErr  error
+
+	nearestRef DeviceRef
+	nearestErr error
+
+	findCalls      int
+	nearestCalls   int
+	lastQuery      PlacementQuery
+	lastNearestCap string
+}
+
+func (f *fakePlacement) Find(_ context.Context, q PlacementQuery) ([]DeviceRef, error) {
+	f.findCalls++
+	f.lastQuery = q
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	if len(f.findRefs) == 0 {
+		return nil, nil
+	}
+	out := make([]DeviceRef, 0, len(f.findRefs))
+	out = append(out, f.findRefs...)
+	return out, nil
+}
+
+func (f *fakePlacement) NearestWith(_ context.Context, _ DeviceRef, cap string) (DeviceRef, error) {
+	f.nearestCalls++
+	f.lastNearestCap = cap
+	if f.nearestErr != nil {
+		return DeviceRef{}, f.nearestErr
+	}
+	return f.nearestRef, nil
+}
+
+func (f *fakePlacement) DevicesInZone(_ context.Context, _ string) ([]DeviceRef, error) {
+	return nil, nil
+}
+
+func (f *fakePlacement) DevicesWithRole(_ context.Context, _ string) ([]DeviceRef, error) {
+	return nil, nil
+}
+
 func TestRuntimeAudioMonitorPreemptedByRedAlertSuspendsAndResumes(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})

@@ -25,6 +25,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/placement"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
@@ -75,6 +76,7 @@ func main() {
 		Scheduler:   scheduler,
 		Broadcast:   broadcaster,
 		DeviceAudio: scenarioDeviceAudio{hub: audioHub},
+		Placement:   placement.NewManagerBackedEngine(deviceManager),
 	}
 	scenario.RegisterBuiltins(scenarioEngine)
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)

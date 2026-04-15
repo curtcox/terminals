@@ -94,3 +94,35 @@ func TestListSorted(t *testing.T) {
 		t.Fatalf("List() order = %q, %q", list[0].DeviceID, list[1].DeviceID)
 	}
 }
+
+func TestUpdatePlacement(t *testing.T) {
+	m := NewManager()
+	_, _ = m.Register(Manifest{DeviceID: "device-1"})
+
+	err := m.UpdatePlacement("device-1", PlacementMetadata{
+		Zone:     "kitchen",
+		Roles:    []string{"kitchen_display", "screen", "screen"},
+		Mobility: "fixed",
+		Affinity: "home",
+	})
+	if err != nil {
+		t.Fatalf("UpdatePlacement() error = %v", err)
+	}
+
+	found, ok := m.Get("device-1")
+	if !ok {
+		t.Fatalf("Get() did not find device-1")
+	}
+	if found.Placement.Zone != "kitchen" {
+		t.Fatalf("Placement.Zone = %q, want kitchen", found.Placement.Zone)
+	}
+	if len(found.Placement.Roles) != 2 || found.Placement.Roles[0] != "kitchen_display" || found.Placement.Roles[1] != "screen" {
+		t.Fatalf("Placement.Roles = %+v, want [kitchen_display screen]", found.Placement.Roles)
+	}
+	if found.Placement.Mobility != "fixed" {
+		t.Fatalf("Placement.Mobility = %q, want fixed", found.Placement.Mobility)
+	}
+	if found.Placement.Affinity != "home" {
+		t.Fatalf("Placement.Affinity = %q, want home", found.Placement.Affinity)
+	}
+}

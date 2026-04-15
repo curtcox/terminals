@@ -33,7 +33,7 @@ func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, e
 		return "", ErrNoMatchingScenario
 	}
 
-	deviceIDs := targetDevices(r.Env, trigger)
+	deviceIDs := targetDevices(ctx, r.Env, trigger)
 	if err := r.Engine.Activate(ctx, r.Env, reg.Scenario.Name(), deviceIDs); err != nil {
 		return "", err
 	}
@@ -52,7 +52,7 @@ func (r *Runtime) StopTrigger(ctx context.Context, trigger Trigger) (string, err
 		return "", ErrNoMatchingScenario
 	}
 
-	deviceIDs := targetDevices(r.Env, trigger)
+	deviceIDs := targetDevices(ctx, r.Env, trigger)
 	if err := r.Engine.Stop(ctx, r.Env, reg.Scenario.Name(), deviceIDs); err != nil {
 		return "", err
 	}
@@ -279,7 +279,7 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 	return processed, nil
 }
 
-func targetDevices(env *Environment, trigger Trigger) []string {
+func targetDevices(ctx context.Context, env *Environment, trigger Trigger) []string {
 	if env == nil || env.Devices == nil {
 		return nil
 	}
@@ -304,6 +304,44 @@ func targetDevices(env *Environment, trigger Trigger) []string {
 	}
 	if explicit, ok := trigger.Arguments["device_id"]; ok && explicit != "" {
 		return []string{explicit}
+	}
+	if env.Placement != nil {
+		zone := strings.TrimSpace(trigger.Arguments["zone"])
+		role := strings.TrimSpace(trigger.Arguments["role"])
+		scopeDeviceID := strings.TrimSpace(trigger.Arguments["scope_device_id"])
+		if scopeDeviceID == "" {
+			scopeDeviceID = strings.TrimSpace(trigger.SourceID)
+		}
+		nearestCap := strings.TrimSpace(trigger.Arguments["nearest_capability"])
+		if nearestCap != "" || strings.EqualFold(strings.TrimSpace(trigger.Arguments["nearest"]), "true") {
+			ref, err := env.Placement.NearestWith(ctx, DeviceRef{DeviceID: scopeDeviceID}, nearestCap)
+			if err == nil && strings.TrimSpace(ref.DeviceID) != "" {
+				return []string{ref.DeviceID}
+			}
+		}
+		if zone != "" || role != "" || scopeDeviceID != "" {
+			query := PlacementQuery{
+				Scope: TargetScope{
+					Zone:      zone,
+					Role:      role,
+					DeviceID:  strings.TrimSpace(trigger.Arguments["placement_device_id"]),
+					Source:    DeviceRef{DeviceID: scopeDeviceID},
+					Broadcast: true,
+				},
+			}
+			refs, err := env.Placement.Find(ctx, query)
+			if err == nil && len(refs) > 0 {
+				out := make([]string, 0, len(refs))
+				for _, ref := range refs {
+					if id := strings.TrimSpace(ref.DeviceID); id != "" {
+						out = append(out, id)
+					}
+				}
+				if len(out) > 0 {
+					return out
+				}
+			}
+		}
 	}
 	return env.Devices.ListDeviceIDs()
 }

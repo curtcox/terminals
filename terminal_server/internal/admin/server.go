@@ -40,6 +40,7 @@ func NewHandler(control *transport.ControlService, runtime *scenario.Runtime, de
 	mux.HandleFunc("/admin", h.handleDashboard)
 	mux.HandleFunc("/admin/api/status", h.handleStatus)
 	mux.HandleFunc("/admin/api/devices", h.handleDevices)
+	mux.HandleFunc("/admin/api/devices/placement", h.handleDevicePlacementUpdate)
 	mux.HandleFunc("/admin/api/scenarios", h.handleScenarios)
 	mux.HandleFunc("/admin/api/scenarios/start", h.handleStartScenario)
 	mux.HandleFunc("/admin/api/scenarios/stop", h.handleStopScenario)
@@ -94,6 +95,10 @@ func (h *Handler) handleDevices(w http.ResponseWriter, req *http.Request) {
 		DeviceName     string            `json:"device_name"`
 		DeviceType     string            `json:"device_type"`
 		Platform       string            `json:"platform"`
+		Zone           string            `json:"zone,omitempty"`
+		Roles          []string          `json:"roles,omitempty"`
+		Mobility       string            `json:"mobility,omitempty"`
+		Affinity       string            `json:"affinity,omitempty"`
 		State          string            `json:"state"`
 		LastHeartbeat  int64             `json:"last_heartbeat_unix_ms"`
 		RegisteredAt   int64             `json:"registered_at_unix_ms"`
@@ -109,6 +114,10 @@ func (h *Handler) handleDevices(w http.ResponseWriter, req *http.Request) {
 			DeviceName:     d.DeviceName,
 			DeviceType:     d.DeviceType,
 			Platform:       d.Platform,
+			Zone:           d.Placement.Zone,
+			Roles:          d.Placement.Roles,
+			Mobility:       d.Placement.Mobility,
+			Affinity:       d.Placement.Affinity,
 			State:          string(d.State),
 			LastHeartbeat:  d.LastHeartbeat.UTC().UnixMilli(),
 			RegisteredAt:   d.RegisteredAt.UTC().UnixMilli(),
@@ -149,6 +158,37 @@ func (h *Handler) handleScenarios(w http.ResponseWriter, req *http.Request) {
 		})
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"scenarios": views})
+}
+
+func (h *Handler) handleDevicePlacementUpdate(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form")
+		return
+	}
+	deviceID := strings.TrimSpace(req.FormValue("device_id"))
+	if deviceID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+	placement := device.PlacementMetadata{
+		Zone:     strings.TrimSpace(req.FormValue("zone")),
+		Roles:    parseDeviceIDs(req.FormValue("roles")),
+		Mobility: strings.TrimSpace(req.FormValue("mobility")),
+		Affinity: strings.TrimSpace(req.FormValue("affinity")),
+	}
+	if err := h.devices.UpdatePlacement(deviceID, placement); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"status":    "ok",
+		"device_id": deviceID,
+		"placement": placement,
+	})
 }
 
 func (h *Handler) handleStartScenario(w http.ResponseWriter, req *http.Request) {
@@ -291,6 +331,19 @@ var dashboardTemplate = template.Must(template.New("admin").Parse(`<!doctype htm
   </section>
 
   <section>
+    <h2>World Model</h2>
+    <div class="row">
+      <label>Device ID<input id="placement_device_id" placeholder="kitchen-1" /></label>
+      <label>Zone<input id="placement_zone" placeholder="kitchen" /></label>
+      <label>Roles (comma-separated)<input id="placement_roles" placeholder="kitchen_display,screen" /></label>
+      <label>Mobility<input id="placement_mobility" placeholder="fixed" /></label>
+      <label>Affinity<input id="placement_affinity" placeholder="home" /></label>
+      <button id="placement_save_btn">Save placement</button>
+    </div>
+    <pre id="placement_result">{}</pre>
+  </section>
+
+  <section>
     <h2>Status</h2>
     <pre id="status">{}</pre>
   </section>
@@ -329,8 +382,21 @@ async function scenarioCommand(path) {
   document.getElementById('scenario_result').textContent = format(json);
   await refresh();
 }
+async function savePlacement() {
+  const body = new URLSearchParams();
+  body.set('device_id', document.getElementById('placement_device_id').value.trim());
+  body.set('zone', document.getElementById('placement_zone').value.trim());
+  body.set('roles', document.getElementById('placement_roles').value.trim());
+  body.set('mobility', document.getElementById('placement_mobility').value.trim());
+  body.set('affinity', document.getElementById('placement_affinity').value.trim());
+  const response = await fetch('/admin/api/devices/placement', { method: 'POST', body });
+  const json = await response.json();
+  document.getElementById('placement_result').textContent = format(json);
+  await refresh();
+}
 document.getElementById('start_btn').addEventListener('click', () => scenarioCommand('/admin/api/scenarios/start'));
 document.getElementById('stop_btn').addEventListener('click', () => scenarioCommand('/admin/api/scenarios/stop'));
+document.getElementById('placement_save_btn').addEventListener('click', () => savePlacement());
 refresh();
 setInterval(refresh, 3000);
 </script>

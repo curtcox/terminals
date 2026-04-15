@@ -30,6 +30,38 @@ type Trigger struct {
 	Arguments map[string]string
 }
 
+// DeviceRef points at a concrete target device selected by placement.
+type DeviceRef struct {
+	DeviceID string
+}
+
+// TargetScope describes semantic targeting preferences.
+type TargetScope struct {
+	DeviceID  string
+	Zone      string
+	Role      string
+	Nearest   bool
+	Source    DeviceRef
+	Broadcast bool
+}
+
+// PlacementQuery resolves semantic scope to concrete device targets.
+type PlacementQuery struct {
+	Scope         TargetScope
+	RequiredCaps  []string
+	PreferredCaps []string
+	ExcludeBusy   bool
+	Count         int
+}
+
+// PlacementEngine resolves semantic target scopes to concrete devices.
+type PlacementEngine interface {
+	Find(ctx context.Context, q PlacementQuery) ([]DeviceRef, error)
+	NearestWith(ctx context.Context, source DeviceRef, cap string) (DeviceRef, error)
+	DevicesInZone(ctx context.Context, zone string) ([]DeviceRef, error)
+	DevicesWithRole(ctx context.Context, role string) ([]DeviceRef, error)
+}
+
 // DeviceManager exposes device selection and command capabilities.
 type DeviceManager interface {
 	ListDeviceIDs() []string
@@ -269,6 +301,7 @@ type Environment struct {
 	Broadcast   Broadcaster
 	DeviceAudio DeviceAudioSubscriber
 	Passthrough PassthroughBridge
+	Placement   PlacementEngine
 }
 
 // Scenario is the runtime contract for all server-side behaviors.

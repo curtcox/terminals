@@ -14,6 +14,15 @@ type Manifest struct {
 	Capabilities CapabilitySet
 }
 
+// PlacementMetadata is server-assigned semantic metadata used by the
+// placement engine for zone/role based targeting.
+type PlacementMetadata struct {
+	Zone     string
+	Roles    []string
+	Mobility string
+	Affinity string
+}
+
 // State represents server-observed lifecycle state for a device.
 type State string
 
@@ -31,6 +40,7 @@ type Device struct {
 	DeviceType    string
 	Platform      string
 	Capabilities  CapabilitySet
+	Placement     PlacementMetadata
 	State         State
 	RegisteredAt  time.Time
 	LastHeartbeat time.Time

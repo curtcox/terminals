@@ -101,6 +101,45 @@ func TestStartAndStopScenarioEndpoints(t *testing.T) {
 	}
 }
 
+func TestUpdateDevicePlacementEndpoint(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "kitchen-1", DeviceName: "Kitchen"})
+	control := transport.NewControlService("HomeServer", devices)
+	engine := scenario.NewEngine()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	h := NewHandler(control, runtime, devices, config.Config{MDNSName: "HomeServer"})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/api/devices/placement", strings.NewReader(url.Values{
+		"device_id": {"kitchen-1"},
+		"zone":      {"kitchen"},
+		"roles":     {"kitchen_display,screen"},
+		"mobility":  {"fixed"},
+		"affinity":  {"home"},
+	}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+
+	found, ok := devices.Get("kitchen-1")
+	if !ok {
+		t.Fatalf("kitchen-1 should exist")
+	}
+	if found.Placement.Zone != "kitchen" {
+		t.Fatalf("zone = %q, want kitchen", found.Placement.Zone)
+	}
+	if len(found.Placement.Roles) != 2 || found.Placement.Roles[0] != "kitchen_display" || found.Placement.Roles[1] != "screen" {
+		t.Fatalf("roles = %+v, want [kitchen_display screen]", found.Placement.Roles)
+	}
+}
+
 func testHandler(t *testing.T) http.Handler {
 	t.Helper()
 	devices := device.NewManager()
