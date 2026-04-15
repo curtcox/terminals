@@ -169,12 +169,13 @@ func TestNormalizeTriggerIntentV2SlotsFallbackFromArguments(t *testing.T) {
 }
 
 func TestNormalizeTriggerPreservesExplicitIntentV2Slots(t *testing.T) {
+	slots := map[string]string{"device_id": "override"}
 	got := normalizeTrigger(Trigger{
 		Kind:      TriggerManual,
 		Arguments: map[string]string{"device_id": "d1"},
 		IntentV2: &IntentRecord{
 			Action: "terminal",
-			Slots:  map[string]string{"device_id": "override"},
+			Slots:  slots,
 		},
 	}, time.Date(2026, 4, 15, 15, 8, 0, 0, time.UTC))
 
@@ -183,6 +184,10 @@ func TestNormalizeTriggerPreservesExplicitIntentV2Slots(t *testing.T) {
 	}
 	if got.IntentV2.Slots["device_id"] != "override" {
 		t.Fatalf("IntentV2.Slots[device_id] = %q, want override", got.IntentV2.Slots["device_id"])
+	}
+	slots["device_id"] = "mutated"
+	if got.IntentV2.Slots["device_id"] != "override" {
+		t.Fatalf("expected normalized slots copy to be immutable from caller mutation, got %+v", got.IntentV2.Slots)
 	}
 }
 
@@ -260,6 +265,29 @@ func TestNormalizeTriggerWithoutIntentOrEventDoesNotSynthesizeIntentV2(t *testin
 	}
 	if got.Arguments == nil {
 		t.Fatalf("expected Arguments map to be initialized")
+	}
+}
+
+func TestNormalizeTriggerCopiesEventAttributes(t *testing.T) {
+	attrs := map[string]string{"label": "alarm"}
+	got := normalizeTrigger(Trigger{
+		Kind: TriggerEvent,
+		EventV2: &EventRecord{
+			Kind:       "sound.detected",
+			Attributes: attrs,
+		},
+	}, time.Date(2026, 4, 15, 15, 31, 0, 0, time.UTC))
+
+	if got.EventV2 == nil {
+		t.Fatalf("expected EventV2 to remain populated")
+	}
+	if got.EventV2.Attributes["label"] != "alarm" {
+		t.Fatalf("EventV2.Attributes[label] = %q, want alarm", got.EventV2.Attributes["label"])
+	}
+
+	attrs["label"] = "mutated"
+	if got.EventV2.Attributes["label"] != "alarm" {
+		t.Fatalf("expected normalized event attributes copy to be immutable from caller mutation, got %+v", got.EventV2.Attributes)
 	}
 }
 

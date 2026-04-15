@@ -75,6 +75,8 @@ func normalizeTrigger(trigger Trigger, now time.Time) Trigger {
 		}
 		if trigger.IntentV2.Slots == nil {
 			trigger.IntentV2.Slots = copyStringMap(trigger.Arguments)
+		} else {
+			trigger.IntentV2.Slots = copyStringMap(trigger.IntentV2.Slots)
 		}
 		if trigger.IntentV2.Source == "" {
 			trigger.IntentV2.Source = sourceFromKind(trigger.Kind)
@@ -89,6 +91,7 @@ func normalizeTrigger(trigger Trigger, now time.Time) Trigger {
 	}
 	if trigger.EventV2 != nil {
 		trigger.EventV2.Kind = strings.TrimSpace(trigger.EventV2.Kind)
+		trigger.EventV2.Attributes = copyStringMap(trigger.EventV2.Attributes)
 		if trigger.EventV2.OccurredAt.IsZero() {
 			trigger.EventV2.OccurredAt = now
 		}
