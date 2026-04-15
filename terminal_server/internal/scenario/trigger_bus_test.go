@@ -168,6 +168,24 @@ func TestNormalizeTriggerIntentV2SlotsFallbackFromArguments(t *testing.T) {
 	}
 }
 
+func TestNormalizeTriggerPreservesExplicitIntentV2Slots(t *testing.T) {
+	got := normalizeTrigger(Trigger{
+		Kind:      TriggerManual,
+		Arguments: map[string]string{"device_id": "d1"},
+		IntentV2: &IntentRecord{
+			Action: "terminal",
+			Slots:  map[string]string{"device_id": "override"},
+		},
+	}, time.Date(2026, 4, 15, 15, 8, 0, 0, time.UTC))
+
+	if got.IntentV2 == nil || got.IntentV2.Slots == nil {
+		t.Fatalf("expected IntentV2.Slots to be populated")
+	}
+	if got.IntentV2.Slots["device_id"] != "override" {
+		t.Fatalf("IntentV2.Slots[device_id] = %q, want override", got.IntentV2.Slots["device_id"])
+	}
+}
+
 func TestNormalizeTriggerInitializesArgumentsMapWhenNil(t *testing.T) {
 	got := normalizeTrigger(Trigger{
 		Kind:      TriggerManual,
@@ -320,5 +338,94 @@ func TestIntentEventBusPublishFansOutToMultipleSubscribers(t *testing.T) {
 		case <-time.After(200 * time.Millisecond):
 			t.Fatalf("timed out waiting for subscriber %d", i+1)
 		}
+	}
+}
+
+func TestIntentEventBusPublishToReadySubscriberWhenAnotherIsFull(t *testing.T) {
+	bus := NewIntentEventBus()
+	fullCh, cancelFull := bus.Subscribe(1)
+	defer cancelFull()
+	readyCh, cancelReady := bus.Subscribe(2)
+	defer cancelReady()
+
+	// Fill one subscriber to force drop behavior on subsequent publish.
+	bus.Publish(Trigger{Kind: TriggerManual, Intent: "first"})
+
+	bus.Publish(Trigger{Kind: TriggerVoice, Intent: "second"})
+
+	got1 := waitTrigger(t, readyCh, "ready subscriber first delivery")
+	got2 := waitTrigger(t, readyCh, "ready subscriber second delivery")
+	if got1.Intent != "first" || got2.Intent != "second" {
+		t.Fatalf("ready subscriber intents = [%q, %q], want [first, second]", got1.Intent, got2.Intent)
+	}
+
+	// The full subscriber should still only have one buffered message.
+	select {
+	case got := <-fullCh:
+		if got.Intent != "first" {
+			t.Fatalf("full subscriber first intent = %q, want first", got.Intent)
+		}
+	default:
+		t.Fatalf("expected first buffered message on full subscriber")
+	}
+	select {
+	case got := <-fullCh:
+		t.Fatalf("unexpected second message on full subscriber: %+v", got)
+	default:
+	}
+}
+
+func TestIntentEventBusCancelOneSubscriberKeepsOthersActive(t *testing.T) {
+	bus := NewIntentEventBus()
+	ch1, cancel1 := bus.Subscribe(1)
+	ch2, cancel2 := bus.Subscribe(1)
+	defer cancel2()
+
+	cancel1()
+	_, ok := <-ch1
+	if ok {
+		t.Fatalf("expected canceled subscriber channel to be closed")
+	}
+
+	bus.Publish(Trigger{Kind: TriggerManual, Intent: "terminal"})
+
+	got := waitTrigger(t, ch2, "active subscriber delivery after peer cancel")
+	if got.Intent != "terminal" {
+		t.Fatalf("active subscriber intent = %q, want terminal", got.Intent)
+	}
+}
+
+func TestIntentEventBusPublishStillWorksAfterPartialUnsubscribe(t *testing.T) {
+	bus := NewIntentEventBus()
+	ch1, cancel1 := bus.Subscribe(1)
+	defer cancel1()
+	_, cancel2 := bus.Subscribe(1)
+	cancel2()
+
+	bus.Publish(Trigger{Kind: TriggerVoice, Intent: "first"})
+	bus.Publish(Trigger{Kind: TriggerVoice, Intent: "second"})
+
+	got1 := waitTrigger(t, ch1, "first publish after partial unsubscribe")
+	if got1.Intent != "first" {
+		t.Fatalf("first intent = %q, want first", got1.Intent)
+	}
+
+	// Buffer is size 1, so a second immediate publish can be dropped; ensure no panic/block and
+	// channel remains readable statefully by publishing again after draining.
+	bus.Publish(Trigger{Kind: TriggerVoice, Intent: "third"})
+	got3 := waitTrigger(t, ch1, "third publish after drain")
+	if got3.Intent != "third" {
+		t.Fatalf("third intent = %q, want third", got3.Intent)
+	}
+}
+
+func waitTrigger(t *testing.T, ch <-chan Trigger, context string) Trigger {
+	t.Helper()
+	select {
+	case got := <-ch:
+		return got
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("timed out waiting for %s", context)
+		return Trigger{}
 	}
 }
