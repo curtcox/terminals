@@ -204,6 +204,40 @@ func TestNormalizeTriggerInitializesArgumentsMapWhenNil(t *testing.T) {
 	}
 }
 
+func TestNormalizeTriggerPrefersExplicitIntentOverIntentV2Action(t *testing.T) {
+	got := normalizeTrigger(Trigger{
+		Kind:   TriggerManual,
+		Intent: "terminal",
+		IntentV2: &IntentRecord{
+			Action: "photo frame",
+		},
+	}, time.Date(2026, 4, 15, 15, 20, 0, 0, time.UTC))
+
+	if got.Intent != "terminal" {
+		t.Fatalf("Intent = %q, want terminal", got.Intent)
+	}
+	if got.IntentV2 == nil || got.IntentV2.Action != "photo frame" {
+		t.Fatalf("IntentV2.Action = %+v, want photo frame", got.IntentV2)
+	}
+}
+
+func TestNormalizeTriggerEventKindTrimDoesNotRewriteExistingIntent(t *testing.T) {
+	got := normalizeTrigger(Trigger{
+		Kind:   TriggerEvent,
+		Intent: "terminal",
+		EventV2: &EventRecord{
+			Kind: " sound.detected ",
+		},
+	}, time.Date(2026, 4, 15, 15, 25, 0, 0, time.UTC))
+
+	if got.Intent != "terminal" {
+		t.Fatalf("Intent = %q, want terminal", got.Intent)
+	}
+	if got.EventV2 == nil || got.EventV2.Kind != "sound.detected" {
+		t.Fatalf("EventV2.Kind = %+v, want sound.detected", got.EventV2)
+	}
+}
+
 func TestIntentEventBusPublishNormalizesBeforeFanout(t *testing.T) {
 	bus := NewIntentEventBus()
 	ch, cancel := bus.Subscribe(1)
