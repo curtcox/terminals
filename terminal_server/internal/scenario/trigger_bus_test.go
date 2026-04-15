@@ -124,6 +124,68 @@ func TestNormalizeTriggerCopiesArgumentsIntoIntentSlots(t *testing.T) {
 	}
 }
 
+func TestNormalizeTriggerBackfillsIntentFromIntentV2Action(t *testing.T) {
+	got := normalizeTrigger(Trigger{
+		Kind:   TriggerManual,
+		Intent: "   ",
+		IntentV2: &IntentRecord{
+			Action: "  terminal  ",
+		},
+	}, time.Date(2026, 4, 15, 15, 0, 0, 0, time.UTC))
+
+	if got.IntentV2 == nil {
+		t.Fatalf("expected IntentV2 to remain populated")
+	}
+	if got.IntentV2.Action != "terminal" {
+		t.Fatalf("IntentV2.Action = %q, want terminal", got.IntentV2.Action)
+	}
+	if got.Intent != "terminal" {
+		t.Fatalf("Intent = %q, want terminal", got.Intent)
+	}
+}
+
+func TestNormalizeTriggerIntentV2SlotsFallbackFromArguments(t *testing.T) {
+	args := map[string]string{"device_id": "d1"}
+	got := normalizeTrigger(Trigger{
+		Kind:      TriggerManual,
+		Arguments: args,
+		IntentV2: &IntentRecord{
+			Action: "terminal",
+			Slots:  nil,
+		},
+	}, time.Date(2026, 4, 15, 15, 5, 0, 0, time.UTC))
+
+	if got.IntentV2 == nil || got.IntentV2.Slots == nil {
+		t.Fatalf("expected IntentV2.Slots fallback from Arguments")
+	}
+	if got.IntentV2.Slots["device_id"] != "d1" {
+		t.Fatalf("IntentV2.Slots[device_id] = %q, want d1", got.IntentV2.Slots["device_id"])
+	}
+	// Ensure copied map semantics are preserved here too.
+	args["device_id"] = "d2"
+	if got.IntentV2.Slots["device_id"] != "d1" {
+		t.Fatalf("slots mutated through shared map reference: %+v", got.IntentV2.Slots)
+	}
+}
+
+func TestNormalizeTriggerInitializesArgumentsMapWhenNil(t *testing.T) {
+	got := normalizeTrigger(Trigger{
+		Kind:      TriggerManual,
+		Intent:    "terminal",
+		Arguments: nil,
+	}, time.Date(2026, 4, 15, 15, 10, 0, 0, time.UTC))
+
+	if got.Arguments == nil {
+		t.Fatalf("expected Arguments map to be initialized")
+	}
+	if got.IntentV2 == nil || got.IntentV2.Slots == nil {
+		t.Fatalf("expected IntentV2 slots to be initialized")
+	}
+	if len(got.Arguments) != 0 || len(got.IntentV2.Slots) != 0 {
+		t.Fatalf("expected empty initialized maps, got arguments=%v slots=%v", got.Arguments, got.IntentV2.Slots)
+	}
+}
+
 func TestIntentEventBusPublishNormalizesBeforeFanout(t *testing.T) {
 	bus := NewIntentEventBus()
 	ch, cancel := bus.Subscribe(1)
