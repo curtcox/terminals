@@ -18,7 +18,7 @@ Build on media streams for communication scenarios.
 - [x] **Internal video call**: Client-to-client video call through the server SFU; each call its own activation. See [use-case-flows.md](use-case-flows.md#audio-and-video-calls).
 - [x] **SIP integration**: Register with a SIP provider for external phone calls.
 - [x] **WebRTC-SIP bridge**: Bridge internal WebRTC streams to external SIP calls.
-- [ ] **Claim-driven preemption**: Extend the claim manager to handle cross-activation preemption — PA claims `speaker.main` on receiving devices without evicting their main-screen scenarios; receiving activations keep running with their audio parked. See [io-abstraction.md](io-abstraction.md#resource-claims) and [scenario-engine.md](scenario-engine.md#resource-claims-and-preemption).
+- [x] **Claim-driven preemption**: Extend the claim manager to handle cross-activation preemption — PA claims `speaker.main` on receiving devices without evicting their main-screen scenarios; receiving activations keep running with their audio parked. See [io-abstraction.md](io-abstraction.md#resource-claims) and [scenario-engine.md](scenario-engine.md#resource-claims-and-preemption).
 
 ## Milestone
 

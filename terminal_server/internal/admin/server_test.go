@@ -57,6 +57,31 @@ func TestStatusEndpointIncludesServerRuntimeAndConfig(t *testing.T) {
 	}
 }
 
+func TestActivationsEndpointIncludesInspectionData(t *testing.T) {
+	h := testHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/admin/api/activations", nil)
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode activations: %v", err)
+	}
+	if _, ok := payload["active_by_device"]; !ok {
+		t.Fatalf("activations payload missing active_by_device")
+	}
+	if _, ok := payload["suspended_by_device"]; !ok {
+		t.Fatalf("activations payload missing suspended_by_device")
+	}
+	if _, ok := payload["event_tail"]; !ok {
+		t.Fatalf("activations payload missing event_tail")
+	}
+}
+
 func TestStartAndStopScenarioEndpoints(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "kitchen-1", DeviceName: "Kitchen"})

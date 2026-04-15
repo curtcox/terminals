@@ -14,8 +14,8 @@ Enable audio and video streaming between clients and server.
 - [x] **WebRTC integration (client)**: `flutter_webrtc` — send/receive audio and video.
 - [x] **Signaling over gRPC**: SDP and ICE candidate exchange through the existing control channel (`WebRTCSignal` messages in [protocol.md](protocol.md)).
 - [x] **IO Router (imperative)**: Initial `Connect`/`Disconnect`-style routing of media streams between devices. See [io-abstraction.md](io-abstraction.md). Superseded by the media planner below.
-- [ ] **Media planner**: Scenarios declare a `MediaPlan` (node/edge graph); the router compiles it to `StartStream`/`StopStream`/`RouteStream` and WebRTC signaling. See [io-abstraction.md](io-abstraction.md#media-topology-plans-not-connects). Start with source → sink and fork nodes; mix, composite, analyze, and record land in later phases.
-- [ ] **Claim manager (basics)**: Per-resource exclusive/shared claims so two activations can coexist on one device (e.g. overlay above main screen). See [io-abstraction.md](io-abstraction.md#resource-claims).
+- [x] **Media planner**: Scenarios declare a `MediaPlan` (node/edge graph); the router compiles it to `StartStream`/`StopStream`/`RouteStream` and WebRTC signaling. See [io-abstraction.md](io-abstraction.md#media-topology-plans-not-connects). Start with source → sink and fork nodes; mix, composite, analyze, and record land in later phases.
+- [x] **Claim manager (basics)**: Per-resource exclusive/shared claims so two activations can coexist on one device (e.g. overlay above main screen). See [io-abstraction.md](io-abstraction.md#resource-claims).
 - [x] **Audio playback**: Server sends audio clips (TTS, alerts) to specific devices. Will migrate onto a one-node-pair media plan once the planner lands.
 
 ## Milestone

@@ -2,35 +2,47 @@ package scenario
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // ErrNoMatchingScenario indicates no scenario handled the trigger.
 var ErrNoMatchingScenario = errors.New("no matching scenario")
 
+const activationSnapshotStorageKey = "scenario.runtime.activation_snapshot.v1"
+
 // Runtime coordinates trigger matching and activation.
 type Runtime struct {
 	Engine *Engine
 	Env    *Environment
 	Bus    *IntentEventBus
+
+	mu          sync.Mutex
+	triggerTail []Trigger
 }
 
 // NewRuntime creates a runtime with engine and environment.
 func NewRuntime(engine *Engine, env *Environment) *Runtime {
-	return &Runtime{
+	r := &Runtime{
 		Engine: engine,
 		Env:    env,
 		Bus:    NewIntentEventBus(),
 	}
+	if env != nil {
+		env.TriggerBus = r.Bus
+	}
+	return r
 }
 
 // HandleTrigger matches and activates a scenario for the selected devices.
 func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, error) {
 	trigger = normalizeTrigger(trigger, time.Now().UTC())
+	r.recordTrigger(trigger)
 	if r != nil && r.Bus != nil {
 		r.Bus.Publish(trigger)
 	}
@@ -47,6 +59,7 @@ func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, e
 	if err := r.Engine.ActivateMatched(ctx, r.Env, match, deviceIDs); err != nil {
 		return "", err
 	}
+	_ = r.persistActivationSnapshot(ctx)
 	return match.Registration.name(), nil
 }
 
@@ -64,6 +77,7 @@ func (r *Runtime) HandleVoiceText(ctx context.Context, sourceID, spoken string, 
 // StopTrigger matches and stops a scenario for the selected devices.
 func (r *Runtime) StopTrigger(ctx context.Context, trigger Trigger) (string, error) {
 	trigger = normalizeTrigger(trigger, time.Now().UTC())
+	r.recordTrigger(trigger)
 	if r != nil && r.Bus != nil {
 		r.Bus.Publish(trigger)
 	}
@@ -81,6 +95,7 @@ func (r *Runtime) StopTrigger(ctx context.Context, trigger Trigger) (string, err
 	if err := r.Engine.Stop(ctx, r.Env, name, deviceIDs); err != nil {
 		return "", err
 	}
+	_ = r.persistActivationSnapshot(ctx)
 	return name, nil
 }
 
@@ -112,6 +127,24 @@ func (r *Runtime) HandleIntent(ctx context.Context, sourceID string, intent Inte
 	return r.HandleTrigger(ctx, trigger)
 }
 
+// HandleWebhookIntent routes webhook-produced intents through the same matcher.
+func (r *Runtime) HandleWebhookIntent(ctx context.Context, sourceID, action string, slots map[string]string) (string, error) {
+	return r.HandleIntent(ctx, sourceID, IntentRecord{
+		Action: strings.TrimSpace(action),
+		Slots:  copyStringMap(slots),
+		Source: SourceWebhook,
+	})
+}
+
+// HandleAutomationIntent routes automation-agent intents through the shared bus.
+func (r *Runtime) HandleAutomationIntent(ctx context.Context, sourceID, action string, slots map[string]string) (string, error) {
+	return r.HandleIntent(ctx, sourceID, IntentRecord{
+		Action: strings.TrimSpace(action),
+		Slots:  copyStringMap(slots),
+		Source: SourceAgent,
+	})
+}
+
 // HandleEvent routes a typed event through the shared trigger bus and matcher
 // pipeline.
 func (r *Runtime) HandleEvent(ctx context.Context, sourceID string, event EventRecord) (string, error) {
@@ -125,6 +158,53 @@ func (r *Runtime) HandleEvent(ctx context.Context, sourceID string, event EventR
 		trigger.Intent = strings.TrimSpace(trigger.EventV2.Kind)
 	}
 	return r.HandleTrigger(ctx, trigger)
+}
+
+// EventTail returns up to the latest limit triggers seen by the runtime.
+func (r *Runtime) EventTail(limit int) []Trigger {
+	if r == nil {
+		return nil
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.triggerTail) <= limit {
+		return append([]Trigger(nil), r.triggerTail...)
+	}
+	start := len(r.triggerTail) - limit
+	return append([]Trigger(nil), r.triggerTail[start:]...)
+}
+
+// RecoverActivations replays persisted active scenarios after a restart.
+func (r *Runtime) RecoverActivations(ctx context.Context) error {
+	if r == nil || r.Env == nil || r.Env.Storage == nil || r.Engine == nil {
+		return nil
+	}
+	payload, err := r.Env.Storage.Get(ctx, activationSnapshotStorageKey)
+	if err != nil {
+		return nil
+	}
+
+	var snapshot struct {
+		ActiveByDevice map[string]string   `json:"active_by_device"`
+		Suspended      map[string][]string `json:"suspended"`
+	}
+	if err := json.Unmarshal([]byte(payload), &snapshot); err != nil {
+		return err
+	}
+	for deviceID, scenarioName := range snapshot.ActiveByDevice {
+		if strings.TrimSpace(deviceID) == "" || strings.TrimSpace(scenarioName) == "" {
+			continue
+		}
+		if err := r.Engine.Activate(ctx, r.Env, scenarioName, []string{deviceID}); err != nil {
+			continue
+		}
+	}
+	_ = r.persistActivationSnapshot(ctx)
+	return nil
 }
 
 // StartScenario requests scenario activation by scenario name and target
@@ -346,6 +426,14 @@ func targetDevices(ctx context.Context, env *Environment, trigger Trigger) []str
 	if env == nil || env.Devices == nil {
 		return nil
 	}
+	if sourceID := strings.TrimSpace(trigger.SourceID); sourceID != "" {
+		intent := strings.TrimSpace(strings.ToLower(trigger.Intent))
+		// PA/announcement claims are resource-scoped and should coexist with
+		// peers' screen.main scenarios; track activation ownership on source only.
+		if intent == "pa_system" || intent == "pa system" || intent == "announcement" || intent == "announce" {
+			return []string{sourceID}
+		}
+	}
 	if explicitMany, ok := trigger.Arguments["device_ids"]; ok && strings.TrimSpace(explicitMany) != "" {
 		parts := strings.Split(explicitMany, ",")
 		out := make([]string, 0, len(parts))
@@ -424,4 +512,36 @@ func normalizeDeviceIDs(deviceIDs []string) []string {
 		out = append(out, deviceID)
 	}
 	return out
+}
+
+func (r *Runtime) recordTrigger(trigger Trigger) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	const maxTail = 128
+	r.triggerTail = append(r.triggerTail, trigger)
+	if len(r.triggerTail) > maxTail {
+		r.triggerTail = append([]Trigger(nil), r.triggerTail[len(r.triggerTail)-maxTail:]...)
+	}
+}
+
+func (r *Runtime) persistActivationSnapshot(ctx context.Context) error {
+	if r == nil || r.Env == nil || r.Env.Storage == nil || r.Engine == nil {
+		return nil
+	}
+	snapshot := struct {
+		ActiveByDevice map[string]string   `json:"active_by_device"`
+		Suspended      map[string][]string `json:"suspended"`
+	}{
+		ActiveByDevice: r.Engine.ActiveSnapshot(),
+		Suspended:      r.Engine.SuspendedSnapshot(),
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	return r.Env.Storage.Put(ctx, activationSnapshotStorageKey, string(encoded))
 }

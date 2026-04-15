@@ -25,11 +25,19 @@ type Route struct {
 type Router struct {
 	mu     sync.RWMutex
 	routes map[string]Route
+
+	claims  *ClaimManager
+	planner *MediaPlanner
 }
 
 // NewRouter creates an empty route registry.
 func NewRouter() *Router {
-	return &Router{routes: make(map[string]Route)}
+	router := &Router{
+		routes: make(map[string]Route),
+		claims: NewClaimManager(),
+	}
+	router.planner = NewMediaPlanner(router)
+	return router
 }
 
 // Connect creates a new logical route.
@@ -79,6 +87,20 @@ func (r *Router) RouteCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.routes)
+}
+
+// Claims returns the shared in-memory claim manager.
+func (r *Router) Claims() *ClaimManager {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.claims
+}
+
+// MediaPlanner returns the declarative media planner.
+func (r *Router) MediaPlanner() *MediaPlanner {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.planner
 }
 
 // ConnectFanout creates one source->target route per target, skipping existing routes.

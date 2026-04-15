@@ -491,6 +491,25 @@ func (s *PhoneCallScenario) Stop() error { return nil }
 // VoiceAssistantScenario proxies a prompt to AI backend and reports response.
 type VoiceAssistantScenario struct {
 	trigger Trigger
+
+	mu           sync.Mutex
+	env          *Environment
+	activationID string
+	planHandle   iorouter.PlanHandle
+}
+
+func (s *VoiceAssistantScenario) ensureActivationID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.activationID != "" {
+		return s.activationID
+	}
+	source := strings.TrimSpace(s.trigger.SourceID)
+	if source == "" {
+		source = "unknown"
+	}
+	s.activationID = "voice_assistant:" + source
+	return s.activationID
 }
 
 // Name returns the stable scenario identifier.
@@ -511,6 +530,69 @@ func (s *VoiceAssistantScenario) Start(ctx context.Context, env *Environment) er
 	if env == nil {
 		return nil
 	}
+	s.mu.Lock()
+	s.env = env
+	s.mu.Unlock()
+
+	activationID := s.ensureActivationID()
+	if routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok {
+		if claims := routeIO.Claims(); claims != nil {
+			_, err := claims.Request(ctx, []iorouter.Claim{
+				{
+					ActivationID: activationID,
+					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
+					Resource:     "mic.analyze",
+					Mode:         iorouter.ClaimShared,
+					Priority:     int(PriorityNormal),
+				},
+				{
+					ActivationID: activationID,
+					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
+					Resource:     "speaker.main",
+					Mode:         iorouter.ClaimExclusive,
+					Priority:     int(PriorityNormal),
+				},
+				{
+					ActivationID: activationID,
+					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
+					Resource:     "screen.overlay",
+					Mode:         iorouter.ClaimShared,
+					Priority:     int(PriorityNormal),
+				},
+			})
+			if err != nil && !errors.Is(err, iorouter.ErrClaimConflict) {
+				return err
+			}
+		}
+	}
+	if routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner }); ok {
+		planner := routeIO.MediaPlanner()
+		if planner != nil {
+			handle, err := planner.Apply(ctx, iorouter.MediaPlan{
+				Nodes: []iorouter.MediaNode{
+					{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": strings.TrimSpace(s.trigger.SourceID)}},
+					{ID: "fork", Kind: iorouter.NodeFork},
+					{ID: "stt", Kind: iorouter.NodeSinkSTT, Args: map[string]string{"device_id": "server"}},
+					{ID: "rec", Kind: iorouter.NodeRecorder, Args: map[string]string{"device_id": "server"}},
+					{ID: "tts", Kind: iorouter.NodeSourceTTS, Args: map[string]string{"device_id": "server"}},
+					{ID: "speaker", Kind: iorouter.NodeSinkSpeaker, Args: map[string]string{"device_id": strings.TrimSpace(s.trigger.SourceID)}},
+				},
+				Edges: []iorouter.MediaEdge{
+					{From: "mic", To: "fork"},
+					{From: "fork", To: "stt"},
+					{From: "fork", To: "rec"},
+					{From: "tts", To: "speaker"},
+				},
+			})
+			if err != nil {
+				return err
+			}
+			s.mu.Lock()
+			s.planHandle = handle
+			s.mu.Unlock()
+		}
+	}
+
 	query := strings.TrimSpace(s.trigger.Arguments["query"])
 	if query == "" {
 		query = "hello"
@@ -537,15 +619,55 @@ func (s *VoiceAssistantScenario) Start(ctx context.Context, env *Environment) er
 	return notifySource(ctx, env, s.trigger.SourceID, response)
 }
 
-// Stop ends assistant mode and currently has no side effects.
-func (s *VoiceAssistantScenario) Stop() error { return nil }
+// Stop ends assistant mode and releases claims/media resources.
+func (s *VoiceAssistantScenario) Stop() error {
+	s.mu.Lock()
+	env := s.env
+	activationID := s.activationID
+	planHandle := s.planHandle
+	s.planHandle = ""
+	s.env = nil
+	s.mu.Unlock()
+
+	if env == nil {
+		return nil
+	}
+	if routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner }); ok {
+		if planner := routeIO.MediaPlanner(); planner != nil && planHandle != "" {
+			if err := planner.Tear(context.Background(), planHandle); err != nil {
+				return err
+			}
+		}
+	}
+	if routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok {
+		if claims := routeIO.Claims(); claims != nil && activationID != "" {
+			if err := claims.Release(context.Background(), activationID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Suspend releases assistant-owned media resources while preempted.
+func (s *VoiceAssistantScenario) Suspend() error {
+	return s.Stop()
+}
+
+// Resume restores assistant media resources and claims after preemption.
+func (s *VoiceAssistantScenario) Resume(ctx context.Context, env *Environment) error {
+	return s.Start(ctx, env)
+}
 
 // AudioMonitorScenario stores monitor intent and confirms arming.
 type AudioMonitorScenario struct {
 	trigger Trigger
 
-	mu     sync.Mutex
-	stopFn func()
+	mu           sync.Mutex
+	stopFn       func()
+	env          *Environment
+	activationID string
+	planHandle   iorouter.PlanHandle
 }
 
 // Name returns the stable scenario identifier.
@@ -565,6 +687,16 @@ func (s *AudioMonitorScenario) Start(ctx context.Context, env *Environment) erro
 	if env == nil {
 		return nil
 	}
+	s.mu.Lock()
+	s.env = env
+	if s.activationID == "" {
+		sourceID := strings.TrimSpace(s.trigger.SourceID)
+		if sourceID == "" {
+			sourceID = "unknown"
+		}
+		s.activationID = "audio_monitor:" + sourceID
+	}
+	s.mu.Unlock()
 	target := strings.TrimSpace(s.trigger.Arguments["target"])
 	if target == "" {
 		target = "sound"
@@ -599,6 +731,25 @@ func openAudioMonitorSource(ctx context.Context, env *Environment, sourceID stri
 // the scenario was never started or has already stopped.
 func (s *AudioMonitorScenario) Stop() error {
 	s.clearMonitorLoop()
+	s.mu.Lock()
+	env := s.env
+	activationID := s.activationID
+	planHandle := s.planHandle
+	s.planHandle = ""
+	s.env = nil
+	s.mu.Unlock()
+	if env != nil {
+		if routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner }); ok {
+			if planner := routeIO.MediaPlanner(); planner != nil && planHandle != "" {
+				_ = planner.Tear(context.Background(), planHandle)
+			}
+		}
+		if routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok {
+			if claims := routeIO.Claims(); claims != nil && activationID != "" {
+				_ = claims.Release(context.Background(), activationID)
+			}
+		}
+	}
 	return nil
 }
 
@@ -629,7 +780,7 @@ func (s *AudioMonitorScenario) clearMonitorLoop() {
 }
 
 func (s *AudioMonitorScenario) startMonitorLoop(ctx context.Context, env *Environment, target, sourceID string) error {
-	if env == nil || env.Sound == nil {
+	if env == nil {
 		return nil
 	}
 	if ctx == nil {
@@ -638,20 +789,114 @@ func (s *AudioMonitorScenario) startMonitorLoop(ctx context.Context, env *Enviro
 
 	s.clearMonitorLoop()
 
+	activationID := ""
+	s.mu.Lock()
+	activationID = s.activationID
+	s.mu.Unlock()
+	if activationID == "" {
+		activationID = "audio_monitor:" + sourceID
+	}
+
+	analyzerPlanActive := false
+	if routeIO, ok := env.IO.(interface {
+		MediaPlanner() *iorouter.MediaPlanner
+		Claims() *iorouter.ClaimManager
+	}); ok {
+		if claims := routeIO.Claims(); claims != nil {
+			_, err := claims.Request(ctx, []iorouter.Claim{{
+				ActivationID: activationID,
+				DeviceID:     sourceID,
+				Resource:     "mic.analyze",
+				Mode:         iorouter.ClaimShared,
+				Priority:     int(PriorityNormal),
+			}})
+			if err != nil && !errors.Is(err, iorouter.ErrClaimConflict) {
+				return err
+			}
+		}
+		if planner := routeIO.MediaPlanner(); planner != nil {
+			if planner.AnalyzerEnabled() {
+				handle, err := planner.Apply(ctx, iorouter.MediaPlan{
+					Nodes: []iorouter.MediaNode{
+						{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
+						{ID: "analyzer", Kind: iorouter.NodeAnalyzer, Args: map[string]string{"name": "sound"}},
+					},
+					Edges: []iorouter.MediaEdge{
+						{From: "mic", To: "analyzer"},
+					},
+				})
+				if err == nil {
+					s.mu.Lock()
+					s.planHandle = handle
+					s.mu.Unlock()
+					analyzerPlanActive = true
+				}
+			}
+		}
+	}
+
+	// Prefer event-bus subscriptions emitted by analyzer nodes.
+	if analyzerPlanActive && env.TriggerBus != nil {
+		sub, cancel := env.TriggerBus.Subscribe(16)
+		audioCtx, cancelAudio := context.WithCancel(ctx)
+		stopFn := func() {
+			cancelAudio()
+			cancel()
+		}
+		s.mu.Lock()
+		s.stopFn = stopFn
+		s.mu.Unlock()
+
+		go func() {
+			defer stopFn()
+			for {
+				select {
+				case <-audioCtx.Done():
+					return
+				case trigger, ok := <-sub:
+					if !ok || trigger.EventV2 == nil {
+						continue
+					}
+					if strings.TrimSpace(trigger.EventV2.Kind) != "sound.detected" {
+						continue
+					}
+					if src := strings.TrimSpace(trigger.SourceID); src != "" && src != sourceID {
+						continue
+					}
+					label := strings.TrimSpace(trigger.EventV2.Subject)
+					if label == "" {
+						label = strings.TrimSpace(trigger.EventV2.Attributes["label"])
+					}
+					if !audioMonitorEventMatchesTarget(target, label) {
+						continue
+					}
+					if label == "" {
+						label = target
+					}
+					_ = notifySource(ctx, env, sourceID, "Audio monitor detected: "+label)
+					return
+				}
+			}
+		}()
+		return nil
+	}
+
+	// Fallback path for tests/contexts without an event bus analyzer runner.
+	if env.Sound == nil {
+		return nil
+	}
 	audioCtx, cancelAudio := context.WithCancel(ctx)
 	audio, closeAudio, err := openAudioMonitorSource(audioCtx, env, sourceID)
 	if err != nil {
 		cancelAudio()
 		return err
 	}
-
 	stream, err := env.Sound.Classify(audioCtx, audio)
 	if err != nil {
 		closeAudio()
 		cancelAudio()
 		return err
 	}
-
 	var stopOnce sync.Once
 	stopFn := func() {
 		stopOnce.Do(func() {
@@ -659,11 +904,9 @@ func (s *AudioMonitorScenario) startMonitorLoop(ctx context.Context, env *Enviro
 			closeAudio()
 		})
 	}
-
 	s.mu.Lock()
 	s.stopFn = stopFn
 	s.mu.Unlock()
-
 	go func() {
 		defer stopFn()
 		for event := range stream {
@@ -678,7 +921,6 @@ func (s *AudioMonitorScenario) startMonitorLoop(ctx context.Context, env *Enviro
 			return
 		}
 	}()
-
 	return nil
 }
 
@@ -816,9 +1058,7 @@ func sensorMotionMagnitude(values map[string]float64) (float64, bool) {
 type PASystemScenario struct {
 	trigger Trigger
 
-	mu          sync.Mutex
-	env         *Environment
-	ownedRoutes []ioRoute
+	recipe scenarioRecipeState
 }
 
 // Name returns the stable scenario identifier.
@@ -838,64 +1078,101 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 	if env == nil {
 		return nil
 	}
-	targets := peerTargetDeviceIDs(env, s.trigger.SourceID, s.trigger.Arguments)
-	ownedRoutes, err := connectSourceToTargetsOwned(ctx, env, s.trigger.SourceID, targets, "pa_audio")
-	if err != nil {
-		return err
+	sourceID := strings.TrimSpace(s.trigger.SourceID)
+	if sourceID == "" {
+		sourceID = "unknown"
 	}
-	s.mu.Lock()
-	s.env = env
-	s.ownedRoutes = ownedRoutes
-	s.mu.Unlock()
-	if err := notifySource(ctx, env, s.trigger.SourceID, "PA system active"); err != nil {
-		return err
-	}
-	if env.Broadcast != nil {
-		sourceID := strings.TrimSpace(s.trigger.SourceID)
-		peerIDs := nonSourceDeviceIDs(env, sourceID)
-		if len(peerIDs) > 0 {
+	activationID := "pa_system:" + sourceID
+	return s.recipe.start(ctx, env, ScenarioRecipe{
+		ActivationID: activationID,
+		Resolve: func(_ context.Context, env *Environment) []string {
+			return peerTargetDeviceIDs(env, sourceID, s.trigger.Arguments)
+		},
+		Claims: func(targets []string) []iorouter.Claim {
+			out := make([]iorouter.Claim, 0, len(targets)+1)
+			out = append(out, iorouter.Claim{
+				ActivationID: activationID,
+				DeviceID:     sourceID,
+				Resource:     "mic.capture",
+				Mode:         iorouter.ClaimExclusive,
+				Priority:     int(PriorityHigh),
+			})
+			for _, targetID := range targets {
+				out = append(out, iorouter.Claim{
+					ActivationID: activationID,
+					DeviceID:     targetID,
+					Resource:     "speaker.main",
+					Mode:         iorouter.ClaimExclusive,
+					Priority:     int(PriorityHigh),
+				})
+			}
+			return out
+		},
+		MediaPlan: func(targets []string) *iorouter.MediaPlan {
+			nodes := []iorouter.MediaNode{
+				{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
+				{ID: "fork", Kind: iorouter.NodeFork},
+			}
+			edges := []iorouter.MediaEdge{{From: "mic", To: "fork"}}
+			for idx, targetID := range targets {
+				nodeID := fmt.Sprintf("speaker_%d", idx)
+				nodes = append(nodes, iorouter.MediaNode{
+					ID:   nodeID,
+					Kind: iorouter.NodeSinkSpeaker,
+					Args: map[string]string{"device_id": targetID, "stream_kind": "pa_audio"},
+				})
+				edges = append(edges, iorouter.MediaEdge{From: "fork", To: nodeID})
+			}
+			return &iorouter.MediaPlan{Nodes: nodes, Edges: edges}
+		},
+		OnStart: func(ctx context.Context, env *Environment, _ []string) error {
+			if err := notifySource(ctx, env, sourceID, "PA system active"); err != nil {
+				return err
+			}
+			if env.Broadcast == nil {
+				return nil
+			}
+			peerIDs := nonSourceDeviceIDs(env, sourceID)
+			if len(peerIDs) == 0 {
+				return nil
+			}
 			return env.Broadcast.Notify(ctx, peerIDs, "PA from "+sourceID)
-		}
-	}
-	return nil
+		},
+	})
 }
 
 // Stop ends PA mode and releases any owned routes.
 func (s *PASystemScenario) Stop() error {
-	s.mu.Lock()
-	env := s.env
-	routes := append([]ioRoute(nil), s.ownedRoutes...)
-	s.env = nil
-	s.ownedRoutes = nil
-	s.mu.Unlock()
-	return disconnectOwnedRoutes(env, routes)
+	sourceID := strings.TrimSpace(s.trigger.SourceID)
+	if sourceID == "" {
+		sourceID = "unknown"
+	}
+	return s.recipe.stop(context.Background(), ScenarioRecipe{
+		ActivationID: "pa_system:" + sourceID,
+	})
 }
 
 // Suspend releases PA-owned routes while preempted.
 func (s *PASystemScenario) Suspend() error {
-	s.mu.Lock()
-	env := s.env
-	routes := append([]ioRoute(nil), s.ownedRoutes...)
-	s.mu.Unlock()
-	return disconnectOwnedRoutes(env, routes)
+	sourceID := strings.TrimSpace(s.trigger.SourceID)
+	if sourceID == "" {
+		sourceID = "unknown"
+	}
+	return s.recipe.stop(context.Background(), ScenarioRecipe{
+		ActivationID: "pa_system:" + sourceID,
+	})
 }
 
 // Resume reacquires PA-owned routes after preemption.
 func (s *PASystemScenario) Resume(_ context.Context, env *Environment) error {
-	s.mu.Lock()
-	routes := append([]ioRoute(nil), s.ownedRoutes...)
-	s.env = env
-	s.mu.Unlock()
-	return reconnectOwnedRoutes(env, routes)
+	return s.Start(context.Background(), env)
 }
 
 // AnnouncementScenario fans out source audio one-way for whole-house announcements.
 type AnnouncementScenario struct {
 	trigger Trigger
 
-	mu          sync.Mutex
-	env         *Environment
-	ownedRoutes []ioRoute
+	recipe scenarioRecipeState
 }
 
 // Name returns the stable scenario identifier.
@@ -915,55 +1192,94 @@ func (s *AnnouncementScenario) Start(ctx context.Context, env *Environment) erro
 	if env == nil {
 		return nil
 	}
-	targets := peerTargetDeviceIDs(env, s.trigger.SourceID, s.trigger.Arguments)
-	ownedRoutes, err := connectSourceToTargetsOwned(ctx, env, s.trigger.SourceID, targets, "announcement_audio")
-	if err != nil {
-		return err
+	sourceID := strings.TrimSpace(s.trigger.SourceID)
+	if sourceID == "" {
+		sourceID = "unknown"
 	}
-	s.mu.Lock()
-	s.env = env
-	s.ownedRoutes = ownedRoutes
-	s.mu.Unlock()
-	if err := notifySource(ctx, env, s.trigger.SourceID, "Announcement active"); err != nil {
-		return err
-	}
-	if env.Broadcast != nil {
-		sourceID := strings.TrimSpace(s.trigger.SourceID)
-		peerIDs := nonSourceDeviceIDs(env, sourceID)
-		if len(peerIDs) > 0 {
+	activationID := "announcement:" + sourceID
+	return s.recipe.start(ctx, env, ScenarioRecipe{
+		ActivationID: activationID,
+		Resolve: func(_ context.Context, env *Environment) []string {
+			return peerTargetDeviceIDs(env, sourceID, s.trigger.Arguments)
+		},
+		Claims: func(targets []string) []iorouter.Claim {
+			out := make([]iorouter.Claim, 0, len(targets)+1)
+			out = append(out, iorouter.Claim{
+				ActivationID: activationID,
+				DeviceID:     sourceID,
+				Resource:     "mic.capture",
+				Mode:         iorouter.ClaimExclusive,
+				Priority:     int(PriorityHigh),
+			})
+			for _, targetID := range targets {
+				out = append(out, iorouter.Claim{
+					ActivationID: activationID,
+					DeviceID:     targetID,
+					Resource:     "speaker.main",
+					Mode:         iorouter.ClaimExclusive,
+					Priority:     int(PriorityHigh),
+				})
+			}
+			return out
+		},
+		MediaPlan: func(targets []string) *iorouter.MediaPlan {
+			nodes := []iorouter.MediaNode{
+				{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
+				{ID: "fork", Kind: iorouter.NodeFork},
+			}
+			edges := []iorouter.MediaEdge{{From: "mic", To: "fork"}}
+			for idx, targetID := range targets {
+				nodeID := fmt.Sprintf("speaker_%d", idx)
+				nodes = append(nodes, iorouter.MediaNode{
+					ID:   nodeID,
+					Kind: iorouter.NodeSinkSpeaker,
+					Args: map[string]string{"device_id": targetID, "stream_kind": "announcement_audio"},
+				})
+				edges = append(edges, iorouter.MediaEdge{From: "fork", To: nodeID})
+			}
+			return &iorouter.MediaPlan{Nodes: nodes, Edges: edges}
+		},
+		OnStart: func(ctx context.Context, env *Environment, _ []string) error {
+			if err := notifySource(ctx, env, sourceID, "Announcement active"); err != nil {
+				return err
+			}
+			if env.Broadcast == nil {
+				return nil
+			}
+			peerIDs := nonSourceDeviceIDs(env, sourceID)
+			if len(peerIDs) == 0 {
+				return nil
+			}
 			return env.Broadcast.Notify(ctx, peerIDs, "Announcement from "+sourceID)
-		}
-	}
-	return nil
+		},
+	})
 }
 
 // Stop ends announcement mode and releases any owned routes.
 func (s *AnnouncementScenario) Stop() error {
-	s.mu.Lock()
-	env := s.env
-	routes := append([]ioRoute(nil), s.ownedRoutes...)
-	s.env = nil
-	s.ownedRoutes = nil
-	s.mu.Unlock()
-	return disconnectOwnedRoutes(env, routes)
+	sourceID := strings.TrimSpace(s.trigger.SourceID)
+	if sourceID == "" {
+		sourceID = "unknown"
+	}
+	return s.recipe.stop(context.Background(), ScenarioRecipe{
+		ActivationID: "announcement:" + sourceID,
+	})
 }
 
 // Suspend releases announcement-owned routes while preempted.
 func (s *AnnouncementScenario) Suspend() error {
-	s.mu.Lock()
-	env := s.env
-	routes := append([]ioRoute(nil), s.ownedRoutes...)
-	s.mu.Unlock()
-	return disconnectOwnedRoutes(env, routes)
+	sourceID := strings.TrimSpace(s.trigger.SourceID)
+	if sourceID == "" {
+		sourceID = "unknown"
+	}
+	return s.recipe.stop(context.Background(), ScenarioRecipe{
+		ActivationID: "announcement:" + sourceID,
+	})
 }
 
 // Resume reacquires announcement-owned routes after preemption.
 func (s *AnnouncementScenario) Resume(_ context.Context, env *Environment) error {
-	s.mu.Lock()
-	routes := append([]ioRoute(nil), s.ownedRoutes...)
-	s.env = env
-	s.mu.Unlock()
-	return reconnectOwnedRoutes(env, routes)
+	return s.Start(context.Background(), env)
 }
 
 // MultiWindowScenario routes all peer cameras to source display.

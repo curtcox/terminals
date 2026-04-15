@@ -91,6 +91,11 @@ func TestStopResumesSuspended(t *testing.T) {
 	if active != "normal" {
 		t.Fatalf("Active() = %q, want %q", active, "normal")
 	}
+
+	suspended := e.SuspendedSnapshot()
+	if len(suspended["device-1"]) != 0 {
+		t.Fatalf("suspended stack should be empty after resume, got %+v", suspended["device-1"])
+	}
 }
 
 func TestActiveSnapshot(t *testing.T) {

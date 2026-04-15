@@ -13,6 +13,7 @@ import (
 
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 )
@@ -44,6 +45,7 @@ func NewHandler(control *transport.ControlService, runtime *scenario.Runtime, de
 	mux.HandleFunc("/admin/api/scenarios", h.handleScenarios)
 	mux.HandleFunc("/admin/api/scenarios/start", h.handleStartScenario)
 	mux.HandleFunc("/admin/api/scenarios/stop", h.handleStopScenario)
+	mux.HandleFunc("/admin/api/activations", h.handleActivations)
 	return mux
 }
 
@@ -249,6 +251,36 @@ func (h *Handler) handleScenarioCommand(w http.ResponseWriter, req *http.Request
 	})
 }
 
+func (h *Handler) handleActivations(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	activeByDevice := h.runtime.Engine.ActiveSnapshot()
+	suspendedByDevice := h.runtime.Engine.SuspendedSnapshot()
+
+	claimsByDevice := map[string][]iorouter.Claim{}
+	suspendedClaimsByDevice := map[string][]iorouter.Claim{}
+	if routeIO, ok := h.runtime.Env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok {
+		claims := routeIO.Claims()
+		if claims != nil {
+			for _, d := range h.devices.List() {
+				deviceID := d.DeviceID
+				claimsByDevice[deviceID] = claims.Snapshot(deviceID)
+				suspendedClaimsByDevice[deviceID] = claims.SuspendedSnapshot(deviceID)
+			}
+		}
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"active_by_device":           activeByDevice,
+		"suspended_by_device":        suspendedByDevice,
+		"claims_by_device":           claimsByDevice,
+		"suspended_claims_by_device": suspendedClaimsByDevice,
+		"event_tail":                 h.runtime.EventTail(50),
+	})
+}
+
 func parseDeviceIDs(raw string) []string {
 	if strings.TrimSpace(raw) == "" {
 		return nil
@@ -357,6 +389,11 @@ var dashboardTemplate = template.Must(template.New("admin").Parse(`<!doctype htm
     <h2>Scenarios</h2>
     <pre id="scenarios">[]</pre>
   </section>
+
+  <section>
+    <h2>Activations</h2>
+    <pre id="activations">[]</pre>
+  </section>
 </main>
 <script>
 async function loadJSON(path) {
@@ -370,6 +407,7 @@ async function refresh() {
   document.getElementById('status').textContent = format(await loadJSON('/admin/api/status'));
   document.getElementById('devices').textContent = format(await loadJSON('/admin/api/devices'));
   document.getElementById('scenarios').textContent = format(await loadJSON('/admin/api/scenarios'));
+  document.getElementById('activations').textContent = format(await loadJSON('/admin/api/activations'));
 }
 async function scenarioCommand(path) {
   const scenario = document.getElementById('scenario').value.trim();

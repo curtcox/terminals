@@ -347,6 +347,7 @@ type Environment struct {
 	DeviceAudio DeviceAudioSubscriber
 	Passthrough PassthroughBridge
 	Placement   PlacementEngine
+	TriggerBus  *IntentEventBus
 }
 
 // Scenario is the runtime contract for all server-side behaviors.

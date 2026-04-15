@@ -16,7 +16,7 @@ Ambient intelligence scenarios.
 - [x] **Schedule monitoring scenario**: Time-triggered activity monitoring with escalating alerts. See [use-case-flows.md](use-case-flows.md#schedule-monitoring-watch-my-child). Target form: activation targets a zone via placement (e.g. `DevicesInZone("alice_room")`).
 - [x] **Red alert scenario**: Broadcast preemption of all devices with alarm. See [use-case-flows.md](use-case-flows.md#red-alert). Target form: critical-priority activation that claims every exclusive resource on every device; cascade trigger that suspends every lower-priority activation via the claim manager.
 - [x] **Placement engine**: Ship zone/role metadata on devices plus the `PlacementEngine` API (`Find`, `NearestWith`, `DevicesInZone`, `DevicesWithRole`). Ambient scenarios target "the kitchen" or "the child's room" by scope, not device ID. See [placement.md](placement.md).
-- [ ] **Analyzer nodes emit events**: The media planner's analyzer nodes publish `Event{Kind: "sound.detected", ...}` onto the intent/event bus; scenarios subscribe rather than polling. See [io-abstraction.md](io-abstraction.md#router-responsibilities).
+- [x] **Analyzer nodes emit events**: The media planner's analyzer nodes publish `Event{Kind: "sound.detected", ...}` onto the intent/event bus; scenarios subscribe rather than polling. See [io-abstraction.md](io-abstraction.md#router-responsibilities).
 
 ## Milestone
 

@@ -290,6 +290,23 @@ func (e *Engine) ActiveSnapshot() map[string]string {
 	return out
 }
 
+// SuspendedSnapshot returns a copy of suspended scenario names per device,
+// ordered from oldest to newest suspension for each device.
+func (e *Engine) SuspendedSnapshot() map[string][]string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	out := make(map[string][]string, len(e.suspendedDev))
+	for deviceID, stack := range e.suspendedDev {
+		names := make([]string, 0, len(stack))
+		for _, suspended := range stack {
+			names = append(names, suspended.name)
+		}
+		out[deviceID] = names
+	}
+	return out
+}
+
 // RegistrySnapshot returns all registered scenarios sorted by name.
 func (e *Engine) RegistrySnapshot() []RegistrationInfo {
 	e.mu.Lock()

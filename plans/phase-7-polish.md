@@ -17,11 +17,11 @@ Refinement, additional scenarios, and robustness.
 - [x] **Bluetooth and USB passthrough**: Server-directed BLE scanning and USB device access.
 - [x] **Recording and playback**: Server records streams to disk, plays back on demand. Target form: recorder node in the media planner; playback as a source node.
 - [x] **Admin UI**: Web-based dashboard for server configuration, device management, and scenario control.
-- [ ] **Preemption and resume hardening**: Activation snapshots persisted in storage; crash recovery replays the active set; soak tests exercise nested suspend/resume (PA on top of photo frame on top of voice overlay). See [scenario-engine.md](scenario-engine.md#resource-claims-and-preemption).
-- [ ] **Scenario recipe builder**: Extract the common "resolve targets → claim → media plan → UI → cleanup" skeleton into the `ScenarioRecipe` helper and port suitable built-in scenarios onto it. See [scenario-engine.md](scenario-engine.md#scenario-recipes).
-- [ ] **Automation/webhook triggers**: Webhook and automation-agent producers on the intent/event bus so external systems can drive activations with the same `Intent`/`Event` shape. See [scenario-engine.md](scenario-engine.md#triggers-intents-and-events).
+- [x] **Preemption and resume hardening**: Activation snapshots persisted in storage; crash recovery replays the active set; soak tests exercise nested suspend/resume (PA on top of photo frame on top of voice overlay). See [scenario-engine.md](scenario-engine.md#resource-claims-and-preemption).
+- [x] **Scenario recipe builder**: Extract the common "resolve targets → claim → media plan → UI → cleanup" skeleton into the `ScenarioRecipe` helper and port suitable built-in scenarios onto it. See [scenario-engine.md](scenario-engine.md#scenario-recipes).
+- [x] **Automation/webhook triggers**: Webhook and automation-agent producers on the intent/event bus so external systems can drive activations with the same `Intent`/`Event` shape. See [scenario-engine.md](scenario-engine.md#triggers-intents-and-events).
 - [x] **Admin UI for world model**: Manage zones, roles, and device metadata from the admin dashboard so adding a room is configuration. See [placement.md](placement.md).
-- [ ] **Activation inspection**: Extend the admin UI to show live claims, suspended activations, and an intent/event tail.
+- [x] **Activation inspection**: Extend the admin UI to show live claims, suspended activations, and an intent/event tail.
 
 ## Milestone
 

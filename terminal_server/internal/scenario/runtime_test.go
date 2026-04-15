@@ -1521,6 +1521,133 @@ func TestRuntimeStatusData(t *testing.T) {
 	}
 }
 
+func TestRuntimeEventTailAndWebhookAutomationIntents(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: &TerminalScenario{},
+		Priority: PriorityNormal,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.HandleWebhookIntent(context.Background(), "d1", "terminal", nil); err != nil {
+		t.Fatalf("HandleWebhookIntent() error = %v", err)
+	}
+	if _, err := runtime.HandleAutomationIntent(context.Background(), "d1", "terminal", nil); err != nil {
+		t.Fatalf("HandleAutomationIntent() error = %v", err)
+	}
+
+	tail := runtime.EventTail(10)
+	if len(tail) < 2 {
+		t.Fatalf("len(EventTail) = %d, want >=2", len(tail))
+	}
+	if tail[len(tail)-2].IntentV2 == nil || tail[len(tail)-2].IntentV2.Source != SourceWebhook {
+		t.Fatalf("expected webhook source in tail, got %+v", tail[len(tail)-2].IntentV2)
+	}
+	if tail[len(tail)-1].IntentV2 == nil || tail[len(tail)-1].IntentV2.Source != SourceAgent {
+		t.Fatalf("expected agent source in tail, got %+v", tail[len(tail)-1].IntentV2)
+	}
+}
+
+func TestRuntimeRecoverActivations(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	store := storage.NewMemoryStore()
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{
+		Scenario: &TerminalScenario{},
+		Priority: PriorityNormal,
+	})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Storage:   store,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.StartScenario(context.Background(), "terminal", []string{"d1"}); err != nil {
+		t.Fatalf("StartScenario() error = %v", err)
+	}
+
+	recoveredEngine := NewEngine()
+	recoveredEngine.Register(Registration{
+		Scenario: &TerminalScenario{},
+		Priority: PriorityNormal,
+	})
+	recovered := NewRuntime(recoveredEngine, &Environment{
+		Devices:   devices,
+		Storage:   store,
+		Broadcast: broadcaster,
+	})
+	if err := recovered.RecoverActivations(context.Background()); err != nil {
+		t.Fatalf("RecoverActivations() error = %v", err)
+	}
+	if got, ok := recovered.Engine.Active("d1"); !ok || got != "terminal" {
+		t.Fatalf("Active(d1) = (%q,%v), want (terminal,true)", got, ok)
+	}
+}
+
+func TestRuntimeNestedPreemptionSoak(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	router := iorouter.NewRouter()
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	RegisterBuiltins(engine)
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+
+	for i := 0; i < 25; i++ {
+		if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+			Kind:     TriggerManual,
+			SourceID: "d1",
+			Intent:   "photo frame",
+		}); err != nil {
+			t.Fatalf("iteration %d photo_frame error = %v", i, err)
+		}
+		if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+			Kind:     TriggerManual,
+			SourceID: "d1",
+			Intent:   "voice_assistant",
+		}); err != nil {
+			t.Fatalf("iteration %d voice_assistant error = %v", i, err)
+		}
+		if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+			Kind:     TriggerManual,
+			SourceID: "d1",
+			Intent:   "pa_system",
+		}); err != nil {
+			t.Fatalf("iteration %d pa_system error = %v", i, err)
+		}
+		if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+			Kind:     TriggerManual,
+			SourceID: "d1",
+			Intent:   "red_alert",
+		}); err != nil {
+			t.Fatalf("iteration %d red_alert start error = %v", i, err)
+		}
+		if _, err := runtime.StopTrigger(context.Background(), Trigger{
+			Kind:     TriggerManual,
+			SourceID: "d1",
+			Intent:   "red_alert",
+		}); err != nil {
+			t.Fatalf("iteration %d red_alert stop error = %v", i, err)
+		}
+	}
+}
+
 func TestRuntimeProcessDueTimers(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})

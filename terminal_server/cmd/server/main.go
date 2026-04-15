@@ -78,8 +78,24 @@ func main() {
 		DeviceAudio: scenarioDeviceAudio{hub: audioHub},
 		Placement:   placement.NewManagerBackedEngine(deviceManager),
 	}
+	ioRouter.MediaPlanner().SetAnalyzerRunner(scenarioAnalyzerRunner{
+		Sound:       environment.Sound,
+		DeviceAudio: environment.DeviceAudio,
+	})
 	scenario.RegisterBuiltins(scenarioEngine)
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
+	ioRouter.MediaPlanner().SetAnalyzerSink(func(event io.AnalyzerEvent) {
+		_, _ = scenarioRuntime.HandleEvent(context.Background(), strings.TrimSpace(event.Subject), scenario.EventRecord{
+			Kind:       strings.TrimSpace(event.Kind),
+			Subject:    strings.TrimSpace(event.Subject),
+			Attributes: copyStringMap(event.Attributes),
+			Source:     scenario.SourceEvent,
+			OccurredAt: event.OccurredAt,
+		})
+	})
+	if err := scenarioRuntime.RecoverActivations(ctx); err != nil {
+		log.Printf("recover scenario activations: %v", err)
+	}
 	controlStream := transport.NewStreamHandler(controlService)
 	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
 	if err != nil {
@@ -194,6 +210,76 @@ func main() {
 			log.Printf("stop telephony bridge: %v", err)
 		}
 	}
+}
+
+type scenarioAnalyzerRunner struct {
+	Sound       scenario.SoundClassifier
+	DeviceAudio scenario.DeviceAudioSubscriber
+}
+
+func (r scenarioAnalyzerRunner) StartAnalyzer(
+	ctx context.Context,
+	sourceDeviceID string,
+	analyzer string,
+	emit func(io.AnalyzerEvent),
+) (func(), error) {
+	if r.Sound == nil || r.DeviceAudio == nil || strings.TrimSpace(sourceDeviceID) == "" {
+		return func() {}, nil
+	}
+	if analyzer != "" && analyzer != "sound" {
+		return func() {}, nil
+	}
+
+	audioSub, err := r.DeviceAudio.SubscribeAudio(ctx, sourceDeviceID)
+	if err != nil {
+		return nil, err
+	}
+	stream, err := r.Sound.Classify(ctx, audioSub)
+	if err != nil {
+		_ = audioSub.Close()
+		return nil, err
+	}
+
+	childCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		defer cancel()
+		defer func() { _ = audioSub.Close() }()
+		for {
+			select {
+			case <-childCtx.Done():
+				return
+			case event, ok := <-stream:
+				if !ok {
+					return
+				}
+				emit(io.AnalyzerEvent{
+					Kind:    "sound.detected",
+					Subject: strings.TrimSpace(sourceDeviceID),
+					Attributes: map[string]string{
+						"label":      strings.TrimSpace(event.Label),
+						"confidence": fmt.Sprintf("%.4f", event.Confidence),
+					},
+					OccurredAt: time.Now().UTC(),
+				})
+			}
+		}
+	}()
+
+	return func() {
+		cancel()
+		_ = audioSub.Close()
+	}, nil
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 // buildTelephonyBridge returns the configured telephony bridge for the
