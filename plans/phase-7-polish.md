@@ -16,7 +16,7 @@ Refinement, additional scenarios, and robustness.
 - [x] **Sensor data streaming**: Accelerometer, gyroscope, compass data to server for future scenarios. See [io-abstraction.md](io-abstraction.md).
 - [x] **Bluetooth and USB passthrough**: Server-directed BLE scanning and USB device access.
 - [x] **Recording and playback**: Server records streams to disk, plays back on demand.
-- [ ] **Admin UI**: Web-based dashboard for server configuration, device management, and scenario control.
+- [x] **Admin UI**: Web-based dashboard for server configuration, device management, and scenario control.
 
 ## Milestone
 

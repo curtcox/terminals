@@ -12,6 +12,8 @@ import (
 type Config struct {
 	GRPCHost                      string
 	GRPCPort                      int
+	AdminHTTPHost                 string
+	AdminHTTPPort                 int
 	PhotoFrameHTTPHost            string
 	PhotoFrameHTTPPort            int
 	PhotoFramePublicBaseURL       string
@@ -43,6 +45,8 @@ func Load() (Config, error) {
 	cfg := Config{
 		GRPCHost:                      getenv("TERMINALS_GRPC_HOST", "0.0.0.0"),
 		GRPCPort:                      50051,
+		AdminHTTPHost:                 getenv("TERMINALS_ADMIN_HTTP_HOST", "0.0.0.0"),
+		AdminHTTPPort:                 50053,
 		PhotoFrameHTTPHost:            getenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "0.0.0.0"),
 		PhotoFrameHTTPPort:            50052,
 		PhotoFramePublicBaseURL:       strings.TrimSpace(os.Getenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL")),
@@ -73,6 +77,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	} else if ok {
 		cfg.PhotoFrameHTTPPort = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_ADMIN_HTTP_PORT"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.AdminHTTPPort = v
 	}
 	if v, ok, err := parseOptionalInt("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS"); err != nil {
 		return Config{}, err

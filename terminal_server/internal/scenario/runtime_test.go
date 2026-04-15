@@ -281,6 +281,61 @@ func TestRuntimeAudioMonitorPreemptedByRedAlertSuspendsAndResumes(t *testing.T) 
 	}
 }
 
+func TestRuntimeStartScenarioTargetsSpecificDevices(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Hall"})
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+	})
+
+	started, err := runtime.StartScenario(context.Background(), "terminal", []string{"d2"})
+	if err != nil {
+		t.Fatalf("StartScenario() error = %v", err)
+	}
+	if started != "terminal" {
+		t.Fatalf("started = %q, want terminal", started)
+	}
+	if active, ok := engine.Active("d2"); !ok || active != "terminal" {
+		t.Fatalf("active(d2) = (%q, %v), want (terminal, true)", active, ok)
+	}
+	if _, ok := engine.Active("d1"); ok {
+		t.Fatalf("d1 should remain inactive when d2 is explicitly targeted")
+	}
+}
+
+func TestRuntimeStopScenarioStopsTargetedDevice(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: broadcaster,
+	})
+
+	if _, err := runtime.StartScenario(context.Background(), "terminal", []string{"d1"}); err != nil {
+		t.Fatalf("StartScenario() error = %v", err)
+	}
+	stopped, err := runtime.StopScenario(context.Background(), "terminal", []string{"d1"})
+	if err != nil {
+		t.Fatalf("StopScenario() error = %v", err)
+	}
+	if stopped != "terminal" {
+		t.Fatalf("stopped = %q, want terminal", stopped)
+	}
+	if _, ok := engine.Active("d1"); ok {
+		t.Fatalf("d1 should be inactive after StopScenario")
+	}
+}
+
 func TestRuntimeIntercomPreemptedByRedAlertSuspendsAndResumesRoutes(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})

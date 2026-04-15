@@ -1,1 +1,1 @@
-Implement Admin UI scaffolding on the server using existing server-driven UI primitives.
+Implement true WebRTC media-plane integration: start with server-side Pion session management and stream forwarding hooks.

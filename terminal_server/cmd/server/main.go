@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/admin"
 	"github.com/curtcox/terminals/terminal_server/internal/ai"
 	"github.com/curtcox/terminals/terminal_server/internal/audio"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
@@ -83,6 +84,11 @@ func main() {
 		log.Printf("start photo frame asset server: %v", err)
 		return
 	}
+	adminServer, err := startAdminServer(cfg, admin.NewHandler(controlService, scenarioRuntime, deviceManager, cfg))
+	if err != nil {
+		log.Printf("start admin dashboard: %v", err)
+		return
+	}
 	controlService.SetRegisterMetadata(map[string]string{
 		"photo_frame_asset_base_url": photoBaseURL,
 	})
@@ -135,6 +141,9 @@ func main() {
 		return
 	}
 	log.Printf("control service ready for server id %q", cfg.MDNSName)
+	if adminServer != nil {
+		log.Printf("admin dashboard available at http://%s/admin", adminServer.Addr)
+	}
 	log.Printf("control stream handler initialized")
 	log.Printf("recording manager initialized dir=%s", cfg.RecordingDir)
 	log.Printf("scenario runtime initialized with %d builtin scenarios", 3)
@@ -161,6 +170,11 @@ func main() {
 	if photoServer != nil {
 		if err := photoServer.Shutdown(shutdownCtx); err != nil {
 			log.Printf("stop photo frame asset server: %v", err)
+		}
+	}
+	if adminServer != nil {
+		if err := adminServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("stop admin dashboard: %v", err)
 		}
 	}
 	if err := mdns.Stop(shutdownCtx); err != nil {

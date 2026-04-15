@@ -7,6 +7,8 @@ import (
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_GRPC_HOST", "")
 	t.Setenv("TERMINALS_GRPC_PORT", "")
+	t.Setenv("TERMINALS_ADMIN_HTTP_HOST", "")
+	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "")
 	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "")
 	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "")
 	t.Setenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL", "")
@@ -29,6 +31,12 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.GRPCPort != 50051 {
 		t.Fatalf("GRPCPort = %d", cfg.GRPCPort)
+	}
+	if cfg.AdminHTTPHost != "0.0.0.0" {
+		t.Fatalf("AdminHTTPHost = %q, want 0.0.0.0", cfg.AdminHTTPHost)
+	}
+	if cfg.AdminHTTPPort != 50053 {
+		t.Fatalf("AdminHTTPPort = %d, want 50053", cfg.AdminHTTPPort)
 	}
 	if cfg.PhotoFrameHTTPHost != "0.0.0.0" {
 		t.Fatalf("PhotoFrameHTTPHost = %q, want 0.0.0.0", cfg.PhotoFrameHTTPHost)
@@ -94,6 +102,8 @@ func TestLoadRecordingDirFromEnv(t *testing.T) {
 func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
 	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "/tmp/terminals-photos")
 	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "30")
+	t.Setenv("TERMINALS_ADMIN_HTTP_HOST", "127.0.0.1")
+	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "7000")
 	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "127.0.0.1")
 	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "7001")
 	t.Setenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL", "https://photos.example.test/slides")
@@ -104,6 +114,12 @@ func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
 	}
 	if cfg.PhotoFrameDir != "/tmp/terminals-photos" {
 		t.Fatalf("PhotoFrameDir = %q, want /tmp/terminals-photos", cfg.PhotoFrameDir)
+	}
+	if cfg.AdminHTTPHost != "127.0.0.1" {
+		t.Fatalf("AdminHTTPHost = %q, want 127.0.0.1", cfg.AdminHTTPHost)
+	}
+	if cfg.AdminHTTPPort != 7000 {
+		t.Fatalf("AdminHTTPPort = %d, want 7000", cfg.AdminHTTPPort)
 	}
 	if cfg.PhotoFrameIntervalSeconds != 30 {
 		t.Fatalf("PhotoFrameIntervalSeconds = %d, want 30", cfg.PhotoFrameIntervalSeconds)
@@ -164,6 +180,13 @@ func TestLoadInvalidPhotoFrameHTTPPort(t *testing.T) {
 	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "wat")
 	if _, err := Load(); err == nil {
 		t.Fatalf("Load() expected error for invalid photo frame HTTP port")
+	}
+}
+
+func TestLoadInvalidAdminHTTPPort(t *testing.T) {
+	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "wat")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid admin HTTP port")
 	}
 }
 

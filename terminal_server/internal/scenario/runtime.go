@@ -64,6 +64,48 @@ func (r *Runtime) StopVoiceText(ctx context.Context, sourceID, spoken string, no
 	return r.StopTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
 }
 
+// StartScenario requests scenario activation by scenario name and target
+// devices. This helper is intended for administrative controls where no
+// natural voice/manual trigger text exists.
+func (r *Runtime) StartScenario(ctx context.Context, scenarioName string, deviceIDs []string) (string, error) {
+	deviceIDs = normalizeDeviceIDs(deviceIDs)
+	args := map[string]string{}
+	if len(deviceIDs) > 0 {
+		args["device_ids"] = strings.Join(deviceIDs, ",")
+	}
+	sourceID := ""
+	if len(deviceIDs) > 0 {
+		sourceID = deviceIDs[0]
+	}
+	return r.HandleTrigger(ctx, Trigger{
+		Kind:      TriggerManual,
+		SourceID:  sourceID,
+		Intent:    strings.TrimSpace(scenarioName),
+		Arguments: args,
+	})
+}
+
+// StopScenario requests scenario stop by scenario name and target devices.
+// This helper is intended for administrative controls where no natural
+// stop trigger text exists.
+func (r *Runtime) StopScenario(ctx context.Context, scenarioName string, deviceIDs []string) (string, error) {
+	deviceIDs = normalizeDeviceIDs(deviceIDs)
+	args := map[string]string{}
+	if len(deviceIDs) > 0 {
+		args["device_ids"] = strings.Join(deviceIDs, ",")
+	}
+	sourceID := ""
+	if len(deviceIDs) > 0 {
+		sourceID = deviceIDs[0]
+	}
+	return r.StopTrigger(ctx, Trigger{
+		Kind:      TriggerManual,
+		SourceID:  sourceID,
+		Intent:    strings.TrimSpace(scenarioName),
+		Arguments: args,
+	})
+}
+
 // ProcessSensorReading dispatches telemetry snapshots to the active scenario
 // for the source device when that scenario declares SensorConsumer support.
 func (r *Runtime) ProcessSensorReading(ctx context.Context, reading SensorReading) error {
@@ -264,4 +306,21 @@ func targetDevices(env *Environment, trigger Trigger) []string {
 		return []string{explicit}
 	}
 	return env.Devices.ListDeviceIDs()
+}
+
+func normalizeDeviceIDs(deviceIDs []string) []string {
+	out := make([]string, 0, len(deviceIDs))
+	seen := make(map[string]struct{}, len(deviceIDs))
+	for _, deviceID := range deviceIDs {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" {
+			continue
+		}
+		if _, exists := seen[deviceID]; exists {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		out = append(out, deviceID)
+	}
+	return out
 }
