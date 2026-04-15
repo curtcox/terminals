@@ -19,6 +19,21 @@ typedef ClientMediaEngineFactory = ClientMediaEngine Function({
   required OutboundSignalCallback onSignal,
 });
 
+const bool _e2eEmitEvents = bool.fromEnvironment(
+  'TERMINALS_E2E_EMIT_EVENTS',
+);
+const bool _e2eAutoScanConnect = bool.fromEnvironment(
+  'TERMINALS_E2E_AUTO_SCAN_CONNECT',
+);
+const String _mdnsServiceType = String.fromEnvironment(
+  'TERMINALS_MDNS_SERVICE_TYPE',
+  defaultValue: '_terminals._tcp.local',
+);
+const int _e2eStartupDelayMs = int.fromEnvironment(
+  'TERMINALS_E2E_STARTUP_DELAY_MS',
+  defaultValue: 600,
+);
+
 Duration calculateReconnectDelay({
   required int reconnectAttempt,
   required Duration reconnectDelayBase,
@@ -106,7 +121,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   final TextEditingController _platformController = TextEditingController(
     text: 'flutter',
   );
-  final MdnsScanner _mdnsScanner = MdnsScanner();
+  final MdnsScanner _mdnsScanner = MdnsScanner(serviceType: _mdnsServiceType);
   TerminalControlClient? _client;
   final StreamController<ConnectRequest> _outgoing =
       StreamController<ConnectRequest>.broadcast();
@@ -165,6 +180,36 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       localDeviceID: _deviceId,
       onSignal: _sendWebRTCSignalMessage,
     );
+    if (_e2eEmitEvents) {
+      debugPrint('E2E_EVENT: client_started');
+    }
+    if (_e2eAutoScanConnect) {
+      unawaited(_runE2EAutoConnectFlow());
+    }
+  }
+
+  Future<void> _runE2EAutoConnectFlow() async {
+    await Future<void>.delayed(Duration(milliseconds: _e2eStartupDelayMs));
+    if (!mounted) {
+      return;
+    }
+    if (_e2eEmitEvents) {
+      debugPrint('E2E_EVENT: scanning_started');
+    }
+    await _scanForServers();
+    if (!mounted) {
+      return;
+    }
+    if (_discoveredServers.isEmpty) {
+      if (_e2eEmitEvents) {
+        debugPrint('E2E_EVENT: no_servers_discovered');
+      }
+      return;
+    }
+    if (_e2eEmitEvents) {
+      debugPrint('E2E_EVENT: discovered_servers=${_discoveredServers.length}');
+    }
+    await _startStream(userInitiated: true);
   }
 
   Future<void> _startStream({bool userInitiated = true}) async {
@@ -255,6 +300,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
               _lastNotification = response.error.message;
             }
             _applyRegisterMetadata(response);
+            if (_e2eEmitEvents && response.hasRegisterAck()) {
+              debugPrint('E2E_EVENT: register_ack');
+            }
             _applyMediaControlResponse(response);
           });
         },

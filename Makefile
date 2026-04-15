@@ -6,7 +6,8 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 .PHONY: server-build server-test server-lint server-coverage \
 	client-build client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
-	all-lint all-test all-check run-server run-client-web
+	all-lint all-test all-check run-server run-client-web \
+	run-mac mac-e2e-test
 
 server-build:
 	cd terminal_server && go build ./...
@@ -52,3 +53,9 @@ run-server:
 
 run-client-web:
 	cd terminal_client && flutter run -d web-server
+
+run-mac:
+	./scripts/run-mac.sh
+
+mac-e2e-test:
+	./scripts/test-mac-e2e.sh

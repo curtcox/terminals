@@ -29,6 +29,12 @@ api/gen/
 dist/
 build/
 tmp/
+.tmp/
+logs/
+*.log
+*.pid
+*.pid.lock
+*.tmp
 .bin/
 .home/
 .sdk/
