@@ -419,6 +419,16 @@ func TestIntentEventBusPublishStillWorksAfterPartialUnsubscribe(t *testing.T) {
 	}
 }
 
+func TestIntentEventBusPublishNilReceiverIsSafe(_ *testing.T) {
+	var bus *IntentEventBus
+	bus.Publish(Trigger{Kind: TriggerManual, Intent: "ignored"})
+}
+
+func TestIntentEventBusPublishWithoutSubscribersIsSafe(_ *testing.T) {
+	bus := NewIntentEventBus()
+	bus.Publish(Trigger{Kind: TriggerManual, Intent: "ignored"})
+}
+
 func waitTrigger(t *testing.T, ch <-chan Trigger, context string) Trigger {
 	t.Helper()
 	select {
