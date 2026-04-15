@@ -198,6 +198,45 @@ func TestRuntimeHandleIntentMapsSourceToTriggerKind(t *testing.T) {
 	}
 }
 
+func TestRuntimeHandleEventRoutesTypedEvent(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1"})
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	ch, cancel := runtime.Bus.Subscribe(1)
+	defer cancel()
+
+	name, err := runtime.HandleEvent(context.Background(), "d1", EventRecord{
+		Kind:   "terminal",
+		Source: SourceWebhook,
+	})
+	if err != nil {
+		t.Fatalf("HandleEvent() error = %v", err)
+	}
+	if name != "terminal" {
+		t.Fatalf("HandleEvent() = %q, want terminal", name)
+	}
+
+	select {
+	case got := <-ch:
+		if got.Kind != TriggerEvent {
+			t.Fatalf("trigger kind = %q, want %q", got.Kind, TriggerEvent)
+		}
+		if got.EventV2 == nil {
+			t.Fatalf("expected EventV2 on published trigger")
+		}
+		if got.EventV2.Source != SourceWebhook {
+			t.Fatalf("event source = %q, want %q", got.EventV2.Source, SourceWebhook)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("timed out waiting for bus trigger")
+	}
+}
+
 func TestRuntimeHandleVoiceTextUsesLLMIntentResolutionForAmbiguousInput(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1"})
@@ -1606,8 +1645,14 @@ func TestRuntimeEventTailAndWebhookAutomationIntents(t *testing.T) {
 	if tail[len(tail)-2].IntentV2 == nil || tail[len(tail)-2].IntentV2.Source != SourceWebhook {
 		t.Fatalf("expected webhook source in tail, got %+v", tail[len(tail)-2].IntentV2)
 	}
+	if tail[len(tail)-2].Kind != TriggerManual {
+		t.Fatalf("expected webhook trigger kind manual, got %q", tail[len(tail)-2].Kind)
+	}
 	if tail[len(tail)-1].IntentV2 == nil || tail[len(tail)-1].IntentV2.Source != SourceAgent {
 		t.Fatalf("expected agent source in tail, got %+v", tail[len(tail)-1].IntentV2)
+	}
+	if tail[len(tail)-1].Kind != TriggerManual {
+		t.Fatalf("expected agent trigger kind manual, got %q", tail[len(tail)-1].Kind)
 	}
 }
 
