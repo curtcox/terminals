@@ -35,6 +35,7 @@ type DeviceCapabilities struct {
 	Sensors       *SensorCapability       `protobuf:"bytes,17,opt,name=sensors,proto3" json:"sensors,omitempty"`
 	Connectivity  *ConnectivityCapability `protobuf:"bytes,18,opt,name=connectivity,proto3" json:"connectivity,omitempty"`
 	Battery       *BatteryCapability      `protobuf:"bytes,19,opt,name=battery,proto3" json:"battery,omitempty"`
+	Edge          *EdgeCapability         `protobuf:"bytes,20,opt,name=edge,proto3" json:"edge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -149,6 +150,13 @@ func (x *DeviceCapabilities) GetConnectivity() *ConnectivityCapability {
 func (x *DeviceCapabilities) GetBattery() *BatteryCapability {
 	if x != nil {
 		return x.Battery
+	}
+	return nil
+}
+
+func (x *DeviceCapabilities) GetEdge() *EdgeCapability {
+	if x != nil {
+		return x.Edge
 	}
 	return nil
 }
@@ -865,11 +873,335 @@ func (x *BatteryCapability) GetCharging() bool {
 	return false
 }
 
+type EdgeCapability struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Runtimes      []string                 `protobuf:"bytes,1,rep,name=runtimes,proto3" json:"runtimes,omitempty"`
+	Compute       *EdgeComputeCapability   `protobuf:"bytes,2,opt,name=compute,proto3" json:"compute,omitempty"`
+	Operators     []string                 `protobuf:"bytes,3,rep,name=operators,proto3" json:"operators,omitempty"`
+	Retention     *EdgeRetentionCapability `protobuf:"bytes,4,opt,name=retention,proto3" json:"retention,omitempty"`
+	Timing        *EdgeTimingCapability    `protobuf:"bytes,5,opt,name=timing,proto3" json:"timing,omitempty"`
+	Geometry      *EdgeGeometryCapability  `protobuf:"bytes,6,opt,name=geometry,proto3" json:"geometry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EdgeCapability) Reset() {
+	*x = EdgeCapability{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EdgeCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EdgeCapability) ProtoMessage() {}
+
+func (x *EdgeCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EdgeCapability.ProtoReflect.Descriptor instead.
+func (*EdgeCapability) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *EdgeCapability) GetRuntimes() []string {
+	if x != nil {
+		return x.Runtimes
+	}
+	return nil
+}
+
+func (x *EdgeCapability) GetCompute() *EdgeComputeCapability {
+	if x != nil {
+		return x.Compute
+	}
+	return nil
+}
+
+func (x *EdgeCapability) GetOperators() []string {
+	if x != nil {
+		return x.Operators
+	}
+	return nil
+}
+
+func (x *EdgeCapability) GetRetention() *EdgeRetentionCapability {
+	if x != nil {
+		return x.Retention
+	}
+	return nil
+}
+
+func (x *EdgeCapability) GetTiming() *EdgeTimingCapability {
+	if x != nil {
+		return x.Timing
+	}
+	return nil
+}
+
+func (x *EdgeCapability) GetGeometry() *EdgeGeometryCapability {
+	if x != nil {
+		return x.Geometry
+	}
+	return nil
+}
+
+type EdgeComputeCapability struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CpuRealtime   int32                  `protobuf:"varint,1,opt,name=cpu_realtime,json=cpuRealtime,proto3" json:"cpu_realtime,omitempty"`
+	GpuRealtime   int32                  `protobuf:"varint,2,opt,name=gpu_realtime,json=gpuRealtime,proto3" json:"gpu_realtime,omitempty"`
+	NpuRealtime   int32                  `protobuf:"varint,3,opt,name=npu_realtime,json=npuRealtime,proto3" json:"npu_realtime,omitempty"`
+	MemMb         int32                  `protobuf:"varint,4,opt,name=mem_mb,json=memMb,proto3" json:"mem_mb,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EdgeComputeCapability) Reset() {
+	*x = EdgeComputeCapability{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EdgeComputeCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EdgeComputeCapability) ProtoMessage() {}
+
+func (x *EdgeComputeCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EdgeComputeCapability.ProtoReflect.Descriptor instead.
+func (*EdgeComputeCapability) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *EdgeComputeCapability) GetCpuRealtime() int32 {
+	if x != nil {
+		return x.CpuRealtime
+	}
+	return 0
+}
+
+func (x *EdgeComputeCapability) GetGpuRealtime() int32 {
+	if x != nil {
+		return x.GpuRealtime
+	}
+	return 0
+}
+
+func (x *EdgeComputeCapability) GetNpuRealtime() int32 {
+	if x != nil {
+		return x.NpuRealtime
+	}
+	return 0
+}
+
+func (x *EdgeComputeCapability) GetMemMb() int32 {
+	if x != nil {
+		return x.MemMb
+	}
+	return 0
+}
+
+type EdgeRetentionCapability struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AudioSec      int32                  `protobuf:"varint,1,opt,name=audio_sec,json=audioSec,proto3" json:"audio_sec,omitempty"`
+	VideoSec      int32                  `protobuf:"varint,2,opt,name=video_sec,json=videoSec,proto3" json:"video_sec,omitempty"`
+	SensorSec     int32                  `protobuf:"varint,3,opt,name=sensor_sec,json=sensorSec,proto3" json:"sensor_sec,omitempty"`
+	RadioSec      int32                  `protobuf:"varint,4,opt,name=radio_sec,json=radioSec,proto3" json:"radio_sec,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EdgeRetentionCapability) Reset() {
+	*x = EdgeRetentionCapability{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EdgeRetentionCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EdgeRetentionCapability) ProtoMessage() {}
+
+func (x *EdgeRetentionCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EdgeRetentionCapability.ProtoReflect.Descriptor instead.
+func (*EdgeRetentionCapability) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *EdgeRetentionCapability) GetAudioSec() int32 {
+	if x != nil {
+		return x.AudioSec
+	}
+	return 0
+}
+
+func (x *EdgeRetentionCapability) GetVideoSec() int32 {
+	if x != nil {
+		return x.VideoSec
+	}
+	return 0
+}
+
+func (x *EdgeRetentionCapability) GetSensorSec() int32 {
+	if x != nil {
+		return x.SensorSec
+	}
+	return 0
+}
+
+func (x *EdgeRetentionCapability) GetRadioSec() int32 {
+	if x != nil {
+		return x.RadioSec
+	}
+	return 0
+}
+
+type EdgeTimingCapability struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SyncErrorMs   float64                `protobuf:"fixed64,1,opt,name=sync_error_ms,json=syncErrorMs,proto3" json:"sync_error_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EdgeTimingCapability) Reset() {
+	*x = EdgeTimingCapability{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EdgeTimingCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EdgeTimingCapability) ProtoMessage() {}
+
+func (x *EdgeTimingCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EdgeTimingCapability.ProtoReflect.Descriptor instead.
+func (*EdgeTimingCapability) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *EdgeTimingCapability) GetSyncErrorMs() float64 {
+	if x != nil {
+		return x.SyncErrorMs
+	}
+	return 0
+}
+
+type EdgeGeometryCapability struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	MicArray         bool                   `protobuf:"varint,1,opt,name=mic_array,json=micArray,proto3" json:"mic_array,omitempty"`
+	CameraIntrinsics bool                   `protobuf:"varint,2,opt,name=camera_intrinsics,json=cameraIntrinsics,proto3" json:"camera_intrinsics,omitempty"`
+	Compass          bool                   `protobuf:"varint,3,opt,name=compass,proto3" json:"compass,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *EdgeGeometryCapability) Reset() {
+	*x = EdgeGeometryCapability{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EdgeGeometryCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EdgeGeometryCapability) ProtoMessage() {}
+
+func (x *EdgeGeometryCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EdgeGeometryCapability.ProtoReflect.Descriptor instead.
+func (*EdgeGeometryCapability) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *EdgeGeometryCapability) GetMicArray() bool {
+	if x != nil {
+		return x.MicArray
+	}
+	return false
+}
+
+func (x *EdgeGeometryCapability) GetCameraIntrinsics() bool {
+	if x != nil {
+		return x.CameraIntrinsics
+	}
+	return false
+}
+
+func (x *EdgeGeometryCapability) GetCompass() bool {
+	if x != nil {
+		return x.Compass
+	}
+	return false
+}
+
 var File_terminals_capabilities_v1_capabilities_proto protoreflect.FileDescriptor
 
 const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\n" +
-	",terminals/capabilities/v1/capabilities.proto\x12\x19terminals.capabilities.v1\"\xdc\x06\n" +
+	",terminals/capabilities/v1/capabilities.proto\x12\x19terminals.capabilities.v1\"\x9b\a\n" +
 	"\x12DeviceCapabilities\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12E\n" +
 	"\bidentity\x18\x02 \x01(\v2).terminals.capabilities.v1.DeviceIdentityR\bidentity\x12C\n" +
@@ -885,7 +1217,8 @@ const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\x06camera\x18\x10 \x01(\v2+.terminals.capabilities.v1.CameraCapabilityR\x06camera\x12E\n" +
 	"\asensors\x18\x11 \x01(\v2+.terminals.capabilities.v1.SensorCapabilityR\asensors\x12U\n" +
 	"\fconnectivity\x18\x12 \x01(\v21.terminals.capabilities.v1.ConnectivityCapabilityR\fconnectivity\x12F\n" +
-	"\abattery\x18\x13 \x01(\v2,.terminals.capabilities.v1.BatteryCapabilityR\abattery\"n\n" +
+	"\abattery\x18\x13 \x01(\v2,.terminals.capabilities.v1.BatteryCapabilityR\abattery\x12=\n" +
+	"\x04edge\x18\x14 \x01(\v2).terminals.capabilities.v1.EdgeCapabilityR\x04edge\"n\n" +
 	"\x0eDeviceIdentity\x12\x1f\n" +
 	"\vdevice_name\x18\x01 \x01(\tR\n" +
 	"deviceName\x12\x1f\n" +
@@ -936,7 +1269,31 @@ const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\x03nfc\x18\x05 \x01(\bR\x03nfc\"E\n" +
 	"\x11BatteryCapability\x12\x14\n" +
 	"\x05level\x18\x01 \x01(\x02R\x05level\x12\x1a\n" +
-	"\bcharging\x18\x02 \x01(\bR\bchargingBTZRgithub.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1;capabilitiesv1b\x06proto3"
+	"\bcharging\x18\x02 \x01(\bR\bcharging\"\x80\x03\n" +
+	"\x0eEdgeCapability\x12\x1a\n" +
+	"\bruntimes\x18\x01 \x03(\tR\bruntimes\x12J\n" +
+	"\acompute\x18\x02 \x01(\v20.terminals.capabilities.v1.EdgeComputeCapabilityR\acompute\x12\x1c\n" +
+	"\toperators\x18\x03 \x03(\tR\toperators\x12P\n" +
+	"\tretention\x18\x04 \x01(\v22.terminals.capabilities.v1.EdgeRetentionCapabilityR\tretention\x12G\n" +
+	"\x06timing\x18\x05 \x01(\v2/.terminals.capabilities.v1.EdgeTimingCapabilityR\x06timing\x12M\n" +
+	"\bgeometry\x18\x06 \x01(\v21.terminals.capabilities.v1.EdgeGeometryCapabilityR\bgeometry\"\x97\x01\n" +
+	"\x15EdgeComputeCapability\x12!\n" +
+	"\fcpu_realtime\x18\x01 \x01(\x05R\vcpuRealtime\x12!\n" +
+	"\fgpu_realtime\x18\x02 \x01(\x05R\vgpuRealtime\x12!\n" +
+	"\fnpu_realtime\x18\x03 \x01(\x05R\vnpuRealtime\x12\x15\n" +
+	"\x06mem_mb\x18\x04 \x01(\x05R\x05memMb\"\x8f\x01\n" +
+	"\x17EdgeRetentionCapability\x12\x1b\n" +
+	"\taudio_sec\x18\x01 \x01(\x05R\baudioSec\x12\x1b\n" +
+	"\tvideo_sec\x18\x02 \x01(\x05R\bvideoSec\x12\x1d\n" +
+	"\n" +
+	"sensor_sec\x18\x03 \x01(\x05R\tsensorSec\x12\x1b\n" +
+	"\tradio_sec\x18\x04 \x01(\x05R\bradioSec\":\n" +
+	"\x14EdgeTimingCapability\x12\"\n" +
+	"\rsync_error_ms\x18\x01 \x01(\x01R\vsyncErrorMs\"|\n" +
+	"\x16EdgeGeometryCapability\x12\x1b\n" +
+	"\tmic_array\x18\x01 \x01(\bR\bmicArray\x12+\n" +
+	"\x11camera_intrinsics\x18\x02 \x01(\bR\x10cameraIntrinsics\x12\x18\n" +
+	"\acompass\x18\x03 \x01(\bR\acompassBTZRgithub.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1;capabilitiesv1b\x06proto3"
 
 var (
 	file_terminals_capabilities_v1_capabilities_proto_rawDescOnce sync.Once
@@ -950,21 +1307,26 @@ func file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP() []byte {
 	return file_terminals_capabilities_v1_capabilities_proto_rawDescData
 }
 
-var file_terminals_capabilities_v1_capabilities_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_terminals_capabilities_v1_capabilities_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_terminals_capabilities_v1_capabilities_proto_goTypes = []any{
-	(*DeviceCapabilities)(nil),     // 0: terminals.capabilities.v1.DeviceCapabilities
-	(*DeviceIdentity)(nil),         // 1: terminals.capabilities.v1.DeviceIdentity
-	(*ScreenCapability)(nil),       // 2: terminals.capabilities.v1.ScreenCapability
-	(*KeyboardCapability)(nil),     // 3: terminals.capabilities.v1.KeyboardCapability
-	(*PointerCapability)(nil),      // 4: terminals.capabilities.v1.PointerCapability
-	(*TouchCapability)(nil),        // 5: terminals.capabilities.v1.TouchCapability
-	(*AudioOutputCapability)(nil),  // 6: terminals.capabilities.v1.AudioOutputCapability
-	(*AudioInputCapability)(nil),   // 7: terminals.capabilities.v1.AudioInputCapability
-	(*CameraLens)(nil),             // 8: terminals.capabilities.v1.CameraLens
-	(*CameraCapability)(nil),       // 9: terminals.capabilities.v1.CameraCapability
-	(*SensorCapability)(nil),       // 10: terminals.capabilities.v1.SensorCapability
-	(*ConnectivityCapability)(nil), // 11: terminals.capabilities.v1.ConnectivityCapability
-	(*BatteryCapability)(nil),      // 12: terminals.capabilities.v1.BatteryCapability
+	(*DeviceCapabilities)(nil),      // 0: terminals.capabilities.v1.DeviceCapabilities
+	(*DeviceIdentity)(nil),          // 1: terminals.capabilities.v1.DeviceIdentity
+	(*ScreenCapability)(nil),        // 2: terminals.capabilities.v1.ScreenCapability
+	(*KeyboardCapability)(nil),      // 3: terminals.capabilities.v1.KeyboardCapability
+	(*PointerCapability)(nil),       // 4: terminals.capabilities.v1.PointerCapability
+	(*TouchCapability)(nil),         // 5: terminals.capabilities.v1.TouchCapability
+	(*AudioOutputCapability)(nil),   // 6: terminals.capabilities.v1.AudioOutputCapability
+	(*AudioInputCapability)(nil),    // 7: terminals.capabilities.v1.AudioInputCapability
+	(*CameraLens)(nil),              // 8: terminals.capabilities.v1.CameraLens
+	(*CameraCapability)(nil),        // 9: terminals.capabilities.v1.CameraCapability
+	(*SensorCapability)(nil),        // 10: terminals.capabilities.v1.SensorCapability
+	(*ConnectivityCapability)(nil),  // 11: terminals.capabilities.v1.ConnectivityCapability
+	(*BatteryCapability)(nil),       // 12: terminals.capabilities.v1.BatteryCapability
+	(*EdgeCapability)(nil),          // 13: terminals.capabilities.v1.EdgeCapability
+	(*EdgeComputeCapability)(nil),   // 14: terminals.capabilities.v1.EdgeComputeCapability
+	(*EdgeRetentionCapability)(nil), // 15: terminals.capabilities.v1.EdgeRetentionCapability
+	(*EdgeTimingCapability)(nil),    // 16: terminals.capabilities.v1.EdgeTimingCapability
+	(*EdgeGeometryCapability)(nil),  // 17: terminals.capabilities.v1.EdgeGeometryCapability
 }
 var file_terminals_capabilities_v1_capabilities_proto_depIdxs = []int32{
 	1,  // 0: terminals.capabilities.v1.DeviceCapabilities.identity:type_name -> terminals.capabilities.v1.DeviceIdentity
@@ -978,13 +1340,18 @@ var file_terminals_capabilities_v1_capabilities_proto_depIdxs = []int32{
 	10, // 8: terminals.capabilities.v1.DeviceCapabilities.sensors:type_name -> terminals.capabilities.v1.SensorCapability
 	11, // 9: terminals.capabilities.v1.DeviceCapabilities.connectivity:type_name -> terminals.capabilities.v1.ConnectivityCapability
 	12, // 10: terminals.capabilities.v1.DeviceCapabilities.battery:type_name -> terminals.capabilities.v1.BatteryCapability
-	8,  // 11: terminals.capabilities.v1.CameraCapability.front:type_name -> terminals.capabilities.v1.CameraLens
-	8,  // 12: terminals.capabilities.v1.CameraCapability.back:type_name -> terminals.capabilities.v1.CameraLens
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	13, // 11: terminals.capabilities.v1.DeviceCapabilities.edge:type_name -> terminals.capabilities.v1.EdgeCapability
+	8,  // 12: terminals.capabilities.v1.CameraCapability.front:type_name -> terminals.capabilities.v1.CameraLens
+	8,  // 13: terminals.capabilities.v1.CameraCapability.back:type_name -> terminals.capabilities.v1.CameraLens
+	14, // 14: terminals.capabilities.v1.EdgeCapability.compute:type_name -> terminals.capabilities.v1.EdgeComputeCapability
+	15, // 15: terminals.capabilities.v1.EdgeCapability.retention:type_name -> terminals.capabilities.v1.EdgeRetentionCapability
+	16, // 16: terminals.capabilities.v1.EdgeCapability.timing:type_name -> terminals.capabilities.v1.EdgeTimingCapability
+	17, // 17: terminals.capabilities.v1.EdgeCapability.geometry:type_name -> terminals.capabilities.v1.EdgeGeometryCapability
+	18, // [18:18] is the sub-list for method output_type
+	18, // [18:18] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_terminals_capabilities_v1_capabilities_proto_init() }
@@ -998,7 +1365,7 @@ func file_terminals_capabilities_v1_capabilities_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_capabilities_v1_capabilities_proto_rawDesc), len(file_terminals_capabilities_v1_capabilities_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -19,6 +19,19 @@ const (
 	ClaimShared ClaimMode = "shared"
 )
 
+// Claimable resource names used by scenarios and flow planners.
+const (
+	ResourceComputeCPUShared = "compute.cpu.shared"
+	ResourceComputeGPUShared = "compute.gpu.shared"
+	ResourceComputeNPUShared = "compute.npu.shared"
+	ResourceBufferAudio      = "buffer.audio.recent"
+	ResourceBufferVideo      = "buffer.video.recent"
+	ResourceBufferSensor     = "buffer.sensor.recent"
+	ResourceBufferRadio      = "buffer.radio.recent"
+	ResourceRadioBLEScan     = "radio.ble.scan"
+	ResourceRadioWiFiScan    = "radio.wifi.scan"
+)
+
 // Claim describes one activation's request for a resource on a device.
 type Claim struct {
 	ActivationID string

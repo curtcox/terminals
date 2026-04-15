@@ -207,6 +207,56 @@ type VoiceAudioRequest struct {
 	IsFinal    bool
 }
 
+// ObservationRequest carries a typed observation from an edge flow.
+type ObservationRequest struct {
+	Observation iorouter.Observation
+}
+
+// ArtifactAvailableRequest reports an artifact that can be pulled by id.
+type ArtifactAvailableRequest struct {
+	Artifact iorouter.ArtifactRef
+}
+
+// FlowStatsRequest carries edge flow health and resource stats.
+type FlowStatsRequest struct {
+	FlowID        string
+	CPUPct        float64
+	MemMB         float64
+	DroppedFrames uint64
+	State         string
+	Error         string
+}
+
+// ClockSampleRequest carries a timing sample from a device clock discipline loop.
+type ClockSampleRequest struct {
+	DeviceID     string
+	ClientUnixMS int64
+	ServerUnixMS int64
+	ErrorMS      float64
+}
+
+// StartFlowResponse instructs a client to start a generalized flow.
+type StartFlowResponse struct {
+	FlowID string
+	Plan   iorouter.FlowPlan
+}
+
+// PatchFlowResponse instructs a client to patch an existing flow.
+type PatchFlowResponse struct {
+	FlowID string
+	Plan   iorouter.FlowPlan
+}
+
+// StopFlowResponse instructs a client to stop one flow.
+type StopFlowResponse struct {
+	FlowID string
+}
+
+// RequestArtifactResponse asks a client to materialize one artifact.
+type RequestArtifactResponse struct {
+	ArtifactID string
+}
+
 // PlayAudioResponse instructs a specific device to play synthesized audio.
 type PlayAudioResponse struct {
 	RequestID string
@@ -226,6 +276,10 @@ type ClientMessage struct {
 	Input           *InputRequest
 	Command         *CommandRequest
 	VoiceAudio      *VoiceAudioRequest
+	Observation     *ObservationRequest
+	ArtifactReady   *ArtifactAvailableRequest
+	FlowStats       *FlowStatsRequest
+	ClockSample     *ClockSampleRequest
 	SessionDeviceID string
 }
 
@@ -241,6 +295,10 @@ type ServerMessage struct {
 	WebRTCSignal    *WebRTCSignalResponse
 	TransitionUI    *UITransition
 	PlayAudio       *PlayAudioResponse
+	StartFlow       *StartFlowResponse
+	PatchFlow       *PatchFlowResponse
+	StopFlow        *StopFlowResponse
+	RequestArtifact *RequestArtifactResponse
 	Notification    string
 	ScenarioStart   string
 	ScenarioStop    string
@@ -540,6 +598,32 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			return nil, nil
 		}
 		return out, nil
+	case msg.Observation != nil:
+		if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Observe != nil {
+			if sink, ok := h.runtime.Env.Observe.(interface {
+				AddObservation(context.Context, iorouter.Observation)
+			}); ok {
+				sink.AddObservation(ctx, msg.Observation.Observation)
+			}
+		}
+		return nil, nil
+	case msg.ArtifactReady != nil:
+		if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Observe != nil {
+			if sink, ok := h.runtime.Env.Observe.(interface {
+				AddObservation(context.Context, iorouter.Observation)
+			}); ok {
+				sink.AddObservation(ctx, iorouter.Observation{
+					Kind:       "artifact.available",
+					OccurredAt: time.Now().UTC(),
+					Evidence:   []iorouter.ArtifactRef{msg.ArtifactReady.Artifact},
+				})
+			}
+		}
+		return nil, nil
+	case msg.FlowStats != nil:
+		return nil, nil
+	case msg.ClockSample != nil:
+		return nil, nil
 	case msg.StreamReady != nil:
 		h.metrics.streamReadyReceived.Add(1)
 		h.markStreamReady(msg.StreamReady.StreamID)

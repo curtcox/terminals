@@ -30,6 +30,7 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
     SensorCapability? sensors,
     ConnectivityCapability? connectivity,
     BatteryCapability? battery,
+    EdgeCapability? edge,
   }) {
     final result = create();
     if (deviceId != null) result.deviceId = deviceId;
@@ -44,6 +45,7 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
     if (sensors != null) result.sensors = sensors;
     if (connectivity != null) result.connectivity = connectivity;
     if (battery != null) result.battery = battery;
+    if (edge != null) result.edge = edge;
     return result;
   }
 
@@ -84,6 +86,8 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
         subBuilder: ConnectivityCapability.create)
     ..aOM<BatteryCapability>(19, _omitFieldNames ? '' : 'battery',
         subBuilder: BatteryCapability.create)
+    ..aOM<EdgeCapability>(20, _omitFieldNames ? '' : 'edge',
+        subBuilder: EdgeCapability.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -234,6 +238,17 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
   void clearBattery() => $_clearField(19);
   @$pb.TagNumber(19)
   BatteryCapability ensureBattery() => $_ensure(11);
+
+  @$pb.TagNumber(20)
+  EdgeCapability get edge => $_getN(12);
+  @$pb.TagNumber(20)
+  set edge(EdgeCapability value) => $_setField(20, value);
+  @$pb.TagNumber(20)
+  $core.bool hasEdge() => $_has(12);
+  @$pb.TagNumber(20)
+  void clearEdge() => $_clearField(20);
+  @$pb.TagNumber(20)
+  EdgeCapability ensureEdge() => $_ensure(12);
 }
 
 class DeviceIdentity extends $pb.GeneratedMessage {
@@ -1166,6 +1181,440 @@ class BatteryCapability extends $pb.GeneratedMessage {
   $core.bool hasCharging() => $_has(1);
   @$pb.TagNumber(2)
   void clearCharging() => $_clearField(2);
+}
+
+class EdgeCapability extends $pb.GeneratedMessage {
+  factory EdgeCapability({
+    $core.Iterable<$core.String>? runtimes,
+    EdgeComputeCapability? compute,
+    $core.Iterable<$core.String>? operators,
+    EdgeRetentionCapability? retention,
+    EdgeTimingCapability? timing,
+    EdgeGeometryCapability? geometry,
+  }) {
+    final result = create();
+    if (runtimes != null) result.runtimes.addAll(runtimes);
+    if (compute != null) result.compute = compute;
+    if (operators != null) result.operators.addAll(operators);
+    if (retention != null) result.retention = retention;
+    if (timing != null) result.timing = timing;
+    if (geometry != null) result.geometry = geometry;
+    return result;
+  }
+
+  EdgeCapability._();
+
+  factory EdgeCapability.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EdgeCapability.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EdgeCapability',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..pPS(1, _omitFieldNames ? '' : 'runtimes')
+    ..aOM<EdgeComputeCapability>(2, _omitFieldNames ? '' : 'compute',
+        subBuilder: EdgeComputeCapability.create)
+    ..pPS(3, _omitFieldNames ? '' : 'operators')
+    ..aOM<EdgeRetentionCapability>(4, _omitFieldNames ? '' : 'retention',
+        subBuilder: EdgeRetentionCapability.create)
+    ..aOM<EdgeTimingCapability>(5, _omitFieldNames ? '' : 'timing',
+        subBuilder: EdgeTimingCapability.create)
+    ..aOM<EdgeGeometryCapability>(6, _omitFieldNames ? '' : 'geometry',
+        subBuilder: EdgeGeometryCapability.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeCapability clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeCapability copyWith(void Function(EdgeCapability) updates) =>
+      super.copyWith((message) => updates(message as EdgeCapability))
+          as EdgeCapability;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EdgeCapability create() => EdgeCapability._();
+  @$core.override
+  EdgeCapability createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EdgeCapability getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EdgeCapability>(create);
+  static EdgeCapability? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get runtimes => $_getList(0);
+
+  @$pb.TagNumber(2)
+  EdgeComputeCapability get compute => $_getN(1);
+  @$pb.TagNumber(2)
+  set compute(EdgeComputeCapability value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCompute() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCompute() => $_clearField(2);
+  @$pb.TagNumber(2)
+  EdgeComputeCapability ensureCompute() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get operators => $_getList(2);
+
+  @$pb.TagNumber(4)
+  EdgeRetentionCapability get retention => $_getN(3);
+  @$pb.TagNumber(4)
+  set retention(EdgeRetentionCapability value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRetention() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRetention() => $_clearField(4);
+  @$pb.TagNumber(4)
+  EdgeRetentionCapability ensureRetention() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  EdgeTimingCapability get timing => $_getN(4);
+  @$pb.TagNumber(5)
+  set timing(EdgeTimingCapability value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTiming() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTiming() => $_clearField(5);
+  @$pb.TagNumber(5)
+  EdgeTimingCapability ensureTiming() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  EdgeGeometryCapability get geometry => $_getN(5);
+  @$pb.TagNumber(6)
+  set geometry(EdgeGeometryCapability value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasGeometry() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearGeometry() => $_clearField(6);
+  @$pb.TagNumber(6)
+  EdgeGeometryCapability ensureGeometry() => $_ensure(5);
+}
+
+class EdgeComputeCapability extends $pb.GeneratedMessage {
+  factory EdgeComputeCapability({
+    $core.int? cpuRealtime,
+    $core.int? gpuRealtime,
+    $core.int? npuRealtime,
+    $core.int? memMb,
+  }) {
+    final result = create();
+    if (cpuRealtime != null) result.cpuRealtime = cpuRealtime;
+    if (gpuRealtime != null) result.gpuRealtime = gpuRealtime;
+    if (npuRealtime != null) result.npuRealtime = npuRealtime;
+    if (memMb != null) result.memMb = memMb;
+    return result;
+  }
+
+  EdgeComputeCapability._();
+
+  factory EdgeComputeCapability.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EdgeComputeCapability.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EdgeComputeCapability',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'cpuRealtime')
+    ..aI(2, _omitFieldNames ? '' : 'gpuRealtime')
+    ..aI(3, _omitFieldNames ? '' : 'npuRealtime')
+    ..aI(4, _omitFieldNames ? '' : 'memMb')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeComputeCapability clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeComputeCapability copyWith(
+          void Function(EdgeComputeCapability) updates) =>
+      super.copyWith((message) => updates(message as EdgeComputeCapability))
+          as EdgeComputeCapability;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EdgeComputeCapability create() => EdgeComputeCapability._();
+  @$core.override
+  EdgeComputeCapability createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EdgeComputeCapability getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EdgeComputeCapability>(create);
+  static EdgeComputeCapability? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get cpuRealtime => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set cpuRealtime($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCpuRealtime() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCpuRealtime() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get gpuRealtime => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set gpuRealtime($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGpuRealtime() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGpuRealtime() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get npuRealtime => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set npuRealtime($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNpuRealtime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNpuRealtime() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get memMb => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set memMb($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMemMb() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMemMb() => $_clearField(4);
+}
+
+class EdgeRetentionCapability extends $pb.GeneratedMessage {
+  factory EdgeRetentionCapability({
+    $core.int? audioSec,
+    $core.int? videoSec,
+    $core.int? sensorSec,
+    $core.int? radioSec,
+  }) {
+    final result = create();
+    if (audioSec != null) result.audioSec = audioSec;
+    if (videoSec != null) result.videoSec = videoSec;
+    if (sensorSec != null) result.sensorSec = sensorSec;
+    if (radioSec != null) result.radioSec = radioSec;
+    return result;
+  }
+
+  EdgeRetentionCapability._();
+
+  factory EdgeRetentionCapability.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EdgeRetentionCapability.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EdgeRetentionCapability',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'audioSec')
+    ..aI(2, _omitFieldNames ? '' : 'videoSec')
+    ..aI(3, _omitFieldNames ? '' : 'sensorSec')
+    ..aI(4, _omitFieldNames ? '' : 'radioSec')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeRetentionCapability clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeRetentionCapability copyWith(
+          void Function(EdgeRetentionCapability) updates) =>
+      super.copyWith((message) => updates(message as EdgeRetentionCapability))
+          as EdgeRetentionCapability;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EdgeRetentionCapability create() => EdgeRetentionCapability._();
+  @$core.override
+  EdgeRetentionCapability createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EdgeRetentionCapability getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EdgeRetentionCapability>(create);
+  static EdgeRetentionCapability? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get audioSec => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set audioSec($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAudioSec() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAudioSec() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get videoSec => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set videoSec($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasVideoSec() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearVideoSec() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get sensorSec => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set sensorSec($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSensorSec() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSensorSec() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get radioSec => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set radioSec($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRadioSec() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRadioSec() => $_clearField(4);
+}
+
+class EdgeTimingCapability extends $pb.GeneratedMessage {
+  factory EdgeTimingCapability({
+    $core.double? syncErrorMs,
+  }) {
+    final result = create();
+    if (syncErrorMs != null) result.syncErrorMs = syncErrorMs;
+    return result;
+  }
+
+  EdgeTimingCapability._();
+
+  factory EdgeTimingCapability.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EdgeTimingCapability.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EdgeTimingCapability',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'syncErrorMs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeTimingCapability clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeTimingCapability copyWith(void Function(EdgeTimingCapability) updates) =>
+      super.copyWith((message) => updates(message as EdgeTimingCapability))
+          as EdgeTimingCapability;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EdgeTimingCapability create() => EdgeTimingCapability._();
+  @$core.override
+  EdgeTimingCapability createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EdgeTimingCapability getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EdgeTimingCapability>(create);
+  static EdgeTimingCapability? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get syncErrorMs => $_getN(0);
+  @$pb.TagNumber(1)
+  set syncErrorMs($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSyncErrorMs() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSyncErrorMs() => $_clearField(1);
+}
+
+class EdgeGeometryCapability extends $pb.GeneratedMessage {
+  factory EdgeGeometryCapability({
+    $core.bool? micArray,
+    $core.bool? cameraIntrinsics,
+    $core.bool? compass,
+  }) {
+    final result = create();
+    if (micArray != null) result.micArray = micArray;
+    if (cameraIntrinsics != null) result.cameraIntrinsics = cameraIntrinsics;
+    if (compass != null) result.compass = compass;
+    return result;
+  }
+
+  EdgeGeometryCapability._();
+
+  factory EdgeGeometryCapability.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EdgeGeometryCapability.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EdgeGeometryCapability',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'micArray')
+    ..aOB(2, _omitFieldNames ? '' : 'cameraIntrinsics')
+    ..aOB(3, _omitFieldNames ? '' : 'compass')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeGeometryCapability clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EdgeGeometryCapability copyWith(
+          void Function(EdgeGeometryCapability) updates) =>
+      super.copyWith((message) => updates(message as EdgeGeometryCapability))
+          as EdgeGeometryCapability;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EdgeGeometryCapability create() => EdgeGeometryCapability._();
+  @$core.override
+  EdgeGeometryCapability createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EdgeGeometryCapability getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EdgeGeometryCapability>(create);
+  static EdgeGeometryCapability? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get micArray => $_getBF(0);
+  @$pb.TagNumber(1)
+  set micArray($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMicArray() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMicArray() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get cameraIntrinsics => $_getBF(1);
+  @$pb.TagNumber(2)
+  set cameraIntrinsics($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCameraIntrinsics() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCameraIntrinsics() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get compass => $_getBF(2);
+  @$pb.TagNumber(3)
+  set compass($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCompass() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCompass() => $_clearField(3);
 }
 
 const $core.bool _omitFieldNames =

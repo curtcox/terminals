@@ -65,6 +65,20 @@ class TerminalControlGrpcClient implements TerminalControlClient {
     List<int> speakerSampleRates = const [44100, 48000],
     int microphoneChannels = 1,
     List<int> microphoneSampleRates = const [16000, 44100, 48000],
+    List<String> edgeRuntimes = const <String>[],
+    List<String> edgeOperators = const <String>[],
+    int edgeCPURealtime = 0,
+    int edgeGPURealtime = 0,
+    int edgeNPURealtime = 0,
+    int edgeMemMB = 0,
+    int edgeAudioRetentionSec = 0,
+    int edgeVideoRetentionSec = 0,
+    int edgeSensorRetentionSec = 0,
+    int edgeRadioRetentionSec = 0,
+    double edgeSyncErrorMs = 0,
+    bool edgeMicArray = false,
+    bool edgeCameraIntrinsics = false,
+    bool edgeCompass = false,
   }) {
     final capabilities = DeviceCapabilities()
       ..deviceId = deviceId
@@ -83,7 +97,25 @@ class TerminalControlGrpcClient implements TerminalControlClient {
         ..sampleRates.addAll(speakerSampleRates))
       ..microphone = (AudioInputCapability()
         ..channels = microphoneChannels
-        ..sampleRates.addAll(microphoneSampleRates));
+        ..sampleRates.addAll(microphoneSampleRates))
+      ..edge = (EdgeCapability()
+        ..runtimes.addAll(edgeRuntimes)
+        ..operators.addAll(edgeOperators)
+        ..compute = (EdgeComputeCapability()
+          ..cpuRealtime = edgeCPURealtime
+          ..gpuRealtime = edgeGPURealtime
+          ..npuRealtime = edgeNPURealtime
+          ..memMb = edgeMemMB)
+        ..retention = (EdgeRetentionCapability()
+          ..audioSec = edgeAudioRetentionSec
+          ..videoSec = edgeVideoRetentionSec
+          ..sensorSec = edgeSensorRetentionSec
+          ..radioSec = edgeRadioRetentionSec)
+        ..timing = (EdgeTimingCapability()..syncErrorMs = edgeSyncErrorMs)
+        ..geometry = (EdgeGeometryCapability()
+          ..micArray = edgeMicArray
+          ..cameraIntrinsics = edgeCameraIntrinsics
+          ..compass = edgeCompass));
 
     if (screenWidth != null || screenHeight != null || screenDensity != null) {
       capabilities.screen = (ScreenCapability()

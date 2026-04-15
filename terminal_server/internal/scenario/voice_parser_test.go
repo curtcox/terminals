@@ -243,3 +243,37 @@ func TestParseVoiceTriggerPAStopAliases(t *testing.T) {
 		}
 	}
 }
+
+func TestParseVoiceTriggerSensingAliases(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	cases := []struct {
+		spoken string
+		intent string
+	}{
+		{"did you feel that", "recent_imu_anomaly"},
+		{"what was that sound", "sound_identification"},
+		{"where did that sound come from", "sound_localization"},
+		{"who is in the house", "presence_query"},
+		{"bluetooth inventory", "bluetooth_inventory"},
+	}
+	for _, tc := range cases {
+		got := ParseVoiceTrigger("device-1", tc.spoken, now)
+		if got.Intent != tc.intent {
+			t.Fatalf("spoken=%q intent = %q, want %q", tc.spoken, got.Intent, tc.intent)
+		}
+	}
+}
+
+func TestParseVoiceTriggerTerminalVerification(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "verify terminal kitchen-tablet marker", now)
+	if got.Intent != "terminal_verification" {
+		t.Fatalf("Intent = %q, want terminal_verification", got.Intent)
+	}
+	if got.Arguments["device_id"] != "kitchen-tablet" {
+		t.Fatalf("device_id = %q, want kitchen-tablet", got.Arguments["device_id"])
+	}
+	if got.Arguments["method"] != "marker" {
+		t.Fatalf("method = %q, want marker", got.Arguments["method"])
+	}
+}

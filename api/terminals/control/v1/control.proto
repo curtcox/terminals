@@ -23,6 +23,10 @@ message ConnectRequest {
     Heartbeat heartbeat = 7;
     WebRTCSignal webrtc_signal = 8;
     VoiceAudio voice_audio = 9;
+    terminals.io.v1.ObservationMessage observation_message = 10;
+    terminals.io.v1.ArtifactAvailable artifact_available = 11;
+    terminals.io.v1.FlowStats flow_stats = 12;
+    terminals.io.v1.ClockSample clock_sample = 13;
   }
 }
 
@@ -49,6 +53,12 @@ message ConnectResponse {
     ControlError error = 12;
     terminals.ui.v1.UpdateUI update_ui = 13;
     terminals.ui.v1.TransitionUI transition_ui = 14;
+    terminals.io.v1.InstallBundle install_bundle = 15;
+    terminals.io.v1.RemoveBundle remove_bundle = 16;
+    terminals.io.v1.StartFlow start_flow = 17;
+    terminals.io.v1.PatchFlow patch_flow = 18;
+    terminals.io.v1.StopFlow stop_flow = 19;
+    terminals.io.v1.RequestArtifact request_artifact = 20;
   }
 }
 

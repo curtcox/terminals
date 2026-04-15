@@ -905,6 +905,1218 @@ func (x *SensorData) GetValues() map[string]float64 {
 	return nil
 }
 
+type FlowNode struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Exec          string                 `protobuf:"bytes,4,opt,name=exec,proto3" json:"exec,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlowNode) Reset() {
+	*x = FlowNode{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlowNode) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowNode) ProtoMessage() {}
+
+func (x *FlowNode) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowNode.ProtoReflect.Descriptor instead.
+func (*FlowNode) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *FlowNode) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *FlowNode) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *FlowNode) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *FlowNode) GetExec() string {
+	if x != nil {
+		return x.Exec
+	}
+	return ""
+}
+
+type FlowEdge struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	From          string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
+	To            string                 `protobuf:"bytes,2,opt,name=to,proto3" json:"to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlowEdge) Reset() {
+	*x = FlowEdge{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlowEdge) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowEdge) ProtoMessage() {}
+
+func (x *FlowEdge) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowEdge.ProtoReflect.Descriptor instead.
+func (*FlowEdge) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *FlowEdge) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *FlowEdge) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+type FlowPlan struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Nodes         []*FlowNode            `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	Edges         []*FlowEdge            `protobuf:"bytes,2,rep,name=edges,proto3" json:"edges,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlowPlan) Reset() {
+	*x = FlowPlan{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlowPlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowPlan) ProtoMessage() {}
+
+func (x *FlowPlan) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowPlan.ProtoReflect.Descriptor instead.
+func (*FlowPlan) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *FlowPlan) GetNodes() []*FlowNode {
+	if x != nil {
+		return x.Nodes
+	}
+	return nil
+}
+
+func (x *FlowPlan) GetEdges() []*FlowEdge {
+	if x != nil {
+		return x.Edges
+	}
+	return nil
+}
+
+type StartFlow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FlowId        string                 `protobuf:"bytes,1,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	Plan          *FlowPlan              `protobuf:"bytes,2,opt,name=plan,proto3" json:"plan,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartFlow) Reset() {
+	*x = StartFlow{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartFlow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartFlow) ProtoMessage() {}
+
+func (x *StartFlow) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartFlow.ProtoReflect.Descriptor instead.
+func (*StartFlow) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *StartFlow) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+func (x *StartFlow) GetPlan() *FlowPlan {
+	if x != nil {
+		return x.Plan
+	}
+	return nil
+}
+
+type PatchFlow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FlowId        string                 `protobuf:"bytes,1,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	Plan          *FlowPlan              `protobuf:"bytes,2,opt,name=plan,proto3" json:"plan,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PatchFlow) Reset() {
+	*x = PatchFlow{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PatchFlow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PatchFlow) ProtoMessage() {}
+
+func (x *PatchFlow) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PatchFlow.ProtoReflect.Descriptor instead.
+func (*PatchFlow) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *PatchFlow) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+func (x *PatchFlow) GetPlan() *FlowPlan {
+	if x != nil {
+		return x.Plan
+	}
+	return nil
+}
+
+type StopFlow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FlowId        string                 `protobuf:"bytes,1,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopFlow) Reset() {
+	*x = StopFlow{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopFlow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopFlow) ProtoMessage() {}
+
+func (x *StopFlow) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopFlow.ProtoReflect.Descriptor instead.
+func (*StopFlow) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *StopFlow) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+type DeviceRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeviceRef) Reset() {
+	*x = DeviceRef{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeviceRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeviceRef) ProtoMessage() {}
+
+func (x *DeviceRef) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeviceRef.ProtoReflect.Descriptor instead.
+func (*DeviceRef) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *DeviceRef) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+type Pose struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
+	Z             float64                `protobuf:"fixed64,3,opt,name=z,proto3" json:"z,omitempty"`
+	Yaw           float64                `protobuf:"fixed64,4,opt,name=yaw,proto3" json:"yaw,omitempty"`
+	Pitch         float64                `protobuf:"fixed64,5,opt,name=pitch,proto3" json:"pitch,omitempty"`
+	Roll          float64                `protobuf:"fixed64,6,opt,name=roll,proto3" json:"roll,omitempty"`
+	Confidence    float64                `protobuf:"fixed64,7,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Pose) Reset() {
+	*x = Pose{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Pose) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Pose) ProtoMessage() {}
+
+func (x *Pose) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Pose.ProtoReflect.Descriptor instead.
+func (*Pose) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *Pose) GetX() float64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *Pose) GetY() float64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *Pose) GetZ() float64 {
+	if x != nil {
+		return x.Z
+	}
+	return 0
+}
+
+func (x *Pose) GetYaw() float64 {
+	if x != nil {
+		return x.Yaw
+	}
+	return 0
+}
+
+func (x *Pose) GetPitch() float64 {
+	if x != nil {
+		return x.Pitch
+	}
+	return 0
+}
+
+func (x *Pose) GetRoll() float64 {
+	if x != nil {
+		return x.Roll
+	}
+	return 0
+}
+
+func (x *Pose) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
+type LocationEstimate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Zone          string                 `protobuf:"bytes,1,opt,name=zone,proto3" json:"zone,omitempty"`
+	Pose          *Pose                  `protobuf:"bytes,2,opt,name=pose,proto3" json:"pose,omitempty"`
+	RadiusM       float64                `protobuf:"fixed64,3,opt,name=radius_m,json=radiusM,proto3" json:"radius_m,omitempty"`
+	Confidence    float64                `protobuf:"fixed64,4,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	Sources       []string               `protobuf:"bytes,5,rep,name=sources,proto3" json:"sources,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LocationEstimate) Reset() {
+	*x = LocationEstimate{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LocationEstimate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LocationEstimate) ProtoMessage() {}
+
+func (x *LocationEstimate) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LocationEstimate.ProtoReflect.Descriptor instead.
+func (*LocationEstimate) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *LocationEstimate) GetZone() string {
+	if x != nil {
+		return x.Zone
+	}
+	return ""
+}
+
+func (x *LocationEstimate) GetPose() *Pose {
+	if x != nil {
+		return x.Pose
+	}
+	return nil
+}
+
+func (x *LocationEstimate) GetRadiusM() float64 {
+	if x != nil {
+		return x.RadiusM
+	}
+	return 0
+}
+
+func (x *LocationEstimate) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
+func (x *LocationEstimate) GetSources() []string {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+type ObservationProvenance struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	FlowId             string                 `protobuf:"bytes,1,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	NodeId             string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ExecSite           string                 `protobuf:"bytes,3,opt,name=exec_site,json=execSite,proto3" json:"exec_site,omitempty"`
+	ModelId            string                 `protobuf:"bytes,4,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	CalibrationVersion string                 `protobuf:"bytes,5,opt,name=calibration_version,json=calibrationVersion,proto3" json:"calibration_version,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *ObservationProvenance) Reset() {
+	*x = ObservationProvenance{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ObservationProvenance) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ObservationProvenance) ProtoMessage() {}
+
+func (x *ObservationProvenance) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ObservationProvenance.ProtoReflect.Descriptor instead.
+func (*ObservationProvenance) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ObservationProvenance) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+func (x *ObservationProvenance) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *ObservationProvenance) GetExecSite() string {
+	if x != nil {
+		return x.ExecSite
+	}
+	return ""
+}
+
+func (x *ObservationProvenance) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *ObservationProvenance) GetCalibrationVersion() string {
+	if x != nil {
+		return x.CalibrationVersion
+	}
+	return ""
+}
+
+type ArtifactRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	Source        *DeviceRef             `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	StartUnixMs   int64                  `protobuf:"varint,4,opt,name=start_unix_ms,json=startUnixMs,proto3" json:"start_unix_ms,omitempty"`
+	EndUnixMs     int64                  `protobuf:"varint,5,opt,name=end_unix_ms,json=endUnixMs,proto3" json:"end_unix_ms,omitempty"`
+	Uri           string                 `protobuf:"bytes,6,opt,name=uri,proto3" json:"uri,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArtifactRef) Reset() {
+	*x = ArtifactRef{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArtifactRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArtifactRef) ProtoMessage() {}
+
+func (x *ArtifactRef) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArtifactRef.ProtoReflect.Descriptor instead.
+func (*ArtifactRef) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ArtifactRef) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ArtifactRef) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *ArtifactRef) GetSource() *DeviceRef {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *ArtifactRef) GetStartUnixMs() int64 {
+	if x != nil {
+		return x.StartUnixMs
+	}
+	return 0
+}
+
+func (x *ArtifactRef) GetEndUnixMs() int64 {
+	if x != nil {
+		return x.EndUnixMs
+	}
+	return 0
+}
+
+func (x *ArtifactRef) GetUri() string {
+	if x != nil {
+		return x.Uri
+	}
+	return ""
+}
+
+type Observation struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Kind           string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Subject        string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	SourceDevice   *DeviceRef             `protobuf:"bytes,3,opt,name=source_device,json=sourceDevice,proto3" json:"source_device,omitempty"`
+	OccurredUnixMs int64                  `protobuf:"varint,4,opt,name=occurred_unix_ms,json=occurredUnixMs,proto3" json:"occurred_unix_ms,omitempty"`
+	Confidence     float64                `protobuf:"fixed64,5,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	Zone           string                 `protobuf:"bytes,6,opt,name=zone,proto3" json:"zone,omitempty"`
+	Location       *LocationEstimate      `protobuf:"bytes,7,opt,name=location,proto3" json:"location,omitempty"`
+	TrackId        string                 `protobuf:"bytes,8,opt,name=track_id,json=trackId,proto3" json:"track_id,omitempty"`
+	Attributes     map[string]string      `protobuf:"bytes,9,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Evidence       []*ArtifactRef         `protobuf:"bytes,10,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	Provenance     *ObservationProvenance `protobuf:"bytes,11,opt,name=provenance,proto3" json:"provenance,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *Observation) Reset() {
+	*x = Observation{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Observation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Observation) ProtoMessage() {}
+
+func (x *Observation) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Observation.ProtoReflect.Descriptor instead.
+func (*Observation) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *Observation) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *Observation) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *Observation) GetSourceDevice() *DeviceRef {
+	if x != nil {
+		return x.SourceDevice
+	}
+	return nil
+}
+
+func (x *Observation) GetOccurredUnixMs() int64 {
+	if x != nil {
+		return x.OccurredUnixMs
+	}
+	return 0
+}
+
+func (x *Observation) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
+func (x *Observation) GetZone() string {
+	if x != nil {
+		return x.Zone
+	}
+	return ""
+}
+
+func (x *Observation) GetLocation() *LocationEstimate {
+	if x != nil {
+		return x.Location
+	}
+	return nil
+}
+
+func (x *Observation) GetTrackId() string {
+	if x != nil {
+		return x.TrackId
+	}
+	return ""
+}
+
+func (x *Observation) GetAttributes() map[string]string {
+	if x != nil {
+		return x.Attributes
+	}
+	return nil
+}
+
+func (x *Observation) GetEvidence() []*ArtifactRef {
+	if x != nil {
+		return x.Evidence
+	}
+	return nil
+}
+
+func (x *Observation) GetProvenance() *ObservationProvenance {
+	if x != nil {
+		return x.Provenance
+	}
+	return nil
+}
+
+type ObservationMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Observation   *Observation           `protobuf:"bytes,1,opt,name=observation,proto3" json:"observation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ObservationMessage) Reset() {
+	*x = ObservationMessage{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ObservationMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ObservationMessage) ProtoMessage() {}
+
+func (x *ObservationMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ObservationMessage.ProtoReflect.Descriptor instead.
+func (*ObservationMessage) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ObservationMessage) GetObservation() *Observation {
+	if x != nil {
+		return x.Observation
+	}
+	return nil
+}
+
+type ArtifactAvailable struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Artifact      *ArtifactRef           `protobuf:"bytes,1,opt,name=artifact,proto3" json:"artifact,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArtifactAvailable) Reset() {
+	*x = ArtifactAvailable{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArtifactAvailable) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArtifactAvailable) ProtoMessage() {}
+
+func (x *ArtifactAvailable) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArtifactAvailable.ProtoReflect.Descriptor instead.
+func (*ArtifactAvailable) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ArtifactAvailable) GetArtifact() *ArtifactRef {
+	if x != nil {
+		return x.Artifact
+	}
+	return nil
+}
+
+type RequestArtifact struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ArtifactId    string                 `protobuf:"bytes,1,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestArtifact) Reset() {
+	*x = RequestArtifact{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestArtifact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestArtifact) ProtoMessage() {}
+
+func (x *RequestArtifact) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestArtifact.ProtoReflect.Descriptor instead.
+func (*RequestArtifact) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *RequestArtifact) GetArtifactId() string {
+	if x != nil {
+		return x.ArtifactId
+	}
+	return ""
+}
+
+type FlowStats struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FlowId        string                 `protobuf:"bytes,1,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	CpuPct        float64                `protobuf:"fixed64,2,opt,name=cpu_pct,json=cpuPct,proto3" json:"cpu_pct,omitempty"`
+	MemMb         float64                `protobuf:"fixed64,3,opt,name=mem_mb,json=memMb,proto3" json:"mem_mb,omitempty"`
+	DroppedFrames uint64                 `protobuf:"varint,4,opt,name=dropped_frames,json=droppedFrames,proto3" json:"dropped_frames,omitempty"`
+	State         string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	Error         string                 `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlowStats) Reset() {
+	*x = FlowStats{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlowStats) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowStats) ProtoMessage() {}
+
+func (x *FlowStats) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowStats.ProtoReflect.Descriptor instead.
+func (*FlowStats) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *FlowStats) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+func (x *FlowStats) GetCpuPct() float64 {
+	if x != nil {
+		return x.CpuPct
+	}
+	return 0
+}
+
+func (x *FlowStats) GetMemMb() float64 {
+	if x != nil {
+		return x.MemMb
+	}
+	return 0
+}
+
+func (x *FlowStats) GetDroppedFrames() uint64 {
+	if x != nil {
+		return x.DroppedFrames
+	}
+	return 0
+}
+
+func (x *FlowStats) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *FlowStats) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type ClockSample struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	ClientUnixMs  int64                  `protobuf:"varint,2,opt,name=client_unix_ms,json=clientUnixMs,proto3" json:"client_unix_ms,omitempty"`
+	ServerUnixMs  int64                  `protobuf:"varint,3,opt,name=server_unix_ms,json=serverUnixMs,proto3" json:"server_unix_ms,omitempty"`
+	ErrorMs       float64                `protobuf:"fixed64,4,opt,name=error_ms,json=errorMs,proto3" json:"error_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClockSample) Reset() {
+	*x = ClockSample{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClockSample) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClockSample) ProtoMessage() {}
+
+func (x *ClockSample) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClockSample.ProtoReflect.Descriptor instead.
+func (*ClockSample) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ClockSample) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *ClockSample) GetClientUnixMs() int64 {
+	if x != nil {
+		return x.ClientUnixMs
+	}
+	return 0
+}
+
+func (x *ClockSample) GetServerUnixMs() int64 {
+	if x != nil {
+		return x.ServerUnixMs
+	}
+	return 0
+}
+
+func (x *ClockSample) GetErrorMs() float64 {
+	if x != nil {
+		return x.ErrorMs
+	}
+	return 0
+}
+
+type InstallBundle struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BundleId      string                 `protobuf:"bytes,1,opt,name=bundle_id,json=bundleId,proto3" json:"bundle_id,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	TarGz         []byte                 `protobuf:"bytes,3,opt,name=tar_gz,json=tarGz,proto3" json:"tar_gz,omitempty"`
+	Sha256        string                 `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InstallBundle) Reset() {
+	*x = InstallBundle{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstallBundle) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstallBundle) ProtoMessage() {}
+
+func (x *InstallBundle) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstallBundle.ProtoReflect.Descriptor instead.
+func (*InstallBundle) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *InstallBundle) GetBundleId() string {
+	if x != nil {
+		return x.BundleId
+	}
+	return ""
+}
+
+func (x *InstallBundle) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *InstallBundle) GetTarGz() []byte {
+	if x != nil {
+		return x.TarGz
+	}
+	return nil
+}
+
+func (x *InstallBundle) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+type RemoveBundle struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BundleId      string                 `protobuf:"bytes,1,opt,name=bundle_id,json=bundleId,proto3" json:"bundle_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveBundle) Reset() {
+	*x = RemoveBundle{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveBundle) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveBundle) ProtoMessage() {}
+
+func (x *RemoveBundle) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveBundle.ProtoReflect.Descriptor instead.
+func (*RemoveBundle) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *RemoveBundle) GetBundleId() string {
+	if x != nil {
+		return x.BundleId
+	}
+	return ""
+}
+
 var File_terminals_io_v1_io_proto protoreflect.FileDescriptor
 
 const file_terminals_io_v1_io_proto_rawDesc = "" +
@@ -983,7 +2195,110 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x06values\x18\x03 \x03(\v2'.terminals.io.v1.SensorData.ValuesEntryR\x06values\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01B@Z>github.com/curtcox/terminals/terminal_server/gen/go/io/v1;iov1b\x06proto3"
+	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\"\xb4\x01\n" +
+	"\bFlowNode\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x127\n" +
+	"\x04args\x18\x03 \x03(\v2#.terminals.io.v1.FlowNode.ArgsEntryR\x04args\x12\x12\n" +
+	"\x04exec\x18\x04 \x01(\tR\x04exec\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\".\n" +
+	"\bFlowEdge\x12\x12\n" +
+	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x02 \x01(\tR\x02to\"l\n" +
+	"\bFlowPlan\x12/\n" +
+	"\x05nodes\x18\x01 \x03(\v2\x19.terminals.io.v1.FlowNodeR\x05nodes\x12/\n" +
+	"\x05edges\x18\x02 \x03(\v2\x19.terminals.io.v1.FlowEdgeR\x05edges\"S\n" +
+	"\tStartFlow\x12\x17\n" +
+	"\aflow_id\x18\x01 \x01(\tR\x06flowId\x12-\n" +
+	"\x04plan\x18\x02 \x01(\v2\x19.terminals.io.v1.FlowPlanR\x04plan\"S\n" +
+	"\tPatchFlow\x12\x17\n" +
+	"\aflow_id\x18\x01 \x01(\tR\x06flowId\x12-\n" +
+	"\x04plan\x18\x02 \x01(\v2\x19.terminals.io.v1.FlowPlanR\x04plan\"#\n" +
+	"\bStopFlow\x12\x17\n" +
+	"\aflow_id\x18\x01 \x01(\tR\x06flowId\"(\n" +
+	"\tDeviceRef\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\"\x8c\x01\n" +
+	"\x04Pose\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x01R\x01y\x12\f\n" +
+	"\x01z\x18\x03 \x01(\x01R\x01z\x12\x10\n" +
+	"\x03yaw\x18\x04 \x01(\x01R\x03yaw\x12\x14\n" +
+	"\x05pitch\x18\x05 \x01(\x01R\x05pitch\x12\x12\n" +
+	"\x04roll\x18\x06 \x01(\x01R\x04roll\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\a \x01(\x01R\n" +
+	"confidence\"\xa6\x01\n" +
+	"\x10LocationEstimate\x12\x12\n" +
+	"\x04zone\x18\x01 \x01(\tR\x04zone\x12)\n" +
+	"\x04pose\x18\x02 \x01(\v2\x15.terminals.io.v1.PoseR\x04pose\x12\x19\n" +
+	"\bradius_m\x18\x03 \x01(\x01R\aradiusM\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\x04 \x01(\x01R\n" +
+	"confidence\x12\x18\n" +
+	"\asources\x18\x05 \x03(\tR\asources\"\xb2\x01\n" +
+	"\x15ObservationProvenance\x12\x17\n" +
+	"\aflow_id\x18\x01 \x01(\tR\x06flowId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\texec_site\x18\x03 \x01(\tR\bexecSite\x12\x19\n" +
+	"\bmodel_id\x18\x04 \x01(\tR\amodelId\x12/\n" +
+	"\x13calibration_version\x18\x05 \x01(\tR\x12calibrationVersion\"\xbb\x01\n" +
+	"\vArtifactRef\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x122\n" +
+	"\x06source\x18\x03 \x01(\v2\x1a.terminals.io.v1.DeviceRefR\x06source\x12\"\n" +
+	"\rstart_unix_ms\x18\x04 \x01(\x03R\vstartUnixMs\x12\x1e\n" +
+	"\vend_unix_ms\x18\x05 \x01(\x03R\tendUnixMs\x12\x10\n" +
+	"\x03uri\x18\x06 \x01(\tR\x03uri\"\xc3\x04\n" +
+	"\vObservation\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x18\n" +
+	"\asubject\x18\x02 \x01(\tR\asubject\x12?\n" +
+	"\rsource_device\x18\x03 \x01(\v2\x1a.terminals.io.v1.DeviceRefR\fsourceDevice\x12(\n" +
+	"\x10occurred_unix_ms\x18\x04 \x01(\x03R\x0eoccurredUnixMs\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\x05 \x01(\x01R\n" +
+	"confidence\x12\x12\n" +
+	"\x04zone\x18\x06 \x01(\tR\x04zone\x12=\n" +
+	"\blocation\x18\a \x01(\v2!.terminals.io.v1.LocationEstimateR\blocation\x12\x19\n" +
+	"\btrack_id\x18\b \x01(\tR\atrackId\x12L\n" +
+	"\n" +
+	"attributes\x18\t \x03(\v2,.terminals.io.v1.Observation.AttributesEntryR\n" +
+	"attributes\x128\n" +
+	"\bevidence\x18\n" +
+	" \x03(\v2\x1c.terminals.io.v1.ArtifactRefR\bevidence\x12F\n" +
+	"\n" +
+	"provenance\x18\v \x01(\v2&.terminals.io.v1.ObservationProvenanceR\n" +
+	"provenance\x1a=\n" +
+	"\x0fAttributesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"T\n" +
+	"\x12ObservationMessage\x12>\n" +
+	"\vobservation\x18\x01 \x01(\v2\x1c.terminals.io.v1.ObservationR\vobservation\"M\n" +
+	"\x11ArtifactAvailable\x128\n" +
+	"\bartifact\x18\x01 \x01(\v2\x1c.terminals.io.v1.ArtifactRefR\bartifact\"2\n" +
+	"\x0fRequestArtifact\x12\x1f\n" +
+	"\vartifact_id\x18\x01 \x01(\tR\n" +
+	"artifactId\"\xa7\x01\n" +
+	"\tFlowStats\x12\x17\n" +
+	"\aflow_id\x18\x01 \x01(\tR\x06flowId\x12\x17\n" +
+	"\acpu_pct\x18\x02 \x01(\x01R\x06cpuPct\x12\x15\n" +
+	"\x06mem_mb\x18\x03 \x01(\x01R\x05memMb\x12%\n" +
+	"\x0edropped_frames\x18\x04 \x01(\x04R\rdroppedFrames\x12\x14\n" +
+	"\x05state\x18\x05 \x01(\tR\x05state\x12\x14\n" +
+	"\x05error\x18\x06 \x01(\tR\x05error\"\x91\x01\n" +
+	"\vClockSample\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12$\n" +
+	"\x0eclient_unix_ms\x18\x02 \x01(\x03R\fclientUnixMs\x12$\n" +
+	"\x0eserver_unix_ms\x18\x03 \x01(\x03R\fserverUnixMs\x12\x19\n" +
+	"\berror_ms\x18\x04 \x01(\x01R\aerrorMs\"u\n" +
+	"\rInstallBundle\x12\x1b\n" +
+	"\tbundle_id\x18\x01 \x01(\tR\bbundleId\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\x15\n" +
+	"\x06tar_gz\x18\x03 \x01(\fR\x05tarGz\x12\x16\n" +
+	"\x06sha256\x18\x04 \x01(\tR\x06sha256\"+\n" +
+	"\fRemoveBundle\x12\x1b\n" +
+	"\tbundle_id\x18\x01 \x01(\tR\bbundleIdB@Z>github.com/curtcox/terminals/terminal_server/gen/go/io/v1;iov1b\x06proto3"
 
 var (
 	file_terminals_io_v1_io_proto_rawDescOnce sync.Once
@@ -997,36 +2312,71 @@ func file_terminals_io_v1_io_proto_rawDescGZIP() []byte {
 	return file_terminals_io_v1_io_proto_rawDescData
 }
 
-var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_terminals_io_v1_io_proto_goTypes = []any{
-	(*StartStream)(nil),  // 0: terminals.io.v1.StartStream
-	(*StopStream)(nil),   // 1: terminals.io.v1.StopStream
-	(*RouteStream)(nil),  // 2: terminals.io.v1.RouteStream
-	(*PlayAudio)(nil),    // 3: terminals.io.v1.PlayAudio
-	(*ShowMedia)(nil),    // 4: terminals.io.v1.ShowMedia
-	(*InputEvent)(nil),   // 5: terminals.io.v1.InputEvent
-	(*KeyEvent)(nil),     // 6: terminals.io.v1.KeyEvent
-	(*PointerEvent)(nil), // 7: terminals.io.v1.PointerEvent
-	(*TouchPoint)(nil),   // 8: terminals.io.v1.TouchPoint
-	(*TouchEvent)(nil),   // 9: terminals.io.v1.TouchEvent
-	(*UIAction)(nil),     // 10: terminals.io.v1.UIAction
-	(*SensorData)(nil),   // 11: terminals.io.v1.SensorData
-	nil,                  // 12: terminals.io.v1.StartStream.MetadataEntry
-	nil,                  // 13: terminals.io.v1.SensorData.ValuesEntry
+	(*StartStream)(nil),           // 0: terminals.io.v1.StartStream
+	(*StopStream)(nil),            // 1: terminals.io.v1.StopStream
+	(*RouteStream)(nil),           // 2: terminals.io.v1.RouteStream
+	(*PlayAudio)(nil),             // 3: terminals.io.v1.PlayAudio
+	(*ShowMedia)(nil),             // 4: terminals.io.v1.ShowMedia
+	(*InputEvent)(nil),            // 5: terminals.io.v1.InputEvent
+	(*KeyEvent)(nil),              // 6: terminals.io.v1.KeyEvent
+	(*PointerEvent)(nil),          // 7: terminals.io.v1.PointerEvent
+	(*TouchPoint)(nil),            // 8: terminals.io.v1.TouchPoint
+	(*TouchEvent)(nil),            // 9: terminals.io.v1.TouchEvent
+	(*UIAction)(nil),              // 10: terminals.io.v1.UIAction
+	(*SensorData)(nil),            // 11: terminals.io.v1.SensorData
+	(*FlowNode)(nil),              // 12: terminals.io.v1.FlowNode
+	(*FlowEdge)(nil),              // 13: terminals.io.v1.FlowEdge
+	(*FlowPlan)(nil),              // 14: terminals.io.v1.FlowPlan
+	(*StartFlow)(nil),             // 15: terminals.io.v1.StartFlow
+	(*PatchFlow)(nil),             // 16: terminals.io.v1.PatchFlow
+	(*StopFlow)(nil),              // 17: terminals.io.v1.StopFlow
+	(*DeviceRef)(nil),             // 18: terminals.io.v1.DeviceRef
+	(*Pose)(nil),                  // 19: terminals.io.v1.Pose
+	(*LocationEstimate)(nil),      // 20: terminals.io.v1.LocationEstimate
+	(*ObservationProvenance)(nil), // 21: terminals.io.v1.ObservationProvenance
+	(*ArtifactRef)(nil),           // 22: terminals.io.v1.ArtifactRef
+	(*Observation)(nil),           // 23: terminals.io.v1.Observation
+	(*ObservationMessage)(nil),    // 24: terminals.io.v1.ObservationMessage
+	(*ArtifactAvailable)(nil),     // 25: terminals.io.v1.ArtifactAvailable
+	(*RequestArtifact)(nil),       // 26: terminals.io.v1.RequestArtifact
+	(*FlowStats)(nil),             // 27: terminals.io.v1.FlowStats
+	(*ClockSample)(nil),           // 28: terminals.io.v1.ClockSample
+	(*InstallBundle)(nil),         // 29: terminals.io.v1.InstallBundle
+	(*RemoveBundle)(nil),          // 30: terminals.io.v1.RemoveBundle
+	nil,                           // 31: terminals.io.v1.StartStream.MetadataEntry
+	nil,                           // 32: terminals.io.v1.SensorData.ValuesEntry
+	nil,                           // 33: terminals.io.v1.FlowNode.ArgsEntry
+	nil,                           // 34: terminals.io.v1.Observation.AttributesEntry
 }
 var file_terminals_io_v1_io_proto_depIdxs = []int32{
-	12, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
+	31, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
 	6,  // 1: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
 	7,  // 2: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
 	9,  // 3: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
 	10, // 4: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
 	8,  // 5: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
-	13, // 6: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	32, // 6: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
+	33, // 7: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
+	12, // 8: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
+	13, // 9: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
+	14, // 10: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	14, // 11: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	19, // 12: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
+	18, // 13: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
+	18, // 14: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
+	20, // 15: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
+	34, // 16: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
+	22, // 17: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
+	21, // 18: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
+	23, // 19: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
+	22, // 20: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_terminals_io_v1_io_proto_init() }
@@ -1051,7 +2401,7 @@ func file_terminals_io_v1_io_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_io_v1_io_proto_rawDesc), len(file_terminals_io_v1_io_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

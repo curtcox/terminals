@@ -10,43 +10,139 @@ import (
 	"time"
 )
 
-// MediaNodeKind identifies node behavior in a media plan.
-type MediaNodeKind string
+// FlowNodeKind identifies node behavior in a flow plan.
+type FlowNodeKind string
 
-// Media node kind constants.
+// Flow node kind constants.
 const (
-	NodeSourceMic    MediaNodeKind = "source.mic"
-	NodeSourceCamera MediaNodeKind = "source.camera"
-	NodeSourceTTS    MediaNodeKind = "source.tts"
-	NodeSinkSpeaker  MediaNodeKind = "sink.speaker"
-	NodeSinkDisplay  MediaNodeKind = "sink.display"
-	NodeSinkSTT      MediaNodeKind = "sink.stt"
-	NodeAnalyzer     MediaNodeKind = "analyzer"
-	NodeRecorder     MediaNodeKind = "recorder"
-	NodeFork         MediaNodeKind = "fork"
+	NodeSourceMic       FlowNodeKind = "source.mic"
+	NodeSourceCamera    FlowNodeKind = "source.camera"
+	NodeSourceTTS       FlowNodeKind = "source.tts"
+	NodeSourceSensor    FlowNodeKind = "source.sensor"
+	NodeSourceBluetooth FlowNodeKind = "source.bluetooth"
+	NodeSourceWiFi      FlowNodeKind = "source.wifi"
+	NodeBufferRecent    FlowNodeKind = "buffer.recent"
+	NodeFeature         FlowNodeKind = "feature"
+	NodeAnalyzer        FlowNodeKind = "analyzer"
+	NodeTracker         FlowNodeKind = "tracker"
+	NodeLocalizer       FlowNodeKind = "localizer"
+	NodeFusion          FlowNodeKind = "fusion"
+	NodeMixer           FlowNodeKind = "mixer"
+	NodeCompositor      FlowNodeKind = "compositor"
+	NodeRecorder        FlowNodeKind = "recorder"
+	NodeArtifact        FlowNodeKind = "artifact"
+	NodeSinkSpeaker     FlowNodeKind = "sink.speaker"
+	NodeSinkDisplay     FlowNodeKind = "sink.display"
+	NodeSinkSTT         FlowNodeKind = "sink.stt"
+	NodeSinkStore       FlowNodeKind = "sink.store"
+	NodeSinkEventBus    FlowNodeKind = "sink.event_bus"
+	NodeFork            FlowNodeKind = "fork"
 )
 
-// MediaNode is one graph node.
-type MediaNode struct {
+// MediaNodeKind remains as a backward-compatible alias.
+type MediaNodeKind = FlowNodeKind
+
+// ExecPolicy controls where a flow node should run.
+type ExecPolicy string
+
+const (
+	ExecAuto          ExecPolicy = "auto"
+	ExecPreferClient  ExecPolicy = "prefer_client"
+	ExecRequireClient ExecPolicy = "require_client"
+	ExecServerOnly    ExecPolicy = "server_only"
+)
+
+// FlowNode is one graph node.
+type FlowNode struct {
 	ID   string
-	Kind MediaNodeKind
+	Kind FlowNodeKind
 	Args map[string]string
+	Exec ExecPolicy
 }
 
-// MediaEdge links two nodes by ID.
-type MediaEdge struct {
+// MediaNode remains as a backward-compatible alias.
+type MediaNode = FlowNode
+
+// FlowEdge links two nodes by ID.
+type FlowEdge struct {
 	From string
 	To   string
 }
 
-// MediaPlan is a declarative topology graph.
-type MediaPlan struct {
-	Nodes []MediaNode
-	Edges []MediaEdge
+// MediaEdge remains as a backward-compatible alias.
+type MediaEdge = FlowEdge
+
+// FlowPlan is a declarative topology graph for media/sensor/radio flows.
+type FlowPlan struct {
+	Nodes []FlowNode
+	Edges []FlowEdge
 }
 
-// PlanHandle identifies one installed media plan.
+// MediaPlan remains as a backward-compatible alias.
+type MediaPlan = FlowPlan
+
+// PlanHandle identifies one installed flow plan.
 type PlanHandle string
+
+// DeviceRef points at a concrete terminal.
+type DeviceRef struct {
+	DeviceID string
+}
+
+// Pose represents a world-space pose estimate.
+type Pose struct {
+	X          float64
+	Y          float64
+	Z          float64
+	Yaw        float64
+	Pitch      float64
+	Roll       float64
+	Confidence float64
+}
+
+// LocationEstimate represents a zone or world-space estimate.
+type LocationEstimate struct {
+	Zone       string
+	Pose       *Pose
+	RadiusM    float64
+	Confidence float64
+	Sources    []string
+}
+
+// ObservationProvenance records where an observation came from.
+type ObservationProvenance struct {
+	FlowID             string
+	NodeID             string
+	ExecSite           string
+	ModelID            string
+	CalibrationVersion string
+}
+
+// ArtifactRef points to optional evidence produced by a flow.
+type ArtifactRef struct {
+	ID        string
+	Kind      string
+	Source    DeviceRef
+	StartTime time.Time
+	EndTime   time.Time
+	URI       string
+}
+
+// Observation is the typed record emitted by analyzers, trackers, localizers,
+// and fusers. It is compact enough to transport over the control plane.
+type Observation struct {
+	Kind         string
+	Subject      string
+	SourceDevice DeviceRef
+	OccurredAt   time.Time
+	Confidence   float64
+	Zone         string
+	Location     *LocationEstimate
+	TrackID      string
+	Attributes   map[string]string
+	Evidence     []ArtifactRef
+	Provenance   ObservationProvenance
+}
 
 // AnalyzerEvent is emitted by analyzer nodes.
 type AnalyzerEvent struct {
@@ -66,15 +162,16 @@ type AnalyzerRunner interface {
 	) (func(), error)
 }
 
-// MediaPlanner installs media plans and compiles them into logical routes.
+// MediaPlanner installs media/flow plans and compiles them into logical routes.
 type MediaPlanner struct {
 	mu sync.Mutex
 
-	router       *Router
-	nextID       uint64
-	active       map[PlanHandle]planRuntime
-	analyzer     AnalyzerRunner
-	analyzerSink func(AnalyzerEvent)
+	router          *Router
+	nextID          uint64
+	active          map[PlanHandle]planRuntime
+	analyzer        AnalyzerRunner
+	analyzerSink    func(AnalyzerEvent)
+	observationSink func(Observation)
 }
 
 type planRuntime struct {
@@ -116,8 +213,20 @@ func (p *MediaPlanner) SetAnalyzerSink(sink func(AnalyzerEvent)) {
 	p.analyzerSink = sink
 }
 
+// SetObservationSink sets optional observation sink callback.
+func (p *MediaPlanner) SetObservationSink(sink func(Observation)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.observationSink = sink
+}
+
 // Apply compiles and installs a media plan.
 func (p *MediaPlanner) Apply(ctx context.Context, plan MediaPlan) (PlanHandle, error) {
+	return p.ApplyFlow(ctx, plan)
+}
+
+// ApplyFlow compiles and installs a generalized flow plan.
+func (p *MediaPlanner) ApplyFlow(ctx context.Context, plan FlowPlan) (PlanHandle, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -137,6 +246,11 @@ func (p *MediaPlanner) Apply(ctx context.Context, plan MediaPlan) (PlanHandle, e
 
 // Patch replaces an existing plan with a new one.
 func (p *MediaPlanner) Patch(ctx context.Context, handle PlanHandle, plan MediaPlan) error {
+	return p.PatchFlow(ctx, handle, plan)
+}
+
+// PatchFlow replaces an existing flow plan with a new one.
+func (p *MediaPlanner) PatchFlow(ctx context.Context, handle PlanHandle, plan FlowPlan) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -179,8 +293,8 @@ func (p *MediaPlanner) Tear(_ context.Context, handle PlanHandle) error {
 	return nil
 }
 
-func (p *MediaPlanner) compileLocked(ctx context.Context, plan MediaPlan) (planRuntime, error) {
-	nodeByID := make(map[string]MediaNode, len(plan.Nodes))
+func (p *MediaPlanner) compileLocked(ctx context.Context, plan FlowPlan) (planRuntime, error) {
+	nodeByID := make(map[string]FlowNode, len(plan.Nodes))
 	incoming := make(map[string][]string)
 	for _, node := range plan.Nodes {
 		id := strings.TrimSpace(node.ID)
@@ -190,6 +304,9 @@ func (p *MediaPlanner) compileLocked(ctx context.Context, plan MediaPlan) (planR
 		node.ID = id
 		if node.Args == nil {
 			node.Args = map[string]string{}
+		}
+		if node.Exec == "" {
+			node.Exec = ExecAuto
 		}
 		nodeByID[id] = node
 	}
@@ -241,7 +358,7 @@ func (p *MediaPlanner) compileLocked(ctx context.Context, plan MediaPlan) (planR
 			})
 		}
 
-		// Analyzer nodes publish typed events through the planner sink.
+		// Analyzer nodes publish typed events through the planner sinks.
 		if to.Kind == NodeAnalyzer && p.analyzer != nil {
 			sourceNode, ok := resolveSourceNode(from.ID, nodeByID, incoming, map[string]struct{}{})
 			if !ok {
@@ -268,60 +385,75 @@ func (p *MediaPlanner) compileLocked(ctx context.Context, plan MediaPlan) (planR
 }
 
 func (p *MediaPlanner) emitAnalyzerEvent(event AnalyzerEvent) {
-	if p == nil || p.analyzerSink == nil {
-		return
-	}
 	if event.OccurredAt.IsZero() {
 		event.OccurredAt = time.Now().UTC()
 	}
 	if event.Attributes == nil {
 		event.Attributes = map[string]string{}
 	}
-	p.analyzerSink(event)
+
+	if p != nil && p.analyzerSink != nil {
+		p.analyzerSink(event)
+	}
+	if p != nil && p.observationSink != nil {
+		observation := Observation{
+			Kind:       strings.TrimSpace(event.Kind),
+			Subject:    strings.TrimSpace(event.Subject),
+			OccurredAt: event.OccurredAt,
+			Attributes: copyStringMap(event.Attributes),
+			Provenance: ObservationProvenance{
+				ExecSite: "server",
+			},
+		}
+		if observation.Kind == "" {
+			observation.Kind = "analyzer.event"
+		}
+		p.observationSink(observation)
+	}
 }
 
 func resolveSourceNode(
 	nodeID string,
-	nodeByID map[string]MediaNode,
+	nodeByID map[string]FlowNode,
 	incoming map[string][]string,
 	visited map[string]struct{},
-) (MediaNode, bool) {
+) (FlowNode, bool) {
 	if _, seen := visited[nodeID]; seen {
-		return MediaNode{}, false
+		return FlowNode{}, false
 	}
 	visited[nodeID] = struct{}{}
 
 	node, ok := nodeByID[nodeID]
 	if !ok {
-		return MediaNode{}, false
+		return FlowNode{}, false
 	}
 	switch node.Kind {
-	case NodeSourceMic, NodeSourceCamera, NodeSourceTTS:
+	case NodeSourceMic, NodeSourceCamera, NodeSourceTTS, NodeSourceSensor, NodeSourceBluetooth, NodeSourceWiFi:
 		return node, true
-	case NodeFork, NodeAnalyzer:
+	case NodeFork, NodeAnalyzer, NodeFeature, NodeTracker, NodeLocalizer, NodeFusion, NodeMixer, NodeCompositor, NodeBufferRecent, NodeArtifact:
 		// Traverse upstream through processing/topology nodes.
-	case NodeSinkSpeaker, NodeSinkDisplay, NodeSinkSTT, NodeRecorder:
-		return MediaNode{}, false
+	case NodeSinkSpeaker, NodeSinkDisplay, NodeSinkSTT, NodeRecorder, NodeSinkStore, NodeSinkEventBus:
+		return FlowNode{}, false
 	}
 	for _, parent := range incoming[nodeID] {
 		if out, ok := resolveSourceNode(parent, nodeByID, incoming, visited); ok {
 			return out, true
 		}
 	}
-	return MediaNode{}, false
+	return FlowNode{}, false
 }
 
-func isSinkNode(kind MediaNodeKind) bool {
+func isSinkNode(kind FlowNodeKind) bool {
 	switch kind {
-	case NodeSinkSpeaker, NodeSinkDisplay, NodeSinkSTT, NodeRecorder:
+	case NodeSinkSpeaker, NodeSinkDisplay, NodeSinkSTT, NodeRecorder, NodeSinkStore, NodeSinkEventBus:
 		return true
-	case NodeSourceMic, NodeSourceCamera, NodeSourceTTS, NodeAnalyzer, NodeFork:
+	case NodeSourceMic, NodeSourceCamera, NodeSourceTTS, NodeSourceSensor, NodeSourceBluetooth, NodeSourceWiFi, NodeAnalyzer, NodeFork, NodeBufferRecent, NodeFeature, NodeTracker, NodeLocalizer, NodeFusion, NodeMixer, NodeCompositor, NodeArtifact:
 		return false
 	}
 	return false
 }
 
-func streamKindFor(source, sink MediaNodeKind) string {
+func streamKindFor(source, sink FlowNodeKind) string {
 	switch {
 	case source == NodeSourceCamera && sink == NodeSinkDisplay:
 		return "video"
@@ -333,7 +465,24 @@ func streamKindFor(source, sink MediaNodeKind) string {
 		return "audio_record"
 	case source == NodeSourceTTS && sink == NodeSinkSpeaker:
 		return "tts_audio"
+	case source == NodeSourceSensor && sink == NodeSinkStore:
+		return "sensor"
+	case source == NodeSourceBluetooth && sink == NodeSinkStore:
+		return "radio_ble"
+	case source == NodeSourceWiFi && sink == NodeSinkStore:
+		return "radio_wifi"
 	default:
 		return ""
 	}
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }

@@ -205,6 +205,10 @@ type ConnectRequest struct {
 	//	*ConnectRequest_Heartbeat
 	//	*ConnectRequest_WebrtcSignal
 	//	*ConnectRequest_VoiceAudio
+	//	*ConnectRequest_ObservationMessage
+	//	*ConnectRequest_ArtifactAvailable
+	//	*ConnectRequest_FlowStats
+	//	*ConnectRequest_ClockSample
 	Payload       isConnectRequest_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -328,6 +332,42 @@ func (x *ConnectRequest) GetVoiceAudio() *VoiceAudio {
 	return nil
 }
 
+func (x *ConnectRequest) GetObservationMessage() *v1.ObservationMessage {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectRequest_ObservationMessage); ok {
+			return x.ObservationMessage
+		}
+	}
+	return nil
+}
+
+func (x *ConnectRequest) GetArtifactAvailable() *v1.ArtifactAvailable {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectRequest_ArtifactAvailable); ok {
+			return x.ArtifactAvailable
+		}
+	}
+	return nil
+}
+
+func (x *ConnectRequest) GetFlowStats() *v1.FlowStats {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectRequest_FlowStats); ok {
+			return x.FlowStats
+		}
+	}
+	return nil
+}
+
+func (x *ConnectRequest) GetClockSample() *v1.ClockSample {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectRequest_ClockSample); ok {
+			return x.ClockSample
+		}
+	}
+	return nil
+}
+
 type isConnectRequest_Payload interface {
 	isConnectRequest_Payload()
 }
@@ -368,6 +408,22 @@ type ConnectRequest_VoiceAudio struct {
 	VoiceAudio *VoiceAudio `protobuf:"bytes,9,opt,name=voice_audio,json=voiceAudio,proto3,oneof"`
 }
 
+type ConnectRequest_ObservationMessage struct {
+	ObservationMessage *v1.ObservationMessage `protobuf:"bytes,10,opt,name=observation_message,json=observationMessage,proto3,oneof"`
+}
+
+type ConnectRequest_ArtifactAvailable struct {
+	ArtifactAvailable *v1.ArtifactAvailable `protobuf:"bytes,11,opt,name=artifact_available,json=artifactAvailable,proto3,oneof"`
+}
+
+type ConnectRequest_FlowStats struct {
+	FlowStats *v1.FlowStats `protobuf:"bytes,12,opt,name=flow_stats,json=flowStats,proto3,oneof"`
+}
+
+type ConnectRequest_ClockSample struct {
+	ClockSample *v1.ClockSample `protobuf:"bytes,13,opt,name=clock_sample,json=clockSample,proto3,oneof"`
+}
+
 func (*ConnectRequest_Register) isConnectRequest_Payload() {}
 
 func (*ConnectRequest_Capability) isConnectRequest_Payload() {}
@@ -385,6 +441,14 @@ func (*ConnectRequest_Heartbeat) isConnectRequest_Payload() {}
 func (*ConnectRequest_WebrtcSignal) isConnectRequest_Payload() {}
 
 func (*ConnectRequest_VoiceAudio) isConnectRequest_Payload() {}
+
+func (*ConnectRequest_ObservationMessage) isConnectRequest_Payload() {}
+
+func (*ConnectRequest_ArtifactAvailable) isConnectRequest_Payload() {}
+
+func (*ConnectRequest_FlowStats) isConnectRequest_Payload() {}
+
+func (*ConnectRequest_ClockSample) isConnectRequest_Payload() {}
 
 type VoiceAudio struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -472,6 +536,12 @@ type ConnectResponse struct {
 	//	*ConnectResponse_Error
 	//	*ConnectResponse_UpdateUi
 	//	*ConnectResponse_TransitionUi
+	//	*ConnectResponse_InstallBundle
+	//	*ConnectResponse_RemoveBundle
+	//	*ConnectResponse_StartFlow
+	//	*ConnectResponse_PatchFlow
+	//	*ConnectResponse_StopFlow
+	//	*ConnectResponse_RequestArtifact
 	Payload       isConnectResponse_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -640,6 +710,60 @@ func (x *ConnectResponse) GetTransitionUi() *v11.TransitionUI {
 	return nil
 }
 
+func (x *ConnectResponse) GetInstallBundle() *v1.InstallBundle {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_InstallBundle); ok {
+			return x.InstallBundle
+		}
+	}
+	return nil
+}
+
+func (x *ConnectResponse) GetRemoveBundle() *v1.RemoveBundle {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_RemoveBundle); ok {
+			return x.RemoveBundle
+		}
+	}
+	return nil
+}
+
+func (x *ConnectResponse) GetStartFlow() *v1.StartFlow {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_StartFlow); ok {
+			return x.StartFlow
+		}
+	}
+	return nil
+}
+
+func (x *ConnectResponse) GetPatchFlow() *v1.PatchFlow {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_PatchFlow); ok {
+			return x.PatchFlow
+		}
+	}
+	return nil
+}
+
+func (x *ConnectResponse) GetStopFlow() *v1.StopFlow {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_StopFlow); ok {
+			return x.StopFlow
+		}
+	}
+	return nil
+}
+
+func (x *ConnectResponse) GetRequestArtifact() *v1.RequestArtifact {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_RequestArtifact); ok {
+			return x.RequestArtifact
+		}
+	}
+	return nil
+}
+
 type isConnectResponse_Payload interface {
 	isConnectResponse_Payload()
 }
@@ -700,6 +824,30 @@ type ConnectResponse_TransitionUi struct {
 	TransitionUi *v11.TransitionUI `protobuf:"bytes,14,opt,name=transition_ui,json=transitionUi,proto3,oneof"`
 }
 
+type ConnectResponse_InstallBundle struct {
+	InstallBundle *v1.InstallBundle `protobuf:"bytes,15,opt,name=install_bundle,json=installBundle,proto3,oneof"`
+}
+
+type ConnectResponse_RemoveBundle struct {
+	RemoveBundle *v1.RemoveBundle `protobuf:"bytes,16,opt,name=remove_bundle,json=removeBundle,proto3,oneof"`
+}
+
+type ConnectResponse_StartFlow struct {
+	StartFlow *v1.StartFlow `protobuf:"bytes,17,opt,name=start_flow,json=startFlow,proto3,oneof"`
+}
+
+type ConnectResponse_PatchFlow struct {
+	PatchFlow *v1.PatchFlow `protobuf:"bytes,18,opt,name=patch_flow,json=patchFlow,proto3,oneof"`
+}
+
+type ConnectResponse_StopFlow struct {
+	StopFlow *v1.StopFlow `protobuf:"bytes,19,opt,name=stop_flow,json=stopFlow,proto3,oneof"`
+}
+
+type ConnectResponse_RequestArtifact struct {
+	RequestArtifact *v1.RequestArtifact `protobuf:"bytes,20,opt,name=request_artifact,json=requestArtifact,proto3,oneof"`
+}
+
 func (*ConnectResponse_RegisterAck) isConnectResponse_Payload() {}
 
 func (*ConnectResponse_SetUi) isConnectResponse_Payload() {}
@@ -727,6 +875,18 @@ func (*ConnectResponse_Error) isConnectResponse_Payload() {}
 func (*ConnectResponse_UpdateUi) isConnectResponse_Payload() {}
 
 func (*ConnectResponse_TransitionUi) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_InstallBundle) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_RemoveBundle) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_StartFlow) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_PatchFlow) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_StopFlow) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_RequestArtifact) isConnectResponse_Payload() {}
 
 type RegisterDevice struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
@@ -1256,7 +1416,7 @@ var File_terminals_control_v1_control_proto protoreflect.FileDescriptor
 
 const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\n" +
-	"\"terminals/control/v1/control.proto\x12\x14terminals.control.v1\x1a,terminals/capabilities/v1/capabilities.proto\x1a\x18terminals/io/v1/io.proto\x1a\x18terminals/ui/v1/ui.proto\"\xf0\x04\n" +
+	"\"terminals/control/v1/control.proto\x12\x14terminals.control.v1\x1a,terminals/capabilities/v1/capabilities.proto\x1a\x18terminals/io/v1/io.proto\x1a\x18terminals/ui/v1/ui.proto\"\x9d\a\n" +
 	"\x0eConnectRequest\x12B\n" +
 	"\bregister\x18\x01 \x01(\v2$.terminals.control.v1.RegisterDeviceH\x00R\bregister\x12H\n" +
 	"\n" +
@@ -1269,7 +1429,13 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\theartbeat\x18\a \x01(\v2\x1f.terminals.control.v1.HeartbeatH\x00R\theartbeat\x12I\n" +
 	"\rwebrtc_signal\x18\b \x01(\v2\".terminals.control.v1.WebRTCSignalH\x00R\fwebrtcSignal\x12C\n" +
 	"\vvoice_audio\x18\t \x01(\v2 .terminals.control.v1.VoiceAudioH\x00R\n" +
-	"voiceAudioB\t\n" +
+	"voiceAudio\x12V\n" +
+	"\x13observation_message\x18\n" +
+	" \x01(\v2#.terminals.io.v1.ObservationMessageH\x00R\x12observationMessage\x12S\n" +
+	"\x12artifact_available\x18\v \x01(\v2\".terminals.io.v1.ArtifactAvailableH\x00R\x11artifactAvailable\x12;\n" +
+	"\n" +
+	"flow_stats\x18\f \x01(\v2\x1a.terminals.io.v1.FlowStatsH\x00R\tflowStats\x12A\n" +
+	"\fclock_sample\x18\r \x01(\v2\x1c.terminals.io.v1.ClockSampleH\x00R\vclockSampleB\t\n" +
 	"\apayload\"{\n" +
 	"\n" +
 	"VoiceAudio\x12\x1b\n" +
@@ -1277,7 +1443,8 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\x05audio\x18\x02 \x01(\fR\x05audio\x12\x1f\n" +
 	"\vsample_rate\x18\x03 \x01(\x05R\n" +
 	"sampleRate\x12\x19\n" +
-	"\bis_final\x18\x04 \x01(\bR\aisFinal\"\xb0\a\n" +
+	"\bis_final\x18\x04 \x01(\bR\aisFinal\"\xc2\n" +
+	"\n" +
 	"\x0fConnectResponse\x12F\n" +
 	"\fregister_ack\x18\x01 \x01(\v2!.terminals.control.v1.RegisterAckH\x00R\vregisterAck\x12/\n" +
 	"\x06set_ui\x18\x02 \x01(\v2\x16.terminals.ui.v1.SetUIH\x00R\x05setUi\x12A\n" +
@@ -1296,7 +1463,15 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\theartbeat\x18\v \x01(\v2\x1f.terminals.control.v1.HeartbeatH\x00R\theartbeat\x12:\n" +
 	"\x05error\x18\f \x01(\v2\".terminals.control.v1.ControlErrorH\x00R\x05error\x128\n" +
 	"\tupdate_ui\x18\r \x01(\v2\x19.terminals.ui.v1.UpdateUIH\x00R\bupdateUi\x12D\n" +
-	"\rtransition_ui\x18\x0e \x01(\v2\x1d.terminals.ui.v1.TransitionUIH\x00R\ftransitionUiB\t\n" +
+	"\rtransition_ui\x18\x0e \x01(\v2\x1d.terminals.ui.v1.TransitionUIH\x00R\ftransitionUi\x12G\n" +
+	"\x0einstall_bundle\x18\x0f \x01(\v2\x1e.terminals.io.v1.InstallBundleH\x00R\rinstallBundle\x12D\n" +
+	"\rremove_bundle\x18\x10 \x01(\v2\x1d.terminals.io.v1.RemoveBundleH\x00R\fremoveBundle\x12;\n" +
+	"\n" +
+	"start_flow\x18\x11 \x01(\v2\x1a.terminals.io.v1.StartFlowH\x00R\tstartFlow\x12;\n" +
+	"\n" +
+	"patch_flow\x18\x12 \x01(\v2\x1a.terminals.io.v1.PatchFlowH\x00R\tpatchFlow\x128\n" +
+	"\tstop_flow\x18\x13 \x01(\v2\x19.terminals.io.v1.StopFlowH\x00R\bstopFlow\x12M\n" +
+	"\x10request_artifact\x18\x14 \x01(\v2 .terminals.io.v1.RequestArtifactH\x00R\x0frequestArtifactB\t\n" +
 	"\apayload\"c\n" +
 	"\x0eRegisterDevice\x12Q\n" +
 	"\fcapabilities\x18\x01 \x01(\v2-.terminals.capabilities.v1.DeviceCapabilitiesR\fcapabilities\"\xce\x01\n" +
@@ -1401,16 +1576,26 @@ var file_terminals_control_v1_control_proto_goTypes = []any{
 	nil,                            // 17: terminals.control.v1.CommandResult.DataEntry
 	(*v1.InputEvent)(nil),          // 18: terminals.io.v1.InputEvent
 	(*v1.SensorData)(nil),          // 19: terminals.io.v1.SensorData
-	(*v11.SetUI)(nil),              // 20: terminals.ui.v1.SetUI
-	(*v1.StartStream)(nil),         // 21: terminals.io.v1.StartStream
-	(*v1.StopStream)(nil),          // 22: terminals.io.v1.StopStream
-	(*v1.PlayAudio)(nil),           // 23: terminals.io.v1.PlayAudio
-	(*v1.ShowMedia)(nil),           // 24: terminals.io.v1.ShowMedia
-	(*v1.RouteStream)(nil),         // 25: terminals.io.v1.RouteStream
-	(*v11.Notification)(nil),       // 26: terminals.ui.v1.Notification
-	(*v11.UpdateUI)(nil),           // 27: terminals.ui.v1.UpdateUI
-	(*v11.TransitionUI)(nil),       // 28: terminals.ui.v1.TransitionUI
-	(*v12.DeviceCapabilities)(nil), // 29: terminals.capabilities.v1.DeviceCapabilities
+	(*v1.ObservationMessage)(nil),  // 20: terminals.io.v1.ObservationMessage
+	(*v1.ArtifactAvailable)(nil),   // 21: terminals.io.v1.ArtifactAvailable
+	(*v1.FlowStats)(nil),           // 22: terminals.io.v1.FlowStats
+	(*v1.ClockSample)(nil),         // 23: terminals.io.v1.ClockSample
+	(*v11.SetUI)(nil),              // 24: terminals.ui.v1.SetUI
+	(*v1.StartStream)(nil),         // 25: terminals.io.v1.StartStream
+	(*v1.StopStream)(nil),          // 26: terminals.io.v1.StopStream
+	(*v1.PlayAudio)(nil),           // 27: terminals.io.v1.PlayAudio
+	(*v1.ShowMedia)(nil),           // 28: terminals.io.v1.ShowMedia
+	(*v1.RouteStream)(nil),         // 29: terminals.io.v1.RouteStream
+	(*v11.Notification)(nil),       // 30: terminals.ui.v1.Notification
+	(*v11.UpdateUI)(nil),           // 31: terminals.ui.v1.UpdateUI
+	(*v11.TransitionUI)(nil),       // 32: terminals.ui.v1.TransitionUI
+	(*v1.InstallBundle)(nil),       // 33: terminals.io.v1.InstallBundle
+	(*v1.RemoveBundle)(nil),        // 34: terminals.io.v1.RemoveBundle
+	(*v1.StartFlow)(nil),           // 35: terminals.io.v1.StartFlow
+	(*v1.PatchFlow)(nil),           // 36: terminals.io.v1.PatchFlow
+	(*v1.StopFlow)(nil),            // 37: terminals.io.v1.StopFlow
+	(*v1.RequestArtifact)(nil),     // 38: terminals.io.v1.RequestArtifact
+	(*v12.DeviceCapabilities)(nil), // 39: terminals.capabilities.v1.DeviceCapabilities
 }
 var file_terminals_control_v1_control_proto_depIdxs = []int32{
 	6,  // 0: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
@@ -1422,35 +1607,45 @@ var file_terminals_control_v1_control_proto_depIdxs = []int32{
 	14, // 6: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
 	13, // 7: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
 	4,  // 8: terminals.control.v1.ConnectRequest.voice_audio:type_name -> terminals.control.v1.VoiceAudio
-	7,  // 9: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
-	20, // 10: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
-	21, // 11: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
-	22, // 12: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
-	23, // 13: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
-	24, // 14: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
-	25, // 15: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
-	26, // 16: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
-	13, // 17: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
-	11, // 18: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
-	14, // 19: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	12, // 20: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
-	27, // 21: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
-	28, // 22: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
-	29, // 23: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	15, // 24: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
-	29, // 25: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	0,  // 26: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
-	1,  // 27: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
-	16, // 28: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
-	17, // 29: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
-	2,  // 30: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
-	3,  // 31: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
-	5,  // 32: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
-	32, // [32:33] is the sub-list for method output_type
-	31, // [31:32] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	20, // 9: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
+	21, // 10: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
+	22, // 11: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
+	23, // 12: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
+	7,  // 13: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
+	24, // 14: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
+	25, // 15: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
+	26, // 16: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
+	27, // 17: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
+	28, // 18: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
+	29, // 19: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
+	30, // 20: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
+	13, // 21: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	11, // 22: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
+	14, // 23: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	12, // 24: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
+	31, // 25: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
+	32, // 26: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
+	33, // 27: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
+	34, // 28: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
+	35, // 29: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
+	36, // 30: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
+	37, // 31: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
+	38, // 32: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
+	39, // 33: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	15, // 34: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
+	39, // 35: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	0,  // 36: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
+	1,  // 37: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
+	16, // 38: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
+	17, // 39: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
+	2,  // 40: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
+	3,  // 41: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
+	5,  // 42: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
+	42, // [42:43] is the sub-list for method output_type
+	41, // [41:42] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_terminals_control_v1_control_proto_init() }
@@ -1468,6 +1663,10 @@ func file_terminals_control_v1_control_proto_init() {
 		(*ConnectRequest_Heartbeat)(nil),
 		(*ConnectRequest_WebrtcSignal)(nil),
 		(*ConnectRequest_VoiceAudio)(nil),
+		(*ConnectRequest_ObservationMessage)(nil),
+		(*ConnectRequest_ArtifactAvailable)(nil),
+		(*ConnectRequest_FlowStats)(nil),
+		(*ConnectRequest_ClockSample)(nil),
 	}
 	file_terminals_control_v1_control_proto_msgTypes[2].OneofWrappers = []any{
 		(*ConnectResponse_RegisterAck)(nil),
@@ -1484,6 +1683,12 @@ func file_terminals_control_v1_control_proto_init() {
 		(*ConnectResponse_Error)(nil),
 		(*ConnectResponse_UpdateUi)(nil),
 		(*ConnectResponse_TransitionUi)(nil),
+		(*ConnectResponse_InstallBundle)(nil),
+		(*ConnectResponse_RemoveBundle)(nil),
+		(*ConnectResponse_StartFlow)(nil),
+		(*ConnectResponse_PatchFlow)(nil),
+		(*ConnectResponse_StopFlow)(nil),
+		(*ConnectResponse_RequestArtifact)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

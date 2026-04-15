@@ -20,11 +20,13 @@ import (
 
 	"github.com/curtcox/terminals/terminal_server/internal/admin"
 	"github.com/curtcox/terminals/terminal_server/internal/ai"
+	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
 	"github.com/curtcox/terminals/terminal_server/internal/audio"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/observation"
 	"github.com/curtcox/terminals/terminal_server/internal/placement"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
@@ -32,6 +34,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
+	"github.com/curtcox/terminals/terminal_server/internal/world"
 )
 
 func main() {
@@ -51,6 +54,10 @@ func main() {
 	store := storage.NewMemoryStore()
 	scheduler := storage.NewMemoryScheduler()
 	broadcaster := ui.NewMemoryBroadcaster()
+	observationStore := observation.NewStore(4096)
+	worldModel := world.NewModel()
+	appRuntime := appruntime.NewRuntime()
+	loadAppPackages(ctx, appRuntime)
 	telephonyBridge, err := buildTelephonyBridge(ctx, cfg.SIP)
 	if err != nil {
 		log.Printf("configure telephony bridge: %v", err)
@@ -77,6 +84,8 @@ func main() {
 		Broadcast:   broadcaster,
 		DeviceAudio: scenarioDeviceAudio{hub: audioHub},
 		Placement:   placement.NewManagerBackedEngine(deviceManager),
+		Observe:     observationStore,
+		World:       worldModelAdapter{model: worldModel},
 	}
 	ioRouter.MediaPlanner().SetAnalyzerRunner(scenarioAnalyzerRunner{
 		Sound:       environment.Sound,
@@ -92,6 +101,9 @@ func main() {
 			Source:     scenario.SourceEvent,
 			OccurredAt: event.OccurredAt,
 		})
+	})
+	ioRouter.MediaPlanner().SetObservationSink(func(observation io.Observation) {
+		observationStore.AddObservation(context.Background(), observation)
 	})
 	if err := scenarioRuntime.RecoverActivations(ctx); err != nil {
 		log.Printf("recover scenario activations: %v", err)
@@ -172,6 +184,7 @@ func main() {
 	log.Printf("control stream handler initialized")
 	log.Printf("recording manager initialized dir=%s", cfg.RecordingDir)
 	log.Printf("scenario runtime initialized with %d builtin scenarios", 3)
+	log.Printf("app runtime initialized with %d loaded packages", len(appRuntime.ListPackages()))
 	log.Printf(
 		"housekeeping configured heartbeat_timeout=%ds liveness_interval=%ds due_timer_interval=%ds",
 		cfg.HeartbeatTimeoutSeconds,
@@ -280,6 +293,74 @@ func copyStringMap(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func loadAppPackages(ctx context.Context, runtime *appruntime.Runtime) {
+	if runtime == nil {
+		return
+	}
+	root := filepath.Join("apps")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		appRoot := filepath.Join(root, entry.Name())
+		if _, err := runtime.LoadPackage(ctx, appRoot); err != nil {
+			log.Printf("skip app package %s: %v", entry.Name(), err)
+			continue
+		}
+		log.Printf("loaded app package %s", entry.Name())
+	}
+}
+
+type worldModelAdapter struct {
+	model *world.Model
+}
+
+func (w worldModelAdapter) LocateEntity(ctx context.Context, query scenario.EntityQuery) (*io.LocationEstimate, error) {
+	if w.model == nil {
+		return nil, world.ErrNotFound
+	}
+	return w.model.LocateEntity(ctx, world.EntityQuery{
+		Person:        query.Person,
+		Object:        query.Object,
+		BluetoothMAC:  query.BluetoothMAC,
+		LastKnownOnly: query.LastKnownOnly,
+		MinConfidence: query.MinConfidence,
+	})
+}
+
+func (w worldModelAdapter) WhoIsHome(ctx context.Context) ([]scenario.EntityRecord, error) {
+	if w.model == nil {
+		return nil, nil
+	}
+	records, err := w.model.WhoIsHome(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]scenario.EntityRecord, 0, len(records))
+	for _, record := range records {
+		out = append(out, scenario.EntityRecord{
+			EntityID:    record.EntityID,
+			Kind:        string(record.Kind),
+			DisplayName: record.DisplayName,
+			LastKnown:   record.LastKnown,
+			LastSeenAt:  record.LastSeenAt,
+			Confidence:  record.Confidence,
+		})
+	}
+	return out, nil
+}
+
+func (w worldModelAdapter) VerifyDevice(ctx context.Context, deviceID string, method string) error {
+	if w.model == nil {
+		return world.ErrNotFound
+	}
+	return w.model.VerifyDevice(ctx, deviceID, method)
 }
 
 // buildTelephonyBridge returns the configured telephony bridge for the

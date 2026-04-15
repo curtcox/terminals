@@ -17,6 +17,7 @@ message DeviceCapabilities {
   SensorCapability sensors = 17;
   ConnectivityCapability connectivity = 18;
   BatteryCapability battery = 19;
+  EdgeCapability edge = 20;
 }
 
 message DeviceIdentity {
@@ -88,4 +89,37 @@ message ConnectivityCapability {
 message BatteryCapability {
   float level = 1;
   bool charging = 2;
+}
+
+message EdgeCapability {
+  repeated string runtimes = 1;
+  EdgeComputeCapability compute = 2;
+  repeated string operators = 3;
+  EdgeRetentionCapability retention = 4;
+  EdgeTimingCapability timing = 5;
+  EdgeGeometryCapability geometry = 6;
+}
+
+message EdgeComputeCapability {
+  int32 cpu_realtime = 1;
+  int32 gpu_realtime = 2;
+  int32 npu_realtime = 3;
+  int32 mem_mb = 4;
+}
+
+message EdgeRetentionCapability {
+  int32 audio_sec = 1;
+  int32 video_sec = 2;
+  int32 sensor_sec = 3;
+  int32 radio_sec = 4;
+}
+
+message EdgeTimingCapability {
+  double sync_error_ms = 1;
+}
+
+message EdgeGeometryCapability {
+  bool mic_array = 1;
+  bool camera_intrinsics = 2;
+  bool compass = 3;
 }

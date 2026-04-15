@@ -49,3 +49,44 @@ func TestClaimManagerPreemptAndRestore(t *testing.T) {
 		t.Fatalf("active after restore = %+v, want photo restored", active)
 	}
 }
+
+func TestClaimManagerComputeAndBufferClaims(t *testing.T) {
+	manager := iorouter.NewClaimManager()
+
+	_, err := manager.Request(context.Background(), []iorouter.Claim{
+		{
+			ActivationID: "sound-localize",
+			DeviceID:     "edge-1",
+			Resource:     iorouter.ResourceComputeCPUShared,
+			Mode:         iorouter.ClaimShared,
+			Priority:     2,
+		},
+		{
+			ActivationID: "sound-localize",
+			DeviceID:     "edge-1",
+			Resource:     iorouter.ResourceBufferAudio,
+			Mode:         iorouter.ClaimShared,
+			Priority:     2,
+		},
+		{
+			ActivationID: "ble-inventory",
+			DeviceID:     "edge-1",
+			Resource:     iorouter.ResourceRadioBLEScan,
+			Mode:         iorouter.ClaimShared,
+			Priority:     1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Request(edge resources) error = %v", err)
+	}
+
+	if _, err := manager.Request(context.Background(), []iorouter.Claim{{
+		ActivationID: "exclusive-cpu",
+		DeviceID:     "edge-1",
+		Resource:     iorouter.ResourceComputeCPUShared,
+		Mode:         iorouter.ClaimExclusive,
+		Priority:     1,
+	}}); err != iorouter.ErrClaimConflict {
+		t.Fatalf("exclusive compute conflict error = %v, want %v", err, iorouter.ErrClaimConflict)
+	}
+}

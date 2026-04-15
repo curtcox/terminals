@@ -73,6 +73,22 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		}
 	case normalized == "audio monitor":
 		trigger.Intent = "audio monitor"
+	case normalized == "did you feel that":
+		trigger.Intent = "recent_imu_anomaly"
+	case normalized == "what was that sound":
+		trigger.Intent = "sound_identification"
+	case normalized == "where did that sound come from":
+		trigger.Intent = "sound_localization"
+	case normalized == "who is in the house" || normalized == "who is home" || normalized == "who is in the house and where":
+		trigger.Intent = "presence_query"
+	case normalized == "bluetooth inventory" || normalized == "what bluetooth devices are here":
+		trigger.Intent = "bluetooth_inventory"
+	case strings.HasPrefix(normalized, "verify terminal "):
+		trigger.Intent = "terminal_verification"
+		if deviceID, method, ok := parseTerminalVerification(normalized); ok {
+			trigger.Arguments["device_id"] = deviceID
+			trigger.Arguments["method"] = method
+		}
 	case normalized == "schedule monitor":
 		trigger.Intent = "schedule monitor"
 	case normalized == "voice assistant" || strings.HasPrefix(normalized, "assistant "):
@@ -233,4 +249,28 @@ func parseUSBClaimVIDPID(normalized string) (string, string, bool) {
 		return "", "", false
 	}
 	return vendorID, productID, true
+}
+
+func parseTerminalVerification(normalized string) (string, string, bool) {
+	const prefix = "verify terminal "
+	if !strings.HasPrefix(normalized, prefix) {
+		return "", "", false
+	}
+	rest := strings.TrimSpace(strings.TrimPrefix(normalized, prefix))
+	if rest == "" {
+		return "", "", false
+	}
+	parts := strings.Fields(rest)
+	if len(parts) == 0 {
+		return "", "", false
+	}
+	deviceID := strings.TrimSpace(parts[0])
+	method := "manual"
+	if len(parts) > 1 {
+		method = strings.TrimSpace(parts[1])
+	}
+	if deviceID == "" {
+		return "", "", false
+	}
+	return deviceID, method, true
 }

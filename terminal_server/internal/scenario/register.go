@@ -27,6 +27,30 @@ func RegisterBuiltins(engine *Engine) {
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
+		Factory:  func() Scenario { return &RecentIMUAnomalyScenario{} },
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
+		Factory:  func() Scenario { return &SoundIdentificationScenario{} },
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
+		Factory:  func() Scenario { return &SoundLocalizationScenario{} },
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
+		Factory:  func() Scenario { return &PresenceQueryScenario{} },
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
+		Factory:  func() Scenario { return &BluetoothInventoryScenario{} },
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
+		Factory:  func() Scenario { return &TerminalVerificationScenario{} },
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
 		Factory:  func() Scenario { return PhotoFrameScenario{} },
 		Priority: PriorityLow,
 	})

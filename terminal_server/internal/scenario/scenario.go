@@ -4,6 +4,8 @@ import (
 	"context"
 	"image"
 	"time"
+
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 )
 
 // TriggerKind identifies how a scenario was requested.
@@ -356,6 +358,8 @@ type Environment struct {
 	Passthrough PassthroughBridge
 	Placement   PlacementEngine
 	TriggerBus  *IntentEventBus
+	Observe     ObservationStore
+	World       WorldModel
 }
 
 // Scenario is the runtime contract for all server-side behaviors.
@@ -384,4 +388,36 @@ type Suspendable interface {
 // reacquire resources after preemption is lifted.
 type Resumable interface {
 	Resume(ctx context.Context, env *Environment) error
+}
+
+// ObservationStore exposes typed observation and artifact history.
+type ObservationStore interface {
+	Recent(ctx context.Context, kind, zone string, since time.Time) []iorouter.Observation
+	Artifact(ctx context.Context, artifactID string) (iorouter.ArtifactRef, bool)
+}
+
+// EntityQuery filters world-model lookup operations.
+type EntityQuery struct {
+	Person        string
+	Object        string
+	BluetoothMAC  string
+	LastKnownOnly bool
+	MinConfidence float64
+}
+
+// EntityRecord represents one person/object/device world-model entry.
+type EntityRecord struct {
+	EntityID    string
+	Kind        string
+	DisplayName string
+	LastKnown   *iorouter.LocationEstimate
+	LastSeenAt  time.Time
+	Confidence  float64
+}
+
+// WorldModel provides calibration, entity location, and verification hooks.
+type WorldModel interface {
+	LocateEntity(ctx context.Context, q EntityQuery) (*iorouter.LocationEstimate, error)
+	WhoIsHome(ctx context.Context) ([]EntityRecord, error)
+	VerifyDevice(ctx context.Context, deviceID string, method string) error
 }

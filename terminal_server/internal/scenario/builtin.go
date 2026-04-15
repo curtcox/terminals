@@ -1350,6 +1350,268 @@ func (s *MultiWindowScenario) Start(ctx context.Context, env *Environment) error
 // Stop ends multi-window mode and currently has no side effects.
 func (s *MultiWindowScenario) Stop() error { return nil }
 
+// RecentIMUAnomalyScenario answers "did you feel that?" from recent observations.
+type RecentIMUAnomalyScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *RecentIMUAnomalyScenario) Name() string { return "recent_imu_anomaly" }
+
+// Match records trigger metadata when retrospective IMU checks are requested.
+func (s *RecentIMUAnomalyScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "recent_imu_anomaly", "did you feel that") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start summarizes recent IMU anomaly observations from the observation store.
+func (s *RecentIMUAnomalyScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil || env.Observe == nil {
+		return notifySource(ctx, env, s.trigger.SourceID, "No recent IMU anomaly data is available.")
+	}
+	zone := strings.TrimSpace(s.trigger.Arguments["zone"])
+	observations := env.Observe.Recent(ctx, "imu_anomaly", zone, time.Now().Add(-30*time.Second))
+	if len(observations) == 0 {
+		return notifySource(ctx, env, s.trigger.SourceID, "No unusual motion was recorded in the last 30 seconds.")
+	}
+	first := observations[0]
+	zoneText := strings.TrimSpace(first.Zone)
+	if zoneText == "" {
+		zoneText = "the monitored area"
+	}
+	return notifySource(ctx, env, s.trigger.SourceID,
+		fmt.Sprintf("Yes. Recent motion anomaly in %s at %.0f%% confidence.", zoneText, first.Confidence*100))
+}
+
+// Stop ends this one-shot scenario.
+func (s *RecentIMUAnomalyScenario) Stop() error { return nil }
+
+// SoundIdentificationScenario answers "what was that sound?" from recent observations.
+type SoundIdentificationScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *SoundIdentificationScenario) Name() string { return "sound_identification" }
+
+// Match records trigger metadata when retrospective sound labeling is requested.
+func (s *SoundIdentificationScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "sound_identification", "what was that sound") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start returns the highest-confidence recent sound label.
+func (s *SoundIdentificationScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil || env.Observe == nil {
+		return notifySource(ctx, env, s.trigger.SourceID, "No recent sound data is available.")
+	}
+	observations := env.Observe.Recent(ctx, "sound", strings.TrimSpace(s.trigger.Arguments["zone"]), time.Now().Add(-20*time.Second))
+	if len(observations) == 0 {
+		return notifySource(ctx, env, s.trigger.SourceID, "I did not find a recent sound event.")
+	}
+	best := observations[0]
+	label := strings.TrimSpace(best.Subject)
+	if label == "" {
+		label = strings.TrimSpace(best.Attributes["label"])
+	}
+	if label == "" {
+		label = "unknown sound"
+	}
+	return notifySource(ctx, env, s.trigger.SourceID,
+		fmt.Sprintf("Most likely: %s (%.0f%% confidence).", label, best.Confidence*100))
+}
+
+// Stop ends this one-shot scenario.
+func (s *SoundIdentificationScenario) Stop() error { return nil }
+
+// SoundLocalizationScenario answers "where did that sound come from?".
+type SoundLocalizationScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *SoundLocalizationScenario) Name() string { return "sound_localization" }
+
+// Match records trigger metadata when retrospective sound localization is requested.
+func (s *SoundLocalizationScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "sound_localization", "where did that sound come from") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start returns the best available recent location estimate for a sound.
+func (s *SoundLocalizationScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil || env.Observe == nil {
+		return notifySource(ctx, env, s.trigger.SourceID, "No recent localization data is available.")
+	}
+	observations := env.Observe.Recent(ctx, "sound", "", time.Now().Add(-20*time.Second))
+	if len(observations) == 0 {
+		return notifySource(ctx, env, s.trigger.SourceID, "I do not have a recent localized sound.")
+	}
+	best := observations[0]
+	zone := strings.TrimSpace(best.Zone)
+	if zone == "" && best.Location != nil {
+		zone = strings.TrimSpace(best.Location.Zone)
+	}
+	if zone == "" {
+		zone = "an unknown zone"
+	}
+	return notifySource(ctx, env, s.trigger.SourceID,
+		fmt.Sprintf("Likely source: %s (%.0f%% confidence).", zone, best.Confidence*100))
+}
+
+// Stop ends this one-shot scenario.
+func (s *SoundLocalizationScenario) Stop() error { return nil }
+
+// PresenceQueryScenario reports current person presence from world model.
+type PresenceQueryScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *PresenceQueryScenario) Name() string { return "presence_query" }
+
+// Match records trigger metadata when presence is requested.
+func (s *PresenceQueryScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "presence_query", "who is in the house", "who is home") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start summarizes known person presence.
+func (s *PresenceQueryScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil || env.World == nil {
+		return notifySource(ctx, env, s.trigger.SourceID, "Presence data is not available yet.")
+	}
+	people, err := env.World.WhoIsHome(ctx)
+	if err != nil || len(people) == 0 {
+		return notifySource(ctx, env, s.trigger.SourceID, "I do not currently have confirmed occupants.")
+	}
+	parts := make([]string, 0, len(people))
+	for _, person := range people {
+		name := strings.TrimSpace(person.DisplayName)
+		if name == "" {
+			name = person.EntityID
+		}
+		zone := ""
+		if person.LastKnown != nil {
+			zone = strings.TrimSpace(person.LastKnown.Zone)
+		}
+		if zone == "" {
+			parts = append(parts, name)
+			continue
+		}
+		parts = append(parts, name+" in "+zone)
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, "Currently detected: "+strings.Join(parts, ", ")+".")
+}
+
+// Stop ends this one-shot scenario.
+func (s *PresenceQueryScenario) Stop() error { return nil }
+
+// BluetoothInventoryScenario summarizes recent Bluetooth sightings.
+type BluetoothInventoryScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *BluetoothInventoryScenario) Name() string { return "bluetooth_inventory" }
+
+// Match records trigger metadata when Bluetooth inventory is requested.
+func (s *BluetoothInventoryScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "bluetooth_inventory", "bluetooth inventory") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start summarizes recent Bluetooth observations.
+func (s *BluetoothInventoryScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil || env.Observe == nil {
+		return notifySource(ctx, env, s.trigger.SourceID, "Bluetooth inventory is unavailable.")
+	}
+	observations := env.Observe.Recent(ctx, "bluetooth", "", time.Now().Add(-5*time.Minute))
+	if len(observations) == 0 {
+		return notifySource(ctx, env, s.trigger.SourceID, "No Bluetooth devices were recently observed.")
+	}
+	names := make([]string, 0, len(observations))
+	seen := map[string]struct{}{}
+	for _, ob := range observations {
+		label := strings.TrimSpace(ob.Subject)
+		if label == "" {
+			label = strings.TrimSpace(ob.Attributes["device"])
+		}
+		if label == "" {
+			label = strings.TrimSpace(ob.Attributes["mac"])
+		}
+		if label == "" {
+			continue
+		}
+		if _, ok := seen[label]; ok {
+			continue
+		}
+		seen[label] = struct{}{}
+		names = append(names, label)
+		if len(names) >= 5 {
+			break
+		}
+	}
+	if len(names) == 0 {
+		return notifySource(ctx, env, s.trigger.SourceID, "Bluetooth scans are active, but no identifiable devices were found.")
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, "Recent Bluetooth devices: "+strings.Join(names, ", ")+".")
+}
+
+// Stop ends this one-shot scenario.
+func (s *BluetoothInventoryScenario) Stop() error { return nil }
+
+// TerminalVerificationScenario updates world-model verification state.
+type TerminalVerificationScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *TerminalVerificationScenario) Name() string { return "terminal_verification" }
+
+// Match records trigger metadata when terminal verification is requested.
+func (s *TerminalVerificationScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "terminal_verification", "verify terminal") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start verifies one terminal placement method in the world model.
+func (s *TerminalVerificationScenario) Start(ctx context.Context, env *Environment) error {
+	deviceID := strings.TrimSpace(s.trigger.Arguments["device_id"])
+	method := strings.TrimSpace(s.trigger.Arguments["method"])
+	if method == "" {
+		method = "manual"
+	}
+	if env == nil || env.World == nil || deviceID == "" {
+		return notifySource(ctx, env, s.trigger.SourceID, "Terminal verification could not run.")
+	}
+	if err := env.World.VerifyDevice(ctx, deviceID, method); err != nil {
+		return notifySource(ctx, env, s.trigger.SourceID, "Terminal verification failed for "+deviceID+".")
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, "Terminal "+deviceID+" verified with method "+method+".")
+}
+
+// Stop ends this one-shot scenario.
+func (s *TerminalVerificationScenario) Stop() error { return nil }
+
 func intentMatches(intent string, accepted ...string) bool {
 	normalized := strings.TrimSpace(strings.ToLower(intent))
 	for _, candidate := range accepted {

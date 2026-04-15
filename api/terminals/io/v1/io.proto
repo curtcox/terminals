@@ -89,3 +89,126 @@ message SensorData {
   int64 unix_ms = 2;
   map<string, double> values = 3;
 }
+
+message FlowNode {
+  string id = 1;
+  string kind = 2;
+  map<string, string> args = 3;
+  string exec = 4;
+}
+
+message FlowEdge {
+  string from = 1;
+  string to = 2;
+}
+
+message FlowPlan {
+  repeated FlowNode nodes = 1;
+  repeated FlowEdge edges = 2;
+}
+
+message StartFlow {
+  string flow_id = 1;
+  FlowPlan plan = 2;
+}
+
+message PatchFlow {
+  string flow_id = 1;
+  FlowPlan plan = 2;
+}
+
+message StopFlow {
+  string flow_id = 1;
+}
+
+message DeviceRef {
+  string device_id = 1;
+}
+
+message Pose {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double yaw = 4;
+  double pitch = 5;
+  double roll = 6;
+  double confidence = 7;
+}
+
+message LocationEstimate {
+  string zone = 1;
+  Pose pose = 2;
+  double radius_m = 3;
+  double confidence = 4;
+  repeated string sources = 5;
+}
+
+message ObservationProvenance {
+  string flow_id = 1;
+  string node_id = 2;
+  string exec_site = 3;
+  string model_id = 4;
+  string calibration_version = 5;
+}
+
+message ArtifactRef {
+  string id = 1;
+  string kind = 2;
+  DeviceRef source = 3;
+  int64 start_unix_ms = 4;
+  int64 end_unix_ms = 5;
+  string uri = 6;
+}
+
+message Observation {
+  string kind = 1;
+  string subject = 2;
+  DeviceRef source_device = 3;
+  int64 occurred_unix_ms = 4;
+  double confidence = 5;
+  string zone = 6;
+  LocationEstimate location = 7;
+  string track_id = 8;
+  map<string, string> attributes = 9;
+  repeated ArtifactRef evidence = 10;
+  ObservationProvenance provenance = 11;
+}
+
+message ObservationMessage {
+  Observation observation = 1;
+}
+
+message ArtifactAvailable {
+  ArtifactRef artifact = 1;
+}
+
+message RequestArtifact {
+  string artifact_id = 1;
+}
+
+message FlowStats {
+  string flow_id = 1;
+  double cpu_pct = 2;
+  double mem_mb = 3;
+  uint64 dropped_frames = 4;
+  string state = 5;
+  string error = 6;
+}
+
+message ClockSample {
+  string device_id = 1;
+  int64 client_unix_ms = 2;
+  int64 server_unix_ms = 3;
+  double error_ms = 4;
+}
+
+message InstallBundle {
+  string bundle_id = 1;
+  string version = 2;
+  bytes tar_gz = 3;
+  string sha256 = 4;
+}
+
+message RemoveBundle {
+  string bundle_id = 1;
+}

@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
 	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	uiv1 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
@@ -130,6 +132,40 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				IsFinal:    voice.GetIsFinal(),
 			},
 		}, nil
+	case *controlv1.ConnectRequest_ObservationMessage:
+		return ClientMessage{
+			Observation: &ObservationRequest{
+				Observation: observationFromProto(payload.ObservationMessage.GetObservation()),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_ArtifactAvailable:
+		return ClientMessage{
+			ArtifactReady: &ArtifactAvailableRequest{
+				Artifact: artifactFromProto(payload.ArtifactAvailable.GetArtifact()),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_FlowStats:
+		stats := payload.FlowStats
+		return ClientMessage{
+			FlowStats: &FlowStatsRequest{
+				FlowID:        stats.GetFlowId(),
+				CPUPct:        stats.GetCpuPct(),
+				MemMB:         stats.GetMemMb(),
+				DroppedFrames: stats.GetDroppedFrames(),
+				State:         stats.GetState(),
+				Error:         stats.GetError(),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_ClockSample:
+		sample := payload.ClockSample
+		return ClientMessage{
+			ClockSample: &ClockSampleRequest{
+				DeviceID:     sample.GetDeviceId(),
+				ClientUnixMS: sample.GetClientUnixMs(),
+				ServerUnixMS: sample.GetServerUnixMs(),
+				ErrorMS:      sample.GetErrorMs(),
+			},
+		}, nil
 	default:
 		return ClientMessage{}, nil
 	}
@@ -225,6 +261,40 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 						PcmData: audio,
 					},
 					Format: msg.PlayAudio.Format,
+				},
+			},
+		}
+	case msg.StartFlow != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_StartFlow{
+				StartFlow: &iov1.StartFlow{
+					FlowId: msg.StartFlow.FlowID,
+					Plan:   flowPlanToProto(msg.StartFlow.Plan),
+				},
+			},
+		}
+	case msg.PatchFlow != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_PatchFlow{
+				PatchFlow: &iov1.PatchFlow{
+					FlowId: msg.PatchFlow.FlowID,
+					Plan:   flowPlanToProto(msg.PatchFlow.Plan),
+				},
+			},
+		}
+	case msg.StopFlow != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_StopFlow{
+				StopFlow: &iov1.StopFlow{
+					FlowId: msg.StopFlow.FlowID,
+				},
+			},
+		}
+	case msg.RequestArtifact != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_RequestArtifact{
+				RequestArtifact: &iov1.RequestArtifact{
+					ArtifactId: msg.RequestArtifact.ArtifactID,
 				},
 			},
 		}
@@ -383,6 +453,30 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		out["battery.level"] = strconv.FormatFloat(float64(battery.GetLevel()), 'f', -1, 32)
 		out["battery.charging"] = strconv.FormatBool(battery.GetCharging())
 	}
+	if edge := caps.GetEdge(); edge != nil {
+		out["edge.runtimes"] = strings.Join(edge.GetRuntimes(), ",")
+		out["edge.operators"] = strings.Join(edge.GetOperators(), ",")
+		if compute := edge.GetCompute(); compute != nil {
+			out["edge.compute.cpu_realtime"] = strconv.FormatInt(int64(compute.GetCpuRealtime()), 10)
+			out["edge.compute.gpu_realtime"] = strconv.FormatInt(int64(compute.GetGpuRealtime()), 10)
+			out["edge.compute.npu_realtime"] = strconv.FormatInt(int64(compute.GetNpuRealtime()), 10)
+			out["edge.compute.mem_mb"] = strconv.FormatInt(int64(compute.GetMemMb()), 10)
+		}
+		if retention := edge.GetRetention(); retention != nil {
+			out["edge.retention.audio_sec"] = strconv.FormatInt(int64(retention.GetAudioSec()), 10)
+			out["edge.retention.video_sec"] = strconv.FormatInt(int64(retention.GetVideoSec()), 10)
+			out["edge.retention.sensor_sec"] = strconv.FormatInt(int64(retention.GetSensorSec()), 10)
+			out["edge.retention.radio_sec"] = strconv.FormatInt(int64(retention.GetRadioSec()), 10)
+		}
+		if timing := edge.GetTiming(); timing != nil {
+			out["edge.timing.sync_error_ms"] = strconv.FormatFloat(timing.GetSyncErrorMs(), 'f', -1, 64)
+		}
+		if geometry := edge.GetGeometry(); geometry != nil {
+			out["edge.geometry.mic_array"] = strconv.FormatBool(geometry.GetMicArray())
+			out["edge.geometry.camera_intrinsics"] = strconv.FormatBool(geometry.GetCameraIntrinsics())
+			out["edge.geometry.compass"] = strconv.FormatBool(geometry.GetCompass())
+		}
+	}
 	return out
 }
 
@@ -512,4 +606,107 @@ func parseBool(raw string) bool {
 		return false
 	}
 	return v
+}
+
+func observationFromProto(ob *iov1.Observation) iorouter.Observation {
+	if ob == nil {
+		return iorouter.Observation{}
+	}
+	out := iorouter.Observation{
+		Kind:       ob.GetKind(),
+		Subject:    ob.GetSubject(),
+		OccurredAt: unixMSTime(ob.GetOccurredUnixMs()),
+		Confidence: ob.GetConfidence(),
+		Zone:       ob.GetZone(),
+		TrackID:    ob.GetTrackId(),
+		Attributes: cloneStringMapAdapter(ob.GetAttributes()),
+		Provenance: iorouter.ObservationProvenance{
+			FlowID:             ob.GetProvenance().GetFlowId(),
+			NodeID:             ob.GetProvenance().GetNodeId(),
+			ExecSite:           ob.GetProvenance().GetExecSite(),
+			ModelID:            ob.GetProvenance().GetModelId(),
+			CalibrationVersion: ob.GetProvenance().GetCalibrationVersion(),
+		},
+	}
+	out.SourceDevice = iorouter.DeviceRef{DeviceID: ob.GetSourceDevice().GetDeviceId()}
+	if loc := ob.GetLocation(); loc != nil {
+		var pose *iorouter.Pose
+		if p := loc.GetPose(); p != nil {
+			pose = &iorouter.Pose{
+				X:          p.GetX(),
+				Y:          p.GetY(),
+				Z:          p.GetZ(),
+				Yaw:        p.GetYaw(),
+				Pitch:      p.GetPitch(),
+				Roll:       p.GetRoll(),
+				Confidence: p.GetConfidence(),
+			}
+		}
+		out.Location = &iorouter.LocationEstimate{
+			Zone:       loc.GetZone(),
+			Pose:       pose,
+			RadiusM:    loc.GetRadiusM(),
+			Confidence: loc.GetConfidence(),
+			Sources:    append([]string(nil), loc.GetSources()...),
+		}
+	}
+	for _, artifact := range ob.GetEvidence() {
+		out.Evidence = append(out.Evidence, artifactFromProto(artifact))
+	}
+	return out
+}
+
+func artifactFromProto(artifact *iov1.ArtifactRef) iorouter.ArtifactRef {
+	if artifact == nil {
+		return iorouter.ArtifactRef{}
+	}
+	return iorouter.ArtifactRef{
+		ID:        artifact.GetId(),
+		Kind:      artifact.GetKind(),
+		Source:    iorouter.DeviceRef{DeviceID: artifact.GetSource().GetDeviceId()},
+		StartTime: unixMSTime(artifact.GetStartUnixMs()),
+		EndTime:   unixMSTime(artifact.GetEndUnixMs()),
+		URI:       artifact.GetUri(),
+	}
+}
+
+func flowPlanToProto(plan iorouter.FlowPlan) *iov1.FlowPlan {
+	nodes := make([]*iov1.FlowNode, 0, len(plan.Nodes))
+	for _, node := range plan.Nodes {
+		nodes = append(nodes, &iov1.FlowNode{
+			Id:   node.ID,
+			Kind: string(node.Kind),
+			Args: cloneStringMapAdapter(node.Args),
+			Exec: string(node.Exec),
+		})
+	}
+	edges := make([]*iov1.FlowEdge, 0, len(plan.Edges))
+	for _, edge := range plan.Edges {
+		edges = append(edges, &iov1.FlowEdge{
+			From: edge.From,
+			To:   edge.To,
+		})
+	}
+	return &iov1.FlowPlan{
+		Nodes: nodes,
+		Edges: edges,
+	}
+}
+
+func unixMSTime(unixMS int64) time.Time {
+	if unixMS <= 0 {
+		return time.Time{}
+	}
+	return time.UnixMilli(unixMS).UTC()
+}
+
+func cloneStringMapAdapter(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }

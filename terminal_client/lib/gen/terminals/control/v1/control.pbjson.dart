@@ -163,6 +163,42 @@ const ConnectRequest$json = {
       '9': 0,
       '10': 'voiceAudio'
     },
+    {
+      '1': 'observation_message',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.ObservationMessage',
+      '9': 0,
+      '10': 'observationMessage'
+    },
+    {
+      '1': 'artifact_available',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.ArtifactAvailable',
+      '9': 0,
+      '10': 'artifactAvailable'
+    },
+    {
+      '1': 'flow_stats',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.FlowStats',
+      '9': 0,
+      '10': 'flowStats'
+    },
+    {
+      '1': 'clock_sample',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.ClockSample',
+      '9': 0,
+      '10': 'clockSample'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -182,7 +218,12 @@ final $typed_data.Uint8List connectRequestDescriptor = $convert.base64Decode(
     'djEuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdBJJCg13ZWJydGNfc2lnbmFsGAggASgLMiIudGVybW'
     'luYWxzLmNvbnRyb2wudjEuV2ViUlRDU2lnbmFsSABSDHdlYnJ0Y1NpZ25hbBJDCgt2b2ljZV9h'
     'dWRpbxgJIAEoCzIgLnRlcm1pbmFscy5jb250cm9sLnYxLlZvaWNlQXVkaW9IAFIKdm9pY2VBdW'
-    'Rpb0IJCgdwYXlsb2Fk');
+    'RpbxJWChNvYnNlcnZhdGlvbl9tZXNzYWdlGAogASgLMiMudGVybWluYWxzLmlvLnYxLk9ic2Vy'
+    'dmF0aW9uTWVzc2FnZUgAUhJvYnNlcnZhdGlvbk1lc3NhZ2USUwoSYXJ0aWZhY3RfYXZhaWxhYm'
+    'xlGAsgASgLMiIudGVybWluYWxzLmlvLnYxLkFydGlmYWN0QXZhaWxhYmxlSABSEWFydGlmYWN0'
+    'QXZhaWxhYmxlEjsKCmZsb3dfc3RhdHMYDCABKAsyGi50ZXJtaW5hbHMuaW8udjEuRmxvd1N0YX'
+    'RzSABSCWZsb3dTdGF0cxJBCgxjbG9ja19zYW1wbGUYDSABKAsyHC50ZXJtaW5hbHMuaW8udjEu'
+    'Q2xvY2tTYW1wbGVIAFILY2xvY2tTYW1wbGVCCQoHcGF5bG9hZA==');
 
 @$core.Deprecated('Use voiceAudioDescriptor instead')
 const VoiceAudio$json = {
@@ -331,6 +372,60 @@ const ConnectResponse$json = {
       '9': 0,
       '10': 'transitionUi'
     },
+    {
+      '1': 'install_bundle',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.InstallBundle',
+      '9': 0,
+      '10': 'installBundle'
+    },
+    {
+      '1': 'remove_bundle',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.RemoveBundle',
+      '9': 0,
+      '10': 'removeBundle'
+    },
+    {
+      '1': 'start_flow',
+      '3': 17,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.StartFlow',
+      '9': 0,
+      '10': 'startFlow'
+    },
+    {
+      '1': 'patch_flow',
+      '3': 18,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.PatchFlow',
+      '9': 0,
+      '10': 'patchFlow'
+    },
+    {
+      '1': 'stop_flow',
+      '3': 19,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.StopFlow',
+      '9': 0,
+      '10': 'stopFlow'
+    },
+    {
+      '1': 'request_artifact',
+      '3': 20,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.RequestArtifact',
+      '9': 0,
+      '10': 'requestArtifact'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -355,8 +450,15 @@ final $typed_data.Uint8List connectResponseDescriptor = $convert.base64Decode(
     'EuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdBI6CgVlcnJvchgMIAEoCzIiLnRlcm1pbmFscy5jb250'
     'cm9sLnYxLkNvbnRyb2xFcnJvckgAUgVlcnJvchI4Cgl1cGRhdGVfdWkYDSABKAsyGS50ZXJtaW'
     '5hbHMudWkudjEuVXBkYXRlVUlIAFIIdXBkYXRlVWkSRAoNdHJhbnNpdGlvbl91aRgOIAEoCzId'
-    'LnRlcm1pbmFscy51aS52MS5UcmFuc2l0aW9uVUlIAFIMdHJhbnNpdGlvblVpQgkKB3BheWxvYW'
-    'Q=');
+    'LnRlcm1pbmFscy51aS52MS5UcmFuc2l0aW9uVUlIAFIMdHJhbnNpdGlvblVpEkcKDmluc3RhbG'
+    'xfYnVuZGxlGA8gASgLMh4udGVybWluYWxzLmlvLnYxLkluc3RhbGxCdW5kbGVIAFINaW5zdGFs'
+    'bEJ1bmRsZRJECg1yZW1vdmVfYnVuZGxlGBAgASgLMh0udGVybWluYWxzLmlvLnYxLlJlbW92ZU'
+    'J1bmRsZUgAUgxyZW1vdmVCdW5kbGUSOwoKc3RhcnRfZmxvdxgRIAEoCzIaLnRlcm1pbmFscy5p'
+    'by52MS5TdGFydEZsb3dIAFIJc3RhcnRGbG93EjsKCnBhdGNoX2Zsb3cYEiABKAsyGi50ZXJtaW'
+    '5hbHMuaW8udjEuUGF0Y2hGbG93SABSCXBhdGNoRmxvdxI4CglzdG9wX2Zsb3cYEyABKAsyGS50'
+    'ZXJtaW5hbHMuaW8udjEuU3RvcEZsb3dIAFIIc3RvcEZsb3cSTQoQcmVxdWVzdF9hcnRpZmFjdB'
+    'gUIAEoCzIgLnRlcm1pbmFscy5pby52MS5SZXF1ZXN0QXJ0aWZhY3RIAFIPcmVxdWVzdEFydGlm'
+    'YWN0QgkKB3BheWxvYWQ=');
 
 @$core.Deprecated('Use registerDeviceDescriptor instead')
 const RegisterDevice$json = {
@@ -624,6 +726,15 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.capabilities.v1.ConnectivityCapability':
       $2.ConnectivityCapability$json,
   '.terminals.capabilities.v1.BatteryCapability': $2.BatteryCapability$json,
+  '.terminals.capabilities.v1.EdgeCapability': $2.EdgeCapability$json,
+  '.terminals.capabilities.v1.EdgeComputeCapability':
+      $2.EdgeComputeCapability$json,
+  '.terminals.capabilities.v1.EdgeRetentionCapability':
+      $2.EdgeRetentionCapability$json,
+  '.terminals.capabilities.v1.EdgeTimingCapability':
+      $2.EdgeTimingCapability$json,
+  '.terminals.capabilities.v1.EdgeGeometryCapability':
+      $2.EdgeGeometryCapability$json,
   '.terminals.control.v1.CapabilityUpdate': CapabilityUpdate$json,
   '.terminals.io.v1.InputEvent': $0.InputEvent$json,
   '.terminals.io.v1.KeyEvent': $0.KeyEvent$json,
@@ -640,6 +751,18 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.control.v1.Heartbeat': Heartbeat$json,
   '.terminals.control.v1.WebRTCSignal': WebRTCSignal$json,
   '.terminals.control.v1.VoiceAudio': VoiceAudio$json,
+  '.terminals.io.v1.ObservationMessage': $0.ObservationMessage$json,
+  '.terminals.io.v1.Observation': $0.Observation$json,
+  '.terminals.io.v1.DeviceRef': $0.DeviceRef$json,
+  '.terminals.io.v1.LocationEstimate': $0.LocationEstimate$json,
+  '.terminals.io.v1.Pose': $0.Pose$json,
+  '.terminals.io.v1.Observation.AttributesEntry':
+      $0.Observation_AttributesEntry$json,
+  '.terminals.io.v1.ArtifactRef': $0.ArtifactRef$json,
+  '.terminals.io.v1.ObservationProvenance': $0.ObservationProvenance$json,
+  '.terminals.io.v1.ArtifactAvailable': $0.ArtifactAvailable$json,
+  '.terminals.io.v1.FlowStats': $0.FlowStats$json,
+  '.terminals.io.v1.ClockSample': $0.ClockSample$json,
   '.terminals.control.v1.ConnectResponse': ConnectResponse$json,
   '.terminals.control.v1.RegisterAck': RegisterAck$json,
   '.terminals.control.v1.RegisterAck.MetadataEntry':
@@ -683,6 +806,16 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.control.v1.ControlError': ControlError$json,
   '.terminals.ui.v1.UpdateUI': $1.UpdateUI$json,
   '.terminals.ui.v1.TransitionUI': $1.TransitionUI$json,
+  '.terminals.io.v1.InstallBundle': $0.InstallBundle$json,
+  '.terminals.io.v1.RemoveBundle': $0.RemoveBundle$json,
+  '.terminals.io.v1.StartFlow': $0.StartFlow$json,
+  '.terminals.io.v1.FlowPlan': $0.FlowPlan$json,
+  '.terminals.io.v1.FlowNode': $0.FlowNode$json,
+  '.terminals.io.v1.FlowNode.ArgsEntry': $0.FlowNode_ArgsEntry$json,
+  '.terminals.io.v1.FlowEdge': $0.FlowEdge$json,
+  '.terminals.io.v1.PatchFlow': $0.PatchFlow$json,
+  '.terminals.io.v1.StopFlow': $0.StopFlow$json,
+  '.terminals.io.v1.RequestArtifact': $0.RequestArtifact$json,
 };
 
 /// Descriptor for `TerminalControlService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

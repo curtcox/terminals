@@ -108,6 +108,14 @@ const DeviceCapabilities$json = {
       '6': '.terminals.capabilities.v1.BatteryCapability',
       '10': 'battery'
     },
+    {
+      '1': 'edge',
+      '3': 20,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.EdgeCapability',
+      '10': 'edge'
+    },
   ],
 };
 
@@ -128,7 +136,8 @@ final $typed_data.Uint8List deviceCapabilitiesDescriptor = $convert.base64Decode
     'bGl0aWVzLnYxLlNlbnNvckNhcGFiaWxpdHlSB3NlbnNvcnMSVQoMY29ubmVjdGl2aXR5GBIgAS'
     'gLMjEudGVybWluYWxzLmNhcGFiaWxpdGllcy52MS5Db25uZWN0aXZpdHlDYXBhYmlsaXR5Ugxj'
     'b25uZWN0aXZpdHkSRgoHYmF0dGVyeRgTIAEoCzIsLnRlcm1pbmFscy5jYXBhYmlsaXRpZXMudj'
-    'EuQmF0dGVyeUNhcGFiaWxpdHlSB2JhdHRlcnk=');
+    'EuQmF0dGVyeUNhcGFiaWxpdHlSB2JhdHRlcnkSPQoEZWRnZRgUIAEoCzIpLnRlcm1pbmFscy5j'
+    'YXBhYmlsaXRpZXMudjEuRWRnZUNhcGFiaWxpdHlSBGVkZ2U=');
 
 @$core.Deprecated('Use deviceIdentityDescriptor instead')
 const DeviceIdentity$json = {
@@ -340,3 +349,123 @@ const BatteryCapability$json = {
 final $typed_data.Uint8List batteryCapabilityDescriptor = $convert.base64Decode(
     'ChFCYXR0ZXJ5Q2FwYWJpbGl0eRIUCgVsZXZlbBgBIAEoAlIFbGV2ZWwSGgoIY2hhcmdpbmcYAi'
     'ABKAhSCGNoYXJnaW5n');
+
+@$core.Deprecated('Use edgeCapabilityDescriptor instead')
+const EdgeCapability$json = {
+  '1': 'EdgeCapability',
+  '2': [
+    {'1': 'runtimes', '3': 1, '4': 3, '5': 9, '10': 'runtimes'},
+    {
+      '1': 'compute',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.EdgeComputeCapability',
+      '10': 'compute'
+    },
+    {'1': 'operators', '3': 3, '4': 3, '5': 9, '10': 'operators'},
+    {
+      '1': 'retention',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.EdgeRetentionCapability',
+      '10': 'retention'
+    },
+    {
+      '1': 'timing',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.EdgeTimingCapability',
+      '10': 'timing'
+    },
+    {
+      '1': 'geometry',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.EdgeGeometryCapability',
+      '10': 'geometry'
+    },
+  ],
+};
+
+/// Descriptor for `EdgeCapability`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List edgeCapabilityDescriptor = $convert.base64Decode(
+    'Cg5FZGdlQ2FwYWJpbGl0eRIaCghydW50aW1lcxgBIAMoCVIIcnVudGltZXMSSgoHY29tcHV0ZR'
+    'gCIAEoCzIwLnRlcm1pbmFscy5jYXBhYmlsaXRpZXMudjEuRWRnZUNvbXB1dGVDYXBhYmlsaXR5'
+    'Ugdjb21wdXRlEhwKCW9wZXJhdG9ycxgDIAMoCVIJb3BlcmF0b3JzElAKCXJldGVudGlvbhgEIA'
+    'EoCzIyLnRlcm1pbmFscy5jYXBhYmlsaXRpZXMudjEuRWRnZVJldGVudGlvbkNhcGFiaWxpdHlS'
+    'CXJldGVudGlvbhJHCgZ0aW1pbmcYBSABKAsyLy50ZXJtaW5hbHMuY2FwYWJpbGl0aWVzLnYxLk'
+    'VkZ2VUaW1pbmdDYXBhYmlsaXR5UgZ0aW1pbmcSTQoIZ2VvbWV0cnkYBiABKAsyMS50ZXJtaW5h'
+    'bHMuY2FwYWJpbGl0aWVzLnYxLkVkZ2VHZW9tZXRyeUNhcGFiaWxpdHlSCGdlb21ldHJ5');
+
+@$core.Deprecated('Use edgeComputeCapabilityDescriptor instead')
+const EdgeComputeCapability$json = {
+  '1': 'EdgeComputeCapability',
+  '2': [
+    {'1': 'cpu_realtime', '3': 1, '4': 1, '5': 5, '10': 'cpuRealtime'},
+    {'1': 'gpu_realtime', '3': 2, '4': 1, '5': 5, '10': 'gpuRealtime'},
+    {'1': 'npu_realtime', '3': 3, '4': 1, '5': 5, '10': 'npuRealtime'},
+    {'1': 'mem_mb', '3': 4, '4': 1, '5': 5, '10': 'memMb'},
+  ],
+};
+
+/// Descriptor for `EdgeComputeCapability`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List edgeComputeCapabilityDescriptor = $convert.base64Decode(
+    'ChVFZGdlQ29tcHV0ZUNhcGFiaWxpdHkSIQoMY3B1X3JlYWx0aW1lGAEgASgFUgtjcHVSZWFsdG'
+    'ltZRIhCgxncHVfcmVhbHRpbWUYAiABKAVSC2dwdVJlYWx0aW1lEiEKDG5wdV9yZWFsdGltZRgD'
+    'IAEoBVILbnB1UmVhbHRpbWUSFQoGbWVtX21iGAQgASgFUgVtZW1NYg==');
+
+@$core.Deprecated('Use edgeRetentionCapabilityDescriptor instead')
+const EdgeRetentionCapability$json = {
+  '1': 'EdgeRetentionCapability',
+  '2': [
+    {'1': 'audio_sec', '3': 1, '4': 1, '5': 5, '10': 'audioSec'},
+    {'1': 'video_sec', '3': 2, '4': 1, '5': 5, '10': 'videoSec'},
+    {'1': 'sensor_sec', '3': 3, '4': 1, '5': 5, '10': 'sensorSec'},
+    {'1': 'radio_sec', '3': 4, '4': 1, '5': 5, '10': 'radioSec'},
+  ],
+};
+
+/// Descriptor for `EdgeRetentionCapability`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List edgeRetentionCapabilityDescriptor = $convert.base64Decode(
+    'ChdFZGdlUmV0ZW50aW9uQ2FwYWJpbGl0eRIbCglhdWRpb19zZWMYASABKAVSCGF1ZGlvU2VjEh'
+    'sKCXZpZGVvX3NlYxgCIAEoBVIIdmlkZW9TZWMSHQoKc2Vuc29yX3NlYxgDIAEoBVIJc2Vuc29y'
+    'U2VjEhsKCXJhZGlvX3NlYxgEIAEoBVIIcmFkaW9TZWM=');
+
+@$core.Deprecated('Use edgeTimingCapabilityDescriptor instead')
+const EdgeTimingCapability$json = {
+  '1': 'EdgeTimingCapability',
+  '2': [
+    {'1': 'sync_error_ms', '3': 1, '4': 1, '5': 1, '10': 'syncErrorMs'},
+  ],
+};
+
+/// Descriptor for `EdgeTimingCapability`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List edgeTimingCapabilityDescriptor = $convert.base64Decode(
+    'ChRFZGdlVGltaW5nQ2FwYWJpbGl0eRIiCg1zeW5jX2Vycm9yX21zGAEgASgBUgtzeW5jRXJyb3'
+    'JNcw==');
+
+@$core.Deprecated('Use edgeGeometryCapabilityDescriptor instead')
+const EdgeGeometryCapability$json = {
+  '1': 'EdgeGeometryCapability',
+  '2': [
+    {'1': 'mic_array', '3': 1, '4': 1, '5': 8, '10': 'micArray'},
+    {
+      '1': 'camera_intrinsics',
+      '3': 2,
+      '4': 1,
+      '5': 8,
+      '10': 'cameraIntrinsics'
+    },
+    {'1': 'compass', '3': 3, '4': 1, '5': 8, '10': 'compass'},
+  ],
+};
+
+/// Descriptor for `EdgeGeometryCapability`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List edgeGeometryCapabilityDescriptor = $convert.base64Decode(
+    'ChZFZGdlR2VvbWV0cnlDYXBhYmlsaXR5EhsKCW1pY19hcnJheRgBIAEoCFIIbWljQXJyYXkSKw'
+    'oRY2FtZXJhX2ludHJpbnNpY3MYAiABKAhSEGNhbWVyYUludHJpbnNpY3MSGAoHY29tcGFzcxgD'
+    'IAEoCFIHY29tcGFzcw==');
