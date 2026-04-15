@@ -238,6 +238,31 @@ func TestNormalizeTriggerEventKindTrimDoesNotRewriteExistingIntent(t *testing.T)
 	}
 }
 
+func TestNormalizeTriggerWithoutIntentOrEventDoesNotSynthesizeIntentV2(t *testing.T) {
+	got := normalizeTrigger(Trigger{
+		Kind:      TriggerManual,
+		SourceID:  "  d1  ",
+		Intent:    "   ",
+		Arguments: nil,
+	}, time.Date(2026, 4, 15, 15, 30, 0, 0, time.UTC))
+
+	if got.SourceID != "d1" {
+		t.Fatalf("SourceID = %q, want d1", got.SourceID)
+	}
+	if got.Intent != "" {
+		t.Fatalf("Intent = %q, want empty", got.Intent)
+	}
+	if got.IntentV2 != nil {
+		t.Fatalf("expected IntentV2 to remain nil when no intent payload is provided, got %+v", got.IntentV2)
+	}
+	if got.EventV2 != nil {
+		t.Fatalf("expected EventV2 to remain nil, got %+v", got.EventV2)
+	}
+	if got.Arguments == nil {
+		t.Fatalf("expected Arguments map to be initialized")
+	}
+}
+
 func TestIntentEventBusPublishNormalizesBeforeFanout(t *testing.T) {
 	bus := NewIntentEventBus()
 	ch, cancel := bus.Subscribe(1)
