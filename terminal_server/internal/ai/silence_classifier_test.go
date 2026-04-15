@@ -55,7 +55,7 @@ func TestSilenceClassifierEmitsOnceOnLoudToQuietTransition(t *testing.T) {
 		t.Fatalf("Classify() error = %v", err)
 	}
 
-	var events []SoundEvent
+	var events []SoundEvent //nolint:prealloc
 	for ev := range stream {
 		events = append(events, ev)
 	}
@@ -90,7 +90,7 @@ func TestSilenceClassifierDoesNotEmitForShortQuiet(t *testing.T) {
 		t.Fatalf("Classify() error = %v", err)
 	}
 
-	var events []SoundEvent
+	var events []SoundEvent //nolint:prealloc
 	for ev := range stream {
 		events = append(events, ev)
 	}
@@ -115,7 +115,7 @@ func TestSilenceClassifierDoesNotEmitForPureQuiet(t *testing.T) {
 		t.Fatalf("Classify() error = %v", err)
 	}
 
-	var events []SoundEvent
+	var events []SoundEvent //nolint:prealloc
 	for ev := range stream {
 		events = append(events, ev)
 	}
@@ -138,7 +138,7 @@ func TestSilenceClassifierDoesNotEmitForSustainedLoud(t *testing.T) {
 		t.Fatalf("Classify() error = %v", err)
 	}
 
-	var events []SoundEvent
+	var events []SoundEvent //nolint:prealloc
 	for ev := range stream {
 		events = append(events, ev)
 	}

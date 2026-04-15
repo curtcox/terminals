@@ -91,7 +91,7 @@ func TestScenarioSoundClassifierClassifyMapsStream(t *testing.T) {
 		t.Fatalf("captured audio = %q, want pcm", string(backend.captured))
 	}
 
-	var events []scenario.SoundEvent
+	var events []scenario.SoundEvent //nolint:prealloc
 	for event := range stream {
 		events = append(events, event)
 	}
