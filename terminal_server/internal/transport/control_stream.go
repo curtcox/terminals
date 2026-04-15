@@ -270,6 +270,25 @@ type DeviceAudioPublisher interface {
 	Publish(deviceID string, chunk []byte)
 }
 
+// WebRTCSignalEngine handles server-managed WebRTC signaling per stream/device.
+type WebRTCSignalEngine interface {
+	HandleSignal(ctx context.Context, req WebRTCSignalEngineRequest) ([]WebRTCSignalEngineResponse, error)
+	RemoveStream(streamID string)
+}
+
+// WebRTCSignalEngineRequest is input to the server-side signaling engine.
+type WebRTCSignalEngineRequest struct {
+	StreamID string
+	DeviceID string
+	Signal   WebRTCSignalRequest
+}
+
+// WebRTCSignalEngineResponse is a server-generated outbound signal.
+type WebRTCSignalEngineResponse struct {
+	TargetDeviceID string
+	Signal         WebRTCSignalResponse
+}
+
 // StreamHandler processes control stream messages.
 type StreamHandler struct {
 	control     *ControlService
@@ -304,6 +323,7 @@ type StreamHandler struct {
 
 	deviceAudio DeviceAudioPublisher
 	recording   recording.Manager
+	webrtc      WebRTCSignalEngine
 }
 
 type mediaStreamState struct {
@@ -429,6 +449,14 @@ func (h *StreamHandler) SetRecordingManager(mgr recording.Manager) {
 	h.recording = mgr
 }
 
+// SetWebRTCSignalEngine wires a server-side signaling engine used for streams
+// marked as server-managed. Passing nil disables server-managed signaling.
+func (h *StreamHandler) SetWebRTCSignalEngine(engine WebRTCSignalEngine) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.webrtc = engine
+}
+
 // SetPhotoFrameSettings overrides photo-frame slide URLs and rotation
 // interval. Empty slide input preserves existing/default slides.
 func (h *StreamHandler) SetPhotoFrameSettings(slides []string, interval time.Duration) {
@@ -518,7 +546,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		return nil, nil
 	case msg.WebRTCSignal != nil:
 		h.metrics.webrtcSignalReceived.Add(1)
-		return h.relayWebRTCSignal(msg.WebRTCSignal, msg.SessionDeviceID), nil
+		return h.handleWebRTCSignal(ctx, msg.WebRTCSignal, msg.SessionDeviceID), nil
 	case msg.VoiceAudio != nil:
 		h.metrics.voiceAudioReceived.Add(1)
 		out, err := h.handleVoiceAudio(ctx, msg.VoiceAudio)
@@ -1081,7 +1109,8 @@ func (h *StreamHandler) routeUpdatesForCommand(
 					SourceDeviceID: route.SourceID,
 					TargetDeviceID: route.TargetID,
 					Metadata: map[string]string{
-						"origin": "route_delta",
+						"origin":      "route_delta",
+						"webrtc_mode": "server_managed",
 					},
 				},
 			}
@@ -1092,7 +1121,8 @@ func (h *StreamHandler) routeUpdatesForCommand(
 				SourceDeviceID: route.SourceID,
 				TargetDeviceID: route.TargetID,
 				Metadata: map[string]string{
-					"origin": "route_delta",
+					"origin":      "route_delta",
+					"webrtc_mode": "server_managed",
 				},
 			})
 			routeMsg := ServerMessage{
@@ -1405,6 +1435,70 @@ func (h *StreamHandler) relayWebRTCSignal(signal *WebRTCSignalRequest, sourceDev
 	}
 }
 
+func (h *StreamHandler) handleWebRTCSignal(
+	ctx context.Context,
+	signal *WebRTCSignalRequest,
+	sourceDeviceID string,
+) []ServerMessage {
+	if signal == nil {
+		return nil
+	}
+	sourceDeviceID = strings.TrimSpace(sourceDeviceID)
+	streamID := strings.TrimSpace(signal.StreamID)
+	if streamID == "" || sourceDeviceID == "" {
+		return h.relayWebRTCSignal(signal, sourceDeviceID)
+	}
+
+	engine, serverManaged := h.serverManagedSignalEngine(streamID)
+	if serverManaged && engine != nil {
+		responses, err := engine.HandleSignal(ctx, WebRTCSignalEngineRequest{
+			StreamID: streamID,
+			DeviceID: sourceDeviceID,
+			Signal:   *signal,
+		})
+		if err == nil {
+			out := make([]ServerMessage, 0, len(responses))
+			for _, response := range responses {
+				msg := ServerMessage{
+					WebRTCSignal: &WebRTCSignalResponse{
+						StreamID:   strings.TrimSpace(response.Signal.StreamID),
+						SignalType: strings.TrimSpace(response.Signal.SignalType),
+						Payload:    response.Signal.Payload,
+					},
+				}
+				target := strings.TrimSpace(response.TargetDeviceID)
+				if msg.WebRTCSignal.StreamID == "" || msg.WebRTCSignal.SignalType == "" || target == "" {
+					continue
+				}
+				if target != sourceDeviceID {
+					msg.RelayToDeviceID = target
+				}
+				out = append(out, msg)
+			}
+			return out
+		}
+	}
+	return h.relayWebRTCSignal(signal, sourceDeviceID)
+}
+
+func (h *StreamHandler) serverManagedSignalEngine(streamID string) (WebRTCSignalEngine, bool) {
+	streamID = strings.TrimSpace(streamID)
+	if streamID == "" {
+		return nil, false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.webrtc == nil {
+		return nil, false
+	}
+	state, ok := h.mediaStreams[streamID]
+	if !ok {
+		return nil, false
+	}
+	mode := strings.ToLower(strings.TrimSpace(state.Metadata["webrtc_mode"]))
+	return h.webrtc, mode == "server_managed"
+}
+
 func (h *StreamHandler) peerDeviceForStream(streamID, sourceDeviceID string) string {
 	const prefix = "route:"
 	if strings.HasPrefix(streamID, prefix) {
@@ -1473,9 +1567,13 @@ func (h *StreamHandler) unregisterMediaStream(streamID string) {
 	h.mu.Lock()
 	delete(h.mediaStreams, streamID)
 	recorder := h.recording
+	engine := h.webrtc
 	h.mu.Unlock()
 	if recorder != nil {
 		_ = recorder.Stop(context.Background(), streamID)
+	}
+	if engine != nil {
+		engine.RemoveStream(streamID)
 	}
 }
 

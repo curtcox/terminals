@@ -79,6 +79,12 @@ func main() {
 	scenario.RegisterBuiltins(scenarioEngine)
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
 	controlStream := transport.NewStreamHandler(controlService)
+	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
+	if err != nil {
+		log.Printf("configure webrtc signal engine: %v", err)
+		return
+	}
+	controlStream.SetWebRTCSignalEngine(webrtcEngine)
 	photoServer, photoBaseURL, err := startPhotoFrameAssetServer(cfg)
 	if err != nil {
 		log.Printf("start photo frame asset server: %v", err)
@@ -104,6 +110,7 @@ func main() {
 	grpcServer.ConfigureRuntime(scenarioRuntime)
 	grpcServer.ConfigureDeviceAudio(audioHub)
 	grpcServer.ConfigureRecording(recordingManager)
+	grpcServer.ConfigureWebRTCSignalEngine(webrtcEngine)
 	mdns := discovery.NewMDNSAdvertiser()
 
 	log.Printf("terminal server starting at %s", grpcServer.Address())

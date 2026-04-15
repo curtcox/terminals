@@ -1,1 +1,1 @@
-Implement true WebRTC media-plane integration: start with server-side Pion session management and stream forwarding hooks.
+Implement client-side flutter_webrtc media support and connect it to StartStream/RouteStream/WebRTCSignal control messages.

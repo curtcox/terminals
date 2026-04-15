@@ -21,6 +21,7 @@ type Server struct {
 	runtime     *scenario.Runtime
 	deviceAudio DeviceAudioPublisher
 	recording   recording.Manager
+	webrtc      WebRTCSignalEngine
 }
 
 // NewServer returns a lifecycle-managed transport server placeholder.
@@ -74,6 +75,12 @@ func (s *Server) ConfigureRecording(mgr recording.Manager) {
 	s.recording = mgr
 }
 
+// ConfigureWebRTCSignalEngine wires a server-side signaling engine for
+// server-managed WebRTC routes.
+func (s *Server) ConfigureWebRTCSignalEngine(engine WebRTCSignalEngine) {
+	s.webrtc = engine
+}
+
 // Connect handles a single bidirectional control stream session.
 func (s *Server) Connect(stream ProtoStream) error {
 	if s.control == nil || s.adapter == nil {
@@ -85,6 +92,9 @@ func (s *Server) Connect(stream ProtoStream) error {
 	}
 	if s.recording != nil {
 		handler.SetRecordingManager(s.recording)
+	}
+	if s.webrtc != nil {
+		handler.SetWebRTCSignalEngine(s.webrtc)
 	}
 	return RunProtoSession(handler, s.control, stream, s.adapter)
 }
