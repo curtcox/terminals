@@ -212,3 +212,51 @@ func TestIntentEventBusCancelUnsubscribesAndClosesChannel(t *testing.T) {
 	// Publishing after cancel should be a no-op for the closed subscriber.
 	bus.Publish(Trigger{Kind: TriggerManual, Intent: "ignored"})
 }
+
+func TestIntentEventBusSubscribeClampsBufferToAtLeastOne(t *testing.T) {
+	bus := NewIntentEventBus()
+	ch, cancel := bus.Subscribe(0)
+	defer cancel()
+
+	bus.Publish(Trigger{Kind: TriggerManual, Intent: "first"})
+	bus.Publish(Trigger{Kind: TriggerManual, Intent: "second"})
+
+	select {
+	case got := <-ch:
+		if got.Intent != "first" {
+			t.Fatalf("received intent = %q, want first", got.Intent)
+		}
+	default:
+		t.Fatalf("expected one buffered message")
+	}
+
+	select {
+	case got := <-ch:
+		t.Fatalf("unexpected second message delivered: %+v", got)
+	default:
+	}
+}
+
+func TestIntentEventBusPublishFansOutToMultipleSubscribers(t *testing.T) {
+	bus := NewIntentEventBus()
+	ch1, cancel1 := bus.Subscribe(1)
+	defer cancel1()
+	ch2, cancel2 := bus.Subscribe(1)
+	defer cancel2()
+
+	bus.Publish(Trigger{Kind: TriggerVoice, Intent: "terminal"})
+
+	for i, ch := range []<-chan Trigger{ch1, ch2} {
+		select {
+		case got := <-ch:
+			if got.Intent != "terminal" {
+				t.Fatalf("subscriber %d intent = %q, want terminal", i+1, got.Intent)
+			}
+			if got.IntentV2 == nil || got.IntentV2.Source != SourceVoice {
+				t.Fatalf("subscriber %d intent source = %+v, want %q", i+1, got.IntentV2, SourceVoice)
+			}
+		case <-time.After(200 * time.Millisecond):
+			t.Fatalf("timed out waiting for subscriber %d", i+1)
+		}
+	}
+}
