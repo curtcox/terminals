@@ -205,16 +205,16 @@ func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 		t.Fatalf("TTS calls = %+v, want single synthesis of LLM response", tts.calls)
 	}
 
-	// The control stream must reply with both rich response UI and TTS audio.
+	// The control stream must reply with both rich overlay UI and TTS audio.
 	var play *PlayAudioResponse
-	var setUI *ui.Descriptor
+	var updateUI *UIUpdate
 	sawAssistantStart := false
 	for _, msg := range out {
 		if msg.ScenarioStart == "voice_assistant" {
 			sawAssistantStart = true
 		}
-		if msg.SetUI != nil {
-			setUI = msg.SetUI
+		if msg.UpdateUI != nil {
+			updateUI = msg.UpdateUI
 		}
 		if msg.PlayAudio != nil {
 			play = msg.PlayAudio
@@ -223,11 +223,17 @@ func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 	if !sawAssistantStart {
 		t.Fatalf("expected voice_assistant scenario start, got %+v", out)
 	}
-	if setUI == nil {
-		t.Fatalf("expected SetUI rich response, got %+v", out)
+	if updateUI == nil {
+		t.Fatalf("expected UpdateUI overlay rich response, got %+v", out)
 	}
-	if !descriptorContainsValue(*setUI, "It is sunny in Test City") {
-		t.Fatalf("SetUI descriptor does not include LLM response text: %+v", *setUI)
+	if updateUI.ComponentID != ui.GlobalOverlayComponentID {
+		t.Fatalf("UpdateUI component = %q, want %q", updateUI.ComponentID, ui.GlobalOverlayComponentID)
+	}
+	if updateUI.Node.Type != "overlay" {
+		t.Fatalf("UpdateUI node type = %q, want overlay", updateUI.Node.Type)
+	}
+	if !descriptorContainsValue(updateUI.Node, "It is sunny in Test City") {
+		t.Fatalf("UpdateUI descriptor does not include LLM response text: %+v", updateUI.Node)
 	}
 	if play == nil {
 		t.Fatalf("expected PlayAudio reply, got %+v", out)
@@ -393,20 +399,26 @@ func TestControlStreamVoiceAudioWithoutTTSEmitsRichResponseUI(t *testing.T) {
 		t.Fatalf("HandleMessage(final voice_audio) error = %v", err)
 	}
 
-	var setUI *ui.Descriptor
+	var updateUI *UIUpdate
 	for _, msg := range out {
-		if msg.SetUI != nil {
-			setUI = msg.SetUI
+		if msg.UpdateUI != nil {
+			updateUI = msg.UpdateUI
 		}
 		if msg.PlayAudio != nil {
 			t.Fatalf("expected no PlayAudio when TTS backend is not configured, got %+v", msg.PlayAudio)
 		}
 	}
-	if setUI == nil {
-		t.Fatalf("expected SetUI rich response when TTS unavailable, got %+v", out)
+	if updateUI == nil {
+		t.Fatalf("expected UpdateUI rich response when TTS unavailable, got %+v", out)
 	}
-	if !descriptorContainsValue(*setUI, "It is sunny in Test City") {
-		t.Fatalf("SetUI descriptor does not include LLM response text: %+v", *setUI)
+	if updateUI.ComponentID != ui.GlobalOverlayComponentID {
+		t.Fatalf("UpdateUI component = %q, want %q", updateUI.ComponentID, ui.GlobalOverlayComponentID)
+	}
+	if updateUI.Node.Type != "overlay" {
+		t.Fatalf("UpdateUI node type = %q, want overlay", updateUI.Node.Type)
+	}
+	if !descriptorContainsValue(updateUI.Node, "It is sunny in Test City") {
+		t.Fatalf("UpdateUI descriptor does not include LLM response text: %+v", updateUI.Node)
 	}
 }
 

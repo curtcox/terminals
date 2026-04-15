@@ -14,6 +14,12 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		SourceID:  sourceID,
 		Intent:    normalized,
 		Arguments: map[string]string{},
+		IntentV2: &IntentRecord{
+			Action:  normalized,
+			Slots:   map[string]string{},
+			RawText: strings.TrimSpace(spoken),
+			Source:  SourceVoice,
+		},
 	}
 
 	switch {
@@ -91,6 +97,9 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 	default:
 		// Keep full normalized text as fallback intent.
 	}
+
+	trigger.IntentV2.Action = trigger.Intent
+	trigger.IntentV2.Slots = copyStringMap(trigger.Arguments)
 
 	return trigger
 }

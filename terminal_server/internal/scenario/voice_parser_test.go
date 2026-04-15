@@ -11,6 +11,15 @@ func TestParseVoiceTriggerRedAlert(t *testing.T) {
 	if got.Intent != "red alert" {
 		t.Fatalf("Intent = %q, want red alert", got.Intent)
 	}
+	if got.IntentV2 == nil {
+		t.Fatalf("IntentV2 should be populated")
+	}
+	if got.IntentV2.Action != "red alert" {
+		t.Fatalf("IntentV2.Action = %q, want red alert", got.IntentV2.Action)
+	}
+	if got.IntentV2.Source != SourceVoice {
+		t.Fatalf("IntentV2.Source = %q, want voice", got.IntentV2.Source)
+	}
 	if got.Kind != TriggerVoice {
 		t.Fatalf("Kind = %q, want voice", got.Kind)
 	}

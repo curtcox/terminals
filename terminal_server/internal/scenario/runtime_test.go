@@ -19,6 +19,18 @@ type testAIBackend struct {
 	response  string
 }
 
+type testLLM struct {
+	text    string
+	queries [][]LLMMessage
+}
+
+func (l *testLLM) Query(_ context.Context, messages []LLMMessage, _ LLMOptions) (*LLMResponse, error) {
+	copyMsgs := make([]LLMMessage, len(messages))
+	copy(copyMsgs, messages)
+	l.queries = append(l.queries, copyMsgs)
+	return &LLMResponse{Text: l.text, FinishReason: "stop"}, nil
+}
+
 func TestRuntimeAudioMonitorNotifiesWhenTargetDetected(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
@@ -66,6 +78,130 @@ func TestRuntimeAudioMonitorNotifiesWhenTargetDetected(t *testing.T) {
 	}
 
 	t.Fatalf("expected audio monitor detection notification; events = %+v", broadcaster.Events())
+}
+
+func TestRuntimePublishesNormalizedTriggerToBus(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1"})
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	ch, cancel := runtime.Bus.Subscribe(2)
+	defer cancel()
+
+	_, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:      TriggerManual,
+		SourceID:  "d1",
+		Intent:    "terminal",
+		Arguments: map[string]string{"device_id": "d1"},
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger() error = %v", err)
+	}
+
+	select {
+	case got := <-ch:
+		if got.IntentV2 == nil {
+			t.Fatalf("expected IntentV2 on published trigger")
+		}
+		if got.IntentV2.Action != "terminal" {
+			t.Fatalf("published intent action = %q, want terminal", got.IntentV2.Action)
+		}
+		if got.IntentV2.Source != SourceManual {
+			t.Fatalf("published intent source = %q, want manual", got.IntentV2.Source)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("timed out waiting for bus trigger")
+	}
+}
+
+func TestRuntimeHandleIntentRoutesTypedIntent(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1"})
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	name, err := runtime.HandleIntent(context.Background(), "d1", IntentRecord{
+		Action: "terminal",
+		Slots:  map[string]string{"device_id": "d1"},
+		Source: SourceUI,
+	})
+	if err != nil {
+		t.Fatalf("HandleIntent() error = %v", err)
+	}
+	if name != "terminal" {
+		t.Fatalf("HandleIntent() = %q, want terminal", name)
+	}
+}
+
+func TestRuntimeHandleVoiceTextUsesLLMIntentResolutionForAmbiguousInput(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1"})
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	llm := &testLLM{
+		text: `{"action":"terminal","object":"","slots":{"device_id":"d1"},"scope":{}}`,
+	}
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+		LLM:       llm,
+	})
+
+	name, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"could you open a terminal for me",
+		time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("HandleVoiceText() error = %v", err)
+	}
+	if name != "terminal" {
+		t.Fatalf("resolved scenario = %q, want terminal", name)
+	}
+	if len(llm.queries) != 1 {
+		t.Fatalf("LLM query count = %d, want 1", len(llm.queries))
+	}
+}
+
+func TestRuntimeHandleVoiceTextSkipsLLMForKnownIntent(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1"})
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	llm := &testLLM{
+		text: `{"action":"red_alert","slots":{},"scope":{}}`,
+	}
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+		LLM:       llm,
+	})
+
+	name, err := runtime.HandleVoiceText(
+		context.Background(),
+		"d1",
+		"open terminal",
+		time.Date(2026, 4, 15, 10, 1, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("HandleVoiceText() error = %v", err)
+	}
+	if name != "terminal" {
+		t.Fatalf("scenario = %q, want terminal", name)
+	}
+	if len(llm.queries) != 0 {
+		t.Fatalf("expected no LLM query for known intent, got %d", len(llm.queries))
+	}
 }
 
 func TestRuntimeAudioMonitorConsumesLiveDeviceAudio(t *testing.T) {

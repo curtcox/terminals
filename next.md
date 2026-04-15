@@ -1,1 +1,1 @@
-Implement Intent/Event bus and route voice + UI triggers through it.
+Implement Voice assistant media plan (mic analyze claim, fork pipeline semantics, and speaker-main claim wiring).

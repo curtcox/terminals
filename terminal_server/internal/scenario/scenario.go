@@ -23,12 +23,48 @@ const (
 	TriggerCascade TriggerKind = "cascade"
 )
 
+// TriggerSource captures provenance for typed intents/events.
+type TriggerSource string
+
+const (
+	SourceVoice    TriggerSource = "voice"
+	SourceUI       TriggerSource = "ui"
+	SourceSchedule TriggerSource = "schedule"
+	SourceEvent    TriggerSource = "event"
+	SourceCascade  TriggerSource = "cascade"
+	SourceAgent    TriggerSource = "agent"
+	SourceWebhook  TriggerSource = "webhook"
+	SourceManual   TriggerSource = "manual"
+)
+
 // Trigger contains routing metadata used for scenario matching.
 type Trigger struct {
 	Kind      TriggerKind
 	SourceID  string
 	Intent    string
 	Arguments map[string]string
+	IntentV2  *IntentRecord
+	EventV2   *EventRecord
+}
+
+// IntentRecord is the typed trigger intent payload.
+type IntentRecord struct {
+	Action     string
+	Object     string
+	Slots      map[string]string
+	Scope      TargetScope
+	Confidence float64
+	RawText    string
+	Source     TriggerSource
+}
+
+// EventRecord is the typed trigger event payload.
+type EventRecord struct {
+	Kind       string
+	Subject    string
+	Attributes map[string]string
+	Source     TriggerSource
+	OccurredAt time.Time
 }
 
 // DeviceRef points at a concrete target device selected by placement.

@@ -16,6 +16,7 @@ var ErrNoMatchingScenario = errors.New("no matching scenario")
 type Runtime struct {
 	Engine *Engine
 	Env    *Environment
+	Bus    *IntentEventBus
 }
 
 // NewRuntime creates a runtime with engine and environment.
@@ -23,11 +24,17 @@ func NewRuntime(engine *Engine, env *Environment) *Runtime {
 	return &Runtime{
 		Engine: engine,
 		Env:    env,
+		Bus:    NewIntentEventBus(),
 	}
 }
 
 // HandleTrigger matches and activates a scenario for the selected devices.
 func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, error) {
+	trigger = normalizeTrigger(trigger, time.Now().UTC())
+	if r != nil && r.Bus != nil {
+		r.Bus.Publish(trigger)
+	}
+
 	match, ok := r.Engine.MatchActivation(ActivationRequest{
 		Trigger:     trigger,
 		RequestedAt: time.Now().UTC(),
@@ -45,11 +52,22 @@ func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, e
 
 // HandleVoiceText parses spoken text and routes to HandleTrigger.
 func (r *Runtime) HandleVoiceText(ctx context.Context, sourceID, spoken string, now time.Time) (string, error) {
-	return r.HandleTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
+	parsed := ParseVoiceTrigger(sourceID, spoken, now)
+	if r != nil && r.Env != nil && shouldResolveWithLLM(spoken, parsed) {
+		if resolved, ok := resolveVoiceIntentWithLLM(ctx, r.Env.LLM, spoken); ok {
+			return r.HandleIntent(ctx, sourceID, *resolved)
+		}
+	}
+	return r.HandleTrigger(ctx, parsed)
 }
 
 // StopTrigger matches and stops a scenario for the selected devices.
 func (r *Runtime) StopTrigger(ctx context.Context, trigger Trigger) (string, error) {
+	trigger = normalizeTrigger(trigger, time.Now().UTC())
+	if r != nil && r.Bus != nil {
+		r.Bus.Publish(trigger)
+	}
+
 	match, ok := r.Engine.MatchActivation(ActivationRequest{
 		Trigger:     trigger,
 		RequestedAt: time.Now().UTC(),
@@ -69,6 +87,44 @@ func (r *Runtime) StopTrigger(ctx context.Context, trigger Trigger) (string, err
 // StopVoiceText parses spoken text and routes to StopTrigger.
 func (r *Runtime) StopVoiceText(ctx context.Context, sourceID, spoken string, now time.Time) (string, error) {
 	return r.StopTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
+}
+
+// HandleIntent routes a typed intent through the shared trigger bus and
+// matcher pipeline.
+func (r *Runtime) HandleIntent(ctx context.Context, sourceID string, intent IntentRecord) (string, error) {
+	trigger := Trigger{
+		Kind:      TriggerManual,
+		SourceID:  strings.TrimSpace(sourceID),
+		Intent:    strings.TrimSpace(intent.Action),
+		Arguments: copyStringMap(intent.Slots),
+		IntentV2:  &intent,
+	}
+	switch intent.Source {
+	case SourceVoice:
+		trigger.Kind = TriggerVoice
+	case SourceSchedule:
+		trigger.Kind = TriggerSchedule
+	case SourceEvent:
+		trigger.Kind = TriggerEvent
+	case SourceCascade:
+		trigger.Kind = TriggerCascade
+	}
+	return r.HandleTrigger(ctx, trigger)
+}
+
+// HandleEvent routes a typed event through the shared trigger bus and matcher
+// pipeline.
+func (r *Runtime) HandleEvent(ctx context.Context, sourceID string, event EventRecord) (string, error) {
+	trigger := Trigger{
+		Kind:      TriggerEvent,
+		SourceID:  strings.TrimSpace(sourceID),
+		Arguments: map[string]string{},
+		EventV2:   &event,
+	}
+	if trigger.EventV2 != nil && strings.TrimSpace(trigger.EventV2.Kind) != "" {
+		trigger.Intent = strings.TrimSpace(trigger.EventV2.Kind)
+	}
+	return r.HandleTrigger(ctx, trigger)
 }
 
 // StartScenario requests scenario activation by scenario name and target

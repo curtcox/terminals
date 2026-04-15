@@ -2029,6 +2029,11 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		SourceID:  deviceID,
 		Intent:    intent,
 		Arguments: triggerArgs,
+		IntentV2: &scenario.IntentRecord{
+			Action: intent,
+			Slots:  copyStringMap(triggerArgs),
+			Source: scenario.SourceUI,
+		},
 	}
 	if commandAction == CommandActionStop {
 		name, err := h.runtime.StopTrigger(ctx, trigger)
@@ -2321,6 +2326,11 @@ func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
 			SourceID:  cmd.DeviceID,
 			Intent:    "bluetooth_passthrough",
 			Arguments: args,
+			IntentV2: &scenario.IntentRecord{
+				Action: "bluetooth_passthrough",
+				Slots:  copyStringMap(args),
+				Source: scenario.SourceManual,
+			},
 		}, true
 	case ManualIntentBluetoothConnect:
 		args := copyStringMap(cmd.Arguments)
@@ -2337,6 +2347,11 @@ func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
 			SourceID:  cmd.DeviceID,
 			Intent:    "bluetooth_passthrough",
 			Arguments: args,
+			IntentV2: &scenario.IntentRecord{
+				Action: "bluetooth_passthrough",
+				Slots:  copyStringMap(args),
+				Source: scenario.SourceManual,
+			},
 		}, true
 	case ManualIntentUSBEnumerate:
 		args := copyStringMap(cmd.Arguments)
@@ -2348,6 +2363,11 @@ func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
 			SourceID:  cmd.DeviceID,
 			Intent:    "usb_passthrough",
 			Arguments: args,
+			IntentV2: &scenario.IntentRecord{
+				Action: "usb_passthrough",
+				Slots:  copyStringMap(args),
+				Source: scenario.SourceManual,
+			},
 		}, true
 	case ManualIntentUSBClaim:
 		args := copyStringMap(cmd.Arguments)
@@ -2359,6 +2379,11 @@ func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
 			SourceID:  cmd.DeviceID,
 			Intent:    "usb_passthrough",
 			Arguments: args,
+			IntentV2: &scenario.IntentRecord{
+				Action: "usb_passthrough",
+				Slots:  copyStringMap(args),
+				Source: scenario.SourceManual,
+			},
 		}, true
 	default:
 		return scenario.Trigger{}, false
@@ -2491,9 +2516,12 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 	if responseText == "" {
 		return out, nil
 	}
-	responseView := ui.VoiceAssistantResponseView(deviceID, spoken, responseText)
+	responseView := ui.VoiceAssistantResponsePatch(responseText)
 	out = append(out, ServerMessage{
-		SetUI: &responseView,
+		UpdateUI: &UIUpdate{
+			ComponentID: ui.GlobalOverlayComponentID,
+			Node:        responseView,
+		},
 	})
 	if h.runtime.Env.TTS == nil {
 		return out, nil
@@ -2716,6 +2744,11 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			SourceID:  cmd.DeviceID,
 			Intent:    cmd.Intent,
 			Arguments: copyStringMap(cmd.Arguments),
+			IntentV2: &scenario.IntentRecord{
+				Action: strings.TrimSpace(cmd.Intent),
+				Slots:  copyStringMap(cmd.Arguments),
+				Source: scenario.SourceManual,
+			},
 		}
 		if action == CommandActionStop {
 			name, err := h.runtime.StopTrigger(ctx, trigger)
