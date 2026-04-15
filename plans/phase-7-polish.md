@@ -14,7 +14,7 @@ Refinement, additional scenarios, and robustness.
 - [x] **Scenario priority and preemption**: Robust suspend/resume of scenarios across devices. See [scenario-engine.md](scenario-engine.md#scenario-priority-and-preemption).
 - [x] **Multi-device scenario coordination**: Single scenario spanning multiple devices.
 - [x] **Sensor data streaming**: Accelerometer, gyroscope, compass data to server for future scenarios. See [io-abstraction.md](io-abstraction.md).
-- [ ] **Bluetooth and USB passthrough**: Server-directed BLE scanning and USB device access.
+- [x] **Bluetooth and USB passthrough**: Server-directed BLE scanning and USB device access.
 - [x] **Recording and playback**: Server records streams to disk, plays back on demand.
 - [ ] **Admin UI**: Web-based dashboard for server configuration, device management, and scenario control.
 

@@ -1,1 +1,1 @@
-Implement Bluetooth/USB passthrough scaffolding on the server (commands + scenario/runtime hooks), keeping it client-agnostic.
+Implement Admin UI scaffolding on the server using existing server-driven UI primitives.

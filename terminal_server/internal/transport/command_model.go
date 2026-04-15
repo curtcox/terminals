@@ -36,4 +36,8 @@ const (
 // Manual command intents that are handled by transport scaffolding.
 const (
 	ManualIntentPlaybackMetadata = "playback_metadata"
+	ManualIntentBluetoothScan    = "bluetooth_scan"
+	ManualIntentBluetoothConnect = "bluetooth_connect"
+	ManualIntentUSBEnumerate     = "usb_enumerate"
+	ManualIntentUSBClaim         = "usb_claim"
 )

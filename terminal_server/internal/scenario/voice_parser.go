@@ -25,6 +25,25 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		trigger.Intent = "photo frame"
 	case normalized == "terminal" || normalized == "open terminal":
 		trigger.Intent = "terminal"
+	case normalized == "bluetooth scan" || normalized == "scan bluetooth" || normalized == "scan ble":
+		trigger.Intent = "bluetooth_passthrough"
+		trigger.Arguments["action"] = "scan"
+	case strings.HasPrefix(normalized, "bluetooth connect ") || strings.HasPrefix(normalized, "connect bluetooth ") || strings.HasPrefix(normalized, "connect ble "):
+		trigger.Intent = "bluetooth_passthrough"
+		trigger.Arguments["action"] = "connect"
+		if targetID, ok := parseBluetoothConnectTarget(normalized); ok {
+			trigger.Arguments["target_id"] = targetID
+		}
+	case normalized == "usb enumerate" || normalized == "scan usb":
+		trigger.Intent = "usb_passthrough"
+		trigger.Arguments["action"] = "enumerate"
+	case strings.HasPrefix(normalized, "usb claim "):
+		trigger.Intent = "usb_passthrough"
+		trigger.Arguments["action"] = "claim"
+		if vendorID, productID, ok := parseUSBClaimVIDPID(normalized); ok {
+			trigger.Arguments["vendor_id"] = vendorID
+			trigger.Arguments["product_id"] = productID
+		}
 	case normalized == "intercom" || normalized == "start intercom":
 		trigger.Intent = "intercom"
 	case normalized == "announcement" || normalized == "announce" || normalized == "start announcement":
@@ -170,4 +189,39 @@ func parseTimerMinutes(args map[string]string, normalized string, now time.Time)
 	}
 	args["minutes"] = strconv.Itoa(minutes)
 	args["fire_unix_ms"] = strconv.FormatInt(now.Add(time.Duration(minutes)*time.Minute).UnixMilli(), 10)
+}
+
+func parseBluetoothConnectTarget(normalized string) (string, bool) {
+	for _, prefix := range []string{
+		"bluetooth connect ",
+		"connect bluetooth ",
+		"connect ble ",
+	} {
+		if strings.HasPrefix(normalized, prefix) {
+			targetID := strings.TrimSpace(strings.TrimPrefix(normalized, prefix))
+			if targetID == "" {
+				return "", false
+			}
+			return targetID, true
+		}
+	}
+	return "", false
+}
+
+func parseUSBClaimVIDPID(normalized string) (string, string, bool) {
+	const prefix = "usb claim "
+	if !strings.HasPrefix(normalized, prefix) {
+		return "", "", false
+	}
+	token := strings.TrimSpace(strings.TrimPrefix(normalized, prefix))
+	parts := strings.Split(token, ":")
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	vendorID := strings.TrimSpace(parts[0])
+	productID := strings.TrimSpace(parts[1])
+	if vendorID == "" || productID == "" {
+		return "", "", false
+	}
+	return vendorID, productID, true
 }

@@ -3600,6 +3600,112 @@ func TestHandleMessageRejectsMissingCommandDeviceID(t *testing.T) {
 	}
 }
 
+func TestHandleMessageManualBluetoothScanUsesPassthroughScenario(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	bridge := &testRuntimePassthroughBridge{}
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:     devices,
+		Broadcast:   ui.NewMemoryBroadcaster(),
+		Passthrough: bridge,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "ble-scan-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    ManualIntentBluetoothScan,
+			Arguments: map[string]string{
+				"window_ms": "5000",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual bluetooth_scan error = %v", err)
+	}
+	if len(out) == 0 || out[0].ScenarioStart != "bluetooth_passthrough" {
+		t.Fatalf("unexpected response: %+v", out)
+	}
+	if len(bridge.bluetooth) != 1 {
+		t.Fatalf("len(bluetooth commands) = %d, want 1", len(bridge.bluetooth))
+	}
+	if bridge.bluetooth[0].Action != "scan" {
+		t.Fatalf("bluetooth action = %q, want scan", bridge.bluetooth[0].Action)
+	}
+	if bridge.bluetooth[0].Parameters["window_ms"] != "5000" {
+		t.Fatalf("window_ms = %q, want 5000", bridge.bluetooth[0].Parameters["window_ms"])
+	}
+}
+
+func TestHandleMessageManualUSBClaimUsesPassthroughScenario(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	bridge := &testRuntimePassthroughBridge{}
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:     devices,
+		Broadcast:   ui.NewMemoryBroadcaster(),
+		Passthrough: bridge,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "usb-claim-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    ManualIntentUSBClaim,
+			Arguments: map[string]string{
+				"vendor_id":  "1a2b",
+				"product_id": "3c4d",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual usb_claim error = %v", err)
+	}
+	if len(out) == 0 || out[0].ScenarioStart != "usb_passthrough" {
+		t.Fatalf("unexpected response: %+v", out)
+	}
+	if len(bridge.usb) != 1 {
+		t.Fatalf("len(usb commands) = %d, want 1", len(bridge.usb))
+	}
+	if bridge.usb[0].Action != "claim" {
+		t.Fatalf("usb action = %q, want claim", bridge.usb[0].Action)
+	}
+	if bridge.usb[0].VendorID != "1a2b" || bridge.usb[0].ProductID != "3c4d" {
+		t.Fatalf("unexpected usb cmd: %+v", bridge.usb[0])
+	}
+}
+
+type testRuntimePassthroughBridge struct {
+	bluetooth []scenario.BluetoothCommand
+	usb       []scenario.USBCommand
+}
+
+func (t *testRuntimePassthroughBridge) DispatchBluetoothCommand(_ context.Context, cmd scenario.BluetoothCommand) error {
+	t.bluetooth = append(t.bluetooth, cmd)
+	return nil
+}
+
+func (t *testRuntimePassthroughBridge) DispatchUSBCommand(_ context.Context, cmd scenario.USBCommand) error {
+	t.usb = append(t.usb, cmd)
+	return nil
+}
+
 func contains(s, needle string) bool {
 	return strings.Contains(s, needle)
 }

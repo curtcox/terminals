@@ -81,6 +81,91 @@ func (r *Runtime) ProcessSensorReading(ctx context.Context, reading SensorReadin
 	return consumer.HandleSensor(ctx, r.Env, reading)
 }
 
+// DispatchBluetoothCommand sends a Bluetooth passthrough command via the
+// configured bridge when available.
+func (r *Runtime) DispatchBluetoothCommand(ctx context.Context, cmd BluetoothCommand) error {
+	if r == nil || r.Env == nil || r.Env.Passthrough == nil {
+		return nil
+	}
+	cmd.DeviceID = strings.TrimSpace(cmd.DeviceID)
+	cmd.Action = strings.TrimSpace(cmd.Action)
+	cmd.TargetID = strings.TrimSpace(cmd.TargetID)
+	if cmd.Parameters == nil {
+		cmd.Parameters = map[string]string{}
+	} else {
+		cmd.Parameters = copyStringMap(cmd.Parameters)
+	}
+	return r.Env.Passthrough.DispatchBluetoothCommand(ctx, cmd)
+}
+
+// DispatchUSBCommand sends a USB passthrough command via the configured
+// bridge when available.
+func (r *Runtime) DispatchUSBCommand(ctx context.Context, cmd USBCommand) error {
+	if r == nil || r.Env == nil || r.Env.Passthrough == nil {
+		return nil
+	}
+	cmd.DeviceID = strings.TrimSpace(cmd.DeviceID)
+	cmd.Action = strings.TrimSpace(cmd.Action)
+	cmd.VendorID = strings.TrimSpace(cmd.VendorID)
+	cmd.ProductID = strings.TrimSpace(cmd.ProductID)
+	if cmd.Parameters == nil {
+		cmd.Parameters = map[string]string{}
+	} else {
+		cmd.Parameters = copyStringMap(cmd.Parameters)
+	}
+	return r.Env.Passthrough.DispatchUSBCommand(ctx, cmd)
+}
+
+// ProcessBluetoothEvent dispatches a Bluetooth passthrough event to the active
+// scenario for the source device when that scenario supports the hook.
+func (r *Runtime) ProcessBluetoothEvent(ctx context.Context, event BluetoothEvent) error {
+	if r == nil || r.Engine == nil || r.Env == nil {
+		return nil
+	}
+	deviceID := strings.TrimSpace(event.DeviceID)
+	activeScenario, ok := r.Engine.ActiveScenario(deviceID)
+	if !ok {
+		return nil
+	}
+	consumer, ok := activeScenario.(BluetoothEventConsumer)
+	if !ok {
+		return nil
+	}
+	event.DeviceID = deviceID
+	event.Event = strings.TrimSpace(event.Event)
+	if event.Data == nil {
+		event.Data = map[string]string{}
+	} else {
+		event.Data = copyStringMap(event.Data)
+	}
+	return consumer.HandleBluetoothEvent(ctx, r.Env, event)
+}
+
+// ProcessUSBEvent dispatches a USB passthrough event to the active scenario
+// for the source device when that scenario supports the hook.
+func (r *Runtime) ProcessUSBEvent(ctx context.Context, event USBEvent) error {
+	if r == nil || r.Engine == nil || r.Env == nil {
+		return nil
+	}
+	deviceID := strings.TrimSpace(event.DeviceID)
+	activeScenario, ok := r.Engine.ActiveScenario(deviceID)
+	if !ok {
+		return nil
+	}
+	consumer, ok := activeScenario.(USBEventConsumer)
+	if !ok {
+		return nil
+	}
+	event.DeviceID = deviceID
+	event.Event = strings.TrimSpace(event.Event)
+	if event.Data == nil {
+		event.Data = map[string]string{}
+	} else {
+		event.Data = copyStringMap(event.Data)
+	}
+	return consumer.HandleUSBEvent(ctx, r.Env, event)
+}
+
 // StatusData returns runtime-focused counters for control-plane system queries.
 func (r *Runtime) StatusData() map[string]string {
 	activeScenarios := 0
@@ -105,6 +190,17 @@ func (r *Runtime) StatusData() map[string]string {
 		"registered_scenarios": strconv.Itoa(registeredScenarios),
 		"pending_timers":       strconv.Itoa(pendingTimers),
 	}
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 // ProcessDueTimers emits notifications for due timer keys and removes them.

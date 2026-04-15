@@ -2207,6 +2207,66 @@ func copyStringMap(in map[string]string) map[string]string {
 	return out
 }
 
+func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
+	if cmd == nil {
+		return scenario.Trigger{}, false
+	}
+	intent := strings.TrimSpace(cmd.Intent)
+	switch intent {
+	case ManualIntentBluetoothScan:
+		args := copyStringMap(cmd.Arguments)
+		if strings.TrimSpace(args["action"]) == "" {
+			args["action"] = "scan"
+		}
+		return scenario.Trigger{
+			Kind:      scenario.TriggerManual,
+			SourceID:  cmd.DeviceID,
+			Intent:    "bluetooth_passthrough",
+			Arguments: args,
+		}, true
+	case ManualIntentBluetoothConnect:
+		args := copyStringMap(cmd.Arguments)
+		if strings.TrimSpace(args["action"]) == "" {
+			args["action"] = "connect"
+		}
+		if strings.TrimSpace(args["target_id"]) == "" {
+			if target := strings.TrimSpace(args["target"]); target != "" {
+				args["target_id"] = target
+			}
+		}
+		return scenario.Trigger{
+			Kind:      scenario.TriggerManual,
+			SourceID:  cmd.DeviceID,
+			Intent:    "bluetooth_passthrough",
+			Arguments: args,
+		}, true
+	case ManualIntentUSBEnumerate:
+		args := copyStringMap(cmd.Arguments)
+		if strings.TrimSpace(args["action"]) == "" {
+			args["action"] = "enumerate"
+		}
+		return scenario.Trigger{
+			Kind:      scenario.TriggerManual,
+			SourceID:  cmd.DeviceID,
+			Intent:    "usb_passthrough",
+			Arguments: args,
+		}, true
+	case ManualIntentUSBClaim:
+		args := copyStringMap(cmd.Arguments)
+		if strings.TrimSpace(args["action"]) == "" {
+			args["action"] = "claim"
+		}
+		return scenario.Trigger{
+			Kind:      scenario.TriggerManual,
+			SourceID:  cmd.DeviceID,
+			Intent:    "usb_passthrough",
+			Arguments: args,
+		}, true
+	default:
+		return scenario.Trigger{}, false
+	}
+}
+
 func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
 	readDeadline, readInterval := h.terminalReadSettings()
 	deadline := time.Now().Add(readDeadline)
@@ -2538,6 +2598,19 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			return ServerMessage{
 				Notification: "Playback metadata ready",
 				Data:         metadata,
+			}, nil
+		}
+		if passthroughTrigger, ok := manualPassthroughTrigger(cmd); ok {
+			if action == CommandActionStop {
+				return ServerMessage{}, ErrInvalidCommandAction
+			}
+			name, err := h.runtime.HandleTrigger(ctx, passthroughTrigger)
+			if err != nil {
+				return ServerMessage{}, err
+			}
+			return ServerMessage{
+				ScenarioStart: name,
+				Notification:  "Scenario started: " + name,
 			}, nil
 		}
 		trigger := scenario.Trigger{
