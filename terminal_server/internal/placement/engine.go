@@ -18,7 +18,7 @@ var ErrNoMatchingDevices = errors.New("no matching devices")
 // Engine resolves semantic placement queries.
 type Engine interface {
 	Find(ctx context.Context, q scenario.PlacementQuery) ([]scenario.DeviceRef, error)
-	NearestWith(ctx context.Context, source scenario.DeviceRef, cap string) (scenario.DeviceRef, error)
+	NearestWith(ctx context.Context, source scenario.DeviceRef, capability string) (scenario.DeviceRef, error)
 	DevicesInZone(ctx context.Context, zone string) ([]scenario.DeviceRef, error)
 	DevicesWithRole(ctx context.Context, role string) ([]scenario.DeviceRef, error)
 }
@@ -51,10 +51,10 @@ func (e *ManagerBackedEngine) Find(_ context.Context, q scenario.PlacementQuery)
 
 // NearestWith returns the nearest matching device for the requested capability.
 // Current distance heuristic is zone proximity: prefer same-zone devices.
-func (e *ManagerBackedEngine) NearestWith(_ context.Context, source scenario.DeviceRef, cap string) (scenario.DeviceRef, error) {
+func (e *ManagerBackedEngine) NearestWith(_ context.Context, source scenario.DeviceRef, capability string) (scenario.DeviceRef, error) {
 	sourceDevice, sourceOK := e.devices.Get(strings.TrimSpace(source.DeviceID))
 	query := scenario.PlacementQuery{
-		RequiredCaps: []string{strings.TrimSpace(cap)},
+		RequiredCaps: []string{strings.TrimSpace(capability)},
 		Count:        1,
 	}
 	if sourceOK && strings.TrimSpace(sourceDevice.Placement.Zone) != "" {
@@ -71,7 +71,7 @@ func (e *ManagerBackedEngine) NearestWith(_ context.Context, source scenario.Dev
 	}
 
 	refs, err = e.Find(context.Background(), scenario.PlacementQuery{
-		RequiredCaps: []string{strings.TrimSpace(cap)},
+		RequiredCaps: []string{strings.TrimSpace(capability)},
 		Count:        2,
 	})
 	if err != nil {

@@ -27,14 +27,22 @@ const (
 type TriggerSource string
 
 const (
-	SourceVoice    TriggerSource = "voice"
-	SourceUI       TriggerSource = "ui"
+	// SourceVoice indicates a voice-produced intent/event.
+	SourceVoice TriggerSource = "voice"
+	// SourceUI indicates a UI-produced intent/event.
+	SourceUI TriggerSource = "ui"
+	// SourceSchedule indicates a scheduler-produced intent/event.
 	SourceSchedule TriggerSource = "schedule"
-	SourceEvent    TriggerSource = "event"
-	SourceCascade  TriggerSource = "cascade"
-	SourceAgent    TriggerSource = "agent"
-	SourceWebhook  TriggerSource = "webhook"
-	SourceManual   TriggerSource = "manual"
+	// SourceEvent indicates an analyzer or system event-produced record.
+	SourceEvent TriggerSource = "event"
+	// SourceCascade indicates a scenario-cascade-produced record.
+	SourceCascade TriggerSource = "cascade"
+	// SourceAgent indicates an automation agent-produced intent.
+	SourceAgent TriggerSource = "agent"
+	// SourceWebhook indicates a webhook-produced intent.
+	SourceWebhook TriggerSource = "webhook"
+	// SourceManual indicates a manually requested intent.
+	SourceManual TriggerSource = "manual"
 )
 
 // Trigger contains routing metadata used for scenario matching.
@@ -94,7 +102,7 @@ type PlacementQuery struct {
 // PlacementEngine resolves semantic target scopes to concrete devices.
 type PlacementEngine interface {
 	Find(ctx context.Context, q PlacementQuery) ([]DeviceRef, error)
-	NearestWith(ctx context.Context, source DeviceRef, cap string) (DeviceRef, error)
+	NearestWith(ctx context.Context, source DeviceRef, capability string) (DeviceRef, error)
 	DevicesInZone(ctx context.Context, zone string) ([]DeviceRef, error)
 	DevicesWithRole(ctx context.Context, role string) ([]DeviceRef, error)
 }
@@ -360,7 +368,7 @@ type Scenario interface {
 
 // ScenarioDefinition is a stateless singleton that can match a request and
 // construct per-run activation instances.
-type ScenarioDefinition interface {
+type ScenarioDefinition interface { //nolint:revive
 	Name() string
 	Match(req ActivationRequest) bool
 	NewActivation(req ActivationRequest) (Scenario, error)

@@ -117,12 +117,16 @@ func (r *Runtime) HandleIntent(ctx context.Context, sourceID string, intent Inte
 	switch intent.Source {
 	case SourceVoice:
 		trigger.Kind = TriggerVoice
+	case SourceUI, SourceManual:
+		trigger.Kind = TriggerManual
 	case SourceSchedule:
 		trigger.Kind = TriggerSchedule
 	case SourceEvent:
 		trigger.Kind = TriggerEvent
 	case SourceCascade:
 		trigger.Kind = TriggerCascade
+	case SourceAgent, SourceWebhook:
+		trigger.Kind = TriggerEvent
 	}
 	return r.HandleTrigger(ctx, trigger)
 }

@@ -1109,11 +1109,13 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 			return out
 		},
 		MediaPlan: func(targets []string) *iorouter.MediaPlan {
-			nodes := []iorouter.MediaNode{
-				{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
-				{ID: "fork", Kind: iorouter.NodeFork},
-			}
-			edges := []iorouter.MediaEdge{{From: "mic", To: "fork"}}
+			nodes := make([]iorouter.MediaNode, 0, 2+len(targets))
+			nodes = append(nodes,
+				iorouter.MediaNode{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
+				iorouter.MediaNode{ID: "fork", Kind: iorouter.NodeFork},
+			)
+			edges := make([]iorouter.MediaEdge, 0, 1+len(targets))
+			edges = append(edges, iorouter.MediaEdge{From: "mic", To: "fork"})
 			for idx, targetID := range targets {
 				nodeID := fmt.Sprintf("speaker_%d", idx)
 				nodes = append(nodes, iorouter.MediaNode{
@@ -1223,11 +1225,13 @@ func (s *AnnouncementScenario) Start(ctx context.Context, env *Environment) erro
 			return out
 		},
 		MediaPlan: func(targets []string) *iorouter.MediaPlan {
-			nodes := []iorouter.MediaNode{
-				{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
-				{ID: "fork", Kind: iorouter.NodeFork},
-			}
-			edges := []iorouter.MediaEdge{{From: "mic", To: "fork"}}
+			nodes := make([]iorouter.MediaNode, 0, 2+len(targets))
+			nodes = append(nodes,
+				iorouter.MediaNode{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
+				iorouter.MediaNode{ID: "fork", Kind: iorouter.NodeFork},
+			)
+			edges := make([]iorouter.MediaEdge, 0, 1+len(targets))
+			edges = append(edges, iorouter.MediaEdge{From: "mic", To: "fork"})
 			for idx, targetID := range targets {
 				nodeID := fmt.Sprintf("speaker_%d", idx)
 				nodes = append(nodes, iorouter.MediaNode{
@@ -1371,43 +1375,6 @@ type ioRoute struct {
 	sourceID   string
 	targetID   string
 	streamKind string
-}
-
-func connectSourceToTargetsOwned(
-	_ context.Context,
-	env *Environment,
-	sourceID string,
-	targetIDs []string,
-	streamKind string,
-) ([]ioRoute, error) {
-	if env == nil || env.IO == nil || env.Devices == nil {
-		return nil, nil
-	}
-	sourceID = strings.TrimSpace(sourceID)
-	if sourceID == "" {
-		return nil, nil
-	}
-	if targetIDs == nil {
-		targetIDs = nonSourceDeviceIDs(env, sourceID)
-	}
-	routes := make([]ioRoute, 0)
-	for _, targetID := range targetIDs {
-		if targetID == "" || targetID == sourceID {
-			continue
-		}
-		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil {
-			if errors.Is(err, iorouter.ErrRouteExists) {
-				continue
-			}
-			return nil, err
-		}
-		routes = append(routes, ioRoute{
-			sourceID:   sourceID,
-			targetID:   targetID,
-			streamKind: streamKind,
-		})
-	}
-	return routes, nil
 }
 
 func connectBidirectionalSourceTargetsOwned(

@@ -10,7 +10,7 @@ import (
 
 // ScenarioRecipe captures the common scenario skeleton:
 // resolve targets -> claim resources -> apply media plan -> render UI -> cleanup.
-type ScenarioRecipe struct {
+type ScenarioRecipe struct { //nolint:revive
 	ActivationID string
 	Resolve      func(ctx context.Context, env *Environment) []string
 	Claims       func(targets []string) []iorouter.Claim

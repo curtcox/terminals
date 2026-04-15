@@ -13,6 +13,7 @@ import (
 // MediaNodeKind identifies node behavior in a media plan.
 type MediaNodeKind string
 
+// Media node kind constants.
 const (
 	NodeSourceMic    MediaNodeKind = "source.mic"
 	NodeSourceCamera MediaNodeKind = "source.camera"
@@ -297,6 +298,10 @@ func resolveSourceNode(
 	switch node.Kind {
 	case NodeSourceMic, NodeSourceCamera, NodeSourceTTS:
 		return node, true
+	case NodeFork, NodeAnalyzer:
+		// Traverse upstream through processing/topology nodes.
+	case NodeSinkSpeaker, NodeSinkDisplay, NodeSinkSTT, NodeRecorder:
+		return MediaNode{}, false
 	}
 	for _, parent := range incoming[nodeID] {
 		if out, ok := resolveSourceNode(parent, nodeByID, incoming, visited); ok {
@@ -310,9 +315,10 @@ func isSinkNode(kind MediaNodeKind) bool {
 	switch kind {
 	case NodeSinkSpeaker, NodeSinkDisplay, NodeSinkSTT, NodeRecorder:
 		return true
-	default:
+	case NodeSourceMic, NodeSourceCamera, NodeSourceTTS, NodeAnalyzer, NodeFork:
 		return false
 	}
+	return false
 }
 
 func streamKindFor(source, sink MediaNodeKind) string {

@@ -464,9 +464,9 @@ func (f *fakePlacement) Find(_ context.Context, q PlacementQuery) ([]DeviceRef, 
 	return out, nil
 }
 
-func (f *fakePlacement) NearestWith(_ context.Context, _ DeviceRef, cap string) (DeviceRef, error) {
+func (f *fakePlacement) NearestWith(_ context.Context, _ DeviceRef, capability string) (DeviceRef, error) {
 	f.nearestCalls++
-	f.lastNearestCap = cap
+	f.lastNearestCap = capability
 	if f.nearestErr != nil {
 		return DeviceRef{}, f.nearestErr
 	}
