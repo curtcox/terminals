@@ -2,7 +2,7 @@
 
 See [masterplan.md](../masterplan.md) for overall system context. See [../usecases.md](../usecases.md) for user-story-style use cases.
 
-Each use case maps to a scenario. The client code is identical in every case — only the server scenario differs.
+Each use case maps to a scenario definition. A single trigger produces an `Intent` or `Event` on the bus; the engine constructs a `ScenarioActivation`; the activation resolves targets via the [placement engine](placement.md), requests [resource claims](io-abstraction.md#resource-claims), applies a [`MediaPlan`](io-abstraction.md#media-topology-plans-not-connects), and sends UI. The client code is identical in every case — only the server scenario differs.
 
 ## Text Terminal
 
@@ -123,7 +123,7 @@ Each use case maps to a scenario. The client code is identical in every case —
 6. Receiving devices get a notification overlay ("PA from {device_name}") on top of their current UI — their active scenario is **not** preempted, only their audio output is temporarily taken over.
 7. On end, server restores normal audio routing and removes the overlay from receiving devices.
 
-**Key IO Router operations**: Fork (one mic → many speakers), with echo suppression via muting receiver mics.
+**Key claims**: `speaker.main` (exclusive) on every receiving device and `screen.overlay` (shared) for the PA notification. The receiving devices' `screen.main` claims are untouched — their active scenarios keep running with their audio parked. **Key media plan**: mic(source) → fork → speaker(A..N).
 
 ```
 Source (mic) ──WebRTC──→ Server ──fork──→ Speaker A
@@ -162,7 +162,7 @@ Mic D ─┘
 
 ## Related Plans
 
-- [scenario-engine.md](scenario-engine.md) — Scenario interface and lifecycle.
+- [scenario-engine.md](scenario-engine.md) — Scenario definitions, activations, and lifecycle.
 - [io-abstraction.md](io-abstraction.md) — Router primitives used by each flow.
 - [server-driven-ui.md](server-driven-ui.md) — UI primitives used by each flow.
 - [../usecases.md](../usecases.md) — User-story form of each scenario.

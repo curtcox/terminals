@@ -67,6 +67,8 @@ On connection, the client sends a capability manifest:
 
 A capability is present if non-null. The server uses this to determine what the device can do — it will never send a command the device can't handle.
 
+Semantic placement (zone, role tags, mobility) is **not** part of the client-declared manifest. The client declares only what it physically is; the server assigns zone and role metadata via admin configuration. See [placement.md](placement.md).
+
 ## Client Module Structure
 
 ```

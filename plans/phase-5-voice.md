@@ -12,11 +12,11 @@ Add AI-powered voice interaction.
 ## Deliverables
 
 - [ ] **AI backend interfaces**: Define and implement the pluggable AI interfaces (`SpeechToText`, `TextToSpeech`, `LLM`, `VisionAnalyzer`, `SoundClassifier`). See [technology.md](technology.md#ai-backend-pluggable).
-- [ ] **Wake word detection**: Continuous low-power audio monitoring on idle devices.
-- [ ] **STT pipeline**: Mic → server → speech-to-text.
-- [ ] **LLM query pipeline**: Transcribed text → LLM → response text.
-- [ ] **TTS pipeline**: Response text → TTS → speaker.
-- [ ] **Rich responses**: Voice response + accompanying visual UI on the device screen. See [use-case-flows.md](use-case-flows.md#smart-speaker--voice-assistant).
+- [ ] **Intent/Event bus**: Ship the typed trigger bus. Voice transcripts are parsed into `Intent` records (with `Action`, `Object`, `Slots`, `Scope`, `Source: voice`); existing UI-triggered flows also emit through the bus. The scenario engine matches on `Intent`/`Event` instead of stringly-typed triggers. See [scenario-engine.md](scenario-engine.md#triggers-intents-and-events).
+- [ ] **LLM intent resolution**: Optional path where ambiguous utterances go through the LLM to produce a structured `Intent`; the LLM is a producer on the same bus, not a side path.
+- [ ] **Wake word detection**: Continuous low-power audio monitoring on idle devices; detection emits an `Event` that activates the voice assistant.
+- [ ] **Voice assistant media plan**: `mic → fork → [STT, optional recorder]`, `TTS → speaker`, with shared `mic.analyze` + exclusive `speaker.main` claims so the assistant overlays without evicting ambient scenarios.
+- [ ] **Rich responses**: Voice response + accompanying visual UI on the device screen (overlay layer, not replacing the main scenario). See [use-case-flows.md](use-case-flows.md#smart-speaker--voice-assistant).
 
 ## Milestone
 

@@ -10,11 +10,13 @@ Ambient intelligence scenarios.
 
 ## Deliverables
 
+- [ ] **Placement engine**: Ship zone/role metadata on devices plus the `PlacementEngine` API (`Find`, `NearestWith`, `DevicesInZone`, `DevicesWithRole`). Ambient scenarios target "the kitchen" or "the child's room" by scope, not device ID. See [placement.md](placement.md).
 - [ ] **Sound classification**: AI backend for detecting specific sounds (silence, beeps, alarms, etc.). See [technology.md](technology.md#ai-backend-pluggable).
-- [ ] **Audio monitoring scenario**: "Tell me when X stops" voice command handling and monitoring. See [use-case-flows.md](use-case-flows.md#audio-monitoring-tell-me-when-the-dishwasher-stops).
-- [ ] **Timer and reminder scenario**: Voice-commanded timers and reminders with scheduler persistence. See [use-case-flows.md](use-case-flows.md#timers-and-reminders).
-- [ ] **Schedule monitoring scenario**: Time-triggered activity monitoring with escalating alerts. See [use-case-flows.md](use-case-flows.md#schedule-monitoring-watch-my-child).
-- [ ] **Red alert scenario**: Broadcast preemption of all devices with alarm. See [use-case-flows.md](use-case-flows.md#red-alert).
+- [ ] **Analyzer nodes emit events**: The media planner's analyzer nodes publish `Event{Kind: "sound.detected", ...}` onto the intent/event bus; scenarios subscribe rather than polling. See [io-abstraction.md](io-abstraction.md#router-responsibilities).
+- [ ] **Audio monitoring scenario**: "Tell me when X stops" — activation with a shared `mic.analyze` claim and a `mic → analyzer → event` media plan. See [use-case-flows.md](use-case-flows.md#audio-monitoring-tell-me-when-the-dishwasher-stops).
+- [ ] **Timer and reminder scenario**: Voice-commanded timers and reminders. Each timer is its own activation, persisted via `ActivationRecord` so the scheduler survives restarts. See [use-case-flows.md](use-case-flows.md#timers-and-reminders).
+- [ ] **Schedule monitoring scenario**: Time-triggered activation targeting a zone via placement (e.g. `DevicesInZone("alice_room")`), escalating alerts on schedule drift. See [use-case-flows.md](use-case-flows.md#schedule-monitoring-watch-my-child).
+- [ ] **Red alert scenario**: Critical-priority activation that claims every exclusive resource on every device; cascade trigger that suspends every lower-priority activation via the claim manager. See [use-case-flows.md](use-case-flows.md#red-alert).
 
 ## Milestone
 
