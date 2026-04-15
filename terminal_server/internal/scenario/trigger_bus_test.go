@@ -66,6 +66,64 @@ func TestNormalizeTriggerDefaultsIntentAndEventSources(t *testing.T) {
 	}
 }
 
+func TestNormalizeTriggerPreservesExplicitSourcesAndOccurredAt(t *testing.T) {
+	now := time.Date(2026, 4, 15, 13, 0, 0, 0, time.UTC)
+	explicitAt := time.Date(2026, 4, 14, 7, 30, 0, 0, time.UTC)
+	got := normalizeTrigger(Trigger{
+		Kind: TriggerVoice,
+		IntentV2: &IntentRecord{
+			Action: "terminal",
+			Source: SourceAgent,
+		},
+		EventV2: &EventRecord{
+			Kind:       "sound.detected",
+			Source:     SourceWebhook,
+			OccurredAt: explicitAt,
+		},
+	}, now)
+
+	if got.IntentV2 == nil || got.IntentV2.Source != SourceAgent {
+		t.Fatalf("IntentV2.Source = %+v, want %q", got.IntentV2, SourceAgent)
+	}
+	if got.EventV2 == nil || got.EventV2.Source != SourceWebhook {
+		t.Fatalf("EventV2.Source = %+v, want %q", got.EventV2, SourceWebhook)
+	}
+	if !got.EventV2.OccurredAt.Equal(explicitAt) {
+		t.Fatalf("EventV2.OccurredAt = %v, want %v", got.EventV2.OccurredAt, explicitAt)
+	}
+}
+
+func TestNormalizeTriggerCopiesArgumentsIntoIntentSlots(t *testing.T) {
+	args := map[string]string{"device_id": "d1"}
+	got := normalizeTrigger(Trigger{
+		Kind:      TriggerManual,
+		Intent:    "terminal",
+		Arguments: args,
+	}, time.Date(2026, 4, 15, 14, 0, 0, 0, time.UTC))
+
+	if got.IntentV2 == nil {
+		t.Fatalf("expected IntentV2 to be created")
+	}
+	if got.IntentV2.Slots == nil {
+		t.Fatalf("expected IntentV2.Slots to be created")
+	}
+	if got.IntentV2.Slots["device_id"] != "d1" {
+		t.Fatalf("IntentV2.Slots[device_id] = %q, want d1", got.IntentV2.Slots["device_id"])
+	}
+
+	// Mutating the original args map must not mutate normalized slots.
+	args["device_id"] = "d2"
+	if got.IntentV2.Slots["device_id"] != "d1" {
+		t.Fatalf("slots mutated through shared map reference: %+v", got.IntentV2.Slots)
+	}
+
+	// Mutating slots must not mutate original args.
+	got.IntentV2.Slots["device_id"] = "d3"
+	if args["device_id"] != "d2" {
+		t.Fatalf("arguments mutated through shared map reference: %+v", args)
+	}
+}
+
 func TestIntentEventBusPublishNormalizesBeforeFanout(t *testing.T) {
 	bus := NewIntentEventBus()
 	ch, cancel := bus.Subscribe(1)
@@ -100,4 +158,57 @@ func TestIntentEventBusPublishNormalizesBeforeFanout(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 		t.Fatalf("timed out waiting for published trigger")
 	}
+}
+
+func TestIntentEventBusPublishDropsWhenListenerBufferIsFull(t *testing.T) {
+	bus := NewIntentEventBus()
+	ch, cancel := bus.Subscribe(1)
+	defer cancel()
+
+	// Fill the only slot in the listener channel.
+	bus.Publish(Trigger{Kind: TriggerManual, Intent: "first"})
+
+	done := make(chan struct{})
+	go func() {
+		bus.Publish(Trigger{Kind: TriggerManual, Intent: "second"})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Expected: publish must never block on a full listener buffer.
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("Publish blocked on full listener channel")
+	}
+
+	select {
+	case got := <-ch:
+		if got.Intent != "first" {
+			t.Fatalf("received intent = %q, want first", got.Intent)
+		}
+	default:
+		t.Fatalf("expected first message in channel")
+	}
+
+	select {
+	case got := <-ch:
+		t.Fatalf("unexpected second message delivered: %+v", got)
+	default:
+	}
+}
+
+func TestIntentEventBusCancelUnsubscribesAndClosesChannel(t *testing.T) {
+	bus := NewIntentEventBus()
+	ch, cancel := bus.Subscribe(1)
+
+	cancel()
+	cancel() // idempotent
+
+	_, ok := <-ch
+	if ok {
+		t.Fatalf("expected closed channel after cancel")
+	}
+
+	// Publishing after cancel should be a no-op for the closed subscriber.
+	bus.Publish(Trigger{Kind: TriggerManual, Intent: "ignored"})
 }
