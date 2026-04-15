@@ -1,1 +1,1 @@
-Await user review and address any follow-up changes.
+Await user review and address follow-up changes.

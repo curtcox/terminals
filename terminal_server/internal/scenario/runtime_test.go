@@ -142,6 +142,62 @@ func TestRuntimeHandleIntentRoutesTypedIntent(t *testing.T) {
 	}
 }
 
+func TestRuntimeHandleIntentMapsSourceToTriggerKind(t *testing.T) {
+	cases := []struct {
+		name         string
+		source       TriggerSource
+		expectedKind TriggerKind
+	}{
+		{name: "voice", source: SourceVoice, expectedKind: TriggerVoice},
+		{name: "schedule", source: SourceSchedule, expectedKind: TriggerSchedule},
+		{name: "event", source: SourceEvent, expectedKind: TriggerEvent},
+		{name: "cascade", source: SourceCascade, expectedKind: TriggerCascade},
+		{name: "ui", source: SourceUI, expectedKind: TriggerManual},
+		{name: "manual", source: SourceManual, expectedKind: TriggerManual},
+		{name: "webhook", source: SourceWebhook, expectedKind: TriggerManual},
+		{name: "agent", source: SourceAgent, expectedKind: TriggerManual},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			devices := device.NewManager()
+			_, _ = devices.Register(device.Manifest{DeviceID: "d1"})
+			engine := NewEngine()
+			engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+			runtime := NewRuntime(engine, &Environment{
+				Devices:   devices,
+				Broadcast: ui.NewMemoryBroadcaster(),
+			})
+			ch, cancel := runtime.Bus.Subscribe(1)
+			defer cancel()
+
+			_, err := runtime.HandleIntent(context.Background(), "d1", IntentRecord{
+				Action: "terminal",
+				Slots:  map[string]string{"device_id": "d1"},
+				Source: tc.source,
+			})
+			if err != nil {
+				t.Fatalf("HandleIntent() error = %v", err)
+			}
+
+			select {
+			case got := <-ch:
+				if got.Kind != tc.expectedKind {
+					t.Fatalf("trigger kind = %q, want %q", got.Kind, tc.expectedKind)
+				}
+				if got.IntentV2 == nil {
+					t.Fatalf("expected IntentV2 on published trigger")
+				}
+				if got.IntentV2.Source != tc.source {
+					t.Fatalf("intent source = %q, want %q", got.IntentV2.Source, tc.source)
+				}
+			case <-time.After(200 * time.Millisecond):
+				t.Fatalf("timed out waiting for bus trigger")
+			}
+		})
+	}
+}
+
 func TestRuntimeHandleVoiceTextUsesLLMIntentResolutionForAmbiguousInput(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1"})

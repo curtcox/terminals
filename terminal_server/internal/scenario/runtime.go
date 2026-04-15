@@ -126,7 +126,7 @@ func (r *Runtime) HandleIntent(ctx context.Context, sourceID string, intent Inte
 	case SourceCascade:
 		trigger.Kind = TriggerCascade
 	case SourceAgent, SourceWebhook:
-		trigger.Kind = TriggerEvent
+		trigger.Kind = TriggerManual
 	}
 	return r.HandleTrigger(ctx, trigger)
 }
