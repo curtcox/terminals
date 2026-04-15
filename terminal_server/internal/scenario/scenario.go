@@ -167,6 +167,67 @@ type SoundClassifier interface {
 	Classify(ctx context.Context, audio AudioSource) (SoundEventStream, error)
 }
 
+// SensorReading is one telemetry snapshot produced by a device client.
+type SensorReading struct {
+	DeviceID string
+	UnixMS   int64
+	Values   map[string]float64
+}
+
+// SensorConsumer is an optional hook implemented by scenarios that consume
+// device telemetry snapshots while active.
+type SensorConsumer interface {
+	HandleSensor(ctx context.Context, env *Environment, reading SensorReading) error
+}
+
+// BluetoothCommand is a server-issued Bluetooth passthrough request.
+type BluetoothCommand struct {
+	DeviceID   string
+	Action     string
+	TargetID   string
+	Parameters map[string]string
+}
+
+// USBCommand is a server-issued USB passthrough request.
+type USBCommand struct {
+	DeviceID   string
+	Action     string
+	VendorID   string
+	ProductID  string
+	Parameters map[string]string
+}
+
+// BluetoothEvent captures device-originated Bluetooth passthrough data.
+type BluetoothEvent struct {
+	DeviceID string
+	Event    string
+	Data     map[string]string
+}
+
+// USBEvent captures device-originated USB passthrough data.
+type USBEvent struct {
+	DeviceID string
+	Event    string
+	Data     map[string]string
+}
+
+// PassthroughBridge mediates server-directed Bluetooth/USB passthrough
+// operations without coupling scenarios to client implementation details.
+type PassthroughBridge interface {
+	DispatchBluetoothCommand(ctx context.Context, cmd BluetoothCommand) error
+	DispatchUSBCommand(ctx context.Context, cmd USBCommand) error
+}
+
+// BluetoothEventConsumer optionally receives Bluetooth passthrough events.
+type BluetoothEventConsumer interface {
+	HandleBluetoothEvent(ctx context.Context, env *Environment, event BluetoothEvent) error
+}
+
+// USBEventConsumer optionally receives USB passthrough events.
+type USBEventConsumer interface {
+	HandleUSBEvent(ctx context.Context, env *Environment, event USBEvent) error
+}
+
 // TelephonyBridge exposes external call controls.
 type TelephonyBridge interface {
 	Call(ctx context.Context, target string) error
@@ -207,6 +268,7 @@ type Environment struct {
 	Scheduler   Scheduler
 	Broadcast   Broadcaster
 	DeviceAudio DeviceAudioSubscriber
+	Passthrough PassthroughBridge
 }
 
 // Scenario is the runtime contract for all server-side behaviors.

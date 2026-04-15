@@ -8,6 +8,7 @@ import (
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
@@ -86,6 +87,64 @@ func TestHandleMessageCommandVoice(t *testing.T) {
 	events := broadcaster.Events()
 	if len(events) == 0 {
 		t.Fatalf("expected broadcast event")
+	}
+}
+
+func TestHandleMessageIntercomStartStopUpdatesRecordingManager(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	recorder := recording.NewMemoryManager()
+	handler.SetRecordingManager(recorder)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall"},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-intercom-start-recording",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(intercom start) error = %v", err)
+	}
+	active := recorder.Active()
+	if len(active) != 2 {
+		t.Fatalf("len(recorder.Active()) after start = %d, want 2", len(active))
+	}
+
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-intercom-stop-recording",
+			DeviceID:  "device-1",
+			Action:    CommandActionStop,
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(intercom stop) error = %v", err)
+	}
+	if len(recorder.Active()) != 0 {
+		t.Fatalf("len(recorder.Active()) after stop = %d, want 0", len(recorder.Active()))
 	}
 }
 
@@ -203,6 +262,140 @@ func TestHandleMessageWebRTCSignalProducesRelayToPeer(t *testing.T) {
 	}
 }
 
+type fakeWebRTCSignalEngine struct {
+	responses   []WebRTCSignalEngineResponse
+	err         error
+	lastRequest WebRTCSignalEngineRequest
+	removeCalls []string
+}
+
+func (f *fakeWebRTCSignalEngine) HandleSignal(_ context.Context, req WebRTCSignalEngineRequest) ([]WebRTCSignalEngineResponse, error) {
+	f.lastRequest = req
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := append([]WebRTCSignalEngineResponse(nil), f.responses...)
+	return out, nil
+}
+
+func (f *fakeWebRTCSignalEngine) RemoveStream(streamID string) {
+	f.removeCalls = append(f.removeCalls, streamID)
+}
+
+func TestHandleMessageWebRTCSignalUsesServerManagedEngine(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+	engine := &fakeWebRTCSignalEngine{
+		responses: []WebRTCSignalEngineResponse{
+			{
+				TargetDeviceID: "device-1",
+				Signal: WebRTCSignalResponse{
+					StreamID:   "route:device-1|device-2|audio",
+					SignalType: "answer",
+					Payload:    "{\"sdp\":\"v=0-answer\"}",
+				},
+			},
+		},
+	}
+	handler.SetWebRTCSignalEngine(engine)
+	handler.registerMediaStream(StartStreamResponse{
+		StreamID:       "route:device-1|device-2|audio",
+		Kind:           "audio",
+		SourceDeviceID: "device-1",
+		TargetDeviceID: "device-2",
+		Metadata: map[string]string{
+			"webrtc_mode": "server_managed",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		SessionDeviceID: "device-1",
+		WebRTCSignal: &WebRTCSignalRequest{
+			StreamID:   "route:device-1|device-2|audio",
+			SignalType: "offer",
+			Payload:    "{\"sdp\":\"v=0-offer\"}",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(server-managed webrtc signal) error = %v", err)
+	}
+	if engine.lastRequest.DeviceID != "device-1" {
+		t.Fatalf("engine request device = %q, want device-1", engine.lastRequest.DeviceID)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].RelayToDeviceID != "" {
+		t.Fatalf("RelayToDeviceID = %q, want empty (back to session device)", out[0].RelayToDeviceID)
+	}
+	if out[0].WebRTCSignal == nil || out[0].WebRTCSignal.SignalType != "answer" {
+		t.Fatalf("expected answer signal from engine, got %+v", out[0].WebRTCSignal)
+	}
+}
+
+func TestHandleMessageWebRTCSignalServerManagedFallsBackToRelayOnEngineError(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+	engine := &fakeWebRTCSignalEngine{err: ErrInvalidClientMessage}
+	handler.SetWebRTCSignalEngine(engine)
+	handler.registerMediaStream(StartStreamResponse{
+		StreamID:       "route:device-1|device-2|audio",
+		Kind:           "audio",
+		SourceDeviceID: "device-1",
+		TargetDeviceID: "device-2",
+		Metadata: map[string]string{
+			"webrtc_mode": "server_managed",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		SessionDeviceID: "device-1",
+		WebRTCSignal: &WebRTCSignalRequest{
+			StreamID:   "route:device-1|device-2|audio",
+			SignalType: "offer",
+			Payload:    "{\"sdp\":\"v=0-offer\"}",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(server-managed fallback) error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].RelayToDeviceID != "device-2" {
+		t.Fatalf("RelayToDeviceID = %q, want device-2 fallback relay", out[0].RelayToDeviceID)
+	}
+	if out[0].WebRTCSignal == nil || out[0].WebRTCSignal.SignalType != "offer" {
+		t.Fatalf("expected fallback offer relay, got %+v", out[0].WebRTCSignal)
+	}
+}
+
+func TestUnregisterMediaStreamRemovesServerManagedWebRTCStream(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+	engine := &fakeWebRTCSignalEngine{}
+	handler.SetWebRTCSignalEngine(engine)
+
+	streamID := "route:device-1|device-2|audio"
+	handler.registerMediaStream(StartStreamResponse{
+		StreamID:       streamID,
+		Kind:           "audio",
+		SourceDeviceID: "device-1",
+		TargetDeviceID: "device-2",
+		Metadata: map[string]string{
+			"webrtc_mode": "server_managed",
+		},
+	})
+	handler.unregisterMediaStream(streamID)
+
+	if len(engine.removeCalls) != 1 || engine.removeCalls[0] != streamID {
+		t.Fatalf("removeCalls = %+v, want [%s]", engine.removeCalls, streamID)
+	}
+}
+
 func TestHandleMessageCommandManual(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -237,14 +430,91 @@ func TestHandleMessageCommandManual(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleMessage(command manual) error = %v", err)
 	}
-	if len(out) != 1 {
-		t.Fatalf("len(out) = %d, want 1", len(out))
+	if len(out) != 3 {
+		t.Fatalf("len(out) = %d, want 3", len(out))
 	}
 	if out[0].ScenarioStart != "photo_frame" {
 		t.Fatalf("ScenarioStart = %q, want photo_frame", out[0].ScenarioStart)
 	}
 	if out[0].CommandAck != "cmd-2" {
 		t.Fatalf("CommandAck = %q, want cmd-2", out[0].CommandAck)
+	}
+	if out[1].SetUI == nil || out[1].SetUI.Props["id"] != "photo_frame_root" {
+		t.Fatalf("expected photo frame SetUI, got %+v", out[1].SetUI)
+	}
+	if out[2].TransitionUI == nil || out[2].TransitionUI.Transition != "photo_frame_enter" {
+		t.Fatalf("expected photo_frame_enter transition, got %+v", out[2].TransitionUI)
+	}
+}
+
+func TestHandleMessageCommandManualWithDeviceIDsRelaysPhotoFrameUI(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-photo-targeted",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+			Arguments: map[string]string{
+				"device_ids": "device-1,device-2",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(targeted photo frame) error = %v", err)
+	}
+
+	var localSetUI bool
+	var relayedSetUI bool
+	var relayedTransition bool
+	for _, msg := range out {
+		if msg.SetUI != nil && msg.RelayToDeviceID == "" && msg.SetUI.Props["id"] == "photo_frame_root" {
+			localSetUI = true
+		}
+		if msg.SetUI != nil && msg.RelayToDeviceID == "device-2" && msg.SetUI.Props["id"] == "photo_frame_root" {
+			relayedSetUI = true
+		}
+		if msg.TransitionUI != nil && msg.RelayToDeviceID == "device-2" && msg.TransitionUI.Transition == "photo_frame_enter" {
+			relayedTransition = true
+		}
+	}
+	if !localSetUI {
+		t.Fatalf("expected local photo frame SetUI in command responses: %+v", out)
+	}
+	if !relayedSetUI {
+		t.Fatalf("expected relayed photo frame SetUI for device-2: %+v", out)
+	}
+	if !relayedTransition {
+		t.Fatalf("expected relayed photo_frame_enter transition for device-2: %+v", out)
+	}
+
+	if active, ok := runtime.Engine.Active("device-1"); !ok || active != "photo_frame" {
+		t.Fatalf("device-1 active = %q (ok=%t), want photo_frame", active, ok)
+	}
+	if active, ok := runtime.Engine.Active("device-2"); !ok || active != "photo_frame" {
+		t.Fatalf("device-2 active = %q (ok=%t), want photo_frame", active, ok)
 	}
 }
 
@@ -993,6 +1263,77 @@ func TestHandleMessageHeartbeatCoalescesTerminalOutputUpdates(t *testing.T) {
 	}
 }
 
+func TestHandleMessageHeartbeatRotatesPhotoFrameAfterInterval(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	now := time.Date(2026, 4, 14, 18, 0, 0, 0, time.UTC)
+	control.now = func() time.Time { return now }
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.photoFrameInterval = 5 * time.Second
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	startOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-photo-rotate-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	if err != nil {
+		t.Fatalf("photo frame start error = %v", err)
+	}
+	if len(startOut) < 2 || startOut[1].SetUI == nil {
+		t.Fatalf("expected initial photo frame SetUI, got %+v", startOut)
+	}
+	firstURL := findNodePropValue(startOut[1].SetUI, "photo_frame_image", "url")
+	if firstURL == "" {
+		t.Fatalf("expected initial photo url in SetUI descriptor")
+	}
+
+	now = now.Add(3 * time.Second)
+	firstHeartbeat, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("first heartbeat error = %v", err)
+	}
+	if len(firstHeartbeat) != 0 {
+		t.Fatalf("expected no rotation before interval, got %+v", firstHeartbeat)
+	}
+
+	now = now.Add(3 * time.Second)
+	secondHeartbeat, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Heartbeat: &HeartbeatRequest{DeviceID: "device-1"},
+	})
+	if err != nil {
+		t.Fatalf("second heartbeat error = %v", err)
+	}
+	if len(secondHeartbeat) != 1 || secondHeartbeat[0].SetUI == nil {
+		t.Fatalf("expected photo frame SetUI after interval, got %+v", secondHeartbeat)
+	}
+	secondURL := findNodePropValue(secondHeartbeat[0].SetUI, "photo_frame_image", "url")
+	if secondURL == "" {
+		t.Fatalf("expected rotated photo url in heartbeat SetUI descriptor")
+	}
+	if secondURL == firstURL {
+		t.Fatalf("expected heartbeat rotation to advance photo url; url stayed %q", firstURL)
+	}
+}
+
 func TestHandleMessageManualRefreshBypassesHeartbeatCoalescing(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -1657,14 +1998,193 @@ func TestHandleMessageCommandStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stop command error = %v", err)
 	}
-	if len(out) != 1 {
-		t.Fatalf("len(out) = %d, want 1", len(out))
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
 	}
 	if out[0].ScenarioStop != "photo_frame" {
 		t.Fatalf("ScenarioStop = %q, want photo_frame", out[0].ScenarioStop)
 	}
 	if out[0].CommandAck != "cmd-3-stop" {
 		t.Fatalf("CommandAck = %q, want cmd-3-stop", out[0].CommandAck)
+	}
+	if out[1].TransitionUI == nil || out[1].TransitionUI.Transition != "photo_frame_exit" {
+		t.Fatalf("expected photo_frame_exit transition, got %+v", out[1].TransitionUI)
+	}
+}
+
+func TestHandleMessageCommandStopRedAlertRestoresPhotoFrameUI(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-photo-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	if err != nil {
+		t.Fatalf("photo frame start error = %v", err)
+	}
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-alert-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "red alert",
+		},
+	})
+	if err != nil {
+		t.Fatalf("red alert start error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-alert-stop",
+			DeviceID:  "device-1",
+			Action:    "stop",
+			Kind:      "manual",
+			Intent:    "red alert",
+		},
+	})
+	if err != nil {
+		t.Fatalf("red alert stop error = %v", err)
+	}
+	if len(out) < 3 {
+		t.Fatalf("expected resumed photo frame UI after red alert stop, got %+v", out)
+	}
+	if out[0].ScenarioStop != "red_alert" {
+		t.Fatalf("ScenarioStop = %q, want red_alert", out[0].ScenarioStop)
+	}
+	foundPhotoUI := false
+	foundPhotoTransition := false
+	for _, msg := range out {
+		if msg.SetUI != nil && msg.SetUI.Props["id"] == "photo_frame_root" {
+			foundPhotoUI = true
+		}
+		if msg.TransitionUI != nil && msg.TransitionUI.Transition == "photo_frame_enter" {
+			foundPhotoTransition = true
+		}
+	}
+	if !foundPhotoUI {
+		t.Fatalf("expected resumed photo frame SetUI after red alert stop: %+v", out)
+	}
+	if !foundPhotoTransition {
+		t.Fatalf("expected photo_frame_enter transition on resume: %+v", out)
+	}
+}
+
+func TestHandleMessageCommandStopRedAlertRestoresPhotoFrameUIForTargetedDevices(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Tablet"},
+	})
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-photo-start-targeted",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+			Arguments: map[string]string{
+				"device_ids": "device-1,device-2",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("photo frame targeted start error = %v", err)
+	}
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-alert-start-targeted",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "red alert",
+			Arguments: map[string]string{
+				"device_ids": "device-1,device-2",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("red alert targeted start error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-alert-stop-targeted",
+			DeviceID:  "device-1",
+			Action:    "stop",
+			Kind:      "manual",
+			Intent:    "red alert",
+			Arguments: map[string]string{
+				"device_ids": "device-1,device-2",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("red alert targeted stop error = %v", err)
+	}
+
+	foundLocalPhotoUI := false
+	foundLocalPhotoTransition := false
+	foundPeerPhotoUI := false
+	foundPeerPhotoTransition := false
+	for _, msg := range out {
+		if msg.SetUI != nil && msg.SetUI.Props["id"] == "photo_frame_root" {
+			if msg.RelayToDeviceID == "" {
+				foundLocalPhotoUI = true
+			}
+			if msg.RelayToDeviceID == "device-2" {
+				foundPeerPhotoUI = true
+			}
+		}
+		if msg.TransitionUI != nil && msg.TransitionUI.Transition == "photo_frame_enter" {
+			if msg.RelayToDeviceID == "" {
+				foundLocalPhotoTransition = true
+			}
+			if msg.RelayToDeviceID == "device-2" {
+				foundPeerPhotoTransition = true
+			}
+		}
+	}
+	if !foundLocalPhotoUI || !foundLocalPhotoTransition {
+		t.Fatalf("expected local resumed photo frame UI+transition; out=%+v", out)
+	}
+	if !foundPeerPhotoUI || !foundPeerPhotoTransition {
+		t.Fatalf("expected relayed resumed photo frame UI+transition for device-2; out=%+v", out)
 	}
 }
 
@@ -1935,6 +2455,12 @@ func TestHandleMessageSystemRuntimeStatus(t *testing.T) {
 	if out[0].Data["sensor_summaries"] != "" {
 		t.Fatalf("sensor_summaries = %q, want empty", out[0].Data["sensor_summaries"])
 	}
+	if out[0].Data["recording_active_streams"] != "0" {
+		t.Fatalf("recording_active_streams = %q, want 0", out[0].Data["recording_active_streams"])
+	}
+	if out[0].Data["recording_stream_ids"] != "" {
+		t.Fatalf("recording_stream_ids = %q, want empty", out[0].Data["recording_stream_ids"])
+	}
 }
 
 func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T) {
@@ -1948,6 +2474,7 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 		IO:      routes,
 	})
 	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.SetRecordingManager(recording.NewMemoryManager())
 
 	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
 		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
@@ -1996,6 +2523,9 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	if out[0].Data["media_streams_pending"] != "2" {
 		t.Fatalf("media_streams_pending pre-ready = %q, want 2", out[0].Data["media_streams_pending"])
 	}
+	if out[0].Data["recording_active_streams"] != "2" {
+		t.Fatalf("recording_active_streams pre-ready = %q, want 2", out[0].Data["recording_active_streams"])
+	}
 
 	for streamID := range streamIDs {
 		_, err = handler.HandleMessage(context.Background(), ClientMessage{
@@ -2024,6 +2554,9 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	}
 	if out[0].Data["media_streams_pending"] != "0" {
 		t.Fatalf("media_streams_pending ready = %q, want 0", out[0].Data["media_streams_pending"])
+	}
+	if out[0].Data["recording_active_streams"] != "2" {
+		t.Fatalf("recording_active_streams ready = %q, want 2", out[0].Data["recording_active_streams"])
 	}
 	if !strings.Contains(out[0].Data["media_streams"], "ready=true") {
 		t.Fatalf("media_streams details should contain ready=true, got %q", out[0].Data["media_streams"])
@@ -2063,6 +2596,271 @@ func TestHandleMessageSystemRuntimeStatusTracksMediaStreamLifecycle(t *testing.T
 	}
 	if out[0].Data["media_streams"] != "" {
 		t.Fatalf("media_streams post-stop = %q, want empty", out[0].Data["media_streams"])
+	}
+	if out[0].Data["recording_active_streams"] != "0" {
+		t.Fatalf("recording_active_streams post-stop = %q, want 0", out[0].Data["recording_active_streams"])
+	}
+	if out[0].Data["recording_stream_ids"] != "" {
+		t.Fatalf("recording_stream_ids post-stop = %q, want empty", out[0].Data["recording_stream_ids"])
+	}
+}
+
+func TestHandleMessageSystemRecordingEvents(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices: devices,
+		IO:      io.NewRouter(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	recorder, err := recording.NewDiskManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	handler.SetRecordingManager(recorder)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-2", DeviceName: "Hall Display"},
+	})
+
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "recording-events-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("intercom start error = %v", err)
+	}
+	_, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "recording-events-stop",
+			DeviceID:  "device-1",
+			Action:    CommandActionStop,
+			Kind:      "manual",
+			Intent:    "intercom",
+		},
+	})
+	if err != nil {
+		t.Fatalf("intercom stop error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-recording-events",
+			Kind:      "system",
+			Intent:    SystemIntentRecordingEvents,
+		},
+	})
+	if err != nil {
+		t.Fatalf("recording_events query error = %v", err)
+	}
+	if out[0].Notification != "System query: recording_events" {
+		t.Fatalf("notification = %q, want recording_events", out[0].Notification)
+	}
+	if len(out[0].Data) == 0 {
+		t.Fatalf("expected recording event rows")
+	}
+	foundStart := false
+	foundStop := false
+	for _, row := range out[0].Data {
+		if strings.Contains(row, "|start|") {
+			foundStart = true
+		}
+		if strings.Contains(row, "|stop|") {
+			foundStop = true
+		}
+	}
+	if !foundStart {
+		t.Fatalf("recording event rows missing start action: %+v", out[0].Data)
+	}
+	if !foundStop {
+		t.Fatalf("recording event rows missing stop action: %+v", out[0].Data)
+	}
+}
+
+func TestHandleMessageSystemListPlaybackArtifacts(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	recorder, err := recording.NewDiskManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	handler.SetRecordingManager(recorder)
+	if err := recorder.Start(context.Background(), recording.Stream{
+		StreamID:       "route:device-1|device-2|audio",
+		Kind:           "audio",
+		SourceDeviceID: "device-1",
+		TargetDeviceID: "device-2",
+	}); err != nil {
+		t.Fatalf("recorder.Start() error = %v", err)
+	}
+	if err := recorder.WriteDeviceAudio("device-1", []byte{0x01, 0x02}); err != nil {
+		t.Fatalf("recorder.WriteDeviceAudio() error = %v", err)
+	}
+	if err := recorder.Stop(context.Background(), "route:device-1|device-2|audio"); err != nil {
+		t.Fatalf("recorder.Stop() error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "sys-playback-artifacts",
+			Kind:      "system",
+			Intent:    SystemIntentListPlaybackFiles,
+		},
+	})
+	if err != nil {
+		t.Fatalf("list_playback_artifacts query error = %v", err)
+	}
+	if out[0].Notification != "System query: list_playback_artifacts" {
+		t.Fatalf("notification = %q, want list_playback_artifacts", out[0].Notification)
+	}
+	if len(out[0].Data) != 1 {
+		t.Fatalf("len(Data) = %d, want 1", len(out[0].Data))
+	}
+	row := out[0].Data["000"]
+	if !strings.Contains(row, "route:device-1|device-2|audio") {
+		t.Fatalf("row = %q, want stream id", row)
+	}
+	if !strings.Contains(row, "|audio|device-1|device-2|") {
+		t.Fatalf("row = %q, want kind/source/target columns", row)
+	}
+}
+
+func TestHandleMessageManualPlaybackMetadata(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	recorder, err := recording.NewDiskManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	handler.SetRecordingManager(recorder)
+	if err := recorder.Start(context.Background(), recording.Stream{
+		StreamID:       "route:device-a|device-b|audio",
+		Kind:           "audio",
+		SourceDeviceID: "device-a",
+		TargetDeviceID: "device-b",
+	}); err != nil {
+		t.Fatalf("recorder.Start() error = %v", err)
+	}
+	if err := recorder.WriteDeviceAudio("device-a", []byte{0xAA, 0xBB, 0xCC}); err != nil {
+		t.Fatalf("recorder.WriteDeviceAudio() error = %v", err)
+	}
+	if err := recorder.Stop(context.Background(), "route:device-a|device-b|audio"); err != nil {
+		t.Fatalf("recorder.Stop() error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "manual-playback-metadata",
+			DeviceID:  "device-a",
+			Kind:      "manual",
+			Intent:    ManualIntentPlaybackMetadata,
+			Arguments: map[string]string{
+				"artifact_id":      "route:device-a|device-b|audio",
+				"target_device_id": "hall-display",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual playback_metadata error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2 (command result + play audio)", len(out))
+	}
+	if out[0].Notification != "Playback metadata ready" {
+		t.Fatalf("notification = %q, want playback metadata ready", out[0].Notification)
+	}
+	if out[0].Data["artifact_id"] != "route:device-a|device-b|audio" {
+		t.Fatalf("artifact_id = %q, want route:device-a|device-b|audio", out[0].Data["artifact_id"])
+	}
+	if out[0].Data["target_device_id"] != "hall-display" {
+		t.Fatalf("target_device_id = %q, want hall-display", out[0].Data["target_device_id"])
+	}
+	if out[0].Data["size_bytes"] != "3" {
+		t.Fatalf("size_bytes = %q, want 3", out[0].Data["size_bytes"])
+	}
+	if out[0].CommandAck != "manual-playback-metadata" {
+		t.Fatalf("CommandAck = %q, want manual-playback-metadata", out[0].CommandAck)
+	}
+	if out[1].PlayAudio == nil {
+		t.Fatalf("expected PlayAudio response")
+	}
+	if out[1].PlayAudio.DeviceID != "hall-display" {
+		t.Fatalf("PlayAudio.DeviceID = %q, want hall-display", out[1].PlayAudio.DeviceID)
+	}
+	if out[1].PlayAudio.Format != "pcm16" {
+		t.Fatalf("PlayAudio.Format = %q, want pcm16", out[1].PlayAudio.Format)
+	}
+	if out[1].RelayToDeviceID != "hall-display" {
+		t.Fatalf("RelayToDeviceID = %q, want hall-display", out[1].RelayToDeviceID)
+	}
+	if string(out[1].PlayAudio.Audio) != string([]byte{0xAA, 0xBB, 0xCC}) {
+		t.Fatalf("PlayAudio.Audio = %v, want %v", out[1].PlayAudio.Audio, []byte{0xAA, 0xBB, 0xCC})
+	}
+}
+
+func TestHandleMessageManualPlaybackMetadataDefaultsTargetToCaller(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	recorder, err := recording.NewDiskManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewDiskManager() error = %v", err)
+	}
+	handler.SetRecordingManager(recorder)
+	if err := recorder.Start(context.Background(), recording.Stream{
+		StreamID:       "route:device-z|device-y|audio",
+		Kind:           "audio",
+		SourceDeviceID: "device-z",
+		TargetDeviceID: "device-y",
+	}); err != nil {
+		t.Fatalf("recorder.Start() error = %v", err)
+	}
+	if err := recorder.WriteDeviceAudio("device-z", []byte{0x01, 0x02, 0x03, 0x04}); err != nil {
+		t.Fatalf("recorder.WriteDeviceAudio() error = %v", err)
+	}
+	if err := recorder.Stop(context.Background(), "route:device-z|device-y|audio"); err != nil {
+		t.Fatalf("recorder.Stop() error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "manual-playback-default-target",
+			DeviceID:  "device-z",
+			Kind:      "manual",
+			Intent:    ManualIntentPlaybackMetadata,
+			Arguments: map[string]string{
+				"artifact_id": "route:device-z|device-y|audio",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual playback_metadata default target error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[1].PlayAudio == nil {
+		t.Fatalf("expected PlayAudio response")
+	}
+	if out[1].PlayAudio.DeviceID != "device-z" {
+		t.Fatalf("PlayAudio.DeviceID = %q, want device-z", out[1].PlayAudio.DeviceID)
+	}
+	if out[1].RelayToDeviceID != "" {
+		t.Fatalf("RelayToDeviceID = %q, want empty for local playback", out[1].RelayToDeviceID)
 	}
 }
 
@@ -2321,6 +3119,9 @@ func TestHandleMessageSystemHelp(t *testing.T) {
 	}
 	if !contains(out[0].Data["system_intents"], "recent_commands") {
 		t.Fatalf("system_help missing recent_commands intent: %+v", out[0].Data)
+	}
+	if !contains(out[0].Data["system_intents"], SystemIntentListPlaybackFiles) {
+		t.Fatalf("system_help missing list_playback_artifacts intent: %+v", out[0].Data)
 	}
 }
 
@@ -2933,6 +3734,128 @@ func TestHandleMessageRejectsMissingCommandDeviceID(t *testing.T) {
 	}
 }
 
+func TestHandleMessageManualBluetoothScanUsesPassthroughScenario(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	bridge := &testRuntimePassthroughBridge{}
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:     devices,
+		Broadcast:   ui.NewMemoryBroadcaster(),
+		Passthrough: bridge,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "ble-scan-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    ManualIntentBluetoothScan,
+			Arguments: map[string]string{
+				"window_ms": "5000",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual bluetooth_scan error = %v", err)
+	}
+	if len(out) == 0 || out[0].ScenarioStart != "bluetooth_passthrough" {
+		t.Fatalf("unexpected response: %+v", out)
+	}
+	if len(bridge.bluetooth) != 1 {
+		t.Fatalf("len(bluetooth commands) = %d, want 1", len(bridge.bluetooth))
+	}
+	if bridge.bluetooth[0].Action != "scan" {
+		t.Fatalf("bluetooth action = %q, want scan", bridge.bluetooth[0].Action)
+	}
+	if bridge.bluetooth[0].Parameters["window_ms"] != "5000" {
+		t.Fatalf("window_ms = %q, want 5000", bridge.bluetooth[0].Parameters["window_ms"])
+	}
+}
+
+func TestHandleMessageManualUSBClaimUsesPassthroughScenario(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	bridge := &testRuntimePassthroughBridge{}
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:     devices,
+		Broadcast:   ui.NewMemoryBroadcaster(),
+		Passthrough: bridge,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "usb-claim-1",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    ManualIntentUSBClaim,
+			Arguments: map[string]string{
+				"vendor_id":  "1a2b",
+				"product_id": "3c4d",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("manual usb_claim error = %v", err)
+	}
+	if len(out) == 0 || out[0].ScenarioStart != "usb_passthrough" {
+		t.Fatalf("unexpected response: %+v", out)
+	}
+	if len(bridge.usb) != 1 {
+		t.Fatalf("len(usb commands) = %d, want 1", len(bridge.usb))
+	}
+	if bridge.usb[0].Action != "claim" {
+		t.Fatalf("usb action = %q, want claim", bridge.usb[0].Action)
+	}
+	if bridge.usb[0].VendorID != "1a2b" || bridge.usb[0].ProductID != "3c4d" {
+		t.Fatalf("unexpected usb cmd: %+v", bridge.usb[0])
+	}
+}
+
+type testRuntimePassthroughBridge struct {
+	bluetooth []scenario.BluetoothCommand
+	usb       []scenario.USBCommand
+}
+
+func (t *testRuntimePassthroughBridge) DispatchBluetoothCommand(_ context.Context, cmd scenario.BluetoothCommand) error {
+	t.bluetooth = append(t.bluetooth, cmd)
+	return nil
+}
+
+func (t *testRuntimePassthroughBridge) DispatchUSBCommand(_ context.Context, cmd scenario.USBCommand) error {
+	t.usb = append(t.usb, cmd)
+	return nil
+}
+
 func contains(s, needle string) bool {
 	return strings.Contains(s, needle)
+}
+
+func findNodePropValue(node *ui.Descriptor, nodeID, prop string) string {
+	if node == nil {
+		return ""
+	}
+	if node.Props["id"] == nodeID {
+		return node.Props[prop]
+	}
+	for i := range node.Children {
+		child := &node.Children[i]
+		if got := findNodePropValue(child, nodeID, prop); got != "" {
+			return got
+		}
+	}
+	return ""
 }

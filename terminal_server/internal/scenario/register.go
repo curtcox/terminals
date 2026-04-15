@@ -43,7 +43,19 @@ func RegisterBuiltins(engine *Engine) {
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
+		Scenario: &BluetoothPassthroughScenario{},
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
+		Scenario: &USBPassthroughScenario{},
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
 		Scenario: &PASystemScenario{},
+		Priority: PriorityHigh,
+	})
+	engine.Register(Registration{
+		Scenario: &AnnouncementScenario{},
 		Priority: PriorityHigh,
 	})
 	engine.Register(Registration{

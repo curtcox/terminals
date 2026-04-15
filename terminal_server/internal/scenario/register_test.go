@@ -23,7 +23,10 @@ func TestRegisterBuiltinsIncludesMasterplanScenarios(t *testing.T) {
 		"multi_window",
 		"timer_reminder",
 		"terminal",
+		"bluetooth_passthrough",
+		"usb_passthrough",
 		"pa_system",
+		"announcement",
 		"red_alert",
 	}
 	for _, name := range want {

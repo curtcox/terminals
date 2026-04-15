@@ -8,6 +8,7 @@ import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/main.dart';
+import 'package:terminal_client/media/webrtc_engine.dart';
 
 void main() {
   testWidgets('app renders MaterialApp', (WidgetTester tester) async {
@@ -22,6 +23,7 @@ void main() {
     await tester.pumpWidget(
       TerminalClientApp(
         clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
         heartbeatInterval: const Duration(milliseconds: 40),
       ),
     );
@@ -43,6 +45,7 @@ void main() {
     await tester.pumpWidget(
       TerminalClientApp(
         clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
         heartbeatInterval: const Duration(seconds: 60),
         sensorTelemetryInterval: const Duration(milliseconds: 40),
       ),
@@ -74,6 +77,7 @@ void main() {
     await tester.pumpWidget(
       TerminalClientApp(
         clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
         reconnectDelayBase: const Duration(milliseconds: 30),
         reconnectDelayMaxSeconds: 1,
       ),
@@ -99,6 +103,7 @@ void main() {
       await tester.pumpWidget(
         TerminalClientApp(
           clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
           heartbeatInterval: const Duration(milliseconds: 40),
           reconnectDelayBase: const Duration(milliseconds: 30),
           reconnectDelayMaxSeconds: 1,
@@ -167,7 +172,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -205,7 +212,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -246,7 +255,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -291,7 +302,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -335,7 +348,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -390,7 +405,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -422,7 +439,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -449,7 +468,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -532,7 +553,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -589,7 +612,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -627,7 +652,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -675,7 +702,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -724,7 +753,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -797,7 +828,9 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final harness = _FakeClientHarness();
       await tester.pumpWidget(
-        TerminalClientApp(clientFactory: harness.createClient),
+        TerminalClientApp(
+            clientFactory: harness.createClient,
+            mediaEngineFactory: harness.createMediaEngine),
       );
       await tester.tap(find.text('Connect Stream'));
       await tester.pump();
@@ -897,13 +930,50 @@ void main() {
     },
   );
 
-  testWidgets('sends system status debug commands and renders diagnostics data',
+  testWidgets('handles play_audio responses and tracks playback status',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..playAudio = (iov1.PlayAudio()
+          ..requestId = 'playback-1'
+          ..deviceId = 'hall-display'
+          ..pcmData = <int>[1, 2, 3, 4, 5]),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('Control Stream: Play audio'), findsOneWidget);
+    expect(find.textContaining('Play audio msgs: 1'), findsOneWidget);
+    expect(find.textContaining('Last play bytes: 5'), findsOneWidget);
+    expect(
+        find.textContaining('Last play target: hall-display'), findsOneWidget);
+    expect(find.textContaining('Last play source: pcm_data'), findsOneWidget);
+    expect(
+      find.textContaining('Play audio: hall-display (pcm_data, 5 bytes)'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+      'sends system and playback debug commands and renders diagnostics data',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -962,6 +1032,86 @@ void main() {
     expect(
         find.textContaining('device_id=flutter-test-device'), findsOneWidget);
     expect(find.textContaining('sensor.unix_ms=1713000009999'), findsOneWidget);
+
+    await tester.tap(find.text('List Playback Artifacts'));
+    await tester.pump();
+    final playbackArtifactsRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_SYSTEM &&
+          request.command.intent == 'list_playback_artifacts',
+    );
+    final playbackArtifactsRequestID =
+        playbackArtifactsRequest.command.requestId;
+    expect(playbackArtifactsRequestID, isNotEmpty);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = playbackArtifactsRequestID
+          ..notification = 'System query: list_playback_artifacts'
+          ..data.addAll({
+            '000':
+                'route:device-a|device-b|audio|device-a|device-b|128|1713000011111|/tmp/audio-1.pcm',
+          })),
+    );
+    await tester.pump();
+    expect(find.textContaining('Diagnostics: list_playback_artifacts'),
+        findsOneWidget);
+    expect(
+      find.textContaining(
+          '000=route:device-a|device-b|audio|device-a|device-b|128|1713000011111|/tmp/audio-1.pcm'),
+      findsOneWidget,
+    );
+    expect(find.text('route:device-a'), findsOneWidget);
+
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == 'Playback Target Device ID',
+      ),
+      'kitchen-display',
+    );
+    await tester.pump();
+    await tester.tap(find.text('Playback Metadata'));
+    await tester.pump();
+
+    final playbackMetadataRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_MANUAL &&
+          request.command.intent == 'playback_metadata',
+    );
+    final playbackMetadataRequestID = playbackMetadataRequest.command.requestId;
+    expect(playbackMetadataRequestID, isNotEmpty);
+    expect(playbackMetadataRequest.command.deviceId, isNotEmpty);
+    expect(
+      playbackMetadataRequest.command.arguments['artifact_id'],
+      'route:device-a',
+    );
+    expect(
+      playbackMetadataRequest.command.arguments['target_device_id'],
+      'kitchen-display',
+    );
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = playbackMetadataRequestID
+          ..notification = 'Playback metadata ready'
+          ..data.addAll({
+            'artifact_id': 'route:device-a',
+            'target_device_id': 'kitchen-display',
+            'audio_path': '/tmp/audio-1.pcm',
+          })),
+    );
+    await tester.pump();
+    expect(
+        find.textContaining('Diagnostics: playback_metadata'), findsOneWidget);
+    expect(find.textContaining('artifact_id=route:device-a'), findsOneWidget);
+    expect(find.textContaining('target_device_id=kitchen-display'),
+        findsOneWidget);
   });
 }
 
@@ -970,6 +1120,7 @@ class _FakeClientHarness {
 
   final List<_FakeTerminalControlClient> createdClients =
       <_FakeTerminalControlClient>[];
+  final List<_FakeMediaEngine> createdMediaEngines = <_FakeMediaEngine>[];
   final bool failFirstConnectStream;
 
   _FakeTerminalControlClient get lastClient => createdClients.last;
@@ -986,6 +1137,76 @@ class _FakeClientHarness {
     createdClients.add(client);
     return client;
   }
+
+  ClientMediaEngine createMediaEngine({
+    required String localDeviceID,
+    required OutboundSignalCallback onSignal,
+  }) {
+    final engine = _FakeMediaEngine(
+      localDeviceID: localDeviceID,
+      onSignal: onSignal,
+    );
+    createdMediaEngines.add(engine);
+    return engine;
+  }
+}
+
+class _FakeMediaEngine implements ClientMediaEngine {
+  _FakeMediaEngine({
+    required this.localDeviceID,
+    required this.onSignal,
+  });
+
+  final String localDeviceID;
+  final OutboundSignalCallback onSignal;
+  final Set<String> _activeStreamIDs = <String>{};
+
+  @override
+  Future<void> startStream(iov1.StartStream start) async {
+    if (start.streamId.isEmpty || _activeStreamIDs.contains(start.streamId)) {
+      return;
+    }
+    _activeStreamIDs.add(start.streamId);
+    onSignal(
+      WebRTCSignal()
+        ..streamId = start.streamId
+        ..signalType = 'offer'
+        ..payload = '{"sdp":"fake-offer-for-${start.streamId}"}',
+    );
+    onSignal(
+      WebRTCSignal()
+        ..streamId = start.streamId
+        ..signalType = 'candidate'
+        ..payload = '{"candidate":"fake-local-candidate-1"}',
+    );
+  }
+
+  @override
+  Future<void> stopStream(String streamID) async {
+    _activeStreamIDs.remove(streamID);
+  }
+
+  @override
+  Future<void> handleSignal(WebRTCSignal signal) async {
+    if (signal.signalType.trim().toLowerCase() != 'offer') {
+      return;
+    }
+    onSignal(
+      WebRTCSignal()
+        ..streamId = signal.streamId
+        ..signalType = 'answer'
+        ..payload = '{"sdp":"fake-answer-for-${signal.streamId}"}',
+    );
+    onSignal(
+      WebRTCSignal()
+        ..streamId = signal.streamId
+        ..signalType = 'candidate'
+        ..payload = '{"candidate":"fake-local-candidate-2"}',
+    );
+  }
+
+  @override
+  Future<void> dispose() async {}
 }
 
 class _FakeTerminalControlClient implements TerminalControlClient {

@@ -94,6 +94,32 @@ func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
 	}
 }
 
+func TestGeneratedProtoAdapterToInternalCommandArguments(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Command{
+			Command: &controlv1.CommandRequest{
+				RequestId: "cmd-args-1",
+				DeviceId:  "device-1",
+				Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
+				Intent:    "photo frame",
+				Arguments: map[string]string{
+					"device_ids": "device-1,device-2",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(command arguments) error = %v", err)
+	}
+	if msg.Command == nil {
+		t.Fatalf("expected command message")
+	}
+	if got := msg.Command.Arguments["device_ids"]; got != "device-1,device-2" {
+		t.Fatalf("device_ids argument = %q, want device-1,device-2", got)
+	}
+}
+
 func TestGeneratedProtoAdapterToInternalSensorAndStreamReady(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 
@@ -386,5 +412,33 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	}
 	if got := resp.GetTransitionUi().GetDurationMs(); got != 250 {
 		t.Fatalf("transition_ui duration_ms = %d, want 250", got)
+	}
+}
+
+func TestGeneratedProtoAdapterFromInternalRegisterAckMetadata(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	envelope, err := adapter.FromInternal(ServerMessage{
+		RegisterAck: &RegisterResponse{
+			ServerID: "srv-1",
+			Message:  "registered",
+			Metadata: map[string]string{
+				"photo_frame_asset_base_url": "http://home.local:50052/photo-frame",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(register ack) error = %v", err)
+	}
+
+	resp, ok := envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("response envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	ack := resp.GetRegisterAck()
+	if ack == nil {
+		t.Fatalf("expected register_ack payload")
+	}
+	if got := ack.GetMetadata()["photo_frame_asset_base_url"]; got != "http://home.local:50052/photo-frame" {
+		t.Fatalf("register_ack metadata photo_frame_asset_base_url = %q, want configured value", got)
 	}
 }

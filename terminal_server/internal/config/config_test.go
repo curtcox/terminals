@@ -7,6 +7,11 @@ import (
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_GRPC_HOST", "")
 	t.Setenv("TERMINALS_GRPC_PORT", "")
+	t.Setenv("TERMINALS_ADMIN_HTTP_HOST", "")
+	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL", "")
 	t.Setenv("TERMINALS_MDNS_SERVICE", "")
 	t.Setenv("TERMINALS_MDNS_NAME", "")
 	t.Setenv("TERMINALS_VERSION", "")
@@ -14,6 +19,8 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS", "")
 	t.Setenv("TERMINALS_LIVENESS_RECONCILE_INTERVAL_SECONDS", "")
 	t.Setenv("TERMINALS_DUE_TIMER_PROCESS_INTERVAL_SECONDS", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "")
+	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -24,6 +31,30 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.GRPCPort != 50051 {
 		t.Fatalf("GRPCPort = %d", cfg.GRPCPort)
+	}
+	if cfg.AdminHTTPHost != "0.0.0.0" {
+		t.Fatalf("AdminHTTPHost = %q, want 0.0.0.0", cfg.AdminHTTPHost)
+	}
+	if cfg.AdminHTTPPort != 50053 {
+		t.Fatalf("AdminHTTPPort = %d, want 50053", cfg.AdminHTTPPort)
+	}
+	if cfg.PhotoFrameHTTPHost != "0.0.0.0" {
+		t.Fatalf("PhotoFrameHTTPHost = %q, want 0.0.0.0", cfg.PhotoFrameHTTPHost)
+	}
+	if cfg.PhotoFrameHTTPPort != 50052 {
+		t.Fatalf("PhotoFrameHTTPPort = %d, want 50052", cfg.PhotoFrameHTTPPort)
+	}
+	if cfg.PhotoFramePublicBaseURL != "" {
+		t.Fatalf("PhotoFramePublicBaseURL = %q, want empty", cfg.PhotoFramePublicBaseURL)
+	}
+	if cfg.RecordingDir != "recordings" {
+		t.Fatalf("RecordingDir = %q, want recordings", cfg.RecordingDir)
+	}
+	if cfg.PhotoFrameDir != "" {
+		t.Fatalf("PhotoFrameDir = %q, want empty", cfg.PhotoFrameDir)
+	}
+	if cfg.PhotoFrameIntervalSeconds != 12 {
+		t.Fatalf("PhotoFrameIntervalSeconds = %d, want 12", cfg.PhotoFrameIntervalSeconds)
 	}
 	if cfg.HeartbeatTimeoutSeconds != 120 {
 		t.Fatalf("HeartbeatTimeoutSeconds = %d", cfg.HeartbeatTimeoutSeconds)
@@ -53,6 +84,54 @@ func TestLoadWakeWordPrefixesFromEnv(t *testing.T) {
 		cfg.WakeWordPrefixes[1] != "computer" ||
 		cfg.WakeWordPrefixes[2] != "hey house" {
 		t.Fatalf("WakeWordPrefixes = %+v, want [jarvis computer hey house]", cfg.WakeWordPrefixes)
+	}
+}
+
+func TestLoadRecordingDirFromEnv(t *testing.T) {
+	t.Setenv("TERMINALS_RECORDING_DIR", "/tmp/terminals-recordings")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.RecordingDir != "/tmp/terminals-recordings" {
+		t.Fatalf("RecordingDir = %q, want /tmp/terminals-recordings", cfg.RecordingDir)
+	}
+}
+
+func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
+	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "/tmp/terminals-photos")
+	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "30")
+	t.Setenv("TERMINALS_ADMIN_HTTP_HOST", "127.0.0.1")
+	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "7000")
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "127.0.0.1")
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "7001")
+	t.Setenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL", "https://photos.example.test/slides")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.PhotoFrameDir != "/tmp/terminals-photos" {
+		t.Fatalf("PhotoFrameDir = %q, want /tmp/terminals-photos", cfg.PhotoFrameDir)
+	}
+	if cfg.AdminHTTPHost != "127.0.0.1" {
+		t.Fatalf("AdminHTTPHost = %q, want 127.0.0.1", cfg.AdminHTTPHost)
+	}
+	if cfg.AdminHTTPPort != 7000 {
+		t.Fatalf("AdminHTTPPort = %d, want 7000", cfg.AdminHTTPPort)
+	}
+	if cfg.PhotoFrameIntervalSeconds != 30 {
+		t.Fatalf("PhotoFrameIntervalSeconds = %d, want 30", cfg.PhotoFrameIntervalSeconds)
+	}
+	if cfg.PhotoFrameHTTPHost != "127.0.0.1" {
+		t.Fatalf("PhotoFrameHTTPHost = %q, want 127.0.0.1", cfg.PhotoFrameHTTPHost)
+	}
+	if cfg.PhotoFrameHTTPPort != 7001 {
+		t.Fatalf("PhotoFrameHTTPPort = %d, want 7001", cfg.PhotoFrameHTTPPort)
+	}
+	if cfg.PhotoFramePublicBaseURL != "https://photos.example.test/slides" {
+		t.Fatalf("PhotoFramePublicBaseURL = %q, want configured URL", cfg.PhotoFramePublicBaseURL)
 	}
 }
 
@@ -87,6 +166,27 @@ func TestLoadInvalidInterval(t *testing.T) {
 	t.Setenv("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS", "abc")
 	if _, err := Load(); err == nil {
 		t.Fatalf("Load() expected error for invalid interval")
+	}
+}
+
+func TestLoadInvalidPhotoFrameInterval(t *testing.T) {
+	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "nope")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid photo frame interval")
+	}
+}
+
+func TestLoadInvalidPhotoFrameHTTPPort(t *testing.T) {
+	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "wat")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid photo frame HTTP port")
+	}
+}
+
+func TestLoadInvalidAdminHTTPPort(t *testing.T) {
+	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "wat")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid admin HTTP port")
 	}
 }
 

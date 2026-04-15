@@ -34,6 +34,7 @@ enum ConnectRequest_Payload {
   command,
   heartbeat,
   webrtcSignal,
+  voiceAudio,
   notSet
 }
 
@@ -47,6 +48,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     CommandRequest? command,
     Heartbeat? heartbeat,
     WebRTCSignal? webrtcSignal,
+    VoiceAudio? voiceAudio,
   }) {
     final result = create();
     if (register != null) result.register = register;
@@ -57,6 +59,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     if (command != null) result.command = command;
     if (heartbeat != null) result.heartbeat = heartbeat;
     if (webrtcSignal != null) result.webrtcSignal = webrtcSignal;
+    if (voiceAudio != null) result.voiceAudio = voiceAudio;
     return result;
   }
 
@@ -79,6 +82,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     6: ConnectRequest_Payload.command,
     7: ConnectRequest_Payload.heartbeat,
     8: ConnectRequest_Payload.webrtcSignal,
+    9: ConnectRequest_Payload.voiceAudio,
     0: ConnectRequest_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -86,7 +90,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'terminals.control.v1'),
       createEmptyInstance: create)
-    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8])
+    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8, 9])
     ..aOM<RegisterDevice>(1, _omitFieldNames ? '' : 'register',
         subBuilder: RegisterDevice.create)
     ..aOM<CapabilityUpdate>(2, _omitFieldNames ? '' : 'capability',
@@ -103,6 +107,8 @@ class ConnectRequest extends $pb.GeneratedMessage {
         subBuilder: Heartbeat.create)
     ..aOM<WebRTCSignal>(8, _omitFieldNames ? '' : 'webrtcSignal',
         subBuilder: WebRTCSignal.create)
+    ..aOM<VoiceAudio>(9, _omitFieldNames ? '' : 'voiceAudio',
+        subBuilder: VoiceAudio.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -132,6 +138,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   @$pb.TagNumber(7)
   @$pb.TagNumber(8)
+  @$pb.TagNumber(9)
   ConnectRequest_Payload whichPayload() =>
       _ConnectRequest_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
@@ -142,6 +149,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   @$pb.TagNumber(7)
   @$pb.TagNumber(8)
+  @$pb.TagNumber(9)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -231,6 +239,108 @@ class ConnectRequest extends $pb.GeneratedMessage {
   void clearWebrtcSignal() => $_clearField(8);
   @$pb.TagNumber(8)
   WebRTCSignal ensureWebrtcSignal() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  VoiceAudio get voiceAudio => $_getN(8);
+  @$pb.TagNumber(9)
+  set voiceAudio(VoiceAudio value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasVoiceAudio() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearVoiceAudio() => $_clearField(9);
+  @$pb.TagNumber(9)
+  VoiceAudio ensureVoiceAudio() => $_ensure(8);
+}
+
+class VoiceAudio extends $pb.GeneratedMessage {
+  factory VoiceAudio({
+    $core.String? deviceId,
+    $core.List<$core.int>? audio,
+    $core.int? sampleRate,
+    $core.bool? isFinal,
+  }) {
+    final result = create();
+    if (deviceId != null) result.deviceId = deviceId;
+    if (audio != null) result.audio = audio;
+    if (sampleRate != null) result.sampleRate = sampleRate;
+    if (isFinal != null) result.isFinal = isFinal;
+    return result;
+  }
+
+  VoiceAudio._();
+
+  factory VoiceAudio.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory VoiceAudio.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'VoiceAudio',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'deviceId')
+    ..a<$core.List<$core.int>>(
+        2, _omitFieldNames ? '' : 'audio', $pb.PbFieldType.OY)
+    ..aI(3, _omitFieldNames ? '' : 'sampleRate')
+    ..aOB(4, _omitFieldNames ? '' : 'isFinal')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VoiceAudio clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VoiceAudio copyWith(void Function(VoiceAudio) updates) =>
+      super.copyWith((message) => updates(message as VoiceAudio)) as VoiceAudio;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VoiceAudio create() => VoiceAudio._();
+  @$core.override
+  VoiceAudio createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static VoiceAudio getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<VoiceAudio>(create);
+  static VoiceAudio? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get deviceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set deviceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDeviceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeviceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<$core.int> get audio => $_getN(1);
+  @$pb.TagNumber(2)
+  set audio($core.List<$core.int> value) => $_setBytes(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAudio() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAudio() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get sampleRate => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set sampleRate($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSampleRate() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSampleRate() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get isFinal => $_getBF(3);
+  @$pb.TagNumber(4)
+  set isFinal($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasIsFinal() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIsFinal() => $_clearField(4);
 }
 
 enum ConnectResponse_Payload {
@@ -617,10 +727,12 @@ class RegisterAck extends $pb.GeneratedMessage {
   factory RegisterAck({
     $core.String? serverId,
     $core.String? message,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
   }) {
     final result = create();
     if (serverId != null) result.serverId = serverId;
     if (message != null) result.message = message;
+    if (metadata != null) result.metadata.addEntries(metadata);
     return result;
   }
 
@@ -640,6 +752,11 @@ class RegisterAck extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'serverId')
     ..aOS(2, _omitFieldNames ? '' : 'message')
+    ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'metadata',
+        entryClassName: 'RegisterAck.MetadataEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('terminals.control.v1'))
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -678,6 +795,9 @@ class RegisterAck extends $pb.GeneratedMessage {
   $core.bool hasMessage() => $_has(1);
   @$pb.TagNumber(2)
   void clearMessage() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(2);
 }
 
 class CapabilityUpdate extends $pb.GeneratedMessage {
@@ -801,6 +921,7 @@ class CommandRequest extends $pb.GeneratedMessage {
     CommandKind? kind,
     $core.String? text,
     $core.String? intent,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? arguments,
   }) {
     final result = create();
     if (requestId != null) result.requestId = requestId;
@@ -809,6 +930,7 @@ class CommandRequest extends $pb.GeneratedMessage {
     if (kind != null) result.kind = kind;
     if (text != null) result.text = text;
     if (intent != null) result.intent = intent;
+    if (arguments != null) result.arguments.addEntries(arguments);
     return result;
   }
 
@@ -834,6 +956,11 @@ class CommandRequest extends $pb.GeneratedMessage {
         enumValues: CommandKind.values)
     ..aOS(5, _omitFieldNames ? '' : 'text')
     ..aOS(6, _omitFieldNames ? '' : 'intent')
+    ..m<$core.String, $core.String>(7, _omitFieldNames ? '' : 'arguments',
+        entryClassName: 'CommandRequest.ArgumentsEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('terminals.control.v1'))
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -908,6 +1035,9 @@ class CommandRequest extends $pb.GeneratedMessage {
   $core.bool hasIntent() => $_has(5);
   @$pb.TagNumber(6)
   void clearIntent() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $pb.PbMap<$core.String, $core.String> get arguments => $_getMap(6);
 }
 
 class CommandResult extends $pb.GeneratedMessage {

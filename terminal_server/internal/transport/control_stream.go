@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
@@ -105,8 +107,20 @@ func enterTransitionForScenario(name string) (UITransition, bool) {
 	switch strings.TrimSpace(name) {
 	case "terminal":
 		return UITransition{Transition: "terminal_enter", DurationMS: 220}, true
+	case "photo_frame":
+		return UITransition{Transition: "photo_frame_enter", DurationMS: 220}, true
 	default:
 		return UITransition{}, false
+	}
+}
+
+func defaultPhotoFrameSlides() []string {
+	return []string{
+		"https://picsum.photos/id/1015/1920/1080",
+		"https://picsum.photos/id/1016/1920/1080",
+		"https://picsum.photos/id/1025/1920/1080",
+		"https://picsum.photos/id/1035/1920/1080",
+		"https://picsum.photos/id/1043/1920/1080",
 	}
 }
 
@@ -180,6 +194,7 @@ type CommandRequest struct {
 	Kind      string // "voice" or "manual"
 	Text      string // voice transcript
 	Intent    string // explicit scenario intent
+	Arguments map[string]string
 }
 
 // VoiceAudioRequest carries a chunk of raw microphone audio from a device.
@@ -255,6 +270,25 @@ type DeviceAudioPublisher interface {
 	Publish(deviceID string, chunk []byte)
 }
 
+// WebRTCSignalEngine handles server-managed WebRTC signaling per stream/device.
+type WebRTCSignalEngine interface {
+	HandleSignal(ctx context.Context, req WebRTCSignalEngineRequest) ([]WebRTCSignalEngineResponse, error)
+	RemoveStream(streamID string)
+}
+
+// WebRTCSignalEngineRequest is input to the server-side signaling engine.
+type WebRTCSignalEngineRequest struct {
+	StreamID string
+	DeviceID string
+	Signal   WebRTCSignalRequest
+}
+
+// WebRTCSignalEngineResponse is a server-generated outbound signal.
+type WebRTCSignalEngineResponse struct {
+	TargetDeviceID string
+	Signal         WebRTCSignalResponse
+}
+
 // StreamHandler processes control stream messages.
 type StreamHandler struct {
 	control     *ControlService
@@ -278,12 +312,18 @@ type StreamHandler struct {
 	terminalUIInterval     time.Duration
 	lastSetUIByDevice      map[string]ui.Descriptor
 	multiWindowResume      map[string]multiWindowResumeState
+	photoFrameSlides       []string
+	photoFrameIndexByDev   map[string]int
+	photoFrameLastByDev    map[string]time.Time
+	photoFrameInterval     time.Duration
 
 	mediaStreams      map[string]mediaStreamState
 	sensorsByDevice   map[string]sensorSnapshot
 	voiceAudioBuffers map[string][]byte
 
 	deviceAudio DeviceAudioPublisher
+	recording   recording.Manager
+	webrtc      WebRTCSignalEngine
 }
 
 type mediaStreamState struct {
@@ -310,6 +350,7 @@ const (
 	defaultTerminalReadDeadline = 180 * time.Millisecond
 	defaultTerminalReadInterval = 10 * time.Millisecond
 	defaultTerminalUIInterval   = 800 * time.Millisecond
+	defaultPhotoFrameInterval   = 12 * time.Second
 )
 
 // CommandEvent is a bounded audit record of command handling.
@@ -343,9 +384,14 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalUIInterval:     defaultTerminalUIInterval,
 		lastSetUIByDevice:      map[string]ui.Descriptor{},
 		multiWindowResume:      map[string]multiWindowResumeState{},
+		photoFrameSlides:       defaultPhotoFrameSlides(),
+		photoFrameIndexByDev:   map[string]int{},
+		photoFrameLastByDev:    map[string]time.Time{},
+		photoFrameInterval:     defaultPhotoFrameInterval,
 		mediaStreams:           map[string]mediaStreamState{},
 		sensorsByDevice:        map[string]sensorSnapshot{},
 		voiceAudioBuffers:      map[string][]byte{},
+		recording:              recording.NoopManager{},
 	}
 }
 
@@ -380,9 +426,47 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalUIInterval:     defaultTerminalUIInterval,
 		lastSetUIByDevice:      map[string]ui.Descriptor{},
 		multiWindowResume:      map[string]multiWindowResumeState{},
+		photoFrameSlides:       defaultPhotoFrameSlides(),
+		photoFrameIndexByDev:   map[string]int{},
+		photoFrameLastByDev:    map[string]time.Time{},
+		photoFrameInterval:     defaultPhotoFrameInterval,
 		mediaStreams:           map[string]mediaStreamState{},
 		sensorsByDevice:        map[string]sensorSnapshot{},
 		voiceAudioBuffers:      map[string][]byte{},
+		recording:              recording.NoopManager{},
+	}
+}
+
+// SetRecordingManager wires stream recording lifecycle hooks used when routes
+// start and stop. Passing nil restores the no-op manager.
+func (h *StreamHandler) SetRecordingManager(mgr recording.Manager) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if mgr == nil {
+		h.recording = recording.NoopManager{}
+		return
+	}
+	h.recording = mgr
+}
+
+// SetWebRTCSignalEngine wires a server-side signaling engine used for streams
+// marked as server-managed. Passing nil disables server-managed signaling.
+func (h *StreamHandler) SetWebRTCSignalEngine(engine WebRTCSignalEngine) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.webrtc = engine
+}
+
+// SetPhotoFrameSettings overrides photo-frame slide URLs and rotation
+// interval. Empty slide input preserves existing/default slides.
+func (h *StreamHandler) SetPhotoFrameSettings(slides []string, interval time.Duration) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(slides) > 0 {
+		h.photoFrameSlides = append([]string(nil), slides...)
+	}
+	if interval > 0 {
+		h.photoFrameInterval = interval
 	}
 }
 
@@ -417,26 +501,52 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
+		out := make([]ServerMessage, 0, 2)
 		update, pollErr := h.pollTerminalOutput(msg.Heartbeat.DeviceID, false)
 		if pollErr != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(pollErr), Error: pollErr.Error()}}, pollErr
 		}
 		if update != nil {
-			return []ServerMessage{*update}, nil
+			out = append(out, *update)
+		}
+		if photoRotate := h.photoFrameHeartbeatUpdate(msg.Heartbeat.DeviceID); photoRotate != nil {
+			out = append(out, *photoRotate)
+		}
+		if len(out) > 0 {
+			return out, nil
 		}
 		return nil, nil
 	case msg.Sensor != nil:
 		h.metrics.sensorReceived.Add(1)
+		beforeBroadcastEvents := h.broadcastEventCount()
 		h.recordSensorData(msg.Sensor)
-		return nil, nil
+		if h.runtime != nil {
+			values := map[string]float64{}
+			for key, value := range msg.Sensor.Values {
+				values[key] = value
+			}
+			if err := h.runtime.ProcessSensorReading(ctx, scenario.SensorReading{
+				DeviceID: strings.TrimSpace(msg.Sensor.DeviceID),
+				UnixMS:   msg.Sensor.UnixMS,
+				Values:   values,
+			}); err != nil {
+				h.metrics.protocolErrors.Add(1)
+				return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
+			}
+		}
+		out := h.broadcastNotificationsSince(beforeBroadcastEvents, msg.Sensor.DeviceID, true)
+		if len(out) == 0 {
+			return nil, nil
+		}
+		return out, nil
 	case msg.StreamReady != nil:
 		h.metrics.streamReadyReceived.Add(1)
 		h.markStreamReady(msg.StreamReady.StreamID)
 		return nil, nil
 	case msg.WebRTCSignal != nil:
 		h.metrics.webrtcSignalReceived.Add(1)
-		return h.relayWebRTCSignal(msg.WebRTCSignal, msg.SessionDeviceID), nil
+		return h.handleWebRTCSignal(ctx, msg.WebRTCSignal, msg.SessionDeviceID), nil
 	case msg.VoiceAudio != nil:
 		h.metrics.voiceAudioReceived.Add(1)
 		out, err := h.handleVoiceAudio(ctx, msg.VoiceAudio)
@@ -570,6 +680,14 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 	if commandResult.ScenarioStart == "" && commandResult.ScenarioStop == "" {
 		return nil
 	}
+	return h.broadcastNotificationsSince(beforeCount, cmd.DeviceID, false)
+}
+
+func (h *StreamHandler) broadcastNotificationsSince(
+	beforeCount int,
+	sessionDeviceID string,
+	includeSession bool,
+) []ServerMessage {
 	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.Broadcast == nil {
 		return nil
 	}
@@ -591,8 +709,8 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 		return nil
 	}
 
+	trimmedSessionDeviceID := strings.TrimSpace(sessionDeviceID)
 	out := make([]ServerMessage, 0, len(newEvents))
-	sessionDeviceID := strings.TrimSpace(cmd.DeviceID)
 	for _, event := range newEvents {
 		if len(event.DeviceIDs) == 0 {
 			continue
@@ -602,21 +720,28 @@ func (h *StreamHandler) broadcastNotificationsForCommand(
 			if targetDeviceID == "" {
 				continue
 			}
-			if targetDeviceID == sessionDeviceID {
+			if targetDeviceID == trimmedSessionDeviceID && !includeSession {
 				continue
 			}
-			out = append(out, ServerMessage{
-				Notification:    event.Message,
-				RelayToDeviceID: targetDeviceID,
-			})
+			msg := ServerMessage{
+				Notification: event.Message,
+			}
+			if targetDeviceID != trimmedSessionDeviceID {
+				msg.RelayToDeviceID = targetDeviceID
+			}
+			out = append(out, msg)
+
 			if strings.HasPrefix(event.Message, "PA from ") {
-				out = append(out, ServerMessage{
+				overlayMsg := ServerMessage{
 					UpdateUI: &UIUpdate{
 						ComponentID: ui.GlobalOverlayComponentID,
 						Node:        ui.PAReceiverOverlayPatch(event.Message),
 					},
-					RelayToDeviceID: targetDeviceID,
-				})
+				}
+				if targetDeviceID != trimmedSessionDeviceID {
+					overlayMsg.RelayToDeviceID = targetDeviceID
+				}
+				out = append(out, overlayMsg)
 			}
 		}
 	}
@@ -756,6 +881,10 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		responses = append(responses, refresh)
 		return responses
 	}
+	if playback, ok := h.commandPlaybackDispatch(cmd, commandResult); ok {
+		responses = append(responses, playback)
+		return responses
+	}
 	if commandResult.ScenarioStop == "terminal" {
 		h.terminateTerminalForDevice(cmd.DeviceID)
 		responses = append(responses, ServerMessage{
@@ -764,6 +893,37 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 				DurationMS: 220,
 			},
 		})
+		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "terminal"); len(restored) > 0 {
+			responses = append(responses, restored...)
+		}
+		return responses
+	}
+	if commandResult.ScenarioStop == "photo_frame" {
+		for _, deviceID := range h.commandTargetDeviceIDs(cmd) {
+			h.clearPhotoFrameState(deviceID)
+		}
+		responses = append(responses, ServerMessage{
+			TransitionUI: &UITransition{
+				Transition: "photo_frame_exit",
+				DurationMS: 220,
+			},
+		})
+		for _, targetDeviceID := range h.commandTargetDeviceIDs(cmd) {
+			targetDeviceID = strings.TrimSpace(targetDeviceID)
+			if targetDeviceID == "" || targetDeviceID == strings.TrimSpace(cmd.DeviceID) {
+				continue
+			}
+			responses = append(responses, ServerMessage{
+				TransitionUI: &UITransition{
+					Transition: "photo_frame_exit",
+					DurationMS: 220,
+				},
+				RelayToDeviceID: targetDeviceID,
+			})
+		}
+		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "photo_frame"); len(restored) > 0 {
+			responses = append(responses, restored...)
+		}
 		return responses
 	}
 	if commandResult.ScenarioStop == "internal_video_call" {
@@ -773,6 +933,9 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 				DurationMS: 220,
 			},
 		})
+		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "internal_video_call"); len(restored) > 0 {
+			responses = append(responses, restored...)
+		}
 		return responses
 	}
 	if commandResult.ScenarioStop == "multi_window" {
@@ -791,6 +954,35 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		multiWindowUI := ui.MultiWindowView(cmd.DeviceID, peerIDs, focusedPeerID)
 		responses = append(responses, ServerMessage{SetUI: &multiWindowUI})
 	}
+	if commandResult.ScenarioStart == "photo_frame" {
+		photoFrameUI := h.photoFrameSetUI(cmd.DeviceID, true)
+		responses = append(responses, ServerMessage{SetUI: &photoFrameUI})
+		responses = append(responses, ServerMessage{
+			TransitionUI: &UITransition{
+				Transition: "photo_frame_enter",
+				DurationMS: 220,
+			},
+		})
+		for _, targetDeviceID := range h.commandTargetDeviceIDs(cmd) {
+			targetDeviceID = strings.TrimSpace(targetDeviceID)
+			if targetDeviceID == "" || targetDeviceID == strings.TrimSpace(cmd.DeviceID) {
+				continue
+			}
+			peerUI := h.photoFrameSetUI(targetDeviceID, true)
+			responses = append(responses, ServerMessage{
+				SetUI:           &peerUI,
+				RelayToDeviceID: targetDeviceID,
+			})
+			responses = append(responses, ServerMessage{
+				TransitionUI: &UITransition{
+					Transition: "photo_frame_enter",
+					DurationMS: 220,
+				},
+				RelayToDeviceID: targetDeviceID,
+			})
+		}
+		return responses
+	}
 	if commandResult.ScenarioStart == "internal_video_call" {
 		if peerID, ok := h.internalVideoCallPeer(cmd.DeviceID); ok {
 			internalVideoCallUI := ui.InternalVideoCallView(cmd.DeviceID, peerID)
@@ -805,6 +997,11 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		return responses
 	}
 	if cmd.Action != "" && cmd.Action != CommandActionStart {
+		if commandResult.ScenarioStop != "" {
+			if restored := h.resumedScenarioUIForTargets(ctx, cmd, commandResult.ScenarioStop); len(restored) > 0 {
+				responses = append(responses, restored...)
+			}
+		}
 		return responses
 	}
 	if commandResult.ScenarioStart != "terminal" {
@@ -827,6 +1024,51 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		},
 	})
 	return responses
+}
+
+func (h *StreamHandler) commandPlaybackDispatch(cmd *CommandRequest, commandResult ServerMessage) (ServerMessage, bool) {
+	if cmd == nil {
+		return ServerMessage{}, false
+	}
+	kind := strings.TrimSpace(cmd.Kind)
+	if kind == "" {
+		kind = CommandKindManual
+	}
+	if kind != CommandKindManual {
+		return ServerMessage{}, false
+	}
+	if defaultAction(cmd.Action) != CommandActionStart {
+		return ServerMessage{}, false
+	}
+	if strings.TrimSpace(cmd.Intent) != ManualIntentPlaybackMetadata {
+		return ServerMessage{}, false
+	}
+	audioPath := strings.TrimSpace(commandResult.Data["audio_path"])
+	targetDeviceID := strings.TrimSpace(commandResult.Data["target_device_id"])
+	if audioPath == "" || targetDeviceID == "" {
+		return ServerMessage{}, false
+	}
+	audio, err := os.ReadFile(audioPath)
+	if err != nil || len(audio) == 0 {
+		return ServerMessage{}, false
+	}
+
+	format := strings.TrimSpace(commandResult.Data["format"])
+	if format == "" {
+		format = "pcm16"
+	}
+	playAudio := ServerMessage{
+		PlayAudio: &PlayAudioResponse{
+			RequestID: cmd.RequestID,
+			DeviceID:  targetDeviceID,
+			Audio:     audio,
+			Format:    format,
+		},
+	}
+	if targetDeviceID != strings.TrimSpace(cmd.DeviceID) {
+		playAudio.RelayToDeviceID = targetDeviceID
+	}
+	return playAudio, true
 }
 
 func (h *StreamHandler) routeUpdatesForCommand(
@@ -867,7 +1109,8 @@ func (h *StreamHandler) routeUpdatesForCommand(
 					SourceDeviceID: route.SourceID,
 					TargetDeviceID: route.TargetID,
 					Metadata: map[string]string{
-						"origin": "route_delta",
+						"origin":      "route_delta",
+						"webrtc_mode": "server_managed",
 					},
 				},
 			}
@@ -878,7 +1121,8 @@ func (h *StreamHandler) routeUpdatesForCommand(
 				SourceDeviceID: route.SourceID,
 				TargetDeviceID: route.TargetID,
 				Metadata: map[string]string{
-					"origin": "route_delta",
+					"origin":      "route_delta",
+					"webrtc_mode": "server_managed",
 				},
 			})
 			routeMsg := ServerMessage{
@@ -921,6 +1165,197 @@ func (h *StreamHandler) routeUpdatesForCommand(
 		}
 	}
 	return out
+}
+
+func (h *StreamHandler) resumedScenarioUI(ctx context.Context, deviceID, stoppedScenario string) []ServerMessage {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" || h.runtime == nil || h.runtime.Engine == nil {
+		return nil
+	}
+	resumedName, active := h.runtime.Engine.Active(deviceID)
+	if !active || resumedName == "" || resumedName == strings.TrimSpace(stoppedScenario) {
+		return nil
+	}
+
+	switch resumedName {
+	case "photo_frame":
+		view := h.photoFrameSetUI(deviceID, false)
+		return []ServerMessage{
+			{SetUI: &view},
+			{TransitionUI: &UITransition{Transition: "photo_frame_enter", DurationMS: 220}},
+		}
+	case "terminal":
+		output, err := h.ensureTerminalSession(ctx, deviceID)
+		if err != nil {
+			return []ServerMessage{{Notification: "Terminal session failed: " + err.Error()}}
+		}
+		view := ui.TerminalViewWithOutput(deviceID, output)
+		return []ServerMessage{
+			{SetUI: &view},
+			{TransitionUI: &UITransition{Transition: "terminal_enter", DurationMS: 220}},
+		}
+	default:
+		return nil
+	}
+}
+
+func (h *StreamHandler) resumedScenarioUIForTargets(
+	ctx context.Context,
+	cmd *CommandRequest,
+	stoppedScenario string,
+) []ServerMessage {
+	if cmd == nil {
+		return nil
+	}
+	targets := h.commandTargetDeviceIDs(cmd)
+	if len(targets) == 0 {
+		return h.resumedScenarioUI(ctx, cmd.DeviceID, stoppedScenario)
+	}
+	sourceDeviceID := strings.TrimSpace(cmd.DeviceID)
+	out := make([]ServerMessage, 0, len(targets)*2)
+	seen := map[string]struct{}{}
+	for _, targetDeviceID := range targets {
+		targetDeviceID = strings.TrimSpace(targetDeviceID)
+		if targetDeviceID == "" {
+			continue
+		}
+		if _, exists := seen[targetDeviceID]; exists {
+			continue
+		}
+		seen[targetDeviceID] = struct{}{}
+		resumed := h.resumedScenarioUI(ctx, targetDeviceID, stoppedScenario)
+		for _, msg := range resumed {
+			if targetDeviceID != sourceDeviceID {
+				msg.RelayToDeviceID = targetDeviceID
+			}
+			out = append(out, msg)
+		}
+	}
+	return out
+}
+
+func (h *StreamHandler) clearPhotoFrameState(deviceID string) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return
+	}
+	h.mu.Lock()
+	delete(h.photoFrameIndexByDev, deviceID)
+	delete(h.photoFrameLastByDev, deviceID)
+	h.mu.Unlock()
+}
+
+func (h *StreamHandler) photoFrameSetUI(deviceID string, reset bool) ui.Descriptor {
+	deviceID = strings.TrimSpace(deviceID)
+	now := h.nowUTC()
+
+	h.mu.Lock()
+	slides := append([]string(nil), h.photoFrameSlides...)
+	if len(slides) == 0 {
+		slides = defaultPhotoFrameSlides()
+	}
+	index := h.photoFrameIndexByDev[deviceID]
+	if reset {
+		index = 0
+	}
+	if index < 0 || index >= len(slides) {
+		index = 0
+	}
+	h.photoFrameIndexByDev[deviceID] = index
+	h.photoFrameLastByDev[deviceID] = now
+	h.mu.Unlock()
+
+	url := slides[index]
+	caption := "Photo frame: " + deviceID
+	return ui.PhotoFrameView(url, caption, index, len(slides))
+}
+
+func (h *StreamHandler) photoFrameHeartbeatUpdate(deviceID string) *ServerMessage {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil
+	}
+	if h.activeScenarioName(deviceID) != "photo_frame" {
+		return nil
+	}
+
+	now := h.nowUTC()
+	h.mu.Lock()
+	slides := append([]string(nil), h.photoFrameSlides...)
+	if len(slides) == 0 {
+		slides = defaultPhotoFrameSlides()
+	}
+
+	last, hasLast := h.photoFrameLastByDev[deviceID]
+	interval := h.photoFrameInterval
+	if interval <= 0 {
+		interval = defaultPhotoFrameInterval
+	}
+	if !hasLast {
+		h.photoFrameLastByDev[deviceID] = now
+		h.mu.Unlock()
+		return nil
+	}
+	if now.Sub(last) < interval {
+		h.mu.Unlock()
+		return nil
+	}
+
+	index := h.photoFrameIndexByDev[deviceID]
+	if index < 0 || index >= len(slides) {
+		index = 0
+	}
+	index = (index + 1) % len(slides)
+	h.photoFrameIndexByDev[deviceID] = index
+	h.photoFrameLastByDev[deviceID] = now
+	h.mu.Unlock()
+
+	view := ui.PhotoFrameView(slides[index], "Photo frame: "+deviceID, index, len(slides))
+	return &ServerMessage{SetUI: &view}
+}
+
+func (h *StreamHandler) commandTargetDeviceIDs(cmd *CommandRequest) []string {
+	if cmd == nil {
+		return nil
+	}
+
+	args := cmd.Arguments
+	if len(args) > 0 {
+		if rawList := strings.TrimSpace(args["device_ids"]); rawList != "" {
+			parts := strings.Split(rawList, ",")
+			out := make([]string, 0, len(parts))
+			seen := map[string]struct{}{}
+			for _, part := range parts {
+				deviceID := strings.TrimSpace(part)
+				if deviceID == "" {
+					continue
+				}
+				if _, exists := seen[deviceID]; exists {
+					continue
+				}
+				seen[deviceID] = struct{}{}
+				out = append(out, deviceID)
+			}
+			if len(out) > 0 {
+				return out
+			}
+		}
+		if one := strings.TrimSpace(args["device_id"]); one != "" {
+			return []string{one}
+		}
+	}
+
+	if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Devices != nil {
+		all := h.runtime.Env.Devices.ListDeviceIDs()
+		if len(all) > 0 {
+			return all
+		}
+	}
+
+	if source := strings.TrimSpace(cmd.DeviceID); source != "" {
+		return []string{source}
+	}
+	return nil
 }
 
 func (h *StreamHandler) appendRouteMessageForPeers(
@@ -1000,6 +1435,70 @@ func (h *StreamHandler) relayWebRTCSignal(signal *WebRTCSignalRequest, sourceDev
 	}
 }
 
+func (h *StreamHandler) handleWebRTCSignal(
+	ctx context.Context,
+	signal *WebRTCSignalRequest,
+	sourceDeviceID string,
+) []ServerMessage {
+	if signal == nil {
+		return nil
+	}
+	sourceDeviceID = strings.TrimSpace(sourceDeviceID)
+	streamID := strings.TrimSpace(signal.StreamID)
+	if streamID == "" || sourceDeviceID == "" {
+		return h.relayWebRTCSignal(signal, sourceDeviceID)
+	}
+
+	engine, serverManaged := h.serverManagedSignalEngine(streamID)
+	if serverManaged && engine != nil {
+		responses, err := engine.HandleSignal(ctx, WebRTCSignalEngineRequest{
+			StreamID: streamID,
+			DeviceID: sourceDeviceID,
+			Signal:   *signal,
+		})
+		if err == nil {
+			out := make([]ServerMessage, 0, len(responses))
+			for _, response := range responses {
+				msg := ServerMessage{
+					WebRTCSignal: &WebRTCSignalResponse{
+						StreamID:   strings.TrimSpace(response.Signal.StreamID),
+						SignalType: strings.TrimSpace(response.Signal.SignalType),
+						Payload:    response.Signal.Payload,
+					},
+				}
+				target := strings.TrimSpace(response.TargetDeviceID)
+				if msg.WebRTCSignal.StreamID == "" || msg.WebRTCSignal.SignalType == "" || target == "" {
+					continue
+				}
+				if target != sourceDeviceID {
+					msg.RelayToDeviceID = target
+				}
+				out = append(out, msg)
+			}
+			return out
+		}
+	}
+	return h.relayWebRTCSignal(signal, sourceDeviceID)
+}
+
+func (h *StreamHandler) serverManagedSignalEngine(streamID string) (WebRTCSignalEngine, bool) {
+	streamID = strings.TrimSpace(streamID)
+	if streamID == "" {
+		return nil, false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.webrtc == nil {
+		return nil, false
+	}
+	state, ok := h.mediaStreams[streamID]
+	if !ok {
+		return nil, false
+	}
+	mode := strings.ToLower(strings.TrimSpace(state.Metadata["webrtc_mode"]))
+	return h.webrtc, mode == "server_managed"
+}
+
 func (h *StreamHandler) peerDeviceForStream(streamID, sourceDeviceID string) string {
 	const prefix = "route:"
 	if strings.HasPrefix(streamID, prefix) {
@@ -1047,7 +1546,17 @@ func (h *StreamHandler) registerMediaStream(start StartStreamResponse) {
 		Metadata:       metadata,
 		Ready:          false,
 	}
+	recorder := h.recording
 	h.mu.Unlock()
+	if recorder != nil {
+		_ = recorder.Start(context.Background(), recording.Stream{
+			StreamID:       streamID,
+			Kind:           start.Kind,
+			SourceDeviceID: start.SourceDeviceID,
+			TargetDeviceID: start.TargetDeviceID,
+			Metadata:       metadata,
+		})
+	}
 }
 
 func (h *StreamHandler) unregisterMediaStream(streamID string) {
@@ -1057,7 +1566,15 @@ func (h *StreamHandler) unregisterMediaStream(streamID string) {
 	}
 	h.mu.Lock()
 	delete(h.mediaStreams, streamID)
+	recorder := h.recording
+	engine := h.webrtc
 	h.mu.Unlock()
+	if recorder != nil {
+		_ = recorder.Stop(context.Background(), streamID)
+	}
+	if engine != nil {
+		engine.RemoveStream(streamID)
+	}
 }
 
 func (h *StreamHandler) markStreamReady(streamID string) {
@@ -1201,6 +1718,31 @@ func (h *StreamHandler) sensorStatusData() map[string]string {
 	}
 }
 
+func (h *StreamHandler) recordingStatusData() map[string]string {
+	h.mu.Lock()
+	recorder := h.recording
+	h.mu.Unlock()
+	activeReader, ok := recorder.(interface {
+		Active() map[string]recording.Stream
+	})
+	if !ok {
+		return map[string]string{
+			"recording_active_streams": "0",
+			"recording_stream_ids":     "",
+		}
+	}
+	active := activeReader.Active()
+	streamIDs := make([]string, 0, len(active))
+	for streamID := range active {
+		streamIDs = append(streamIDs, streamID)
+	}
+	sort.Strings(streamIDs)
+	return map[string]string{
+		"recording_active_streams": strconv.Itoa(len(streamIDs)),
+		"recording_stream_ids":     strings.Join(streamIDs, ","),
+	}
+}
+
 func (h *StreamHandler) disconnectScenarioRoutes(deviceID, scenarioName string) {
 	deviceID = strings.TrimSpace(deviceID)
 	if deviceID == "" {
@@ -1236,6 +1778,8 @@ func isScenarioOwnedRoute(deviceID, scenarioName string, route iorouter.Route) b
 		return route.SourceID == deviceID || route.TargetID == deviceID
 	case "pa_system":
 		return route.SourceID == deviceID && route.StreamKind == "pa_audio"
+	case "announcement":
+		return route.SourceID == deviceID && route.StreamKind == "announcement_audio"
 	case "multi_window":
 		if route.TargetID != deviceID {
 			return false
@@ -1496,10 +2040,11 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 			Notification: "Scenario stopped: " + name,
 		}
 		cmd := &CommandRequest{
-			DeviceID: deviceID,
-			Action:   commandAction,
-			Kind:     CommandKindManual,
-			Intent:   intent,
+			DeviceID:  deviceID,
+			Action:    commandAction,
+			Kind:      CommandKindManual,
+			Intent:    intent,
+			Arguments: copyStringMap(triggerArgs),
 		}
 		responses := h.commandResponses(ctx, cmd, result)
 		afterRoutes := h.routeSnapshotForDevice(deviceID)
@@ -1533,10 +2078,11 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		h.captureMultiWindowResume(deviceID, activeName)
 	}
 	cmd := &CommandRequest{
-		DeviceID: deviceID,
-		Action:   commandAction,
-		Kind:     CommandKindManual,
-		Intent:   intent,
+		DeviceID:  deviceID,
+		Action:    commandAction,
+		Kind:      CommandKindManual,
+		Intent:    intent,
+		Arguments: copyStringMap(triggerArgs),
 	}
 	responses := h.commandResponses(ctx, cmd, result)
 	afterRoutes := h.routeSnapshotForDevice(deviceID)
@@ -1748,6 +2294,77 @@ func normalizeTerminalKeyText(text string) string {
 	return strings.ReplaceAll(text, "\b", "\x7f")
 }
 
+func copyStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
+	if cmd == nil {
+		return scenario.Trigger{}, false
+	}
+	intent := strings.TrimSpace(cmd.Intent)
+	switch intent {
+	case ManualIntentBluetoothScan:
+		args := copyStringMap(cmd.Arguments)
+		if strings.TrimSpace(args["action"]) == "" {
+			args["action"] = "scan"
+		}
+		return scenario.Trigger{
+			Kind:      scenario.TriggerManual,
+			SourceID:  cmd.DeviceID,
+			Intent:    "bluetooth_passthrough",
+			Arguments: args,
+		}, true
+	case ManualIntentBluetoothConnect:
+		args := copyStringMap(cmd.Arguments)
+		if strings.TrimSpace(args["action"]) == "" {
+			args["action"] = "connect"
+		}
+		if strings.TrimSpace(args["target_id"]) == "" {
+			if target := strings.TrimSpace(args["target"]); target != "" {
+				args["target_id"] = target
+			}
+		}
+		return scenario.Trigger{
+			Kind:      scenario.TriggerManual,
+			SourceID:  cmd.DeviceID,
+			Intent:    "bluetooth_passthrough",
+			Arguments: args,
+		}, true
+	case ManualIntentUSBEnumerate:
+		args := copyStringMap(cmd.Arguments)
+		if strings.TrimSpace(args["action"]) == "" {
+			args["action"] = "enumerate"
+		}
+		return scenario.Trigger{
+			Kind:      scenario.TriggerManual,
+			SourceID:  cmd.DeviceID,
+			Intent:    "usb_passthrough",
+			Arguments: args,
+		}, true
+	case ManualIntentUSBClaim:
+		args := copyStringMap(cmd.Arguments)
+		if strings.TrimSpace(args["action"]) == "" {
+			args["action"] = "claim"
+		}
+		return scenario.Trigger{
+			Kind:      scenario.TriggerManual,
+			SourceID:  cmd.DeviceID,
+			Intent:    "usb_passthrough",
+			Arguments: args,
+		}, true
+	default:
+		return scenario.Trigger{}, false
+	}
+}
+
 func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
 	readDeadline, readInterval := h.terminalReadSettings()
 	deadline := time.Now().Add(readDeadline)
@@ -1801,11 +2418,15 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 	buf = append(buf, existing...)
 	buf = append(buf, va.Audio...)
 	publisher := h.deviceAudio
+	recorder := h.recording
 	if !va.IsFinal {
 		h.voiceAudioBuffers[deviceID] = buf
 		h.mu.Unlock()
 		if publisher != nil && len(va.Audio) > 0 {
 			publisher.Publish(deviceID, va.Audio)
+		}
+		if len(va.Audio) > 0 {
+			h.recordVoiceAudioChunk(recorder, deviceID, va.Audio)
 		}
 		return nil, nil
 	}
@@ -1814,6 +2435,9 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 
 	if publisher != nil && len(va.Audio) > 0 {
 		publisher.Publish(deviceID, va.Audio)
+	}
+	if len(va.Audio) > 0 {
+		h.recordVoiceAudioChunk(recorder, deviceID, va.Audio)
 	}
 
 	if h.runtime == nil || h.runtime.Env == nil {
@@ -1895,6 +2519,16 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 		},
 	})
 	return out, nil
+}
+
+func (h *StreamHandler) recordVoiceAudioChunk(recorder recording.Manager, deviceID string, chunk []byte) {
+	writer, ok := recorder.(interface {
+		WriteDeviceAudio(deviceID string, chunk []byte) error
+	})
+	if !ok {
+		return
+	}
+	_ = writer.WriteDeviceAudio(deviceID, chunk)
 }
 
 // latestBroadcastForDevice returns the most recent broadcast message emitted
@@ -1986,9 +2620,6 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	if strings.TrimSpace(cmd.DeviceID) == "" {
 		return ServerMessage{}, ErrMissingCommandDeviceID
 	}
-	if h.runtime == nil {
-		return ServerMessage{}, errors.New("scenario runtime not configured")
-	}
 
 	action := cmd.Action
 	if action == "" {
@@ -1996,6 +2627,13 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 	}
 	if action != CommandActionStart && action != CommandActionStop {
 		return ServerMessage{}, ErrInvalidCommandAction
+	}
+	manualIntent := strings.TrimSpace(cmd.Intent)
+	if h.runtime == nil {
+		if kind != CommandKindManual ||
+			(manualIntent != SystemIntentTerminalRefresh && manualIntent != ManualIntentPlaybackMetadata) {
+			return ServerMessage{}, errors.New("scenario runtime not configured")
+		}
 	}
 
 	switch kind {
@@ -2022,10 +2660,10 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 			Notification:  "Scenario started: " + name,
 		}, nil
 	case CommandKindManual:
-		if strings.TrimSpace(cmd.Intent) == "" {
+		if manualIntent == "" {
 			return ServerMessage{}, ErrMissingCommandIntent
 		}
-		if strings.TrimSpace(cmd.Intent) == SystemIntentTerminalRefresh {
+		if manualIntent == SystemIntentTerminalRefresh {
 			if action == CommandActionStop {
 				return ServerMessage{}, ErrInvalidCommandAction
 			}
@@ -2036,11 +2674,48 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 				},
 			}, nil
 		}
+		if manualIntent == ManualIntentPlaybackMetadata {
+			if action == CommandActionStop {
+				return ServerMessage{}, ErrInvalidCommandAction
+			}
+			artifactID := strings.TrimSpace(cmd.Arguments["artifact_id"])
+			if artifactID == "" {
+				return ServerMessage{}, fmt.Errorf("playback_metadata requires artifact_id")
+			}
+			targetDeviceID := strings.TrimSpace(cmd.Arguments["target_device_id"])
+			if targetDeviceID == "" {
+				targetDeviceID = strings.TrimSpace(cmd.DeviceID)
+			}
+			if targetDeviceID == "" {
+				return ServerMessage{}, ErrMissingCommandDeviceID
+			}
+			metadata, ok := h.playbackMetadataForTarget(artifactID, targetDeviceID)
+			if !ok {
+				return ServerMessage{}, fmt.Errorf("playback artifact not found: %s", artifactID)
+			}
+			return ServerMessage{
+				Notification: "Playback metadata ready",
+				Data:         metadata,
+			}, nil
+		}
+		if passthroughTrigger, ok := manualPassthroughTrigger(cmd); ok {
+			if action == CommandActionStop {
+				return ServerMessage{}, ErrInvalidCommandAction
+			}
+			name, err := h.runtime.HandleTrigger(ctx, passthroughTrigger)
+			if err != nil {
+				return ServerMessage{}, err
+			}
+			return ServerMessage{
+				ScenarioStart: name,
+				Notification:  "Scenario started: " + name,
+			}, nil
+		}
 		trigger := scenario.Trigger{
 			Kind:      scenario.TriggerManual,
 			SourceID:  cmd.DeviceID,
 			Intent:    cmd.Intent,
-			Arguments: map[string]string{},
+			Arguments: copyStringMap(cmd.Arguments),
 		}
 		if action == CommandActionStop {
 			name, err := h.runtime.StopTrigger(ctx, trigger)
@@ -2099,6 +2774,9 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			data[k] = v
 		}
 		for k, v := range h.sensorStatusData() {
+			data[k] = v
+		}
+		for k, v := range h.recordingStatusData() {
 			data[k] = v
 		}
 		return ServerMessage{
@@ -2218,6 +2896,51 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Notification: "System query: recent_commands",
 			Data:         data,
 		}, nil
+	case SystemIntentRecordingEvents:
+		data := map[string]string{}
+		h.mu.Lock()
+		recorder := h.recording
+		h.mu.Unlock()
+		eventReader, ok := recorder.(interface {
+			RecentEvents(limit int) []recording.Event
+		})
+		if ok {
+			events := eventReader.RecentEvents(50)
+			for i, event := range events {
+				key := fmt.Sprintf("%03d", i)
+				data[key] = strings.Join([]string{
+					strconv.FormatInt(event.AtUnixMS, 10),
+					event.Action,
+					event.StreamID,
+					event.Kind,
+					event.SourceID,
+					event.TargetID,
+				}, "|")
+			}
+		}
+		return ServerMessage{
+			Notification: "System query: recording_events",
+			Data:         data,
+		}, nil
+	case SystemIntentListPlaybackFiles:
+		data := map[string]string{}
+		for i, artifact := range h.listPlaybackArtifacts() {
+			key := fmt.Sprintf("%03d", i)
+			data[key] = strings.Join([]string{
+				artifact.ArtifactID,
+				artifact.StreamID,
+				artifact.Kind,
+				artifact.SourceDeviceID,
+				artifact.TargetDeviceID,
+				strconv.FormatInt(artifact.SizeBytes, 10),
+				strconv.FormatInt(artifact.UpdatedUnixMS, 10),
+				artifact.AudioPath,
+			}, "|")
+		}
+		return ServerMessage{
+			Notification: "System query: list_playback_artifacts",
+			Data:         data,
+		}, nil
 	case SystemIntentTerminalRefresh:
 		targetDeviceID := strings.TrimSpace(parsed.Arg)
 		if targetDeviceID == "" {
@@ -2268,6 +2991,55 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 	}
 }
 
+func (h *StreamHandler) listPlaybackArtifacts() []recording.Artifact {
+	h.mu.Lock()
+	recorder := h.recording
+	h.mu.Unlock()
+	lister, ok := recorder.(interface {
+		ListPlayableArtifacts() []recording.Artifact
+	})
+	if !ok {
+		return nil
+	}
+	artifacts := lister.ListPlayableArtifacts()
+	out := make([]recording.Artifact, len(artifacts))
+	copy(out, artifacts)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].UpdatedUnixMS == out[j].UpdatedUnixMS {
+			return out[i].ArtifactID < out[j].ArtifactID
+		}
+		return out[i].UpdatedUnixMS > out[j].UpdatedUnixMS
+	})
+	return out
+}
+
+func (h *StreamHandler) playbackMetadataForTarget(artifactID, targetDeviceID string) (map[string]string, bool) {
+	h.mu.Lock()
+	recorder := h.recording
+	h.mu.Unlock()
+	provider, ok := recorder.(interface {
+		PlaybackMetadata(artifactID, targetDeviceID string) (recording.PlaybackMetadata, bool)
+	})
+	if !ok {
+		return nil, false
+	}
+	metadata, ok := provider.PlaybackMetadata(artifactID, targetDeviceID)
+	if !ok {
+		return nil, false
+	}
+	return map[string]string{
+		"artifact_id":      metadata.Artifact.ArtifactID,
+		"stream_id":        metadata.Artifact.StreamID,
+		"kind":             metadata.Artifact.Kind,
+		"source_device_id": metadata.Artifact.SourceDeviceID,
+		"target_device_id": metadata.TargetDeviceID,
+		"audio_path":       metadata.Artifact.AudioPath,
+		"format":           "pcm16",
+		"size_bytes":       strconv.FormatInt(metadata.Artifact.SizeBytes, 10),
+		"updated_unix_ms":  strconv.FormatInt(metadata.Artifact.UpdatedUnixMS, 10),
+	}, true
+}
+
 // NoteProtocolError increments protocol error counters from session-level validation.
 func (h *StreamHandler) NoteProtocolError() {
 	if h.metrics != nil {
@@ -2296,6 +3068,7 @@ func (h *StreamHandler) disconnectRoutesForDevice(deviceID string) {
 	routes := routeIO.RoutesForDevice(deviceID)
 	for _, route := range routes {
 		_ = routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
+		h.unregisterMediaStream(routeStreamID(route))
 	}
 }
 

@@ -88,6 +88,7 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				Kind:      internalKindFromProto(command.GetKind()),
 				Text:      command.GetText(),
 				Intent:    command.GetIntent(),
+				Arguments: command.GetArguments(),
 			},
 		}, nil
 	case *controlv1.ConnectRequest_Sensor:
@@ -142,6 +143,7 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 				RegisterAck: &controlv1.RegisterAck{
 					ServerId: msg.RegisterAck.ServerID,
 					Message:  msg.RegisterAck.Message,
+					Metadata: msg.RegisterAck.Metadata,
 				},
 			},
 		}

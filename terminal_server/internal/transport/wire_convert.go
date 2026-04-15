@@ -52,6 +52,7 @@ func InternalFromWireClient(w WireClientMessage) (ClientMessage, error) {
 				Kind:      internalKindFromWire(w.Command.Kind),
 				Text:      w.Command.Text,
 				Intent:    w.Command.Intent,
+				Arguments: DecodeDataEntries(w.Command.Arguments),
 			},
 		}, nil
 	case w.VoiceAudio != nil:
@@ -125,6 +126,7 @@ func WireFromInternalServer(msg ServerMessage) WireServerMessage {
 		out.RegisterAck = &WireRegisterResponse{
 			ServerID: msg.RegisterAck.ServerID,
 			Message:  msg.RegisterAck.Message,
+			Metadata: EncodeDataMap(msg.RegisterAck.Metadata),
 		}
 	}
 	if msg.CommandAck != "" || msg.Notification != "" || msg.ScenarioStart != "" || msg.ScenarioStop != "" || len(msg.Data) > 0 {

@@ -3,17 +3,29 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
 	"os/signal"
+	"path"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/admin"
 	"github.com/curtcox/terminals/terminal_server/internal/ai"
 	"github.com/curtcox/terminals/terminal_server/internal/audio"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
@@ -67,10 +79,38 @@ func main() {
 	scenario.RegisterBuiltins(scenarioEngine)
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
 	controlStream := transport.NewStreamHandler(controlService)
+	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
+	if err != nil {
+		log.Printf("configure webrtc signal engine: %v", err)
+		return
+	}
+	controlStream.SetWebRTCSignalEngine(webrtcEngine)
+	photoServer, photoBaseURL, err := startPhotoFrameAssetServer(cfg)
+	if err != nil {
+		log.Printf("start photo frame asset server: %v", err)
+		return
+	}
+	adminServer, err := startAdminServer(cfg, admin.NewHandler(controlService, scenarioRuntime, deviceManager, cfg))
+	if err != nil {
+		log.Printf("start admin dashboard: %v", err)
+		return
+	}
+	controlService.SetRegisterMetadata(map[string]string{
+		"photo_frame_asset_base_url": photoBaseURL,
+	})
+	configurePhotoFrame(controlStream, cfg, photoBaseURL)
+	recordingManager, err := recording.NewDiskManager(cfg.RecordingDir)
+	if err != nil {
+		log.Printf("configure recording manager: %v", err)
+		return
+	}
+	controlStream.SetRecordingManager(recordingManager)
 	grpcServer := transport.NewServer(cfg.GRPCAddress())
 	grpcServer.ConfigureControl(controlService, transport.GeneratedProtoAdapter{})
 	grpcServer.ConfigureRuntime(scenarioRuntime)
 	grpcServer.ConfigureDeviceAudio(audioHub)
+	grpcServer.ConfigureRecording(recordingManager)
+	grpcServer.ConfigureWebRTCSignalEngine(webrtcEngine)
 	mdns := discovery.NewMDNSAdvertiser()
 
 	log.Printf("terminal server starting at %s", grpcServer.Address())
@@ -108,7 +148,11 @@ func main() {
 		return
 	}
 	log.Printf("control service ready for server id %q", cfg.MDNSName)
+	if adminServer != nil {
+		log.Printf("admin dashboard available at http://%s/admin", adminServer.Addr)
+	}
 	log.Printf("control stream handler initialized")
+	log.Printf("recording manager initialized dir=%s", cfg.RecordingDir)
 	log.Printf("scenario runtime initialized with %d builtin scenarios", 3)
 	log.Printf(
 		"housekeeping configured heartbeat_timeout=%ds liveness_interval=%ds due_timer_interval=%ds",
@@ -129,6 +173,16 @@ func main() {
 	defer cancel()
 	if err := grpcServer.Stop(shutdownCtx); err != nil {
 		log.Printf("stop transport: %v", err)
+	}
+	if photoServer != nil {
+		if err := photoServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("stop photo frame asset server: %v", err)
+		}
+	}
+	if adminServer != nil {
+		if err := adminServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("stop admin dashboard: %v", err)
+		}
 	}
 	if err := mdns.Stop(shutdownCtx); err != nil {
 		log.Printf("stop mDNS: %v", err)
@@ -212,4 +266,125 @@ func runLivenessLoop(ctx context.Context, control *transport.ControlService, tim
 			}
 		}
 	}
+}
+
+func configurePhotoFrame(handler *transport.StreamHandler, cfg config.Config, baseURL string) {
+	if handler == nil {
+		return
+	}
+	interval := time.Duration(cfg.PhotoFrameIntervalSeconds) * time.Second
+	slides, err := loadPhotoFrameSlides(cfg.PhotoFrameDir, baseURL)
+	if err != nil {
+		log.Printf("photo frame slide discovery failed dir=%q err=%v", cfg.PhotoFrameDir, err)
+	}
+	handler.SetPhotoFrameSettings(slides, interval)
+	log.Printf(
+		"photo frame configured slides=%d dir=%q interval=%ds base_url=%q",
+		len(slides),
+		cfg.PhotoFrameDir,
+		cfg.PhotoFrameIntervalSeconds,
+		baseURL,
+	)
+}
+
+func loadPhotoFrameSlides(dir, baseURL string) ([]string, error) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return nil, nil
+	}
+	baseURL = strings.TrimSuffix(strings.TrimSpace(baseURL), "/")
+	if baseURL == "" {
+		return nil, nil
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	slides := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := strings.TrimSpace(entry.Name())
+		if name == "" {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		switch ext {
+		case ".jpg", ".jpeg", ".png", ".webp", ".gif":
+		default:
+			continue
+		}
+		absPath := filepath.Join(dir, name)
+		absPath, err = filepath.Abs(absPath)
+		if err != nil {
+			return nil, fmt.Errorf("resolve photo frame slide %q: %w", absPath, err)
+		}
+		slideURL, joinErr := url.JoinPath(baseURL, path.Base(absPath))
+		if joinErr != nil {
+			return nil, fmt.Errorf("build photo frame url for %q: %w", absPath, joinErr)
+		}
+		slides = append(slides, slideURL)
+	}
+	sort.Strings(slides)
+	return slides, nil
+}
+
+func startPhotoFrameAssetServer(cfg config.Config) (*http.Server, string, error) {
+	baseURL := photoFrameAssetBaseURL(cfg)
+	if strings.TrimSpace(cfg.PhotoFrameDir) == "" {
+		return nil, baseURL, nil
+	}
+	if strings.TrimSpace(cfg.PhotoFramePublicBaseURL) != "" {
+		return nil, baseURL, nil
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/photo-frame/", newPhotoFrameAssetHandler(cfg.PhotoFrameDir))
+
+	address := net.JoinHostPort(strings.TrimSpace(cfg.PhotoFrameHTTPHost), strconv.Itoa(cfg.PhotoFrameHTTPPort))
+	server := &http.Server{
+		Addr:              address,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	go func() {
+		log.Printf("photo frame asset server listening at %s", address)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("photo frame asset server error: %v", err)
+		}
+	}()
+
+	return server, baseURL, nil
+}
+
+func newPhotoFrameAssetHandler(dir string) http.Handler {
+	fileServer := http.StripPrefix("/photo-frame/", http.FileServer(http.Dir(dir)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "public, max-age=60")
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
+func photoFrameAssetBaseURL(cfg config.Config) string {
+	if configured := strings.TrimSpace(cfg.PhotoFramePublicBaseURL); configured != "" {
+		return strings.TrimSuffix(configured, "/")
+	}
+	publicHost := strings.TrimSpace(cfg.MDNSName)
+	if publicHost == "" {
+		publicHost = "localhost"
+	}
+	if !strings.Contains(publicHost, ".") {
+		publicHost += ".local"
+	}
+	return fmt.Sprintf("http://%s:%d/photo-frame", publicHost, cfg.PhotoFrameHTTPPort)
 }

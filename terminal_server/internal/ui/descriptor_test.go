@@ -164,3 +164,49 @@ func TestMultiWindowViewUsesAdaptiveGridAndFocusActions(t *testing.T) {
 		t.Fatalf("expected focused peer button label Hearing cam-b")
 	}
 }
+
+func TestPhotoFrameViewIncludesKeepAwakeAndFullscreenImage(t *testing.T) {
+	d := PhotoFrameView("https://example.invalid/photo-1.jpg", "Kitchen memories", 1, 4)
+	if d.Type != "stack" {
+		t.Fatalf("Type = %q, want stack", d.Type)
+	}
+	if d.Props["id"] != "photo_frame_root" {
+		t.Fatalf("id = %q, want photo_frame_root", d.Props["id"])
+	}
+	if len(d.Children) < 3 {
+		t.Fatalf("children = %d, want at least 3", len(d.Children))
+	}
+
+	keepAwake := d.Children[0]
+	if keepAwake.Type != "keep_awake" || keepAwake.Props["enabled"] != "true" {
+		t.Fatalf("first child = %+v, want keep_awake enabled", keepAwake)
+	}
+	if len(keepAwake.Children) != 1 || keepAwake.Children[0].Type != "fullscreen" {
+		t.Fatalf("keep_awake children = %+v, want fullscreen", keepAwake.Children)
+	}
+	fullscreen := keepAwake.Children[0]
+	if len(fullscreen.Children) != 1 || fullscreen.Children[0].Type != "image" {
+		t.Fatalf("fullscreen children = %+v, want image", fullscreen.Children)
+	}
+	if got := fullscreen.Children[0].Props["url"]; got != "https://example.invalid/photo-1.jpg" {
+		t.Fatalf("image url = %q, want provided photo url", got)
+	}
+
+	overlay := d.Children[1]
+	if overlay.Type != "stack" || overlay.Props["id"] != "photo_frame_overlay" {
+		t.Fatalf("overlay = %+v, want photo_frame_overlay stack", overlay)
+	}
+	if len(overlay.Children) != 2 {
+		t.Fatalf("overlay child count = %d, want 2", len(overlay.Children))
+	}
+	if got := overlay.Children[0].Props["value"]; got != "Kitchen memories" {
+		t.Fatalf("caption = %q, want Kitchen memories", got)
+	}
+	if got := overlay.Children[1].Props["value"]; got != "2 / 4" {
+		t.Fatalf("progress = %q, want 2 / 4", got)
+	}
+
+	if d.Children[2].Type != "overlay" || d.Children[2].Props["id"] != GlobalOverlayComponentID {
+		t.Fatalf("third child should be global overlay slot, got %+v", d.Children[2])
+	}
+}

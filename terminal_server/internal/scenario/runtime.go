@@ -64,6 +64,150 @@ func (r *Runtime) StopVoiceText(ctx context.Context, sourceID, spoken string, no
 	return r.StopTrigger(ctx, ParseVoiceTrigger(sourceID, spoken, now))
 }
 
+// StartScenario requests scenario activation by scenario name and target
+// devices. This helper is intended for administrative controls where no
+// natural voice/manual trigger text exists.
+func (r *Runtime) StartScenario(ctx context.Context, scenarioName string, deviceIDs []string) (string, error) {
+	deviceIDs = normalizeDeviceIDs(deviceIDs)
+	args := map[string]string{}
+	if len(deviceIDs) > 0 {
+		args["device_ids"] = strings.Join(deviceIDs, ",")
+	}
+	sourceID := ""
+	if len(deviceIDs) > 0 {
+		sourceID = deviceIDs[0]
+	}
+	return r.HandleTrigger(ctx, Trigger{
+		Kind:      TriggerManual,
+		SourceID:  sourceID,
+		Intent:    strings.TrimSpace(scenarioName),
+		Arguments: args,
+	})
+}
+
+// StopScenario requests scenario stop by scenario name and target devices.
+// This helper is intended for administrative controls where no natural
+// stop trigger text exists.
+func (r *Runtime) StopScenario(ctx context.Context, scenarioName string, deviceIDs []string) (string, error) {
+	deviceIDs = normalizeDeviceIDs(deviceIDs)
+	args := map[string]string{}
+	if len(deviceIDs) > 0 {
+		args["device_ids"] = strings.Join(deviceIDs, ",")
+	}
+	sourceID := ""
+	if len(deviceIDs) > 0 {
+		sourceID = deviceIDs[0]
+	}
+	return r.StopTrigger(ctx, Trigger{
+		Kind:      TriggerManual,
+		SourceID:  sourceID,
+		Intent:    strings.TrimSpace(scenarioName),
+		Arguments: args,
+	})
+}
+
+// ProcessSensorReading dispatches telemetry snapshots to the active scenario
+// for the source device when that scenario declares SensorConsumer support.
+func (r *Runtime) ProcessSensorReading(ctx context.Context, reading SensorReading) error {
+	if r == nil || r.Engine == nil || r.Env == nil {
+		return nil
+	}
+	activeScenario, ok := r.Engine.ActiveScenario(strings.TrimSpace(reading.DeviceID))
+	if !ok {
+		return nil
+	}
+	consumer, ok := activeScenario.(SensorConsumer)
+	if !ok {
+		return nil
+	}
+	return consumer.HandleSensor(ctx, r.Env, reading)
+}
+
+// DispatchBluetoothCommand sends a Bluetooth passthrough command via the
+// configured bridge when available.
+func (r *Runtime) DispatchBluetoothCommand(ctx context.Context, cmd BluetoothCommand) error {
+	if r == nil || r.Env == nil || r.Env.Passthrough == nil {
+		return nil
+	}
+	cmd.DeviceID = strings.TrimSpace(cmd.DeviceID)
+	cmd.Action = strings.TrimSpace(cmd.Action)
+	cmd.TargetID = strings.TrimSpace(cmd.TargetID)
+	if cmd.Parameters == nil {
+		cmd.Parameters = map[string]string{}
+	} else {
+		cmd.Parameters = copyStringMap(cmd.Parameters)
+	}
+	return r.Env.Passthrough.DispatchBluetoothCommand(ctx, cmd)
+}
+
+// DispatchUSBCommand sends a USB passthrough command via the configured
+// bridge when available.
+func (r *Runtime) DispatchUSBCommand(ctx context.Context, cmd USBCommand) error {
+	if r == nil || r.Env == nil || r.Env.Passthrough == nil {
+		return nil
+	}
+	cmd.DeviceID = strings.TrimSpace(cmd.DeviceID)
+	cmd.Action = strings.TrimSpace(cmd.Action)
+	cmd.VendorID = strings.TrimSpace(cmd.VendorID)
+	cmd.ProductID = strings.TrimSpace(cmd.ProductID)
+	if cmd.Parameters == nil {
+		cmd.Parameters = map[string]string{}
+	} else {
+		cmd.Parameters = copyStringMap(cmd.Parameters)
+	}
+	return r.Env.Passthrough.DispatchUSBCommand(ctx, cmd)
+}
+
+// ProcessBluetoothEvent dispatches a Bluetooth passthrough event to the active
+// scenario for the source device when that scenario supports the hook.
+func (r *Runtime) ProcessBluetoothEvent(ctx context.Context, event BluetoothEvent) error {
+	if r == nil || r.Engine == nil || r.Env == nil {
+		return nil
+	}
+	deviceID := strings.TrimSpace(event.DeviceID)
+	activeScenario, ok := r.Engine.ActiveScenario(deviceID)
+	if !ok {
+		return nil
+	}
+	consumer, ok := activeScenario.(BluetoothEventConsumer)
+	if !ok {
+		return nil
+	}
+	event.DeviceID = deviceID
+	event.Event = strings.TrimSpace(event.Event)
+	if event.Data == nil {
+		event.Data = map[string]string{}
+	} else {
+		event.Data = copyStringMap(event.Data)
+	}
+	return consumer.HandleBluetoothEvent(ctx, r.Env, event)
+}
+
+// ProcessUSBEvent dispatches a USB passthrough event to the active scenario
+// for the source device when that scenario supports the hook.
+func (r *Runtime) ProcessUSBEvent(ctx context.Context, event USBEvent) error {
+	if r == nil || r.Engine == nil || r.Env == nil {
+		return nil
+	}
+	deviceID := strings.TrimSpace(event.DeviceID)
+	activeScenario, ok := r.Engine.ActiveScenario(deviceID)
+	if !ok {
+		return nil
+	}
+	consumer, ok := activeScenario.(USBEventConsumer)
+	if !ok {
+		return nil
+	}
+	event.DeviceID = deviceID
+	event.Event = strings.TrimSpace(event.Event)
+	if event.Data == nil {
+		event.Data = map[string]string{}
+	} else {
+		event.Data = copyStringMap(event.Data)
+	}
+	return consumer.HandleUSBEvent(ctx, r.Env, event)
+}
+
 // StatusData returns runtime-focused counters for control-plane system queries.
 func (r *Runtime) StatusData() map[string]string {
 	activeScenarios := 0
@@ -88,6 +232,17 @@ func (r *Runtime) StatusData() map[string]string {
 		"registered_scenarios": strconv.Itoa(registeredScenarios),
 		"pending_timers":       strconv.Itoa(pendingTimers),
 	}
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 // ProcessDueTimers emits notifications for due timer keys and removes them.
@@ -128,8 +283,44 @@ func targetDevices(env *Environment, trigger Trigger) []string {
 	if env == nil || env.Devices == nil {
 		return nil
 	}
+	if explicitMany, ok := trigger.Arguments["device_ids"]; ok && strings.TrimSpace(explicitMany) != "" {
+		parts := strings.Split(explicitMany, ",")
+		out := make([]string, 0, len(parts))
+		seen := map[string]struct{}{}
+		for _, part := range parts {
+			deviceID := strings.TrimSpace(part)
+			if deviceID == "" {
+				continue
+			}
+			if _, exists := seen[deviceID]; exists {
+				continue
+			}
+			seen[deviceID] = struct{}{}
+			out = append(out, deviceID)
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
 	if explicit, ok := trigger.Arguments["device_id"]; ok && explicit != "" {
 		return []string{explicit}
 	}
 	return env.Devices.ListDeviceIDs()
+}
+
+func normalizeDeviceIDs(deviceIDs []string) []string {
+	out := make([]string, 0, len(deviceIDs))
+	seen := make(map[string]struct{}, len(deviceIDs))
+	for _, deviceID := range deviceIDs {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" {
+			continue
+		}
+		if _, exists := seen[deviceID]; exists {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		out = append(out, deviceID)
+	}
+	return out
 }

@@ -13,6 +13,7 @@ dependencies:
   protobuf: ^5.1.0
   fixnum: ^1.1.1
   multicast_dns: ^0.3.3
+  flutter_webrtc: ^1.2.0
 
 dev_dependencies:
   flutter_test:

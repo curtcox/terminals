@@ -12,6 +12,14 @@ import (
 type Config struct {
 	GRPCHost                      string
 	GRPCPort                      int
+	AdminHTTPHost                 string
+	AdminHTTPPort                 int
+	PhotoFrameHTTPHost            string
+	PhotoFrameHTTPPort            int
+	PhotoFramePublicBaseURL       string
+	RecordingDir                  string
+	PhotoFrameDir                 string
+	PhotoFrameIntervalSeconds     int
 	MDNSService                   string
 	MDNSName                      string
 	Version                       string
@@ -37,6 +45,14 @@ func Load() (Config, error) {
 	cfg := Config{
 		GRPCHost:                      getenv("TERMINALS_GRPC_HOST", "0.0.0.0"),
 		GRPCPort:                      50051,
+		AdminHTTPHost:                 getenv("TERMINALS_ADMIN_HTTP_HOST", "0.0.0.0"),
+		AdminHTTPPort:                 50053,
+		PhotoFrameHTTPHost:            getenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "0.0.0.0"),
+		PhotoFrameHTTPPort:            50052,
+		PhotoFramePublicBaseURL:       strings.TrimSpace(os.Getenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL")),
+		RecordingDir:                  getenv("TERMINALS_RECORDING_DIR", "recordings"),
+		PhotoFrameDir:                 getenv("TERMINALS_PHOTO_FRAME_DIR", ""),
+		PhotoFrameIntervalSeconds:     12,
 		MDNSService:                   getenv("TERMINALS_MDNS_SERVICE", "_terminals._tcp.local."),
 		MDNSName:                      getenv("TERMINALS_MDNS_NAME", "HomeServer"),
 		Version:                       getenv("TERMINALS_VERSION", "1"),
@@ -57,6 +73,16 @@ func Load() (Config, error) {
 		}
 		cfg.GRPCPort = parsed
 	}
+	if v, ok, err := parseOptionalInt("TERMINALS_PHOTO_FRAME_HTTP_PORT"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.PhotoFrameHTTPPort = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_ADMIN_HTTP_PORT"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.AdminHTTPPort = v
+	}
 	if v, ok, err := parseOptionalInt("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS"); err != nil {
 		return Config{}, err
 	} else if ok {
@@ -71,6 +97,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	} else if ok {
 		cfg.DueTimerProcessIntervalSecs = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.PhotoFrameIntervalSeconds = v
 	}
 
 	sip, err := loadSIPConfig()

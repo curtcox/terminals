@@ -1,1 +1,1 @@
-Implement Phase 7 photo_frame scenario idle rotation with preemption-aware suspend/resume behavior.
+Run a manual multi-device LAN smoke test (discovery, intercom audio route, and UI updates) and capture any runtime gaps.

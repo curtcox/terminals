@@ -23,6 +23,7 @@ type RegisterRequest struct {
 type RegisterResponse struct {
 	ServerID string
 	Message  string
+	Metadata map[string]string
 	Initial  ui.Descriptor
 }
 
@@ -30,6 +31,7 @@ type RegisterResponse struct {
 type ControlService struct {
 	serverID string
 	devices  *device.Manager
+	metadata map[string]string
 	now      func() time.Time
 	started  time.Time
 }
@@ -40,6 +42,7 @@ func NewControlService(serverID string, devices *device.Manager) *ControlService
 	return &ControlService{
 		serverID: serverID,
 		devices:  devices,
+		metadata: map[string]string{},
 		now:      time.Now,
 		started:  started,
 	}
@@ -66,8 +69,14 @@ func (s *ControlService) Register(_ context.Context, req RegisterRequest) (Regis
 	return RegisterResponse{
 		ServerID: s.serverID,
 		Message:  "registered",
+		Metadata: cloneStringMap(s.metadata),
 		Initial:  initial,
 	}, nil
+}
+
+// SetRegisterMetadata configures metadata included with each RegisterAck.
+func (s *ControlService) SetRegisterMetadata(metadata map[string]string) {
+	s.metadata = cloneStringMap(metadata)
 }
 
 // Heartbeat records a liveness pulse.
@@ -127,4 +136,15 @@ func (s *ControlService) SetNowForTest(now func() time.Time) {
 		return
 	}
 	s.now = now
+}
+
+func cloneStringMap(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(input))
+	for key, value := range input {
+		out[key] = value
+	}
+	return out
 }

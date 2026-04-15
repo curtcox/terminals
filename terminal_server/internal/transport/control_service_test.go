@@ -12,6 +12,9 @@ import (
 func TestRegisterReturnsInitialUI(t *testing.T) {
 	m := device.NewManager()
 	s := NewControlService("srv-1", m)
+	s.SetRegisterMetadata(map[string]string{
+		"photo_frame_asset_base_url": "http://photos.example.test/photo-frame",
+	})
 
 	resp, err := s.Register(context.Background(), RegisterRequest{
 		DeviceID:   "device-1",
@@ -25,6 +28,9 @@ func TestRegisterReturnsInitialUI(t *testing.T) {
 	}
 	if resp.Initial.Type != "stack" {
 		t.Fatalf("Initial.Type = %q, want stack", resp.Initial.Type)
+	}
+	if got := resp.Metadata["photo_frame_asset_base_url"]; got != "http://photos.example.test/photo-frame" {
+		t.Fatalf("metadata photo_frame_asset_base_url = %q, want configured value", got)
 	}
 }
 

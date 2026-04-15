@@ -8,10 +8,15 @@ import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
+import 'package:terminal_client/media/webrtc_engine.dart';
 
 typedef TerminalControlClientFactory = TerminalControlClient Function({
   required String host,
   required int port,
+});
+typedef ClientMediaEngineFactory = ClientMediaEngine Function({
+  required String localDeviceID,
+  required OutboundSignalCallback onSignal,
 });
 
 Duration calculateReconnectDelay({
@@ -34,6 +39,7 @@ class TerminalClientApp extends StatelessWidget {
   const TerminalClientApp({
     super.key,
     this.clientFactory = TerminalControlGrpcClient.new,
+    this.mediaEngineFactory = defaultClientMediaEngineFactory,
     this.heartbeatInterval = const Duration(seconds: 10),
     this.sensorTelemetryInterval = const Duration(seconds: 15),
     this.reconnectDelayBase = const Duration(seconds: 2),
@@ -41,6 +47,7 @@ class TerminalClientApp extends StatelessWidget {
   });
 
   final TerminalControlClientFactory clientFactory;
+  final ClientMediaEngineFactory mediaEngineFactory;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
@@ -52,6 +59,7 @@ class TerminalClientApp extends StatelessWidget {
       title: 'Terminal Client',
       home: _ControlStreamScaffold(
         clientFactory: clientFactory,
+        mediaEngineFactory: mediaEngineFactory,
         heartbeatInterval: heartbeatInterval,
         sensorTelemetryInterval: sensorTelemetryInterval,
         reconnectDelayBase: reconnectDelayBase,
@@ -64,6 +72,7 @@ class TerminalClientApp extends StatelessWidget {
 class _ControlStreamScaffold extends StatefulWidget {
   const _ControlStreamScaffold({
     required this.clientFactory,
+    required this.mediaEngineFactory,
     required this.heartbeatInterval,
     required this.sensorTelemetryInterval,
     required this.reconnectDelayBase,
@@ -71,6 +80,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   });
 
   final TerminalControlClientFactory clientFactory;
+  final ClientMediaEngineFactory mediaEngineFactory;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
@@ -105,12 +115,17 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _status = 'Idle';
   int _responses = 0;
   final String _deviceId = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
+  late final ClientMediaEngine _mediaEngine;
   uiv1.Node? _activeRoot;
   int _activeRootRevision = 0;
   String _activeTransition = 'none';
   Duration _activeTransitionDuration = Duration.zero;
   String _lastNotification = '';
   final TextEditingController _terminalInputController =
+      TextEditingController();
+  final TextEditingController _playbackArtifactIdController =
+      TextEditingController();
+  final TextEditingController _playbackTargetDeviceIdController =
       TextEditingController();
   String _terminalInputShadow = '';
   bool _isScanning = false;
@@ -130,11 +145,27 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   int _sensorSendCount = 0;
   int _streamReadyAckCount = 0;
   int _lastSensorSendUnixMs = 0;
+  int _playAudioCount = 0;
+  int _lastPlayAudioBytes = 0;
+  String _lastPlayAudioDeviceID = 'none';
+  String _lastPlayAudioSource = 'none';
   int _debugCommandSeq = 0;
   String _pendingRuntimeStatusRequestID = '';
   String _pendingDeviceStatusRequestID = '';
+  String _pendingPlaybackArtifactsRequestID = '';
+  String _pendingPlaybackMetadataRequestID = '';
   String _diagnosticsTitle = 'none';
   Map<String, String> _diagnosticsData = <String, String>{};
+  String _photoFrameAssetBaseURL = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _mediaEngine = widget.mediaEngineFactory(
+      localDeviceID: _deviceId,
+      onSignal: _sendWebRTCSignalMessage,
+    );
+  }
 
   Future<void> _startStream({bool userInitiated = true}) async {
     if (_isConnecting) {
@@ -223,6 +254,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             if (response.hasError()) {
               _lastNotification = response.error.message;
             }
+            _applyRegisterMetadata(response);
             _applyMediaControlResponse(response);
           });
         },
@@ -352,6 +384,57 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     );
   }
 
+  void _sendPlaybackArtifactsQuery() {
+    final requestID = _nextDebugRequestID('debug-playback-artifacts');
+    _pendingPlaybackArtifactsRequestID = requestID;
+    _outgoing.add(
+      ConnectRequest()
+        ..command = (CommandRequest()
+          ..requestId = requestID
+          ..kind = CommandKind.COMMAND_KIND_SYSTEM
+          ..intent = 'list_playback_artifacts'),
+    );
+  }
+
+  void _sendPlaybackMetadataQuery() {
+    final artifactID = _playbackArtifactIdController.text.trim();
+    if (artifactID.isEmpty) {
+      setState(() {
+        _status = 'Command error';
+        _lastNotification = 'Playback artifact ID required';
+      });
+      return;
+    }
+    var targetDeviceID = _playbackTargetDeviceIdController.text.trim();
+    if (targetDeviceID.isEmpty) {
+      targetDeviceID = _deviceId;
+      _playbackTargetDeviceIdController.text = targetDeviceID;
+    }
+    final requestID = _nextDebugRequestID('debug-playback-metadata');
+    _pendingPlaybackMetadataRequestID = requestID;
+    _outgoing.add(
+      ConnectRequest()
+        ..command = (CommandRequest()
+          ..requestId = requestID
+          ..deviceId = _deviceId
+          ..kind = CommandKind.COMMAND_KIND_MANUAL
+          ..intent = 'playback_metadata'
+          ..arguments['artifact_id'] = artifactID
+          ..arguments['target_device_id'] = targetDeviceID),
+    );
+  }
+
+  String _firstPlaybackArtifactID(Map<String, String> data) {
+    final keys = data.keys.toList()..sort();
+    for (final key in keys) {
+      final parts = data[key]?.split('|') ?? const <String>[];
+      if (parts.isNotEmpty && parts.first.trim().isNotEmpty) {
+        return parts.first.trim();
+      }
+    }
+    return '';
+  }
+
   void _applyDiagnosticsResponse(ConnectResponse response) {
     if (!response.hasCommandResult()) {
       return;
@@ -368,10 +451,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     } else if (requestID.isNotEmpty &&
         requestID == _pendingDeviceStatusRequestID) {
       diagnosticsTitle = 'device_status';
+    } else if (requestID.isNotEmpty &&
+        requestID == _pendingPlaybackArtifactsRequestID) {
+      diagnosticsTitle = 'list_playback_artifacts';
+    } else if (requestID.isNotEmpty &&
+        requestID == _pendingPlaybackMetadataRequestID) {
+      diagnosticsTitle = 'playback_metadata';
     } else if (result.notification == 'System query: runtime_status') {
       diagnosticsTitle = 'runtime_status';
     } else if (result.notification == 'System query: device_status') {
       diagnosticsTitle = 'device_status';
+    } else if (result.notification == 'System query: list_playback_artifacts') {
+      diagnosticsTitle = 'list_playback_artifacts';
+    } else if (result.notification == 'Playback metadata ready') {
+      diagnosticsTitle = 'playback_metadata';
     } else {
       return;
     }
@@ -379,6 +472,29 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     final data = Map<String, String>.from(result.data);
     _diagnosticsTitle = diagnosticsTitle;
     _diagnosticsData = data;
+    if (diagnosticsTitle == 'list_playback_artifacts') {
+      final firstArtifactID = _firstPlaybackArtifactID(data);
+      if (firstArtifactID.isNotEmpty) {
+        _playbackArtifactIdController.text = firstArtifactID;
+      }
+    }
+  }
+
+  void _applyRegisterMetadata(ConnectResponse response) {
+    if (!response.hasRegisterAck()) {
+      return;
+    }
+    final metadata = Map<String, String>.from(response.registerAck.metadata);
+    if (metadata.isEmpty) {
+      return;
+    }
+    _diagnosticsTitle = 'register_ack';
+    _diagnosticsData = metadata;
+    final photoBaseURL = metadata['photo_frame_asset_base_url']?.trim() ?? '';
+    if (photoBaseURL.isNotEmpty) {
+      _photoFrameAssetBaseURL = photoBaseURL;
+      _lastNotification = 'Photo frame asset base URL configured';
+    }
   }
 
   void _stopHeartbeatLoop() {
@@ -502,6 +618,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _stopSensorTelemetryLoop();
     await _incoming?.cancel();
     _incoming = null;
+    for (final streamID in _activeStreamsByID.keys.toList(growable: false)) {
+      await _mediaEngine.stopStream(streamID);
+    }
+    _activeStreamsByID.clear();
+    _routesByStreamID.clear();
     final existingClient = _client;
     if (existingClient != null) {
       await existingClient.shutdown();
@@ -526,6 +647,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       unawaited(incoming.cancel());
     }
     _outgoing.close();
+    unawaited(_mediaEngine.dispose());
     final existingClient = _client;
     if (existingClient != null) {
       unawaited(existingClient.shutdown());
@@ -536,13 +658,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _deviceTypeController.dispose();
     _platformController.dispose();
     _terminalInputController.dispose();
+    _playbackArtifactIdController.dispose();
+    _playbackTargetDeviceIdController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
+      body: Align(
+        alignment: Alignment.topCenter,
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -629,6 +754,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                 Text(
                   'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount',
                 ),
+                if (_playAudioCount > 0)
+                  Text(
+                    'Play audio msgs: $_playAudioCount  Last play bytes: $_lastPlayAudioBytes  Last play target: $_lastPlayAudioDeviceID  Last play source: $_lastPlayAudioSource',
+                  ),
+                if (_photoFrameAssetBaseURL.isNotEmpty)
+                  Text('Photo frame assets: $_photoFrameAssetBaseURL'),
                 if (_lastNotification.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text('Notification: $_lastNotification'),
@@ -653,7 +784,30 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                       onPressed: _sendDeviceStatusQuery,
                       child: const Text('Device Status'),
                     ),
+                    OutlinedButton(
+                      onPressed: _sendPlaybackArtifactsQuery,
+                      child: const Text('List Playback Artifacts'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _sendPlaybackMetadataQuery,
+                      child: const Text('Playback Metadata'),
+                    ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _playbackArtifactIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Playback Artifact ID',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _playbackTargetDeviceIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Playback Target Device ID',
+                    hintText: 'Defaults to this device',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildDiagnosticsPanel(),
@@ -730,6 +884,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (response.hasWebrtcSignal()) {
       return 'WebRTC signal';
     }
+    if (response.hasPlayAudio()) {
+      return 'Play audio';
+    }
     if (response.hasUpdateUi()) {
       return 'UI patched';
     }
@@ -755,18 +912,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             ..streamReady = (StreamReady()..streamId = start.streamId),
         );
         _streamReadyAckCount += 1;
-        _sendWebRTCSignal(
-          streamID: start.streamId,
-          signalType: 'offer',
-          payload:
-              '{"type":"offer","stream_id":"${start.streamId}","kind":"${start.kind}","source":"client"}',
-        );
-        _sendWebRTCSignal(
-          streamID: start.streamId,
-          signalType: 'candidate',
-          payload:
-              '{"type":"candidate","stream_id":"${start.streamId}","candidate":"candidate:local-1"}',
-        );
+        unawaited(_mediaEngine.startStream(start.deepCopy()));
       }
       if (start.kind.isNotEmpty) {
         _lastNotification = 'Start stream: ${start.kind} (${start.streamId})';
@@ -777,6 +923,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       if (streamID.isNotEmpty) {
         _activeStreamsByID.remove(streamID);
         _routesByStreamID.remove(streamID);
+        unawaited(_mediaEngine.stopStream(streamID));
         _lastNotification = 'Stop stream: $streamID';
       }
     }
@@ -799,21 +946,37 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       }
       _lastNotification =
           'WebRTC signal: ${response.webrtcSignal.signalType} (${response.webrtcSignal.streamId})';
-      final signalType = response.webrtcSignal.signalType.trim().toLowerCase();
-      if (signalType == 'offer') {
-        _sendWebRTCSignal(
-          streamID: response.webrtcSignal.streamId,
-          signalType: 'answer',
-          payload:
-              '{"type":"answer","stream_id":"${response.webrtcSignal.streamId}","source":"client"}',
-        );
-        _sendWebRTCSignal(
-          streamID: response.webrtcSignal.streamId,
-          signalType: 'candidate',
-          payload:
-              '{"type":"candidate","stream_id":"${response.webrtcSignal.streamId}","candidate":"candidate:local-2"}',
-        );
+      unawaited(_mediaEngine.handleSignal(response.webrtcSignal.deepCopy()));
+    }
+    if (response.hasPlayAudio()) {
+      final playAudio = response.playAudio;
+      var source = 'unknown';
+      var bytes = 0;
+      switch (playAudio.whichSource()) {
+        case iov1.PlayAudio_Source.pcmData:
+          source = 'pcm_data';
+          bytes = playAudio.pcmData.length;
+          break;
+        case iov1.PlayAudio_Source.url:
+          source = 'url';
+          bytes = 0;
+          break;
+        case iov1.PlayAudio_Source.ttsText:
+          source = 'tts_text';
+          bytes = 0;
+          break;
+        case iov1.PlayAudio_Source.notSet:
+          source = 'not_set';
+          bytes = 0;
+          break;
       }
+      _playAudioCount += 1;
+      _lastPlayAudioBytes = bytes;
+      _lastPlayAudioDeviceID =
+          playAudio.deviceId.isNotEmpty ? playAudio.deviceId : 'unknown';
+      _lastPlayAudioSource = source;
+      _lastNotification =
+          'Play audio: $_lastPlayAudioDeviceID ($source, $bytes bytes)';
     }
   }
 
@@ -973,20 +1136,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     );
   }
 
-  void _sendWebRTCSignal({
-    required String streamID,
-    required String signalType,
-    required String payload,
-  }) {
+  void _sendWebRTCSignalMessage(WebRTCSignal signal) {
+    final streamID = signal.streamId.trim();
+    final signalType = signal.signalType.trim();
     if (streamID.isEmpty || signalType.isEmpty) {
       return;
     }
     _outgoing.add(
-      ConnectRequest()
-        ..webrtcSignal = (WebRTCSignal()
-          ..streamId = streamID
-          ..signalType = signalType
-          ..payload = payload),
+      ConnectRequest()..webrtcSignal = signal.deepCopy(),
     );
   }
 

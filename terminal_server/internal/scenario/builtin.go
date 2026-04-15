@@ -4,7 +4,9 @@ package scenario
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -167,9 +169,165 @@ func (s *TerminalScenario) Start(ctx context.Context, env *Environment) error {
 // Stop ends terminal mode and currently has no side effects.
 func (s *TerminalScenario) Stop() error { return nil }
 
+// BluetoothPassthroughScenario dispatches server-directed BLE passthrough commands.
+type BluetoothPassthroughScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *BluetoothPassthroughScenario) Name() string { return "bluetooth_passthrough" }
+
+// Match records trigger metadata when Bluetooth passthrough is requested.
+func (s *BluetoothPassthroughScenario) Match(trigger Trigger) bool {
+	if !intentMatches(
+		trigger.Intent,
+		"bluetooth passthrough",
+		"bluetooth_passthrough",
+		"bluetooth scan",
+		"bluetooth_scan",
+		"ble scan",
+		"bluetooth connect",
+		"bluetooth_connect",
+	) {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start dispatches a Bluetooth passthrough command through the server bridge.
+func (s *BluetoothPassthroughScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil {
+		return nil
+	}
+	action := strings.TrimSpace(s.trigger.Arguments["action"])
+	if action == "" {
+		action = "scan"
+		if strings.Contains(strings.ToLower(strings.TrimSpace(s.trigger.Intent)), "connect") {
+			action = "connect"
+		}
+	}
+	targetID := strings.TrimSpace(s.trigger.Arguments["target_id"])
+	if targetID == "" {
+		targetID = strings.TrimSpace(s.trigger.Arguments["target"])
+	}
+
+	if env.Passthrough != nil {
+		if err := env.Passthrough.DispatchBluetoothCommand(ctx, BluetoothCommand{
+			DeviceID:   strings.TrimSpace(s.trigger.SourceID),
+			Action:     action,
+			TargetID:   targetID,
+			Parameters: passthroughParameters(s.trigger.Arguments, "action", "target_id", "target"),
+		}); err != nil {
+			return err
+		}
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, "Bluetooth passthrough requested: "+action)
+}
+
+// Stop ends passthrough mode and currently has no side effects.
+func (s *BluetoothPassthroughScenario) Stop() error { return nil }
+
+// HandleBluetoothEvent reports passthrough updates to the source device.
+func (s *BluetoothPassthroughScenario) HandleBluetoothEvent(ctx context.Context, env *Environment, event BluetoothEvent) error {
+	message := "Bluetooth event"
+	if evt := strings.TrimSpace(event.Event); evt != "" {
+		message = "Bluetooth event: " + evt
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, message)
+}
+
+// USBPassthroughScenario dispatches server-directed USB passthrough commands.
+type USBPassthroughScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (s *USBPassthroughScenario) Name() string { return "usb_passthrough" }
+
+// Match records trigger metadata when USB passthrough is requested.
+func (s *USBPassthroughScenario) Match(trigger Trigger) bool {
+	if !intentMatches(
+		trigger.Intent,
+		"usb passthrough",
+		"usb_passthrough",
+		"usb enumerate",
+		"usb_enumerate",
+		"usb claim",
+		"usb_claim",
+	) {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start dispatches a USB passthrough command through the server bridge.
+func (s *USBPassthroughScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil {
+		return nil
+	}
+	action := strings.TrimSpace(s.trigger.Arguments["action"])
+	if action == "" {
+		action = "enumerate"
+		if strings.Contains(strings.ToLower(strings.TrimSpace(s.trigger.Intent)), "claim") {
+			action = "claim"
+		}
+	}
+	vendorID := strings.TrimSpace(s.trigger.Arguments["vendor_id"])
+	productID := strings.TrimSpace(s.trigger.Arguments["product_id"])
+
+	if env.Passthrough != nil {
+		if err := env.Passthrough.DispatchUSBCommand(ctx, USBCommand{
+			DeviceID:   strings.TrimSpace(s.trigger.SourceID),
+			Action:     action,
+			VendorID:   vendorID,
+			ProductID:  productID,
+			Parameters: passthroughParameters(s.trigger.Arguments, "action", "vendor_id", "product_id"),
+		}); err != nil {
+			return err
+		}
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, "USB passthrough requested: "+action)
+}
+
+// Stop ends passthrough mode and currently has no side effects.
+func (s *USBPassthroughScenario) Stop() error { return nil }
+
+// HandleUSBEvent reports passthrough updates to the source device.
+func (s *USBPassthroughScenario) HandleUSBEvent(ctx context.Context, env *Environment, event USBEvent) error {
+	message := "USB event"
+	if evt := strings.TrimSpace(event.Event); evt != "" {
+		message = "USB event: " + evt
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, message)
+}
+
+func passthroughParameters(args map[string]string, skip ...string) map[string]string {
+	if len(args) == 0 {
+		return map[string]string{}
+	}
+	skipSet := map[string]struct{}{}
+	for _, key := range skip {
+		skipSet[key] = struct{}{}
+	}
+	out := map[string]string{}
+	for key, value := range args {
+		if _, skipKey := skipSet[key]; skipKey {
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
 // IntercomScenario connects source device audio to all peer devices.
 type IntercomScenario struct {
 	trigger Trigger
+
+	mu          sync.Mutex
+	env         *Environment
+	ownedRoutes []ioRoute
 }
 
 // Name returns the stable scenario identifier.
@@ -189,16 +347,49 @@ func (s *IntercomScenario) Start(ctx context.Context, env *Environment) error {
 	if env == nil {
 		return nil
 	}
-	if err := connectBidirectionalSourcePeers(ctx, env, s.trigger.SourceID, "audio"); err != nil {
+	targets := peerTargetDeviceIDs(env, s.trigger.SourceID, s.trigger.Arguments)
+	ownedRoutes, err := connectBidirectionalSourceTargetsOwned(ctx, env, s.trigger.SourceID, targets, "audio")
+	if err != nil {
 		return err
 	}
-	return notifySource(ctx, env, s.trigger.SourceID, "Intercom active")
+	s.mu.Lock()
+	s.env = env
+	s.ownedRoutes = ownedRoutes
+	s.mu.Unlock()
+	if err := notifySource(ctx, env, s.trigger.SourceID, "Intercom active"); err != nil {
+		return err
+	}
+	return nil
 }
 
-// Stop ends intercom mode and currently has no side effects.
-// TODO(phase-7): evaluate Suspend/Resume hooks if intercom begins owning
-// long-lived subscriptions that must be explicitly torn down on preemption.
-func (s *IntercomScenario) Stop() error { return nil }
+// Stop ends intercom mode and releases any owned routes.
+func (s *IntercomScenario) Stop() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = nil
+	s.ownedRoutes = nil
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Suspend releases owned routes while preempted.
+func (s *IntercomScenario) Suspend() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Resume reacquires owned routes after preemption.
+func (s *IntercomScenario) Resume(_ context.Context, env *Environment) error {
+	s.mu.Lock()
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = env
+	s.mu.Unlock()
+	return reconnectOwnedRoutes(env, routes)
+}
 
 // InternalVideoCallScenario connects source and target with bidirectional audio/video.
 type InternalVideoCallScenario struct {
@@ -512,6 +703,9 @@ func audioMonitorEventMatchesTarget(target, label string) bool {
 // ScheduleMonitorScenario schedules a check and confirms activation.
 type ScheduleMonitorScenario struct {
 	trigger Trigger
+
+	mu              sync.Mutex
+	lastAlertUnixMS int64
 }
 
 // Name returns the stable scenario identifier.
@@ -542,15 +736,89 @@ func (s *ScheduleMonitorScenario) Start(ctx context.Context, env *Environment) e
 			return err
 		}
 	}
+	s.mu.Lock()
+	s.lastAlertUnixMS = 0
+	s.mu.Unlock()
 	return notifySource(ctx, env, s.trigger.SourceID, "Schedule monitor active")
 }
 
 // Stop ends schedule monitor mode and currently has no side effects.
 func (s *ScheduleMonitorScenario) Stop() error { return nil }
 
+// HandleSensor consumes live sensor telemetry while schedule monitoring is
+// active and raises an activity alert when movement exceeds threshold.
+func (s *ScheduleMonitorScenario) HandleSensor(ctx context.Context, env *Environment, reading SensorReading) error {
+	if env == nil || env.Broadcast == nil {
+		return nil
+	}
+	if strings.TrimSpace(reading.DeviceID) == "" {
+		return nil
+	}
+	monitorDeviceID := strings.TrimSpace(s.trigger.SourceID)
+	if monitorDeviceID != "" && reading.DeviceID != monitorDeviceID {
+		return nil
+	}
+
+	magnitude, ok := sensorMotionMagnitude(reading.Values)
+	if !ok {
+		return nil
+	}
+	threshold := parseFloatOrDefault(s.trigger.Arguments["motion_threshold"], 1.20)
+	if magnitude < threshold {
+		return nil
+	}
+
+	eventUnixMS := reading.UnixMS
+	if eventUnixMS <= 0 {
+		eventUnixMS = time.Now().UnixMilli()
+	}
+	cooldownMS := int64(parseFloatOrDefault(s.trigger.Arguments["cooldown_ms"], 60_000))
+	if cooldownMS < 0 {
+		cooldownMS = 0
+	}
+
+	s.mu.Lock()
+	if s.lastAlertUnixMS > 0 && eventUnixMS-s.lastAlertUnixMS < cooldownMS {
+		s.mu.Unlock()
+		return nil
+	}
+	s.lastAlertUnixMS = eventUnixMS
+	s.mu.Unlock()
+
+	return notifySource(ctx, env, reading.DeviceID, fmt.Sprintf("Schedule monitor activity detected: magnitude=%.2f", magnitude))
+}
+
+func parseFloatOrDefault(raw string, fallback float64) float64 {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func sensorMotionMagnitude(values map[string]float64) (float64, bool) {
+	if len(values) == 0 {
+		return 0, false
+	}
+	if scalar, ok := values["motion.magnitude"]; ok {
+		return math.Abs(scalar), true
+	}
+	x, hasX := values["accelerometer.x"]
+	y, hasY := values["accelerometer.y"]
+	z, hasZ := values["accelerometer.z"]
+	if hasX || hasY || hasZ {
+		return math.Sqrt((x * x) + (y * y) + (z * z)), true
+	}
+	return 0, false
+}
+
 // PASystemScenario fans out source audio to peers with PA semantics.
 type PASystemScenario struct {
 	trigger Trigger
+
+	mu          sync.Mutex
+	env         *Environment
+	ownedRoutes []ioRoute
 }
 
 // Name returns the stable scenario identifier.
@@ -570,9 +838,15 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 	if env == nil {
 		return nil
 	}
-	if err := connectSourceToPeers(ctx, env, s.trigger.SourceID, "pa_audio"); err != nil {
+	targets := peerTargetDeviceIDs(env, s.trigger.SourceID, s.trigger.Arguments)
+	ownedRoutes, err := connectSourceToTargetsOwned(ctx, env, s.trigger.SourceID, targets, "pa_audio")
+	if err != nil {
 		return err
 	}
+	s.mu.Lock()
+	s.env = env
+	s.ownedRoutes = ownedRoutes
+	s.mu.Unlock()
 	if err := notifySource(ctx, env, s.trigger.SourceID, "PA system active"); err != nil {
 		return err
 	}
@@ -586,10 +860,111 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 	return nil
 }
 
-// Stop ends PA mode and currently has no side effects.
-// TODO(phase-7): evaluate Suspend/Resume hooks if PA mode moves to explicit
-// resource ownership with lifecycle distinct from Start/Stop.
-func (s *PASystemScenario) Stop() error { return nil }
+// Stop ends PA mode and releases any owned routes.
+func (s *PASystemScenario) Stop() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = nil
+	s.ownedRoutes = nil
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Suspend releases PA-owned routes while preempted.
+func (s *PASystemScenario) Suspend() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Resume reacquires PA-owned routes after preemption.
+func (s *PASystemScenario) Resume(_ context.Context, env *Environment) error {
+	s.mu.Lock()
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = env
+	s.mu.Unlock()
+	return reconnectOwnedRoutes(env, routes)
+}
+
+// AnnouncementScenario fans out source audio one-way for whole-house announcements.
+type AnnouncementScenario struct {
+	trigger Trigger
+
+	mu          sync.Mutex
+	env         *Environment
+	ownedRoutes []ioRoute
+}
+
+// Name returns the stable scenario identifier.
+func (s *AnnouncementScenario) Name() string { return "announcement" }
+
+// Match records trigger metadata when announcement mode is requested.
+func (s *AnnouncementScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "announcement", "announce", "whole house announcement") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start routes source audio to peers and announces announcement mode.
+func (s *AnnouncementScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil {
+		return nil
+	}
+	targets := peerTargetDeviceIDs(env, s.trigger.SourceID, s.trigger.Arguments)
+	ownedRoutes, err := connectSourceToTargetsOwned(ctx, env, s.trigger.SourceID, targets, "announcement_audio")
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.env = env
+	s.ownedRoutes = ownedRoutes
+	s.mu.Unlock()
+	if err := notifySource(ctx, env, s.trigger.SourceID, "Announcement active"); err != nil {
+		return err
+	}
+	if env.Broadcast != nil {
+		sourceID := strings.TrimSpace(s.trigger.SourceID)
+		peerIDs := nonSourceDeviceIDs(env, sourceID)
+		if len(peerIDs) > 0 {
+			return env.Broadcast.Notify(ctx, peerIDs, "Announcement from "+sourceID)
+		}
+	}
+	return nil
+}
+
+// Stop ends announcement mode and releases any owned routes.
+func (s *AnnouncementScenario) Stop() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = nil
+	s.ownedRoutes = nil
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Suspend releases announcement-owned routes while preempted.
+func (s *AnnouncementScenario) Suspend() error {
+	s.mu.Lock()
+	env := s.env
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.mu.Unlock()
+	return disconnectOwnedRoutes(env, routes)
+}
+
+// Resume reacquires announcement-owned routes after preemption.
+func (s *AnnouncementScenario) Resume(_ context.Context, env *Environment) error {
+	s.mu.Lock()
+	routes := append([]ioRoute(nil), s.ownedRoutes...)
+	s.env = env
+	s.mu.Unlock()
+	return reconnectOwnedRoutes(env, routes)
+}
 
 // MultiWindowScenario routes all peer cameras to source display.
 type MultiWindowScenario struct {
@@ -615,12 +990,8 @@ func (s *MultiWindowScenario) Start(ctx context.Context, env *Environment) error
 	}
 	if env.IO != nil && env.Devices != nil && strings.TrimSpace(s.trigger.SourceID) != "" {
 		source := strings.TrimSpace(s.trigger.SourceID)
-		peers := make([]string, 0, len(env.Devices.ListDeviceIDs()))
-		for _, peer := range env.Devices.ListDeviceIDs() {
-			if peer == "" || peer == source {
-				continue
-			}
-			peers = append(peers, peer)
+		peers := peerTargetDeviceIDs(env, source, s.trigger.Arguments)
+		for _, peer := range peers {
 			if err := env.IO.Connect(peer, source, "video"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 				return err
 			}
@@ -680,41 +1051,117 @@ func notifySource(ctx context.Context, env *Environment, sourceID, message strin
 	return env.Broadcast.Notify(ctx, deviceIDs, message)
 }
 
-func connectSourceToPeers(_ context.Context, env *Environment, sourceID, streamKind string) error {
+type ioRoute struct {
+	sourceID   string
+	targetID   string
+	streamKind string
+}
+
+func connectSourceToTargetsOwned(
+	_ context.Context,
+	env *Environment,
+	sourceID string,
+	targetIDs []string,
+	streamKind string,
+) ([]ioRoute, error) {
 	if env == nil || env.IO == nil || env.Devices == nil {
-		return nil
+		return nil, nil
 	}
 	sourceID = strings.TrimSpace(sourceID)
 	if sourceID == "" {
-		return nil
+		return nil, nil
 	}
-	for _, targetID := range env.Devices.ListDeviceIDs() {
+	if targetIDs == nil {
+		targetIDs = nonSourceDeviceIDs(env, sourceID)
+	}
+	routes := make([]ioRoute, 0)
+	for _, targetID := range targetIDs {
 		if targetID == "" || targetID == sourceID {
 			continue
 		}
-		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil {
+			if errors.Is(err, iorouter.ErrRouteExists) {
+				continue
+			}
+			return nil, err
+		}
+		routes = append(routes, ioRoute{
+			sourceID:   sourceID,
+			targetID:   targetID,
+			streamKind: streamKind,
+		})
+	}
+	return routes, nil
+}
+
+func connectBidirectionalSourceTargetsOwned(
+	_ context.Context,
+	env *Environment,
+	sourceID string,
+	targetIDs []string,
+	streamKind string,
+) ([]ioRoute, error) {
+	if env == nil || env.IO == nil || env.Devices == nil {
+		return nil, nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	if sourceID == "" {
+		return nil, nil
+	}
+	if targetIDs == nil {
+		targetIDs = nonSourceDeviceIDs(env, sourceID)
+	}
+	routes := make([]ioRoute, 0)
+	for _, peerID := range targetIDs {
+		if peerID == "" || peerID == sourceID {
+			continue
+		}
+		if err := env.IO.Connect(sourceID, peerID, streamKind); err != nil {
+			if !errors.Is(err, iorouter.ErrRouteExists) {
+				return nil, err
+			}
+		} else {
+			routes = append(routes, ioRoute{
+				sourceID:   sourceID,
+				targetID:   peerID,
+				streamKind: streamKind,
+			})
+		}
+		if err := env.IO.Connect(peerID, sourceID, streamKind); err != nil {
+			if !errors.Is(err, iorouter.ErrRouteExists) {
+				return nil, err
+			}
+		} else {
+			routes = append(routes, ioRoute{
+				sourceID:   peerID,
+				targetID:   sourceID,
+				streamKind: streamKind,
+			})
+		}
+	}
+	return routes, nil
+}
+
+func disconnectOwnedRoutes(env *Environment, routes []ioRoute) error {
+	if env == nil || env.IO == nil || len(routes) == 0 {
+		return nil
+	}
+	for _, route := range routes {
+		err := env.IO.Disconnect(route.sourceID, route.targetID, route.streamKind)
+		if err != nil && !errors.Is(err, iorouter.ErrRouteNotFound) {
 			return err
 		}
 	}
 	return nil
 }
 
-func connectBidirectionalSourcePeers(_ context.Context, env *Environment, sourceID, streamKind string) error {
-	if env == nil || env.IO == nil || env.Devices == nil {
+func reconnectOwnedRoutes(env *Environment, routes []ioRoute) error {
+	if env == nil || env.IO == nil || len(routes) == 0 {
 		return nil
 	}
-	sourceID = strings.TrimSpace(sourceID)
-	if sourceID == "" {
-		return nil
-	}
-	for _, peerID := range env.Devices.ListDeviceIDs() {
-		if peerID == "" || peerID == sourceID {
-			continue
-		}
-		if err := env.IO.Connect(sourceID, peerID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
-			return err
-		}
-		if err := env.IO.Connect(peerID, sourceID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+	for _, route := range routes {
+		err := env.IO.Connect(route.sourceID, route.targetID, route.streamKind)
+		if err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
 			return err
 		}
 	}
@@ -735,4 +1182,46 @@ func nonSourceDeviceIDs(env *Environment, sourceID string) []string {
 		peers = append(peers, deviceID)
 	}
 	return peers
+}
+
+func peerTargetDeviceIDs(env *Environment, sourceID string, args map[string]string) []string {
+	if env == nil || env.Devices == nil {
+		return nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	raw := ""
+	if args != nil {
+		raw = strings.TrimSpace(args["device_ids"])
+	}
+	if raw == "" {
+		return nonSourceDeviceIDs(env, sourceID)
+	}
+
+	validSet := map[string]struct{}{}
+	for _, deviceID := range env.Devices.ListDeviceIDs() {
+		trimmed := strings.TrimSpace(deviceID)
+		if trimmed == "" || trimmed == sourceID {
+			continue
+		}
+		validSet[trimmed] = struct{}{}
+	}
+
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		deviceID := strings.TrimSpace(part)
+		if deviceID == "" || deviceID == sourceID {
+			continue
+		}
+		if _, ok := validSet[deviceID]; !ok {
+			continue
+		}
+		if _, exists := seen[deviceID]; exists {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		out = append(out, deviceID)
+	}
+	return out
 }

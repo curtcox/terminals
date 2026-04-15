@@ -48,6 +48,50 @@ func TestParseVoiceTriggerTerminal(t *testing.T) {
 	}
 }
 
+func TestParseVoiceTriggerBluetoothPassthrough(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "scan bluetooth", now)
+	if got.Intent != "bluetooth_passthrough" {
+		t.Fatalf("Intent = %q, want bluetooth_passthrough", got.Intent)
+	}
+	if got.Arguments["action"] != "scan" {
+		t.Fatalf("action = %q, want scan", got.Arguments["action"])
+	}
+
+	connect := ParseVoiceTrigger("device-1", "bluetooth connect AA:BB:CC:DD", now)
+	if connect.Intent != "bluetooth_passthrough" {
+		t.Fatalf("Intent = %q, want bluetooth_passthrough", connect.Intent)
+	}
+	if connect.Arguments["action"] != "connect" {
+		t.Fatalf("action = %q, want connect", connect.Arguments["action"])
+	}
+	if connect.Arguments["target_id"] != "aa:bb:cc:dd" {
+		t.Fatalf("target_id = %q, want aa:bb:cc:dd", connect.Arguments["target_id"])
+	}
+}
+
+func TestParseVoiceTriggerUSBPassthrough(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	got := ParseVoiceTrigger("device-1", "usb enumerate", now)
+	if got.Intent != "usb_passthrough" {
+		t.Fatalf("Intent = %q, want usb_passthrough", got.Intent)
+	}
+	if got.Arguments["action"] != "enumerate" {
+		t.Fatalf("action = %q, want enumerate", got.Arguments["action"])
+	}
+
+	claim := ParseVoiceTrigger("device-1", "usb claim 1a2b:3c4d", now)
+	if claim.Intent != "usb_passthrough" {
+		t.Fatalf("Intent = %q, want usb_passthrough", claim.Intent)
+	}
+	if claim.Arguments["action"] != "claim" {
+		t.Fatalf("action = %q, want claim", claim.Arguments["action"])
+	}
+	if claim.Arguments["vendor_id"] != "1a2b" || claim.Arguments["product_id"] != "3c4d" {
+		t.Fatalf("claim args = %+v, want vendor_id=1a2b product_id=3c4d", claim.Arguments)
+	}
+}
+
 func TestParseVoiceTriggerPhoneCallWithTarget(t *testing.T) {
 	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
 	got := ParseVoiceTrigger("device-1", "call 5551212", now)
@@ -94,6 +138,16 @@ func TestParseVoiceTriggerPAModeAlias(t *testing.T) {
 	got := ParseVoiceTrigger("device-1", "PA mode", now)
 	if got.Intent != "pa system" {
 		t.Fatalf("Intent = %q, want pa system", got.Intent)
+	}
+}
+
+func TestParseVoiceTriggerAnnouncementAliases(t *testing.T) {
+	now := time.Date(2026, 4, 11, 21, 0, 0, 0, time.UTC)
+	for _, spoken := range []string{"announcement", "announce", "start announcement"} {
+		got := ParseVoiceTrigger("device-1", spoken, now)
+		if got.Intent != "announcement" {
+			t.Fatalf("spoken=%q intent = %q, want announcement", spoken, got.Intent)
+		}
 	}
 }
 
