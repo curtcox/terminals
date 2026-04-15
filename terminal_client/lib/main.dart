@@ -8,10 +8,15 @@ import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
+import 'package:terminal_client/media/webrtc_engine.dart';
 
 typedef TerminalControlClientFactory = TerminalControlClient Function({
   required String host,
   required int port,
+});
+typedef ClientMediaEngineFactory = ClientMediaEngine Function({
+  required String localDeviceID,
+  required OutboundSignalCallback onSignal,
 });
 
 Duration calculateReconnectDelay({
@@ -34,6 +39,7 @@ class TerminalClientApp extends StatelessWidget {
   const TerminalClientApp({
     super.key,
     this.clientFactory = TerminalControlGrpcClient.new,
+    this.mediaEngineFactory = defaultClientMediaEngineFactory,
     this.heartbeatInterval = const Duration(seconds: 10),
     this.sensorTelemetryInterval = const Duration(seconds: 15),
     this.reconnectDelayBase = const Duration(seconds: 2),
@@ -41,6 +47,7 @@ class TerminalClientApp extends StatelessWidget {
   });
 
   final TerminalControlClientFactory clientFactory;
+  final ClientMediaEngineFactory mediaEngineFactory;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
@@ -52,6 +59,7 @@ class TerminalClientApp extends StatelessWidget {
       title: 'Terminal Client',
       home: _ControlStreamScaffold(
         clientFactory: clientFactory,
+        mediaEngineFactory: mediaEngineFactory,
         heartbeatInterval: heartbeatInterval,
         sensorTelemetryInterval: sensorTelemetryInterval,
         reconnectDelayBase: reconnectDelayBase,
@@ -64,6 +72,7 @@ class TerminalClientApp extends StatelessWidget {
 class _ControlStreamScaffold extends StatefulWidget {
   const _ControlStreamScaffold({
     required this.clientFactory,
+    required this.mediaEngineFactory,
     required this.heartbeatInterval,
     required this.sensorTelemetryInterval,
     required this.reconnectDelayBase,
@@ -71,6 +80,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   });
 
   final TerminalControlClientFactory clientFactory;
+  final ClientMediaEngineFactory mediaEngineFactory;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
@@ -105,6 +115,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _status = 'Idle';
   int _responses = 0;
   final String _deviceId = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
+  late final ClientMediaEngine _mediaEngine;
   uiv1.Node? _activeRoot;
   int _activeRootRevision = 0;
   String _activeTransition = 'none';
@@ -146,6 +157,15 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _diagnosticsTitle = 'none';
   Map<String, String> _diagnosticsData = <String, String>{};
   String _photoFrameAssetBaseURL = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _mediaEngine = widget.mediaEngineFactory(
+      localDeviceID: _deviceId,
+      onSignal: _sendWebRTCSignalMessage,
+    );
+  }
 
   Future<void> _startStream({bool userInitiated = true}) async {
     if (_isConnecting) {
@@ -598,6 +618,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _stopSensorTelemetryLoop();
     await _incoming?.cancel();
     _incoming = null;
+    for (final streamID in _activeStreamsByID.keys.toList(growable: false)) {
+      await _mediaEngine.stopStream(streamID);
+    }
+    _activeStreamsByID.clear();
+    _routesByStreamID.clear();
     final existingClient = _client;
     if (existingClient != null) {
       await existingClient.shutdown();
@@ -622,6 +647,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       unawaited(incoming.cancel());
     }
     _outgoing.close();
+    unawaited(_mediaEngine.dispose());
     final existingClient = _client;
     if (existingClient != null) {
       unawaited(existingClient.shutdown());
@@ -886,18 +912,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             ..streamReady = (StreamReady()..streamId = start.streamId),
         );
         _streamReadyAckCount += 1;
-        _sendWebRTCSignal(
-          streamID: start.streamId,
-          signalType: 'offer',
-          payload:
-              '{"type":"offer","stream_id":"${start.streamId}","kind":"${start.kind}","source":"client"}',
-        );
-        _sendWebRTCSignal(
-          streamID: start.streamId,
-          signalType: 'candidate',
-          payload:
-              '{"type":"candidate","stream_id":"${start.streamId}","candidate":"candidate:local-1"}',
-        );
+        unawaited(_mediaEngine.startStream(start.deepCopy()));
       }
       if (start.kind.isNotEmpty) {
         _lastNotification = 'Start stream: ${start.kind} (${start.streamId})';
@@ -908,6 +923,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       if (streamID.isNotEmpty) {
         _activeStreamsByID.remove(streamID);
         _routesByStreamID.remove(streamID);
+        unawaited(_mediaEngine.stopStream(streamID));
         _lastNotification = 'Stop stream: $streamID';
       }
     }
@@ -930,21 +946,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       }
       _lastNotification =
           'WebRTC signal: ${response.webrtcSignal.signalType} (${response.webrtcSignal.streamId})';
-      final signalType = response.webrtcSignal.signalType.trim().toLowerCase();
-      if (signalType == 'offer') {
-        _sendWebRTCSignal(
-          streamID: response.webrtcSignal.streamId,
-          signalType: 'answer',
-          payload:
-              '{"type":"answer","stream_id":"${response.webrtcSignal.streamId}","source":"client"}',
-        );
-        _sendWebRTCSignal(
-          streamID: response.webrtcSignal.streamId,
-          signalType: 'candidate',
-          payload:
-              '{"type":"candidate","stream_id":"${response.webrtcSignal.streamId}","candidate":"candidate:local-2"}',
-        );
-      }
+      unawaited(_mediaEngine.handleSignal(response.webrtcSignal.deepCopy()));
     }
     if (response.hasPlayAudio()) {
       final playAudio = response.playAudio;
@@ -1134,20 +1136,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     );
   }
 
-  void _sendWebRTCSignal({
-    required String streamID,
-    required String signalType,
-    required String payload,
-  }) {
+  void _sendWebRTCSignalMessage(WebRTCSignal signal) {
+    final streamID = signal.streamId.trim();
+    final signalType = signal.signalType.trim();
     if (streamID.isEmpty || signalType.isEmpty) {
       return;
     }
     _outgoing.add(
-      ConnectRequest()
-        ..webrtcSignal = (WebRTCSignal()
-          ..streamId = streamID
-          ..signalType = signalType
-          ..payload = payload),
+      ConnectRequest()..webrtcSignal = signal.deepCopy(),
     );
   }
 

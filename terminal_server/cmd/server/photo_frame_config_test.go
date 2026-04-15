@@ -140,7 +140,11 @@ func TestPhotoFrameAssetHandlerServesFilesAndBlocksDirectories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET file error = %v", err)
 	}
-	defer fileRes.Body.Close()
+	t.Cleanup(func() {
+		if closeErr := fileRes.Body.Close(); closeErr != nil {
+			t.Fatalf("fileRes.Body.Close() error = %v", closeErr)
+		}
+	})
 	if fileRes.StatusCode != http.StatusOK {
 		t.Fatalf("GET file status = %d, want 200", fileRes.StatusCode)
 	}
@@ -152,7 +156,11 @@ func TestPhotoFrameAssetHandlerServesFilesAndBlocksDirectories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET dir error = %v", err)
 	}
-	defer dirRes.Body.Close()
+	t.Cleanup(func() {
+		if closeErr := dirRes.Body.Close(); closeErr != nil {
+			t.Fatalf("dirRes.Body.Close() error = %v", closeErr)
+		}
+	})
 	if dirRes.StatusCode != http.StatusNotFound {
 		t.Fatalf("GET dir status = %d, want 404", dirRes.StatusCode)
 	}

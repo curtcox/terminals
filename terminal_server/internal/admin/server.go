@@ -1,3 +1,4 @@
+// Package admin serves a lightweight web dashboard and JSON admin APIs.
 package admin
 
 import (

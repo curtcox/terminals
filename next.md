@@ -1,1 +1,1 @@
-Implement client-side flutter_webrtc media support and connect it to StartStream/RouteStream/WebRTCSignal control messages.
+Run a manual multi-device LAN smoke test (discovery, intercom audio route, and UI updates) and capture any runtime gaps.

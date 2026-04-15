@@ -31,7 +31,11 @@ func TestStartAdminServerServesRequests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /admin error = %v", err)
 	}
-	defer resp.Body.Close()
+	t.Cleanup(func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Fatalf("resp.Body.Close() error = %v", closeErr)
+		}
+	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /admin status = %d, want 200", resp.StatusCode)
 	}

@@ -8,6 +8,7 @@ import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/main.dart';
+import 'package:terminal_client/media/webrtc_engine.dart';
 
 void main() {
   testWidgets('app renders MaterialApp', (WidgetTester tester) async {
@@ -22,6 +23,7 @@ void main() {
     await tester.pumpWidget(
       TerminalClientApp(
         clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
         heartbeatInterval: const Duration(milliseconds: 40),
       ),
     );
@@ -43,6 +45,7 @@ void main() {
     await tester.pumpWidget(
       TerminalClientApp(
         clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
         heartbeatInterval: const Duration(seconds: 60),
         sensorTelemetryInterval: const Duration(milliseconds: 40),
       ),
@@ -74,6 +77,7 @@ void main() {
     await tester.pumpWidget(
       TerminalClientApp(
         clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
         reconnectDelayBase: const Duration(milliseconds: 30),
         reconnectDelayMaxSeconds: 1,
       ),
@@ -99,6 +103,7 @@ void main() {
       await tester.pumpWidget(
         TerminalClientApp(
           clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
           heartbeatInterval: const Duration(milliseconds: 40),
           reconnectDelayBase: const Duration(milliseconds: 30),
           reconnectDelayMaxSeconds: 1,
@@ -167,7 +172,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -205,7 +212,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -246,7 +255,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -291,7 +302,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -335,7 +348,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -390,7 +405,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -422,7 +439,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -449,7 +468,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -532,7 +553,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -589,7 +612,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -627,7 +652,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -675,7 +702,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -724,7 +753,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -797,7 +828,9 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final harness = _FakeClientHarness();
       await tester.pumpWidget(
-        TerminalClientApp(clientFactory: harness.createClient),
+        TerminalClientApp(
+            clientFactory: harness.createClient,
+            mediaEngineFactory: harness.createMediaEngine),
       );
       await tester.tap(find.text('Connect Stream'));
       await tester.pump();
@@ -903,7 +936,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -936,7 +971,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness();
     await tester.pumpWidget(
-      TerminalClientApp(clientFactory: harness.createClient),
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
@@ -1083,6 +1120,7 @@ class _FakeClientHarness {
 
   final List<_FakeTerminalControlClient> createdClients =
       <_FakeTerminalControlClient>[];
+  final List<_FakeMediaEngine> createdMediaEngines = <_FakeMediaEngine>[];
   final bool failFirstConnectStream;
 
   _FakeTerminalControlClient get lastClient => createdClients.last;
@@ -1099,6 +1137,76 @@ class _FakeClientHarness {
     createdClients.add(client);
     return client;
   }
+
+  ClientMediaEngine createMediaEngine({
+    required String localDeviceID,
+    required OutboundSignalCallback onSignal,
+  }) {
+    final engine = _FakeMediaEngine(
+      localDeviceID: localDeviceID,
+      onSignal: onSignal,
+    );
+    createdMediaEngines.add(engine);
+    return engine;
+  }
+}
+
+class _FakeMediaEngine implements ClientMediaEngine {
+  _FakeMediaEngine({
+    required this.localDeviceID,
+    required this.onSignal,
+  });
+
+  final String localDeviceID;
+  final OutboundSignalCallback onSignal;
+  final Set<String> _activeStreamIDs = <String>{};
+
+  @override
+  Future<void> startStream(iov1.StartStream start) async {
+    if (start.streamId.isEmpty || _activeStreamIDs.contains(start.streamId)) {
+      return;
+    }
+    _activeStreamIDs.add(start.streamId);
+    onSignal(
+      WebRTCSignal()
+        ..streamId = start.streamId
+        ..signalType = 'offer'
+        ..payload = '{"sdp":"fake-offer-for-${start.streamId}"}',
+    );
+    onSignal(
+      WebRTCSignal()
+        ..streamId = start.streamId
+        ..signalType = 'candidate'
+        ..payload = '{"candidate":"fake-local-candidate-1"}',
+    );
+  }
+
+  @override
+  Future<void> stopStream(String streamID) async {
+    _activeStreamIDs.remove(streamID);
+  }
+
+  @override
+  Future<void> handleSignal(WebRTCSignal signal) async {
+    if (signal.signalType.trim().toLowerCase() != 'offer') {
+      return;
+    }
+    onSignal(
+      WebRTCSignal()
+        ..streamId = signal.streamId
+        ..signalType = 'answer'
+        ..payload = '{"sdp":"fake-answer-for-${signal.streamId}"}',
+    );
+    onSignal(
+      WebRTCSignal()
+        ..streamId = signal.streamId
+        ..signalType = 'candidate'
+        ..payload = '{"candidate":"fake-local-candidate-2"}',
+    );
+  }
+
+  @override
+  Future<void> dispose() async {}
 }
 
 class _FakeTerminalControlClient implements TerminalControlClient {
