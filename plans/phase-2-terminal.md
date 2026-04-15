@@ -10,7 +10,7 @@ First real use case. Validates keyboard input forwarding and text-based server-d
 
 ## Deliverables
 
-- [ ] **Scenario definition/activation split**: Introduce `ScenarioDefinition` and `ScenarioActivation` with a trivial engine that can match a trigger and start/stop a single activation. See [scenario-engine.md](scenario-engine.md#definitions-vs-activations). The terminal scenario is the first definition; each PTY session becomes its own activation so multiple terminals are natural.
+- [x] **Scenario definition/activation split**: Introduce `ScenarioDefinition` and `ScenarioActivation` with a trivial engine that can match a trigger and start/stop a single activation. See [scenario-engine.md](scenario-engine.md#definitions-vs-activations). The terminal scenario is the first definition; each PTY session becomes its own activation so multiple terminals are natural.
 - [x] **PTY management**: Server spawns and manages pseudo-terminal sessions (one per activation once the split above lands).
 - [x] **Terminal UI descriptor**: Monospace scrollable text output + text input. Composed from existing primitives (see [server-driven-ui.md](server-driven-ui.md)).
 - [x] **Keyboard forwarding**: Client sends key events, server feeds them to the PTY. See `InputEvent` in [protocol.md](protocol.md).

@@ -28,16 +28,19 @@ func NewRuntime(engine *Engine, env *Environment) *Runtime {
 
 // HandleTrigger matches and activates a scenario for the selected devices.
 func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, error) {
-	reg, ok := r.Engine.Match(trigger)
+	match, ok := r.Engine.MatchActivation(ActivationRequest{
+		Trigger:     trigger,
+		RequestedAt: time.Now().UTC(),
+	})
 	if !ok {
 		return "", ErrNoMatchingScenario
 	}
 
 	deviceIDs := targetDevices(ctx, r.Env, trigger)
-	if err := r.Engine.Activate(ctx, r.Env, reg.Scenario.Name(), deviceIDs); err != nil {
+	if err := r.Engine.ActivateMatched(ctx, r.Env, match, deviceIDs); err != nil {
 		return "", err
 	}
-	return reg.Scenario.Name(), nil
+	return match.Registration.name(), nil
 }
 
 // HandleVoiceText parses spoken text and routes to HandleTrigger.
@@ -47,16 +50,20 @@ func (r *Runtime) HandleVoiceText(ctx context.Context, sourceID, spoken string, 
 
 // StopTrigger matches and stops a scenario for the selected devices.
 func (r *Runtime) StopTrigger(ctx context.Context, trigger Trigger) (string, error) {
-	reg, ok := r.Engine.Match(trigger)
+	match, ok := r.Engine.MatchActivation(ActivationRequest{
+		Trigger:     trigger,
+		RequestedAt: time.Now().UTC(),
+	})
 	if !ok {
 		return "", ErrNoMatchingScenario
 	}
 
 	deviceIDs := targetDevices(ctx, r.Env, trigger)
-	if err := r.Engine.Stop(ctx, r.Env, reg.Scenario.Name(), deviceIDs); err != nil {
+	name := match.Registration.name()
+	if err := r.Engine.Stop(ctx, r.Env, name, deviceIDs); err != nil {
 		return "", err
 	}
-	return reg.Scenario.Name(), nil
+	return name, nil
 }
 
 // StopVoiceText parses spoken text and routes to StopTrigger.

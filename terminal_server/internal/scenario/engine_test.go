@@ -128,3 +128,42 @@ func TestRegistrySnapshot(t *testing.T) {
 		t.Fatalf("reg[0].Priority = %d, want %d", reg[0].Priority, PriorityHigh)
 	}
 }
+
+func TestActivateFactoryCreatesPerRunActivation(t *testing.T) {
+	e := NewEngine()
+	var created []*stubScenario
+	e.Register(Registration{
+		Factory: func() Scenario {
+			s := &stubScenario{name: "terminal", match: true}
+			created = append(created, s)
+			return s
+		},
+		Priority: PriorityNormal,
+	})
+
+	if err := e.Activate(context.Background(), &Environment{}, "terminal", []string{"device-1"}); err != nil {
+		t.Fatalf("Activate(terminal, device-1) error = %v", err)
+	}
+	if err := e.Stop(context.Background(), &Environment{}, "terminal", []string{"device-1"}); err != nil {
+		t.Fatalf("Stop(terminal, device-1) error = %v", err)
+	}
+	if err := e.Activate(context.Background(), &Environment{}, "terminal", []string{"device-2"}); err != nil {
+		t.Fatalf("Activate(terminal, device-2) error = %v", err)
+	}
+
+	started := make([]*stubScenario, 0, len(created))
+	for _, scenario := range created {
+		if scenario.started > 0 {
+			started = append(started, scenario)
+		}
+	}
+	if len(started) != 2 {
+		t.Fatalf("started activation count = %d, want 2 (created=%d)", len(started), len(created))
+	}
+	if started[0] == started[1] {
+		t.Fatalf("expected distinct started activation instances per run")
+	}
+	if started[0].started != 1 || started[1].started != 1 {
+		t.Fatalf("started activation counters = (%d, %d), want (1, 1)", started[0].started, started[1].started)
+	}
+}

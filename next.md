@@ -1,1 +1,1 @@
-Implement ScenarioDefinition/ScenarioActivation split in scenario engine and runtime.
+Implement Intent/Event bus and route voice + UI triggers through it.

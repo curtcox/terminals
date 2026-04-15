@@ -3,6 +3,7 @@ package scenario
 import (
 	"context"
 	"image"
+	"time"
 )
 
 // TriggerKind identifies how a scenario was requested.
@@ -60,6 +61,14 @@ type PlacementEngine interface {
 	NearestWith(ctx context.Context, source DeviceRef, cap string) (DeviceRef, error)
 	DevicesInZone(ctx context.Context, zone string) ([]DeviceRef, error)
 	DevicesWithRole(ctx context.Context, role string) ([]DeviceRef, error)
+}
+
+// ActivationRequest is the normalized request passed to definitions to
+// determine match + activation construction.
+type ActivationRequest struct {
+	Trigger     Trigger
+	Targets     []DeviceRef
+	RequestedAt time.Time
 }
 
 // DeviceManager exposes device selection and command capabilities.
@@ -310,6 +319,14 @@ type Scenario interface {
 	Match(trigger Trigger) bool
 	Start(ctx context.Context, env *Environment) error
 	Stop() error
+}
+
+// ScenarioDefinition is a stateless singleton that can match a request and
+// construct per-run activation instances.
+type ScenarioDefinition interface {
+	Name() string
+	Match(req ActivationRequest) bool
+	NewActivation(req ActivationRequest) (Scenario, error)
 }
 
 // Suspendable is an optional hook implemented by scenarios that need to

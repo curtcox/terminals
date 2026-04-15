@@ -3,8 +3,11 @@ package scenario
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
+	"strings"
 	"sync"
+	"time"
 )
 
 // Priority defines scenario preemption order.
@@ -29,6 +32,14 @@ var ErrScenarioNotFound = errors.New("scenario not found")
 
 // Registration wraps a scenario with runtime metadata.
 type Registration struct {
+	// Definition is the preferred registration model. It is stateless and
+	// produces per-run activation instances.
+	Definition ScenarioDefinition
+	// Factory is a legacy-friendly path for registering per-activation
+	// scenario constructors while the codebase migrates to Definition.
+	Factory func() Scenario
+	// Scenario is legacy registration support. When used directly, the same
+	// scenario instance may be reused across activations.
 	Scenario Scenario
 	Priority Priority
 }
@@ -43,6 +54,14 @@ type activeScenario struct {
 	name     string
 	priority Priority
 	scenario Scenario
+}
+
+// MatchResult contains the selected registration and the activation instance
+// prepared for this specific request.
+type MatchResult struct {
+	Registration Registration
+	Activation   Scenario
+	Request      ActivationRequest
 }
 
 // Engine manages registration, matching, and activation with preemption.
@@ -64,27 +83,53 @@ func NewEngine() *Engine {
 
 // Register adds or replaces a scenario registration.
 func (e *Engine) Register(reg Registration) {
+	name := strings.TrimSpace(reg.name())
+	if name == "" {
+		return
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.registry[reg.Scenario.Name()] = reg
+	e.registry[name] = reg
 }
 
 // Match returns the highest-priority matching scenario, if any.
 func (e *Engine) Match(trigger Trigger) (Registration, bool) {
+	result, ok := e.MatchActivation(ActivationRequest{
+		Trigger:     trigger,
+		RequestedAt: time.Now().UTC(),
+	})
+	if !ok {
+		return Registration{}, false
+	}
+	return result.Registration, true
+}
+
+// MatchActivation returns the highest-priority matching definition and the
+// prepared activation instance for this request.
+func (e *Engine) MatchActivation(req ActivationRequest) (MatchResult, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	candidates := make([]Registration, 0, len(e.registry))
+	candidates := make([]MatchResult, 0, len(e.registry))
 	for _, reg := range e.registry {
-		if reg.Scenario.Match(trigger) {
-			candidates = append(candidates, reg)
+		if strings.TrimSpace(reg.name()) == "" {
+			continue
 		}
+		activation, matched := reg.newActivation(req)
+		if !matched || activation == nil {
+			continue
+		}
+		candidates = append(candidates, MatchResult{
+			Registration: reg,
+			Activation:   activation,
+			Request:      req,
+		})
 	}
 	if len(candidates) == 0 {
-		return Registration{}, false
+		return MatchResult{}, false
 	}
 	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].Priority > candidates[j].Priority
+		return candidates[i].Registration.Priority > candidates[j].Registration.Priority
 	})
 	return candidates[0], true
 }
@@ -94,7 +139,39 @@ func (e *Engine) Match(trigger Trigger) (Registration, bool) {
 func (e *Engine) Activate(ctx context.Context, env *Environment, name string, deviceIDs []string) error {
 	e.mu.Lock()
 	reg, exists := e.registry[name]
+	e.mu.Unlock()
 	if !exists {
+		return ErrScenarioNotFound
+	}
+
+	req := ActivationRequest{
+		Trigger: Trigger{
+			Kind:     TriggerManual,
+			Intent:   name,
+			SourceID: firstOrEmpty(deviceIDs),
+			Arguments: map[string]string{
+				"device_ids": joinCSV(deviceIDs),
+			},
+		},
+		RequestedAt: time.Now().UTC(),
+	}
+	activation, matched := reg.newActivation(req)
+	if !matched || activation == nil {
+		return fmt.Errorf("scenario %q does not match activation request", name)
+	}
+	return e.ActivateMatched(ctx, env, MatchResult{
+		Registration: reg,
+		Activation:   activation,
+		Request:      req,
+	}, deviceIDs)
+}
+
+// ActivateMatched starts a pre-matched activation across target devices.
+func (e *Engine) ActivateMatched(ctx context.Context, env *Environment, match MatchResult, deviceIDs []string) error {
+	e.mu.Lock()
+	reg := match.Registration
+	name := strings.TrimSpace(reg.name())
+	if name == "" || match.Activation == nil {
 		e.mu.Unlock()
 		return ErrScenarioNotFound
 	}
@@ -114,7 +191,7 @@ func (e *Engine) Activate(ctx context.Context, env *Environment, name string, de
 		e.activeByDev[deviceID] = activeScenario{
 			name:     name,
 			priority: reg.Priority,
-			scenario: reg.Scenario,
+			scenario: match.Activation,
 		}
 	}
 	e.mu.Unlock()
@@ -129,18 +206,19 @@ func (e *Engine) Activate(ctx context.Context, env *Environment, name string, de
 		}
 	}
 
-	return reg.Scenario.Start(ctx, env)
+	return match.Activation.Start(ctx, env)
 }
 
 // Stop deactivates the named scenario and resumes any suspended scenario.
 func (e *Engine) Stop(ctx context.Context, env *Environment, name string, deviceIDs []string) error {
 	e.mu.Lock()
-	reg, exists := e.registry[name]
+	_, exists := e.registry[name]
 	if !exists {
 		e.mu.Unlock()
 		return ErrScenarioNotFound
 	}
 
+	toStop := make(map[Scenario]struct{})
 	toResume := make(map[Scenario]struct{})
 	for _, deviceID := range deviceIDs {
 		active, ok := e.activeByDev[deviceID]
@@ -148,6 +226,7 @@ func (e *Engine) Stop(ctx context.Context, env *Environment, name string, device
 			continue
 		}
 		delete(e.activeByDev, deviceID)
+		toStop[active.scenario] = struct{}{}
 
 		stack := e.suspendedDev[deviceID]
 		if len(stack) == 0 {
@@ -160,8 +239,10 @@ func (e *Engine) Stop(ctx context.Context, env *Environment, name string, device
 	}
 	e.mu.Unlock()
 
-	if err := reg.Scenario.Stop(); err != nil {
-		return err
+	for activation := range toStop {
+		if err := activation.Stop(); err != nil {
+			return err
+		}
 	}
 	for resumed := range toResume {
 		r, ok := resumed.(Resumable)
@@ -215,7 +296,11 @@ func (e *Engine) RegistrySnapshot() []RegistrationInfo {
 	defer e.mu.Unlock()
 
 	out := make([]RegistrationInfo, 0, len(e.registry))
-	for name, reg := range e.registry {
+	for _, reg := range e.registry {
+		name := strings.TrimSpace(reg.name())
+		if name == "" {
+			continue
+		}
 		out = append(out, RegistrationInfo{
 			Name:     name,
 			Priority: reg.Priority,
@@ -225,4 +310,68 @@ func (e *Engine) RegistrySnapshot() []RegistrationInfo {
 		return out[i].Name < out[j].Name
 	})
 	return out
+}
+
+func (r Registration) name() string {
+	if r.Definition != nil {
+		return r.Definition.Name()
+	}
+	if r.Factory != nil {
+		if scenario := r.Factory(); scenario != nil {
+			return scenario.Name()
+		}
+	}
+	if r.Scenario != nil {
+		return r.Scenario.Name()
+	}
+	return ""
+}
+
+func (r Registration) newActivation(req ActivationRequest) (Scenario, bool) {
+	if r.Definition != nil {
+		if !r.Definition.Match(req) {
+			return nil, false
+		}
+		activation, err := r.Definition.NewActivation(req)
+		if err != nil {
+			return nil, false
+		}
+		return activation, activation != nil
+	}
+	if r.Factory != nil {
+		scenario := r.Factory()
+		if scenario == nil {
+			return nil, false
+		}
+		if !scenario.Match(req.Trigger) {
+			return nil, false
+		}
+		return scenario, true
+	}
+	if r.Scenario != nil && r.Scenario.Match(req.Trigger) {
+		return r.Scenario, true
+	}
+	return nil, false
+}
+
+func firstOrEmpty(in []string) string {
+	if len(in) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(in[0])
+}
+
+func joinCSV(items []string) string {
+	if len(items) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return strings.Join(out, ",")
 }

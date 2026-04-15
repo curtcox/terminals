@@ -3,63 +3,63 @@ package scenario
 // RegisterBuiltins installs core scenarios into the engine.
 func RegisterBuiltins(engine *Engine) {
 	engine.Register(Registration{
-		Scenario: &IntercomScenario{},
+		Factory:  func() Scenario { return &IntercomScenario{} },
 		Priority: PriorityHigh,
 	})
 	engine.Register(Registration{
-		Scenario: &PhoneCallScenario{},
+		Factory:  func() Scenario { return &PhoneCallScenario{} },
 		Priority: PriorityHigh,
 	})
 	engine.Register(Registration{
-		Scenario: &InternalVideoCallScenario{},
+		Factory:  func() Scenario { return &InternalVideoCallScenario{} },
 		Priority: PriorityHigh,
 	})
 	engine.Register(Registration{
-		Scenario: &VoiceAssistantScenario{},
+		Factory:  func() Scenario { return &VoiceAssistantScenario{} },
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
-		Scenario: &AudioMonitorScenario{},
+		Factory:  func() Scenario { return &AudioMonitorScenario{} },
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
-		Scenario: &ScheduleMonitorScenario{},
+		Factory:  func() Scenario { return &ScheduleMonitorScenario{} },
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
-		Scenario: PhotoFrameScenario{},
+		Factory:  func() Scenario { return PhotoFrameScenario{} },
 		Priority: PriorityLow,
 	})
 	engine.Register(Registration{
-		Scenario: &MultiWindowScenario{},
+		Factory:  func() Scenario { return &MultiWindowScenario{} },
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
-		Scenario: &TimerReminderScenario{},
+		Factory:  func() Scenario { return &TimerReminderScenario{} },
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
-		Scenario: &TerminalScenario{},
+		Factory:  func() Scenario { return &TerminalScenario{} },
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
-		Scenario: &BluetoothPassthroughScenario{},
+		Factory:  func() Scenario { return &BluetoothPassthroughScenario{} },
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
-		Scenario: &USBPassthroughScenario{},
+		Factory:  func() Scenario { return &USBPassthroughScenario{} },
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
-		Scenario: &PASystemScenario{},
+		Factory:  func() Scenario { return &PASystemScenario{} },
 		Priority: PriorityHigh,
 	})
 	engine.Register(Registration{
-		Scenario: &AnnouncementScenario{},
+		Factory:  func() Scenario { return &AnnouncementScenario{} },
 		Priority: PriorityHigh,
 	})
 	engine.Register(Registration{
-		Scenario: AlertScenario{},
+		Factory:  func() Scenario { return AlertScenario{} },
 		Priority: PriorityCritical,
 	})
 }
