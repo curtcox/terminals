@@ -65,6 +65,11 @@ None of this requires updating the client app. The Flutter client is a generic t
 - [plans/server-driven-ui.md](plans/server-driven-ui.md) — Fixed primitive component set, descriptor format, update/patch/animate.
 - [plans/scenario-engine.md](plans/scenario-engine.md) — Scenario definitions vs activations, intent/event triggers, claim-driven preemption, scenario recipes.
 - [plans/use-case-flows.md](plans/use-case-flows.md) — End-to-end flows for each planned scenario.
+- [plans/application-runtime.md](plans/application-runtime.md) — Runtime model for app/session lifecycles and server orchestration.
+- [plans/edge-execution.md](plans/edge-execution.md) — Edge execution model and on-device/off-device execution boundaries.
+- [plans/observation-plane.md](plans/observation-plane.md) — Telemetry, sensing signals, and observation pipeline.
+- [plans/world-model-calibration.md](plans/world-model-calibration.md) — World-model calibration strategy and feedback loops.
+- [plans/sensing-use-case-flows.md](plans/sensing-use-case-flows.md) — End-to-end sensing-centric use-case flows.
 
 ### Tooling
 
@@ -83,6 +88,7 @@ Each phase is a standalone checklist with explicit prerequisites. Execute in ord
 - [plans/phase-4-comms.md](plans/phase-4-comms.md) — Intercom, PA, multi-window, calls, SIP bridge.
 - [plans/phase-5-voice.md](plans/phase-5-voice.md) — AI backends and voice assistant pipeline.
 - [plans/phase-6-monitoring.md](plans/phase-6-monitoring.md) — Sound classification, timers, schedule monitoring, red alert.
+- [plans/phase-6b-edge-sensing.md](plans/phase-6b-edge-sensing.md) — Edge sensing expansion phase.
 - [plans/phase-7-polish.md](plans/phase-7-polish.md) — Photo frame, preemption hardening, admin UI, misc IO.
 
 ### Adjacent docs
