@@ -67,6 +67,8 @@ func normalizeTrigger(trigger Trigger, now time.Time) Trigger {
 	trigger.Intent = strings.TrimSpace(trigger.Intent)
 	if trigger.Arguments == nil {
 		trigger.Arguments = map[string]string{}
+	} else {
+		trigger.Arguments = copyStringMap(trigger.Arguments)
 	}
 	if trigger.IntentV2 != nil {
 		trigger.IntentV2.Action = strings.TrimSpace(trigger.IntentV2.Action)

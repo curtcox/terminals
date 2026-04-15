@@ -122,6 +122,9 @@ func TestNormalizeTriggerCopiesArgumentsIntoIntentSlots(t *testing.T) {
 	if args["device_id"] != "d2" {
 		t.Fatalf("arguments mutated through shared map reference: %+v", args)
 	}
+	if got.Arguments["device_id"] != "d1" {
+		t.Fatalf("expected normalized Arguments to remain copied, got %+v", got.Arguments)
+	}
 }
 
 func TestNormalizeTriggerBackfillsIntentFromIntentV2Action(t *testing.T) {
@@ -265,6 +268,28 @@ func TestNormalizeTriggerWithoutIntentOrEventDoesNotSynthesizeIntentV2(t *testin
 	}
 	if got.Arguments == nil {
 		t.Fatalf("expected Arguments map to be initialized")
+	}
+}
+
+func TestNormalizeTriggerCopiesArgumentsMap(t *testing.T) {
+	args := map[string]string{"target": "dishwasher"}
+	got := normalizeTrigger(Trigger{
+		Kind:      TriggerManual,
+		Arguments: args,
+	}, time.Date(2026, 4, 15, 15, 32, 0, 0, time.UTC))
+
+	if got.Arguments["target"] != "dishwasher" {
+		t.Fatalf("Arguments[target] = %q, want dishwasher", got.Arguments["target"])
+	}
+
+	args["target"] = "mutated"
+	if got.Arguments["target"] != "dishwasher" {
+		t.Fatalf("expected normalized Arguments copy to be immutable from caller mutation, got %+v", got.Arguments)
+	}
+
+	got.Arguments["target"] = "server-side"
+	if args["target"] != "mutated" {
+		t.Fatalf("expected caller args to remain independent, got %+v", args)
 	}
 }
 
