@@ -195,3 +195,24 @@ Each phase is independently mergeable and independently useful.
 - Should we surface a live-tail of `bug.report.*` events in the admin dashboard the way `/admin/logs` does for the event log? (Low-cost addition; defer to phase 1 if cheap.)
 - Max inline attachment size vs. forcing a separate upload round-trip? Default to a 2 MB inline cap and a later "request full artifact" round-trip for anything larger.
 - Retention policy for `logs/bug_reports/`? Defer to the same rotation model as the event log, but with a longer default horizon.
+
+## Incident Addendum (2026-04-16)
+
+See [bug-reporting-incident-2026-04-16.md](./bug-reporting-incident-2026-04-16.md) for the full report from local testing and iterative fixes.
+
+Summary of observed failure:
+
+- Multiple user-submitted bug reports produced no durable server-side evidence:
+  - no `bug.report.filed` events in `terminal_server/logs/terminals.jsonl`
+  - no `bug_token_word` / `bug_token_code` matches
+  - no `logs/bug_reports/<date>/<report_id>.json` artifacts
+- User-facing status suggested success too early (before confirmed server ack), creating false confidence.
+
+Summary of mitigations implemented in code:
+
+- Ack-driven state handling: reports are "filed" only after `BugReportAck`; otherwise they become "not confirmed" on timeout/stream close.
+- Offline queue and replay: reports created while disconnected are queued and replayed after connection.
+- Auto-connect on submit: a queued report triggers stream connect automatically instead of requiring manual connect.
+- Correlation token enrichment: token word/code are embedded in tags/source hints and propagated to server event attributes.
+- Optional input UX: description/tags remain optional; reference token is presented as text + audio + QR.
+- Expanded automatic source hints: connection, UI, stream counts, and queue/pending counters are captured at submit time.
