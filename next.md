@@ -1,1 +1,1 @@
-Await review feedback on the eventlog write-failure fallback changes.
+Await feedback on implemented bug-reporting pipeline and remaining rollout phases.

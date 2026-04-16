@@ -8,6 +8,7 @@ import (
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	uiv1 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
@@ -166,6 +167,10 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				ErrorMS:      sample.GetErrorMs(),
 			},
 		}, nil
+	case *controlv1.ConnectRequest_BugReport:
+		return ClientMessage{
+			BugReport: payload.BugReport,
+		}, nil
 	default:
 		return ClientMessage{}, nil
 	}
@@ -296,6 +301,16 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 				RequestArtifact: &iov1.RequestArtifact{
 					ArtifactId: msg.RequestArtifact.ArtifactID,
 				},
+			},
+		}
+	case msg.BugReportAck != nil:
+		ack := msg.BugReportAck
+		if ack == nil {
+			ack = &diagnosticsv1.BugReportAck{}
+		}
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_BugReportAck{
+				BugReportAck: ack,
 			},
 		}
 	case msg.CommandAck != "" || msg.ScenarioStart != "" || msg.ScenarioStop != "" || msg.Notification != "" || len(msg.Data) > 0:

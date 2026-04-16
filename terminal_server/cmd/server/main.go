@@ -24,6 +24,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/audio"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	"github.com/curtcox/terminals/terminal_server/internal/diagnostics/bugreport"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
@@ -134,6 +135,7 @@ func main() {
 		logger.Error("recover scenario activations", "event", "scenario.recovery.failed", "error", err)
 	}
 	controlStream := transport.NewStreamHandler(controlService)
+	bugReports := bugreport.NewService(cfg.LogDir, deviceManager, scenarioRuntime)
 	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
 	if err != nil {
 		logger.Error("configure webrtc signal engine", "event", "transport.webrtc.configure_failed", "error", err)
@@ -173,6 +175,7 @@ func main() {
 	grpcServer.ConfigureDeviceAudio(audioHub)
 	grpcServer.ConfigureRecording(recordingManager)
 	grpcServer.ConfigureWebRTCSignalEngine(webrtcEngine)
+	grpcServer.ConfigureBugReportIntake(bugReports)
 	mdns := discovery.NewMDNSAdvertiser()
 
 	logger.Info("terminal server starting", "event", "server.starting", "grpc_address", grpcServer.Address())

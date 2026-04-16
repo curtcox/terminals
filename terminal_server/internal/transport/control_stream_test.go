@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
@@ -14,6 +15,18 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
+
+type bugReportIntakeStub struct {
+	ack *diagnosticsv1.BugReportAck
+	err error
+}
+
+func (s bugReportIntakeStub) File(_ context.Context, _ *diagnosticsv1.BugReport) (*diagnosticsv1.BugReportAck, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.ack, nil
+}
 
 type audioChunkRecordingStub struct {
 	mu      sync.Mutex
@@ -232,6 +245,48 @@ func TestHandleMessageSensorTriggersActiveScenarioHook(t *testing.T) {
 	}
 	if out[0].RelayToDeviceID != "" {
 		t.Fatalf("RelayToDeviceID = %q, want empty for local notification", out[0].RelayToDeviceID)
+	}
+}
+
+func TestHandleMessageBugReportRequiresIntake(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+
+	_, err := handler.HandleMessage(context.Background(), ClientMessage{
+		BugReport: &diagnosticsv1.BugReport{ReportId: "bug-1"},
+	})
+	if err == nil {
+		t.Fatalf("expected error when bug report intake is missing")
+	}
+	if err != ErrBugReportIntakeUnavailable {
+		t.Fatalf("err = %v, want %v", err, ErrBugReportIntakeUnavailable)
+	}
+}
+
+func TestHandleMessageBugReportReturnsAck(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+	handler.SetBugReportIntake(bugReportIntakeStub{
+		ack: &diagnosticsv1.BugReportAck{
+			ReportId:      "bug-2",
+			CorrelationId: "bug:bug-2",
+			Status:        diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED,
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		BugReport: &diagnosticsv1.BugReport{ReportId: "bug-2"},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(bug_report) error = %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("len(out) = %d, want 1", len(out))
+	}
+	if out[0].BugReportAck == nil || out[0].BugReportAck.GetReportId() != "bug-2" {
+		t.Fatalf("bug_report_ack = %+v, want report_id bug-2", out[0].BugReportAck)
 	}
 }
 

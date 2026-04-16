@@ -24,6 +24,7 @@ type Server struct {
 	deviceAudio DeviceAudioPublisher
 	recording   recording.Manager
 	webrtc      WebRTCSignalEngine
+	bugReports  BugReportIntake
 }
 
 // NewServer returns a lifecycle-managed transport server placeholder.
@@ -91,6 +92,11 @@ func (s *Server) ConfigureWebRTCSignalEngine(engine WebRTCSignalEngine) {
 	s.webrtc = engine
 }
 
+// ConfigureBugReportIntake wires persisted diagnostics intake for Connect streams.
+func (s *Server) ConfigureBugReportIntake(intake BugReportIntake) {
+	s.bugReports = intake
+}
+
 // Connect handles a single bidirectional control stream session.
 func (s *Server) Connect(stream ProtoStream) error {
 	if s.control == nil || s.adapter == nil {
@@ -105,6 +111,9 @@ func (s *Server) Connect(stream ProtoStream) error {
 	}
 	if s.webrtc != nil {
 		handler.SetWebRTCSignalEngine(s.webrtc)
+	}
+	if s.bugReports != nil {
+		handler.SetBugReportIntake(s.bugReports)
 	}
 	ctx, end := eventlog.WithSpan(context.Background(), "grpc:connect")
 	defer end()

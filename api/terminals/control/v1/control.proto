@@ -3,6 +3,7 @@ syntax = "proto3";
 package terminals.control.v1;
 
 import "terminals/capabilities/v1/capabilities.proto";
+import "terminals/diagnostics/v1/diagnostics.proto";
 import "terminals/io/v1/io.proto";
 import "terminals/ui/v1/ui.proto";
 
@@ -27,6 +28,7 @@ message ConnectRequest {
     terminals.io.v1.ArtifactAvailable artifact_available = 11;
     terminals.io.v1.FlowStats flow_stats = 12;
     terminals.io.v1.ClockSample clock_sample = 13;
+    terminals.diagnostics.v1.BugReport bug_report = 14;
   }
 }
 
@@ -59,6 +61,7 @@ message ConnectResponse {
     terminals.io.v1.PatchFlow patch_flow = 18;
     terminals.io.v1.StopFlow stop_flow = 19;
     terminals.io.v1.RequestArtifact request_artifact = 20;
+    terminals.diagnostics.v1.BugReportAck bug_report_ack = 21;
   }
 }
 

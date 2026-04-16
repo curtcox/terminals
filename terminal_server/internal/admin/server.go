@@ -15,6 +15,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	"github.com/curtcox/terminals/terminal_server/internal/diagnostics/bugreport"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog/query"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
@@ -29,6 +30,7 @@ type Handler struct {
 	appRuntime  *appruntime.Runtime
 	syncAppDefs func()
 	devices     *device.Manager
+	bugReports  *bugreport.Service
 	cfg         config.Config
 	now         func() time.Time
 }
@@ -48,6 +50,7 @@ func NewHandler(
 		appRuntime:  appRuntime,
 		syncAppDefs: syncAppDefs,
 		devices:     devices,
+		bugReports:  bugreport.NewService(cfg.LogDir, devices, runtime),
 		cfg:         cfg,
 		now:         time.Now,
 	}
@@ -68,6 +71,13 @@ func NewHandler(
 	mux.HandleFunc("/admin/logs.jsonl", h.handleLogsJSONL)
 	mux.HandleFunc("/admin/logs/trace/", h.handleLogsTrace)
 	mux.HandleFunc("/admin/logs/activation/", h.handleLogsActivation)
+	mux.HandleFunc("/admin/bugs", h.handleBugsListPage)
+	mux.HandleFunc("/admin/bugs/", h.handleBugDetailPage)
+	mux.HandleFunc("/admin/bugs/new", h.handleBugNewPage)
+	mux.HandleFunc("/admin/api/bugs", h.handleBugsListAPI)
+	mux.HandleFunc("/admin/api/bugs/", h.handleBugConfirmAPI)
+	mux.HandleFunc("/bug", h.handleBugNewPage)
+	mux.HandleFunc("/bug/intake", h.handleBugIntake)
 	return h.withRequestLogging(mux)
 }
 

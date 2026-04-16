@@ -5,6 +5,7 @@ import (
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
@@ -191,6 +192,48 @@ func TestGeneratedProtoAdapterToInternalSensorAndStreamReady(t *testing.T) {
 	}
 	if webrtcMsg.WebRTCSignal.Payload != "{\"sdp\":\"v=0...\"}" {
 		t.Fatalf("webrtc_signal payload = %q, want {\"sdp\":\"v=0...\"}", webrtcMsg.WebRTCSignal.Payload)
+	}
+}
+
+func TestGeneratedProtoAdapterToInternalBugReport(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_BugReport{
+			BugReport: &diagnosticsv1.BugReport{
+				ReportId:         "bug-1",
+				ReporterDeviceId: "d1",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(bug_report) error = %v", err)
+	}
+	if msg.BugReport == nil {
+		t.Fatalf("expected bug_report message")
+	}
+	if msg.BugReport.GetReportId() != "bug-1" {
+		t.Fatalf("report_id = %q, want bug-1", msg.BugReport.GetReportId())
+	}
+}
+
+func TestGeneratedProtoAdapterFromInternalBugReportAck(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	envelope, err := adapter.FromInternal(ServerMessage{
+		BugReportAck: &diagnosticsv1.BugReportAck{
+			ReportId:      "bug-2",
+			CorrelationId: "bug:bug-2",
+			Status:        diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED,
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(bug_report_ack) error = %v", err)
+	}
+	resp, ok := envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("response envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if got := resp.GetBugReportAck(); got == nil || got.GetReportId() != "bug-2" {
+		t.Fatalf("bug_report_ack = %+v, want report_id bug-2", got)
 	}
 }
 

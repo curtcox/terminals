@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
@@ -35,6 +36,8 @@ var (
 	ErrMissingCommandText = errors.New("missing command text")
 	// ErrMissingCommandDeviceID indicates required command device id is missing.
 	ErrMissingCommandDeviceID = errors.New("missing command device id")
+	// ErrBugReportIntakeUnavailable indicates bug-report handling is not configured.
+	ErrBugReportIntakeUnavailable = errors.New("bug report intake unavailable")
 )
 
 // CapabilityUpdateRequest is a transport-neutral capability update payload.
@@ -282,6 +285,7 @@ type ClientMessage struct {
 	ArtifactReady   *ArtifactAvailableRequest
 	FlowStats       *FlowStatsRequest
 	ClockSample     *ClockSampleRequest
+	BugReport       *diagnosticsv1.BugReport
 	SessionDeviceID string
 }
 
@@ -297,6 +301,7 @@ type ServerMessage struct {
 	WebRTCSignal    *WebRTCSignalResponse
 	TransitionUI    *UITransition
 	PlayAudio       *PlayAudioResponse
+	BugReportAck    *diagnosticsv1.BugReportAck
 	StartFlow       *StartFlowResponse
 	PatchFlow       *PatchFlowResponse
 	StopFlow        *StopFlowResponse
@@ -349,6 +354,11 @@ type WebRTCSignalEngineResponse struct {
 	Signal         WebRTCSignalResponse
 }
 
+// BugReportIntake handles persisted bug-report intake for control messages.
+type BugReportIntake interface {
+	File(context.Context, *diagnosticsv1.BugReport) (*diagnosticsv1.BugReportAck, error)
+}
+
 // StreamHandler processes control stream messages.
 type StreamHandler struct {
 	control     *ControlService
@@ -384,6 +394,7 @@ type StreamHandler struct {
 	deviceAudio DeviceAudioPublisher
 	recording   recording.Manager
 	webrtc      WebRTCSignalEngine
+	bugReports  BugReportIntake
 }
 
 type mediaStreamState struct {
@@ -515,6 +526,13 @@ func (h *StreamHandler) SetWebRTCSignalEngine(engine WebRTCSignalEngine) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.webrtc = engine
+}
+
+// SetBugReportIntake wires a persisted bug-report intake for control streams.
+func (h *StreamHandler) SetBugReportIntake(intake BugReportIntake) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.bugReports = intake
 }
 
 // SetPhotoFrameSettings overrides photo-frame slide URLs and rotation
@@ -752,6 +770,17 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		}
 		h.rememberSetUI(msg.Command.DeviceID, postResponses)
 		return postResponses, nil
+	case msg.BugReport != nil:
+		if h.bugReports == nil {
+			h.metrics.protocolErrors.Add(1)
+			return []ServerMessage{{ErrorCode: errorCodeFor(ErrBugReportIntakeUnavailable), Error: ErrBugReportIntakeUnavailable.Error()}}, ErrBugReportIntakeUnavailable
+		}
+		ack, err := h.bugReports.File(ctx, msg.BugReport)
+		if err != nil {
+			h.metrics.protocolErrors.Add(1)
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
+		}
+		return []ServerMessage{{BugReportAck: ack}}, nil
 	default:
 		h.metrics.protocolErrors.Add(1)
 		return []ServerMessage{{ErrorCode: errorCodeFor(ErrInvalidClientMessage), Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage

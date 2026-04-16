@@ -1,5 +1,7 @@
 package transport
 
+import diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
+
 // WireRegisterRequest is a protobuf-adapter-friendly register payload.
 type WireRegisterRequest struct {
 	DeviceID     string
@@ -77,6 +79,7 @@ type WireClientMessage struct {
 	WebRTCSignal *WireWebRTCSignal
 	Command      *WireCommandRequest
 	VoiceAudio   *WireVoiceAudio
+	BugReport    *diagnosticsv1.BugReport
 }
 
 // WireRegisterResponse is a protobuf-adapter-friendly register response.
@@ -138,6 +141,7 @@ type WireServerMessage struct {
 	TransitionUI  *uiWireTransition
 	PlayAudio     *WirePlayAudio
 	Error         *WireControlError
+	BugReportAck  *diagnosticsv1.BugReportAck
 }
 
 // WirePlayAudio is a protobuf-adapter-friendly play-audio payload.
