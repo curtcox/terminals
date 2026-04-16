@@ -46,6 +46,9 @@ func TestBugIntakeAndListAndDetail(t *testing.T) {
 	if len(payload["bugs"]) != 1 {
 		t.Fatalf("bugs len = %d, want 1", len(payload["bugs"]))
 	}
+	if confirmed, ok := payload["bugs"][0]["confirmed"].(bool); !ok || confirmed {
+		t.Fatalf("confirmed = %v, want false", payload["bugs"][0]["confirmed"])
+	}
 
 	detailReq := httptest.NewRequest(http.MethodGet, location, nil)
 	detailW := httptest.NewRecorder()
@@ -55,5 +58,43 @@ func TestBugIntakeAndListAndDetail(t *testing.T) {
 	}
 	if !strings.Contains(detailW.Body.String(), "screen stuck") {
 		t.Fatalf("detail should include submitted description")
+	}
+}
+
+func TestBugListFilterByTag(t *testing.T) {
+	logDir := t.TempDir()
+	h := testHandler(t, config.Config{MDNSName: "HomeServer", LogDir: logDir})
+
+	post := func(tags string) {
+		req := httptest.NewRequest(http.MethodPost, "/bug/intake", strings.NewReader(url.Values{
+			"reporter_device_id": {"d1"},
+			"subject_device_id":  {"d1"},
+			"source":             {"admin"},
+			"tags":               {tags},
+			"description":        {"screen stuck"},
+		}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusSeeOther {
+			t.Fatalf("POST /bug/intake status = %d, want 303 body=%s", w.Code, w.Body.String())
+		}
+	}
+
+	post("ui_glitch")
+	post("lost_connection")
+
+	listReq := httptest.NewRequest(http.MethodGet, "/admin/api/bugs?tag=lost_connection", nil)
+	listW := httptest.NewRecorder()
+	h.ServeHTTP(listW, listReq)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("GET /admin/api/bugs?tag=lost_connection status = %d", listW.Code)
+	}
+	payload := map[string][]map[string]any{}
+	if err := json.Unmarshal(listW.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode bug list: %v", err)
+	}
+	if len(payload["bugs"]) != 1 {
+		t.Fatalf("filtered bugs len = %d, want 1", len(payload["bugs"]))
 	}
 }

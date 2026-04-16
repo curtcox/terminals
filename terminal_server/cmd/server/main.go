@@ -236,7 +236,13 @@ func main() {
 	_ = controlStream
 
 	go runDueTimerLoop(ctx, scenarioRuntime, time.Duration(cfg.DueTimerProcessIntervalSecs)*time.Second)
-	go runLivenessLoop(ctx, controlService, time.Duration(cfg.HeartbeatTimeoutSeconds)*time.Second, time.Duration(cfg.LivenessReconcileIntervalSecs)*time.Second)
+	go runLivenessLoop(
+		ctx,
+		controlService,
+		bugReports,
+		time.Duration(cfg.HeartbeatTimeoutSeconds)*time.Second,
+		time.Duration(cfg.LivenessReconcileIntervalSecs)*time.Second,
+	)
 
 	<-ctx.Done()
 	logger.Info("terminal server shutting down", "event", "server.stopping")
@@ -465,7 +471,12 @@ func runDueTimerLoop(ctx context.Context, runtime *scenario.Runtime, interval ti
 	}
 }
 
-func runLivenessLoop(ctx context.Context, control *transport.ControlService, timeout, interval time.Duration) {
+func runLivenessLoop(
+	ctx context.Context,
+	control *transport.ControlService,
+	bugs *bugreport.Service,
+	timeout, interval time.Duration,
+) {
 	logger := eventlog.Component("housekeeping")
 	if interval <= 0 {
 		return
@@ -478,9 +489,21 @@ func runLivenessLoop(ctx context.Context, control *transport.ControlService, tim
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			updated := control.ReconcileLiveness(timeout)
-			if updated > 0 {
-				logger.Info("liveness reconcile updated", "event", "housekeeping.liveness.reconciled", "updated", updated)
+			updatedIDs := control.ReconcileLivenessDeviceIDs(timeout)
+			if len(updatedIDs) > 0 {
+				logger.Info("liveness reconcile updated", "event", "housekeeping.liveness.reconciled", "updated", len(updatedIDs))
+				for _, deviceID := range updatedIDs {
+					if bugs == nil {
+						continue
+					}
+					if _, err := bugs.FileAutodetect(ctx, deviceID, "heartbeat timeout or reconnect loop", nil); err != nil {
+						logger.Error("autodetect bug filing failed",
+							"event", "bug.report.autodetect.failed",
+							"device_id", deviceID,
+							"error", err,
+						)
+					}
+				}
 			} else {
 				logger.Debug("liveness reconcile idle", "event", "housekeeping.liveness.reconciled", "updated", 0)
 			}

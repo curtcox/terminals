@@ -1,1 +1,1 @@
-Await feedback on implemented bug-reporting pipeline and remaining rollout phases.
+Implement client-side bug report capture/send (ClientContext + UI affordance) to complete remaining bug-reporting plan phases.

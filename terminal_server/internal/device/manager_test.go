@@ -126,3 +126,22 @@ func TestUpdatePlacement(t *testing.T) {
 		t.Fatalf("Placement.Affinity = %q, want home", found.Placement.Affinity)
 	}
 }
+
+func TestMarkStaleDisconnectedDevices(t *testing.T) {
+	m := NewManager()
+	base := time.Date(2026, 4, 12, 10, 0, 0, 0, time.UTC)
+	m.now = func() time.Time { return base.Add(-10 * time.Minute) }
+	_, _ = m.Register(Manifest{DeviceID: "stale"})
+	_, _ = m.Register(Manifest{DeviceID: "fresh"})
+	m.now = func() time.Time { return base }
+	_ = m.Heartbeat("fresh", base)
+
+	updated := m.MarkStaleDisconnectedDevices(base.Add(-5 * time.Minute))
+	if len(updated) != 1 || updated[0] != "stale" {
+		t.Fatalf("updated = %+v, want [stale]", updated)
+	}
+	stale, _ := m.Get("stale")
+	if stale.State != StateDisconnected {
+		t.Fatalf("stale state = %q, want disconnected", stale.State)
+	}
+}

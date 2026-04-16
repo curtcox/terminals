@@ -130,3 +130,24 @@ func TestReconcileLiveness(t *testing.T) {
 		t.Fatalf("d2 state = %q, want connected", d2.State)
 	}
 }
+
+func TestReconcileLivenessDeviceIDs(t *testing.T) {
+	m := device.NewManager()
+	s := NewControlService("srv-1", m)
+	base := time.Date(2026, 4, 12, 10, 0, 0, 0, time.UTC)
+	stale := base.Add(-10 * time.Minute)
+	s.now = func() time.Time { return stale }
+
+	_, _ = s.Register(context.Background(), RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"})
+	_, _ = s.Register(context.Background(), RegisterRequest{DeviceID: "d2", DeviceName: "Hall"})
+	_ = s.Heartbeat(context.Background(), "d1")
+	_ = s.Heartbeat(context.Background(), "d2")
+
+	s.now = func() time.Time { return base }
+	_ = s.Heartbeat(context.Background(), "d2")
+
+	updated := s.ReconcileLivenessDeviceIDs(5 * time.Minute)
+	if len(updated) != 1 || updated[0] != "d1" {
+		t.Fatalf("updated = %+v, want [d1]", updated)
+	}
+}

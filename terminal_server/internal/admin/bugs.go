@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
+	"github.com/curtcox/terminals/terminal_server/internal/diagnostics/bugreport"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -23,7 +25,7 @@ func (h *Handler) handleBugsListAPI(w http.ResponseWriter, req *http.Request) {
 		h.writeJSON(w, http.StatusOK, map[string]any{"bugs": []any{}})
 		return
 	}
-	items, err := h.bugReports.List()
+	items, err := h.bugReports.ListFiltered(parseBugListFilter(req))
 	if err != nil {
 		h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("list bug reports: %v", err))
 		return
@@ -37,8 +39,9 @@ func (h *Handler) handleBugsListPage(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	items := []any{}
+	filter := parseBugListFilter(req)
 	if h.bugReports != nil {
-		list, err := h.bugReports.List()
+		list, err := h.bugReports.ListFiltered(filter)
 		if err != nil {
 			h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("list bug reports: %v", err))
 			return
@@ -48,7 +51,7 @@ func (h *Handler) handleBugsListPage(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := bugsListTemplate.Execute(w, map[string]any{"Reports": items}); err != nil {
+	if err := bugsListTemplate.Execute(w, map[string]any{"Reports": items, "Filter": filter}); err != nil {
 		h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("render bugs list: %v", err))
 	}
 }
@@ -210,6 +213,41 @@ func parseBugSource(raw string) diagnosticsv1.BugReportSource {
 	return diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_OTHER
 }
 
+func parseBugListFilter(req *http.Request) bugreport.ListFilter {
+	query := req.URL.Query()
+	return bugreport.ListFilter{
+		SubjectDeviceID:  strings.TrimSpace(query.Get("subject_device_id")),
+		ReporterDeviceID: strings.TrimSpace(query.Get("reporter_device_id")),
+		Source:           strings.TrimSpace(query.Get("source")),
+		Tag:              strings.TrimSpace(query.Get("tag")),
+		FromUnixMS:       parseInt64Query(query.Get("from_unix_ms")),
+		ToUnixMS:         parseInt64Query(query.Get("to_unix_ms")),
+		ConfirmedOnly:    parseBoolQuery(query.Get("confirmed")),
+		PendingOnly:      parseBoolQuery(query.Get("pending")),
+	}
+}
+
+func parseInt64Query(raw string) int64 {
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return 0
+	}
+	value, err := strconv.ParseInt(text, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return value
+}
+
+func parseBoolQuery(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
 var bugsListTemplate = template.Must(template.New("bugs_list").Parse(`<!doctype html>
 <html>
 <head>
@@ -219,6 +257,15 @@ var bugsListTemplate = template.Must(template.New("bugs_list").Parse(`<!doctype 
 <body>
   <h1>Bug Reports</h1>
   <p><a href="/admin">Back to dashboard</a> | <a href="/admin/bugs/new">File a report</a></p>
+  <form method="get" action="/admin/bugs">
+    <label>Subject <input name="subject_device_id" value="{{.Filter.SubjectDeviceID}}" /></label>
+    <label>Reporter <input name="reporter_device_id" value="{{.Filter.ReporterDeviceID}}" /></label>
+    <label>Source <input name="source" value="{{.Filter.Source}}" /></label>
+    <label>Tag <input name="tag" value="{{.Filter.Tag}}" /></label>
+    <label>Confirmed <input type="checkbox" name="confirmed" value="1" {{if .Filter.ConfirmedOnly}}checked{{end}} /></label>
+    <label>Pending <input type="checkbox" name="pending" value="1" {{if .Filter.PendingOnly}}checked{{end}} /></label>
+    <button type="submit">Apply</button>
+  </form>
   <table border="1" cellspacing="0" cellpadding="6">
     <thead>
       <tr>
@@ -228,6 +275,7 @@ var bugsListTemplate = template.Must(template.New("bugs_list").Parse(`<!doctype 
         <th>Subject</th>
         <th>Reporter</th>
         <th>Offline</th>
+        <th>Confirmed</th>
       </tr>
     </thead>
     <tbody>
@@ -239,9 +287,10 @@ var bugsListTemplate = template.Must(template.New("bugs_list").Parse(`<!doctype 
         <td>{{.SubjectDeviceID}}</td>
         <td>{{.ReporterDeviceID}}</td>
         <td>{{.SubjectOffline}}</td>
+        <td>{{.Confirmed}}</td>
       </tr>
       {{else}}
-      <tr><td colspan="6">No reports yet.</td></tr>
+      <tr><td colspan="7">No reports yet.</td></tr>
       {{end}}
     </tbody>
   </table>

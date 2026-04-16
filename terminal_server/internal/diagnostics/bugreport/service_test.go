@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
@@ -74,5 +75,81 @@ func TestServiceFileAndListAndGet(t *testing.T) {
 	}
 	if rec.Summary.SubjectOffline {
 		t.Fatalf("subject_offline = true, want false for connected subject")
+	}
+}
+
+func TestServiceListFiltered(t *testing.T) {
+	logDir := t.TempDir()
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "rep-1"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "sub-1"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "sub-2"})
+
+	svc := NewService(logDir, devices, nil)
+	base := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return base }
+	_, _ = svc.File(context.Background(), &diagnosticsv1.BugReport{
+		ReporterDeviceId: "rep-1",
+		SubjectDeviceId:  "sub-1",
+		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_ADMIN,
+		Tags:             []string{"unresponsive"},
+		TimestampUnixMs:  base.UnixMilli(),
+	})
+
+	svc.now = func() time.Time { return base.Add(2 * time.Minute) }
+	_, _ = svc.File(context.Background(), &diagnosticsv1.BugReport{
+		ReporterDeviceId: "rep-1",
+		SubjectDeviceId:  "sub-2",
+		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_WEBHOOK,
+		Tags:             []string{"lost_connection"},
+		TimestampUnixMs:  base.Add(2 * time.Minute).UnixMilli(),
+	})
+
+	got, err := svc.ListFiltered(ListFilter{
+		SubjectDeviceID: "sub-2",
+		Source:          "webhook",
+		Tag:             "lost_connection",
+		FromUnixMS:      base.Add(time.Minute).UnixMilli(),
+	})
+	if err != nil {
+		t.Fatalf("ListFiltered() error = %v", err)
+	}
+	if len(got) != 1 || got[0].SubjectDeviceID != "sub-2" {
+		t.Fatalf("ListFiltered() = %+v, want only sub-2 report", got)
+	}
+}
+
+func TestServiceAutodetectMerge(t *testing.T) {
+	logDir := t.TempDir()
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "rep-1"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "sub-1"})
+
+	svc := NewService(logDir, devices, nil)
+	base := time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return base }
+	autoAck, err := svc.FileAutodetect(context.Background(), "sub-1", "heartbeat timeout", nil)
+	if err != nil {
+		t.Fatalf("FileAutodetect() error = %v", err)
+	}
+	if autoAck.GetStatus() != diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED {
+		t.Fatalf("autodetect status = %v, want FILED", autoAck.GetStatus())
+	}
+
+	svc.now = func() time.Time { return base.Add(2 * time.Minute) }
+	userAck, err := svc.File(context.Background(), &diagnosticsv1.BugReport{
+		ReporterDeviceId: "rep-1",
+		SubjectDeviceId:  "sub-1",
+		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_ADMIN,
+		Description:      "screen frozen",
+	})
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+	if userAck.GetStatus() != diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT {
+		t.Fatalf("user status = %v, want MERGED_WITH_AUTODETECT", userAck.GetStatus())
+	}
+	if userAck.GetMergedAutodetectReportId() != autoAck.GetReportId() {
+		t.Fatalf("merged_autodetect_report_id = %q, want %q", userAck.GetMergedAutodetectReportId(), autoAck.GetReportId())
 	}
 }

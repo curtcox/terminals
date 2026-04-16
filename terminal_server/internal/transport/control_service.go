@@ -123,11 +123,17 @@ func (s *ControlService) StatusData() map[string]string {
 
 // ReconcileLiveness marks stale devices as disconnected based on a heartbeat timeout.
 func (s *ControlService) ReconcileLiveness(timeout time.Duration) int {
+	return len(s.ReconcileLivenessDeviceIDs(timeout))
+}
+
+// ReconcileLivenessDeviceIDs marks stale devices as disconnected and returns
+// the IDs that changed state.
+func (s *ControlService) ReconcileLivenessDeviceIDs(timeout time.Duration) []string {
 	if timeout < 0 {
 		timeout = 0
 	}
 	cutoff := s.now().UTC().Add(-timeout)
-	return s.devices.MarkStaleDisconnected(cutoff)
+	return s.devices.MarkStaleDisconnectedDevices(cutoff)
 }
 
 // SetNowForTest overrides the service clock in tests.

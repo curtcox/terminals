@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	"github.com/curtcox/terminals/terminal_server/internal/diagnostics/bugreport"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
@@ -60,7 +61,7 @@ func TestRunLivenessLoopMarksStaleDevices(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go runLivenessLoop(ctx, control, 10*time.Second, 10*time.Millisecond)
+	go runLivenessLoop(ctx, control, bugreport.NewService(t.TempDir(), devices, nil), 10*time.Second, 10*time.Millisecond)
 
 	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {

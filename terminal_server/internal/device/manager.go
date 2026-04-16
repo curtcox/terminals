@@ -144,10 +144,16 @@ func (m *Manager) ListDeviceIDs() []string {
 // MarkStaleDisconnected marks connected devices as disconnected when
 // their last heartbeat is older than cutoff. Returns the number updated.
 func (m *Manager) MarkStaleDisconnected(cutoff time.Time) int {
+	return len(m.MarkStaleDisconnectedDevices(cutoff))
+}
+
+// MarkStaleDisconnectedDevices marks stale connected devices as disconnected
+// and returns the device ids that changed state.
+func (m *Manager) MarkStaleDisconnectedDevices(cutoff time.Time) []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	updated := 0
+	updated := make([]string, 0, len(m.devices))
 	cutoff = cutoff.UTC()
 	for id, current := range m.devices {
 		if current.State != StateConnected {
@@ -156,7 +162,7 @@ func (m *Manager) MarkStaleDisconnected(cutoff time.Time) int {
 		if current.LastHeartbeat.IsZero() || current.LastHeartbeat.Before(cutoff) {
 			current.State = StateDisconnected
 			m.devices[id] = current
-			updated++
+			updated = append(updated, id)
 		}
 	}
 	return updated

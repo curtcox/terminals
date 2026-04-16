@@ -35,6 +35,23 @@ type Service struct {
 	jsonMarshal protojson.MarshalOptions
 }
 
+const (
+	autodetectDedupWindow = 10 * time.Minute
+	autodetectTagsReason  = "suspected_failure"
+)
+
+// ListFilter narrows bug report list output for admin queries.
+type ListFilter struct {
+	SubjectDeviceID  string
+	ReporterDeviceID string
+	Source           string
+	Tag              string
+	FromUnixMS       int64
+	ToUnixMS         int64
+	ConfirmedOnly    bool
+	PendingOnly      bool
+}
+
 // Summary is a list-friendly view over one stored report.
 type Summary struct {
 	ReportID           string   `json:"report_id"`
@@ -52,6 +69,7 @@ type Summary struct {
 	ScreenshotPath     string   `json:"screenshot_path,omitempty"`
 	AudioPath          string   `json:"audio_path,omitempty"`
 	MergedAutodetectID string   `json:"merged_autodetect_report_id,omitempty"`
+	Confirmed          bool     `json:"confirmed"`
 }
 
 // SubjectSnapshot captures server-known state for the subject device.
@@ -99,6 +117,25 @@ func NewService(logDir string, devices *device.Manager, runtime *scenario.Runtim
 
 // File persists a bug report and returns a correlation-aware ack.
 func (s *Service) File(ctx context.Context, in *diagnosticsv1.BugReport) (*diagnosticsv1.BugReportAck, error) {
+	return s.file(ctx, in, false)
+}
+
+// FileAutodetect files a suspected-failure report for a subject device.
+func (s *Service) FileAutodetect(ctx context.Context, subjectDeviceID, description string, tags []string) (*diagnosticsv1.BugReportAck, error) {
+	subjectDeviceID = strings.TrimSpace(subjectDeviceID)
+	if subjectDeviceID == "" {
+		return nil, fmt.Errorf("subject device id is required")
+	}
+	normalized := normalizeTags(append([]string{autodetectTagsReason}, tags...))
+	return s.file(ctx, &diagnosticsv1.BugReport{
+		SubjectDeviceId: subjectDeviceID,
+		Source:          diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_AUTODETECT,
+		Description:     strings.TrimSpace(description),
+		Tags:            normalized,
+	}, true)
+}
+
+func (s *Service) file(ctx context.Context, in *diagnosticsv1.BugReport, isAutodetect bool) (*diagnosticsv1.BugReportAck, error) {
 	if in == nil {
 		return nil, fmt.Errorf("bug report is required")
 	}
@@ -136,6 +173,29 @@ func (s *Service) File(ctx context.Context, in *diagnosticsv1.BugReport) (*diagn
 	}
 	if summary.Source == diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_UNSPECIFIED.String() {
 		summary.Source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_OTHER.String()
+	}
+
+	var mergedAutodetectID string
+	status := diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED
+	if strings.TrimSpace(summary.SubjectDeviceID) != "" {
+		if recent := s.findRecentAutodetectLocked(summary.SubjectDeviceID, now, autodetectDedupWindow); recent != nil {
+			if isAutodetect {
+				return &diagnosticsv1.BugReportAck{
+					ReportId:                 recent.Summary.ReportID,
+					CorrelationId:            recent.Summary.CorrelationID,
+					Status:                   diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT,
+					ReportPath:               recent.Summary.ReportPath,
+					MergedAutodetectReportId: recent.Summary.ReportID,
+					Message:                  "merged_with_autodetect",
+				}, nil
+			}
+			if report.GetSource() != diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_AUTODETECT {
+				mergedAutodetectID = recent.Summary.ReportID
+				status = diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT
+				summary.MergedAutodetectID = recent.Summary.ReportID
+				summary.Status = diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT.String()
+			}
+		}
 	}
 
 	subject, offline := s.subjectSnapshot(report.GetSubjectDeviceId())
@@ -200,7 +260,13 @@ func (s *Service) File(ctx context.Context, in *diagnosticsv1.BugReport) (*diagn
 	}
 
 	eventCtx := eventlog.WithCorrelation(ctx, summary.CorrelationID)
-	eventlog.Emit(eventCtx, "bug.report.filed", slog.LevelInfo, "bug report filed",
+	eventName := "bug.report.filed"
+	eventMsg := "bug report filed"
+	if report.GetSource() == diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_AUTODETECT {
+		eventName = "bug.report.autodetected"
+		eventMsg = "bug report autodetected"
+	}
+	eventlog.Emit(eventCtx, eventName, slog.LevelInfo, eventMsg,
 		slog.String("component", "diagnostics.bugreport"),
 		slog.String("report_id", summary.ReportID),
 		slog.String("correlation_id", summary.CorrelationID),
@@ -213,22 +279,37 @@ func (s *Service) File(ctx context.Context, in *diagnosticsv1.BugReport) (*diagn
 	)
 
 	return &diagnosticsv1.BugReportAck{
-		ReportId:      summary.ReportID,
-		CorrelationId: summary.CorrelationID,
-		Status:        diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED,
-		ReportPath:    summary.ReportPath,
-		Message:       "filed",
+		ReportId:                 summary.ReportID,
+		CorrelationId:            summary.CorrelationID,
+		Status:                   status,
+		ReportPath:               summary.ReportPath,
+		MergedAutodetectReportId: mergedAutodetectID,
+		Message: func() string {
+			if status == diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT {
+				return "merged_with_autodetect"
+			}
+			return "filed"
+		}(),
 	}, nil
 }
 
 // List returns summaries sorted newest-first.
 func (s *Service) List() ([]Summary, error) {
+	return s.ListFiltered(ListFilter{})
+}
+
+// ListFiltered returns summaries sorted newest-first with optional filters.
+func (s *Service) ListFiltered(filter ListFilter) ([]Summary, error) {
 	records, err := s.readAllRecords()
 	if err != nil {
 		return nil, err
 	}
 	out := make([]Summary, 0, len(records))
 	for _, rec := range records {
+		rec.Summary.Confirmed = rec.Confirmed
+		if !matchFilter(rec, filter) {
+			continue
+		}
 		out = append(out, rec.Summary)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -273,6 +354,7 @@ func (s *Service) Confirm(ctx context.Context, reportID, confirmedBy string) (Re
 			continue
 		}
 		rec.Confirmed = true
+		rec.Summary.Confirmed = true
 		rec.ConfirmedUnix = s.now().UTC().UnixMilli()
 		rec.ConfirmedBy = strings.TrimSpace(confirmedBy)
 
@@ -295,6 +377,91 @@ func (s *Service) Confirm(ctx context.Context, reportID, confirmedBy string) (Re
 		return rec, true, nil
 	}
 	return Record{}, false, nil
+}
+
+func matchFilter(rec Record, filter ListFilter) bool {
+	if filter.ConfirmedOnly && !rec.Confirmed {
+		return false
+	}
+	if filter.PendingOnly && rec.Confirmed {
+		return false
+	}
+	subject := strings.TrimSpace(filter.SubjectDeviceID)
+	if subject != "" && !strings.EqualFold(strings.TrimSpace(rec.Summary.SubjectDeviceID), subject) {
+		return false
+	}
+	reporter := strings.TrimSpace(filter.ReporterDeviceID)
+	if reporter != "" && !strings.EqualFold(strings.TrimSpace(rec.Summary.ReporterDeviceID), reporter) {
+		return false
+	}
+	source := normalizeSourceFilter(filter.Source)
+	if source != "" && strings.TrimSpace(rec.Summary.Source) != source {
+		return false
+	}
+	tag := strings.TrimSpace(strings.ToLower(filter.Tag))
+	if tag != "" {
+		tagMatch := false
+		for _, item := range rec.Summary.Tags {
+			if strings.TrimSpace(strings.ToLower(item)) == tag {
+				tagMatch = true
+				break
+			}
+		}
+		if !tagMatch {
+			return false
+		}
+	}
+	if filter.FromUnixMS > 0 && rec.Summary.TimestampUnixMS < filter.FromUnixMS {
+		return false
+	}
+	if filter.ToUnixMS > 0 && rec.Summary.TimestampUnixMS > filter.ToUnixMS {
+		return false
+	}
+	return true
+}
+
+func normalizeSourceFilter(raw string) string {
+	trimmed := strings.TrimSpace(strings.ToUpper(raw))
+	if trimmed == "" {
+		return ""
+	}
+	if !strings.HasPrefix(trimmed, "BUG_REPORT_SOURCE_") {
+		trimmed = "BUG_REPORT_SOURCE_" + trimmed
+	}
+	if _, ok := diagnosticsv1.BugReportSource_value[trimmed]; !ok {
+		return ""
+	}
+	return trimmed
+}
+
+func (s *Service) findRecentAutodetectLocked(subjectID string, now time.Time, window time.Duration) *Record {
+	subjectID = strings.TrimSpace(subjectID)
+	if subjectID == "" {
+		return nil
+	}
+	records, err := s.readAllRecords()
+	if err != nil {
+		return nil
+	}
+	cutoffUnix := now.Add(-window).UnixMilli()
+	var best *Record
+	for i := range records {
+		rec := records[i]
+		if strings.TrimSpace(rec.Summary.SubjectDeviceID) != subjectID {
+			continue
+		}
+		if rec.Summary.Source != diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_AUTODETECT.String() {
+			continue
+		}
+		if rec.Summary.TimestampUnixMS < cutoffUnix {
+			continue
+		}
+		if best == nil || rec.Summary.TimestampUnixMS > best.Summary.TimestampUnixMS {
+			copyRec := rec
+			best = &copyRec
+		}
+	}
+	return best
 }
 
 func (s *Service) readAllRecords() ([]Record, error) {
