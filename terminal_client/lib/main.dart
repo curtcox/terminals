@@ -46,6 +46,7 @@ const String _bugReportActionPrefix = 'bug_report';
 const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
+const Duration _bugReportAckTimeout = Duration(seconds: 20);
 const List<String> _bugWordSyllables = <String>[
   'ba',
   'be',
@@ -267,6 +268,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   int _lastFlutterErrorUnixMs = 0;
   String _lastBugTokenWord = '';
   String _lastBugTokenCode = '';
+  final List<_PendingBugReport> _pendingBugReports = <_PendingBugReport>[];
+  Timer? _bugReportAckTimer;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
 
   @override
@@ -430,15 +433,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
               _recordClientLog('error', response.error.message);
             }
             if (response.hasBugReportAck()) {
-              final ack = response.bugReportAck;
-              _lastNotification = _lastBugTokenWord.isEmpty
-                  ? 'Bug report filed: ${ack.reportId}'
-                  : 'Bug report filed: ${ack.reportId} (word: $_lastBugTokenWord)';
-              _recordClientLog(
-                'info',
-                'bug report ack status=${ack.status.name} id=${ack.reportId} '
-                    'word=$_lastBugTokenWord code=$_lastBugTokenCode',
-              );
+              _handleBugReportAck(response.bugReportAck);
             }
             _applyRegisterMetadata(response);
             if (_e2eEmitEvents && response.hasRegisterAck()) {
@@ -947,6 +942,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _outgoing.add(
       ConnectRequest()..bugReport = bugReport,
     );
+    _pendingBugReports.add(
+      _PendingBugReport(
+        identifier: identifier,
+        submittedUnixMs: now.toUtc().millisecondsSinceEpoch,
+      ),
+    );
+    _ensureBugReportAckWatchdog();
     _recordClientLog(
       'info',
       'submitted bug report for subject=$subjectDeviceID '
@@ -958,9 +960,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     setState(() {
       _lastBugTokenWord = identifier.word;
       _lastBugTokenCode = identifier.code;
-      _status = 'Bug report submitted';
+      _status = 'Bug report pending';
       _lastNotification =
-          'Submitting bug report (word: ${identifier.word}, code: ${identifier.code})...';
+          'Submitting bug report (word: ${identifier.word}, code: ${identifier.code}) and waiting for server ack...';
     });
   }
 
@@ -1151,7 +1153,97 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       'reconnect_attempt': _reconnectAttempt.toString(),
       'last_notification': _lastNotification,
       'page_url': Uri.base.toString(),
+      'active_root_revision': _activeRootRevision.toString(),
+      'responses_seen': _responses.toString(),
     };
+  }
+
+  void _handleBugReportAck(diagv1.BugReportAck ack) {
+    _PendingBugReport? pending;
+    if (_pendingBugReports.isNotEmpty) {
+      pending = _pendingBugReports.removeAt(0);
+    }
+    final tokenWord = pending?.identifier.word ?? _lastBugTokenWord;
+    final tokenCode = pending?.identifier.code ?? _lastBugTokenCode;
+    _lastBugTokenWord = tokenWord;
+    _lastBugTokenCode = tokenCode;
+    if (_pendingBugReports.isEmpty) {
+      _bugReportAckTimer?.cancel();
+      _bugReportAckTimer = null;
+    }
+    if (mounted) {
+      setState(() {
+        _status = 'Bug report filed';
+        _lastNotification = tokenWord.isEmpty
+            ? 'Bug report filed: ${ack.reportId}'
+            : 'Bug report filed: ${ack.reportId} (word: $tokenWord)';
+      });
+    }
+    _recordClientLog(
+      'info',
+      'bug report ack status=${ack.status.name} id=${ack.reportId} '
+          'word=$tokenWord code=$tokenCode',
+    );
+  }
+
+  void _ensureBugReportAckWatchdog() {
+    if (_bugReportAckTimer != null) {
+      return;
+    }
+    _bugReportAckTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_pendingBugReports.isEmpty) {
+        _bugReportAckTimer?.cancel();
+        _bugReportAckTimer = null;
+        return;
+      }
+      final nowUnixMs = DateTime.now().toUtc().millisecondsSinceEpoch;
+      final first = _pendingBugReports.first;
+      if (nowUnixMs - first.submittedUnixMs <
+          _bugReportAckTimeout.inMilliseconds) {
+        return;
+      }
+      final failed = _pendingBugReports.removeAt(0);
+      _lastBugTokenWord = failed.identifier.word;
+      _lastBugTokenCode = failed.identifier.code;
+      if (mounted) {
+        setState(() {
+          _status = 'Bug report not confirmed';
+          _lastNotification =
+              'Bug report not confirmed by server (word: ${failed.identifier.word}, code: ${failed.identifier.code}).';
+        });
+      }
+      _recordClientLog(
+        'error',
+        'bug report ack timeout word=${failed.identifier.word} code=${failed.identifier.code}',
+      );
+      if (_pendingBugReports.isEmpty) {
+        _bugReportAckTimer?.cancel();
+        _bugReportAckTimer = null;
+      }
+    });
+  }
+
+  void _drainPendingBugReportsAsFailed(String reason) {
+    if (_pendingBugReports.isEmpty) {
+      return;
+    }
+    final failed = _pendingBugReports.removeAt(0);
+    _lastBugTokenWord = failed.identifier.word;
+    _lastBugTokenCode = failed.identifier.code;
+    _recordClientLog(
+      'error',
+      'bug report failed word=${failed.identifier.word} code=${failed.identifier.code} reason=$reason',
+    );
+    if (mounted) {
+      setState(() {
+        _status = 'Bug report not confirmed';
+        _lastNotification =
+            'Bug report not confirmed (word: ${failed.identifier.word}, code: ${failed.identifier.code}).';
+      });
+    }
+    _pendingBugReports.clear();
+    _bugReportAckTimer?.cancel();
+    _bugReportAckTimer = null;
   }
 
   void _stopHeartbeatLoop() {
@@ -1174,6 +1266,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _stopHeartbeatLoop();
     _stopSensorTelemetryLoop();
     _incoming = null;
+    _drainPendingBugReportsAsFailed('stream closed before bug report ack');
     final existingClient = _client;
     _client = null;
     if (existingClient != null) {
@@ -1280,6 +1373,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _cancelReconnectTimer();
     _stopHeartbeatLoop();
     _stopSensorTelemetryLoop();
+    _drainPendingBugReportsAsFailed('stream stopped before bug report ack');
     await _incoming?.cancel();
     _incoming = null;
     for (final streamID in _activeStreamsByID.keys.toList(growable: false)) {
@@ -1305,6 +1399,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   void dispose() {
     _shouldStayConnected = false;
     _cancelReconnectTimer();
+    _bugReportAckTimer?.cancel();
+    _bugReportAckTimer = null;
     _stopHeartbeatLoop();
     _stopSensorTelemetryLoop();
     final incoming = _incoming;
@@ -2231,4 +2327,14 @@ class _BugReportDraft {
   final String description;
   final List<String> tags;
   final _BugIdentifier identifier;
+}
+
+class _PendingBugReport {
+  const _PendingBugReport({
+    required this.identifier,
+    required this.submittedUnixMs,
+  });
+
+  final _BugIdentifier identifier;
+  final int submittedUnixMs;
 }
