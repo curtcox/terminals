@@ -1,3 +1,4 @@
+// Package observation stores recent observations and evidence artifacts.
 package observation
 
 import (
@@ -18,13 +19,13 @@ type Store struct {
 }
 
 // NewStore returns an in-memory observation store.
-func NewStore(max int) *Store {
-	if max <= 0 {
-		max = 2048
+func NewStore(capacity int) *Store {
+	if capacity <= 0 {
+		capacity = 2048
 	}
 	return &Store{
 		artifacts: make(map[string]iorouter.ArtifactRef),
-		max:       max,
+		max:       capacity,
 	}
 }
 

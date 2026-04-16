@@ -1,1 +1,1 @@
-Await user review and address follow-up changes.
+Await user validation and implement any requested follow-up changes.

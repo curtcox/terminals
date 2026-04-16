@@ -1,3 +1,4 @@
+// Package world stores calibration data and fused world-model entities.
 package world
 
 import (
@@ -14,11 +15,17 @@ import (
 type VerificationState string
 
 const (
+	// VerificationUnknown means no verification method has been recorded yet.
 	VerificationUnknown       VerificationState = "unknown"
+	// VerificationManual indicates a user manually confirmed the location.
 	VerificationManual        VerificationState = "manual"
+	// VerificationMarker indicates marker-based visual verification.
 	VerificationMarker        VerificationState = "marker"
+	// VerificationAudioChirp indicates calibration by emitted/recorded chirps.
 	VerificationAudioChirp    VerificationState = "audio_chirp"
+	// VerificationRFFingerprint indicates RF-based verification.
 	VerificationRFFingerprint VerificationState = "rf_fingerprint"
+	// VerificationMixed indicates multiple verification methods were combined.
 	VerificationMixed         VerificationState = "mixed"
 )
 
@@ -37,8 +44,11 @@ type DeviceGeometry struct {
 type EntityKind string
 
 const (
+	// EntityPerson tracks people presence/location.
 	EntityPerson    EntityKind = "person"
+	// EntityObject tracks household objects.
 	EntityObject    EntityKind = "object"
+	// EntityBluetooth tracks Bluetooth devices.
 	EntityBluetooth EntityKind = "bluetooth_device"
 )
 

@@ -299,7 +299,7 @@ func loadAppPackages(ctx context.Context, runtime *appruntime.Runtime) {
 	if runtime == nil {
 		return
 	}
-	root := filepath.Join("apps")
+	root := "apps"
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return

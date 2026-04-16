@@ -46,9 +46,13 @@ type MediaNodeKind = FlowNodeKind
 type ExecPolicy string
 
 const (
+	// ExecAuto lets the scheduler choose where to run the node.
 	ExecAuto          ExecPolicy = "auto"
+	// ExecPreferClient prefers client/edge execution when supported.
 	ExecPreferClient  ExecPolicy = "prefer_client"
+	// ExecRequireClient requires client/edge execution.
 	ExecRequireClient ExecPolicy = "require_client"
+	// ExecServerOnly requires server-side execution.
 	ExecServerOnly    ExecPolicy = "server_only"
 )
 

@@ -1,3 +1,4 @@
+// Package appruntime loads and hot-reloads TAR/TAL application packages.
 package appruntime
 
 import (
@@ -131,7 +132,9 @@ func parseManifest(path string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, ErrInvalidManifest
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	manifest := Manifest{}
 	scanner := bufio.NewScanner(file)

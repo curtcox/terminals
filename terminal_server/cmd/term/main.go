@@ -1,3 +1,4 @@
+// Command term provides app runtime helper commands.
 package main
 
 import (
