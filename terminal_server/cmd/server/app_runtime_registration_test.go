@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,6 +15,11 @@ import (
 
 type mockAppActivation struct {
 	lastTrigger appruntime.Trigger
+}
+
+type concurrentMockAppActivation struct {
+	current int32
+	maxSeen int32
 }
 
 func (m *mockAppActivation) ID() string { return "mock-id" }
@@ -45,6 +52,50 @@ func (m *mockAppActivation) Suspend(ctx context.Context, env *appruntime.Environ
 }
 
 func (m *mockAppActivation) Resume(ctx context.Context, env *appruntime.Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
+func (m *concurrentMockAppActivation) ID() string { return "concurrent-id" }
+
+func (m *concurrentMockAppActivation) DefinitionName() string { return "concurrent-def" }
+
+func (m *concurrentMockAppActivation) Start(ctx context.Context, env *appruntime.Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
+func (m *concurrentMockAppActivation) Handle(ctx context.Context, env *appruntime.Environment, trigger appruntime.Trigger) error {
+	_ = ctx
+	_ = env
+	_ = trigger
+	now := atomic.AddInt32(&m.current, 1)
+	for {
+		seen := atomic.LoadInt32(&m.maxSeen)
+		if now <= seen || atomic.CompareAndSwapInt32(&m.maxSeen, seen, now) {
+			break
+		}
+	}
+	time.Sleep(20 * time.Millisecond)
+	atomic.AddInt32(&m.current, -1)
+	return nil
+}
+
+func (m *concurrentMockAppActivation) Stop(ctx context.Context, env *appruntime.Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
+func (m *concurrentMockAppActivation) Suspend(ctx context.Context, env *appruntime.Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
+func (m *concurrentMockAppActivation) Resume(ctx context.Context, env *appruntime.Environment) error {
 	_ = ctx
 	_ = env
 	return nil
@@ -131,5 +182,30 @@ func TestAppScenarioActivationHandleEventForwardsToAppActivation(t *testing.T) {
 	}
 	if !mock.lastTrigger.OccurredAt.Equal(occurredAt) {
 		t.Fatalf("trigger occurred_at = %s, want %s", mock.lastTrigger.OccurredAt, occurredAt)
+	}
+}
+
+func TestAppScenarioActivationHandleEventSerializesConcurrentCalls(t *testing.T) {
+	mock := &concurrentMockAppActivation{}
+	activation := &appScenarioActivation{
+		name:       "app.kitchen_watch.watch",
+		activation: mock,
+	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			defer wg.Done()
+			_ = activation.HandleEvent(context.Background(), nil, scenario.EventRecord{
+				Kind:       "sound.classified",
+				Subject:    "kitchen-1",
+				OccurredAt: time.Now().UTC(),
+			})
+		}()
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt32(&mock.maxSeen); got != 1 {
+		t.Fatalf("max concurrent app Handle calls = %d, want 1", got)
 	}
 }

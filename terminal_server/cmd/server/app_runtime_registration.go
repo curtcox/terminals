@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
@@ -57,6 +58,7 @@ type appScenarioActivation struct {
 	name       string
 	activation appruntime.AppActivation
 	appEnv     *appruntime.Environment
+	mu         sync.Mutex
 }
 
 func (a *appScenarioActivation) Name() string {
@@ -70,25 +72,35 @@ func (a *appScenarioActivation) Match(trigger scenario.Trigger) bool {
 
 func (a *appScenarioActivation) Start(ctx context.Context, env *scenario.Environment) error {
 	_ = env
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.appEnv = &appruntime.Environment{}
 	return a.activation.Start(ctx, a.appEnv)
 }
 
 func (a *appScenarioActivation) Stop() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return a.activation.Stop(context.Background(), a.appEnv)
 }
 
 func (a *appScenarioActivation) Suspend() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return a.activation.Suspend(context.Background(), a.appEnv)
 }
 
 func (a *appScenarioActivation) Resume(ctx context.Context, env *scenario.Environment) error {
 	_ = env
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return a.activation.Resume(ctx, a.appEnv)
 }
 
 func (a *appScenarioActivation) HandleEvent(ctx context.Context, env *scenario.Environment, event scenario.EventRecord) error {
 	_ = env
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if a.appEnv == nil {
 		a.appEnv = &appruntime.Environment{}
 	}
