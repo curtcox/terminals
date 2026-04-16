@@ -3,7 +3,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +18,7 @@ import (
 
 func main() {
 	if len(os.Args) < 3 || strings.TrimSpace(os.Args[1]) != "app" {
-		fmt.Fprintln(os.Stderr, "usage: term app <new|check|load|reload> <name>")
+		fmt.Fprintln(os.Stderr, "usage: term app <new|check|load|reload|rollback> <name>")
 		os.Exit(2)
 	}
 	command := strings.TrimSpace(os.Args[2])
@@ -45,21 +50,85 @@ func main() {
 			fatal(err)
 		}
 		fmt.Printf("%s ok: %s@%s\n", command, pkg.Manifest.Name, pkg.Manifest.Version)
-	case "reload":
-		runtime := appruntime.NewRuntime()
-		if _, err := runtime.LoadPackage(context.Background(), root); err != nil {
-			fatal(err)
+	case "reload", "rollback":
+		if result, err := postAdminAppCommand(command, name); err == nil {
+			fmt.Printf("%s ok: %s@%s r%.0f\n", command, name, result["version"], toFloat(result["revision"]))
+			return
 		}
-		if _, changed, err := runtime.ReloadPackage(context.Background(), name); err != nil {
-			fatal(err)
-		} else if changed {
-			fmt.Printf("reload ok: %s changed\n", name)
+
+		if command == "reload" {
+			runtime := appruntime.NewRuntime()
+			if _, err := runtime.LoadPackage(context.Background(), root); err != nil {
+				fatal(err)
+			}
+			if _, changed, err := runtime.ReloadPackage(context.Background(), name); err != nil {
+				fatal(err)
+			} else if changed {
+				fmt.Printf("reload ok: %s changed (local runtime)\n", name)
+			} else {
+				fmt.Printf("reload ok: %s unchanged (local runtime)\n", name)
+			}
 		} else {
-			fmt.Printf("reload ok: %s unchanged\n", name)
+			fatal(fmt.Errorf("rollback requires a running server admin API"))
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown app command: %s\n", command)
 		os.Exit(2)
+	}
+}
+
+func postAdminAppCommand(command, app string) (map[string]any, error) {
+	action := strings.TrimSpace(strings.ToLower(command))
+	if action != "reload" && action != "rollback" {
+		return nil, fmt.Errorf("unsupported app command %q", command)
+	}
+	baseURL := strings.TrimSpace(os.Getenv("TERM_ADMIN_URL"))
+	if baseURL == "" {
+		baseURL = "http://127.0.0.1:50053"
+	}
+	body := url.Values{}
+	body.Set("app", strings.TrimSpace(app))
+	req, err := http.NewRequest(http.MethodPost, baseURL+"/admin/api/apps/"+action, strings.NewReader(body.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	payload := map[string]any{}
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return nil, err
+		}
+	}
+	if resp.StatusCode >= 300 {
+		if errText, ok := payload["error"].(string); ok && strings.TrimSpace(errText) != "" {
+			return nil, errors.New(errText)
+		}
+		return nil, fmt.Errorf("admin request failed with status %d", resp.StatusCode)
+	}
+	return payload, nil
+}
+
+func toFloat(v any) float64 {
+	switch x := v.(type) {
+	case float64:
+		return x
+	case int:
+		return float64(x)
+	case int64:
+		return float64(x)
+	default:
+		return 0
 	}
 }
 

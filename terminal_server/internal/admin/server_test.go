@@ -1,13 +1,18 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
@@ -94,7 +99,7 @@ func TestStartAndStopScenarioEndpoints(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
 
 	startReq := httptest.NewRequest(http.MethodPost, "/admin/api/scenarios/start", strings.NewReader(url.Values{
 		"scenario":   {"terminal"},
@@ -137,7 +142,7 @@ func TestUpdateDevicePlacementEndpoint(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/api/devices/placement", strings.NewReader(url.Values{
 		"device_id": {"kitchen-1"},
@@ -178,7 +183,7 @@ func testHandler(t *testing.T) http.Handler {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	return NewHandler(control, runtime, devices, config.Config{
+	return NewHandler(control, runtime, nil, nil, devices, config.Config{
 		GRPCHost:      "0.0.0.0",
 		GRPCPort:      50051,
 		MDNSService:   "_terminals._tcp.local.",
@@ -187,4 +192,93 @@ func testHandler(t *testing.T) http.Handler {
 		AdminHTTPHost: "127.0.0.1",
 		AdminHTTPPort: 50053,
 	})
+}
+
+func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
+	appRoot := createTestAppPackage(t, "sound_watch", "1.0.0")
+	appRuntime := appruntime.NewRuntime()
+	if _, err := appRuntime.LoadPackage(context.Background(), appRoot); err != nil {
+		t.Fatalf("LoadPackage(v1) error = %v", err)
+	}
+
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "kitchen-1", DeviceName: "Kitchen"})
+	control := transport.NewControlService("HomeServer", devices)
+	engine := scenario.NewEngine()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	h := NewHandler(control, runtime, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"})
+
+	listReq := httptest.NewRequest(http.MethodGet, "/admin/api/apps", nil)
+	listW := httptest.NewRecorder()
+	h.ServeHTTP(listW, listReq)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("apps list status = %d, want 200 body=%s", listW.Code, listW.Body.String())
+	}
+	var listed map[string][]map[string]any
+	if err := json.Unmarshal(listW.Body.Bytes(), &listed); err != nil {
+		t.Fatalf("decode apps list: %v", err)
+	}
+	if len(listed["apps"]) != 1 || listed["apps"][0]["name"] != "sound_watch" {
+		t.Fatalf("apps list = %+v, want one sound_watch app", listed["apps"])
+	}
+
+	time.Sleep(5 * time.Millisecond)
+	if err := os.WriteFile(filepath.Join(appRoot, "manifest.toml"), []byte(
+		"name = \"sound_watch\"\nversion = \"1.1.0\"\nlanguage = \"tal/1\"\nexports = [\"watch\"]\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v2) error = %v", err)
+	}
+	reloadReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/reload", strings.NewReader(url.Values{
+		"app": {"sound_watch"},
+	}.Encode()))
+	reloadReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reloadW := httptest.NewRecorder()
+	h.ServeHTTP(reloadW, reloadReq)
+	if reloadW.Code != http.StatusOK {
+		t.Fatalf("reload status = %d, want 200 body=%s", reloadW.Code, reloadW.Body.String())
+	}
+	var reloaded map[string]any
+	if err := json.Unmarshal(reloadW.Body.Bytes(), &reloaded); err != nil {
+		t.Fatalf("decode reload: %v", err)
+	}
+	if reloaded["version"] != "1.1.0" {
+		t.Fatalf("reloaded version = %v, want 1.1.0", reloaded["version"])
+	}
+
+	rollbackReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/rollback", strings.NewReader(url.Values{
+		"app": {"sound_watch"},
+	}.Encode()))
+	rollbackReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rollbackW := httptest.NewRecorder()
+	h.ServeHTTP(rollbackW, rollbackReq)
+	if rollbackW.Code != http.StatusOK {
+		t.Fatalf("rollback status = %d, want 200 body=%s", rollbackW.Code, rollbackW.Body.String())
+	}
+	var rolledBack map[string]any
+	if err := json.Unmarshal(rollbackW.Body.Bytes(), &rolledBack); err != nil {
+		t.Fatalf("decode rollback: %v", err)
+	}
+	if rolledBack["version"] != "1.0.0" {
+		t.Fatalf("rolled back version = %v, want 1.0.0", rolledBack["version"])
+	}
+}
+
+func createTestAppPackage(t *testing.T, name, version string) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), name)
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("MkdirAll(app) error = %v", err)
+	}
+	manifest := "name = \"" + name + "\"\nversion = \"" + version + "\"\nlanguage = \"tal/1\"\nexports = [\"watch\"]\n"
+	if err := os.WriteFile(filepath.Join(root, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main.tal) error = %v", err)
+	}
+	return root
 }

@@ -121,7 +121,14 @@ func main() {
 		log.Printf("start photo frame asset server: %v", err)
 		return
 	}
-	adminServer, err := startAdminServer(cfg, admin.NewHandler(controlService, scenarioRuntime, deviceManager, cfg))
+	adminServer, err := startAdminServer(cfg, admin.NewHandler(
+		controlService,
+		scenarioRuntime,
+		appRuntime,
+		func() { registerAppScenarioDefinitions(scenarioEngine, appRuntime) },
+		deviceManager,
+		cfg,
+	))
 	if err != nil {
 		log.Printf("start admin dashboard: %v", err)
 		return

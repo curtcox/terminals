@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
@@ -20,21 +21,32 @@ import (
 
 // Handler serves a lightweight admin dashboard and JSON control APIs.
 type Handler struct {
-	control *transport.ControlService
-	runtime *scenario.Runtime
-	devices *device.Manager
-	cfg     config.Config
-	now     func() time.Time
+	control     *transport.ControlService
+	runtime     *scenario.Runtime
+	appRuntime  *appruntime.Runtime
+	syncAppDefs func()
+	devices     *device.Manager
+	cfg         config.Config
+	now         func() time.Time
 }
 
 // NewHandler builds an admin handler with dashboard and API routes.
-func NewHandler(control *transport.ControlService, runtime *scenario.Runtime, devices *device.Manager, cfg config.Config) http.Handler {
+func NewHandler(
+	control *transport.ControlService,
+	runtime *scenario.Runtime,
+	appRuntime *appruntime.Runtime,
+	syncAppDefs func(),
+	devices *device.Manager,
+	cfg config.Config,
+) http.Handler {
 	h := &Handler{
-		control: control,
-		runtime: runtime,
-		devices: devices,
-		cfg:     cfg,
-		now:     time.Now,
+		control:     control,
+		runtime:     runtime,
+		appRuntime:  appRuntime,
+		syncAppDefs: syncAppDefs,
+		devices:     devices,
+		cfg:         cfg,
+		now:         time.Now,
 	}
 
 	mux := http.NewServeMux()
@@ -46,6 +58,9 @@ func NewHandler(control *transport.ControlService, runtime *scenario.Runtime, de
 	mux.HandleFunc("/admin/api/scenarios/start", h.handleStartScenario)
 	mux.HandleFunc("/admin/api/scenarios/stop", h.handleStopScenario)
 	mux.HandleFunc("/admin/api/activations", h.handleActivations)
+	mux.HandleFunc("/admin/api/apps", h.handleApps)
+	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
+	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
 	return mux
 }
 
@@ -281,6 +296,120 @@ func (h *Handler) handleActivations(w http.ResponseWriter, req *http.Request) {
 	})
 }
 
+func (h *Handler) handleApps(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.appRuntime == nil {
+		h.writeJSON(w, http.StatusOK, map[string]any{"apps": []map[string]any{}})
+		return
+	}
+	names := h.appRuntime.ListPackages()
+	views := make([]map[string]any, 0, len(names))
+	for _, name := range names {
+		pkg, ok := h.appRuntime.GetPackage(name)
+		if !ok {
+			continue
+		}
+		history := h.appRuntime.ListPackageHistory(name)
+		versions := make([]string, 0, len(history))
+		for _, version := range history {
+			versions = append(versions, strings.TrimSpace(version.Manifest.Version))
+		}
+		views = append(views, map[string]any{
+			"name":             pkg.Manifest.Name,
+			"version":          pkg.Manifest.Version,
+			"revision":         pkg.Revision,
+			"loaded_at_unixms": pkg.LoadedAt.UTC().UnixMilli(),
+			"permissions":      pkg.Manifest.Permissions,
+			"exports":          pkg.Manifest.Exports,
+			"dev_mode":         pkg.Manifest.DevMode,
+			"history_versions": versions,
+		})
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"apps": views})
+}
+
+func (h *Handler) handleReloadApp(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.appRuntime == nil {
+		h.writeJSONError(w, http.StatusBadRequest, "app runtime not configured")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form")
+		return
+	}
+	name := strings.TrimSpace(req.FormValue("app"))
+	if name == "" {
+		name = strings.TrimSpace(req.FormValue("name"))
+	}
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "app is required")
+		return
+	}
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+	pkg, changed, err := h.appRuntime.ReloadPackage(ctx, name)
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if changed && h.syncAppDefs != nil {
+		h.syncAppDefs()
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"status":   "ok",
+		"action":   "reload",
+		"app":      pkg.Manifest.Name,
+		"changed":  changed,
+		"version":  pkg.Manifest.Version,
+		"revision": pkg.Revision,
+	})
+}
+
+func (h *Handler) handleRollbackApp(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.appRuntime == nil {
+		h.writeJSONError(w, http.StatusBadRequest, "app runtime not configured")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form")
+		return
+	}
+	name := strings.TrimSpace(req.FormValue("app"))
+	if name == "" {
+		name = strings.TrimSpace(req.FormValue("name"))
+	}
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "app is required")
+		return
+	}
+	pkg, err := h.appRuntime.RollbackPackage(name)
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if h.syncAppDefs != nil {
+		h.syncAppDefs()
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"status":   "ok",
+		"action":   "rollback",
+		"app":      pkg.Manifest.Name,
+		"version":  pkg.Manifest.Version,
+		"revision": pkg.Revision,
+	})
+}
+
 func parseDeviceIDs(raw string) []string {
 	if strings.TrimSpace(raw) == "" {
 		return nil
@@ -394,6 +523,17 @@ var dashboardTemplate = template.Must(template.New("admin").Parse(`<!doctype htm
     <h2>Activations</h2>
     <pre id="activations">[]</pre>
   </section>
+
+  <section>
+    <h2>Apps</h2>
+    <div class="row">
+      <label>App name<input id="app_name" placeholder="sound_watch" /></label>
+      <button id="app_reload_btn">Reload</button>
+      <button class="secondary" id="app_rollback_btn">Rollback</button>
+    </div>
+    <pre id="app_result">{}</pre>
+    <pre id="apps">[]</pre>
+  </section>
 </main>
 <script>
 async function loadJSON(path) {
@@ -408,6 +548,7 @@ async function refresh() {
   document.getElementById('devices').textContent = format(await loadJSON('/admin/api/devices'));
   document.getElementById('scenarios').textContent = format(await loadJSON('/admin/api/scenarios'));
   document.getElementById('activations').textContent = format(await loadJSON('/admin/api/activations'));
+  document.getElementById('apps').textContent = format(await loadJSON('/admin/api/apps'));
 }
 async function scenarioCommand(path) {
   const scenario = document.getElementById('scenario').value.trim();
@@ -432,9 +573,19 @@ async function savePlacement() {
   document.getElementById('placement_result').textContent = format(json);
   await refresh();
 }
+async function appCommand(path) {
+  const body = new URLSearchParams();
+  body.set('app', document.getElementById('app_name').value.trim());
+  const response = await fetch(path, { method: 'POST', body });
+  const json = await response.json();
+  document.getElementById('app_result').textContent = format(json);
+  await refresh();
+}
 document.getElementById('start_btn').addEventListener('click', () => scenarioCommand('/admin/api/scenarios/start'));
 document.getElementById('stop_btn').addEventListener('click', () => scenarioCommand('/admin/api/scenarios/stop'));
 document.getElementById('placement_save_btn').addEventListener('click', () => savePlacement());
+document.getElementById('app_reload_btn').addEventListener('click', () => appCommand('/admin/api/apps/reload'));
+document.getElementById('app_rollback_btn').addEventListener('click', () => appCommand('/admin/api/apps/rollback'));
 refresh();
 setInterval(refresh, 3000);
 </script>
