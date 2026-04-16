@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/config"
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 )
 
 func startAdminServer(cfg config.Config, handler http.Handler) (*http.Server, error) {
@@ -27,9 +27,10 @@ func startAdminServer(cfg config.Config, handler http.Handler) (*http.Server, er
 	server.Addr = listener.Addr().String()
 
 	go func() {
-		log.Printf("admin dashboard listening at %s", server.Addr)
+		logger := eventlog.Component("admin.http")
+		logger.Info("admin dashboard listening", "event", "admin.http.listener_ready", "addr", server.Addr)
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			log.Printf("admin dashboard server error: %v", err)
+			logger.Error("admin dashboard server error", "event", "admin.http.server_error", "error", err)
 		}
 	}()
 	return server, nil

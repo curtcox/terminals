@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog/query"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
@@ -61,7 +64,11 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
-	return mux
+	mux.HandleFunc("/admin/logs", h.handleLogs)
+	mux.HandleFunc("/admin/logs.jsonl", h.handleLogsJSONL)
+	mux.HandleFunc("/admin/logs/trace/", h.handleLogsTrace)
+	mux.HandleFunc("/admin/logs/activation/", h.handleLogsActivation)
+	return h.withRequestLogging(mux)
 }
 
 func (h *Handler) handleDashboard(w http.ResponseWriter, _ *http.Request) {
@@ -91,6 +98,11 @@ func (h *Handler) handleStatus(w http.ResponseWriter, req *http.Request) {
 			"liveness_interval_seconds":  h.cfg.LivenessReconcileIntervalSecs,
 			"due_timer_interval_seconds": h.cfg.DueTimerProcessIntervalSecs,
 			"recording_dir":              h.cfg.RecordingDir,
+			"log_dir":                    h.cfg.LogDir,
+			"log_level":                  h.cfg.LogLevel,
+			"log_max_bytes":              h.cfg.LogMaxBytes,
+			"log_max_archives":           h.cfg.LogMaxArchives,
+			"log_stderr":                 h.cfg.LogStderr,
 			"photo_frame_dir":            h.cfg.PhotoFrameDir,
 			"admin_http_host":            h.cfg.AdminHTTPHost,
 			"admin_http_port":            h.cfg.AdminHTTPPort,
@@ -455,6 +467,122 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, payload any) {
 	}
 }
 
+func (h *Handler) withRequestLogging(next http.Handler) http.Handler {
+	logger := eventlog.Component("admin.http")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		ctx, end := eventlog.WithSpan(r.Context(), "admin:"+r.Method+":"+r.URL.Path)
+		defer end()
+		r = r.WithContext(ctx)
+		next.ServeHTTP(w, r)
+		eventlog.Emit(ctx, "admin.http.request", slog.LevelInfo, "admin request",
+			slog.String("component", "admin.http"),
+			slog.Group("http",
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
+			),
+		)
+		logger.Debug("admin request served", "event", "admin.http.request", "method", r.Method, "path", r.URL.Path)
+	})
+}
+
+func (h *Handler) handleLogs(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	args := logFilterArgs(req)
+	records, err := query.Search(h.cfg.LogDir, args, h.now().UTC())
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(records) > 200 {
+		records = records[len(records)-200:]
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := logsTemplate.Execute(w, map[string]any{
+		"Count":   len(records),
+		"Filters": strings.Join(args, " "),
+		"Rows":    records,
+	}); err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("render logs: %v", err))
+	}
+}
+
+func (h *Handler) handleLogsJSONL(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	records, err := query.Search(h.cfg.LogDir, logFilterArgs(req), h.now().UTC())
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	enc := json.NewEncoder(w)
+	for _, record := range records {
+		if err := enc.Encode(record); err != nil {
+			return
+		}
+	}
+}
+
+func (h *Handler) handleLogsTrace(w http.ResponseWriter, req *http.Request) {
+	traceID := strings.TrimSpace(strings.TrimPrefix(req.URL.Path, "/admin/logs/trace/"))
+	if traceID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "trace id is required")
+		return
+	}
+	records, err := query.ReadAll(h.cfg.LogDir)
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"trace_id": traceID,
+		"events":   query.Trace(records, traceID),
+	})
+}
+
+func (h *Handler) handleLogsActivation(w http.ResponseWriter, req *http.Request) {
+	activationID := strings.TrimSpace(strings.TrimPrefix(req.URL.Path, "/admin/logs/activation/"))
+	if activationID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "activation id is required")
+		return
+	}
+	records, err := query.ReadAll(h.cfg.LogDir)
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"activation_id": activationID,
+		"events":        query.Activation(records, activationID),
+	})
+}
+
+func logFilterArgs(req *http.Request) []string {
+	out := make([]string, 0)
+	values := req.URL.Query()
+	for key, items := range values {
+		for _, item := range items {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				continue
+			}
+			if key == "q" {
+				out = append(out, item)
+				continue
+			}
+			out = append(out, key+"="+item)
+		}
+	}
+	return out
+}
+
 var dashboardTemplate = template.Must(template.New("admin").Parse(`<!doctype html>
 <html lang="en">
 <head>
@@ -589,5 +717,46 @@ document.getElementById('app_rollback_btn').addEventListener('click', () => appC
 refresh();
 setInterval(refresh, 3000);
 </script>
+</body>
+</html>`))
+
+var logsTemplate = template.Must(template.New("logs").Parse(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Terminals Event Logs</title>
+  <style>
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #0b1220; color: #e2e8f0; margin: 0; }
+    main { padding: 16px; }
+    a { color: #7dd3fc; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border-bottom: 1px solid #1e293b; text-align: left; padding: 6px; font-size: 13px; vertical-align: top; }
+    th { color: #93c5fd; }
+    .err { color: #fda4af; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Event Logs</h1>
+  <p>matching events: {{.Count}} | filters: {{.Filters}}</p>
+  <p><a href="/admin">Back to dashboard</a></p>
+  <table>
+    <thead><tr><th>ts</th><th>level</th><th>event</th><th>component</th><th>msg</th><th>trace</th><th>activation</th></tr></thead>
+    <tbody>
+      {{range .Rows}}
+      <tr>
+        <td>{{index . "ts"}}</td>
+        <td>{{index . "level"}}</td>
+        <td>{{index . "event"}}</td>
+        <td>{{index . "component"}}</td>
+        <td>{{index . "msg"}}</td>
+        <td><a href="/admin/logs/trace/{{index . "trace_id"}}">{{index . "trace_id"}}</a></td>
+        <td><a href="/admin/logs/activation/{{index . "activation_id"}}">{{index . "activation_id"}}</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</main>
 </body>
 </html>`))

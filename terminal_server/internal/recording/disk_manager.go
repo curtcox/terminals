@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 )
 
 // Event represents one persisted recording lifecycle event.
@@ -265,6 +268,14 @@ func (m *DiskManager) appendEventLocked(event Event) error {
 	if _, err := f.Write([]byte{'\n'}); err != nil {
 		return err
 	}
+	eventlog.Emit(context.Background(), "recording.segment_flushed", slog.LevelInfo, "recording event flushed",
+		slog.String("component", "recording.disk"),
+		slog.String("action", event.Action),
+		slog.String("stream_id", event.StreamID),
+		slog.String("kind", event.Kind),
+		slog.String("source_id", event.SourceID),
+		slog.String("target_id", event.TargetID),
+	)
 	return nil
 }
 

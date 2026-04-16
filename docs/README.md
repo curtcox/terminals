@@ -13,6 +13,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | [Client — Android](client-android.md) | Flutter Android client |
 | [Client — Linux](client-linux.md) | Flutter Linux desktop client |
 | [Client — Windows](client-windows.md) | Flutter Windows desktop client |
+| [Event Taxonomy](event-taxonomy.md) | Server event names emitted to JSONL logs |
 
 ## Quick start
 

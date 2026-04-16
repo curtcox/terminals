@@ -9,6 +9,11 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_GRPC_PORT", "")
 	t.Setenv("TERMINALS_ADMIN_HTTP_HOST", "")
 	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "")
+	t.Setenv("TERMINALS_LOG_DIR", "")
+	t.Setenv("TERMINALS_LOG_LEVEL", "")
+	t.Setenv("TERMINALS_LOG_MAX_BYTES", "")
+	t.Setenv("TERMINALS_LOG_MAX_ARCHIVES", "")
+	t.Setenv("TERMINALS_LOG_STDERR", "")
 	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "")
 	t.Setenv("TERMINALS_PHOTO_FRAME_HTTP_PORT", "")
 	t.Setenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL", "")
@@ -37,6 +42,21 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.AdminHTTPPort != 50053 {
 		t.Fatalf("AdminHTTPPort = %d, want 50053", cfg.AdminHTTPPort)
+	}
+	if cfg.LogDir != "logs" {
+		t.Fatalf("LogDir = %q, want logs", cfg.LogDir)
+	}
+	if cfg.LogLevel != "info" {
+		t.Fatalf("LogLevel = %q, want info", cfg.LogLevel)
+	}
+	if cfg.LogMaxBytes != 104857600 {
+		t.Fatalf("LogMaxBytes = %d, want 104857600", cfg.LogMaxBytes)
+	}
+	if cfg.LogMaxArchives != 10 {
+		t.Fatalf("LogMaxArchives = %d, want 10", cfg.LogMaxArchives)
+	}
+	if !cfg.LogStderr {
+		t.Fatalf("LogStderr = false, want true")
 	}
 	if cfg.PhotoFrameHTTPHost != "0.0.0.0" {
 		t.Fatalf("PhotoFrameHTTPHost = %q, want 0.0.0.0", cfg.PhotoFrameHTTPHost)
@@ -132,6 +152,34 @@ func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
 	}
 	if cfg.PhotoFramePublicBaseURL != "https://photos.example.test/slides" {
 		t.Fatalf("PhotoFramePublicBaseURL = %q, want configured URL", cfg.PhotoFramePublicBaseURL)
+	}
+}
+
+func TestLoadEventLogConfigFromEnv(t *testing.T) {
+	t.Setenv("TERMINALS_LOG_DIR", "/tmp/terminals-logs")
+	t.Setenv("TERMINALS_LOG_LEVEL", "debug")
+	t.Setenv("TERMINALS_LOG_MAX_BYTES", "1234")
+	t.Setenv("TERMINALS_LOG_MAX_ARCHIVES", "7")
+	t.Setenv("TERMINALS_LOG_STDERR", "false")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.LogDir != "/tmp/terminals-logs" {
+		t.Fatalf("LogDir = %q, want /tmp/terminals-logs", cfg.LogDir)
+	}
+	if cfg.LogLevel != "debug" {
+		t.Fatalf("LogLevel = %q, want debug", cfg.LogLevel)
+	}
+	if cfg.LogMaxBytes != 1234 {
+		t.Fatalf("LogMaxBytes = %d, want 1234", cfg.LogMaxBytes)
+	}
+	if cfg.LogMaxArchives != 7 {
+		t.Fatalf("LogMaxArchives = %d, want 7", cfg.LogMaxArchives)
+	}
+	if cfg.LogStderr {
+		t.Fatalf("LogStderr = true, want false")
 	}
 }
 

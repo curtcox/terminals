@@ -25,6 +25,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/observation"
 	"github.com/curtcox/terminals/terminal_server/internal/placement"
@@ -40,11 +41,34 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "load config: %v\n", err)
+		os.Exit(1)
 	}
+
+	evtLogger, err := eventlog.New(eventlog.Config{
+		Dir:           cfg.LogDir,
+		Level:         cfg.LogLevel,
+		MaxBytes:      cfg.LogMaxBytes,
+		MaxArchives:   cfg.LogMaxArchives,
+		MirrorStderr:  cfg.LogStderr,
+		ServerID:      cfg.MDNSName,
+		ServerVersion: cfg.Version,
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "init event logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = evtLogger.Flush() }()
+	eventlog.SetDefault(evtLogger)
+	log.SetFlags(0)
+	log.SetOutput(evtLogger.StdLogAdapter("legacy"))
+	logger := eventlog.Component("main")
+	logger.Info("config loaded", "event", "config.loaded")
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	ctx, endSpan := eventlog.WithSpan(ctx, "server:start")
+	defer endSpan()
 
 	deviceManager := device.NewManager()
 	ioRouter := io.NewRouter()
@@ -61,7 +85,7 @@ func main() {
 	registerAppScenarioDefinitions(scenarioEngine, appRuntime)
 	telephonyBridge, err := buildTelephonyBridge(ctx, cfg.SIP)
 	if err != nil {
-		log.Printf("configure telephony bridge: %v", err)
+		logger.Error("configure telephony bridge", "event", "telephony.bridge.failed", "error", err)
 		return
 	}
 	aiBackends := ai.NewNoopBackends()
@@ -107,18 +131,18 @@ func main() {
 		observationStore.AddObservation(context.Background(), observation)
 	})
 	if err := scenarioRuntime.RecoverActivations(ctx); err != nil {
-		log.Printf("recover scenario activations: %v", err)
+		logger.Error("recover scenario activations", "event", "scenario.recovery.failed", "error", err)
 	}
 	controlStream := transport.NewStreamHandler(controlService)
 	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
 	if err != nil {
-		log.Printf("configure webrtc signal engine: %v", err)
+		logger.Error("configure webrtc signal engine", "event", "transport.webrtc.configure_failed", "error", err)
 		return
 	}
 	controlStream.SetWebRTCSignalEngine(webrtcEngine)
 	photoServer, photoBaseURL, err := startPhotoFrameAssetServer(cfg)
 	if err != nil {
-		log.Printf("start photo frame asset server: %v", err)
+		logger.Error("start photo frame asset server", "event", "transport.http.photo_frame.start_failed", "error", err)
 		return
 	}
 	adminServer, err := startAdminServer(cfg, admin.NewHandler(
@@ -130,7 +154,7 @@ func main() {
 		cfg,
 	))
 	if err != nil {
-		log.Printf("start admin dashboard: %v", err)
+		logger.Error("start admin dashboard", "event", "admin.http.start_failed", "error", err)
 		return
 	}
 	controlService.SetRegisterMetadata(map[string]string{
@@ -139,7 +163,7 @@ func main() {
 	configurePhotoFrame(controlStream, cfg, photoBaseURL)
 	recordingManager, err := recording.NewDiskManager(cfg.RecordingDir)
 	if err != nil {
-		log.Printf("configure recording manager: %v", err)
+		logger.Error("configure recording manager", "event", "recording.configure_failed", "error", err)
 		return
 	}
 	controlStream.SetRecordingManager(recordingManager)
@@ -151,7 +175,7 @@ func main() {
 	grpcServer.ConfigureWebRTCSignalEngine(webrtcEngine)
 	mdns := discovery.NewMDNSAdvertiser()
 
-	log.Printf("terminal server starting at %s", grpcServer.Address())
+	logger.Info("terminal server starting", "event", "server.starting", "grpc_address", grpcServer.Address())
 
 	if err := mdns.Start(ctx, discovery.ServiceInfo{
 		ServiceType: cfg.MDNSService,
@@ -159,49 +183,51 @@ func main() {
 		Port:        cfg.GRPCPort,
 		Version:     cfg.Version,
 	}); err != nil {
-		log.Printf("start mDNS: %v", err)
+		logger.Error("start mDNS", "event", "discovery.mdns.failed", "error", err)
 		return
 	}
 
 	if err := grpcServer.Start(ctx); err != nil {
-		log.Printf("start transport: %v", err)
+		logger.Error("start transport", "event", "transport.grpc.start_failed", "error", err)
 		return
 	}
 
 	// Keep this non-empty so startup validates major foundational services.
 	if len(deviceManager.List()) != 0 {
-		log.Printf("unexpected initial device registry state")
+		logger.Error("unexpected initial device registry state", "event", "server.bootstrap.invalid_state")
 		return
 	}
 	if len(ioRouter.Routes()) != 0 {
-		log.Printf("unexpected initial route registry state")
+		logger.Error("unexpected initial route registry state", "event", "server.bootstrap.invalid_state")
 		return
 	}
 	if _, ok := scenarioEngine.Active("bootstrap"); ok {
-		log.Printf("unexpected initial scenario state")
+		logger.Error("unexpected initial scenario state", "event", "server.bootstrap.invalid_state")
 		return
 	}
 	if len(scheduler.List()) != 0 {
-		log.Printf("unexpected initial scheduler state")
+		logger.Error("unexpected initial scheduler state", "event", "server.bootstrap.invalid_state")
 		return
 	}
-	log.Printf("control service ready for server id %q", cfg.MDNSName)
+	logger.Info("control service ready", "event", "server.started", "server_id", cfg.MDNSName)
 	if adminServer != nil {
-		log.Printf("admin dashboard available at http://%s/admin", adminServer.Addr)
+		logger.Info("admin dashboard available", "event", "admin.http.ready", "addr", adminServer.Addr)
 	}
-	log.Printf("control stream handler initialized")
-	log.Printf("recording manager initialized dir=%s", cfg.RecordingDir)
-	log.Printf("scenario runtime initialized with %d builtin scenarios", 3)
-	log.Printf(
-		"app runtime initialized with %d loaded packages and %d app definitions",
-		len(appRuntime.ListPackages()),
-		len(appRuntime.Definitions()),
+	logger.Info("control stream handler initialized", "event", "transport.stream.ready")
+	logger.Info("recording manager initialized", "event", "recording.started", "dir", cfg.RecordingDir)
+	logger.Info("scenario runtime initialized", "event", "scenario.definition.registered", "builtin_scenarios", 3)
+	logger.Info(
+		"app runtime initialized",
+		"event", "appruntime.package.loaded",
+		"packages", len(appRuntime.ListPackages()),
+		"definitions", len(appRuntime.Definitions()),
 	)
-	log.Printf(
-		"housekeeping configured heartbeat_timeout=%ds liveness_interval=%ds due_timer_interval=%ds",
-		cfg.HeartbeatTimeoutSeconds,
-		cfg.LivenessReconcileIntervalSecs,
-		cfg.DueTimerProcessIntervalSecs,
+	logger.Info(
+		"housekeeping configured",
+		"event", "housekeeping.configured",
+		"heartbeat_timeout_seconds", cfg.HeartbeatTimeoutSeconds,
+		"liveness_interval_seconds", cfg.LivenessReconcileIntervalSecs,
+		"due_timer_interval_seconds", cfg.DueTimerProcessIntervalSecs,
 	)
 	_ = controlService
 	_ = controlStream
@@ -210,31 +236,32 @@ func main() {
 	go runLivenessLoop(ctx, controlService, time.Duration(cfg.HeartbeatTimeoutSeconds)*time.Second, time.Duration(cfg.LivenessReconcileIntervalSecs)*time.Second)
 
 	<-ctx.Done()
-	log.Println("terminal server shutting down")
+	logger.Info("terminal server shutting down", "event", "server.stopping")
 
 	shutdownCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := grpcServer.Stop(shutdownCtx); err != nil {
-		log.Printf("stop transport: %v", err)
+		logger.Error("stop transport", "event", "transport.grpc.stop_failed", "error", err)
 	}
 	if photoServer != nil {
 		if err := photoServer.Shutdown(shutdownCtx); err != nil {
-			log.Printf("stop photo frame asset server: %v", err)
+			logger.Error("stop photo frame asset server", "event", "transport.http.photo_frame.stop_failed", "error", err)
 		}
 	}
 	if adminServer != nil {
 		if err := adminServer.Shutdown(shutdownCtx); err != nil {
-			log.Printf("stop admin dashboard: %v", err)
+			logger.Error("stop admin dashboard", "event", "admin.http.stop_failed", "error", err)
 		}
 	}
 	if err := mdns.Stop(shutdownCtx); err != nil {
-		log.Printf("stop mDNS: %v", err)
+		logger.Error("stop mDNS", "event", "discovery.mdns.stop_failed", "error", err)
 	}
 	if bridge, ok := telephonyBridge.(*telephony.SIPBridge); ok {
 		if err := bridge.Stop(shutdownCtx); err != nil {
-			log.Printf("stop telephony bridge: %v", err)
+			logger.Error("stop telephony bridge", "event", "telephony.bridge.stop_failed", "error", err)
 		}
 	}
+	logger.Info("terminal server stopped", "event", "server.stopped")
 }
 
 type scenarioAnalyzerRunner struct {
@@ -308,6 +335,7 @@ func copyStringMap(in map[string]string) map[string]string {
 }
 
 func loadAppPackages(ctx context.Context, runtime *appruntime.Runtime) {
+	logger := eventlog.Component("appruntime")
 	if runtime == nil {
 		return
 	}
@@ -322,10 +350,10 @@ func loadAppPackages(ctx context.Context, runtime *appruntime.Runtime) {
 		}
 		appRoot := filepath.Join(root, entry.Name())
 		if _, err := runtime.LoadPackage(ctx, appRoot); err != nil {
-			log.Printf("skip app package %s: %v", entry.Name(), err)
+			logger.Warn("skip app package", "event", "appruntime.package.skipped", "package", entry.Name(), "error", err)
 			continue
 		}
-		log.Printf("loaded app package %s", entry.Name())
+		logger.Info("loaded app package", "event", "appruntime.package.loaded", "package", entry.Name())
 	}
 }
 
@@ -379,8 +407,9 @@ func (w worldModelAdapter) VerifyDevice(ctx context.Context, deviceID string, me
 // server runtime. When SIP is disabled a NoopBridge is returned so
 // scenarios continue to function without a SIP provider.
 func buildTelephonyBridge(ctx context.Context, cfg config.SIPConfig) (scenario.TelephonyBridge, error) {
+	logger := eventlog.Component("telephony.sip")
 	if !cfg.Enabled {
-		log.Printf("telephony bridge disabled; using noop bridge")
+		logger.Info("telephony bridge disabled", "event", "telephony.bridge.disabled")
 		return telephony.NoopBridge{}, nil
 	}
 	bridge := telephony.NewSIPBridge(
@@ -390,22 +419,24 @@ func buildTelephonyBridge(ctx context.Context, cfg config.SIPConfig) (scenario.T
 			DisplayName: cfg.DisplayName,
 			Password:    cfg.Password,
 		},
-		telephony.LogTransport{Logf: log.Printf},
-		telephony.WithMediaTransport(telephony.LogMediaTransport{Logf: log.Printf}),
+		telephony.LogTransport{Logger: logger},
+		telephony.WithMediaTransport(telephony.LogMediaTransport{Logger: logger}),
 	)
 	if err := bridge.Start(ctx); err != nil {
 		return nil, err
 	}
-	log.Printf(
-		"telephony bridge registered server=%s user=%s display=%s",
-		cfg.ServerURI,
-		cfg.Username,
-		cfg.DisplayName,
+	logger.Info(
+		"telephony bridge registered",
+		"event", "telephony.bridge.registered",
+		"server", cfg.ServerURI,
+		"user", cfg.Username,
+		"display", cfg.DisplayName,
 	)
 	return bridge, nil
 }
 
 func runDueTimerLoop(ctx context.Context, runtime *scenario.Runtime, interval time.Duration) {
+	logger := eventlog.Component("housekeeping")
 	if interval <= 0 {
 		return
 	}
@@ -419,17 +450,20 @@ func runDueTimerLoop(ctx context.Context, runtime *scenario.Runtime, interval ti
 		case now := <-ticker.C:
 			processed, err := runtime.ProcessDueTimers(ctx, now.UTC())
 			if err != nil {
-				log.Printf("due timer loop error: %v", err)
+				logger.Error("due timer loop error", "event", "housekeeping.due_timers.failed", "error", err)
 				continue
 			}
 			if processed > 0 {
-				log.Printf("due timer loop processed=%d", processed)
+				logger.Info("due timer loop processed", "event", "housekeeping.due_timers.processed", "processed", processed)
+			} else {
+				logger.Debug("due timer loop idle", "event", "housekeeping.due_timers.processed", "processed", 0)
 			}
 		}
 	}
 }
 
 func runLivenessLoop(ctx context.Context, control *transport.ControlService, timeout, interval time.Duration) {
+	logger := eventlog.Component("housekeeping")
 	if interval <= 0 {
 		return
 	}
@@ -443,28 +477,32 @@ func runLivenessLoop(ctx context.Context, control *transport.ControlService, tim
 		case <-ticker.C:
 			updated := control.ReconcileLiveness(timeout)
 			if updated > 0 {
-				log.Printf("liveness reconcile updated=%d", updated)
+				logger.Info("liveness reconcile updated", "event", "housekeeping.liveness.reconciled", "updated", updated)
+			} else {
+				logger.Debug("liveness reconcile idle", "event", "housekeeping.liveness.reconciled", "updated", 0)
 			}
 		}
 	}
 }
 
 func configurePhotoFrame(handler *transport.StreamHandler, cfg config.Config, baseURL string) {
+	logger := eventlog.Component("transport.photo_frame")
 	if handler == nil {
 		return
 	}
 	interval := time.Duration(cfg.PhotoFrameIntervalSeconds) * time.Second
 	slides, err := loadPhotoFrameSlides(cfg.PhotoFrameDir, baseURL)
 	if err != nil {
-		log.Printf("photo frame slide discovery failed dir=%q err=%v", cfg.PhotoFrameDir, err)
+		logger.Error("photo frame slide discovery failed", "event", "photo_frame.slide_discovery.failed", "dir", cfg.PhotoFrameDir, "error", err)
 	}
 	handler.SetPhotoFrameSettings(slides, interval)
-	log.Printf(
-		"photo frame configured slides=%d dir=%q interval=%ds base_url=%q",
-		len(slides),
-		cfg.PhotoFrameDir,
-		cfg.PhotoFrameIntervalSeconds,
-		baseURL,
+	logger.Info(
+		"photo frame configured",
+		"event", "photo_frame.configured",
+		"slides", len(slides),
+		"dir", cfg.PhotoFrameDir,
+		"interval_seconds", cfg.PhotoFrameIntervalSeconds,
+		"base_url", baseURL,
 	)
 }
 
@@ -512,6 +550,7 @@ func loadPhotoFrameSlides(dir, baseURL string) ([]string, error) {
 }
 
 func startPhotoFrameAssetServer(cfg config.Config) (*http.Server, string, error) {
+	logger := eventlog.Component("transport.photo_frame")
 	baseURL := photoFrameAssetBaseURL(cfg)
 	if strings.TrimSpace(cfg.PhotoFrameDir) == "" {
 		return nil, baseURL, nil
@@ -531,9 +570,9 @@ func startPhotoFrameAssetServer(cfg config.Config) (*http.Server, string, error)
 	}
 
 	go func() {
-		log.Printf("photo frame asset server listening at %s", address)
+		logger.Info("photo frame asset server listening", "event", "transport.http.photo_frame.ready", "address", address)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("photo frame asset server error: %v", err)
+			logger.Error("photo frame asset server error", "event", "transport.http.photo_frame.error", "error", err)
 		}
 	}()
 

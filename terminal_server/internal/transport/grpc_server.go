@@ -3,8 +3,10 @@ package transport
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync/atomic"
 
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
@@ -37,12 +39,20 @@ func (s *Server) Address() string {
 // Start marks the server as running.
 func (s *Server) Start(context.Context) error {
 	s.running.Store(true)
+	eventlog.Emit(context.Background(), "transport.grpc.listener_ready", slog.LevelInfo, "grpc listener ready",
+		slog.String("component", "transport.grpc"),
+		slog.String("address", s.addr),
+	)
 	return nil
 }
 
 // Stop marks the server as stopped.
 func (s *Server) Stop(context.Context) error {
 	s.running.Store(false)
+	eventlog.Emit(context.Background(), "transport.grpc.stopped", slog.LevelInfo, "grpc server stopped",
+		slog.String("component", "transport.grpc"),
+		slog.String("address", s.addr),
+	)
 	return nil
 }
 
@@ -96,5 +106,23 @@ func (s *Server) Connect(stream ProtoStream) error {
 	if s.webrtc != nil {
 		handler.SetWebRTCSignalEngine(s.webrtc)
 	}
-	return RunProtoSession(handler, s.control, stream, s.adapter)
+	ctx, end := eventlog.WithSpan(context.Background(), "grpc:connect")
+	defer end()
+	eventlog.Emit(ctx, "transport.grpc.request.started", slog.LevelInfo, "control stream connect started",
+		slog.String("component", "transport.grpc"),
+		slog.Group("grpc", slog.String("method", "Control.Connect"), slog.String("status", "started")),
+	)
+	err := RunProtoSession(handler, s.control, stream, s.adapter)
+	status := "ok"
+	level := slog.LevelInfo
+	if err != nil {
+		status = "error"
+		level = slog.LevelError
+	}
+	eventlog.Emit(ctx, "transport.grpc.request.finished", level, "control stream connect finished",
+		slog.String("component", "transport.grpc"),
+		slog.Group("grpc", slog.String("method", "Control.Connect"), slog.String("status", status)),
+		slog.Any("error", err),
+	)
+	return err
 }

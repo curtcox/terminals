@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -358,11 +359,20 @@ func (b *SIPBridge) nextSessionIDLocked() string {
 // logging function. A nil Logf turns every operation into a silent no-op,
 // which keeps the bridge safe when no real SIP stack has been wired up.
 type LogTransport struct {
-	Logf func(format string, args ...any)
+	Logf   func(format string, args ...any)
+	Logger *slog.Logger
 }
 
 // Register records the REGISTER transaction.
 func (t LogTransport) Register(_ context.Context, reg Registration) error {
+	if t.Logger != nil {
+		t.Logger.Info("sip register",
+			"event", "telephony.bridge.registered",
+			"server", reg.ServerURI,
+			"user", reg.Username,
+			"display", reg.DisplayName,
+		)
+	}
 	t.logf(
 		"sip: register server=%s user=%s display=%s",
 		reg.ServerURI,
@@ -374,18 +384,27 @@ func (t LogTransport) Register(_ context.Context, reg Registration) error {
 
 // Invite records the outbound INVITE transaction.
 func (t LogTransport) Invite(_ context.Context, session Session) error {
+	if t.Logger != nil {
+		t.Logger.Info("sip invite", "event", "telephony.call.incoming", "session_id", session.ID, "target", session.Target)
+	}
 	t.logf("sip: invite session=%s target=%s", session.ID, session.Target)
 	return nil
 }
 
 // Bye records the terminating BYE transaction.
 func (t LogTransport) Bye(_ context.Context, session Session) error {
+	if t.Logger != nil {
+		t.Logger.Info("sip bye", "event", "telephony.call.ended", "session_id", session.ID, "target", session.Target)
+	}
 	t.logf("sip: bye session=%s target=%s", session.ID, session.Target)
 	return nil
 }
 
 // Close records transport shutdown.
 func (t LogTransport) Close(_ context.Context) error {
+	if t.Logger != nil {
+		t.Logger.Info("sip transport close", "event", "telephony.bridge.stopped")
+	}
 	t.logf("sip: close")
 	return nil
 }
@@ -403,8 +422,9 @@ func (t LogTransport) logf(format string, args ...any) {
 // without a real WebRTC stack — useful for development, configs without an
 // SFU, and tests that only need to verify allocation and release happen.
 type LogMediaTransport struct {
-	Logf  func(format string, args ...any)
-	Codec string
+	Logf   func(format string, args ...any)
+	Logger *slog.Logger
+	Codec  string
 }
 
 // Allocate returns a deterministic MediaPeer keyed off the session ID.
@@ -424,12 +444,18 @@ func (t LogMediaTransport) Allocate(_ context.Context, session Session) (MediaPe
 		peer.StreamID,
 		peer.Codec,
 	)
+	if t.Logger != nil {
+		t.Logger.Debug("sip media allocate", "event", "telephony.media.rtp_out", "session_id", peer.SessionID, "stream_id", peer.StreamID, "codec", peer.Codec)
+	}
 	return peer, nil
 }
 
 // Release records the WebRTC peer teardown.
 func (t LogMediaTransport) Release(_ context.Context, peer MediaPeer) error {
 	t.logf("sip-media: release session=%s stream=%s", peer.SessionID, peer.StreamID)
+	if t.Logger != nil {
+		t.Logger.Debug("sip media release", "event", "telephony.media.rtp_in", "session_id", peer.SessionID, "stream_id", peer.StreamID)
+	}
 	return nil
 }
 

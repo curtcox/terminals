@@ -14,6 +14,11 @@ type Config struct {
 	GRPCPort                      int
 	AdminHTTPHost                 string
 	AdminHTTPPort                 int
+	LogDir                        string
+	LogLevel                      string
+	LogMaxBytes                   int64
+	LogMaxArchives                int
+	LogStderr                     bool
 	PhotoFrameHTTPHost            string
 	PhotoFrameHTTPPort            int
 	PhotoFramePublicBaseURL       string
@@ -47,6 +52,11 @@ func Load() (Config, error) {
 		GRPCPort:                      50051,
 		AdminHTTPHost:                 getenv("TERMINALS_ADMIN_HTTP_HOST", "0.0.0.0"),
 		AdminHTTPPort:                 50053,
+		LogDir:                        getenv("TERMINALS_LOG_DIR", "logs"),
+		LogLevel:                      getenv("TERMINALS_LOG_LEVEL", "info"),
+		LogMaxBytes:                   104857600,
+		LogMaxArchives:                10,
+		LogStderr:                     true,
 		PhotoFrameHTTPHost:            getenv("TERMINALS_PHOTO_FRAME_HTTP_HOST", "0.0.0.0"),
 		PhotoFrameHTTPPort:            50052,
 		PhotoFramePublicBaseURL:       strings.TrimSpace(os.Getenv("TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL")),
@@ -83,6 +93,16 @@ func Load() (Config, error) {
 	} else if ok {
 		cfg.AdminHTTPPort = v
 	}
+	if v, ok, err := parseOptionalInt("TERMINALS_LOG_MAX_BYTES"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.LogMaxBytes = int64(v)
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_LOG_MAX_ARCHIVES"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.LogMaxArchives = v
+	}
 	if v, ok, err := parseOptionalInt("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS"); err != nil {
 		return Config{}, err
 	} else if ok {
@@ -102,6 +122,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	} else if ok {
 		cfg.PhotoFrameIntervalSeconds = v
+	}
+	if v, err := parseOptionalBool("TERMINALS_LOG_STDERR"); err != nil {
+		return Config{}, err
+	} else if strings.TrimSpace(os.Getenv("TERMINALS_LOG_STDERR")) != "" {
+		cfg.LogStderr = v
 	}
 
 	sip, err := loadSIPConfig()

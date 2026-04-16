@@ -37,6 +37,32 @@ func TestDashboardRenders(t *testing.T) {
 	}
 }
 
+func TestLogsJSONLEndpointReturnsMatchingEvents(t *testing.T) {
+	logDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(logDir, "terminals.jsonl"), []byte(
+		`{"ts":"2026-04-16T10:00:00Z","seq":1,"event":"scenario.activation.started","activation_id":"act-1"}`+"\n"+
+			`{"ts":"2026-04-16T10:00:01Z","seq":2,"event":"device.registered","activation_id":""}`+"\n",
+	), 0o644); err != nil {
+		t.Fatalf("WriteFile(logs) error = %v", err)
+	}
+	h := testHandler(t, config.Config{MDNSName: "HomeServer", LogDir: logDir})
+	req := httptest.NewRequest(http.MethodGet, "/admin/logs.jsonl?event=scenario.activation.started", nil)
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "scenario.activation.started") {
+		t.Fatalf("body = %q", body)
+	}
+	if strings.Contains(body, "device.registered") {
+		t.Fatalf("body should not include unfiltered event: %q", body)
+	}
+}
+
 func TestStatusEndpointIncludesServerRuntimeAndConfig(t *testing.T) {
 	h := testHandler(t)
 	req := httptest.NewRequest(http.MethodGet, "/admin/api/status", nil)
@@ -170,7 +196,7 @@ func TestUpdateDevicePlacementEndpoint(t *testing.T) {
 	}
 }
 
-func testHandler(t *testing.T) http.Handler {
+func testHandler(t *testing.T, cfgOverride ...config.Config) http.Handler {
 	t.Helper()
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
@@ -183,7 +209,7 @@ func testHandler(t *testing.T) http.Handler {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	return NewHandler(control, runtime, nil, nil, devices, config.Config{
+	cfg := config.Config{
 		GRPCHost:      "0.0.0.0",
 		GRPCPort:      50051,
 		MDNSService:   "_terminals._tcp.local.",
@@ -191,7 +217,18 @@ func testHandler(t *testing.T) http.Handler {
 		Version:       "1",
 		AdminHTTPHost: "127.0.0.1",
 		AdminHTTPPort: 50053,
-	})
+		LogDir:        filepath.Join(t.TempDir(), "logs"),
+	}
+	if len(cfgOverride) > 0 {
+		override := cfgOverride[0]
+		if strings.TrimSpace(override.MDNSName) != "" {
+			cfg.MDNSName = override.MDNSName
+		}
+		if strings.TrimSpace(override.LogDir) != "" {
+			cfg.LogDir = override.LogDir
+		}
+	}
+	return NewHandler(control, runtime, nil, nil, devices, cfg)
 }
 
 func TestAppsEndpointsListReloadAndRollback(t *testing.T) {

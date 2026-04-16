@@ -1,1 +1,1 @@
-Confirm whether you want `term app logs/trace` to include app-specific filtering beyond current admin snapshots.
+Review the diff for completeness against plans/event-logging.md and share implementation/test status with remaining gaps.

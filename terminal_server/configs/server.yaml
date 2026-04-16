@@ -3,6 +3,11 @@ server:
   grpc_port: 50051
   admin_http_host: "0.0.0.0"
   admin_http_port: 50053
+  log_dir: "logs"
+  log_level: "info"
+  log_max_bytes: 104857600
+  log_max_archives: 10
+  log_stderr: true
   mdns_service: "_terminals._tcp.local."
   mdns_name: "HomeServer"
   version: 1

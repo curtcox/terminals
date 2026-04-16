@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,10 +13,15 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog/query"
 )
+
+var adminHTTPClient = http.DefaultClient
 
 func main() {
 	code := run(os.Args[1:], os.Stdout, os.Stderr)
@@ -33,6 +39,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch top {
 	case "app":
 		return runApp(args[1:], stdout, stderr)
+	case "logs":
+		return runLogs(args[1:], stdout, stderr)
 	case "sim":
 		return runSim(args[1:], stdout, stderr)
 	default:
@@ -192,6 +200,101 @@ func runSim(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func runLogs(args []string, stdout, stderr io.Writer) int {
+	if len(args) < 1 {
+		fmt.Fprintln(stderr, "usage: term logs <tail|search|trace|activation|stats> [filters...]")
+		return 2
+	}
+	dir := strings.TrimSpace(os.Getenv("TERMINALS_LOG_DIR"))
+	if dir == "" {
+		dir = "logs"
+	}
+	cmd := strings.TrimSpace(strings.ToLower(args[0]))
+	rest := args[1:]
+	switch cmd {
+	case "tail":
+		n := 50
+		if len(rest) >= 2 && strings.TrimSpace(rest[0]) == "-n" {
+			parsed, err := strconv.Atoi(strings.TrimSpace(rest[1]))
+			if err != nil {
+				return fail(stderr, fmt.Errorf("invalid -n value: %w", err))
+			}
+			n = parsed
+			rest = rest[2:]
+		}
+		records, err := query.Search(dir, rest, time.Now().UTC())
+		if err != nil {
+			return fail(stderr, err)
+		}
+		if n > 0 && len(records) > n {
+			records = records[len(records)-n:]
+		}
+		return printRecords(stdout, records)
+	case "search":
+		records, err := query.Search(dir, rest, time.Now().UTC())
+		if err != nil {
+			return fail(stderr, err)
+		}
+		return printRecords(stdout, records)
+	case "trace":
+		if len(rest) < 1 || strings.TrimSpace(rest[0]) == "" {
+			return fail(stderr, fmt.Errorf("usage: term logs trace <trace_id>"))
+		}
+		records, err := query.ReadAll(dir)
+		if err != nil {
+			return fail(stderr, err)
+		}
+		return printRecords(stdout, query.Trace(records, strings.TrimSpace(rest[0])))
+	case "activation":
+		if len(rest) < 1 || strings.TrimSpace(rest[0]) == "" {
+			return fail(stderr, fmt.Errorf("usage: term logs activation <activation_id>"))
+		}
+		records, err := query.ReadAll(dir)
+		if err != nil {
+			return fail(stderr, err)
+		}
+		return printRecords(stdout, query.Activation(records, strings.TrimSpace(rest[0])))
+	case "stats":
+		by := "event"
+		filters := make([]string, 0, len(rest))
+		for i := 0; i < len(rest); i++ {
+			token := strings.TrimSpace(rest[i])
+			if strings.HasPrefix(token, "--by=") {
+				by = strings.TrimSpace(strings.TrimPrefix(token, "--by="))
+				continue
+			}
+			filters = append(filters, token)
+		}
+		records, err := query.Search(dir, filters, time.Now().UTC())
+		if err != nil {
+			return fail(stderr, err)
+		}
+		stats := query.Stats(records, by)
+		keys := make([]string, 0, len(stats))
+		for key := range stats {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			fmt.Fprintf(stdout, "%s\t%d\n", key, stats[key])
+		}
+		return 0
+	default:
+		return fail(stderr, fmt.Errorf("unknown logs command: %s", cmd))
+	}
+}
+
+func printRecords(out io.Writer, records []query.Record) int {
+	w := bufio.NewWriter(out)
+	for _, record := range records {
+		encoded, _ := json.Marshal(record)
+		_, _ = w.Write(encoded)
+		_ = w.WriteByte('\n')
+	}
+	_ = w.Flush()
+	return 0
+}
+
 func parseFixtureFlag(args []string) (string, error) {
 	for idx := 0; idx < len(args); idx++ {
 		if strings.TrimSpace(args[idx]) != "--fixture" {
@@ -211,7 +314,7 @@ func getAdminJSON(path string) (map[string]any, error) {
 	if baseURL == "" {
 		baseURL = "http://127.0.0.1:50053"
 	}
-	resp, err := http.Get(strings.TrimRight(baseURL, "/") + path)
+	resp, err := adminHTTPClient.Get(strings.TrimRight(baseURL, "/") + path)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +356,7 @@ func postAdminAppCommand(command, app string) (map[string]any, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := adminHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -315,5 +418,6 @@ func fail(stderr io.Writer, err error) int {
 func printUsage(stderr io.Writer) {
 	fmt.Fprintln(stderr, "usage:")
 	fmt.Fprintln(stderr, "  term app <new|check|test|load|reload|rollback|logs|trace> <name>")
+	fmt.Fprintln(stderr, "  term logs <tail|search|trace|activation|stats> [args]")
 	fmt.Fprintln(stderr, "  term sim run <app-name> --fixture <path>")
 }

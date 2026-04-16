@@ -3,10 +3,12 @@ package observation
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 )
 
@@ -30,7 +32,7 @@ func NewStore(capacity int) *Store {
 }
 
 // AddObservation stores one observation and referenced artifacts.
-func (s *Store) AddObservation(_ context.Context, observation iorouter.Observation) {
+func (s *Store) AddObservation(ctx context.Context, observation iorouter.Observation) {
 	if s == nil {
 		return
 	}
@@ -54,6 +56,15 @@ func (s *Store) AddObservation(_ context.Context, observation iorouter.Observati
 		}
 		s.artifacts[artifact.ID] = artifact
 	}
+
+	eventlog.Emit(ctx, "observation.emitted", slog.LevelInfo, "observation emitted",
+		slog.String("component", "observation.store"),
+		slog.String("observation_kind", observation.Kind),
+		slog.String("zone", observation.Zone),
+		slog.String("source_device_id", observation.SourceDevice.DeviceID),
+		slog.Time("occurred_at", observation.OccurredAt.UTC()),
+		slog.Int("evidence_count", len(observation.Evidence)),
+	)
 }
 
 // Recent returns observations filtered by kind/zone/since.
