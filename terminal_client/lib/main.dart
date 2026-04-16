@@ -4,6 +4,9 @@ import 'dart:math' as math;
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
@@ -14,6 +17,7 @@ import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/media/webrtc_engine.dart';
+import 'package:terminal_client/util/speech.dart' as speech;
 
 typedef TerminalControlClientFactory = TerminalControlClient Function({
   required String host,
@@ -42,6 +46,72 @@ const String _bugReportActionPrefix = 'bug_report';
 const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
+const List<String> _bugWordSyllables = <String>[
+  'ba',
+  'be',
+  'bi',
+  'bo',
+  'bu',
+  'da',
+  'de',
+  'di',
+  'do',
+  'du',
+  'fa',
+  'fe',
+  'fi',
+  'fo',
+  'ga',
+  'ge',
+  'gi',
+  'go',
+  'gu',
+  'ha',
+  'he',
+  'hi',
+  'ho',
+  'ja',
+  'je',
+  'ji',
+  'jo',
+  'ka',
+  'ke',
+  'ki',
+  'ko',
+  'ku',
+  'la',
+  'le',
+  'li',
+  'lo',
+  'lu',
+  'ma',
+  'me',
+  'mi',
+  'mo',
+  'mu',
+  'na',
+  'ne',
+  'ni',
+  'no',
+  'nu',
+  'pa',
+  'pe',
+  'pi',
+  'po',
+  'pu',
+  'ra',
+  're',
+  'ri',
+  'ro',
+  'ru',
+  'sa',
+  'se',
+  'si',
+  'so',
+  'su',
+  'ta',
+  'to',
+];
 
 Duration calculateReconnectDelay({
   required int reconnectAttempt,
@@ -195,6 +265,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _lastFlutterErrorMessage = '';
   String _lastFlutterErrorStack = '';
   int _lastFlutterErrorUnixMs = 0;
+  String _lastBugTokenWord = '';
+  String _lastBugTokenCode = '';
   FlutterExceptionHandler? _previousFlutterErrorHandler;
 
   @override
@@ -359,10 +431,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             }
             if (response.hasBugReportAck()) {
               final ack = response.bugReportAck;
-              _lastNotification = 'Bug report filed: ${ack.reportId}';
+              _lastNotification = _lastBugTokenWord.isEmpty
+                  ? 'Bug report filed: ${ack.reportId}'
+                  : 'Bug report filed: ${ack.reportId} (word: $_lastBugTokenWord)';
               _recordClientLog(
                 'info',
-                'bug report ack status=${ack.status.name} id=${ack.reportId}',
+                'bug report ack status=${ack.status.name} id=${ack.reportId} '
+                    'word=$_lastBugTokenWord code=$_lastBugTokenCode',
               );
             }
             _applyRegisterMetadata(response);
@@ -828,6 +903,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     required diagv1.BugReportSource source,
     Map<String, String> sourceHints = const <String, String>{},
     List<String> tags = const <String>[],
+    _BugIdentifier? bugIdentifier,
   }) async {
     if (_client == null) {
       if (!mounted) {
@@ -840,14 +916,30 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       return;
     }
 
+    final now = DateTime.now().toLocal();
+    final identifier = bugIdentifier ?? _buildBugIdentifier(now);
     final bugReport = diagv1.BugReport()
       ..reporterDeviceId = _deviceId
       ..subjectDeviceId = subjectDeviceID
       ..source = source
       ..description = description
-      ..timestampUnixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
+      ..timestampUnixMs = Int64(now.toUtc().millisecondsSinceEpoch)
       ..clientContext = _buildClientContext();
-    bugReport.tags.addAll(tags);
+    bugReport.tags.addAll(<String>[
+      ...tags,
+      'bug_word:${identifier.word}',
+      'bug_code:${identifier.code}',
+    ]);
+    bugReport.sourceHints['bug_token_word'] = identifier.word;
+    bugReport.sourceHints['bug_token_code'] = identifier.code;
+    bugReport.sourceHints['bug_token_timestamp_unix_ms'] =
+        now.toUtc().millisecondsSinceEpoch.toString();
+    _buildAutomaticBugSourceHints().forEach((key, value) {
+      if (value.isEmpty) {
+        return;
+      }
+      bugReport.sourceHints[key] = value;
+    });
     sourceHints.forEach((key, value) {
       bugReport.sourceHints[key] = value;
     });
@@ -857,87 +949,209 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     );
     _recordClientLog(
       'info',
-      'submitted bug report for subject=$subjectDeviceID',
+      'submitted bug report for subject=$subjectDeviceID '
+          'word=${identifier.word} code=${identifier.code}',
     );
     if (!mounted) {
       return;
     }
     setState(() {
+      _lastBugTokenWord = identifier.word;
+      _lastBugTokenCode = identifier.code;
       _status = 'Bug report submitted';
-      _lastNotification = 'Submitting bug report...';
+      _lastNotification =
+          'Submitting bug report (word: ${identifier.word}, code: ${identifier.code})...';
     });
   }
 
   Future<void> _showBugReportDialog() async {
     final descriptionController = TextEditingController();
     final tagsController = TextEditingController();
-    final submitted = await showDialog<bool>(
+    var draftIdentifier = _buildBugIdentifier(DateTime.now().toLocal());
+    final draft = await showDialog<_BugReportDraft>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Report a bug'),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: descriptionController,
-                  minLines: 3,
-                  maxLines: 5,
-                  decoration: const InputDecoration(
-                    labelText: 'What went wrong?',
-                    hintText:
-                        'Describe what you expected and what happened instead.',
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Report a bug'),
+              content: SizedBox(
+                width: 440,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('No fields are required.'),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.blueGrey.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Reference word',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              draftIdentifier.word,
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            SelectableText(draftIdentifier.code),
+                            const SizedBox(height: 8),
+                            Center(
+                              child: QrImageView(
+                                data: draftIdentifier.qrPayload,
+                                size: 140,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _announceBugIdentifier(draftIdentifier),
+                                  icon: const Icon(Icons.volume_up_outlined),
+                                  label: const Text('Speak'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      draftIdentifier = _buildBugIdentifier(
+                                        DateTime.now().toLocal(),
+                                      );
+                                    });
+                                  },
+                                  icon: const Icon(Icons.refresh_outlined),
+                                  label: const Text('Refresh'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descriptionController,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Description (optional)',
+                          hintText: 'What happened? (optional)',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: tagsController,
+                        decoration: const InputDecoration(
+                          labelText: 'Tags (optional)',
+                          hintText: 'ui, playback, audio',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: tagsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tags (optional)',
-                    hintText: 'ui, playback, audio',
-                  ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(
+                      _BugReportDraft(
+                        description: descriptionController.text.trim(),
+                        tags: tagsController.text
+                            .split(',')
+                            .map((value) => value.trim())
+                            .where((value) => value.isNotEmpty)
+                            .toList(),
+                        identifier: draftIdentifier,
+                      ),
+                    );
+                  },
+                  child: const Text('Submit'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Submit'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
 
-    final description = descriptionController.text.trim();
-    final tags = tagsController.text
-        .split(',')
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .toList();
     descriptionController.dispose();
     tagsController.dispose();
-    if (submitted != true) {
+    if (draft == null) {
       return;
     }
+    _announceBugIdentifier(draft.identifier);
     await _submitBugReport(
       subjectDeviceID: _deviceId,
-      description: description.isNotEmpty
-          ? description
+      description: draft.description.isNotEmpty
+          ? draft.description
           : 'Filed from terminal client bug-report dialog',
       source: diagv1.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
       sourceHints: const <String, String>{
         'entry_point': 'manual_bug_report_dialog',
       },
-      tags: tags,
+      tags: draft.tags,
+      bugIdentifier: draft.identifier,
     );
+  }
+
+  _BugIdentifier _buildBugIdentifier(DateTime nowLocal) {
+    final secondsFromMidnight =
+        nowLocal.hour * 3600 + nowLocal.minute * 60 + nowLocal.second;
+    final setSize = _bugWordSyllables.length * _bugWordSyllables.length;
+    final index = (secondsFromMidnight ~/ 21) % setSize;
+    final first = _bugWordSyllables[index ~/ _bugWordSyllables.length];
+    final second = _bugWordSyllables[index % _bugWordSyllables.length];
+    final word = '$first$second';
+    final hh = nowLocal.hour.toString().padLeft(2, '0');
+    final mm = nowLocal.minute.toString().padLeft(2, '0');
+    final ss = nowLocal.second.toString().padLeft(2, '0');
+    final code = '$hh$mm$ss-$word';
+    return _BugIdentifier(
+      word: word,
+      code: code,
+      qrPayload: 'terminals-bug://$code',
+    );
+  }
+
+  void _announceBugIdentifier(_BugIdentifier identifier) {
+    speech.speakText(
+        'Bug reference word ${identifier.word}. Code ${identifier.code}');
+    if (!mounted) {
+      return;
+    }
+    final direction = Directionality.of(context);
+    SemanticsService.announce(
+      'Bug reference word ${identifier.word}. Code ${identifier.code}',
+      direction,
+    );
+  }
+
+  Map<String, String> _buildAutomaticBugSourceHints() {
+    return <String, String>{
+      'host': _hostController.text.trim(),
+      'port': _portController.text.trim(),
+      'status': _status,
+      'last_connection_status': _lastConnectionStatus,
+      'active_ui_root': _activeRoot == null ? '' : _nodeId(_activeRoot!),
+      'active_stream_count': _activeStreamsByID.length.toString(),
+      'route_count': _routesByStreamID.length.toString(),
+      'reconnect_attempt': _reconnectAttempt.toString(),
+      'last_notification': _lastNotification,
+      'page_url': Uri.base.toString(),
+    };
   }
 
   void _stopHeartbeatLoop() {
@@ -1993,4 +2207,28 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     }
     return Color(parsed);
   }
+}
+
+class _BugIdentifier {
+  const _BugIdentifier({
+    required this.word,
+    required this.code,
+    required this.qrPayload,
+  });
+
+  final String word;
+  final String code;
+  final String qrPayload;
+}
+
+class _BugReportDraft {
+  const _BugReportDraft({
+    required this.description,
+    required this.tags,
+    required this.identifier,
+  });
+
+  final String description;
+  final List<String> tags;
+  final _BugIdentifier identifier;
 }

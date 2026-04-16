@@ -266,7 +266,7 @@ func (s *Service) file(ctx context.Context, in *diagnosticsv1.BugReport, isAutod
 		eventName = "bug.report.autodetected"
 		eventMsg = "bug report autodetected"
 	}
-	eventlog.Emit(eventCtx, eventName, slog.LevelInfo, eventMsg,
+	eventAttrs := []slog.Attr{
 		slog.String("component", "diagnostics.bugreport"),
 		slog.String("report_id", summary.ReportID),
 		slog.String("correlation_id", summary.CorrelationID),
@@ -276,7 +276,14 @@ func (s *Service) file(ctx context.Context, in *diagnosticsv1.BugReport, isAutod
 		slog.String("report_path", summary.ReportPath),
 		slog.Int("tag_count", len(summary.Tags)),
 		slog.Bool("subject_offline", summary.SubjectOffline),
-	)
+	}
+	if tokenWord := strings.TrimSpace(report.GetSourceHints()["bug_token_word"]); tokenWord != "" {
+		eventAttrs = append(eventAttrs, slog.String("bug_token_word", tokenWord))
+	}
+	if tokenCode := strings.TrimSpace(report.GetSourceHints()["bug_token_code"]); tokenCode != "" {
+		eventAttrs = append(eventAttrs, slog.String("bug_token_code", tokenCode))
+	}
+	eventlog.Emit(eventCtx, eventName, slog.LevelInfo, eventMsg, eventAttrs...)
 
 	return &diagnosticsv1.BugReportAck{
 		ReportId:                 summary.ReportID,
