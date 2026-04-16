@@ -41,6 +41,30 @@ Run the server locally:
 make run-server
 ```
 
+Run server + local client with bootstrap checks (works from a fresh clone or existing checkout):
+
+```bash
+make run-local
+```
+
+The script defaults to a web client. Use a macOS client instead:
+
+```bash
+./scripts/run-local.sh --client macos
+```
+
+Validate the local launcher behavior (bootstrap, port selection, and startup checks):
+
+```bash
+make run-local-test
+```
+
+Run an opt-in smoke test against real local tools (Go + Flutter):
+
+```bash
+make run-local-smoke-test
+```
+
 ## Architecture Rule
 
 Add behavior on the server, not the client. The client remains a generic terminal.

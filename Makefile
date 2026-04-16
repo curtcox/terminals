@@ -7,7 +7,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	client-build client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
 	all-lint all-test all-check run-server run-client-web \
-	run-mac mac-e2e-test usecase-validate
+	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate
 
 server-build:
 	cd terminal_server && go build ./...
@@ -53,6 +53,15 @@ run-server:
 
 run-client-web:
 	cd terminal_client && flutter run -d web-server
+
+run-local:
+	./scripts/run-local.sh
+
+run-local-test:
+	./scripts/test-run-local.sh
+
+run-local-smoke-test:
+	./scripts/test-run-local.sh --real-smoke
 
 run-mac:
 	./scripts/run-mac.sh
