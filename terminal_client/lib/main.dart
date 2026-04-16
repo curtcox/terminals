@@ -811,15 +811,46 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       subjectDeviceID = value.trim();
     }
 
+    await _submitBugReport(
+      subjectDeviceID: subjectDeviceID,
+      description: 'Filed from on-device bug report button',
+      source: diagv1.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
+      sourceHints: <String, String>{
+        'component_id': componentId,
+        'action': action,
+      },
+    );
+  }
+
+  Future<void> _submitBugReport({
+    required String subjectDeviceID,
+    required String description,
+    required diagv1.BugReportSource source,
+    Map<String, String> sourceHints = const <String, String>{},
+    List<String> tags = const <String>[],
+  }) async {
+    if (_client == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = 'Bug report failed';
+        _lastNotification = 'Connect stream before filing a bug report';
+      });
+      return;
+    }
+
     final bugReport = diagv1.BugReport()
       ..reporterDeviceId = _deviceId
       ..subjectDeviceId = subjectDeviceID
-      ..source = diagv1.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON
-      ..description = 'Filed from on-device bug report button'
+      ..source = source
+      ..description = description
       ..timestampUnixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
-      ..clientContext = _buildClientContext()
-      ..sourceHints['component_id'] = componentId
-      ..sourceHints['action'] = action;
+      ..clientContext = _buildClientContext();
+    bugReport.tags.addAll(tags);
+    sourceHints.forEach((key, value) {
+      bugReport.sourceHints[key] = value;
+    });
 
     _outgoing.add(
       ConnectRequest()..bugReport = bugReport,
@@ -835,6 +866,78 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       _status = 'Bug report submitted';
       _lastNotification = 'Submitting bug report...';
     });
+  }
+
+  Future<void> _showBugReportDialog() async {
+    final descriptionController = TextEditingController();
+    final tagsController = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Report a bug'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: descriptionController,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'What went wrong?',
+                    hintText:
+                        'Describe what you expected and what happened instead.',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: tagsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags (optional)',
+                    hintText: 'ui, playback, audio',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+
+    final description = descriptionController.text.trim();
+    final tags = tagsController.text
+        .split(',')
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList();
+    descriptionController.dispose();
+    tagsController.dispose();
+    if (submitted != true) {
+      return;
+    }
+    await _submitBugReport(
+      subjectDeviceID: _deviceId,
+      description: description.isNotEmpty
+          ? description
+          : 'Filed from terminal client bug-report dialog',
+      source: diagv1.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
+      sourceHints: const <String, String>{
+        'entry_point': 'manual_bug_report_dialog',
+      },
+      tags: tags,
+    );
   }
 
   void _stopHeartbeatLoop() {
@@ -1015,6 +1118,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showBugReportDialog,
+        icon: const Icon(Icons.bug_report_outlined),
+        label: const Text('Report Bug'),
+      ),
       body: Align(
         alignment: Alignment.topCenter,
         child: SingleChildScrollView(

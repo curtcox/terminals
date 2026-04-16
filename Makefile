@@ -1,6 +1,8 @@
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 LOCAL_BIN := $(ROOT_DIR)/.bin
 LOCAL_FLUTTER_BIN := $(ROOT_DIR)/.sdk/flutter/bin
+CLIENT_WEB_PORT ?= 60739
+CLIENT_WEB_HOST ?= 0.0.0.0
 export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 
 .PHONY: server-build server-test server-lint server-coverage \
@@ -52,7 +54,7 @@ run-server:
 	cd terminal_server && go run ./cmd/server
 
 run-client-web:
-	cd terminal_client && flutter run -d web-server
+	cd terminal_client && flutter run -d web-server --web-port=$(CLIENT_WEB_PORT) --web-hostname=$(CLIENT_WEB_HOST)
 
 run-local:
 	./scripts/run-local.sh

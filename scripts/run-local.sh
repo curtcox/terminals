@@ -10,15 +10,20 @@ CLIENT_LOG="${TMP_DIR}/run-local-client.log"
 GRPC_PORT="${TERMINALS_GRPC_PORT:-}"
 ADMIN_PORT="${TERMINALS_ADMIN_HTTP_PORT:-}"
 PHOTO_PORT="${TERMINALS_PHOTO_FRAME_HTTP_PORT:-}"
+CLIENT_WEB_PORT="${TERMINALS_CLIENT_WEB_PORT:-}"
+CLIENT_WEB_HOST="${TERMINALS_CLIENT_WEB_HOST:-0.0.0.0}"
 CLIENT_DEVICE="web-server"
 SKIP_BOOTSTRAP="false"
 TEST_MODE="${RUN_LOCAL_TEST_MODE:-false}"
 CLIENT_STARTUP_DELAY_SECONDS="${RUN_LOCAL_CLIENT_STARTUP_DELAY_SECONDS:-5}"
+OPEN_BROWSER="${RUN_LOCAL_OPEN_BROWSER:-true}"
 
 export PATH="${ROOT_DIR}/.bin:${ROOT_DIR}/.sdk/flutter/bin:${PATH}"
 
 SERVER_PID=""
 CLIENT_PID=""
+BROWSER_OPENER_PID=""
+CLIENT_FOREGROUND="false"
 HAS_ERROR="false"
 
 usage() {
@@ -54,6 +59,11 @@ fail() {
 }
 
 cleanup() {
+  if [[ -n "${BROWSER_OPENER_PID}" ]] && kill -0 "${BROWSER_OPENER_PID}" >/dev/null 2>&1; then
+    kill "${BROWSER_OPENER_PID}" >/dev/null 2>&1 || true
+    wait "${BROWSER_OPENER_PID}" >/dev/null 2>&1 || true
+  fi
+
   if [[ -n "${CLIENT_PID}" ]] && kill -0 "${CLIENT_PID}" >/dev/null 2>&1; then
     kill "${CLIENT_PID}" >/dev/null 2>&1 || true
     wait "${CLIENT_PID}" >/dev/null 2>&1 || true
@@ -178,6 +188,17 @@ resolve_ports() {
       fail "unable to find open port for photo frame HTTP starting at 50052"
     fi
   fi
+
+  if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
+    if [[ -n "${CLIENT_WEB_PORT}" ]]; then
+      require_available_port "${CLIENT_WEB_PORT}" "web client" "TERMINALS_CLIENT_WEB_PORT"
+    else
+      CLIENT_WEB_PORT="$(find_available_port 60739 200 || true)"
+      if [[ -z "${CLIENT_WEB_PORT}" ]]; then
+        fail "unable to find open port for web client starting at 60739"
+      fi
+    fi
+  fi
 }
 
 require_cmd() {
@@ -287,9 +308,50 @@ start_server() {
 start_client() {
   : >"${CLIENT_LOG}"
   echo "Starting local client (${CLIENT_DEVICE})..."
+
+  if [[ "${CLIENT_DEVICE}" == "web-server" && "${TEST_MODE}" != "true" ]]; then
+    CLIENT_FOREGROUND="true"
+    local browser_url="http://localhost:${CLIENT_WEB_PORT}"
+    echo "Browser client URL: ${browser_url}"
+    if [[ "${OPEN_BROWSER}" == "true" ]]; then
+      (
+        local deadline=$((SECONDS + 120))
+        while (( SECONDS < deadline )); do
+          if nc -z 127.0.0.1 "${CLIENT_WEB_PORT}" >/dev/null 2>&1; then
+            if command -v open >/dev/null 2>&1; then
+              open "${browser_url}" >/dev/null 2>&1 || true
+            elif command -v xdg-open >/dev/null 2>&1; then
+              xdg-open "${browser_url}" >/dev/null 2>&1 || true
+            fi
+            exit 0
+          fi
+          sleep 1
+        done
+        exit 0
+      ) &
+      BROWSER_OPENER_PID=$!
+    fi
+
+    set +e
+    (
+      cd "${ROOT_DIR}/terminal_client"
+      flutter run -d web-server --web-port="${CLIENT_WEB_PORT}" --web-hostname="${CLIENT_WEB_HOST}"
+    ) 2>&1 | tee "${CLIENT_LOG}"
+    local client_status=${PIPESTATUS[0]}
+    set -e
+    if [[ "${client_status}" -ne 0 ]]; then
+      fail "client exited with status ${client_status}"
+    fi
+    return 0
+  fi
+
   (
     cd "${ROOT_DIR}/terminal_client"
-    flutter run -d "${CLIENT_DEVICE}"
+    if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
+      flutter run -d web-server --web-port="${CLIENT_WEB_PORT}" --web-hostname="${CLIENT_WEB_HOST}"
+    else
+      flutter run -d "${CLIENT_DEVICE}"
+    fi
   ) >"${CLIENT_LOG}" 2>&1 &
   CLIENT_PID=$!
 
@@ -353,9 +415,15 @@ main() {
   parse_args "$@"
   resolve_ports
   echo "Using ports: grpc=${GRPC_PORT} admin=${ADMIN_PORT} photo=${PHOTO_PORT}"
+  if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
+    echo "Using web client endpoint: http://localhost:${CLIENT_WEB_PORT}"
+  fi
   bootstrap
   start_server
   start_client
+  if [[ "${CLIENT_FOREGROUND}" == "true" ]]; then
+    return 0
+  fi
   monitor_processes
 }
 
