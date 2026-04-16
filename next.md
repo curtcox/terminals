@@ -1,1 +1,1 @@
-Decide next runtime-plan gap to implement (likely term app test/logs/trace scaffolding or app-definition sync edge cases).
+Confirm whether you want `term app logs/trace` to include app-specific filtering beyond current admin snapshots.
