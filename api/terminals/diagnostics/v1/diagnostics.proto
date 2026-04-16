@@ -1,0 +1,185 @@
+syntax = "proto3";
+
+package terminals.diagnostics.v1;
+
+import "terminals/capabilities/v1/capabilities.proto";
+import "terminals/ui/v1/ui.proto";
+
+option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1;diagnosticsv1";
+
+// Source describes which entry point produced a bug report.
+enum BugReportSource {
+  BUG_REPORT_SOURCE_UNSPECIFIED = 0;
+  BUG_REPORT_SOURCE_SCREEN_BUTTON = 1;
+  BUG_REPORT_SOURCE_GESTURE = 2;
+  BUG_REPORT_SOURCE_SHAKE = 3;
+  BUG_REPORT_SOURCE_KEYBOARD = 4;
+  BUG_REPORT_SOURCE_VOICE = 5;
+  BUG_REPORT_SOURCE_QR = 6;
+  BUG_REPORT_SOURCE_NFC = 7;
+  BUG_REPORT_SOURCE_ADMIN = 8;
+  BUG_REPORT_SOURCE_SIP = 9;
+  BUG_REPORT_SOURCE_WEBHOOK = 10;
+  BUG_REPORT_SOURCE_AUTODETECT = 11;
+  BUG_REPORT_SOURCE_OTHER = 99;
+}
+
+// Status reflects the persisted state of a bug report after server handling.
+enum BugReportStatus {
+  BUG_REPORT_STATUS_UNSPECIFIED = 0;
+  BUG_REPORT_STATUS_FILED = 1;
+  BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT = 2;
+  BUG_REPORT_STATUS_REJECTED = 3;
+}
+
+// BugReport is filed by a reporter device against a subject device (which may
+// be the same device, a different device, or unknown). The client contributes
+// ClientContext; the server enriches the record with subject-side state.
+message BugReport {
+  string report_id = 1;
+  string reporter_device_id = 2;
+  // subject_device_id may equal reporter_device_id. Empty means "unknown
+  // subject" and the server will attempt to infer one from tags/description.
+  string subject_device_id = 3;
+  BugReportSource source = 4;
+  string description = 5;
+  repeated string tags = 6;
+  int64 timestamp_unix_ms = 7;
+  ClientContext client_context = 8;
+  // Inline attachments; server MAY move these to sibling files on disk. When
+  // larger than the intake cap, clients SHOULD upload via a separate artifact
+  // request and leave these empty.
+  bytes screenshot_png = 9;
+  bytes audio_wav = 10;
+  // Optional free-form structured hints captured by the originating entry
+  // point (e.g. voice transcript confidence, NFC tag id, SIP caller id).
+  map<string, string> source_hints = 11;
+}
+
+// BugReportAck is the server's persisted acknowledgement of a BugReport.
+message BugReportAck {
+  string report_id = 1;
+  string correlation_id = 2;
+  BugReportStatus status = 3;
+  // Pointer into the durable JSON record on disk, e.g.
+  // "logs/bug_reports/2026-04-16/<report_id>.json".
+  string report_path = 4;
+  // Populated when status == MERGED_WITH_AUTODETECT.
+  string merged_autodetect_report_id = 5;
+  string message = 6;
+}
+
+// ClientContext is the reporter-side snapshot collected at report time.
+// Every collection is size-capped and redacted before transmission per the
+// rules documented in plans/bug-reporting.md.
+message ClientContext {
+  ClientIdentity identity = 1;
+  terminals.capabilities.v1.DeviceCapabilities capabilities = 2;
+  RuntimeState runtime = 3;
+  ConnectionHealth connection = 4;
+  HardwareState hardware = 5;
+  ErrorCapture error_capture = 6;
+}
+
+message ClientIdentity {
+  string device_id = 1;
+  string device_name = 2;
+  string device_type = 3;
+  string platform = 4;
+  string client_version = 5;
+  string client_git_sha = 6;
+  int64 client_build_unix_ms = 7;
+  string os_version = 8;
+  string locale = 9;
+  string timezone = 10;
+  // Device system-clock offset vs server, in milliseconds. Positive means the
+  // device clock is ahead of the server. Zero means unknown.
+  int64 clock_offset_ms = 11;
+}
+
+message RuntimeState {
+  repeated string scenario_ids = 1;
+  repeated string activation_ids = 2;
+  // Serialized UI root exactly as last set by the server.
+  terminals.ui.v1.Node active_ui_root = 3;
+  repeated UiEventEntry recent_ui_updates = 4; // cap 32
+  repeated UiActionEntry recent_ui_actions = 5; // cap 32
+  repeated StreamEntry active_streams = 6;
+  repeated RouteEntry active_routes = 7;
+  repeated WebrtcSignalEntry recent_webrtc_signals = 8;
+  // Free-form log ring buffer. Values are already redacted by the client.
+  repeated LogEntry recent_logs = 9; // cap 200
+}
+
+message UiEventEntry {
+  int64 unix_ms = 1;
+  string kind = 2; // set_ui | update_ui | transition_ui
+  string component_id = 3;
+  string detail = 4;
+}
+
+message UiActionEntry {
+  int64 unix_ms = 1;
+  string component_id = 2;
+  string action = 3;
+  // Value is redacted on the client before send.
+  string value = 4;
+}
+
+message StreamEntry {
+  string stream_id = 1;
+  string kind = 2;
+  string source_device_id = 3;
+  string target_device_id = 4;
+}
+
+message RouteEntry {
+  string stream_id = 1;
+  string source_device_id = 2;
+  string target_device_id = 3;
+  string kind = 4;
+}
+
+message WebrtcSignalEntry {
+  int64 unix_ms = 1;
+  string stream_id = 2;
+  string signal_type = 3;
+}
+
+message LogEntry {
+  int64 unix_ms = 1;
+  string level = 2;
+  string message = 3;
+}
+
+message ConnectionHealth {
+  int64 last_heartbeat_unix_ms = 1;
+  int32 reconnect_attempt = 2;
+  string last_status = 3;
+  double last_rtt_ms = 4;
+  bool online = 5;
+  repeated ControlErrorEntry recent_control_errors = 6;
+}
+
+message ControlErrorEntry {
+  int64 unix_ms = 1;
+  string code = 2;
+  string message = 3;
+}
+
+message HardwareState {
+  float battery_level = 1;
+  bool battery_charging = 2;
+  int32 screen_width_px = 3;
+  int32 screen_height_px = 4;
+  double device_pixel_ratio = 5;
+  string orientation = 6;
+  map<string, double> sensor_snapshot = 7;
+}
+
+message ErrorCapture {
+  // Most recent caught Flutter/UI error, if any.
+  string last_error_message = 1;
+  string last_error_stack = 2;
+  int64 last_error_unix_ms = 3;
+}

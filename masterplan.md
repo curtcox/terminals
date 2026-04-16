@@ -70,6 +70,7 @@ None of this requires updating the client app. The Flutter client is a generic t
 - [plans/observation-plane.md](plans/observation-plane.md) — Telemetry, sensing signals, and observation pipeline.
 - [plans/world-model-calibration.md](plans/world-model-calibration.md) — World-model calibration strategy and feedback loops.
 - [plans/sensing-use-case-flows.md](plans/sensing-use-case-flows.md) — End-to-end sensing-centric use-case flows.
+- [plans/bug-reporting.md](plans/bug-reporting.md) — Modality-agnostic, cross-device bug reporting with full client/subject context capture.
 
 ### Tooling
 
