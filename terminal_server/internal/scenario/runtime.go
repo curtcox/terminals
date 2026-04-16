@@ -152,16 +152,36 @@ func (r *Runtime) HandleAutomationIntent(ctx context.Context, sourceID, action s
 // HandleEvent routes a typed event through the shared trigger bus and matcher
 // pipeline.
 func (r *Runtime) HandleEvent(ctx context.Context, sourceID string, event EventRecord) (string, error) {
+	sourceID = strings.TrimSpace(sourceID)
+	event = normalizeEventRecord(event)
+
+	handledByActive, err := r.dispatchEventToActiveScenario(ctx, sourceID, event)
+	if err != nil {
+		return "", err
+	}
+
 	trigger := Trigger{
 		Kind:      TriggerEvent,
-		SourceID:  strings.TrimSpace(sourceID),
+		SourceID:  sourceID,
 		Arguments: map[string]string{},
 		EventV2:   &event,
 	}
 	if trigger.EventV2 != nil && strings.TrimSpace(trigger.EventV2.Kind) != "" {
 		trigger.Intent = strings.TrimSpace(trigger.EventV2.Kind)
 	}
-	return r.HandleTrigger(ctx, trigger)
+	name, err := r.HandleTrigger(ctx, trigger)
+	if err == nil {
+		return name, nil
+	}
+	if errors.Is(err, ErrNoMatchingScenario) && handledByActive {
+		if r != nil && r.Engine != nil {
+			if activeName, ok := r.Engine.Active(sourceID); ok {
+				return activeName, nil
+			}
+		}
+		return "", nil
+	}
+	return name, err
 }
 
 // EventTail returns up to the latest limit triggers seen by the runtime.
@@ -516,6 +536,34 @@ func normalizeDeviceIDs(deviceIDs []string) []string {
 		out = append(out, deviceID)
 	}
 	return out
+}
+
+func (r *Runtime) dispatchEventToActiveScenario(ctx context.Context, sourceID string, event EventRecord) (bool, error) {
+	if r == nil || r.Engine == nil || r.Env == nil || sourceID == "" {
+		return false, nil
+	}
+	activeScenario, ok := r.Engine.ActiveScenario(sourceID)
+	if !ok {
+		return false, nil
+	}
+	consumer, ok := activeScenario.(EventConsumer)
+	if !ok {
+		return false, nil
+	}
+	return true, consumer.HandleEvent(ctx, r.Env, event)
+}
+
+func normalizeEventRecord(event EventRecord) EventRecord {
+	event.Kind = strings.TrimSpace(event.Kind)
+	event.Subject = strings.TrimSpace(event.Subject)
+	event.Source = TriggerSource(strings.TrimSpace(string(event.Source)))
+	event.Attributes = copyStringMap(event.Attributes)
+	if event.OccurredAt.IsZero() {
+		event.OccurredAt = time.Now().UTC()
+	} else {
+		event.OccurredAt = event.OccurredAt.UTC()
+	}
+	return event
 }
 
 func (r *Runtime) recordTrigger(trigger Trigger) {

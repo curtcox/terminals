@@ -24,6 +24,54 @@ type testLLM struct {
 	queries [][]LLMMessage
 }
 
+type eventForwardingScenario struct {
+	mu      sync.Mutex
+	events  []EventRecord
+	matchOn string
+}
+
+func (s *eventForwardingScenario) Name() string {
+	return "app.watch"
+}
+
+func (s *eventForwardingScenario) Match(trigger Trigger) bool {
+	return trigger.Intent == s.matchOn
+}
+
+func (s *eventForwardingScenario) Start(ctx context.Context, env *Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
+func (s *eventForwardingScenario) Stop() error {
+	return nil
+}
+
+func (s *eventForwardingScenario) HandleEvent(ctx context.Context, env *Environment, event EventRecord) error {
+	_ = ctx
+	_ = env
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append(s.events, event)
+	return nil
+}
+
+func (s *eventForwardingScenario) eventCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.events)
+}
+
+func (s *eventForwardingScenario) lastEvent() EventRecord {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.events) == 0 {
+		return EventRecord{}
+	}
+	return s.events[len(s.events)-1]
+}
+
 func (l *testLLM) Query(_ context.Context, messages []LLMMessage, _ LLMOptions) (*LLMResponse, error) {
 	copyMsgs := make([]LLMMessage, len(messages))
 	copy(copyMsgs, messages)
@@ -234,6 +282,49 @@ func TestRuntimeHandleEventRoutesTypedEvent(t *testing.T) {
 		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatalf("timed out waiting for bus trigger")
+	}
+}
+
+func TestRuntimeHandleEventDispatchesToActiveEventConsumer(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1"})
+	engine := NewEngine()
+	app := &eventForwardingScenario{matchOn: "app.watch"}
+	engine.Register(Registration{Scenario: app, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "app.watch",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(app.watch) error = %v", err)
+	}
+
+	name, err := runtime.HandleEvent(context.Background(), "d1", EventRecord{
+		Kind:       "sound.classified",
+		Subject:    "d1",
+		Attributes: map[string]string{"label": "dishwasher_done"},
+		Source:     SourceEvent,
+	})
+	if err != nil {
+		t.Fatalf("HandleEvent() error = %v", err)
+	}
+	if name != "app.watch" {
+		t.Fatalf("HandleEvent() = %q, want app.watch", name)
+	}
+	if count := app.eventCount(); count != 1 {
+		t.Fatalf("event count = %d, want 1", count)
+	}
+	last := app.lastEvent()
+	if last.Kind != "sound.classified" {
+		t.Fatalf("last event kind = %q, want sound.classified", last.Kind)
+	}
+	if last.Attributes["label"] != "dishwasher_done" {
+		t.Fatalf("last event label = %q, want dishwasher_done", last.Attributes["label"])
 	}
 }
 

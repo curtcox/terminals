@@ -11,6 +11,45 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
 
+type mockAppActivation struct {
+	lastTrigger appruntime.Trigger
+}
+
+func (m *mockAppActivation) ID() string { return "mock-id" }
+
+func (m *mockAppActivation) DefinitionName() string { return "mock-def" }
+
+func (m *mockAppActivation) Start(ctx context.Context, env *appruntime.Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
+func (m *mockAppActivation) Handle(ctx context.Context, env *appruntime.Environment, trigger appruntime.Trigger) error {
+	_ = ctx
+	_ = env
+	m.lastTrigger = trigger
+	return nil
+}
+
+func (m *mockAppActivation) Stop(ctx context.Context, env *appruntime.Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
+func (m *mockAppActivation) Suspend(ctx context.Context, env *appruntime.Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
+func (m *mockAppActivation) Resume(ctx context.Context, env *appruntime.Environment) error {
+	_ = ctx
+	_ = env
+	return nil
+}
+
 func TestRegisterAppScenarioDefinitions(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "kitchen_watch")
@@ -62,5 +101,35 @@ func TestRegisterAppScenarioDefinitions(t *testing.T) {
 	}
 	if got := activation.activation.ID(); got != "app:kitchen_watch:watch:kitchen-1:r1" {
 		t.Fatalf("activation id = %q, want app:kitchen_watch:watch:kitchen-1:r1", got)
+	}
+}
+
+func TestAppScenarioActivationHandleEventForwardsToAppActivation(t *testing.T) {
+	mock := &mockAppActivation{}
+	activation := &appScenarioActivation{
+		name:       "app.kitchen_watch.watch",
+		activation: mock,
+	}
+	occurredAt := time.Date(2026, 4, 15, 20, 30, 0, 0, time.UTC)
+	err := activation.HandleEvent(context.Background(), nil, scenario.EventRecord{
+		Kind:       "sound.classified",
+		Subject:    "kitchen-1",
+		Attributes: map[string]string{"label": "dishwasher_done"},
+		OccurredAt: occurredAt,
+	})
+	if err != nil {
+		t.Fatalf("HandleEvent() error = %v", err)
+	}
+	if mock.lastTrigger.Kind != "sound.classified" {
+		t.Fatalf("trigger kind = %q, want sound.classified", mock.lastTrigger.Kind)
+	}
+	if mock.lastTrigger.Subject != "kitchen-1" {
+		t.Fatalf("trigger subject = %q, want kitchen-1", mock.lastTrigger.Subject)
+	}
+	if mock.lastTrigger.Attributes["label"] != "dishwasher_done" {
+		t.Fatalf("trigger attribute label = %q, want dishwasher_done", mock.lastTrigger.Attributes["label"])
+	}
+	if !mock.lastTrigger.OccurredAt.Equal(occurredAt) {
+		t.Fatalf("trigger occurred_at = %s, want %s", mock.lastTrigger.OccurredAt, occurredAt)
 	}
 }

@@ -1,1 +1,1 @@
-Route scenario runtime event triggers into active app activations via AppActivation.Handle.
+Await your review of the application runtime event-dispatch integration.

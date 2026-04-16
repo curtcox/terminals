@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
@@ -84,6 +85,23 @@ func (a *appScenarioActivation) Suspend() error {
 func (a *appScenarioActivation) Resume(ctx context.Context, env *scenario.Environment) error {
 	_ = env
 	return a.activation.Resume(ctx, a.appEnv)
+}
+
+func (a *appScenarioActivation) HandleEvent(ctx context.Context, env *scenario.Environment, event scenario.EventRecord) error {
+	_ = env
+	if a.appEnv == nil {
+		a.appEnv = &appruntime.Environment{}
+	}
+	occurredAt := event.OccurredAt.UTC()
+	if occurredAt.IsZero() {
+		occurredAt = time.Now().UTC()
+	}
+	return a.activation.Handle(ctx, a.appEnv, appruntime.Trigger{
+		Kind:       strings.TrimSpace(event.Kind),
+		Subject:    strings.TrimSpace(event.Subject),
+		Attributes: copyStringMap(event.Attributes),
+		OccurredAt: occurredAt,
+	})
 }
 
 func toAppActivationRequest(req scenario.ActivationRequest) appruntime.ActivationRequest {

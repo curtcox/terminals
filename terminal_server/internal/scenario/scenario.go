@@ -390,6 +390,12 @@ type Resumable interface {
 	Resume(ctx context.Context, env *Environment) error
 }
 
+// EventConsumer is an optional hook implemented by scenarios that want
+// typed runtime events delivered while active.
+type EventConsumer interface {
+	HandleEvent(ctx context.Context, env *Environment, event EventRecord) error
+}
+
 // ObservationStore exposes typed observation and artifact history.
 type ObservationStore interface {
 	Recent(ctx context.Context, kind, zone string, since time.Time) []iorouter.Observation
