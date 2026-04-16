@@ -58,6 +58,7 @@ func main() {
 	worldModel := world.NewModel()
 	appRuntime := appruntime.NewRuntime()
 	loadAppPackages(ctx, appRuntime)
+	registerAppScenarioDefinitions(scenarioEngine, appRuntime)
 	telephonyBridge, err := buildTelephonyBridge(ctx, cfg.SIP)
 	if err != nil {
 		log.Printf("configure telephony bridge: %v", err)
@@ -184,7 +185,11 @@ func main() {
 	log.Printf("control stream handler initialized")
 	log.Printf("recording manager initialized dir=%s", cfg.RecordingDir)
 	log.Printf("scenario runtime initialized with %d builtin scenarios", 3)
-	log.Printf("app runtime initialized with %d loaded packages", len(appRuntime.ListPackages()))
+	log.Printf(
+		"app runtime initialized with %d loaded packages and %d app definitions",
+		len(appRuntime.ListPackages()),
+		len(appRuntime.Definitions()),
+	)
 	log.Printf(
 		"housekeeping configured heartbeat_timeout=%ds liveness_interval=%ds due_timer_interval=%ds",
 		cfg.HeartbeatTimeoutSeconds,

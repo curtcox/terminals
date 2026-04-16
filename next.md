@@ -1,1 +1,1 @@
-Wire appruntime package definitions/activations into scenario runtime registration path in cmd/server.
+Route scenario runtime event triggers into active app activations via AppActivation.Handle.
