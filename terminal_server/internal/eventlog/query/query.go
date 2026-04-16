@@ -1,3 +1,4 @@
+// Package query provides local filtering utilities for eventlog JSONL records.
 package query
 
 import (
@@ -12,8 +13,10 @@ import (
 	"time"
 )
 
+// Record is one decoded eventlog JSON object.
 type Record map[string]any
 
+// Filters defines supported search constraints for eventlog queries.
 type Filters struct {
 	Equals   map[string][]string
 	LevelMin string
@@ -23,6 +26,7 @@ type Filters struct {
 	TraceID  string
 }
 
+// ReadAll loads all available eventlog files from dir in chronological order.
 func ReadAll(dir string) ([]Record, error) {
 	files, err := logFiles(dir)
 	if err != nil {
@@ -52,6 +56,7 @@ func ReadAll(dir string) ([]Record, error) {
 	return out, nil
 }
 
+// Search loads records then applies parsed filters.
 func Search(dir string, args []string, now time.Time) ([]Record, error) {
 	all, err := ReadAll(dir)
 	if err != nil {
@@ -70,6 +75,7 @@ func Search(dir string, args []string, now time.Time) ([]Record, error) {
 	return out, nil
 }
 
+// ParseFilters parses CLI-style filter arguments into a Filters struct.
 func ParseFilters(args []string, now time.Time) (Filters, error) {
 	f := Filters{Equals: map[string][]string{}}
 	for _, raw := range args {
@@ -111,6 +117,7 @@ func ParseFilters(args []string, now time.Time) (Filters, error) {
 	return f, nil
 }
 
+// Trace returns records matching the provided trace id.
 func Trace(records []Record, traceID string) []Record {
 	traceID = strings.TrimSpace(traceID)
 	if traceID == "" {
@@ -126,6 +133,7 @@ func Trace(records []Record, traceID string) []Record {
 	return out
 }
 
+// Activation returns records matching the provided activation id.
 func Activation(records []Record, activationID string) []Record {
 	activationID = strings.TrimSpace(activationID)
 	if activationID == "" {
@@ -141,6 +149,7 @@ func Activation(records []Record, activationID string) []Record {
 	return out
 }
 
+// Stats counts records grouped by one record key.
 func Stats(records []Record, by string) map[string]int {
 	by = strings.TrimSpace(strings.ToLower(by))
 	if by == "" {

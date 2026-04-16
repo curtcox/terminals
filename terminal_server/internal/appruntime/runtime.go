@@ -184,7 +184,7 @@ func (r *Runtime) LoadPackage(ctx context.Context, root string) (Package, error)
 }
 
 // ReloadPackage reloads one known package if sources changed.
-func (r *Runtime) ReloadPackage(ctx context.Context, name string) (Package, bool, error) {
+func (r *Runtime) ReloadPackage(_ context.Context, name string) (Package, bool, error) {
 	r.mu.RLock()
 	current, ok := r.packages[name]
 	r.mu.RUnlock()

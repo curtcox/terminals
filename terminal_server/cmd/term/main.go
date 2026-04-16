@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +25,8 @@ import (
 )
 
 var adminHTTPClient = http.DefaultClient
+
+var testDeclPattern = regexp.MustCompile(`^test\((?:"([^"]+)"|'([^']+)')\):$`)
 
 func main() {
 	code := run(os.Args[1:], os.Stdout, os.Stderr)
@@ -46,7 +49,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case "sim":
 		return runSim(args[1:], stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown command group: %s\n", top)
+		if err := writef(stderr, "unknown command group: %s\n", top); err != nil {
+			return fail(stderr, err)
+		}
 		printUsage(stderr)
 		return 2
 	}
@@ -54,13 +59,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 func runApp(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 2 {
-		fmt.Fprintln(stderr, "usage: term app <new|check|test|load|reload|rollback|logs|trace> <name>")
+		if err := writeln(stderr, "usage: term app <new|check|test|load|reload|rollback|logs|trace> <name>"); err != nil {
+			return fail(stderr, err)
+		}
 		return 2
 	}
 	command := strings.TrimSpace(args[0])
 	name := strings.TrimSpace(args[1])
 	if name == "" {
-		fmt.Fprintln(stderr, "missing app name")
+		if err := writeln(stderr, "missing app name"); err != nil {
+			return fail(stderr, err)
+		}
 		return 2
 	}
 
@@ -79,7 +88,9 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 		if err := writeIfMissing(filepath.Join(root, "main.tal"), []byte("def on_start():\n  pass\n")); err != nil {
 			return fail(stderr, err)
 		}
-		fmt.Fprintf(stdout, "created app scaffold at %s\n", root)
+		if err := writef(stdout, "created app scaffold at %s\n", root); err != nil {
+			return fail(stderr, err)
+		}
 		return 0
 	case "check", "load":
 		runtime := appruntime.NewRuntime()
@@ -87,7 +98,9 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return fail(stderr, err)
 		}
-		fmt.Fprintf(stdout, "%s ok: %s@%s\n", command, pkg.Manifest.Name, pkg.Manifest.Version)
+		if err := writef(stdout, "%s ok: %s@%s\n", command, pkg.Manifest.Name, pkg.Manifest.Version); err != nil {
+			return fail(stderr, err)
+		}
 		return 0
 	case "test":
 		runtime := appruntime.NewRuntime()
@@ -100,14 +113,35 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 			return fail(stderr, err)
 		}
 		sort.Strings(testFiles)
-		fmt.Fprintf(stdout, "test ok: %s@%s\n", pkg.Manifest.Name, pkg.Manifest.Version)
 		if len(testFiles) == 0 {
-			fmt.Fprintln(stdout, "tests: none found (*.tal in apps/<name>/tests/")
-			return 0
+			return fail(stderr, fmt.Errorf("no tests found (*.tal in apps/%s/tests/)", name))
 		}
-		fmt.Fprintf(stdout, "tests: %d file(s)\n", len(testFiles))
-		for _, file := range testFiles {
-			fmt.Fprintf(stdout, "- %s\n", file)
+		results, runErr := runTALTests(pkg, testFiles)
+		if err := writef(stdout, "test ok: %s@%s\n", pkg.Manifest.Name, pkg.Manifest.Version); err != nil {
+			return fail(stderr, err)
+		}
+		passed := 0
+		for _, result := range results {
+			status := "PASS"
+			if !result.Passed {
+				status = "FAIL"
+			} else {
+				passed++
+			}
+			if err := writef(stdout, "%s %s:%d %s\n", status, result.Path, result.Line, result.Name); err != nil {
+				return fail(stderr, err)
+			}
+			if result.Message != "" {
+				if err := writef(stdout, "  %s\n", result.Message); err != nil {
+					return fail(stderr, err)
+				}
+			}
+		}
+		if err := writef(stdout, "tests: %d total, %d passed, %d failed\n", len(results), passed, len(results)-passed); err != nil {
+			return fail(stderr, err)
+		}
+		if runErr != nil {
+			return fail(stderr, runErr)
 		}
 		return 0
 	case "reload", "rollback":
@@ -121,15 +155,21 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 				if _, changed, reloadErr := runtime.ReloadPackage(context.Background(), name); reloadErr != nil {
 					return fail(stderr, reloadErr)
 				} else if changed {
-					fmt.Fprintf(stdout, "reload ok: %s changed (local runtime)\n", name)
+					if err := writef(stdout, "reload ok: %s changed (local runtime)\n", name); err != nil {
+						return fail(stderr, err)
+					}
 				} else {
-					fmt.Fprintf(stdout, "reload ok: %s unchanged (local runtime)\n", name)
+					if err := writef(stdout, "reload ok: %s unchanged (local runtime)\n", name); err != nil {
+						return fail(stderr, err)
+					}
 				}
 				return 0
 			}
 			return fail(stderr, err)
 		}
-		fmt.Fprintf(stdout, "%s ok: %s@%s r%.0f\n", command, name, result["version"], toFloat(result["revision"]))
+		if err := writef(stdout, "%s ok: %s@%s r%.0f\n", command, name, result["version"], toFloat(result["revision"])); err != nil {
+			return fail(stderr, err)
+		}
 		return 0
 	case "logs":
 		payload, err := getAdminJSON("/admin/api/apps")
@@ -146,7 +186,9 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 				continue
 			}
 			b, _ := json.MarshalIndent(row, "", "  ")
-			fmt.Fprintln(stdout, string(b))
+			if err := writeln(stdout, string(b)); err != nil {
+				return fail(stderr, err)
+			}
 			return 0
 		}
 		return fail(stderr, fmt.Errorf("app %q not found", name))
@@ -157,30 +199,42 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 		}
 		eventTail, ok := payload["event_tail"]
 		if !ok {
-			fmt.Fprintln(stdout, "[]")
+			if err := writeln(stdout, "[]"); err != nil {
+				return fail(stderr, err)
+			}
 			return 0
 		}
 		b, _ := json.MarshalIndent(eventTail, "", "  ")
-		fmt.Fprintln(stdout, string(b))
+		if err := writeln(stdout, string(b)); err != nil {
+			return fail(stderr, err)
+		}
 		return 0
 	default:
-		fmt.Fprintf(stderr, "unknown app command: %s\n", command)
+		if err := writef(stderr, "unknown app command: %s\n", command); err != nil {
+			return fail(stderr, err)
+		}
 		return 2
 	}
 }
 
 func runSim(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 || strings.TrimSpace(args[0]) != "run" {
-		fmt.Fprintln(stderr, "usage: term sim run <app-name> --fixture <path>")
+		if err := writeln(stderr, "usage: term sim run <app-name> --fixture <path>"); err != nil {
+			return fail(stderr, err)
+		}
 		return 2
 	}
 	if len(args) < 2 {
-		fmt.Fprintln(stderr, "missing app name")
+		if err := writeln(stderr, "missing app name"); err != nil {
+			return fail(stderr, err)
+		}
 		return 2
 	}
 	name := strings.TrimSpace(args[1])
 	if name == "" {
-		fmt.Fprintln(stderr, "missing app name")
+		if err := writeln(stderr, "missing app name"); err != nil {
+			return fail(stderr, err)
+		}
 		return 2
 	}
 	fixturePath, err := parseFixtureFlag(args[2:])
@@ -198,13 +252,17 @@ func runSim(args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 
-	fmt.Fprintf(stdout, "sim run ok: app=%s version=%s fixture=%s\n", pkg.Manifest.Name, pkg.Manifest.Version, fixturePath)
+	if err := writef(stdout, "sim run ok: app=%s version=%s fixture=%s\n", pkg.Manifest.Name, pkg.Manifest.Version, fixturePath); err != nil {
+		return fail(stderr, err)
+	}
 	return 0
 }
 
 func runLogs(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "usage: term logs <tail|search|trace|activation|stats> [filters...]")
+		if err := writeln(stderr, "usage: term logs <tail|search|trace|activation|stats> [filters...]"); err != nil {
+			return fail(stderr, err)
+		}
 		return 2
 	}
 	cmd := strings.TrimSpace(strings.ToLower(args[0]))
@@ -319,7 +377,9 @@ doneOpts:
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			fmt.Fprintf(stdout, "%s\t%d\n", key, stats[key])
+			if err := writef(stdout, "%s\t%d\n", key, stats[key]); err != nil {
+				return fail(stderr, err)
+			}
 		}
 		return 0
 	default:
@@ -445,9 +505,13 @@ func printTraceTree(out io.Writer, records []query.Record) int {
 	}
 	w := bufio.NewWriter(out)
 	for _, root := range roots {
-		_ = writeTraceNode(w, root, children, 0)
+		if err := writeTraceNode(w, root, children, 0); err != nil {
+			return 1
+		}
 	}
-	_ = w.Flush()
+	if err := w.Flush(); err != nil {
+		return 1
+	}
 	return 0
 }
 
@@ -469,13 +533,13 @@ func writeTraceNode(w io.Writer, record query.Record, children map[string][]quer
 }
 
 func lastSeq(records []query.Record) uint64 {
-	var max uint64
+	var maxSeq uint64
 	for _, record := range records {
-		if seq := recordSeq(record); seq > max {
-			max = seq
+		if seq := recordSeq(record); seq > maxSeq {
+			maxSeq = seq
 		}
 	}
-	return max
+	return maxSeq
 }
 
 func recordSeq(record query.Record) uint64 {
@@ -623,13 +687,256 @@ func writeIfMissing(path string, payload []byte) error {
 }
 
 func fail(stderr io.Writer, err error) int {
-	fmt.Fprintln(stderr, err)
+	_ = writeln(stderr, err.Error())
 	return 1
 }
 
 func printUsage(stderr io.Writer) {
-	fmt.Fprintln(stderr, "usage:")
-	fmt.Fprintln(stderr, "  term app <new|check|test|load|reload|rollback|logs|trace> <name>")
-	fmt.Fprintln(stderr, "  term logs <tail|search|trace|activation|stats> [args]")
-	fmt.Fprintln(stderr, "  term sim run <app-name> --fixture <path>")
+	_ = writeln(stderr, "usage:")
+	_ = writeln(stderr, "  term app <new|check|test|load|reload|rollback|logs|trace> <name>")
+	_ = writeln(stderr, "  term logs <tail|search|trace|activation|stats> [args]")
+	_ = writeln(stderr, "  term sim run <app-name> --fixture <path>")
+}
+
+type talTestResult struct {
+	Name    string
+	Path    string
+	Line    int
+	Passed  bool
+	Message string
+}
+
+type talAssertion func(appruntime.Package, string) error
+
+type talTestCase struct {
+	Name       string
+	Path       string
+	Line       int
+	Assertions []talAssertion
+}
+
+func runTALTests(pkg appruntime.Package, testFiles []string) ([]talTestResult, error) {
+	mainBytes, err := os.ReadFile(pkg.MainPath)
+	if err != nil {
+		return nil, fmt.Errorf("read main.tal: %w", err)
+	}
+	mainContent := string(mainBytes)
+
+	results := make([]talTestResult, 0)
+	var firstErr error
+	for _, testPath := range testFiles {
+		testCases, parseErr := parseTALTestCases(testPath)
+		if parseErr != nil {
+			results = append(results, talTestResult{
+				Name:    "parse",
+				Path:    testPath,
+				Line:    1,
+				Passed:  false,
+				Message: parseErr.Error(),
+			})
+			if firstErr == nil {
+				firstErr = parseErr
+			}
+			continue
+		}
+		for _, testCase := range testCases {
+			testErr := runTALTestCase(pkg, mainContent, testCase)
+			passed := testErr == nil
+			message := "ok"
+			if testErr != nil {
+				message = testErr.Error()
+				if firstErr == nil {
+					firstErr = testErr
+				}
+			}
+			results = append(results, talTestResult{
+				Name:    testCase.Name,
+				Path:    testCase.Path,
+				Line:    testCase.Line,
+				Passed:  passed,
+				Message: message,
+			})
+		}
+	}
+	return results, firstErr
+}
+
+func parseTALTestCases(path string) ([]talTestCase, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(raw), "\n")
+	out := make([]talTestCase, 0)
+	var current *talTestCase
+	currentIndent := 0
+
+	appendCurrent := func() error {
+		if current == nil {
+			return nil
+		}
+		if len(current.Assertions) == 0 {
+			return fmt.Errorf("%s:%d test %q has no assertions", path, current.Line, current.Name)
+		}
+		out = append(out, *current)
+		current = nil
+		currentIndent = 0
+		return nil
+	}
+
+	for idx := 0; idx < len(lines); idx++ {
+		rawLine := lines[idx]
+		lineNo := idx + 1
+
+		for {
+			trimmed := strings.TrimSpace(rawLine)
+			if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+				break
+			}
+			indent := leadingSpaces(rawLine)
+			if current != nil && indent <= currentIndent {
+				if err := appendCurrent(); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			if current == nil {
+				matches := testDeclPattern.FindStringSubmatch(trimmed)
+				if len(matches) == 0 {
+					return nil, fmt.Errorf("%s:%d expected test declaration", path, lineNo)
+				}
+				current = &talTestCase{
+					Name:       firstNonEmpty(matches[1], matches[2]),
+					Path:       path,
+					Line:       lineNo,
+					Assertions: make([]talAssertion, 0, 1),
+				}
+				currentIndent = indent
+				break
+			}
+			if !strings.HasPrefix(trimmed, "assert ") {
+				return nil, fmt.Errorf("%s:%d expected assert statement", path, lineNo)
+			}
+			assertion, assertionErr := parseTALAssertion(strings.TrimSpace(strings.TrimPrefix(trimmed, "assert ")))
+			if assertionErr != nil {
+				return nil, fmt.Errorf("%s:%d %w", path, lineNo, assertionErr)
+			}
+			current.Assertions = append(current.Assertions, assertion)
+			break
+		}
+	}
+	if err := appendCurrent(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%s contains no test declarations", path)
+	}
+	return out, nil
+}
+
+func runTALTestCase(pkg appruntime.Package, mainContent string, testCase talTestCase) error {
+	for _, assertion := range testCase.Assertions {
+		if err := assertion(pkg, mainContent); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func parseTALAssertion(raw string) (talAssertion, error) {
+	raw = strings.TrimSpace(raw)
+	switch {
+	case strings.HasPrefix(raw, "manifest.name == "):
+		want := parseQuotedValue(strings.TrimSpace(strings.TrimPrefix(raw, "manifest.name == ")))
+		if want == "" {
+			return nil, fmt.Errorf("manifest.name assertion requires quoted value")
+		}
+		return func(pkg appruntime.Package, _ string) error {
+			if pkg.Manifest.Name != want {
+				return fmt.Errorf("manifest.name=%q want %q", pkg.Manifest.Name, want)
+			}
+			return nil
+		}, nil
+	case strings.HasPrefix(raw, "manifest.version == "):
+		want := parseQuotedValue(strings.TrimSpace(strings.TrimPrefix(raw, "manifest.version == ")))
+		if want == "" {
+			return nil, fmt.Errorf("manifest.version assertion requires quoted value")
+		}
+		return func(pkg appruntime.Package, _ string) error {
+			if pkg.Manifest.Version != want {
+				return fmt.Errorf("manifest.version=%q want %q", pkg.Manifest.Version, want)
+			}
+			return nil
+		}, nil
+	case strings.HasPrefix(raw, "main.contains(") && strings.HasSuffix(raw, ")"):
+		want := parseQuotedValue(strings.TrimSuffix(strings.TrimPrefix(raw, "main.contains("), ")"))
+		if want == "" {
+			return nil, fmt.Errorf("main.contains assertion requires quoted value")
+		}
+		return func(_ appruntime.Package, mainContent string) error {
+			if !strings.Contains(mainContent, want) {
+				return fmt.Errorf("main.tal missing %q", want)
+			}
+			return nil
+		}, nil
+	case strings.HasPrefix(raw, "!main.contains(") && strings.HasSuffix(raw, ")"):
+		want := parseQuotedValue(strings.TrimSuffix(strings.TrimPrefix(raw, "!main.contains("), ")"))
+		if want == "" {
+			return nil, fmt.Errorf("!main.contains assertion requires quoted value")
+		}
+		return func(_ appruntime.Package, mainContent string) error {
+			if strings.Contains(mainContent, want) {
+				return fmt.Errorf("main.tal unexpectedly contains %q", want)
+			}
+			return nil
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported assertion %q", raw)
+	}
+}
+
+func parseQuotedValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) < 2 {
+		return ""
+	}
+	if (raw[0] != '"' || raw[len(raw)-1] != '"') && (raw[0] != '\'' || raw[len(raw)-1] != '\'') {
+		return ""
+	}
+	return raw[1 : len(raw)-1]
+}
+
+func leadingSpaces(raw string) int {
+	count := 0
+	for _, ch := range raw {
+		if ch == ' ' {
+			count++
+			continue
+		}
+		if ch == '\t' {
+			count += 4
+			continue
+		}
+		break
+	}
+	return count
+}
+
+func writef(out io.Writer, format string, args ...any) error {
+	_, err := fmt.Fprintf(out, format, args...)
+	return err
+}
+
+func writeln(out io.Writer, line string) error {
+	_, err := fmt.Fprintln(out, line)
+	return err
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, val := range vals {
+		if strings.TrimSpace(val) != "" {
+			return val
+		}
+	}
+	return ""
 }

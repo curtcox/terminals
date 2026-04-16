@@ -32,6 +32,7 @@ When Flutter and Buf are installed:
 make client-build
 make proto-lint
 make all-check
+make usecase-validate USECASE=C1
 ```
 
 Run the server locally:

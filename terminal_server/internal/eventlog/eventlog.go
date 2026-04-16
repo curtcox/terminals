@@ -21,6 +21,7 @@ const (
 	defaultFileName = "terminals.jsonl"
 )
 
+// Config defines eventlog initialization and rotation settings.
 type Config struct {
 	Dir           string
 	Level         string
@@ -31,6 +32,7 @@ type Config struct {
 	ServerVersion string
 }
 
+// Logger wraps slog with terminal-server event metadata and rotating writes.
 type Logger struct {
 	logger *slog.Logger
 	writer *RotatingWriter
@@ -39,6 +41,7 @@ type Logger struct {
 	pid    int
 }
 
+// New configures an eventlog-backed structured logger.
 func New(cfg Config) (*Logger, error) {
 	dir := strings.TrimSpace(cfg.Dir)
 	if dir == "" {
@@ -80,6 +83,7 @@ func New(cfg Config) (*Logger, error) {
 		pid:           pid,
 		serverID:      strings.TrimSpace(cfg.ServerID),
 		serverVersion: strings.TrimSpace(cfg.ServerVersion),
+		seq:           &atomic.Uint64{},
 	}
 	base := slog.New(h).With(
 		slog.String("component", "main"),
@@ -87,6 +91,7 @@ func New(cfg Config) (*Logger, error) {
 	return &Logger{logger: base, writer: rw, async: async, runID: runID, pid: pid}, nil
 }
 
+// Logger returns the wrapped structured logger.
 func (l *Logger) Logger() *slog.Logger {
 	if l == nil || l.logger == nil {
 		return slog.Default()
@@ -94,6 +99,7 @@ func (l *Logger) Logger() *slog.Logger {
 	return l.logger
 }
 
+// Component returns a component-scoped logger.
 func (l *Logger) Component(name string) *slog.Logger {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -102,6 +108,7 @@ func (l *Logger) Component(name string) *slog.Logger {
 	return l.Logger().With(slog.String("component", name))
 }
 
+// StdLogAdapter returns an io.Writer for adapting legacy stdlib logger output.
 func (l *Logger) StdLogAdapter(component string) io.Writer {
 	c := strings.TrimSpace(component)
 	if c == "" {
@@ -110,6 +117,7 @@ func (l *Logger) StdLogAdapter(component string) io.Writer {
 	return &stdLogAdapter{logger: l.Component(c)}
 }
 
+// Flush drains async log writes and syncs the current log file.
 func (l *Logger) Flush() error {
 	if l == nil {
 		return nil
@@ -132,6 +140,7 @@ func (l *Logger) Flush() error {
 	return l.writer.Sync()
 }
 
+// RunID returns the current process run identifier.
 func (l *Logger) RunID() string {
 	if l == nil {
 		return ""
@@ -141,6 +150,7 @@ func (l *Logger) RunID() string {
 
 var defaultLogger atomic.Pointer[Logger]
 
+// SetDefault installs logger as the package-global default logger.
 func SetDefault(logger *Logger) {
 	defaultLogger.Store(logger)
 	if logger != nil {
@@ -148,10 +158,12 @@ func SetDefault(logger *Logger) {
 	}
 }
 
+// Default returns the package-global default logger when configured.
 func Default() *Logger {
 	return defaultLogger.Load()
 }
 
+// Component returns a component-scoped logger from the default logger.
 func Component(name string) *slog.Logger {
 	if logger := Default(); logger != nil {
 		return logger.Component(name)
@@ -163,6 +175,7 @@ func Component(name string) *slog.Logger {
 	return slog.Default().With(slog.String("component", name))
 }
 
+// Emit writes one structured event with context attributes.
 func Emit(ctx context.Context, event string, level slog.Level, msg string, attrs ...slog.Attr) {
 	event = strings.TrimSpace(event)
 	if event == "" {
@@ -203,16 +216,19 @@ type spanCtx struct {
 	CorrelationID string
 }
 
+// With appends one context attribute used by Emit.
 func With(ctx context.Context, key string, val any) context.Context {
 	return WithAttrs(ctx, slog.Any(strings.TrimSpace(key), val))
 }
 
+// WithCorrelation sets a correlation id in context for Emit.
 func WithCorrelation(ctx context.Context, correlationID string) context.Context {
 	span, _ := spanFromContext(ctx)
 	span.CorrelationID = strings.TrimSpace(correlationID)
 	return context.WithValue(ctx, spanCtxKey{}, span)
 }
 
+// WithAttrs appends structured attributes to context for Emit.
 func WithAttrs(ctx context.Context, attrs ...slog.Attr) context.Context {
 	if len(attrs) == 0 {
 		return ctx
@@ -247,6 +263,7 @@ func attrsFromContext(ctx context.Context) []slog.Attr {
 	return out
 }
 
+// WithSpan adds a span envelope to context and returns a no-op finish function.
 func WithSpan(ctx context.Context, correlationID string) (context.Context, func()) {
 	var (
 		traceID string
@@ -338,7 +355,7 @@ type enrichHandler struct {
 	serverID      string
 	serverVersion string
 	pid           int
-	seq           atomic.Uint64
+	seq           *atomic.Uint64
 }
 
 func (h *enrichHandler) Enabled(ctx context.Context, level slog.Level) bool {
@@ -398,7 +415,7 @@ func newJSONHandler(w io.Writer, level slog.Level) slog.Handler {
 	opts := &slog.HandlerOptions{
 		Level:     level,
 		AddSource: true,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			switch a.Key {
 			case slog.TimeKey:
 				tm, ok := a.Value.Any().(time.Time)

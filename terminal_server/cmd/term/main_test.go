@@ -38,7 +38,10 @@ func TestRunAppTestReportsTalTests(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(cwd, "apps", "sound_watch", "tests"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(tests) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cwd, "apps", "sound_watch", "tests", "sound_watch_test.tal"), []byte("test('ok')\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cwd, "apps", "sound_watch", "tests", "sound_watch_test.tal"), []byte(
+		"test(\"manifest matches\"):\n  assert manifest.name == \"sound_watch\"\n  assert manifest.version == \"1.0.0\"\n"+
+			"test(\"main contains on_start\"):\n  assert main.contains(\"on_start\")\n",
+	), 0o644); err != nil {
 		t.Fatalf("WriteFile(test) error = %v", err)
 	}
 
@@ -49,8 +52,28 @@ func TestRunAppTestReportsTalTests(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("run() code = %d, want 0 stderr=%s", code, errOut.String())
 		}
-		if !strings.Contains(out.String(), "tests: 1 file(s)") {
-			t.Fatalf("stdout = %q, want tests count", out.String())
+		if !strings.Contains(out.String(), "PASS apps/sound_watch/tests/sound_watch_test.tal:1 manifest matches") {
+			t.Fatalf("stdout = %q, want test pass output", out.String())
+		}
+		if !strings.Contains(out.String(), "tests: 2 total, 2 passed, 0 failed") {
+			t.Fatalf("stdout = %q, want summary output", out.String())
+		}
+	})
+}
+
+func TestRunAppTestFailsWithoutTests(t *testing.T) {
+	cwd := t.TempDir()
+	createApp(t, cwd, "sound_watch", "1.0.0")
+
+	withCWD(t, cwd, func() {
+		var out bytes.Buffer
+		var errOut bytes.Buffer
+		code := run([]string{"app", "test", "sound_watch"}, &out, &errOut)
+		if code == 0 {
+			t.Fatalf("run() code = %d, want non-zero", code)
+		}
+		if !strings.Contains(errOut.String(), "no tests found") {
+			t.Fatalf("stderr = %q, want missing tests error", errOut.String())
 		}
 	})
 }

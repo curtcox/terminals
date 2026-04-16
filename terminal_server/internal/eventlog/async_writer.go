@@ -1,3 +1,4 @@
+// Package eventlog provides structured JSONL logging primitives.
 package eventlog
 
 import (
@@ -9,6 +10,7 @@ import (
 	"time"
 )
 
+// WriteFailure describes one sink-write error emitted by AsyncWriter.
 type WriteFailure struct {
 	At  time.Time
 	Err error
@@ -33,6 +35,7 @@ type AsyncWriter struct {
 	onWriteFailure  func(WriteFailure)
 }
 
+// NewAsyncWriter creates a buffered asynchronous writer around sink.
 func NewAsyncWriter(sink io.Writer, capacity int) *AsyncWriter {
 	if capacity <= 0 {
 		capacity = 4096
@@ -49,6 +52,7 @@ func NewAsyncWriter(sink io.Writer, capacity int) *AsyncWriter {
 	return w
 }
 
+// SetWriteFailureCallback sets a callback invoked when sink writes fail.
 func (w *AsyncWriter) SetWriteFailureCallback(callback func(WriteFailure)) {
 	w.errMu.Lock()
 	defer w.errMu.Unlock()
@@ -120,6 +124,7 @@ func (w *AsyncWriter) markHealthy() {
 	w.errMu.Unlock()
 }
 
+// DroppedSinceLast returns queue drops since the previous call.
 func (w *AsyncWriter) DroppedSinceLast() uint64 {
 	total := w.dropped.Load()
 	last := w.reported.Swap(total)
@@ -129,12 +134,10 @@ func (w *AsyncWriter) DroppedSinceLast() uint64 {
 	return total - last
 }
 
+// Flush waits briefly for queued writes, then syncs the underlying sink if supported.
 func (w *AsyncWriter) Flush() error {
 	deadline := time.After(3 * time.Second)
-	for {
-		if len(w.queue) == 0 && w.inFlight.Load() == 0 {
-			break
-		}
+	for len(w.queue) > 0 || w.inFlight.Load() > 0 {
 		select {
 		case <-deadline:
 			return nil
@@ -148,6 +151,7 @@ func (w *AsyncWriter) Flush() error {
 	return nil
 }
 
+// Close drains writer goroutines and closes the sink if it implements io.Closer.
 func (w *AsyncWriter) Close() error {
 	if !w.closed.CompareAndSwap(false, true) {
 		return nil

@@ -19,6 +19,7 @@ type RotatingWriter struct {
 	size        int64
 }
 
+// NewRotatingWriter creates a size-based rotating file writer.
 func NewRotatingWriter(activePath string, maxBytes int64, maxArchives int) (*RotatingWriter, error) {
 	activePath = strings.TrimSpace(activePath)
 	if activePath == "" {
@@ -67,6 +68,7 @@ func (w *RotatingWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// Sync flushes the active file descriptor to disk.
 func (w *RotatingWriter) Sync() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -76,6 +78,7 @@ func (w *RotatingWriter) Sync() error {
 	return w.file.Sync()
 }
 
+// Close closes the active file descriptor.
 func (w *RotatingWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

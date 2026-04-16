@@ -14,6 +14,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | [Client — Linux](client-linux.md) | Flutter Linux desktop client |
 | [Client — Windows](client-windows.md) | Flutter Windows desktop client |
 | [Event Taxonomy](event-taxonomy.md) | Server event names emitted to JSONL logs |
+| [Use Case Validation Matrix](usecase-validation-matrix.md) | Mapping from use-case IDs to automated validation commands |
 
 ## Quick start
 
@@ -33,6 +34,12 @@ Run all linters, tests, and proto checks:
 
 ```bash
 make all-check
+```
+
+Run validation for one mapped use case:
+
+```bash
+make usecase-validate USECASE=C1
 ```
 
 ## Protobuf

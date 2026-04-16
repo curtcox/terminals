@@ -7,7 +7,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	client-build client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
 	all-lint all-test all-check run-server run-client-web \
-	run-mac mac-e2e-test
+	run-mac mac-e2e-test usecase-validate
 
 server-build:
 	cd terminal_server && go build ./...
@@ -59,3 +59,6 @@ run-mac:
 
 mac-e2e-test:
 	./scripts/test-mac-e2e.sh
+
+usecase-validate:
+	./scripts/usecase-validate.sh "$(USECASE)"
