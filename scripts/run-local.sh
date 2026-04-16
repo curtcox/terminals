@@ -317,7 +317,7 @@ start_client() {
       (
         local deadline=$((SECONDS + 120))
         while (( SECONDS < deadline )); do
-          if nc -z 127.0.0.1 "${CLIENT_WEB_PORT}" >/dev/null 2>&1; then
+          if [[ -f "${CLIENT_LOG}" ]] && grep -Eq 'lib/main.dart is being served at http://[^ ]+:[0-9]+' "${CLIENT_LOG}"; then
             if command -v open >/dev/null 2>&1; then
               open "${browser_url}" >/dev/null 2>&1 || true
             elif command -v xdg-open >/dev/null 2>&1; then
