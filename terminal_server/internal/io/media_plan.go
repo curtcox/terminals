@@ -5,9 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 )
 
 // FlowNodeKind identifies node behavior in a flow plan.
@@ -47,13 +50,13 @@ type ExecPolicy string
 
 const (
 	// ExecAuto lets the scheduler choose where to run the node.
-	ExecAuto          ExecPolicy = "auto"
+	ExecAuto ExecPolicy = "auto"
 	// ExecPreferClient prefers client/edge execution when supported.
-	ExecPreferClient  ExecPolicy = "prefer_client"
+	ExecPreferClient ExecPolicy = "prefer_client"
 	// ExecRequireClient requires client/edge execution.
 	ExecRequireClient ExecPolicy = "require_client"
 	// ExecServerOnly requires server-side execution.
-	ExecServerOnly    ExecPolicy = "server_only"
+	ExecServerOnly ExecPolicy = "server_only"
 )
 
 // FlowNode is one graph node.
@@ -245,6 +248,13 @@ func (p *MediaPlanner) ApplyFlow(ctx context.Context, plan FlowPlan) (PlanHandle
 	p.nextID++
 	handle := PlanHandle(fmt.Sprintf("plan-%d", p.nextID))
 	p.active[handle] = compiled
+	eventlog.Emit(ctx, "io.flow.started", slog.LevelInfo, "flow started",
+		slog.String("component", "io.flow"),
+		slog.String("flow_id", string(handle)),
+		slog.Int("route_count", len(compiled.routes)),
+		slog.Int("node_count", len(plan.Nodes)),
+		slog.Int("edge_count", len(plan.Edges)),
+	)
 	return handle, nil
 }
 
@@ -267,6 +277,13 @@ func (p *MediaPlanner) PatchFlow(ctx context.Context, handle PlanHandle, plan Fl
 	}
 	for _, route := range previous.routes {
 		_ = p.router.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
+		eventlog.Emit(ctx, "io.route.torn_down", slog.LevelInfo, "route torn down",
+			slog.String("component", "io.router"),
+			slog.String("flow_id", string(handle)),
+			slog.String("source_device_id", route.SourceID),
+			slog.String("target_device_id", route.TargetID),
+			slog.String("stream_kind", route.StreamKind),
+		)
 	}
 
 	compiled, err := p.compileLocked(ctx, plan)
@@ -274,11 +291,18 @@ func (p *MediaPlanner) PatchFlow(ctx context.Context, handle PlanHandle, plan Fl
 		return err
 	}
 	p.active[handle] = compiled
+	eventlog.Emit(ctx, "io.flow.patched", slog.LevelInfo, "flow patched",
+		slog.String("component", "io.flow"),
+		slog.String("flow_id", string(handle)),
+		slog.Int("route_count", len(compiled.routes)),
+		slog.Int("node_count", len(plan.Nodes)),
+		slog.Int("edge_count", len(plan.Edges)),
+	)
 	return nil
 }
 
 // Tear uninstalls a plan.
-func (p *MediaPlanner) Tear(_ context.Context, handle PlanHandle) error {
+func (p *MediaPlanner) Tear(ctx context.Context, handle PlanHandle) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -293,7 +317,19 @@ func (p *MediaPlanner) Tear(_ context.Context, handle PlanHandle) error {
 	}
 	for _, route := range runtime.routes {
 		_ = p.router.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
+		eventlog.Emit(ctx, "io.route.torn_down", slog.LevelInfo, "route torn down",
+			slog.String("component", "io.router"),
+			slog.String("flow_id", string(handle)),
+			slog.String("source_device_id", route.SourceID),
+			slog.String("target_device_id", route.TargetID),
+			slog.String("stream_kind", route.StreamKind),
+		)
 	}
+	eventlog.Emit(ctx, "io.flow.stopped", slog.LevelInfo, "flow stopped",
+		slog.String("component", "io.flow"),
+		slog.String("flow_id", string(handle)),
+		slog.Int("route_count", len(runtime.routes)),
+	)
 	return nil
 }
 
@@ -360,6 +396,12 @@ func (p *MediaPlanner) compileLocked(ctx context.Context, plan FlowPlan) (planRu
 				TargetID:   targetDeviceID,
 				StreamKind: streamKind,
 			})
+			eventlog.Emit(ctx, "io.route.applied", slog.LevelInfo, "route applied",
+				slog.String("component", "io.router"),
+				slog.String("source_device_id", sourceDeviceID),
+				slog.String("target_device_id", targetDeviceID),
+				slog.String("stream_kind", streamKind),
+			)
 		}
 
 		// Analyzer nodes publish typed events through the planner sinks.
@@ -399,6 +441,12 @@ func (p *MediaPlanner) emitAnalyzerEvent(event AnalyzerEvent) {
 	if p != nil && p.analyzerSink != nil {
 		p.analyzerSink(event)
 	}
+	eventlog.Emit(context.Background(), "io.analyzer.event", slog.LevelInfo, "analyzer event",
+		slog.String("component", "io.flow"),
+		slog.String("kind", strings.TrimSpace(event.Kind)),
+		slog.String("subject", strings.TrimSpace(event.Subject)),
+		slog.Int("attribute_count", len(event.Attributes)),
+	)
 	if p != nil && p.observationSink != nil {
 		observation := Observation{
 			Kind:       strings.TrimSpace(event.Kind),

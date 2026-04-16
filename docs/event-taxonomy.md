@@ -23,10 +23,28 @@ Canonical server event names written to `logs/terminals.jsonl`.
 ## Scenario (`scenario.*`)
 - `scenario.definition.registered`
 - `scenario.recovery.failed`
+- `scenario.trigger.received`
+- `scenario.trigger.matched`
+- `scenario.trigger.unmatched`
+- `scenario.activation.started`
+- `scenario.activation.stopped`
+- `scenario.activation.failed`
+- `scenario.recovery.started`
+- `scenario.recovery.finished`
 
 ## App Runtime (`appruntime`)
 - `appruntime.package.loaded`
 - `appruntime.package.skipped`
+- `appruntime.op.emitted`
+
+## IO / Flow (`io.router`, `io.flow`)
+- `io.route.applied`
+- `io.route.torn_down`
+- `io.flow.started`
+- `io.flow.patched`
+- `io.flow.stopped`
+- `io.flow.stats`
+- `io.analyzer.event`
 
 ## Observation (`observation.store`)
 - `observation.emitted`

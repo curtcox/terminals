@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
 
@@ -75,26 +77,62 @@ func (a *appScenarioActivation) Start(ctx context.Context, env *scenario.Environ
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.appEnv = &appruntime.Environment{}
-	return a.activation.Start(ctx, a.appEnv)
+	if err := a.activation.Start(ctx, a.appEnv); err != nil {
+		return err
+	}
+	eventlog.Emit(ctx, "appruntime.op.emitted", slog.LevelInfo, "app runtime op emitted",
+		slog.String("component", "appruntime"),
+		slog.String("op_kind", "activation.start"),
+		slog.String("activation_name", a.name),
+		slog.String("activation_id", a.activation.ID()),
+	)
+	return nil
 }
 
 func (a *appScenarioActivation) Stop() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.activation.Stop(context.Background(), a.appEnv)
+	if err := a.activation.Stop(context.Background(), a.appEnv); err != nil {
+		return err
+	}
+	eventlog.Emit(context.Background(), "appruntime.op.emitted", slog.LevelInfo, "app runtime op emitted",
+		slog.String("component", "appruntime"),
+		slog.String("op_kind", "activation.stop"),
+		slog.String("activation_name", a.name),
+		slog.String("activation_id", a.activation.ID()),
+	)
+	return nil
 }
 
 func (a *appScenarioActivation) Suspend() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.activation.Suspend(context.Background(), a.appEnv)
+	if err := a.activation.Suspend(context.Background(), a.appEnv); err != nil {
+		return err
+	}
+	eventlog.Emit(context.Background(), "appruntime.op.emitted", slog.LevelInfo, "app runtime op emitted",
+		slog.String("component", "appruntime"),
+		slog.String("op_kind", "activation.suspend"),
+		slog.String("activation_name", a.name),
+		slog.String("activation_id", a.activation.ID()),
+	)
+	return nil
 }
 
 func (a *appScenarioActivation) Resume(ctx context.Context, env *scenario.Environment) error {
 	_ = env
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.activation.Resume(ctx, a.appEnv)
+	if err := a.activation.Resume(ctx, a.appEnv); err != nil {
+		return err
+	}
+	eventlog.Emit(ctx, "appruntime.op.emitted", slog.LevelInfo, "app runtime op emitted",
+		slog.String("component", "appruntime"),
+		slog.String("op_kind", "activation.resume"),
+		slog.String("activation_name", a.name),
+		slog.String("activation_id", a.activation.ID()),
+	)
+	return nil
 }
 
 func (a *appScenarioActivation) HandleEvent(ctx context.Context, env *scenario.Environment, event scenario.EventRecord) error {
@@ -108,12 +146,23 @@ func (a *appScenarioActivation) HandleEvent(ctx context.Context, env *scenario.E
 	if occurredAt.IsZero() {
 		occurredAt = time.Now().UTC()
 	}
-	return a.activation.Handle(ctx, a.appEnv, appruntime.Trigger{
+	if err := a.activation.Handle(ctx, a.appEnv, appruntime.Trigger{
 		Kind:       strings.TrimSpace(event.Kind),
 		Subject:    strings.TrimSpace(event.Subject),
 		Attributes: copyStringMap(event.Attributes),
 		OccurredAt: occurredAt,
-	})
+	}); err != nil {
+		return err
+	}
+	eventlog.Emit(ctx, "appruntime.op.emitted", slog.LevelInfo, "app runtime op emitted",
+		slog.String("component", "appruntime"),
+		slog.String("op_kind", "trigger.handle"),
+		slog.String("activation_name", a.name),
+		slog.String("activation_id", a.activation.ID()),
+		slog.String("trigger_kind", strings.TrimSpace(event.Kind)),
+		slog.String("trigger_subject", strings.TrimSpace(event.Subject)),
+	)
+	return nil
 }
 
 func toAppActivationRequest(req scenario.ActivationRequest) appruntime.ActivationRequest {

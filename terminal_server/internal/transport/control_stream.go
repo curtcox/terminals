@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"os"
 	"sort"
@@ -13,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
@@ -621,8 +623,24 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		}
 		return nil, nil
 	case msg.FlowStats != nil:
+		eventlog.Emit(ctx, "io.flow.stats", slog.LevelInfo, "flow stats received",
+			slog.String("component", "io.flow"),
+			slog.String("flow_id", strings.TrimSpace(msg.FlowStats.FlowID)),
+			slog.Float64("cpu_pct", msg.FlowStats.CPUPct),
+			slog.Float64("mem_mb", msg.FlowStats.MemMB),
+			slog.Uint64("dropped_frames", msg.FlowStats.DroppedFrames),
+			slog.String("state", strings.TrimSpace(msg.FlowStats.State)),
+			slog.String("error", strings.TrimSpace(msg.FlowStats.Error)),
+		)
 		return nil, nil
 	case msg.ClockSample != nil:
+		eventlog.Emit(ctx, "io.flow.stats", slog.LevelDebug, "clock sample received",
+			slog.String("component", "io.flow"),
+			slog.String("device_id", strings.TrimSpace(msg.ClockSample.DeviceID)),
+			slog.Float64("error_ms", msg.ClockSample.ErrorMS),
+			slog.Int64("client_unix_ms", msg.ClockSample.ClientUnixMS),
+			slog.Int64("server_unix_ms", msg.ClockSample.ServerUnixMS),
+		)
 		return nil, nil
 	case msg.StreamReady != nil:
 		h.metrics.streamReadyReceived.Add(1)

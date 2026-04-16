@@ -1,1 +1,1 @@
-Instrument remaining domain seams from the plan (`io.flow*`, `io.analyzer.event`, and `appruntime.op.emitted`) and add focused tests.
+Implement `housekeeping.log.write_failed` fallback behavior in `internal/eventlog` (once-per-minute stderr reporting plus structured event emission) and add failure-path tests.
