@@ -268,6 +268,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   int _lastFlutterErrorUnixMs = 0;
   String _lastBugTokenWord = '';
   String _lastBugTokenCode = '';
+  final List<_QueuedBugReport> _queuedBugReports = <_QueuedBugReport>[];
   final List<_PendingBugReport> _pendingBugReports = <_PendingBugReport>[];
   Timer? _bugReportAckTimer;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
@@ -476,6 +477,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       );
       _recordClientLog('info', 'control stream connected');
       _sendSensorTelemetry();
+      _flushQueuedBugReports();
     } catch (error) {
       await _handleStreamClosed('Connection error: $error');
     } finally {
@@ -900,17 +902,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     List<String> tags = const <String>[],
     _BugIdentifier? bugIdentifier,
   }) async {
-    if (_client == null) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _status = 'Bug report failed';
-        _lastNotification = 'Connect stream before filing a bug report';
-      });
-      return;
-    }
-
     final now = DateTime.now().toLocal();
     final identifier = bugIdentifier ?? _buildBugIdentifier(now);
     final bugReport = diagv1.BugReport()
@@ -939,30 +930,43 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       bugReport.sourceHints[key] = value;
     });
 
-    _outgoing.add(
-      ConnectRequest()..bugReport = bugReport,
-    );
-    _pendingBugReports.add(
-      _PendingBugReport(
-        identifier: identifier,
-        submittedUnixMs: now.toUtc().millisecondsSinceEpoch,
-      ),
-    );
-    _ensureBugReportAckWatchdog();
-    _recordClientLog(
-      'info',
-      'submitted bug report for subject=$subjectDeviceID '
-          'word=${identifier.word} code=${identifier.code}',
-    );
     if (!mounted) {
       return;
     }
+    if (_isBugReportTransportReady()) {
+      _dispatchBugReport(
+        bugReport: bugReport,
+        identifier: identifier,
+        subjectDeviceID: subjectDeviceID,
+        replay: false,
+      );
+      setState(() {
+        _lastBugTokenWord = identifier.word;
+        _lastBugTokenCode = identifier.code;
+        _status = 'Bug report pending';
+        _lastNotification =
+            'Submitting bug report (word: ${identifier.word}, code: ${identifier.code}) and waiting for server ack...';
+      });
+      return;
+    }
+
+    _queuedBugReports.add(
+      _QueuedBugReport(
+        bugReport: bugReport,
+        identifier: identifier,
+      ),
+    );
+    _recordClientLog(
+      'warn',
+      'queued bug report while disconnected for subject=$subjectDeviceID '
+          'word=${identifier.word} code=${identifier.code}',
+    );
     setState(() {
       _lastBugTokenWord = identifier.word;
       _lastBugTokenCode = identifier.code;
-      _status = 'Bug report pending';
+      _status = 'Bug report queued';
       _lastNotification =
-          'Submitting bug report (word: ${identifier.word}, code: ${identifier.code}) and waiting for server ack...';
+          'Bug report queued offline (word: ${identifier.word}, code: ${identifier.code}) and will send when connected.';
     });
   }
 
@@ -1155,6 +1159,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       'page_url': Uri.base.toString(),
       'active_root_revision': _activeRootRevision.toString(),
       'responses_seen': _responses.toString(),
+      'queued_bug_reports': _queuedBugReports.length.toString(),
+      'pending_bug_reports': _pendingBugReports.length.toString(),
     };
   }
 
@@ -1171,19 +1177,68 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       _bugReportAckTimer?.cancel();
       _bugReportAckTimer = null;
     }
-    if (mounted) {
-      setState(() {
-        _status = 'Bug report filed';
-        _lastNotification = tokenWord.isEmpty
-            ? 'Bug report filed: ${ack.reportId}'
-            : 'Bug report filed: ${ack.reportId} (word: $tokenWord)';
-      });
-    }
+    _status = 'Bug report filed';
+    _lastNotification = tokenWord.isEmpty
+        ? 'Bug report filed: ${ack.reportId}'
+        : 'Bug report filed: ${ack.reportId} (word: $tokenWord)';
     _recordClientLog(
       'info',
       'bug report ack status=${ack.status.name} id=${ack.reportId} '
           'word=$tokenWord code=$tokenCode',
     );
+  }
+
+  bool _isBugReportTransportReady() {
+    return _client != null && _incoming != null && _shouldStayConnected;
+  }
+
+  void _dispatchBugReport({
+    required diagv1.BugReport bugReport,
+    required _BugIdentifier identifier,
+    required String subjectDeviceID,
+    required bool replay,
+  }) {
+    _outgoing.add(
+      ConnectRequest()..bugReport = bugReport,
+    );
+    _pendingBugReports.add(
+      _PendingBugReport(
+        identifier: identifier,
+        submittedUnixMs: DateTime.now().toUtc().millisecondsSinceEpoch,
+      ),
+    );
+    _ensureBugReportAckWatchdog();
+    _recordClientLog(
+      'info',
+      '${replay ? 'replayed' : 'submitted'} bug report for subject=$subjectDeviceID '
+          'word=${identifier.word} code=${identifier.code}',
+    );
+  }
+
+  void _flushQueuedBugReports() {
+    if (!_isBugReportTransportReady()) {
+      return;
+    }
+    if (_queuedBugReports.isEmpty) {
+      return;
+    }
+    final queued = List<_QueuedBugReport>.from(_queuedBugReports);
+    _queuedBugReports.clear();
+    for (final item in queued) {
+      _dispatchBugReport(
+        bugReport: item.bugReport,
+        identifier: item.identifier,
+        subjectDeviceID: item.bugReport.subjectDeviceId,
+        replay: true,
+      );
+    }
+    if (mounted) {
+      setState(() {
+        _status = 'Queued bug reports sent';
+        _lastNotification =
+            'Sent ${queued.length} queued bug report(s); waiting for server ack.';
+      });
+    }
   }
 
   void _ensureBugReportAckWatchdog() {
@@ -2337,4 +2392,14 @@ class _PendingBugReport {
 
   final _BugIdentifier identifier;
   final int submittedUnixMs;
+}
+
+class _QueuedBugReport {
+  const _QueuedBugReport({
+    required this.bugReport,
+    required this.identifier,
+  });
+
+  final diagv1.BugReport bugReport;
+  final _BugIdentifier identifier;
 }
