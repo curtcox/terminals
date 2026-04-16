@@ -1,1 +1,1 @@
-Implement `housekeeping.log.write_failed` fallback behavior in `internal/eventlog` (once-per-minute stderr reporting plus structured event emission) and add failure-path tests.
+Await review feedback on the eventlog write-failure fallback changes.

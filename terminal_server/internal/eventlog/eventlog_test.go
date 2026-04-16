@@ -1,13 +1,16 @@
 package eventlog
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEmitIncludesRunIDSeqAndContextSpan(t *testing.T) {
@@ -78,5 +81,48 @@ func TestStdLogAdapterWritesLegacyEvent(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "legacy.log") {
 		t.Fatalf("expected legacy.log event, got %q", string(raw))
+	}
+}
+
+func TestWriteFailureEmitterWritesStructuredEvent(t *testing.T) {
+	var stderr bytes.Buffer
+	emitter := makeWriteFailureEmitter(writeFailureEmitterConfig{
+		stderr:        &stderr,
+		runID:         "run-123",
+		pid:           42,
+		serverID:      "HomeServer",
+		serverVersion: "1",
+	})
+	emitter(WriteFailure{
+		At:  time.Date(2026, 4, 16, 14, 3, 22, 184000000, time.UTC),
+		Err: errors.New("disk full"),
+	})
+
+	line := strings.TrimSpace(stderr.String())
+	if line == "" {
+		t.Fatalf("expected structured failure event")
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(line), &got); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if got["event"] != "housekeeping.log.write_failed" {
+		t.Fatalf("event = %v", got["event"])
+	}
+	if got["component"] != "housekeeping" {
+		t.Fatalf("component = %v", got["component"])
+	}
+	if got["run_id"] != "run-123" {
+		t.Fatalf("run_id = %v", got["run_id"])
+	}
+	if got["server_id"] != "HomeServer" {
+		t.Fatalf("server_id = %v", got["server_id"])
+	}
+	errField, ok := got["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("error field missing or invalid: %T", got["error"])
+	}
+	if errField["message"] != "disk full" {
+		t.Fatalf("error.message = %v", errField["message"])
 	}
 }

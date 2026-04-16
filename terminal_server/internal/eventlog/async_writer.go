@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+type WriteFailure struct {
+	At  time.Time
+	Err error
+}
+
 // AsyncWriter provides non-blocking buffered writes around a sink.
 // When the queue is full, it drops the oldest entry and enqueues the latest.
 type AsyncWriter struct {
@@ -22,6 +27,10 @@ type AsyncWriter struct {
 
 	errMu           sync.Mutex
 	lastErrReported time.Time
+	now             func() time.Time
+	errInterval     time.Duration
+	stderr          io.Writer
+	onWriteFailure  func(WriteFailure)
 }
 
 func NewAsyncWriter(sink io.Writer, capacity int) *AsyncWriter {
@@ -29,12 +38,21 @@ func NewAsyncWriter(sink io.Writer, capacity int) *AsyncWriter {
 		capacity = 4096
 	}
 	w := &AsyncWriter{
-		sink:  sink,
-		queue: make(chan []byte, capacity),
+		sink:        sink,
+		queue:       make(chan []byte, capacity),
+		now:         time.Now,
+		errInterval: time.Minute,
+		stderr:      os.Stderr,
 	}
 	w.wg.Add(1)
 	go w.run()
 	return w
+}
+
+func (w *AsyncWriter) SetWriteFailureCallback(callback func(WriteFailure)) {
+	w.errMu.Lock()
+	defer w.errMu.Unlock()
+	w.onWriteFailure = callback
 }
 
 func (w *AsyncWriter) Write(p []byte) (int, error) {
@@ -72,6 +90,8 @@ func (w *AsyncWriter) run() {
 		}
 		if _, err := w.sink.Write(payload); err != nil {
 			w.reportWriteError(err)
+		} else {
+			w.markHealthy()
 		}
 		w.inFlight.Add(-1)
 	}
@@ -79,13 +99,25 @@ func (w *AsyncWriter) run() {
 
 func (w *AsyncWriter) reportWriteError(err error) {
 	w.errMu.Lock()
-	defer w.errMu.Unlock()
-	now := time.Now().UTC()
-	if !w.lastErrReported.IsZero() && now.Sub(w.lastErrReported) < time.Minute {
+	now := w.now().UTC()
+	if !w.lastErrReported.IsZero() && now.Sub(w.lastErrReported) < w.errInterval {
+		w.errMu.Unlock()
 		return
 	}
 	w.lastErrReported = now
-	_, _ = fmt.Fprintf(os.Stderr, "eventlog sink write failed: %v\n", err)
+	stderr := w.stderr
+	callback := w.onWriteFailure
+	w.errMu.Unlock()
+	_, _ = fmt.Fprintf(stderr, "eventlog sink write failed: %v\n", err)
+	if callback != nil {
+		callback(WriteFailure{At: now, Err: err})
+	}
+}
+
+func (w *AsyncWriter) markHealthy() {
+	w.errMu.Lock()
+	w.lastErrReported = time.Time{}
+	w.errMu.Unlock()
 }
 
 func (w *AsyncWriter) DroppedSinceLast() uint64 {

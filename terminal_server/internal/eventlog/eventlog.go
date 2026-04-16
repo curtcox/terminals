@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -65,17 +66,25 @@ func New(cfg Config) (*Logger, error) {
 	async := NewAsyncWriter(sink, 4096)
 
 	runID := makeRunID()
+	pid := os.Getpid()
+	async.SetWriteFailureCallback(makeWriteFailureEmitter(writeFailureEmitterConfig{
+		stderr:        os.Stderr,
+		runID:         runID,
+		pid:           pid,
+		serverID:      strings.TrimSpace(cfg.ServerID),
+		serverVersion: strings.TrimSpace(cfg.ServerVersion),
+	}))
 	h := &enrichHandler{
 		next:          newJSONHandler(async, parseLevel(cfg.Level)),
 		runID:         runID,
-		pid:           os.Getpid(),
+		pid:           pid,
 		serverID:      strings.TrimSpace(cfg.ServerID),
 		serverVersion: strings.TrimSpace(cfg.ServerVersion),
 	}
 	base := slog.New(h).With(
 		slog.String("component", "main"),
 	)
-	return &Logger{logger: base, writer: rw, async: async, runID: runID, pid: os.Getpid()}, nil
+	return &Logger{logger: base, writer: rw, async: async, runID: runID, pid: pid}, nil
 }
 
 func (l *Logger) Logger() *slog.Logger {
@@ -437,4 +446,46 @@ func shortFunc(fn string) string {
 		tail = strings.ReplaceAll(tail, "\\", "/")
 	}
 	return tail
+}
+
+type writeFailureEmitterConfig struct {
+	stderr        io.Writer
+	runID         string
+	pid           int
+	serverID      string
+	serverVersion string
+}
+
+func makeWriteFailureEmitter(cfg writeFailureEmitterConfig) func(WriteFailure) {
+	stderr := cfg.stderr
+	if stderr == nil {
+		stderr = os.Stderr
+	}
+	return func(failure WriteFailure) {
+		record := map[string]any{
+			"ts":        failure.At.UTC().Format("2006-01-02T15:04:05.000Z07:00"),
+			"level":     "error",
+			"event":     "housekeeping.log.write_failed",
+			"msg":       "event log sink write failed",
+			"component": "housekeeping",
+			"run_id":    cfg.runID,
+			"pid":       cfg.pid,
+			"error": map[string]any{
+				"type":    "write_error",
+				"message": failure.Err.Error(),
+			},
+		}
+		if cfg.serverID != "" {
+			record["server_id"] = cfg.serverID
+		}
+		if cfg.serverVersion != "" {
+			record["server_version"] = cfg.serverVersion
+		}
+		encoded, err := json.Marshal(record)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "eventlog write failure event encode failed: %v\n", err)
+			return
+		}
+		_, _ = fmt.Fprintf(stderr, "%s\n", string(encoded))
+	}
 }
