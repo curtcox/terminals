@@ -101,6 +101,15 @@ These are not explicitly described in the master plan but are natural extensions
 | AH6 | **Homeowner** | receive a spoken summary of the day's weather and schedule each morning on the kitchen device | start my day informed without checking my phone |
 | AH7 | **Pet owner** | say "check on the dog" and see the camera feed from the room the pet is in | monitor my pet from another room |
 | AH8 | **Home user** | have the system detect smoke alarm or CO detector sounds and alert all devices | be notified of safety events even in distant rooms |
+| AH9 | **Home occupant** | ask whether unusual accelerometer events were recorded recently | confirm whether what I just felt was detected by the system |
+| AH10 | **Home occupant** | ask the system to identify a sound I just heard | understand what the sound was |
+| AH11 | **Home occupant** | ask the system to locate where a sound I just heard came from | know where the sound originated |
+| AH12 | **Home occupant** | ask who is currently in the house and where they are | find and talk to the right person quickly |
+| AH13 | **Home occupant** | be notified when a relevant change is detected by sensors or devices | take action quickly when something changes |
+| AH14 | **Home occupant** | be notified when unusual behavior or anomalies are detected | take action when something seems wrong |
+| AH15 | **Home occupant** | track the location of important objects in the home | find needed items when they are misplaced |
+| AH16 | **Home network admin** | view which Bluetooth devices are active in the house and where they are observed | understand what devices are operating and where |
+| AH17 | **Home network admin** | verify the physical locations of terminal devices against reported placement | trust and validate the system's location data |
 
 ### Office
 
