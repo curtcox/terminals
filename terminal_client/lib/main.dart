@@ -2,10 +2,15 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:fixnum/fixnum.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
+import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
+    as capv1;
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart'
+    as diagv1;
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/media/webrtc_engine.dart';
@@ -33,6 +38,10 @@ const int _e2eStartupDelayMs = int.fromEnvironment(
   'TERMINALS_E2E_STARTUP_DELAY_MS',
   defaultValue: 600,
 );
+const String _bugReportActionPrefix = 'bug_report';
+const int _clientContextRecentUiCap = 32;
+const int _clientContextRecentLogCap = 200;
+const int _clientContextRecentErrorCap = 32;
 
 Duration calculateReconnectDelay({
   required int reconnectAttempt,
@@ -172,14 +181,31 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _diagnosticsTitle = 'none';
   Map<String, String> _diagnosticsData = <String, String>{};
   String _photoFrameAssetBaseURL = '';
+  final List<diagv1.UiEventEntry> _recentUiEvents = <diagv1.UiEventEntry>[];
+  final List<diagv1.UiActionEntry> _recentUiActions = <diagv1.UiActionEntry>[];
+  final List<diagv1.LogEntry> _recentLogs = <diagv1.LogEntry>[];
+  final List<diagv1.ControlErrorEntry> _recentControlErrors =
+      <diagv1.ControlErrorEntry>[];
+  final Map<String, double> _lastSensorSnapshot = <String, double>{};
+  capv1.DeviceCapabilities? _lastRegisteredCapabilities;
+  int _lastHeartbeatUnixMs = 0;
+  int _pendingHeartbeatUnixMs = 0;
+  double _lastRttMs = 0;
+  String _lastConnectionStatus = 'Idle';
+  String _lastFlutterErrorMessage = '';
+  String _lastFlutterErrorStack = '';
+  int _lastFlutterErrorUnixMs = 0;
+  FlutterExceptionHandler? _previousFlutterErrorHandler;
 
   @override
   void initState() {
     super.initState();
+    _installFlutterErrorHook();
     _mediaEngine = widget.mediaEngineFactory(
       localDeviceID: _deviceId,
       onSignal: _sendWebRTCSignalMessage,
     );
+    _recordClientLog('info', 'client started');
     if (_e2eEmitEvents) {
       debugPrint('E2E_EVENT: client_started');
     }
@@ -230,6 +256,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       _shouldStayConnected = false;
       setState(() {
         _status = 'Invalid host or port';
+        _lastConnectionStatus = _status;
       });
       return;
     }
@@ -238,6 +265,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (mounted) {
       setState(() {
         _status = userInitiated ? 'Connecting...' : 'Reconnecting...';
+        _lastConnectionStatus = _status;
       });
     }
     try {
@@ -255,18 +283,29 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           if (!mounted) {
             return;
           }
+          final nowUnixMs = DateTime.now().toUtc().millisecondsSinceEpoch;
           _reconnectAttempt = 0;
           setState(() {
+            if (_pendingHeartbeatUnixMs > 0) {
+              _lastRttMs = (nowUnixMs - _pendingHeartbeatUnixMs).toDouble();
+              _pendingHeartbeatUnixMs = 0;
+            }
             _responses += 1;
             final responseStatus = _statusFromResponse(response);
             if (responseStatus.isNotEmpty) {
               _status = responseStatus;
+              _lastConnectionStatus = responseStatus;
             }
             var nextRoot = _activeRoot;
             var uiChanged = false;
             if (response.hasSetUi() && response.setUi.hasRoot()) {
               nextRoot = response.setUi.root.deepCopy();
               uiChanged = true;
+              _recordUiEvent(
+                kind: 'set_ui',
+                componentId: _nodeId(response.setUi.root),
+                detail: 'root updated',
+              );
             }
             if (response.hasUpdateUi()) {
               final updatedRoot = _applyUpdateUi(
@@ -277,12 +316,22 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
                 uiChanged = true;
               }
               nextRoot = updatedRoot;
+              _recordUiEvent(
+                kind: 'update_ui',
+                componentId: response.updateUi.componentId,
+                detail: 'component patch',
+              );
             }
             if (response.hasTransitionUi()) {
               _applyTransitionHint(response.transitionUi);
               if (nextRoot != null) {
                 uiChanged = true;
               }
+              _recordUiEvent(
+                kind: 'transition_ui',
+                componentId: _nodeId(nextRoot ?? uiv1.Node()),
+                detail: response.transitionUi.transition,
+              );
             }
             _activeRoot = nextRoot;
             if (uiChanged) {
@@ -298,6 +347,23 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             _applyDiagnosticsResponse(response);
             if (response.hasError()) {
               _lastNotification = response.error.message;
+              _appendBounded<diagv1.ControlErrorEntry>(
+                _recentControlErrors,
+                diagv1.ControlErrorEntry()
+                  ..unixMs = Int64(nowUnixMs)
+                  ..code = response.error.code.name
+                  ..message = response.error.message,
+                _clientContextRecentErrorCap,
+              );
+              _recordClientLog('error', response.error.message);
+            }
+            if (response.hasBugReportAck()) {
+              final ack = response.bugReportAck;
+              _lastNotification = 'Bug report filed: ${ack.reportId}';
+              _recordClientLog(
+                'info',
+                'bug report ack status=${ack.status.name} id=${ack.reportId}',
+              );
             }
             _applyRegisterMetadata(response);
             if (_e2eEmitEvents && response.hasRegisterAck()) {
@@ -316,24 +382,29 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
 
       _startHeartbeatLoop();
       _startSensorTelemetryLoop();
-      _outgoing.add(
-        TerminalControlGrpcClient.registerRequest(
-          deviceId: _deviceId,
-          deviceName: _deviceNameController.text.trim(),
-          deviceType: _deviceTypeController.text.trim(),
-          platform: _platformController.text.trim(),
-          screenWidth: size.width.round(),
-          screenHeight: size.height.round(),
-          screenDensity: mediaQuery.devicePixelRatio,
-          screenTouch: true,
-        ),
+      final registerRequest = TerminalControlGrpcClient.registerRequest(
+        deviceId: _deviceId,
+        deviceName: _deviceNameController.text.trim(),
+        deviceType: _deviceTypeController.text.trim(),
+        platform: _platformController.text.trim(),
+        screenWidth: size.width.round(),
+        screenHeight: size.height.round(),
+        screenDensity: mediaQuery.devicePixelRatio,
+        screenTouch: true,
       );
+      _lastRegisteredCapabilities = registerRequest.register.capabilities;
+      _outgoing.add(registerRequest);
+      final initialHeartbeatUnixMs =
+          DateTime.now().toUtc().millisecondsSinceEpoch;
+      _lastHeartbeatUnixMs = initialHeartbeatUnixMs;
+      _pendingHeartbeatUnixMs = initialHeartbeatUnixMs;
       _outgoing.add(
         TerminalControlGrpcClient.heartbeatRequest(
           deviceId: _deviceId,
-          unixMs: DateTime.now().millisecondsSinceEpoch,
+          unixMs: initialHeartbeatUnixMs,
         ),
       );
+      _recordClientLog('info', 'control stream connected');
       _sendSensorTelemetry();
     } catch (error) {
       await _handleStreamClosed('Connection error: $error');
@@ -348,10 +419,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       if (!_shouldStayConnected || _deviceId.isEmpty) {
         return;
       }
+      final unixMs = DateTime.now().toUtc().millisecondsSinceEpoch;
+      _lastHeartbeatUnixMs = unixMs;
+      _pendingHeartbeatUnixMs = unixMs;
       _outgoing.add(
         TerminalControlGrpcClient.heartbeatRequest(
           deviceId: _deviceId,
-          unixMs: DateTime.now().millisecondsSinceEpoch,
+          unixMs: unixMs,
         ),
       );
     });
@@ -390,6 +464,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       return;
     }
     final request = _buildSensorTelemetryRequest();
+    _lastSensorSnapshot
+      ..clear()
+      ..addAll(request.sensor.values);
     _outgoing.add(request);
     final unixMs = request.sensor.unixMs.toInt();
     if (mounted) {
@@ -545,6 +622,221 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     }
   }
 
+  void _installFlutterErrorHook() {
+    _previousFlutterErrorHandler = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails details) {
+      _lastFlutterErrorMessage = details.exceptionAsString();
+      _lastFlutterErrorStack = details.stack?.toString() ?? '';
+      _lastFlutterErrorUnixMs = DateTime.now().toUtc().millisecondsSinceEpoch;
+      _recordClientLog('error', _lastFlutterErrorMessage);
+      final prior = _previousFlutterErrorHandler;
+      if (prior != null) {
+        prior(details);
+      } else {
+        FlutterError.presentError(details);
+      }
+    };
+  }
+
+  void _restoreFlutterErrorHook() {
+    if (FlutterError.onError == null) {
+      return;
+    }
+    FlutterError.onError = _previousFlutterErrorHandler;
+    _previousFlutterErrorHandler = null;
+  }
+
+  void _appendBounded<T>(List<T> items, T next, int maxItems) {
+    items.add(next);
+    if (items.length > maxItems) {
+      items.removeRange(0, items.length - maxItems);
+    }
+  }
+
+  void _recordClientLog(String level, String message) {
+    final entry = diagv1.LogEntry()
+      ..unixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
+      ..level = level
+      ..message = message;
+    _appendBounded<diagv1.LogEntry>(
+      _recentLogs,
+      entry,
+      _clientContextRecentLogCap,
+    );
+  }
+
+  void _recordUiEvent({
+    required String kind,
+    required String componentId,
+    required String detail,
+  }) {
+    final entry = diagv1.UiEventEntry()
+      ..unixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
+      ..kind = kind
+      ..componentId = componentId
+      ..detail = detail;
+    _appendBounded<diagv1.UiEventEntry>(
+      _recentUiEvents,
+      entry,
+      _clientContextRecentUiCap,
+    );
+  }
+
+  void _recordUiAction({
+    required String componentId,
+    required String action,
+    required String value,
+  }) {
+    final entry = diagv1.UiActionEntry()
+      ..unixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
+      ..componentId = componentId
+      ..action = action
+      ..value = value;
+    _appendBounded<diagv1.UiActionEntry>(
+      _recentUiActions,
+      entry,
+      _clientContextRecentUiCap,
+    );
+  }
+
+  diagv1.ClientContext _buildClientContext() {
+    final dispatcher = WidgetsBinding.instance.platformDispatcher;
+    final locale = dispatcher.locale;
+    final timezone = dispatcher.locale.toLanguageTag().isNotEmpty
+        ? DateTime.now().timeZoneName
+        : '';
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final size = mediaQuery?.size;
+    final devicePixelRatio = mediaQuery?.devicePixelRatio ?? 1.0;
+    final orientation = mediaQuery?.orientation.name ?? 'unknown';
+
+    final runtime = diagv1.RuntimeState()
+      ..activeUiRoot = (_activeRoot?.deepCopy() ?? uiv1.Node())
+      ..recentUiUpdates.addAll(_recentUiEvents.map((item) => item.deepCopy()))
+      ..recentUiActions.addAll(_recentUiActions.map((item) => item.deepCopy()))
+      ..recentLogs.addAll(_recentLogs.map((item) => item.deepCopy()));
+
+    _activeStreamsByID.forEach((streamID, start) {
+      runtime.activeStreams.add(
+        diagv1.StreamEntry()
+          ..streamId = streamID
+          ..kind = start.kind
+          ..sourceDeviceId = start.sourceDeviceId
+          ..targetDeviceId = start.targetDeviceId,
+      );
+    });
+    _routesByStreamID.forEach((streamID, route) {
+      runtime.activeRoutes.add(
+        diagv1.RouteEntry()
+          ..streamId = streamID
+          ..sourceDeviceId = route.sourceDeviceId
+          ..targetDeviceId = route.targetDeviceId
+          ..kind = route.kind,
+      );
+    });
+    for (final signal in _recentWebRTCSignals) {
+      runtime.recentWebrtcSignals.add(
+        diagv1.WebrtcSignalEntry()
+          ..unixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
+          ..streamId = signal.streamId
+          ..signalType = signal.signalType,
+      );
+    }
+
+    final connection = diagv1.ConnectionHealth()
+      ..lastHeartbeatUnixMs = Int64(_lastHeartbeatUnixMs)
+      ..reconnectAttempt = _reconnectAttempt
+      ..lastStatus = _lastConnectionStatus
+      ..lastRttMs = _lastRttMs
+      ..online = _shouldStayConnected;
+    connection.recentControlErrors
+        .addAll(_recentControlErrors.map((item) => item.deepCopy()));
+
+    final hardware = diagv1.HardwareState()
+      ..batteryLevel = (_lastSensorSnapshot['battery.level'] ?? 0).toDouble()
+      ..batteryCharging =
+          (_lastSensorSnapshot['battery.charging'] ?? 0).toDouble() >= 0.5
+      ..screenWidthPx = size?.width.round() ?? 0
+      ..screenHeightPx = size?.height.round() ?? 0
+      ..devicePixelRatio = devicePixelRatio
+      ..orientation = orientation;
+    hardware.sensorSnapshot.addAll(_lastSensorSnapshot);
+
+    final contextProto = diagv1.ClientContext()
+      ..identity = (diagv1.ClientIdentity()
+        ..deviceId = _deviceId
+        ..deviceName = _deviceNameController.text.trim()
+        ..deviceType = _deviceTypeController.text.trim()
+        ..platform = _platformController.text.trim()
+        ..clientVersion = const String.fromEnvironment(
+          'TERMINALS_CLIENT_VERSION',
+        )
+        ..clientGitSha = const String.fromEnvironment('TERMINALS_GIT_SHA')
+        ..clientBuildUnixMs = Int64(
+          int.tryParse(
+                const String.fromEnvironment('TERMINALS_BUILD_UNIX_MS'),
+              ) ??
+              0,
+        )
+        ..osVersion = '${defaultTargetPlatform.name}${kIsWeb ? ':web' : ''}'
+        ..locale = locale.toLanguageTag()
+        ..timezone = timezone
+        ..clockOffsetMs = Int64(0))
+      ..runtime = runtime
+      ..connection = connection
+      ..hardware = hardware
+      ..errorCapture = (diagv1.ErrorCapture()
+        ..lastErrorMessage = _lastFlutterErrorMessage
+        ..lastErrorStack = _lastFlutterErrorStack
+        ..lastErrorUnixMs = Int64(_lastFlutterErrorUnixMs));
+    if (_lastRegisteredCapabilities != null) {
+      contextProto.capabilities = _lastRegisteredCapabilities!.deepCopy();
+    }
+    return contextProto;
+  }
+
+  Future<void> _submitBugReportFromAction({
+    required String componentId,
+    required String action,
+    required String value,
+  }) async {
+    var subjectDeviceID = _deviceId;
+    final parts = action.split(':');
+    if (parts.length > 1) {
+      final explicit = parts.sublist(1).join(':').trim();
+      if (explicit.isNotEmpty) {
+        subjectDeviceID = explicit;
+      }
+    } else if (value.trim().isNotEmpty) {
+      subjectDeviceID = value.trim();
+    }
+
+    final bugReport = diagv1.BugReport()
+      ..reporterDeviceId = _deviceId
+      ..subjectDeviceId = subjectDeviceID
+      ..source = diagv1.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON
+      ..description = 'Filed from on-device bug report button'
+      ..timestampUnixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
+      ..clientContext = _buildClientContext()
+      ..sourceHints['component_id'] = componentId
+      ..sourceHints['action'] = action;
+
+    _outgoing.add(
+      ConnectRequest()..bugReport = bugReport,
+    );
+    _recordClientLog(
+      'info',
+      'submitted bug report for subject=$subjectDeviceID',
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _status = 'Bug report submitted';
+      _lastNotification = 'Submitting bug report...';
+    });
+  }
+
   void _stopHeartbeatLoop() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
@@ -561,6 +853,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   }
 
   Future<void> _handleStreamClosed(String status) async {
+    _recordClientLog('warn', 'control stream closed: $status');
     _stopHeartbeatLoop();
     _stopSensorTelemetryLoop();
     _incoming = null;
@@ -572,6 +865,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (mounted) {
       setState(() {
         _status = status;
+        _lastConnectionStatus = status;
       });
     }
     _scheduleReconnect();
@@ -606,6 +900,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (mounted) {
       setState(() {
         _status = 'Connection lost, retrying in ${displaySeconds}s...';
+        _lastConnectionStatus = _status;
       });
     }
     _reconnectTimer = Timer(reconnectDelay, () {
@@ -624,6 +919,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     setState(() {
       _isScanning = true;
       _status = 'Scanning LAN for server...';
+      _lastConnectionStatus = _status;
     });
     try {
       final found = await _mdnsScanner.scan();
@@ -637,9 +933,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           _hostController.text = found.first.host;
           _portController.text = found.first.port.toString();
           _status = 'Found ${found.length} server(s)';
+          _lastConnectionStatus = _status;
         } else {
           _selectedDiscoveredServer = null;
           _status = 'No servers discovered';
+          _lastConnectionStatus = _status;
         }
       });
     } catch (error) {
@@ -648,6 +946,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       }
       setState(() {
         _status = 'Discovery error: $error';
+        _lastConnectionStatus = _status;
       });
     } finally {
       if (mounted) {
@@ -679,6 +978,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (mounted) {
       setState(() {
         _status = 'Disconnected';
+        _lastConnectionStatus = _status;
         _activeRoot = null;
       });
     }
@@ -708,6 +1008,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _terminalInputController.dispose();
     _playbackArtifactIdController.dispose();
     _playbackTargetDeviceIdController.dispose();
+    _restoreFlutterErrorHook();
     super.dispose();
   }
 
@@ -935,6 +1236,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     if (response.hasPlayAudio()) {
       return 'Play audio';
     }
+    if (response.hasBugReportAck()) {
+      return 'Bug report filed';
+    }
     if (response.hasUpdateUi()) {
       return 'UI patched';
     }
@@ -1159,6 +1463,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     required String value,
   }) async {
     if (_deviceId.isEmpty) {
+      return;
+    }
+    _recordUiAction(
+      componentId: componentId,
+      action: action,
+      value: value,
+    );
+    if (action.startsWith(_bugReportActionPrefix)) {
+      await _submitBugReportFromAction(
+        componentId: componentId,
+        action: action,
+        value: value,
+      );
       return;
     }
     _outgoing.add(

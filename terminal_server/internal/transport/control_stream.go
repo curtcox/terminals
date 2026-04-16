@@ -422,6 +422,8 @@ const (
 	defaultTerminalReadInterval = 10 * time.Millisecond
 	defaultTerminalUIInterval   = 800 * time.Millisecond
 	defaultPhotoFrameInterval   = 12 * time.Second
+	bugReportButtonID           = "global_bug_report_button"
+	bugReportActionPrefix       = "bug_report"
 )
 
 // CommandEvent is a bounded audit record of command handling.
@@ -785,6 +787,56 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		h.metrics.protocolErrors.Add(1)
 		return []ServerMessage{{ErrorCode: errorCodeFor(ErrInvalidClientMessage), Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
 	}
+}
+
+func (h *StreamHandler) decorateBugReportAffordance(deviceID string, msg ServerMessage) ServerMessage {
+	if msg.SetUI == nil {
+		return msg
+	}
+	decorated := withBugReportAffordance(*msg.SetUI, strings.TrimSpace(deviceID))
+	msg.SetUI = &decorated
+	return msg
+}
+
+func withBugReportAffordance(root ui.Descriptor, subjectDeviceID string) ui.Descriptor {
+	if hasBugReportAffordance(root) {
+		return root
+	}
+	action := bugReportActionPrefix
+	if subjectDeviceID != "" {
+		action += ":" + subjectDeviceID
+	}
+	button := ui.New("button", map[string]string{
+		"id":     bugReportButtonID,
+		"label":  "Report a bug",
+		"action": action,
+	})
+	if root.Type == "stack" {
+		root.Children = append(root.Children, button)
+		return root
+	}
+	return ui.New("stack", map[string]string{
+		"id": "bug_report_affordance_root",
+	}, root, button)
+}
+
+func hasBugReportAffordance(node ui.Descriptor) bool {
+	nodeID := strings.TrimSpace(node.ID)
+	if nodeID == "" {
+		nodeID = strings.TrimSpace(node.Props["id"])
+	}
+	if nodeID == bugReportButtonID {
+		return true
+	}
+	if strings.TrimSpace(node.Type) == "button" && strings.HasPrefix(strings.TrimSpace(node.Props["action"]), bugReportActionPrefix) {
+		return true
+	}
+	for _, child := range node.Children {
+		if hasBugReportAffordance(child) {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *StreamHandler) broadcastEventCount() int {
@@ -2011,6 +2063,10 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	action := strings.ToLower(strings.TrimSpace(in.Action))
 	componentID := strings.TrimSpace(in.ComponentID)
 
+	if strings.HasPrefix(action, bugReportActionPrefix) {
+		return h.handleBugReportUIAction(ctx, deviceID, action, strings.TrimSpace(in.Value))
+	}
+
 	switch action {
 	case "change":
 		if componentID == "terminal_input" {
@@ -2087,6 +2143,43 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	return []ServerMessage{{
 		UpdateUI: h.terminalOutputUpdate(deviceID),
 	}}, nil
+}
+
+func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDeviceID, action, value string) ([]ServerMessage, error) {
+	if h.bugReports == nil {
+		return nil, ErrBugReportIntakeUnavailable
+	}
+	subjectDeviceID := reporterDeviceID
+	if parts := strings.SplitN(strings.TrimSpace(action), ":", 2); len(parts) == 2 {
+		if parsed := strings.TrimSpace(parts[1]); parsed != "" {
+			subjectDeviceID = parsed
+		}
+	}
+	if subjectDeviceID == "" {
+		subjectDeviceID = strings.TrimSpace(value)
+	}
+	if subjectDeviceID == "" {
+		subjectDeviceID = reporterDeviceID
+	}
+	ack, err := h.bugReports.File(ctx, &diagnosticsv1.BugReport{
+		ReporterDeviceId: reporterDeviceID,
+		SubjectDeviceId:  subjectDeviceID,
+		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON,
+		Description:      "Filed from server-driven report button",
+		Tags:             []string{"other"},
+		TimestampUnixMs:  time.Now().UTC().UnixMilli(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return []ServerMessage{
+		{
+			BugReportAck: ack,
+		},
+		{
+			Notification: "Bug report filed: " + ack.GetReportId(),
+		},
+	}, nil
 }
 
 func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, action string) ([]ServerMessage, bool, error) {

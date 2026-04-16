@@ -290,6 +290,39 @@ func TestHandleMessageBugReportReturnsAck(t *testing.T) {
 	}
 }
 
+func TestHandleMessageInputBugReportActionFilesReport(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+	handler.SetBugReportIntake(bugReportIntakeStub{
+		ack: &diagnosticsv1.BugReportAck{
+			ReportId:      "bug-from-ui-action",
+			CorrelationId: "bug:bug-from-ui-action",
+			Status:        diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED,
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: bugReportButtonID,
+			Action:      "bug_report:subject-1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input bug_report) error = %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("len(out) = %d, want 2", len(out))
+	}
+	if out[0].BugReportAck == nil || out[0].BugReportAck.GetReportId() != "bug-from-ui-action" {
+		t.Fatalf("first response bug_report_ack = %+v", out[0].BugReportAck)
+	}
+	if out[1].Notification == "" {
+		t.Fatalf("second response should include filing notification")
+	}
+}
+
 func TestHandleDisconnectStopsRecordingForDisconnectedDeviceRoutes(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

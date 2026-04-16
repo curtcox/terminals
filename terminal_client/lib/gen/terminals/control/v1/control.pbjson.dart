@@ -15,9 +15,10 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import '../../capabilities/v1/capabilities.pbjson.dart' as $2;
+import '../../capabilities/v1/capabilities.pbjson.dart' as $3;
+import '../../diagnostics/v1/diagnostics.pbjson.dart' as $1;
 import '../../io/v1/io.pbjson.dart' as $0;
-import '../../ui/v1/ui.pbjson.dart' as $1;
+import '../../ui/v1/ui.pbjson.dart' as $2;
 
 @$core.Deprecated('Use commandActionDescriptor instead')
 const CommandAction$json = {
@@ -199,6 +200,15 @@ const ConnectRequest$json = {
       '9': 0,
       '10': 'clockSample'
     },
+    {
+      '1': 'bug_report',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.diagnostics.v1.BugReport',
+      '9': 0,
+      '10': 'bugReport'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -223,7 +233,8 @@ final $typed_data.Uint8List connectRequestDescriptor = $convert.base64Decode(
     'xlGAsgASgLMiIudGVybWluYWxzLmlvLnYxLkFydGlmYWN0QXZhaWxhYmxlSABSEWFydGlmYWN0'
     'QXZhaWxhYmxlEjsKCmZsb3dfc3RhdHMYDCABKAsyGi50ZXJtaW5hbHMuaW8udjEuRmxvd1N0YX'
     'RzSABSCWZsb3dTdGF0cxJBCgxjbG9ja19zYW1wbGUYDSABKAsyHC50ZXJtaW5hbHMuaW8udjEu'
-    'Q2xvY2tTYW1wbGVIAFILY2xvY2tTYW1wbGVCCQoHcGF5bG9hZA==');
+    'Q2xvY2tTYW1wbGVIAFILY2xvY2tTYW1wbGUSRAoKYnVnX3JlcG9ydBgOIAEoCzIjLnRlcm1pbm'
+    'Fscy5kaWFnbm9zdGljcy52MS5CdWdSZXBvcnRIAFIJYnVnUmVwb3J0QgkKB3BheWxvYWQ=');
 
 @$core.Deprecated('Use voiceAudioDescriptor instead')
 const VoiceAudio$json = {
@@ -426,6 +437,15 @@ const ConnectResponse$json = {
       '9': 0,
       '10': 'requestArtifact'
     },
+    {
+      '1': 'bug_report_ack',
+      '3': 21,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.diagnostics.v1.BugReportAck',
+      '9': 0,
+      '10': 'bugReportAck'
+    },
   ],
   '8': [
     {'1': 'payload'},
@@ -458,7 +478,8 @@ final $typed_data.Uint8List connectResponseDescriptor = $convert.base64Decode(
     '5hbHMuaW8udjEuUGF0Y2hGbG93SABSCXBhdGNoRmxvdxI4CglzdG9wX2Zsb3cYEyABKAsyGS50'
     'ZXJtaW5hbHMuaW8udjEuU3RvcEZsb3dIAFIIc3RvcEZsb3cSTQoQcmVxdWVzdF9hcnRpZmFjdB'
     'gUIAEoCzIgLnRlcm1pbmFscy5pby52MS5SZXF1ZXN0QXJ0aWZhY3RIAFIPcmVxdWVzdEFydGlm'
-    'YWN0QgkKB3BheWxvYWQ=');
+    'YWN0Ek4KDmJ1Z19yZXBvcnRfYWNrGBUgASgLMiYudGVybWluYWxzLmRpYWdub3N0aWNzLnYxLk'
+    'J1Z1JlcG9ydEFja0gAUgxidWdSZXBvcnRBY2tCCQoHcGF5bG9hZA==');
 
 @$core.Deprecated('Use registerDeviceDescriptor instead')
 const RegisterDevice$json = {
@@ -710,31 +731,31 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
     TerminalControlServiceBase$messageJson = {
   '.terminals.control.v1.ConnectRequest': ConnectRequest$json,
   '.terminals.control.v1.RegisterDevice': RegisterDevice$json,
-  '.terminals.capabilities.v1.DeviceCapabilities': $2.DeviceCapabilities$json,
-  '.terminals.capabilities.v1.DeviceIdentity': $2.DeviceIdentity$json,
-  '.terminals.capabilities.v1.ScreenCapability': $2.ScreenCapability$json,
-  '.terminals.capabilities.v1.KeyboardCapability': $2.KeyboardCapability$json,
-  '.terminals.capabilities.v1.PointerCapability': $2.PointerCapability$json,
-  '.terminals.capabilities.v1.TouchCapability': $2.TouchCapability$json,
+  '.terminals.capabilities.v1.DeviceCapabilities': $3.DeviceCapabilities$json,
+  '.terminals.capabilities.v1.DeviceIdentity': $3.DeviceIdentity$json,
+  '.terminals.capabilities.v1.ScreenCapability': $3.ScreenCapability$json,
+  '.terminals.capabilities.v1.KeyboardCapability': $3.KeyboardCapability$json,
+  '.terminals.capabilities.v1.PointerCapability': $3.PointerCapability$json,
+  '.terminals.capabilities.v1.TouchCapability': $3.TouchCapability$json,
   '.terminals.capabilities.v1.AudioOutputCapability':
-      $2.AudioOutputCapability$json,
+      $3.AudioOutputCapability$json,
   '.terminals.capabilities.v1.AudioInputCapability':
-      $2.AudioInputCapability$json,
-  '.terminals.capabilities.v1.CameraCapability': $2.CameraCapability$json,
-  '.terminals.capabilities.v1.CameraLens': $2.CameraLens$json,
-  '.terminals.capabilities.v1.SensorCapability': $2.SensorCapability$json,
+      $3.AudioInputCapability$json,
+  '.terminals.capabilities.v1.CameraCapability': $3.CameraCapability$json,
+  '.terminals.capabilities.v1.CameraLens': $3.CameraLens$json,
+  '.terminals.capabilities.v1.SensorCapability': $3.SensorCapability$json,
   '.terminals.capabilities.v1.ConnectivityCapability':
-      $2.ConnectivityCapability$json,
-  '.terminals.capabilities.v1.BatteryCapability': $2.BatteryCapability$json,
-  '.terminals.capabilities.v1.EdgeCapability': $2.EdgeCapability$json,
+      $3.ConnectivityCapability$json,
+  '.terminals.capabilities.v1.BatteryCapability': $3.BatteryCapability$json,
+  '.terminals.capabilities.v1.EdgeCapability': $3.EdgeCapability$json,
   '.terminals.capabilities.v1.EdgeComputeCapability':
-      $2.EdgeComputeCapability$json,
+      $3.EdgeComputeCapability$json,
   '.terminals.capabilities.v1.EdgeRetentionCapability':
-      $2.EdgeRetentionCapability$json,
+      $3.EdgeRetentionCapability$json,
   '.terminals.capabilities.v1.EdgeTimingCapability':
-      $2.EdgeTimingCapability$json,
+      $3.EdgeTimingCapability$json,
   '.terminals.capabilities.v1.EdgeGeometryCapability':
-      $2.EdgeGeometryCapability$json,
+      $3.EdgeGeometryCapability$json,
   '.terminals.control.v1.CapabilityUpdate': CapabilityUpdate$json,
   '.terminals.io.v1.InputEvent': $0.InputEvent$json,
   '.terminals.io.v1.KeyEvent': $0.KeyEvent$json,
@@ -763,36 +784,54 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.io.v1.ArtifactAvailable': $0.ArtifactAvailable$json,
   '.terminals.io.v1.FlowStats': $0.FlowStats$json,
   '.terminals.io.v1.ClockSample': $0.ClockSample$json,
+  '.terminals.diagnostics.v1.BugReport': $1.BugReport$json,
+  '.terminals.diagnostics.v1.ClientContext': $1.ClientContext$json,
+  '.terminals.diagnostics.v1.ClientIdentity': $1.ClientIdentity$json,
+  '.terminals.diagnostics.v1.RuntimeState': $1.RuntimeState$json,
+  '.terminals.ui.v1.Node': $2.Node$json,
+  '.terminals.ui.v1.Node.PropsEntry': $2.Node_PropsEntry$json,
+  '.terminals.ui.v1.StackWidget': $2.StackWidget$json,
+  '.terminals.ui.v1.RowWidget': $2.RowWidget$json,
+  '.terminals.ui.v1.GridWidget': $2.GridWidget$json,
+  '.terminals.ui.v1.ScrollWidget': $2.ScrollWidget$json,
+  '.terminals.ui.v1.PaddingWidget': $2.PaddingWidget$json,
+  '.terminals.ui.v1.CenterWidget': $2.CenterWidget$json,
+  '.terminals.ui.v1.ExpandWidget': $2.ExpandWidget$json,
+  '.terminals.ui.v1.TextWidget': $2.TextWidget$json,
+  '.terminals.ui.v1.ImageWidget': $2.ImageWidget$json,
+  '.terminals.ui.v1.VideoSurfaceWidget': $2.VideoSurfaceWidget$json,
+  '.terminals.ui.v1.AudioVisualizerWidget': $2.AudioVisualizerWidget$json,
+  '.terminals.ui.v1.CanvasWidget': $2.CanvasWidget$json,
+  '.terminals.ui.v1.TextInputWidget': $2.TextInputWidget$json,
+  '.terminals.ui.v1.ButtonWidget': $2.ButtonWidget$json,
+  '.terminals.ui.v1.SliderWidget': $2.SliderWidget$json,
+  '.terminals.ui.v1.ToggleWidget': $2.ToggleWidget$json,
+  '.terminals.ui.v1.DropdownWidget': $2.DropdownWidget$json,
+  '.terminals.ui.v1.GestureAreaWidget': $2.GestureAreaWidget$json,
+  '.terminals.ui.v1.OverlayWidget': $2.OverlayWidget$json,
+  '.terminals.ui.v1.ProgressWidget': $2.ProgressWidget$json,
+  '.terminals.ui.v1.FullscreenWidget': $2.FullscreenWidget$json,
+  '.terminals.ui.v1.KeepAwakeWidget': $2.KeepAwakeWidget$json,
+  '.terminals.ui.v1.BrightnessWidget': $2.BrightnessWidget$json,
+  '.terminals.diagnostics.v1.UiEventEntry': $1.UiEventEntry$json,
+  '.terminals.diagnostics.v1.UiActionEntry': $1.UiActionEntry$json,
+  '.terminals.diagnostics.v1.StreamEntry': $1.StreamEntry$json,
+  '.terminals.diagnostics.v1.RouteEntry': $1.RouteEntry$json,
+  '.terminals.diagnostics.v1.WebrtcSignalEntry': $1.WebrtcSignalEntry$json,
+  '.terminals.diagnostics.v1.LogEntry': $1.LogEntry$json,
+  '.terminals.diagnostics.v1.ConnectionHealth': $1.ConnectionHealth$json,
+  '.terminals.diagnostics.v1.ControlErrorEntry': $1.ControlErrorEntry$json,
+  '.terminals.diagnostics.v1.HardwareState': $1.HardwareState$json,
+  '.terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry':
+      $1.HardwareState_SensorSnapshotEntry$json,
+  '.terminals.diagnostics.v1.ErrorCapture': $1.ErrorCapture$json,
+  '.terminals.diagnostics.v1.BugReport.SourceHintsEntry':
+      $1.BugReport_SourceHintsEntry$json,
   '.terminals.control.v1.ConnectResponse': ConnectResponse$json,
   '.terminals.control.v1.RegisterAck': RegisterAck$json,
   '.terminals.control.v1.RegisterAck.MetadataEntry':
       RegisterAck_MetadataEntry$json,
-  '.terminals.ui.v1.SetUI': $1.SetUI$json,
-  '.terminals.ui.v1.Node': $1.Node$json,
-  '.terminals.ui.v1.Node.PropsEntry': $1.Node_PropsEntry$json,
-  '.terminals.ui.v1.StackWidget': $1.StackWidget$json,
-  '.terminals.ui.v1.RowWidget': $1.RowWidget$json,
-  '.terminals.ui.v1.GridWidget': $1.GridWidget$json,
-  '.terminals.ui.v1.ScrollWidget': $1.ScrollWidget$json,
-  '.terminals.ui.v1.PaddingWidget': $1.PaddingWidget$json,
-  '.terminals.ui.v1.CenterWidget': $1.CenterWidget$json,
-  '.terminals.ui.v1.ExpandWidget': $1.ExpandWidget$json,
-  '.terminals.ui.v1.TextWidget': $1.TextWidget$json,
-  '.terminals.ui.v1.ImageWidget': $1.ImageWidget$json,
-  '.terminals.ui.v1.VideoSurfaceWidget': $1.VideoSurfaceWidget$json,
-  '.terminals.ui.v1.AudioVisualizerWidget': $1.AudioVisualizerWidget$json,
-  '.terminals.ui.v1.CanvasWidget': $1.CanvasWidget$json,
-  '.terminals.ui.v1.TextInputWidget': $1.TextInputWidget$json,
-  '.terminals.ui.v1.ButtonWidget': $1.ButtonWidget$json,
-  '.terminals.ui.v1.SliderWidget': $1.SliderWidget$json,
-  '.terminals.ui.v1.ToggleWidget': $1.ToggleWidget$json,
-  '.terminals.ui.v1.DropdownWidget': $1.DropdownWidget$json,
-  '.terminals.ui.v1.GestureAreaWidget': $1.GestureAreaWidget$json,
-  '.terminals.ui.v1.OverlayWidget': $1.OverlayWidget$json,
-  '.terminals.ui.v1.ProgressWidget': $1.ProgressWidget$json,
-  '.terminals.ui.v1.FullscreenWidget': $1.FullscreenWidget$json,
-  '.terminals.ui.v1.KeepAwakeWidget': $1.KeepAwakeWidget$json,
-  '.terminals.ui.v1.BrightnessWidget': $1.BrightnessWidget$json,
+  '.terminals.ui.v1.SetUI': $2.SetUI$json,
   '.terminals.io.v1.StartStream': $0.StartStream$json,
   '.terminals.io.v1.StartStream.MetadataEntry':
       $0.StartStream_MetadataEntry$json,
@@ -800,12 +839,12 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.io.v1.PlayAudio': $0.PlayAudio$json,
   '.terminals.io.v1.ShowMedia': $0.ShowMedia$json,
   '.terminals.io.v1.RouteStream': $0.RouteStream$json,
-  '.terminals.ui.v1.Notification': $1.Notification$json,
+  '.terminals.ui.v1.Notification': $2.Notification$json,
   '.terminals.control.v1.CommandResult': CommandResult$json,
   '.terminals.control.v1.CommandResult.DataEntry': CommandResult_DataEntry$json,
   '.terminals.control.v1.ControlError': ControlError$json,
-  '.terminals.ui.v1.UpdateUI': $1.UpdateUI$json,
-  '.terminals.ui.v1.TransitionUI': $1.TransitionUI$json,
+  '.terminals.ui.v1.UpdateUI': $2.UpdateUI$json,
+  '.terminals.ui.v1.TransitionUI': $2.TransitionUI$json,
   '.terminals.io.v1.InstallBundle': $0.InstallBundle$json,
   '.terminals.io.v1.RemoveBundle': $0.RemoveBundle$json,
   '.terminals.io.v1.StartFlow': $0.StartFlow$json,
@@ -816,6 +855,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.io.v1.PatchFlow': $0.PatchFlow$json,
   '.terminals.io.v1.StopFlow': $0.StopFlow$json,
   '.terminals.io.v1.RequestArtifact': $0.RequestArtifact$json,
+  '.terminals.diagnostics.v1.BugReportAck': $1.BugReportAck$json,
 };
 
 /// Descriptor for `TerminalControlService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

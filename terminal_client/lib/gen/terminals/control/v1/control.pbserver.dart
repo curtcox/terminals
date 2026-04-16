@@ -15,19 +15,19 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'control.pb.dart' as $3;
+import 'control.pb.dart' as $4;
 import 'control.pbjson.dart';
 
 export 'control.pb.dart';
 
 abstract class TerminalControlServiceBase extends $pb.GeneratedService {
-  $async.Future<$3.ConnectResponse> connect(
-      $pb.ServerContext ctx, $3.ConnectRequest request);
+  $async.Future<$4.ConnectResponse> connect(
+      $pb.ServerContext ctx, $4.ConnectRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'Connect':
-        return $3.ConnectRequest();
+        return $4.ConnectRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -37,7 +37,7 @@ abstract class TerminalControlServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'Connect':
-        return connect(ctx, request as $3.ConnectRequest);
+        return connect(ctx, request as $4.ConnectRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

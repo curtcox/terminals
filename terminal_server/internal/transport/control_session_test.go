@@ -63,6 +63,12 @@ func TestSessionRunRegisterAndDisconnect(t *testing.T) {
 	if len(stream.sent) != 2 {
 		t.Fatalf("len(sent) = %d, want 2", len(stream.sent))
 	}
+	if stream.sent[1].SetUI == nil {
+		t.Fatalf("second message should include SetUI")
+	}
+	if !sessionUIDescriptorHasBugButton(*stream.sent[1].SetUI) {
+		t.Fatalf("register SetUI should include bug-report affordance")
+	}
 
 	got, ok := manager.Get("device-1")
 	if !ok {
@@ -71,6 +77,25 @@ func TestSessionRunRegisterAndDisconnect(t *testing.T) {
 	if got.State != device.StateDisconnected {
 		t.Fatalf("state = %q, want %q", got.State, device.StateDisconnected)
 	}
+}
+
+func sessionUIDescriptorHasBugButton(root ui.Descriptor) bool {
+	nodeID := root.ID
+	if nodeID == "" {
+		nodeID = root.Props["id"]
+	}
+	if nodeID == bugReportButtonID {
+		return true
+	}
+	if root.Type == "button" && root.Props["action"] == bugReportActionPrefix+":device-1" {
+		return true
+	}
+	for _, child := range root.Children {
+		if sessionUIDescriptorHasBugButton(child) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestSessionRunCapabilityAndHeartbeat(t *testing.T) {

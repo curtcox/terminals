@@ -16,9 +16,10 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import '../../capabilities/v1/capabilities.pb.dart' as $2;
+import '../../capabilities/v1/capabilities.pb.dart' as $3;
+import '../../diagnostics/v1/diagnostics.pb.dart' as $1;
 import '../../io/v1/io.pb.dart' as $0;
-import '../../ui/v1/ui.pb.dart' as $1;
+import '../../ui/v1/ui.pb.dart' as $2;
 import 'control.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -39,6 +40,7 @@ enum ConnectRequest_Payload {
   artifactAvailable,
   flowStats,
   clockSample,
+  bugReport,
   notSet
 }
 
@@ -57,6 +59,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     $0.ArtifactAvailable? artifactAvailable,
     $0.FlowStats? flowStats,
     $0.ClockSample? clockSample,
+    $1.BugReport? bugReport,
   }) {
     final result = create();
     if (register != null) result.register = register;
@@ -73,6 +76,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     if (artifactAvailable != null) result.artifactAvailable = artifactAvailable;
     if (flowStats != null) result.flowStats = flowStats;
     if (clockSample != null) result.clockSample = clockSample;
+    if (bugReport != null) result.bugReport = bugReport;
     return result;
   }
 
@@ -100,6 +104,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
     11: ConnectRequest_Payload.artifactAvailable,
     12: ConnectRequest_Payload.flowStats,
     13: ConnectRequest_Payload.clockSample,
+    14: ConnectRequest_Payload.bugReport,
     0: ConnectRequest_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -107,7 +112,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'terminals.control.v1'),
       createEmptyInstance: create)
-    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
     ..aOM<RegisterDevice>(1, _omitFieldNames ? '' : 'register',
         subBuilder: RegisterDevice.create)
     ..aOM<CapabilityUpdate>(2, _omitFieldNames ? '' : 'capability',
@@ -135,6 +140,8 @@ class ConnectRequest extends $pb.GeneratedMessage {
         subBuilder: $0.FlowStats.create)
     ..aOM<$0.ClockSample>(13, _omitFieldNames ? '' : 'clockSample',
         subBuilder: $0.ClockSample.create)
+    ..aOM<$1.BugReport>(14, _omitFieldNames ? '' : 'bugReport',
+        subBuilder: $1.BugReport.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -169,6 +176,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   ConnectRequest_Payload whichPayload() =>
       _ConnectRequest_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
@@ -184,6 +192,7 @@ class ConnectRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -328,6 +337,17 @@ class ConnectRequest extends $pb.GeneratedMessage {
   void clearClockSample() => $_clearField(13);
   @$pb.TagNumber(13)
   $0.ClockSample ensureClockSample() => $_ensure(12);
+
+  @$pb.TagNumber(14)
+  $1.BugReport get bugReport => $_getN(13);
+  @$pb.TagNumber(14)
+  set bugReport($1.BugReport value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasBugReport() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearBugReport() => $_clearField(14);
+  @$pb.TagNumber(14)
+  $1.BugReport ensureBugReport() => $_ensure(13);
 }
 
 class VoiceAudio extends $pb.GeneratedMessage {
@@ -442,31 +462,33 @@ enum ConnectResponse_Payload {
   patchFlow,
   stopFlow,
   requestArtifact,
+  bugReportAck,
   notSet
 }
 
 class ConnectResponse extends $pb.GeneratedMessage {
   factory ConnectResponse({
     RegisterAck? registerAck,
-    $1.SetUI? setUi,
+    $2.SetUI? setUi,
     $0.StartStream? startStream,
     $0.StopStream? stopStream,
     $0.PlayAudio? playAudio,
     $0.ShowMedia? showMedia,
     $0.RouteStream? routeStream,
-    $1.Notification? notification,
+    $2.Notification? notification,
     WebRTCSignal? webrtcSignal,
     CommandResult? commandResult,
     Heartbeat? heartbeat,
     ControlError? error,
-    $1.UpdateUI? updateUi,
-    $1.TransitionUI? transitionUi,
+    $2.UpdateUI? updateUi,
+    $2.TransitionUI? transitionUi,
     $0.InstallBundle? installBundle,
     $0.RemoveBundle? removeBundle,
     $0.StartFlow? startFlow,
     $0.PatchFlow? patchFlow,
     $0.StopFlow? stopFlow,
     $0.RequestArtifact? requestArtifact,
+    $1.BugReportAck? bugReportAck,
   }) {
     final result = create();
     if (registerAck != null) result.registerAck = registerAck;
@@ -489,6 +511,7 @@ class ConnectResponse extends $pb.GeneratedMessage {
     if (patchFlow != null) result.patchFlow = patchFlow;
     if (stopFlow != null) result.stopFlow = stopFlow;
     if (requestArtifact != null) result.requestArtifact = requestArtifact;
+    if (bugReportAck != null) result.bugReportAck = bugReportAck;
     return result;
   }
 
@@ -523,6 +546,7 @@ class ConnectResponse extends $pb.GeneratedMessage {
     18: ConnectResponse_Payload.patchFlow,
     19: ConnectResponse_Payload.stopFlow,
     20: ConnectResponse_Payload.requestArtifact,
+    21: ConnectResponse_Payload.bugReportAck,
     0: ConnectResponse_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -530,12 +554,33 @@ class ConnectResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'terminals.control.v1'),
       createEmptyInstance: create)
-    ..oo(0,
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    ..oo(0, [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21
+    ])
     ..aOM<RegisterAck>(1, _omitFieldNames ? '' : 'registerAck',
         subBuilder: RegisterAck.create)
-    ..aOM<$1.SetUI>(2, _omitFieldNames ? '' : 'setUi',
-        subBuilder: $1.SetUI.create)
+    ..aOM<$2.SetUI>(2, _omitFieldNames ? '' : 'setUi',
+        subBuilder: $2.SetUI.create)
     ..aOM<$0.StartStream>(3, _omitFieldNames ? '' : 'startStream',
         subBuilder: $0.StartStream.create)
     ..aOM<$0.StopStream>(4, _omitFieldNames ? '' : 'stopStream',
@@ -546,8 +591,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
         subBuilder: $0.ShowMedia.create)
     ..aOM<$0.RouteStream>(7, _omitFieldNames ? '' : 'routeStream',
         subBuilder: $0.RouteStream.create)
-    ..aOM<$1.Notification>(8, _omitFieldNames ? '' : 'notification',
-        subBuilder: $1.Notification.create)
+    ..aOM<$2.Notification>(8, _omitFieldNames ? '' : 'notification',
+        subBuilder: $2.Notification.create)
     ..aOM<WebRTCSignal>(9, _omitFieldNames ? '' : 'webrtcSignal',
         subBuilder: WebRTCSignal.create)
     ..aOM<CommandResult>(10, _omitFieldNames ? '' : 'commandResult',
@@ -556,10 +601,10 @@ class ConnectResponse extends $pb.GeneratedMessage {
         subBuilder: Heartbeat.create)
     ..aOM<ControlError>(12, _omitFieldNames ? '' : 'error',
         subBuilder: ControlError.create)
-    ..aOM<$1.UpdateUI>(13, _omitFieldNames ? '' : 'updateUi',
-        subBuilder: $1.UpdateUI.create)
-    ..aOM<$1.TransitionUI>(14, _omitFieldNames ? '' : 'transitionUi',
-        subBuilder: $1.TransitionUI.create)
+    ..aOM<$2.UpdateUI>(13, _omitFieldNames ? '' : 'updateUi',
+        subBuilder: $2.UpdateUI.create)
+    ..aOM<$2.TransitionUI>(14, _omitFieldNames ? '' : 'transitionUi',
+        subBuilder: $2.TransitionUI.create)
     ..aOM<$0.InstallBundle>(15, _omitFieldNames ? '' : 'installBundle',
         subBuilder: $0.InstallBundle.create)
     ..aOM<$0.RemoveBundle>(16, _omitFieldNames ? '' : 'removeBundle',
@@ -572,6 +617,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
         subBuilder: $0.StopFlow.create)
     ..aOM<$0.RequestArtifact>(20, _omitFieldNames ? '' : 'requestArtifact',
         subBuilder: $0.RequestArtifact.create)
+    ..aOM<$1.BugReportAck>(21, _omitFieldNames ? '' : 'bugReportAck',
+        subBuilder: $1.BugReportAck.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -613,6 +660,7 @@ class ConnectResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   ConnectResponse_Payload whichPayload() =>
       _ConnectResponse_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
@@ -635,6 +683,7 @@ class ConnectResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -649,15 +698,15 @@ class ConnectResponse extends $pb.GeneratedMessage {
   RegisterAck ensureRegisterAck() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  $1.SetUI get setUi => $_getN(1);
+  $2.SetUI get setUi => $_getN(1);
   @$pb.TagNumber(2)
-  set setUi($1.SetUI value) => $_setField(2, value);
+  set setUi($2.SetUI value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasSetUi() => $_has(1);
   @$pb.TagNumber(2)
   void clearSetUi() => $_clearField(2);
   @$pb.TagNumber(2)
-  $1.SetUI ensureSetUi() => $_ensure(1);
+  $2.SetUI ensureSetUi() => $_ensure(1);
 
   @$pb.TagNumber(3)
   $0.StartStream get startStream => $_getN(2);
@@ -715,15 +764,15 @@ class ConnectResponse extends $pb.GeneratedMessage {
   $0.RouteStream ensureRouteStream() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  $1.Notification get notification => $_getN(7);
+  $2.Notification get notification => $_getN(7);
   @$pb.TagNumber(8)
-  set notification($1.Notification value) => $_setField(8, value);
+  set notification($2.Notification value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasNotification() => $_has(7);
   @$pb.TagNumber(8)
   void clearNotification() => $_clearField(8);
   @$pb.TagNumber(8)
-  $1.Notification ensureNotification() => $_ensure(7);
+  $2.Notification ensureNotification() => $_ensure(7);
 
   @$pb.TagNumber(9)
   WebRTCSignal get webrtcSignal => $_getN(8);
@@ -770,26 +819,26 @@ class ConnectResponse extends $pb.GeneratedMessage {
   ControlError ensureError() => $_ensure(11);
 
   @$pb.TagNumber(13)
-  $1.UpdateUI get updateUi => $_getN(12);
+  $2.UpdateUI get updateUi => $_getN(12);
   @$pb.TagNumber(13)
-  set updateUi($1.UpdateUI value) => $_setField(13, value);
+  set updateUi($2.UpdateUI value) => $_setField(13, value);
   @$pb.TagNumber(13)
   $core.bool hasUpdateUi() => $_has(12);
   @$pb.TagNumber(13)
   void clearUpdateUi() => $_clearField(13);
   @$pb.TagNumber(13)
-  $1.UpdateUI ensureUpdateUi() => $_ensure(12);
+  $2.UpdateUI ensureUpdateUi() => $_ensure(12);
 
   @$pb.TagNumber(14)
-  $1.TransitionUI get transitionUi => $_getN(13);
+  $2.TransitionUI get transitionUi => $_getN(13);
   @$pb.TagNumber(14)
-  set transitionUi($1.TransitionUI value) => $_setField(14, value);
+  set transitionUi($2.TransitionUI value) => $_setField(14, value);
   @$pb.TagNumber(14)
   $core.bool hasTransitionUi() => $_has(13);
   @$pb.TagNumber(14)
   void clearTransitionUi() => $_clearField(14);
   @$pb.TagNumber(14)
-  $1.TransitionUI ensureTransitionUi() => $_ensure(13);
+  $2.TransitionUI ensureTransitionUi() => $_ensure(13);
 
   @$pb.TagNumber(15)
   $0.InstallBundle get installBundle => $_getN(14);
@@ -856,11 +905,22 @@ class ConnectResponse extends $pb.GeneratedMessage {
   void clearRequestArtifact() => $_clearField(20);
   @$pb.TagNumber(20)
   $0.RequestArtifact ensureRequestArtifact() => $_ensure(19);
+
+  @$pb.TagNumber(21)
+  $1.BugReportAck get bugReportAck => $_getN(20);
+  @$pb.TagNumber(21)
+  set bugReportAck($1.BugReportAck value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasBugReportAck() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearBugReportAck() => $_clearField(21);
+  @$pb.TagNumber(21)
+  $1.BugReportAck ensureBugReportAck() => $_ensure(20);
 }
 
 class RegisterDevice extends $pb.GeneratedMessage {
   factory RegisterDevice({
-    $2.DeviceCapabilities? capabilities,
+    $3.DeviceCapabilities? capabilities,
   }) {
     final result = create();
     if (capabilities != null) result.capabilities = capabilities;
@@ -881,8 +941,8 @@ class RegisterDevice extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'terminals.control.v1'),
       createEmptyInstance: create)
-    ..aOM<$2.DeviceCapabilities>(1, _omitFieldNames ? '' : 'capabilities',
-        subBuilder: $2.DeviceCapabilities.create)
+    ..aOM<$3.DeviceCapabilities>(1, _omitFieldNames ? '' : 'capabilities',
+        subBuilder: $3.DeviceCapabilities.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -905,15 +965,15 @@ class RegisterDevice extends $pb.GeneratedMessage {
   static RegisterDevice? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $2.DeviceCapabilities get capabilities => $_getN(0);
+  $3.DeviceCapabilities get capabilities => $_getN(0);
   @$pb.TagNumber(1)
-  set capabilities($2.DeviceCapabilities value) => $_setField(1, value);
+  set capabilities($3.DeviceCapabilities value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasCapabilities() => $_has(0);
   @$pb.TagNumber(1)
   void clearCapabilities() => $_clearField(1);
   @$pb.TagNumber(1)
-  $2.DeviceCapabilities ensureCapabilities() => $_ensure(0);
+  $3.DeviceCapabilities ensureCapabilities() => $_ensure(0);
 }
 
 class RegisterAck extends $pb.GeneratedMessage {
@@ -995,7 +1055,7 @@ class RegisterAck extends $pb.GeneratedMessage {
 
 class CapabilityUpdate extends $pb.GeneratedMessage {
   factory CapabilityUpdate({
-    $2.DeviceCapabilities? capabilities,
+    $3.DeviceCapabilities? capabilities,
   }) {
     final result = create();
     if (capabilities != null) result.capabilities = capabilities;
@@ -1016,8 +1076,8 @@ class CapabilityUpdate extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'terminals.control.v1'),
       createEmptyInstance: create)
-    ..aOM<$2.DeviceCapabilities>(1, _omitFieldNames ? '' : 'capabilities',
-        subBuilder: $2.DeviceCapabilities.create)
+    ..aOM<$3.DeviceCapabilities>(1, _omitFieldNames ? '' : 'capabilities',
+        subBuilder: $3.DeviceCapabilities.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1040,15 +1100,15 @@ class CapabilityUpdate extends $pb.GeneratedMessage {
   static CapabilityUpdate? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $2.DeviceCapabilities get capabilities => $_getN(0);
+  $3.DeviceCapabilities get capabilities => $_getN(0);
   @$pb.TagNumber(1)
-  set capabilities($2.DeviceCapabilities value) => $_setField(1, value);
+  set capabilities($3.DeviceCapabilities value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasCapabilities() => $_has(0);
   @$pb.TagNumber(1)
   void clearCapabilities() => $_clearField(1);
   @$pb.TagNumber(1)
-  $2.DeviceCapabilities ensureCapabilities() => $_ensure(0);
+  $3.DeviceCapabilities ensureCapabilities() => $_ensure(0);
 }
 
 class StreamReady extends $pb.GeneratedMessage {

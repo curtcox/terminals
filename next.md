@@ -1,1 +1,1 @@
-Implement client-side bug report capture/send (ClientContext + UI affordance) to complete remaining bug-reporting plan phases.
+Review the bug-reporting implementation changes and report any follow-up adjustments.

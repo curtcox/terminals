@@ -92,6 +92,11 @@ func (s *Session) Run(stream ControlStream) error {
 
 		out, handleErr := s.handler.HandleMessage(stream.Context(), in)
 		for _, msg := range out {
+			targetDeviceID := connectedDeviceID
+			if relayTarget := msg.RelayToDeviceID; relayTarget != "" {
+				targetDeviceID = relayTarget
+			}
+			msg = s.handler.decorateBugReportAffordance(targetDeviceID, msg)
 			if msg.RelayToDeviceID != "" {
 				relayMsg := msg
 				relayMsg.RelayToDeviceID = ""
