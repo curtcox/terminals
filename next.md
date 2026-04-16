@@ -1,1 +1,1 @@
-Await user validation and implement any requested follow-up changes.
+Wire appruntime package definitions/activations into scenario runtime registration path in cmd/server.
