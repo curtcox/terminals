@@ -33,6 +33,7 @@ type Config struct {
 type Logger struct {
 	logger *slog.Logger
 	writer *RotatingWriter
+	async  *AsyncWriter
 	runID  string
 	pid    int
 }
@@ -61,10 +62,11 @@ func New(cfg Config) (*Logger, error) {
 	if cfg.MirrorStderr {
 		sink = io.MultiWriter(rw, os.Stderr)
 	}
+	async := NewAsyncWriter(sink, 4096)
 
 	runID := makeRunID()
 	h := &enrichHandler{
-		next:          newJSONHandler(sink, parseLevel(cfg.Level)),
+		next:          newJSONHandler(async, parseLevel(cfg.Level)),
 		runID:         runID,
 		pid:           os.Getpid(),
 		serverID:      strings.TrimSpace(cfg.ServerID),
@@ -73,7 +75,7 @@ func New(cfg Config) (*Logger, error) {
 	base := slog.New(h).With(
 		slog.String("component", "main"),
 	)
-	return &Logger{logger: base, writer: rw, runID: runID, pid: os.Getpid()}, nil
+	return &Logger{logger: base, writer: rw, async: async, runID: runID, pid: os.Getpid()}, nil
 }
 
 func (l *Logger) Logger() *slog.Logger {
@@ -100,7 +102,22 @@ func (l *Logger) StdLogAdapter(component string) io.Writer {
 }
 
 func (l *Logger) Flush() error {
-	if l == nil || l.writer == nil {
+	if l == nil {
+		return nil
+	}
+	if l.async != nil {
+		if dropped := l.async.DroppedSinceLast(); dropped > 0 {
+			l.logger.Warn("log events dropped",
+				"event", "housekeeping.log.dropped",
+				"component", "housekeeping",
+				"dropped", dropped,
+			)
+		}
+		if err := l.async.Flush(); err != nil {
+			return err
+		}
+	}
+	if l.writer == nil {
 		return nil
 	}
 	return l.writer.Sync()

@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 )
 
 // ErrNoMatchingScenario indicates no scenario handled the trigger.
@@ -42,6 +45,12 @@ func NewRuntime(engine *Engine, env *Environment) *Runtime {
 // HandleTrigger matches and activates a scenario for the selected devices.
 func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, error) {
 	trigger = normalizeTrigger(trigger, time.Now().UTC())
+	eventlog.Emit(ctx, "scenario.trigger.received", slog.LevelInfo, "scenario trigger received",
+		slog.String("component", "scenario.runtime"),
+		slog.String("trigger_kind", string(trigger.Kind)),
+		slog.String("trigger_source", trigger.SourceID),
+		slog.String("intent", trigger.Intent),
+	)
 	r.recordTrigger(trigger)
 	if r != nil && r.Bus != nil {
 		r.Bus.Publish(trigger)
@@ -52,11 +61,32 @@ func (r *Runtime) HandleTrigger(ctx context.Context, trigger Trigger) (string, e
 		RequestedAt: time.Now().UTC(),
 	})
 	if !ok {
+		eventlog.Emit(ctx, "scenario.trigger.unmatched", slog.LevelInfo, "scenario trigger unmatched",
+			slog.String("component", "scenario.runtime"),
+			slog.String("intent", trigger.Intent),
+			slog.String("trigger_source", trigger.SourceID),
+		)
 		return "", ErrNoMatchingScenario
 	}
+	eventlog.Emit(ctx, "scenario.trigger.matched", slog.LevelInfo, "scenario trigger matched",
+		slog.String("component", "scenario.runtime"),
+		slog.String("scenario", match.Registration.name()),
+		slog.String("intent", trigger.Intent),
+	)
 
 	deviceIDs := targetDevices(ctx, r.Env, trigger)
+	eventlog.Emit(ctx, "scenario.activation.started", slog.LevelInfo, "scenario activation started",
+		slog.String("component", "scenario.runtime"),
+		slog.String("scenario", match.Registration.name()),
+		slog.Int("target_device_count", len(deviceIDs)),
+		slog.String("trigger_source", trigger.SourceID),
+	)
 	if err := r.Engine.ActivateMatched(ctx, r.Env, match, deviceIDs); err != nil {
+		eventlog.Emit(ctx, "scenario.activation.failed", slog.LevelError, "scenario activation failed",
+			slog.String("component", "scenario.runtime"),
+			slog.String("scenario", match.Registration.name()),
+			slog.Any("error", err),
+		)
 		return "", err
 	}
 	_ = r.persistActivationSnapshot(ctx)
@@ -77,6 +107,12 @@ func (r *Runtime) HandleVoiceText(ctx context.Context, sourceID, spoken string, 
 // StopTrigger matches and stops a scenario for the selected devices.
 func (r *Runtime) StopTrigger(ctx context.Context, trigger Trigger) (string, error) {
 	trigger = normalizeTrigger(trigger, time.Now().UTC())
+	eventlog.Emit(ctx, "scenario.trigger.received", slog.LevelInfo, "scenario stop trigger received",
+		slog.String("component", "scenario.runtime"),
+		slog.String("trigger_kind", string(trigger.Kind)),
+		slog.String("trigger_source", trigger.SourceID),
+		slog.String("intent", trigger.Intent),
+	)
 	r.recordTrigger(trigger)
 	if r != nil && r.Bus != nil {
 		r.Bus.Publish(trigger)
@@ -87,14 +123,29 @@ func (r *Runtime) StopTrigger(ctx context.Context, trigger Trigger) (string, err
 		RequestedAt: time.Now().UTC(),
 	})
 	if !ok {
+		eventlog.Emit(ctx, "scenario.trigger.unmatched", slog.LevelInfo, "scenario stop trigger unmatched",
+			slog.String("component", "scenario.runtime"),
+			slog.String("intent", trigger.Intent),
+			slog.String("trigger_source", trigger.SourceID),
+		)
 		return "", ErrNoMatchingScenario
 	}
 
 	deviceIDs := targetDevices(ctx, r.Env, trigger)
 	name := match.Registration.name()
 	if err := r.Engine.Stop(ctx, r.Env, name, deviceIDs); err != nil {
+		eventlog.Emit(ctx, "scenario.activation.failed", slog.LevelError, "scenario stop failed",
+			slog.String("component", "scenario.runtime"),
+			slog.String("scenario", name),
+			slog.Any("error", err),
+		)
 		return "", err
 	}
+	eventlog.Emit(ctx, "scenario.activation.stopped", slog.LevelInfo, "scenario activation stopped",
+		slog.String("component", "scenario.runtime"),
+		slog.String("scenario", name),
+		slog.Int("target_device_count", len(deviceIDs)),
+	)
 	_ = r.persistActivationSnapshot(ctx)
 	return name, nil
 }
@@ -219,6 +270,10 @@ func (r *Runtime) RecoverActivations(ctx context.Context) error {
 	if err := json.Unmarshal([]byte(payload), &snapshot); err != nil {
 		return err
 	}
+	eventlog.Emit(ctx, "scenario.recovery.started", slog.LevelInfo, "scenario activation recovery started",
+		slog.String("component", "scenario.runtime"),
+		slog.Int("active_devices", len(snapshot.ActiveByDevice)),
+	)
 	for deviceID, scenarioName := range snapshot.ActiveByDevice {
 		if strings.TrimSpace(deviceID) == "" || strings.TrimSpace(scenarioName) == "" {
 			continue
@@ -228,6 +283,9 @@ func (r *Runtime) RecoverActivations(ctx context.Context) error {
 		}
 	}
 	_ = r.persistActivationSnapshot(ctx)
+	eventlog.Emit(ctx, "scenario.recovery.finished", slog.LevelInfo, "scenario activation recovery finished",
+		slog.String("component", "scenario.runtime"),
+	)
 	return nil
 }
 

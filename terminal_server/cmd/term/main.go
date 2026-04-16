@@ -11,10 +11,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
@@ -205,55 +207,96 @@ func runLogs(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: term logs <tail|search|trace|activation|stats> [filters...]")
 		return 2
 	}
-	dir := strings.TrimSpace(os.Getenv("TERMINALS_LOG_DIR"))
-	if dir == "" {
-		dir = "logs"
-	}
 	cmd := strings.TrimSpace(strings.ToLower(args[0]))
-	rest := args[1:]
-	switch cmd {
-	case "tail":
-		n := 50
-		if len(rest) >= 2 && strings.TrimSpace(rest[0]) == "-n" {
+	rest := append([]string(nil), args[1:]...)
+	opts := logsOptions{
+		dir: defaultLogDir(),
+		n:   50,
+	}
+	for len(rest) > 0 {
+		token := strings.TrimSpace(rest[0])
+		switch {
+		case token == "--json":
+			opts.json = true
+			rest = rest[1:]
+		case token == "--follow":
+			opts.follow = true
+			rest = rest[1:]
+		case token == "--since" && len(rest) >= 2:
+			opts.since = strings.TrimSpace(rest[1])
+			rest = rest[2:]
+		case strings.HasPrefix(token, "--since="):
+			opts.since = strings.TrimSpace(strings.TrimPrefix(token, "--since="))
+			rest = rest[1:]
+		case token == "--dir" && len(rest) >= 2:
+			opts.dir = strings.TrimSpace(rest[1])
+			rest = rest[2:]
+		case strings.HasPrefix(token, "--dir="):
+			opts.dir = strings.TrimSpace(strings.TrimPrefix(token, "--dir="))
+			rest = rest[1:]
+		case token == "-n" && len(rest) >= 2:
 			parsed, err := strconv.Atoi(strings.TrimSpace(rest[1]))
 			if err != nil {
 				return fail(stderr, fmt.Errorf("invalid -n value: %w", err))
 			}
-			n = parsed
+			opts.n = parsed
 			rest = rest[2:]
+		default:
+			goto doneOpts
 		}
-		records, err := query.Search(dir, rest, time.Now().UTC())
+	}
+doneOpts:
+	if opts.since != "" {
+		rest = append(rest, "since="+opts.since)
+	}
+	if opts.dir == "" {
+		opts.dir = defaultLogDir()
+	}
+
+	switch cmd {
+	case "tail":
+		records, err := query.Search(opts.dir, rest, time.Now().UTC())
 		if err != nil {
 			return fail(stderr, err)
 		}
-		if n > 0 && len(records) > n {
-			records = records[len(records)-n:]
+		if opts.n > 0 && len(records) > opts.n {
+			records = records[len(records)-opts.n:]
 		}
-		return printRecords(stdout, records)
+		if err := printRecords(stdout, records, opts.json); err != nil {
+			return fail(stderr, err)
+		}
+		if !opts.follow {
+			return 0
+		}
+		return followLogs(opts, rest, stdout, stderr, lastSeq(records))
 	case "search":
-		records, err := query.Search(dir, rest, time.Now().UTC())
+		records, err := query.Search(opts.dir, rest, time.Now().UTC())
 		if err != nil {
 			return fail(stderr, err)
 		}
-		return printRecords(stdout, records)
+		return finishPrint(stdout, stderr, records, opts.json)
 	case "trace":
 		if len(rest) < 1 || strings.TrimSpace(rest[0]) == "" {
 			return fail(stderr, fmt.Errorf("usage: term logs trace <trace_id>"))
 		}
-		records, err := query.ReadAll(dir)
+		records, err := query.ReadAll(opts.dir)
 		if err != nil {
 			return fail(stderr, err)
 		}
-		return printRecords(stdout, query.Trace(records, strings.TrimSpace(rest[0])))
+		traceRecords := query.Trace(records, strings.TrimSpace(rest[0]))
+		if opts.json {
+			return finishPrint(stdout, stderr, traceRecords, true)
+		}
+		return printTraceTree(stdout, traceRecords)
 	case "activation":
 		if len(rest) < 1 || strings.TrimSpace(rest[0]) == "" {
 			return fail(stderr, fmt.Errorf("usage: term logs activation <activation_id>"))
 		}
-		records, err := query.ReadAll(dir)
+		records, err := query.ReadAll(opts.dir)
 		if err != nil {
 			return fail(stderr, err)
 		}
-		return printRecords(stdout, query.Activation(records, strings.TrimSpace(rest[0])))
+		return finishPrint(stdout, stderr, query.Activation(records, strings.TrimSpace(rest[0])), opts.json)
 	case "stats":
 		by := "event"
 		filters := make([]string, 0, len(rest))
@@ -265,7 +308,7 @@ func runLogs(args []string, stdout, stderr io.Writer) int {
 			}
 			filters = append(filters, token)
 		}
-		records, err := query.Search(dir, filters, time.Now().UTC())
+		records, err := query.Search(opts.dir, filters, time.Now().UTC())
 		if err != nil {
 			return fail(stderr, err)
 		}
@@ -284,15 +327,184 @@ func runLogs(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-func printRecords(out io.Writer, records []query.Record) int {
+type logsOptions struct {
+	dir    string
+	json   bool
+	follow bool
+	since  string
+	n      int
+}
+
+func defaultLogDir() string {
+	dir := strings.TrimSpace(os.Getenv("TERMINALS_LOG_DIR"))
+	if dir == "" {
+		dir = "logs"
+	}
+	return dir
+}
+
+func finishPrint(stdout, stderr io.Writer, records []query.Record, asJSON bool) int {
+	if err := printRecords(stdout, records, asJSON); err != nil {
+		return fail(stderr, err)
+	}
+	return 0
+}
+
+func printRecords(out io.Writer, records []query.Record, asJSON bool) error {
 	w := bufio.NewWriter(out)
 	for _, record := range records {
-		encoded, _ := json.Marshal(record)
-		_, _ = w.Write(encoded)
-		_ = w.WriteByte('\n')
+		if asJSON {
+			encoded, _ := json.Marshal(record)
+			if _, err := w.Write(encoded); err != nil {
+				return err
+			}
+			if err := w.WriteByte('\n'); err != nil {
+				return err
+			}
+			continue
+		}
+		line := formatRecord(record)
+		if _, err := w.WriteString(line); err != nil {
+			return err
+		}
+		if err := w.WriteByte('\n'); err != nil {
+			return err
+		}
+	}
+	return w.Flush()
+}
+
+func followLogs(opts logsOptions, filters []string, stdout, stderr io.Writer, startSeq uint64) int {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	currentSeq := startSeq
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return 0
+		case <-ticker.C:
+			records, err := query.Search(opts.dir, filters, time.Now().UTC())
+			if err != nil {
+				return fail(stderr, err)
+			}
+			newRows := make([]query.Record, 0, len(records))
+			for _, record := range records {
+				seq := recordSeq(record)
+				if seq <= currentSeq {
+					continue
+				}
+				newRows = append(newRows, record)
+				if seq > currentSeq {
+					currentSeq = seq
+				}
+			}
+			if len(newRows) == 0 {
+				continue
+			}
+			if err := printRecords(stdout, newRows, opts.json); err != nil {
+				return fail(stderr, err)
+			}
+		}
+	}
+}
+
+func formatRecord(record query.Record) string {
+	ts := recString(record, "ts")
+	level := recString(record, "level")
+	component := recString(record, "component")
+	event := recString(record, "event")
+	msg := recString(record, "msg")
+	activation := recString(record, "activation_id")
+	trace := recString(record, "trace_id")
+	seq := recString(record, "seq")
+	parts := []string{fmt.Sprintf("ts=%s", ts), fmt.Sprintf("level=%s", level), fmt.Sprintf("seq=%s", seq), fmt.Sprintf("component=%s", component), fmt.Sprintf("event=%s", event)}
+	if trace != "" {
+		parts = append(parts, "trace="+trace)
+	}
+	if activation != "" {
+		parts = append(parts, "activation="+activation)
+	}
+	if msg != "" {
+		parts = append(parts, "msg="+strconv.Quote(msg))
+	}
+	return strings.Join(parts, " ")
+}
+
+func printTraceTree(out io.Writer, records []query.Record) int {
+	children := make(map[string][]query.Record)
+	roots := make([]query.Record, 0)
+	for _, record := range records {
+		parent := recString(record, "parent_span_id")
+		if parent == "" {
+			roots = append(roots, record)
+			continue
+		}
+		children[parent] = append(children[parent], record)
+	}
+	w := bufio.NewWriter(out)
+	for _, root := range roots {
+		_ = writeTraceNode(w, root, children, 0)
 	}
 	_ = w.Flush()
 	return 0
+}
+
+func writeTraceNode(w io.Writer, record query.Record, children map[string][]query.Record, depth int) error {
+	prefix := strings.Repeat("  ", depth)
+	if _, err := fmt.Fprintf(w, "%s%s\n", prefix, formatRecord(record)); err != nil {
+		return err
+	}
+	spanID := recString(record, "span_id")
+	if spanID == "" {
+		return nil
+	}
+	for _, child := range children[spanID] {
+		if err := writeTraceNode(w, child, children, depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func lastSeq(records []query.Record) uint64 {
+	var max uint64
+	for _, record := range records {
+		if seq := recordSeq(record); seq > max {
+			max = seq
+		}
+	}
+	return max
+}
+
+func recordSeq(record query.Record) uint64 {
+	switch v := record["seq"].(type) {
+	case float64:
+		return uint64(v)
+	case int64:
+		return uint64(v)
+	case int:
+		return uint64(v)
+	case uint64:
+		return v
+	default:
+		return 0
+	}
+}
+
+func recString(record query.Record, key string) string {
+	if v, ok := record[key]; ok {
+		switch x := v.(type) {
+		case string:
+			return strings.TrimSpace(x)
+		case float64:
+			return strconv.FormatFloat(x, 'f', -1, 64)
+		case int:
+			return strconv.Itoa(x)
+		}
+	}
+	return ""
 }
 
 func parseFixtureFlag(args []string) (string, error) {

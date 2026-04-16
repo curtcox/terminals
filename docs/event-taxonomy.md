@@ -50,6 +50,7 @@ Canonical server event names written to `logs/terminals.jsonl`.
 - `admin.http.request`
 - `admin.http.ready`
 - `admin.http.server_error`
+- `admin.action.applied`
 
 ## Housekeeping (`housekeeping`)
 - `housekeeping.configured`

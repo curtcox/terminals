@@ -1,1 +1,1 @@
-Review the diff for completeness against plans/event-logging.md and share implementation/test status with remaining gaps.
+Instrument remaining domain seams from the plan (`io.flow*`, `io.analyzer.event`, and `appruntime.op.emitted`) and add focused tests.

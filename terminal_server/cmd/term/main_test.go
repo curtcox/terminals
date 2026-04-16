@@ -149,6 +149,58 @@ func TestRunLogsSearchFiltersByEvent(t *testing.T) {
 	})
 }
 
+func TestRunLogsTailUsesDirFlagAndHumanOutput(t *testing.T) {
+	cwd := t.TempDir()
+	logsDir := filepath.Join(cwd, "my-logs")
+	if err := os.MkdirAll(logsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(logs) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logsDir, "terminals.jsonl"), []byte(
+		`{"ts":"2026-04-16T10:00:00Z","seq":1,"level":"info","component":"main","event":"server.started","msg":"started"}`+"\n",
+	), 0o644); err != nil {
+		t.Fatalf("WriteFile(terminals.jsonl) error = %v", err)
+	}
+
+	withCWD(t, cwd, func() {
+		var out bytes.Buffer
+		var errOut bytes.Buffer
+		code := run([]string{"logs", "tail", "--dir", logsDir, "-n", "1"}, &out, &errOut)
+		if code != 0 {
+			t.Fatalf("run() code = %d, want 0 stderr=%s", code, errOut.String())
+		}
+		if !strings.Contains(out.String(), "event=server.started") {
+			t.Fatalf("stdout = %q", out.String())
+		}
+	})
+}
+
+func TestRunLogsTracePrintsTree(t *testing.T) {
+	cwd := t.TempDir()
+	logsDir := filepath.Join(cwd, "logs")
+	if err := os.MkdirAll(logsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(logs) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logsDir, "terminals.jsonl"), []byte(
+		`{"ts":"2026-04-16T10:00:00Z","seq":1,"trace_id":"t1","span_id":"s1","event":"root"}`+"\n"+
+			`{"ts":"2026-04-16T10:00:01Z","seq":2,"trace_id":"t1","span_id":"s2","parent_span_id":"s1","event":"child"}`+"\n",
+	), 0o644); err != nil {
+		t.Fatalf("WriteFile(terminals.jsonl) error = %v", err)
+	}
+
+	t.Setenv("TERMINALS_LOG_DIR", logsDir)
+	withCWD(t, cwd, func() {
+		var out bytes.Buffer
+		var errOut bytes.Buffer
+		code := run([]string{"logs", "trace", "t1"}, &out, &errOut)
+		if code != 0 {
+			t.Fatalf("run() code = %d, want 0 stderr=%s", code, errOut.String())
+		}
+		if !strings.Contains(out.String(), "event=root") || !strings.Contains(out.String(), "  ts=2026-04-16T10:00:01Z") {
+			t.Fatalf("stdout = %q", out.String())
+		}
+	})
+}
+
 func createApp(t *testing.T, cwd, name, version string) {
 	t.Helper()
 	root := filepath.Join(cwd, "apps", name)

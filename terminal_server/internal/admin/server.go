@@ -213,6 +213,11 @@ func (h *Handler) handleDevicePlacementUpdate(w http.ResponseWriter, req *http.R
 		h.writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	eventlog.Emit(req.Context(), "admin.action.applied", slog.LevelInfo, "admin placement update applied",
+		slog.String("component", "admin.http"),
+		slog.String("action", "device_placement.update"),
+		slog.String("device_id", deviceID),
+	)
 	h.writeJSON(w, http.StatusOK, map[string]any{
 		"status":    "ok",
 		"device_id": deviceID,
@@ -268,6 +273,12 @@ func (h *Handler) handleScenarioCommand(w http.ResponseWriter, req *http.Request
 		h.writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	eventlog.Emit(req.Context(), "admin.action.applied", slog.LevelInfo, "admin scenario command applied",
+		slog.String("component", "admin.http"),
+		slog.String("action", "scenario."+action),
+		slog.String("scenario", matched),
+		slog.Int("target_device_count", len(deviceIDs)),
+	)
 
 	h.writeJSON(w, http.StatusOK, map[string]any{
 		"status":            "ok",
@@ -374,6 +385,13 @@ func (h *Handler) handleReloadApp(w http.ResponseWriter, req *http.Request) {
 	if changed && h.syncAppDefs != nil {
 		h.syncAppDefs()
 	}
+	eventlog.Emit(req.Context(), "admin.action.applied", slog.LevelInfo, "admin app reload applied",
+		slog.String("component", "admin.http"),
+		slog.String("action", "app.reload"),
+		slog.String("app", pkg.Manifest.Name),
+		slog.Bool("changed", changed),
+		slog.String("version", pkg.Manifest.Version),
+	)
 	h.writeJSON(w, http.StatusOK, map[string]any{
 		"status":   "ok",
 		"action":   "reload",
@@ -413,6 +431,12 @@ func (h *Handler) handleRollbackApp(w http.ResponseWriter, req *http.Request) {
 	if h.syncAppDefs != nil {
 		h.syncAppDefs()
 	}
+	eventlog.Emit(req.Context(), "admin.action.applied", slog.LevelInfo, "admin app rollback applied",
+		slog.String("component", "admin.http"),
+		slog.String("action", "app.rollback"),
+		slog.String("app", pkg.Manifest.Name),
+		slog.String("version", pkg.Manifest.Version),
+	)
 	h.writeJSON(w, http.StatusOK, map[string]any{
 		"status":   "ok",
 		"action":   "rollback",
@@ -541,10 +565,20 @@ func (h *Handler) handleLogsTrace(w http.ResponseWriter, req *http.Request) {
 		h.writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	h.writeJSON(w, http.StatusOK, map[string]any{
-		"trace_id": traceID,
-		"events":   query.Trace(records, traceID),
-	})
+	events := query.Trace(records, traceID)
+	if req.URL.Query().Get("format") == "json" {
+		h.writeJSON(w, http.StatusOK, map[string]any{"trace_id": traceID, "events": events})
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := traceTemplate.Execute(w, map[string]any{
+		"Title":  "Trace Timeline",
+		"ID":     traceID,
+		"Events": events,
+		"Kind":   "trace",
+	}); err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("render trace logs: %v", err))
+	}
 }
 
 func (h *Handler) handleLogsActivation(w http.ResponseWriter, req *http.Request) {
@@ -558,10 +592,20 @@ func (h *Handler) handleLogsActivation(w http.ResponseWriter, req *http.Request)
 		h.writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	h.writeJSON(w, http.StatusOK, map[string]any{
-		"activation_id": activationID,
-		"events":        query.Activation(records, activationID),
-	})
+	events := query.Activation(records, activationID)
+	if req.URL.Query().Get("format") == "json" {
+		h.writeJSON(w, http.StatusOK, map[string]any{"activation_id": activationID, "events": events})
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := traceTemplate.Execute(w, map[string]any{
+		"Title":  "Activation Timeline",
+		"ID":     activationID,
+		"Events": events,
+		"Kind":   "activation",
+	}); err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("render activation logs: %v", err))
+	}
 }
 
 func logFilterArgs(req *http.Request) []string {
@@ -753,6 +797,50 @@ var logsTemplate = template.Must(template.New("logs").Parse(`<!doctype html>
         <td>{{index . "msg"}}</td>
         <td><a href="/admin/logs/trace/{{index . "trace_id"}}">{{index . "trace_id"}}</a></td>
         <td><a href="/admin/logs/activation/{{index . "activation_id"}}">{{index . "activation_id"}}</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</main>
+</body>
+</html>`))
+
+var traceTemplate = template.Must(template.New("trace").Parse(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{.Title}}</title>
+  <style>
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #0b1220; color: #e2e8f0; margin: 0; }
+    main { padding: 16px; }
+    a { color: #7dd3fc; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border-bottom: 1px solid #1e293b; text-align: left; padding: 6px; font-size: 13px; vertical-align: top; }
+    th { color: #93c5fd; }
+    .indent-1 { padding-left: 18px; }
+    .indent-2 { padding-left: 36px; }
+    .indent-3 { padding-left: 54px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>{{.Title}}</h1>
+  <p>{{.Kind}}: <strong>{{.ID}}</strong></p>
+  <p><a href="/admin/logs">Back to logs</a></p>
+  <table>
+    <thead><tr><th>seq</th><th>ts</th><th>level</th><th>event</th><th>component</th><th>msg</th><th>span</th><th>parent</th></tr></thead>
+    <tbody>
+      {{range .Events}}
+      <tr>
+        <td>{{index . "seq"}}</td>
+        <td>{{index . "ts"}}</td>
+        <td>{{index . "level"}}</td>
+        <td>{{index . "event"}}</td>
+        <td>{{index . "component"}}</td>
+        <td>{{index . "msg"}}</td>
+        <td>{{index . "span_id"}}</td>
+        <td>{{index . "parent_span_id"}}</td>
       </tr>
       {{end}}
     </tbody>
