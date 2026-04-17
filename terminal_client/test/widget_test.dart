@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:grpc/grpc.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
@@ -1436,6 +1438,10 @@ class _FakeMediaEngine implements ClientMediaEngine {
   final String localDeviceID;
   final OutboundSignalCallback onSignal;
   final Set<String> _activeStreamIDs = <String>{};
+  final Map<String, ValueNotifier<MediaStream?>> _remoteStreamsByID =
+      <String, ValueNotifier<MediaStream?>>{};
+  final Map<String, ValueNotifier<double>> _audioLevelsByID =
+      <String, ValueNotifier<double>>{};
 
   @override
   Future<void> startStream(iov1.StartStream start) async {
@@ -1443,6 +1449,14 @@ class _FakeMediaEngine implements ClientMediaEngine {
       return;
     }
     _activeStreamIDs.add(start.streamId);
+    _remoteStreamsByID.putIfAbsent(
+      start.streamId,
+      () => ValueNotifier<MediaStream?>(null),
+    );
+    _audioLevelsByID.putIfAbsent(
+      start.streamId,
+      () => ValueNotifier<double>(0.5),
+    );
     onSignal(
       WebRTCSignal()
         ..streamId = start.streamId
@@ -1460,6 +1474,18 @@ class _FakeMediaEngine implements ClientMediaEngine {
   @override
   Future<void> stopStream(String streamID) async {
     _activeStreamIDs.remove(streamID);
+    _remoteStreamsByID
+        .putIfAbsent(
+          streamID,
+          () => ValueNotifier<MediaStream?>(null),
+        )
+        .value = null;
+    _audioLevelsByID
+        .putIfAbsent(
+          streamID,
+          () => ValueNotifier<double>(0.0),
+        )
+        .value = 0.0;
   }
 
   @override
@@ -1483,6 +1509,22 @@ class _FakeMediaEngine implements ClientMediaEngine {
 
   @override
   Future<void> dispose() async {}
+
+  @override
+  ValueListenable<MediaStream?> remoteStream(String streamID) {
+    return _remoteStreamsByID.putIfAbsent(
+      streamID,
+      () => ValueNotifier<MediaStream?>(null),
+    );
+  }
+
+  @override
+  ValueListenable<double> audioLevel(String streamID) {
+    return _audioLevelsByID.putIfAbsent(
+      streamID,
+      () => ValueNotifier<double>(0.0),
+    );
+  }
 }
 
 class _FakeTerminalControlClient implements TerminalControlClient {

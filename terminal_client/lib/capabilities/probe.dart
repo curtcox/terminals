@@ -81,6 +81,16 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     if (hasCamera) {
       capabilities.camera = capv1.CameraCapability();
     }
+    capabilities.connectivity = capv1.ConnectivityCapability()
+      ..wifiSignalStrength = true;
+    capabilities.edge = (capv1.EdgeCapability()
+      ..runtimes.addAll(<String>['dart'])
+      ..operators.addAll(<String>['monitor.foreground_only'])
+      ..retention = (capv1.EdgeRetentionCapability()
+        ..audioSec = 120
+        ..videoSec = 120
+        ..sensorSec = 600
+        ..radioSec = 0));
 
     return capabilities;
   }

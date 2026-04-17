@@ -5,7 +5,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/capabilities/probe.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/control_client.dart';
@@ -18,6 +18,7 @@ import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart
     as diagv1;
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
+import 'package:terminal_client/media/playback.dart';
 import 'package:terminal_client/media/webrtc_engine.dart';
 import 'package:terminal_client/util/speech.dart' as speech;
 
@@ -30,6 +31,7 @@ typedef ClientMediaEngineFactory = ClientMediaEngine Function({
   required String localDeviceID,
   required OutboundSignalCallback onSignal,
 });
+typedef AudioPlaybackFactory = AudioPlayback Function();
 typedef UnixMsProvider = int Function();
 
 int _systemNowUnixMs() => DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -42,6 +44,14 @@ CapabilityProbe _defaultCapabilityProbeFactory() {
     );
   }
   return DefaultCapabilityProbe();
+}
+
+AudioPlayback _defaultAudioPlaybackFactory() {
+  final bindingType = WidgetsBinding.instance.runtimeType.toString();
+  if (bindingType.contains('TestWidgetsFlutterBinding')) {
+    return NoopAudioPlayback();
+  }
+  return AudioPlayerPlayback();
 }
 
 const bool _e2eEmitEvents = bool.fromEnvironment(
@@ -476,6 +486,7 @@ class TerminalClientApp extends StatelessWidget {
     this.clientFactory = createTerminalControlClient,
     this.capabilityProbeFactory = _defaultCapabilityProbeFactory,
     this.mediaEngineFactory = defaultClientMediaEngineFactory,
+    this.audioPlaybackFactory = _defaultAudioPlaybackFactory,
     this.heartbeatInterval = const Duration(seconds: 10),
     this.sensorTelemetryInterval = const Duration(seconds: 15),
     this.reconnectDelayBase = const Duration(seconds: 2),
@@ -486,6 +497,7 @@ class TerminalClientApp extends StatelessWidget {
   final TerminalControlClientFactory clientFactory;
   final CapabilityProbeFactory capabilityProbeFactory;
   final ClientMediaEngineFactory mediaEngineFactory;
+  final AudioPlaybackFactory audioPlaybackFactory;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
@@ -500,6 +512,7 @@ class TerminalClientApp extends StatelessWidget {
         clientFactory: clientFactory,
         capabilityProbeFactory: capabilityProbeFactory,
         mediaEngineFactory: mediaEngineFactory,
+        audioPlaybackFactory: audioPlaybackFactory,
         heartbeatInterval: heartbeatInterval,
         sensorTelemetryInterval: sensorTelemetryInterval,
         reconnectDelayBase: reconnectDelayBase,
@@ -515,6 +528,7 @@ class _ControlStreamScaffold extends StatefulWidget {
     required this.clientFactory,
     required this.capabilityProbeFactory,
     required this.mediaEngineFactory,
+    required this.audioPlaybackFactory,
     required this.heartbeatInterval,
     required this.sensorTelemetryInterval,
     required this.reconnectDelayBase,
@@ -525,6 +539,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   final TerminalControlClientFactory clientFactory;
   final CapabilityProbeFactory capabilityProbeFactory;
   final ClientMediaEngineFactory mediaEngineFactory;
+  final AudioPlaybackFactory audioPlaybackFactory;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
@@ -535,7 +550,8 @@ class _ControlStreamScaffold extends StatefulWidget {
   State<_ControlStreamScaffold> createState() => _ControlStreamScaffoldState();
 }
 
-class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
+class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
+    with WidgetsBindingObserver {
   final TextEditingController _hostController = TextEditingController(
     text: _defaultControlHost,
   );
@@ -562,6 +578,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   final String _deviceId = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
   late final CapabilityProbe _capabilityProbe;
   late final ClientMediaEngine _mediaEngine;
+  late final AudioPlayback _audioPlayback;
   uiv1.Node? _activeRoot;
   int _activeRootRevision = 0;
   String _activeTransition = 'none';
@@ -628,18 +645,21 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   Timer? _bugReportAckTimer;
   bool _hasRegisterAck = false;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
+  bool _appIsForeground = true;
 
   int _nowUnixMs() => widget.nowUnixMsProvider();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _installFlutterErrorHook();
     _capabilityProbe = widget.capabilityProbeFactory();
     _mediaEngine = widget.mediaEngineFactory(
       localDeviceID: _deviceId,
       onSignal: _sendWebRTCSignalMessage,
     );
+    _audioPlayback = widget.audioPlaybackFactory();
     _recordClientLog('info', 'client started');
     if (_e2eEmitEvents) {
       debugPrint('E2E_EVENT: client_started');
@@ -906,7 +926,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   void _startSensorTelemetryLoop() {
     _sensorTimer?.cancel();
     _sensorTimer = Timer.periodic(widget.sensorTelemetryInterval, (_) {
-      if (!_shouldStayConnected || _deviceId.isEmpty) {
+      if (!_shouldStayConnected || _deviceId.isEmpty || !_appIsForeground) {
         return;
       }
       _sendSensorTelemetry();
@@ -1550,7 +1570,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       return;
     }
     final direction = Directionality.of(context);
-    SemanticsService.announce(
+    SemanticsService.sendAnnouncement(
+      View.of(context),
       'Bug reference word ${identifier.word}. Code ${identifier.code}',
       direction,
     );
@@ -1930,8 +1951,24 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _appIsForeground = true;
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _appIsForeground = false;
+        break;
+    }
+  }
+
+  @override
   void dispose() {
     _shouldStayConnected = false;
+    WidgetsBinding.instance.removeObserver(this);
     _cancelReconnectTimer();
     _bugReportAckTimer?.cancel();
     _bugReportAckTimer = null;
@@ -1943,6 +1980,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     }
     _outgoing.close();
     unawaited(_mediaEngine.dispose());
+    unawaited(_audioPlayback.dispose());
     final existingClient = _client;
     if (existingClient != null) {
       unawaited(existingClient.shutdown());
@@ -2281,7 +2319,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             ..streamReady = (StreamReady()..streamId = start.streamId),
         );
         _streamReadyAckCount += 1;
-        unawaited(_mediaEngine.startStream(start.deepCopy()));
+        unawaited(_startMediaStream(start.deepCopy()));
       }
       if (start.kind.isNotEmpty) {
         _lastNotification = 'Start stream: ${start.kind} (${start.streamId})';
@@ -2318,34 +2356,80 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       unawaited(_mediaEngine.handleSignal(response.webrtcSignal.deepCopy()));
     }
     if (response.hasPlayAudio()) {
-      final playAudio = response.playAudio;
-      var source = 'unknown';
-      var bytes = 0;
-      switch (playAudio.whichSource()) {
-        case iov1.PlayAudio_Source.pcmData:
-          source = 'pcm_data';
-          bytes = playAudio.pcmData.length;
-          break;
-        case iov1.PlayAudio_Source.url:
-          source = 'url';
-          bytes = 0;
-          break;
-        case iov1.PlayAudio_Source.ttsText:
-          source = 'tts_text';
-          bytes = 0;
-          break;
-        case iov1.PlayAudio_Source.notSet:
-          source = 'not_set';
-          bytes = 0;
-          break;
+      unawaited(_executePlayAudio(response.playAudio.deepCopy()));
+    }
+  }
+
+  Future<void> _startMediaStream(iov1.StartStream start) async {
+    try {
+      await _ensureMediaPermissionsForStart(start);
+      await _mediaEngine.startStream(start);
+    } catch (error) {
+      if (!mounted) {
+        return;
       }
-      _playAudioCount += 1;
-      _lastPlayAudioBytes = bytes;
-      _lastPlayAudioDeviceID =
-          playAudio.deviceId.isNotEmpty ? playAudio.deviceId : 'unknown';
-      _lastPlayAudioSource = source;
-      _lastNotification =
-          'Play audio: $_lastPlayAudioDeviceID ($source, $bytes bytes)';
+      setState(() {
+        _status = 'Media permission required';
+        _lastConnectionStatus = _status;
+        _lastNotification =
+            'Unable to start media stream ${start.streamId}: $error';
+      });
+    }
+  }
+
+  Future<void> _ensureMediaPermissionsForStart(iov1.StartStream start) async {
+    final sourceDevice = start.sourceDeviceId.trim();
+    if (sourceDevice != _deviceId) {
+      return;
+    }
+    final wantsAudio = start.kind.toLowerCase().contains('audio');
+    final wantsVideo = start.kind.toLowerCase().contains('video');
+    if (!wantsAudio && !wantsVideo) {
+      return;
+    }
+    final stream = await navigator.mediaDevices.getUserMedia(
+      <String, dynamic>{
+        'audio': wantsAudio,
+        'video': wantsVideo,
+      },
+    );
+    for (final track in stream.getTracks()) {
+      track.stop();
+    }
+    await stream.dispose();
+  }
+
+  Future<void> _executePlayAudio(iov1.PlayAudio playAudio) async {
+    final source = switch (playAudio.whichSource()) {
+      iov1.PlayAudio_Source.pcmData => 'pcm_data',
+      iov1.PlayAudio_Source.url => 'url',
+      iov1.PlayAudio_Source.ttsText => 'tts_text',
+      iov1.PlayAudio_Source.notSet => 'not_set',
+    };
+    final bytes = playAudio.whichSource() == iov1.PlayAudio_Source.pcmData
+        ? playAudio.pcmData.length
+        : 0;
+    try {
+      await _audioPlayback.play(playAudio);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _playAudioCount += 1;
+        _lastPlayAudioBytes = bytes;
+        _lastPlayAudioDeviceID =
+            playAudio.deviceId.isNotEmpty ? playAudio.deviceId : 'unknown';
+        _lastPlayAudioSource = source;
+        _lastNotification =
+            'Play audio: $_lastPlayAudioDeviceID ($source, $bytes bytes)';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Play audio failed: $error';
+      });
     }
   }
 
@@ -2762,26 +2846,35 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         );
       case uiv1.Node_Widget.videoSurface:
         final componentId = _nodeId(node);
+        final streamID = node.videoSurface.trackId.trim();
         return _placeholderPrimitive(
           key: ValueKey<String>('ui-video-surface-$componentId'),
-          title: 'Video surface',
+          title: 'Video surface (${streamID.isEmpty ? 'unbound' : streamID})',
           detail: node.videoSurface.trackId,
-          child: const SizedBox(
-            height: 120,
-            child: Center(
-              child: Icon(Icons.videocam_outlined),
+          child: SizedBox(
+            height: 160,
+            child: _VideoSurfaceView(
+              streamListenable: _mediaEngine.remoteStream(streamID),
             ),
           ),
         );
       case uiv1.Node_Widget.audioVisualizer:
         final componentId = _nodeId(node);
+        final streamID = node.audioVisualizer.streamId.trim();
         return _placeholderPrimitive(
           key: ValueKey<String>('ui-audio-visualizer-$componentId'),
           title: 'Audio visualizer',
           detail: node.audioVisualizer.streamId,
-          child: const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: LinearProgressIndicator(),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: ValueListenableBuilder<double>(
+              valueListenable: _mediaEngine.audioLevel(streamID),
+              builder: (context, level, _) {
+                return LinearProgressIndicator(
+                  value: level > 0 ? level.clamp(0.0, 1.0) : null,
+                );
+              },
+            ),
           ),
         );
       case uiv1.Node_Widget.canvas:
@@ -2901,6 +2994,85 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       return null;
     }
     return Color(parsed);
+  }
+}
+
+class _VideoSurfaceView extends StatefulWidget {
+  const _VideoSurfaceView({
+    required this.streamListenable,
+  });
+
+  final ValueListenable<MediaStream?> streamListenable;
+
+  @override
+  State<_VideoSurfaceView> createState() => _VideoSurfaceViewState();
+}
+
+class _VideoSurfaceViewState extends State<_VideoSurfaceView> {
+  final RTCVideoRenderer _renderer = RTCVideoRenderer();
+  MediaStream? _boundStream;
+  bool _rendererReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.streamListenable.addListener(_syncStream);
+    unawaited(_initializeRenderer());
+  }
+
+  Future<void> _initializeRenderer() async {
+    await _renderer.initialize();
+    _rendererReady = true;
+    await _bind(widget.streamListenable.value);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _syncStream() async {
+    await _bind(widget.streamListenable.value);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _bind(MediaStream? stream) async {
+    if (!_rendererReady || identical(stream, _boundStream)) {
+      return;
+    }
+    _boundStream = stream;
+    _renderer.srcObject = stream;
+  }
+
+  @override
+  void didUpdateWidget(covariant _VideoSurfaceView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.streamListenable, widget.streamListenable)) {
+      oldWidget.streamListenable.removeListener(_syncStream);
+      widget.streamListenable.addListener(_syncStream);
+      unawaited(_syncStream());
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.streamListenable.removeListener(_syncStream);
+    unawaited(_renderer.dispose());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasVideo = _boundStream?.getVideoTracks().isNotEmpty ?? false;
+    if (!_rendererReady || !hasVideo) {
+      return const Center(
+        child: Icon(Icons.videocam_off_outlined),
+      );
+    }
+    return RTCVideoView(
+      _renderer,
+      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+    );
   }
 }
 

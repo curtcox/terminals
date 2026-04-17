@@ -26,6 +26,10 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Terminals needs microphone access for live audio scenarios.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Terminals needs camera access for live video scenarios.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

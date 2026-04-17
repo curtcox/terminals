@@ -33,4 +33,21 @@ void main() {
     expect(plist, contains('NSCameraUsageDescription'));
     expect(plist, contains('NSMicrophoneUsageDescription'));
   });
+
+  test('macOS metadata includes microphone and camera permissions', () {
+    final plist = File('macos/Runner/Info.plist').readAsStringSync();
+    final debugEntitlements =
+        File('macos/Runner/DebugProfile.entitlements').readAsStringSync();
+    final releaseEntitlements =
+        File('macos/Runner/Release.entitlements').readAsStringSync();
+
+    expect(plist, contains('NSMicrophoneUsageDescription'));
+    expect(plist, contains('NSCameraUsageDescription'));
+    expect(
+        debugEntitlements, contains('com.apple.security.device.audio-input'));
+    expect(debugEntitlements, contains('com.apple.security.device.camera'));
+    expect(
+        releaseEntitlements, contains('com.apple.security.device.audio-input'));
+    expect(releaseEntitlements, contains('com.apple.security.device.camera'));
+  });
 }

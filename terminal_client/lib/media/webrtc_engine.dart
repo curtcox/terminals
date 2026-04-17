@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
@@ -12,6 +13,8 @@ abstract class ClientMediaEngine {
   Future<void> startStream(iov1.StartStream start);
   Future<void> stopStream(String streamID);
   Future<void> handleSignal(WebRTCSignal signal);
+  ValueListenable<MediaStream?> remoteStream(String streamID);
+  ValueListenable<double> audioLevel(String streamID);
   Future<void> dispose();
 }
 
@@ -34,6 +37,10 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
   final String localDeviceID;
   final OutboundSignalCallback onSignal;
   final Map<String, _WebRTCSession> _sessions = <String, _WebRTCSession>{};
+  final Map<String, ValueNotifier<MediaStream?>> _remoteStreamsByID =
+      <String, ValueNotifier<MediaStream?>>{};
+  final Map<String, ValueNotifier<double>> _audioLevelsByID =
+      <String, ValueNotifier<double>>{};
 
   @override
   Future<void> startStream(iov1.StartStream start) async {
@@ -59,6 +66,8 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
       peerConnection: peerConnection,
       wantsAudio: wantsAudio,
       wantsVideo: wantsVideo,
+      remoteStream: _ensureRemoteStreamNotifier(streamID),
+      audioLevel: _ensureAudioLevelNotifier(streamID),
     );
     _sessions[streamID] = session;
 
@@ -68,6 +77,15 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
         return;
       }
       _emitSignal(streamID, 'candidate', payload);
+    };
+    peerConnection.onTrack = (RTCTrackEvent event) {
+      final streams = event.streams;
+      if (streams.isEmpty) {
+        return;
+      }
+      session.remoteStream.value = streams.first;
+      session.audioLevel.value =
+          streams.first.getAudioTracks().isNotEmpty ? 1.0 : 0.0;
     };
 
     if (sendLocalMedia && (wantsAudio || wantsVideo)) {
@@ -99,6 +117,8 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
     if (session == null) {
       return;
     }
+    session.remoteStream.value = null;
+    session.audioLevel.value = 0.0;
     await session.dispose();
   }
 
@@ -164,6 +184,22 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
     for (final session in sessions) {
       await session.dispose();
     }
+    for (final notifier in _remoteStreamsByID.values) {
+      notifier.value = null;
+    }
+    for (final notifier in _audioLevelsByID.values) {
+      notifier.value = 0.0;
+    }
+  }
+
+  @override
+  ValueListenable<MediaStream?> remoteStream(String streamID) {
+    return _ensureRemoteStreamNotifier(streamID.trim());
+  }
+
+  @override
+  ValueListenable<double> audioLevel(String streamID) {
+    return _ensureAudioLevelNotifier(streamID.trim());
   }
 
   void _emitSignal(String streamID, String signalType, String payload) {
@@ -174,6 +210,20 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
         ..payload = payload,
     );
   }
+
+  ValueNotifier<MediaStream?> _ensureRemoteStreamNotifier(String streamID) {
+    return _remoteStreamsByID.putIfAbsent(
+      streamID,
+      () => ValueNotifier<MediaStream?>(null),
+    );
+  }
+
+  ValueNotifier<double> _ensureAudioLevelNotifier(String streamID) {
+    return _audioLevelsByID.putIfAbsent(
+      streamID,
+      () => ValueNotifier<double>(0.0),
+    );
+  }
 }
 
 class _WebRTCSession {
@@ -182,12 +232,16 @@ class _WebRTCSession {
     required this.peerConnection,
     required this.wantsAudio,
     required this.wantsVideo,
+    required this.remoteStream,
+    required this.audioLevel,
   });
 
   final String streamID;
   final RTCPeerConnection peerConnection;
   final bool wantsAudio;
   final bool wantsVideo;
+  final ValueNotifier<MediaStream?> remoteStream;
+  final ValueNotifier<double> audioLevel;
   MediaStream? localStream;
 
   Future<void> dispose() async {
