@@ -1,1 +1,1 @@
-Review the bug-reporting implementation changes and report any follow-up adjustments.
+Implement Stage 4 capability probes and remove synthetic capability declarations from registration.

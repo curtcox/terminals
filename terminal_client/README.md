@@ -1,17 +1,29 @@
-# terminal_client
+# Terminal Client
 
-A new Flutter project.
+Flutter terminal client for the Terminals system.
 
-## Getting Started
+## Supported Platforms
 
-This project is a starting point for a Flutter application.
+- Web
+- macOS
+- Android
+- iOS
+- Linux
+- Windows
 
-A few resources to get you started if this is your first Flutter project:
+## Platform Notes
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- Android and iOS include camera/microphone permission placeholders that are requested when media features are enabled.
+- Linux and Windows runtime media capability/permission handling is platform-dependent and will be tightened in later remediation stages.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Build Targets
+
+From repository root:
+
+- `make client-build-web`
+- `make client-build-android`
+- `make client-build-ios`
+- `make client-build-linux`
+- `make client-build-windows`
+- `make client-build-macos`
+- `make client-build-all`

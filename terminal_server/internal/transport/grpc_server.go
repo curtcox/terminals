@@ -4,19 +4,24 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
+	"sync"
 	"sync/atomic"
 
+	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
+	"google.golang.org/grpc"
 )
 
 // ErrControlNotConfigured indicates Connect was called before control wiring.
 var ErrControlNotConfigured = errors.New("control service not configured")
 
-// Server is a small lifecycle wrapper for the future gRPC control server.
+// Server is a lifecycle wrapper around the gRPC control server.
 type Server struct {
 	addr        string
+	boundAddr   string
 	running     atomic.Bool
 	control     *ControlService
 	adapter     ProtoAdapter
@@ -25,34 +30,104 @@ type Server struct {
 	recording   recording.Manager
 	webrtc      WebRTCSignalEngine
 	bugReports  BugReportIntake
+
+	mu         sync.Mutex
+	listener   net.Listener
+	grpcServer *grpc.Server
 }
 
-// NewServer returns a lifecycle-managed transport server placeholder.
+// NewServer returns a lifecycle-managed gRPC transport server.
 func NewServer(addr string) *Server {
 	return &Server{addr: addr}
 }
 
-// Address returns the configured bind address.
+// Address returns the bound address once started, otherwise the configured bind address.
 func (s *Server) Address() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.boundAddr != "" {
+		return s.boundAddr
+	}
 	return s.addr
 }
 
-// Start marks the server as running.
+// Start binds the gRPC listener, registers services, and starts serving.
 func (s *Server) Start(context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.running.Load() {
+		return nil
+	}
+
+	listener, err := net.Listen("tcp", s.addr)
+	if err != nil {
+		return err
+	}
+	grpcServer := grpc.NewServer()
+	controlv1.RegisterTerminalControlServiceServer(grpcServer, newGeneratedControlService(s))
+
+	s.listener = listener
+	s.grpcServer = grpcServer
+	s.boundAddr = listener.Addr().String()
 	s.running.Store(true)
+
+	go func(listener net.Listener, server *grpc.Server) {
+		if err := server.Serve(listener); err != nil {
+			s.mu.Lock()
+			running := s.running.Load()
+			address := s.boundAddr
+			s.mu.Unlock()
+			if running {
+				eventlog.Emit(context.Background(), "transport.grpc.serve_failed", slog.LevelError, "grpc server serve failed",
+					slog.String("component", "transport.grpc"),
+					slog.String("address", address),
+					slog.Any("error", err),
+				)
+			}
+		}
+	}(listener, grpcServer)
+
 	eventlog.Emit(context.Background(), "transport.grpc.listener_ready", slog.LevelInfo, "grpc listener ready",
 		slog.String("component", "transport.grpc"),
-		slog.String("address", s.addr),
+		slog.String("address", s.boundAddr),
 	)
 	return nil
 }
 
-// Stop marks the server as stopped.
-func (s *Server) Stop(context.Context) error {
+// Stop drains active RPCs and stops the server.
+func (s *Server) Stop(ctx context.Context) error {
+	s.mu.Lock()
+	if !s.running.Load() {
+		s.mu.Unlock()
+		return nil
+	}
+	grpcServer := s.grpcServer
+	address := s.boundAddr
+	s.mu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		grpcServer.GracefulStop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		grpcServer.Stop()
+		<-done
+	}
+
+	s.mu.Lock()
 	s.running.Store(false)
+	s.listener = nil
+	s.grpcServer = nil
+	s.boundAddr = ""
+	s.mu.Unlock()
+
 	eventlog.Emit(context.Background(), "transport.grpc.stopped", slog.LevelInfo, "grpc server stopped",
 		slog.String("component", "transport.grpc"),
-		slog.String("address", s.addr),
+		slog.String("address", address),
 	)
 	return nil
 }

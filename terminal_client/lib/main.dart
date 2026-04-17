@@ -8,6 +8,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/control_client.dart';
+import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
     as capv1;
@@ -45,6 +46,20 @@ const int _e2eStartupDelayMs = int.fromEnvironment(
   'TERMINALS_E2E_STARTUP_DELAY_MS',
   defaultValue: 600,
 );
+const String _defaultControlHost = String.fromEnvironment(
+  'TERMINALS_CONTROL_HOST',
+  defaultValue: '127.0.0.1',
+);
+const int _defaultGrpcPort = int.fromEnvironment(
+  'TERMINALS_GRPC_PORT',
+  defaultValue: 50051,
+);
+const int _defaultControlWSPort = int.fromEnvironment(
+  'TERMINALS_CONTROL_WS_PORT',
+  defaultValue: 50054,
+);
+const int _defaultControlPort =
+    kIsWeb ? _defaultControlWSPort : _defaultGrpcPort;
 const String _bugReportActionPrefix = 'bug_report';
 const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
@@ -383,18 +398,17 @@ TransportErrorDiagnosis diagnoseTransportError(
 }) {
   final raw = error.toString();
   final lower = raw.toLowerCase();
-  final grpcCodeMatch = RegExp(r'code:\s*([0-9]+)', caseSensitive: false)
-      .firstMatch(raw);
-  final grpcCode = grpcCodeMatch == null
-      ? null
-      : int.tryParse(grpcCodeMatch.group(1) ?? '');
+  final grpcCodeMatch =
+      RegExp(r'code:\s*([0-9]+)', caseSensitive: false).firstMatch(raw);
+  final grpcCode =
+      grpcCodeMatch == null ? null : int.tryParse(grpcCodeMatch.group(1) ?? '');
   final grpcCodeNameMatch =
       RegExp(r'codeName:\s*([A-Z_]+)', caseSensitive: false).firstMatch(raw);
-  final grpcCodeName =
-      (grpcCodeNameMatch?.group(1) ?? '').trim().toUpperCase();
+  final grpcCodeName = (grpcCodeNameMatch?.group(1) ?? '').trim().toUpperCase();
   final isGrpcError = lower.contains('grpc error');
-  final isUnavailable =
-      grpcCode == 14 || grpcCodeName == 'UNAVAILABLE' || lower.contains('unavailable');
+  final isUnavailable = grpcCode == 14 ||
+      grpcCodeName == 'UNAVAILABLE' ||
+      lower.contains('unavailable');
   final hasSocketConstructorFailure =
       lower.contains('unsupported operation: socket constructor');
 
@@ -424,8 +438,7 @@ TransportErrorDiagnosis diagnoseTransportError(
     final displayName = grpcCodeName.isEmpty ? '' : ' ($grpcCodeName)';
     return TransportErrorDiagnosis(
       summary: 'gRPC error $grpcCode$displayName',
-      guidance:
-          'Check server logs and client/server protocol compatibility.',
+      guidance: 'Check server logs and client/server protocol compatibility.',
       grpcCode: grpcCode,
       grpcCodeName: grpcCodeName,
       rawError: raw,
@@ -448,7 +461,7 @@ void main() {
 class TerminalClientApp extends StatelessWidget {
   const TerminalClientApp({
     super.key,
-    this.clientFactory = TerminalControlGrpcClient.new,
+    this.clientFactory = createTerminalControlClient,
     this.mediaEngineFactory = defaultClientMediaEngineFactory,
     this.heartbeatInterval = const Duration(seconds: 10),
     this.sensorTelemetryInterval = const Duration(seconds: 15),
@@ -507,10 +520,10 @@ class _ControlStreamScaffold extends StatefulWidget {
 
 class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   final TextEditingController _hostController = TextEditingController(
-    text: '127.0.0.1',
+    text: _defaultControlHost,
   );
   final TextEditingController _portController = TextEditingController(
-    text: '50051',
+    text: _defaultControlPort.toString(),
   );
   final TextEditingController _deviceNameController = TextEditingController(
     text: 'Flutter Client',
@@ -1721,8 +1734,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             'Bug report failed: no positive receipt (word: ${failed.identifier.word}, code: ${failed.identifier.code}).';
         _bugReceiptState = _BugReceiptState.error;
         _bugReceiptReportId = '';
-        _bugReceiptDetail =
-            'No positive receipt could be generated: $reason.';
+        _bugReceiptDetail = 'No positive receipt could be generated: $reason.';
       });
     }
     _pendingBugReports.clear();
@@ -2172,7 +2184,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 if (_bugReceiptReportId.isNotEmpty)
                   Text(
                     'Receipt ID: $_bugReceiptReportId',

@@ -7,6 +7,9 @@ import (
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_GRPC_HOST", "")
 	t.Setenv("TERMINALS_GRPC_PORT", "")
+	t.Setenv("TERMINALS_CONTROL_WS_HOST", "")
+	t.Setenv("TERMINALS_CONTROL_WS_PORT", "")
+	t.Setenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS", "")
 	t.Setenv("TERMINALS_ADMIN_HTTP_HOST", "")
 	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "")
 	t.Setenv("TERMINALS_LOG_DIR", "")
@@ -36,6 +39,15 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.GRPCPort != 50051 {
 		t.Fatalf("GRPCPort = %d", cfg.GRPCPort)
+	}
+	if cfg.ControlWSHost != "0.0.0.0" {
+		t.Fatalf("ControlWSHost = %q, want 0.0.0.0", cfg.ControlWSHost)
+	}
+	if cfg.ControlWSPort != 50054 {
+		t.Fatalf("ControlWSPort = %d, want 50054", cfg.ControlWSPort)
+	}
+	if len(cfg.ControlWSAllowedOrigins) != 0 {
+		t.Fatalf("ControlWSAllowedOrigins = %+v, want empty", cfg.ControlWSAllowedOrigins)
 	}
 	if cfg.AdminHTTPHost != "0.0.0.0" {
 		t.Fatalf("AdminHTTPHost = %q, want 0.0.0.0", cfg.AdminHTTPHost)
@@ -120,6 +132,9 @@ func TestLoadRecordingDirFromEnv(t *testing.T) {
 }
 
 func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
+	t.Setenv("TERMINALS_CONTROL_WS_HOST", "127.0.0.1")
+	t.Setenv("TERMINALS_CONTROL_WS_PORT", "7002")
+	t.Setenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS", "http://localhost:60739,https://example.test")
 	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "/tmp/terminals-photos")
 	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "30")
 	t.Setenv("TERMINALS_ADMIN_HTTP_HOST", "127.0.0.1")
@@ -134,6 +149,17 @@ func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
 	}
 	if cfg.PhotoFrameDir != "/tmp/terminals-photos" {
 		t.Fatalf("PhotoFrameDir = %q, want /tmp/terminals-photos", cfg.PhotoFrameDir)
+	}
+	if cfg.ControlWSHost != "127.0.0.1" {
+		t.Fatalf("ControlWSHost = %q, want 127.0.0.1", cfg.ControlWSHost)
+	}
+	if cfg.ControlWSPort != 7002 {
+		t.Fatalf("ControlWSPort = %d, want 7002", cfg.ControlWSPort)
+	}
+	if len(cfg.ControlWSAllowedOrigins) != 2 ||
+		cfg.ControlWSAllowedOrigins[0] != "http://localhost:60739" ||
+		cfg.ControlWSAllowedOrigins[1] != "https://example.test" {
+		t.Fatalf("ControlWSAllowedOrigins = %+v, want configured list", cfg.ControlWSAllowedOrigins)
 	}
 	if cfg.AdminHTTPHost != "127.0.0.1" {
 		t.Fatalf("AdminHTTPHost = %q, want 127.0.0.1", cfg.AdminHTTPHost)
@@ -187,6 +213,13 @@ func TestLoadInvalidPort(t *testing.T) {
 	t.Setenv("TERMINALS_GRPC_PORT", "bad")
 	if _, err := Load(); err == nil {
 		t.Fatalf("Load() expected error for invalid port")
+	}
+}
+
+func TestLoadInvalidControlWSPort(t *testing.T) {
+	t.Setenv("TERMINALS_CONTROL_WS_PORT", "bad")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid control websocket port")
 	}
 }
 

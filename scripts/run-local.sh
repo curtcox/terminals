@@ -8,6 +8,7 @@ SERVER_LOG="${TMP_DIR}/run-local-server.log"
 CLIENT_LOG="${TMP_DIR}/run-local-client.log"
 
 GRPC_PORT="${TERMINALS_GRPC_PORT:-}"
+CONTROL_WS_PORT="${TERMINALS_CONTROL_WS_PORT:-}"
 ADMIN_PORT="${TERMINALS_ADMIN_HTTP_PORT:-}"
 PHOTO_PORT="${TERMINALS_PHOTO_FRAME_HTTP_PORT:-}"
 CLIENT_WEB_PORT="${TERMINALS_CLIENT_WEB_PORT:-}"
@@ -28,10 +29,11 @@ HAS_ERROR="false"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/run-local.sh [--client web-server|macos] [--skip-bootstrap]
+Usage: ./scripts/run-local.sh [--platform web-server|macos|ios|android|linux|windows] [--skip-bootstrap]
 
 Options:
-  --client <device>    Flutter device to run locally (default: web-server)
+  --platform <device>  Flutter device to run locally (default: web-server)
+  --client <device>    Back-compat alias for --platform
   --skip-bootstrap     Skip dependency bootstrap checks/install
   -h, --help           Show this help
 EOF
@@ -180,6 +182,15 @@ resolve_ports() {
     fi
   fi
 
+  if [[ -n "${CONTROL_WS_PORT}" ]]; then
+    require_available_port "${CONTROL_WS_PORT}" "control websocket" "TERMINALS_CONTROL_WS_PORT"
+  else
+    CONTROL_WS_PORT="$(find_available_port 50054 200 || true)"
+    if [[ -z "${CONTROL_WS_PORT}" ]]; then
+      fail "unable to find open port for control websocket starting at 50054"
+    fi
+  fi
+
   if [[ -n "${PHOTO_PORT}" ]]; then
     require_available_port "${PHOTO_PORT}" "photo frame" "TERMINALS_PHOTO_FRAME_HTTP_PORT"
   else
@@ -211,6 +222,14 @@ require_cmd() {
 parse_args() {
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
+      --platform)
+        shift
+        if [[ "$#" -eq 0 ]]; then
+          usage
+          fail "missing value for --platform"
+        fi
+        CLIENT_DEVICE="$1"
+        ;;
       --client)
         shift
         if [[ "$#" -eq 0 ]]; then
@@ -234,9 +253,13 @@ parse_args() {
     shift
   done
 
-  if [[ "${CLIENT_DEVICE}" != "web-server" && "${CLIENT_DEVICE}" != "macos" ]]; then
-    fail "unsupported client device '${CLIENT_DEVICE}'. Use 'web-server' or 'macos'."
-  fi
+  case "${CLIENT_DEVICE}" in
+    web-server|macos|ios|android|linux|windows)
+      ;;
+    *)
+      fail "unsupported client device '${CLIENT_DEVICE}'. Use one of: web-server, macos, ios, android, linux, windows."
+      ;;
+  esac
 }
 
 bootstrap() {
@@ -292,6 +315,7 @@ start_server() {
   (
     cd "${ROOT_DIR}/terminal_server"
     TERMINALS_GRPC_PORT="${GRPC_PORT}" \
+    TERMINALS_CONTROL_WS_PORT="${CONTROL_WS_PORT}" \
     TERMINALS_ADMIN_HTTP_PORT="${ADMIN_PORT}" \
     TERMINALS_PHOTO_FRAME_HTTP_PORT="${PHOTO_PORT}" \
     go run ./cmd/server
@@ -335,7 +359,12 @@ start_client() {
     set +e
     (
       cd "${ROOT_DIR}/terminal_client"
-      flutter run -d web-server --web-port="${CLIENT_WEB_PORT}" --web-hostname="${CLIENT_WEB_HOST}"
+      flutter run \
+        -d web-server \
+        --web-port="${CLIENT_WEB_PORT}" \
+        --web-hostname="${CLIENT_WEB_HOST}" \
+        --dart-define=TERMINALS_CONTROL_WS_PORT="${CONTROL_WS_PORT}" \
+        --dart-define=TERMINALS_GRPC_PORT="${GRPC_PORT}"
     ) 2>&1 | tee "${CLIENT_LOG}"
     local client_status=${PIPESTATUS[0]}
     set -e
@@ -348,7 +377,12 @@ start_client() {
   (
     cd "${ROOT_DIR}/terminal_client"
     if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
-      flutter run -d web-server --web-port="${CLIENT_WEB_PORT}" --web-hostname="${CLIENT_WEB_HOST}"
+      flutter run \
+        -d web-server \
+        --web-port="${CLIENT_WEB_PORT}" \
+        --web-hostname="${CLIENT_WEB_HOST}" \
+        --dart-define=TERMINALS_CONTROL_WS_PORT="${CONTROL_WS_PORT}" \
+        --dart-define=TERMINALS_GRPC_PORT="${GRPC_PORT}"
     else
       flutter run -d "${CLIENT_DEVICE}"
     fi
@@ -414,7 +448,7 @@ main() {
   : >"${CLIENT_LOG}"
   parse_args "$@"
   resolve_ports
-  echo "Using ports: grpc=${GRPC_PORT} admin=${ADMIN_PORT} photo=${PHOTO_PORT}"
+  echo "Using ports: grpc=${GRPC_PORT} control_ws=${CONTROL_WS_PORT} admin=${ADMIN_PORT} photo=${PHOTO_PORT}"
   if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
     echo "Using web client endpoint: http://localhost:${CLIENT_WEB_PORT}"
   fi

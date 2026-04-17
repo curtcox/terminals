@@ -176,6 +176,7 @@ func main() {
 	grpcServer.ConfigureRecording(recordingManager)
 	grpcServer.ConfigureWebRTCSignalEngine(webrtcEngine)
 	grpcServer.ConfigureBugReportIntake(bugReports)
+	websocketServer := transport.NewWebSocketServer(cfg.ControlWSAddress(), grpcServer, cfg.ControlWSAllowedOrigins)
 	mdns := discovery.NewMDNSAdvertiser()
 
 	logger.Info("terminal server starting", "event", "server.starting", "grpc_address", grpcServer.Address())
@@ -192,6 +193,10 @@ func main() {
 
 	if err := grpcServer.Start(ctx); err != nil {
 		logger.Error("start transport", "event", "transport.grpc.start_failed", "error", err)
+		return
+	}
+	if err := websocketServer.Start(ctx); err != nil {
+		logger.Error("start websocket transport", "event", "transport.websocket.start_failed", "error", err)
 		return
 	}
 
@@ -213,6 +218,7 @@ func main() {
 		return
 	}
 	logger.Info("control service ready", "event", "server.started", "server_id", cfg.MDNSName)
+	logger.Info("websocket control ready", "event", "transport.websocket.ready", "websocket_address", websocketServer.Address(), "path", websocketServer.Path())
 	if adminServer != nil {
 		logger.Info("admin dashboard available", "event", "admin.http.ready", "addr", adminServer.Addr)
 	}
@@ -249,6 +255,9 @@ func main() {
 
 	shutdownCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	if err := websocketServer.Stop(shutdownCtx); err != nil {
+		logger.Error("stop websocket transport", "event", "transport.websocket.stop_failed", "error", err)
+	}
 	if err := grpcServer.Stop(shutdownCtx); err != nil {
 		logger.Error("stop transport", "event", "transport.grpc.stop_failed", "error", err)
 	}

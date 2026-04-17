@@ -6,7 +6,8 @@ CLIENT_WEB_HOST ?= 0.0.0.0
 export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 
 .PHONY: server-build server-test server-lint server-coverage \
-	client-build client-test client-lint client-coverage \
+	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
+	client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
 	all-lint all-test all-check run-server run-client-web \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate
@@ -24,7 +25,47 @@ server-coverage:
 	cd terminal_server && go test ./... -coverprofile=coverage.out
 
 client-build:
+	$(MAKE) client-build-web
+
+client-build-web:
 	cd terminal_client && flutter build web
+
+client-build-android:
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
+		cd terminal_client && flutter build apk; \
+	else \
+		echo "Skipping Android build: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
+	fi
+
+client-build-ios:
+	@if [ "$$(uname -s)" = "Darwin" ] && xcodebuild -version >/dev/null 2>&1; then \
+		cd terminal_client && flutter build ios --no-codesign; \
+	else \
+		echo "Skipping iOS build: requires macOS with Xcode command line tools."; \
+	fi
+
+client-build-linux:
+	@if [ "$$(uname -s)" = "Linux" ]; then \
+		cd terminal_client && flutter build linux; \
+	else \
+		echo "Skipping Linux build: only supported on Linux hosts."; \
+	fi
+
+client-build-windows:
+	@if [ "$$(uname -s)" = "MINGW64_NT" ] || [ "$$(uname -s)" = "MSYS_NT" ] || [ "$$(uname -s)" = "CYGWIN_NT" ]; then \
+		cd terminal_client && flutter build windows; \
+	else \
+		echo "Skipping Windows build: only supported on Windows hosts."; \
+	fi
+
+client-build-macos:
+	@if [ "$$(uname -s)" = "Darwin" ] && xcodebuild -version >/dev/null 2>&1; then \
+		cd terminal_client && flutter build macos; \
+	else \
+		echo "Skipping macOS build: requires macOS with Xcode command line tools."; \
+	fi
+
+client-build-all: client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos
 
 client-test:
 	cd terminal_client && flutter test
@@ -48,7 +89,7 @@ all-lint: server-lint client-lint proto-lint
 
 all-test: server-test client-test
 
-all-check: all-lint all-test proto-breaking
+all-check: all-lint all-test proto-breaking client-build-all
 
 run-server:
 	cd terminal_server && go run ./cmd/server

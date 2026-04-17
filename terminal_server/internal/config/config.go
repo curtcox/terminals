@@ -12,6 +12,9 @@ import (
 type Config struct {
 	GRPCHost                      string
 	GRPCPort                      int
+	ControlWSHost                 string
+	ControlWSPort                 int
+	ControlWSAllowedOrigins       []string
 	AdminHTTPHost                 string
 	AdminHTTPPort                 int
 	LogDir                        string
@@ -50,6 +53,9 @@ func Load() (Config, error) {
 	cfg := Config{
 		GRPCHost:                      getenv("TERMINALS_GRPC_HOST", "0.0.0.0"),
 		GRPCPort:                      50051,
+		ControlWSHost:                 getenv("TERMINALS_CONTROL_WS_HOST", "0.0.0.0"),
+		ControlWSPort:                 50054,
+		ControlWSAllowedOrigins:       []string{},
 		AdminHTTPHost:                 getenv("TERMINALS_ADMIN_HTTP_HOST", "0.0.0.0"),
 		AdminHTTPPort:                 50053,
 		LogDir:                        getenv("TERMINALS_LOG_DIR", "logs"),
@@ -82,6 +88,14 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("parse TERMINALS_GRPC_PORT: %w", err)
 		}
 		cfg.GRPCPort = parsed
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_CONTROL_WS_PORT"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.ControlWSPort = v
+	}
+	if origins := parseCSVStrings(os.Getenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS")); len(origins) > 0 {
+		cfg.ControlWSAllowedOrigins = origins
 	}
 	if v, ok, err := parseOptionalInt("TERMINALS_PHOTO_FRAME_HTTP_PORT"); err != nil {
 		return Config{}, err
@@ -165,6 +179,11 @@ func loadSIPConfig() (SIPConfig, error) {
 // GRPCAddress returns host:port.
 func (c Config) GRPCAddress() string {
 	return fmt.Sprintf("%s:%d", c.GRPCHost, c.GRPCPort)
+}
+
+// ControlWSAddress returns host:port for the websocket control listener.
+func (c Config) ControlWSAddress() string {
+	return fmt.Sprintf("%s:%d", c.ControlWSHost, c.ControlWSPort)
 }
 
 func getenv(k, fallback string) string {
