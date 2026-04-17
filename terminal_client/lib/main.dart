@@ -342,6 +342,105 @@ Duration calculateReconnectDelay({
   return Duration(milliseconds: delayMs);
 }
 
+class TransportErrorDiagnosis {
+  const TransportErrorDiagnosis({
+    required this.summary,
+    required this.guidance,
+    required this.grpcCode,
+    required this.grpcCodeName,
+    required this.rawError,
+  });
+
+  final String summary;
+  final String guidance;
+  final int? grpcCode;
+  final String grpcCodeName;
+  final String rawError;
+
+  bool get hasSummary => summary.isNotEmpty;
+
+  String statusText() {
+    if (hasSummary) {
+      return 'Stream error: $summary';
+    }
+    return 'Stream error: $rawError';
+  }
+
+  String notificationText() {
+    if (!hasSummary) {
+      return '';
+    }
+    if (guidance.isEmpty) {
+      return summary;
+    }
+    return '$summary $guidance';
+  }
+}
+
+TransportErrorDiagnosis diagnoseTransportError(
+  Object error, {
+  required bool isWeb,
+}) {
+  final raw = error.toString();
+  final lower = raw.toLowerCase();
+  final grpcCodeMatch = RegExp(r'code:\s*([0-9]+)', caseSensitive: false)
+      .firstMatch(raw);
+  final grpcCode = grpcCodeMatch == null
+      ? null
+      : int.tryParse(grpcCodeMatch.group(1) ?? '');
+  final grpcCodeNameMatch =
+      RegExp(r'codeName:\s*([A-Z_]+)', caseSensitive: false).firstMatch(raw);
+  final grpcCodeName =
+      (grpcCodeNameMatch?.group(1) ?? '').trim().toUpperCase();
+  final isGrpcError = lower.contains('grpc error');
+  final isUnavailable =
+      grpcCode == 14 || grpcCodeName == 'UNAVAILABLE' || lower.contains('unavailable');
+  final hasSocketConstructorFailure =
+      lower.contains('unsupported operation: socket constructor');
+
+  if (isGrpcError && isUnavailable && hasSocketConstructorFailure && isWeb) {
+    return TransportErrorDiagnosis(
+      summary: 'gRPC UNAVAILABLE (14)',
+      guidance:
+          'Browser runtime cannot open raw gRPC sockets. Configure gRPC-Web via an HTTP proxy (for example Envoy) or use a non-web client target.',
+      grpcCode: grpcCode,
+      grpcCodeName: grpcCodeName,
+      rawError: raw,
+    );
+  }
+
+  if (isGrpcError && isUnavailable) {
+    return TransportErrorDiagnosis(
+      summary: 'gRPC UNAVAILABLE (14)',
+      guidance:
+          'Server is unreachable or transport is unavailable. Verify host/port, server process, and network/proxy configuration.',
+      grpcCode: grpcCode,
+      grpcCodeName: grpcCodeName,
+      rawError: raw,
+    );
+  }
+
+  if (isGrpcError && grpcCode != null) {
+    final displayName = grpcCodeName.isEmpty ? '' : ' ($grpcCodeName)';
+    return TransportErrorDiagnosis(
+      summary: 'gRPC error $grpcCode$displayName',
+      guidance:
+          'Check server logs and client/server protocol compatibility.',
+      grpcCode: grpcCode,
+      grpcCodeName: grpcCodeName,
+      rawError: raw,
+    );
+  }
+
+  return TransportErrorDiagnosis(
+    summary: '',
+    guidance: '',
+    grpcCode: grpcCode,
+    grpcCodeName: grpcCodeName,
+    rawError: raw,
+  );
+}
+
 void main() {
   runApp(const TerminalClientApp());
 }
@@ -487,6 +586,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _lastFlutterErrorMessage = '';
   String _lastFlutterErrorStack = '';
   int _lastFlutterErrorUnixMs = 0;
+  String _lastTransportDiagnostic = '';
   String _lastBugTokenWord = '';
   String _lastBugTokenCode = '';
   _BugReceiptState _bugReceiptState = _BugReceiptState.none;
@@ -683,7 +783,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
           }
         },
         onError: (Object error) {
-          unawaited(_handleStreamClosed('Stream error: $error'));
+          final diagnosis = diagnoseTransportError(error, isWeb: kIsWeb);
+          _lastTransportDiagnostic = diagnosis.hasSummary
+              ? diagnosis.notificationText()
+              : diagnosis.rawError;
+          unawaited(_handleStreamClosed(
+            diagnosis.statusText(),
+            notificationOverride: diagnosis.notificationText(),
+          ));
         },
         onDone: () {
           unawaited(_handleStreamClosed('Disconnected'));
@@ -717,7 +824,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       _recordClientLog('info', 'control stream connected');
       _sendSensorTelemetry();
     } catch (error) {
-      await _handleStreamClosed('Connection error: $error');
+      final diagnosis = diagnoseTransportError(error, isWeb: kIsWeb);
+      _lastTransportDiagnostic = diagnosis.hasSummary
+          ? diagnosis.notificationText()
+          : diagnosis.rawError;
+      await _handleStreamClosed(
+        diagnosis.hasSummary
+            ? 'Connection error: ${diagnosis.summary}'
+            : 'Connection error: $error',
+        notificationOverride: diagnosis.notificationText(),
+      );
     } finally {
       _isConnecting = false;
     }
@@ -1408,6 +1524,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       'route_count': _routesByStreamID.length.toString(),
       'reconnect_attempt': _reconnectAttempt.toString(),
       'last_notification': _lastNotification,
+      'last_transport_diagnostic': _lastTransportDiagnostic,
       'page_url': Uri.base.toString(),
       'active_root_revision': _activeRootRevision.toString(),
       'responses_seen': _responses.toString(),
@@ -1628,7 +1745,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _reconnectTimer = null;
   }
 
-  Future<void> _handleStreamClosed(String status) async {
+  Future<void> _handleStreamClosed(
+    String status, {
+    String notificationOverride = '',
+  }) async {
     _recordClientLog('warn', 'control stream closed: $status');
     _stopHeartbeatLoop();
     _stopSensorTelemetryLoop();
@@ -1644,6 +1764,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       setState(() {
         _status = status;
         _lastConnectionStatus = status;
+        if (notificationOverride.isNotEmpty) {
+          _lastNotification = notificationOverride;
+        }
       });
     }
     _scheduleReconnect();

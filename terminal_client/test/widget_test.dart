@@ -13,6 +13,35 @@ import 'package:terminal_client/main.dart';
 import 'package:terminal_client/media/webrtc_engine.dart';
 
 void main() {
+  test('diagnoseTransportError identifies grpc unavailable socket issue', () {
+    final diagnosis = diagnoseTransportError(
+      StateError(
+        'gRPC Error (code: 14, codeName: UNAVAILABLE, message: Error connecting: Unsupported operation: Socket constructor, details: null, rawResponse: null, trailers: {})',
+      ),
+      isWeb: true,
+    );
+    expect(diagnosis.summary, 'gRPC UNAVAILABLE (14)');
+    expect(diagnosis.grpcCode, 14);
+    expect(
+      diagnosis.notificationText(),
+      contains('Browser runtime cannot open raw gRPC sockets'),
+    );
+  });
+
+  test('diagnoseTransportError identifies grpc unavailable generally', () {
+    final diagnosis = diagnoseTransportError(
+      StateError(
+        'gRPC Error (code: 14, codeName: UNAVAILABLE, message: connection refused)',
+      ),
+      isWeb: false,
+    );
+    expect(diagnosis.summary, 'gRPC UNAVAILABLE (14)');
+    expect(
+      diagnosis.notificationText(),
+      contains('Server is unreachable or transport is unavailable'),
+    );
+  });
+
   testWidgets('app renders MaterialApp', (WidgetTester tester) async {
     await tester.pumpWidget(const TerminalClientApp());
     expect(find.byType(MaterialApp), findsOneWidget);
