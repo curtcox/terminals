@@ -10,6 +10,7 @@ import (
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	"github.com/curtcox/terminals/terminal_server/internal/eventlog/query"
 )
 
 func TestServiceFileAndListAndGet(t *testing.T) {
@@ -151,5 +152,45 @@ func TestServiceAutodetectMerge(t *testing.T) {
 	}
 	if userAck.GetMergedAutodetectReportId() != autoAck.GetReportId() {
 		t.Fatalf("merged_autodetect_report_id = %q, want %q", userAck.GetMergedAutodetectReportId(), autoAck.GetReportId())
+	}
+}
+
+func TestServiceFileReturnsAckWhenEventQueryIsSlow(t *testing.T) {
+	logDir := t.TempDir()
+	devices := device.NewManager()
+	_, err := devices.Register(device.Manifest{DeviceID: "rep-1", DeviceName: "Reporter"})
+	if err != nil {
+		t.Fatalf("register reporter: %v", err)
+	}
+	_, err = devices.Register(device.Manifest{DeviceID: "sub-1", DeviceName: "Subject"})
+	if err != nil {
+		t.Fatalf("register subject: %v", err)
+	}
+
+	svc := NewService(logDir, devices, nil)
+	svc.subjectEventsQueryBudget = 15 * time.Millisecond
+	wait := make(chan struct{})
+	svc.readAllEvents = func(string) ([]query.Record, error) {
+		<-wait
+		return nil, nil
+	}
+
+	start := time.Now()
+	ack, err := svc.File(context.Background(), &diagnosticsv1.BugReport{
+		ReporterDeviceId: "rep-1",
+		SubjectDeviceId:  "sub-1",
+		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON,
+		Description:      "button tap did nothing",
+	})
+	close(wait)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+	if strings.TrimSpace(ack.GetReportId()) == "" {
+		t.Fatalf("ack report_id should be populated")
+	}
+
+	if elapsed := time.Since(start); elapsed > 150*time.Millisecond {
+		t.Fatalf("File() elapsed = %v, want <= 150ms when event query is slow", elapsed)
 	}
 }

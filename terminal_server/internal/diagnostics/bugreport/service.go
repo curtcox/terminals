@@ -27,13 +27,17 @@ import (
 
 // Service stores and retrieves bug reports plus server-side enrichment.
 type Service struct {
-	mu          sync.Mutex
-	logDir      string
-	rootDir     string
-	devices     *device.Manager
-	runtime     *scenario.Runtime
-	now         func() time.Time
-	jsonMarshal protojson.MarshalOptions
+	mu            sync.Mutex
+	logDir        string
+	rootDir       string
+	devices       *device.Manager
+	runtime       *scenario.Runtime
+	now           func() time.Time
+	readAllEvents func(string) ([]query.Record, error)
+	// subjectEventsQueryBudget bounds best-effort enrichment so ack emission
+	// does not block on large eventlog scans.
+	subjectEventsQueryBudget time.Duration
+	jsonMarshal              protojson.MarshalOptions
 }
 
 const (
@@ -104,11 +108,13 @@ func NewService(logDir string, devices *device.Manager, runtime *scenario.Runtim
 		trimmed = "logs"
 	}
 	return &Service{
-		logDir:  trimmed,
-		rootDir: filepath.Join(trimmed, "bug_reports"),
-		devices: devices,
-		runtime: runtime,
-		now:     time.Now,
+		logDir:                   trimmed,
+		rootDir:                  filepath.Join(trimmed, "bug_reports"),
+		devices:                  devices,
+		runtime:                  runtime,
+		now:                      time.Now,
+		readAllEvents:            query.ReadAll,
+		subjectEventsQueryBudget: 250 * time.Millisecond,
 		jsonMarshal: protojson.MarshalOptions{
 			UseProtoNames:   true,
 			EmitUnpopulated: false,
@@ -201,7 +207,7 @@ func (s *Service) file(ctx context.Context, in *diagnosticsv1.BugReport, isAutod
 
 	subject, offline := s.subjectSnapshot(report.GetSubjectDeviceId())
 	summary.SubjectOffline = offline
-	events := s.subjectEvents(report.GetSubjectDeviceId(), report.GetTimestampUnixMs())
+	events := s.subjectEvents(ctx, report.GetSubjectDeviceId(), report.GetTimestampUnixMs())
 
 	recordReport := proto.Clone(report).(*diagnosticsv1.BugReport)
 	reportJSON, err := s.jsonMarshal.Marshal(recordReport)
@@ -536,13 +542,47 @@ func (s *Service) subjectSnapshot(subjectID string) (*SubjectSnapshot, bool) {
 	return snapshot, dev.State != device.StateConnected
 }
 
-func (s *Service) subjectEvents(subjectID string, reportUnixMS int64) []query.Record {
+func (s *Service) subjectEvents(ctx context.Context, subjectID string, reportUnixMS int64) []query.Record {
 	subjectID = strings.TrimSpace(subjectID)
 	if subjectID == "" {
 		return nil
 	}
-	all, err := query.ReadAll(s.logDir)
-	if err != nil || len(all) == 0 {
+	readAll := s.readAllEvents
+	if readAll == nil {
+		readAll = query.ReadAll
+	}
+	queryCtx := ctx
+	if queryCtx == nil {
+		queryCtx = context.Background()
+	}
+	if budget := s.subjectEventsQueryBudget; budget > 0 {
+		var cancel context.CancelFunc
+		queryCtx, cancel = context.WithTimeout(queryCtx, budget)
+		defer cancel()
+	}
+	type eventReadResult struct {
+		records []query.Record
+		err     error
+	}
+	readDone := make(chan eventReadResult, 1)
+	// query.ReadAll is not context-aware, so run it in a goroutine and bound
+	// how long filing waits for enrichment before continuing without it.
+	go func() {
+		all, err := readAll(s.logDir)
+		readDone <- eventReadResult{records: all, err: err}
+	}()
+
+	var all []query.Record
+	select {
+	case <-queryCtx.Done():
+		return nil
+	case result := <-readDone:
+		if result.err != nil || len(result.records) == 0 {
+			return nil
+		}
+		all = result.records
+	}
+	if len(all) == 0 {
 		return nil
 	}
 	reportTime := time.UnixMilli(reportUnixMS).UTC()
