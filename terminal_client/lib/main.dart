@@ -823,6 +823,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                 _clientContextRecentErrorCap,
               );
               _recordClientLog('error', response.error.message);
+              _failPendingBugReportsForControlError(response.error);
             }
             if (response.hasBugReportAck()) {
               _handleBugReportAck(response.bugReportAck);
@@ -1706,6 +1707,32 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       'bug report ack status=${ack.status.name} id=$receiptID '
           'word=$tokenWord code=$tokenCode',
     );
+  }
+
+  void _failPendingBugReportsForControlError(ControlError error) {
+    if (_pendingBugReports.isEmpty) {
+      return;
+    }
+    final failed = _pendingBugReports.removeAt(0);
+    _lastBugTokenWord = failed.identifier.word;
+    _lastBugTokenCode = failed.identifier.code;
+    final reason = error.message.trim().isNotEmpty
+        ? error.message.trim()
+        : error.code.name;
+    _status = 'Bug report receipt error';
+    _lastNotification =
+        'Bug report failed: $reason (word: ${failed.identifier.word}, code: ${failed.identifier.code}).';
+    _bugReceiptState = _BugReceiptState.error;
+    _bugReceiptReportId = '';
+    _bugReceiptDetail = 'No positive receipt could be generated: $reason.';
+    _recordClientLog(
+      'error',
+      'bug report rejected by control error code=${error.code.name} '
+          'message=$reason word=${failed.identifier.word} code=${failed.identifier.code}',
+    );
+    _pendingBugReports.clear();
+    _bugReportAckTimer?.cancel();
+    _bugReportAckTimer = null;
   }
 
   bool _isBugReportTransportReady() {

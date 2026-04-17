@@ -387,6 +387,86 @@ void main() {
     );
   });
 
+  testWidgets('fails bug report immediately when server returns control error',
+      (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness();
+    var fakeNow = DateTime.utc(2026, 1, 1, 0, 0, 0).millisecondsSinceEpoch;
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        nowUnixMsProvider: () => fakeNow,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'server_bug_button'
+                ..button = (uiv1.ButtonWidget()
+                  ..label = 'Report a bug'
+                  ..action = 'bug_report:subject-1'),
+            ))),
+    );
+    await tester.pump();
+
+    final serverBugButton = find.text('Report a bug');
+    await tester.ensureVisible(serverBugButton);
+    await tester.pumpAndSettle();
+    await tester.tap(serverBugButton);
+    await tester.pump();
+
+    expect(
+      find.textContaining('Bug Report Receipt: Pending'),
+      findsOneWidget,
+    );
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..error = (ControlError()
+          ..code = ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION
+          ..message = 'bug report intake unavailable'),
+    );
+    await tester.pump();
+
+    expect(
+      find.textContaining('Bug Report Receipt: Error'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'No positive receipt could be generated: bug report intake unavailable',
+      ),
+      findsOneWidget,
+    );
+
+    fakeNow += const Duration(seconds: 21).inMilliseconds;
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      find.textContaining(
+        'No positive receipt could be generated: bug report intake unavailable',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('shows bug report receipt error when report stays queued', (
     WidgetTester tester,
   ) async {
