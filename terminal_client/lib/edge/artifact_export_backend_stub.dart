@@ -6,10 +6,10 @@ class _MemoryArtifactExportBackend implements ArtifactExportBackend {
   final Map<String, Uint8List> _storage = <String, Uint8List>{};
 
   @override
-  Uint8List? read(String artifactId) => _storage[artifactId];
+  Future<Uint8List?> read(String artifactId) async => _storage[artifactId];
 
   @override
-  void write(String artifactId, Uint8List payload) {
+  Future<void> write(String artifactId, Uint8List payload) async {
     _storage[artifactId] = payload;
   }
 }

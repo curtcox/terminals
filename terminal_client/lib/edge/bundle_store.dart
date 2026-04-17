@@ -4,9 +4,12 @@ import 'bundle_store_backend.dart';
 
 /// Durable bundle store backed by platform storage.
 class BundleStore {
-  BundleStore({BundleStoreBackend? backend})
-      : _backend = backend ?? createBundleStoreBackend() {
-    _bundles.addAll(_backend.loadAll());
+  BundleStore._(this._backend);
+
+  static Future<BundleStore> create({BundleStoreBackend? backend}) async {
+    final store = BundleStore._(backend ?? createBundleStoreBackend());
+    store._bundles.addAll(await store._backend.loadAll());
+    return store;
   }
 
   final BundleStoreBackend _backend;
@@ -14,14 +17,14 @@ class BundleStore {
 
   Iterable<String> get ids => _bundles.keys;
 
-  void install(String bundleId, Uint8List payload) {
+  Future<void> install(String bundleId, Uint8List payload) async {
     _bundles[bundleId] = payload;
-    _backend.put(bundleId, payload);
+    await _backend.put(bundleId, payload);
   }
 
-  void remove(String bundleId) {
+  Future<void> remove(String bundleId) async {
     _bundles.remove(bundleId);
-    _backend.remove(bundleId);
+    await _backend.remove(bundleId);
   }
 
   Uint8List? get(String bundleId) => _bundles[bundleId];

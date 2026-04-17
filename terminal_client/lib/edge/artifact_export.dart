@@ -15,7 +15,7 @@ class DurableArtifactExporter implements ArtifactExporter {
 
   @override
   Future<Uint8List> exportByID(String artifactId) async {
-    final payload = _backend.read(artifactId);
+    final payload = await _backend.read(artifactId);
     if (payload != null) {
       return payload;
     }
@@ -23,6 +23,6 @@ class DurableArtifactExporter implements ArtifactExporter {
   }
 
   Future<void> save(String artifactId, Uint8List payload) async {
-    _backend.write(artifactId, payload);
+    await _backend.write(artifactId, payload);
   }
 }

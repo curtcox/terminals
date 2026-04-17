@@ -5,9 +5,9 @@ import 'bundle_store_backend_stub.dart'
     if (dart.library.html) 'bundle_store_backend_web.dart';
 
 abstract class BundleStoreBackend {
-  Map<String, Uint8List> loadAll();
-  void put(String bundleId, Uint8List payload);
-  void remove(String bundleId);
+  Future<Map<String, Uint8List>> loadAll();
+  Future<void> put(String bundleId, Uint8List payload);
+  Future<void> remove(String bundleId);
 }
 
 BundleStoreBackend createBundleStoreBackend() =>

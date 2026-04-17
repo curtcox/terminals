@@ -1024,8 +1024,7 @@ void main() {
     );
   });
 
-  testWidgets(
-      'renders safe placeholders for canvas, media, and system hint primitives',
+  testWidgets('renders media and system hint primitives with live widgets',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -1094,6 +1093,7 @@ void main() {
       find.byKey(const ValueKey<String>('ui-brightness-brightness_hint')),
       findsOneWidget,
     );
+    expect(find.text('track-a'), findsOneWidget);
     expect(find.text('Fullscreen body'), findsOneWidget);
     expect(find.text('Awake body'), findsOneWidget);
     expect(find.text('Brightness body'), findsOneWidget);
@@ -1240,6 +1240,50 @@ void main() {
       find.textContaining('Play audio: hall-display (pcm_data, 5 bytes)'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('responds to request_artifact after local artifact persistence',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..playAudio = (iov1.PlayAudio()
+          ..requestId = 'artifact-001'
+          ..deviceId = 'hall-display'
+          ..pcmData = <int>[7, 8, 9]),
+    );
+    await tester.pumpAndSettle();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..requestArtifact =
+            (iov1.RequestArtifact()..artifactId = 'play_audio/artifact-001'),
+    );
+    await tester.pumpAndSettle();
+
+    final artifactAvailableRequest = harness.lastClient.requests.lastWhere(
+      (request) => request.hasArtifactAvailable(),
+    );
+    expect(
+      artifactAvailableRequest.artifactAvailable.artifact.id,
+      'play_audio/artifact-001',
+    );
+    expect(
+      artifactAvailableRequest.artifactAvailable.artifact.source.deviceId,
+      isNotEmpty,
+    );
+    expect(find.textContaining('Artifact available: play_audio/artifact-001'),
+        findsOneWidget);
   });
 
   testWidgets(

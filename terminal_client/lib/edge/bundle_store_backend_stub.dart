@@ -6,15 +6,16 @@ class _MemoryBundleStoreBackend implements BundleStoreBackend {
   final Map<String, Uint8List> _storage = <String, Uint8List>{};
 
   @override
-  Map<String, Uint8List> loadAll() => Map<String, Uint8List>.from(_storage);
+  Future<Map<String, Uint8List>> loadAll() async =>
+      Map<String, Uint8List>.from(_storage);
 
   @override
-  void put(String bundleId, Uint8List payload) {
+  Future<void> put(String bundleId, Uint8List payload) async {
     _storage[bundleId] = payload;
   }
 
   @override
-  void remove(String bundleId) {
+  Future<void> remove(String bundleId) async {
     _storage.remove(bundleId);
   }
 }

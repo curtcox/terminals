@@ -8,7 +8,7 @@ See [masterplan.md](../masterplan.md) for overall system context. This phase ext
 
 ## Deliverables
 - [x] **Application runtime**: add TAR/TAL package loading, permissions, hot reload, and PTY-first development tooling. See [application-runtime.md](application-runtime.md).
-- [x] **Edge operator host**: add a generic client runtime for portable compute kernels, retention buffers, clock sync, and artifact export. See [edge-execution.md](edge-execution.md).
+- [~] **Edge operator host**: generic runtime scaffold landed; production durability and artifact lifecycle hardening are still pending. See [edge-execution.md](edge-execution.md).
 - [x] **FlowPlan generalization**: broaden `MediaPlan` into `FlowPlan` so audio, video, sensors, and radio observations all use one planner. See [observation-plane.md](observation-plane.md).
 - [x] **Observation plane**: ship typed `Observation`, `ArtifactRef`, `FlowStats`, and artifact-pull messages over the control plane. See [observation-plane.md](observation-plane.md#observation-plane-messages).
 - [x] **Compute and buffer claims**: add `compute.*`, `buffer.*`, and `radio.*` resource kinds so edge work is schedulable and preemptable. See [edge-execution.md](edge-execution.md#resource-claims-for-edge-compute).

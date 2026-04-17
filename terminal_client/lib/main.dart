@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
+import 'package:terminal_client/edge/artifact_export.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
     as capv1;
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
@@ -579,6 +581,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   late final CapabilityProbe _capabilityProbe;
   late final ClientMediaEngine _mediaEngine;
   late final AudioPlayback _audioPlayback;
+  late final DurableArtifactExporter _artifactExporter;
   uiv1.Node? _activeRoot;
   int _activeRootRevision = 0;
   String _activeTransition = 'none';
@@ -660,6 +663,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       onSignal: _sendWebRTCSignalMessage,
     );
     _audioPlayback = widget.audioPlaybackFactory();
+    _artifactExporter = DurableArtifactExporter();
     _recordClientLog('info', 'client started');
     if (_e2eEmitEvents) {
       debugPrint('E2E_EVENT: client_started');
@@ -2291,6 +2295,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (response.hasPlayAudio()) {
       return 'Play audio';
     }
+    if (response.hasRequestArtifact()) {
+      return 'Artifact requested';
+    }
     if (response.hasBugReportAck()) {
       return 'Bug report filed';
     }
@@ -2358,6 +2365,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (response.hasPlayAudio()) {
       unawaited(_executePlayAudio(response.playAudio.deepCopy()));
     }
+    if (response.hasRequestArtifact()) {
+      unawaited(_handleRequestArtifact(response.requestArtifact.deepCopy()));
+    }
   }
 
   Future<void> _startMediaStream(iov1.StartStream start) async {
@@ -2411,6 +2421,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         : 0;
     try {
       await _audioPlayback.play(playAudio);
+      if (playAudio.whichSource() == iov1.PlayAudio_Source.pcmData &&
+          playAudio.pcmData.isNotEmpty &&
+          playAudio.requestId.trim().isNotEmpty) {
+        await _artifactExporter.save(
+          'play_audio/${playAudio.requestId.trim()}',
+          Uint8List.fromList(playAudio.pcmData),
+        );
+      }
       if (!mounted) {
         return;
       }
@@ -2430,6 +2448,39 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       setState(() {
         _lastNotification = 'Play audio failed: $error';
       });
+    }
+  }
+
+  Future<void> _handleRequestArtifact(iov1.RequestArtifact request) async {
+    final artifactID = request.artifactId.trim();
+    if (artifactID.isEmpty) {
+      return;
+    }
+    try {
+      final payload = await _artifactExporter.exportByID(artifactID);
+      final nowUnixMs = _nowUnixMs();
+      _outgoing.add(
+        ConnectRequest()
+          ..artifactAvailable = (iov1.ArtifactAvailable()
+            ..artifact = (iov1.ArtifactRef()
+              ..id = artifactID
+              ..kind = 'artifact.binary'
+              ..source = (iov1.DeviceRef()..deviceId = _deviceId)
+              ..startUnixMs = Int64(nowUnixMs)
+              ..endUnixMs = Int64(nowUnixMs)
+              ..uri = 'local://artifact/$artifactID?bytes=${payload.length}')),
+      );
+      if (mounted) {
+        setState(() {
+          _lastNotification = 'Artifact available: $artifactID';
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _lastNotification = 'Artifact request failed: $artifactID ($error)';
+        });
+      }
     }
   }
 
@@ -2847,34 +2898,77 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       case uiv1.Node_Widget.videoSurface:
         final componentId = _nodeId(node);
         final streamID = node.videoSurface.trackId.trim();
-        return _placeholderPrimitive(
+        return Container(
           key: ValueKey<String>('ui-video-surface-$componentId'),
-          title: 'Video surface (${streamID.isEmpty ? 'unbound' : streamID})',
-          detail: node.videoSurface.trackId,
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.black,
+            border: Border.all(color: Colors.blueGrey.shade700),
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: SizedBox(
             height: 160,
-            child: _VideoSurfaceView(
-              streamListenable: _mediaEngine.remoteStream(streamID),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _VideoSurfaceView(
+                    streamListenable: _mediaEngine.remoteStream(streamID),
+                  ),
+                ),
+                if (streamID.isNotEmpty)
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Container(
+                      margin: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        streamID,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         );
       case uiv1.Node_Widget.audioVisualizer:
         final componentId = _nodeId(node);
         final streamID = node.audioVisualizer.streamId.trim();
-        return _placeholderPrimitive(
+        return Container(
           key: ValueKey<String>('ui-audio-visualizer-$componentId'),
-          title: 'Audio visualizer',
-          detail: node.audioVisualizer.streamId,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: ValueListenableBuilder<double>(
-              valueListenable: _mediaEngine.audioLevel(streamID),
-              builder: (context, level, _) {
-                return LinearProgressIndicator(
-                  value: level > 0 ? level.clamp(0.0, 1.0) : null,
-                );
-              },
-            ),
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.blueGrey.shade200),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Audio level'),
+              if (streamID.isNotEmpty)
+                Text(streamID, style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 8),
+              ValueListenableBuilder<double>(
+                valueListenable: _mediaEngine.audioLevel(streamID),
+                builder: (context, level, _) {
+                  return LinearProgressIndicator(
+                    value: level > 0 ? level.clamp(0.0, 1.0) : null,
+                  );
+                },
+              ),
+            ],
           ),
         );
       case uiv1.Node_Widget.canvas:
