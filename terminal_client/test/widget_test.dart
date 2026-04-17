@@ -138,6 +138,65 @@ void main() {
     },
   );
 
+  testWidgets('queues bug report until register ack is received', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'server_bug_button'
+                ..button = (uiv1.ButtonWidget()
+                  ..label = 'Report a bug'
+                  ..action = 'bug_report:subject-1'),
+            ))),
+    );
+    await tester.pump();
+
+    final serverBugButton = find.text('Report a bug');
+    await tester.ensureVisible(serverBugButton);
+    await tester.pumpAndSettle();
+    await tester.tap(serverBugButton);
+    await tester.pump();
+
+    expect(
+      harness.lastClient.requests.where((request) => request.hasBugReport()),
+      isEmpty,
+    );
+    expect(find.textContaining('Control Stream: Bug report queued'),
+        findsOneWidget);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pump();
+
+    expect(
+      harness.lastClient.requests.where((request) => request.hasBugReport()),
+      hasLength(1),
+    );
+    expect(find.textContaining('Control Stream: Queued bug reports sent'),
+        findsOneWidget);
+  });
+
   test('reconnect delay grows exponentially and caps at max', () {
     expect(
       calculateReconnectDelay(

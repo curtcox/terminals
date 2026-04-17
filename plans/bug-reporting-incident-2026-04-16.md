@@ -1,19 +1,23 @@
 # Bug Report Incident: Bug Reporting Reliability (2026-04-16)
 
+## Incident Status
+
+Mitigated in code on 2026-04-16. Follow-up hardening items remain open.
+
 ## Scope
 
 This incident tracks failures in the bug-reporting feature itself during local development runs of the Flutter web client and Go server.
 
 ## Reported Problem
 
-User filed several bug reports and provided time-derived code words (for example `nude`, `nujo`, `nuno`, `nuro`, `sky`). The system could not find corresponding records.
+User filed several bug reports and provided time-derived token words/codes (for example `sky` and its paired code). The system could not find corresponding records.
 
 ## Expected Behavior
 
 - On submit, each report should produce:
   - a server-side `bug.report.filed` event
   - searchable token attributes (`bug_token_word`, `bug_token_code`)
-  - a durable report artifact under `logs/bug_reports/<YYYY-MM-DD>/<report_id>.json`
+  - a durable report artifact under `${TERMINALS_LOG_DIR}/bug_reports/<YYYY-MM-DD>/<report_id>.json` (default local path during `make run-local`: `terminal_server/logs/bug_reports/...`)
 - Client status should only indicate success after server ack.
 
 ## Actual Behavior
@@ -30,6 +34,7 @@ User filed several bug reports and provided time-derived code words (for example
    - `.tmp/run-local-client.log`
    - `.tmp/run-local-server.log`
    - `terminal_server/logs/terminals.jsonl`
+   - `terminal_server/logs/bug_reports/<YYYY-MM-DD>/`
 4. Observe missing token matches and missing persisted report files.
 
 ## Root Causes
@@ -67,12 +72,14 @@ User filed several bug reports and provided time-derived code words (for example
    - validates eventual ack
    - validates presence of token fields in server logs
    - validates on-disk JSON artifact creation
-2. Add an admin view filter for `bug_token_word` and `bug_token_code` to speed lookup.
+2. Improve admin lookup ergonomics for token word/code:
+   - current workaround: filter by `tag` using `bug_word:<word>` or `bug_code:<code>`
+   - follow-up: add dedicated `bug_token_word` / `bug_token_code` filter inputs
 3. Add a startup health check warning when the server process is not alive while the client is running.
 
 ## Verification Checklist
 
 - [ ] Submit report while connected; verify ack and token in logs.
 - [ ] Submit report while disconnected; verify auto-connect, queue flush, ack, and token in logs.
-- [ ] Confirm `logs/bug_reports/<date>/<report_id>.json` exists.
+- [ ] Confirm `terminal_server/logs/bug_reports/<date>/<report_id>.json` exists (or `${TERMINALS_LOG_DIR}/bug_reports/...` when overridden).
 - [ ] Confirm no "filed" UI state appears without ack.

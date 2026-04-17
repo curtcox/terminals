@@ -484,6 +484,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   final List<_QueuedBugReport> _queuedBugReports = <_QueuedBugReport>[];
   final List<_PendingBugReport> _pendingBugReports = <_PendingBugReport>[];
   Timer? _bugReportAckTimer;
+  bool _hasRegisterAck = false;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
 
   @override
@@ -543,6 +544,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     final size = mediaQuery.size;
     if (host.isEmpty || port == null || port <= 0 || port > 65535) {
       _shouldStayConnected = false;
+      _hasRegisterAck = false;
       setState(() {
         _status = 'Invalid host or port';
         _lastConnectionStatus = _status;
@@ -551,6 +553,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     }
 
     _isConnecting = true;
+    _hasRegisterAck = false;
     if (mounted) {
       setState(() {
         _status = userInitiated ? 'Connecting...' : 'Reconnecting...';
@@ -573,6 +576,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             return;
           }
           final nowUnixMs = DateTime.now().toUtc().millisecondsSinceEpoch;
+          var shouldFlushQueuedBugReports = false;
           _reconnectAttempt = 0;
           setState(() {
             if (_pendingHeartbeatUnixMs > 0) {
@@ -649,12 +653,21 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
             if (response.hasBugReportAck()) {
               _handleBugReportAck(response.bugReportAck);
             }
+            if (response.hasRegisterAck()) {
+              if (!_hasRegisterAck) {
+                shouldFlushQueuedBugReports = true;
+              }
+              _hasRegisterAck = true;
+            }
             _applyRegisterMetadata(response);
             if (_e2eEmitEvents && response.hasRegisterAck()) {
               debugPrint('E2E_EVENT: register_ack');
             }
             _applyMediaControlResponse(response);
           });
+          if (shouldFlushQueuedBugReports) {
+            _flushQueuedBugReports();
+          }
         },
         onError: (Object error) {
           unawaited(_handleStreamClosed('Stream error: $error'));
@@ -690,7 +703,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
       );
       _recordClientLog('info', 'control stream connected');
       _sendSensorTelemetry();
-      _flushQueuedBugReports();
     } catch (error) {
       await _handleStreamClosed('Connection error: $error');
     } finally {
@@ -1169,12 +1181,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
         identifier: identifier,
       ),
     );
-    if (!_isConnecting) {
+    final hasActiveStreamAttempt =
+        _shouldStayConnected && _client != null && _incoming != null;
+    if (!hasActiveStreamAttempt && !_isConnecting) {
       unawaited(_startStream(userInitiated: true));
     }
     _recordClientLog(
       'warn',
-      'queued bug report while disconnected for subject=$subjectDeviceID '
+      'queued bug report while transport not ready for subject=$subjectDeviceID '
           'word=${identifier.word} code=${identifier.code}',
     );
     setState(() {
@@ -1404,7 +1418,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   }
 
   bool _isBugReportTransportReady() {
-    return _client != null && _incoming != null && _shouldStayConnected;
+    return _client != null &&
+        _incoming != null &&
+        _shouldStayConnected &&
+        _hasRegisterAck;
   }
 
   void _dispatchBugReport({
@@ -1536,6 +1553,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
     _stopHeartbeatLoop();
     _stopSensorTelemetryLoop();
     _incoming = null;
+    _hasRegisterAck = false;
     _drainPendingBugReportsAsFailed('stream closed before bug report ack');
     final existingClient = _client;
     _client = null;
@@ -1639,6 +1657,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
 
   Future<void> _stopStream() async {
     _shouldStayConnected = false;
+    _hasRegisterAck = false;
     _reconnectAttempt = 0;
     _cancelReconnectTimer();
     _stopHeartbeatLoop();
