@@ -91,6 +91,125 @@ func TestWebSocketServerRejectsDisallowedOrigin(t *testing.T) {
 	}
 }
 
+func TestIsLoopbackHostPort(t *testing.T) {
+	cases := []struct {
+		hostPort string
+		want     bool
+	}{
+		{"localhost", true},
+		{"localhost:60739", true},
+		{"127.0.0.1", true},
+		{"127.0.0.1:50054", true},
+		{"127.1.2.3:8080", true},
+		{"[::1]", true},
+		{"[::1]:50054", true},
+		{"example.com", false},
+		{"example.com:443", false},
+		{"10.0.0.1:8080", false},
+		{"0.0.0.0:50054", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := isLoopbackHostPort(c.hostPort); got != c.want {
+			t.Errorf("isLoopbackHostPort(%q) = %v, want %v", c.hostPort, got, c.want)
+		}
+	}
+}
+
+func TestWebSocketServerRejectsNonLoopbackOriginOnLoopbackBind(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	grpcServer := NewServer(mustAvailableTCPAddress(t))
+	grpcServer.ConfigureControl(control, GeneratedProtoAdapter{})
+	wsServer := NewWebSocketServer(mustAvailableTCPAddress(t), grpcServer, []string{})
+
+	if err := wsServer.Start(context.Background()); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = wsServer.Stop(ctx)
+	})
+
+	endpoint := url.URL{Scheme: "ws", Host: wsServer.Address(), Path: wsServer.Path()}
+	config, err := websocket.NewConfig(endpoint.String(), "http://evil.example")
+	if err != nil {
+		t.Fatalf("websocket.NewConfig() error = %v", err)
+	}
+	if _, err := websocket.DialConfig(config); err == nil {
+		t.Fatalf("DialConfig() error = nil, want cross-origin rejection even on loopback bind")
+	}
+}
+
+func TestWebSocketServerAllowsLoopbackOriginWithoutExplicitAllowList(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	grpcServer := NewServer(mustAvailableTCPAddress(t))
+	grpcServer.ConfigureControl(control, GeneratedProtoAdapter{})
+	grpcServer.ConfigureBugReportIntake(bugReportIntakeStub{
+		ack: &diagnosticsv1.BugReportAck{
+			ReportId:      "bug-loopback-ack-1",
+			CorrelationId: "bug:bug-loopback-ack-1",
+			Status:        diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED,
+		},
+	})
+
+	wsServer := NewWebSocketServer(mustAvailableTCPAddress(t), grpcServer, []string{})
+	if err := wsServer.Start(context.Background()); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = wsServer.Stop(ctx)
+	})
+
+	// Simulate the production browser flow: the Flutter web client at
+	// http://localhost:60739 connects to the control WebSocket on a
+	// different loopback port. Without an explicit allow list, both
+	// endpoints are still on the same host and should be permitted.
+	conn := mustDialWebSocket(t, wsServer.Address(), wsServer.Path(), "http://localhost:60739")
+	defer func() { _ = conn.Close() }()
+
+	register := &controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Register{
+			Register: &controlv1.RegisterDevice{
+				Capabilities: &capabilitiesv1.DeviceCapabilities{
+					DeviceId: "device-1",
+					Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Browser Client"},
+				},
+			},
+		},
+	}
+	mustSendProtoMessage(t, conn, register)
+
+	registerAck := mustReceiveConnectResponse(t, conn)
+	if registerAck.GetRegisterAck() == nil {
+		t.Fatalf("first register response should include register_ack")
+	}
+
+	bugReport := &controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_BugReport{
+			BugReport: &diagnosticsv1.BugReport{
+				ReportId:         "bug-loopback-1",
+				ReporterDeviceId: "device-1",
+				SubjectDeviceId:  "device-1",
+				Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON,
+				Description:      "cross-port loopback bug report",
+				TimestampUnixMs:  time.Now().UTC().UnixMilli(),
+			},
+		},
+	}
+
+	const ackDeadline = 1 * time.Second
+	mustSendProtoMessage(t, conn, bugReport)
+	ack := mustReceiveBugReportAckWithin(t, conn, ackDeadline)
+	if ack.GetReportId() != "bug-loopback-ack-1" {
+		t.Fatalf("bug_report_ack report_id = %q, want bug-loopback-ack-1", ack.GetReportId())
+	}
+}
+
 func TestWebSocketServerRoundTripBugReportAckWithinDeadline(t *testing.T) {
 	manager := device.NewManager()
 	control := NewControlService("srv-1", manager)
