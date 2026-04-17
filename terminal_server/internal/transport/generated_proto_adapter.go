@@ -430,23 +430,46 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		out["touch.max_points"] = strconv.FormatInt(int64(touch.GetMaxPoints()), 10)
 	}
 	if speakers := caps.GetSpeakers(); speakers != nil {
-		out["speakers.channels"] = strconv.FormatInt(int64(speakers.GetChannels()), 10)
-		out["speakers.sample_rates"] = joinInts(speakers.GetSampleRates())
+		out["speakers.present"] = "true"
+		if speakers.GetChannels() > 0 {
+			out["speakers.channels"] = strconv.FormatInt(int64(speakers.GetChannels()), 10)
+		}
+		if rates := joinInts(speakers.GetSampleRates()); rates != "" {
+			out["speakers.sample_rates"] = rates
+		}
 	}
 	if mic := caps.GetMicrophone(); mic != nil {
-		out["microphone.channels"] = strconv.FormatInt(int64(mic.GetChannels()), 10)
-		out["microphone.sample_rates"] = joinInts(mic.GetSampleRates())
+		out["microphone.present"] = "true"
+		if mic.GetChannels() > 0 {
+			out["microphone.channels"] = strconv.FormatInt(int64(mic.GetChannels()), 10)
+		}
+		if rates := joinInts(mic.GetSampleRates()); rates != "" {
+			out["microphone.sample_rates"] = rates
+		}
 	}
 	if camera := caps.GetCamera(); camera != nil {
+		out["camera.present"] = "true"
 		if front := camera.GetFront(); front != nil {
-			out["camera.front.width"] = strconv.FormatInt(int64(front.GetWidth()), 10)
-			out["camera.front.height"] = strconv.FormatInt(int64(front.GetHeight()), 10)
-			out["camera.front.fps"] = strconv.FormatInt(int64(front.GetFps()), 10)
+			if front.GetWidth() > 0 {
+				out["camera.front.width"] = strconv.FormatInt(int64(front.GetWidth()), 10)
+			}
+			if front.GetHeight() > 0 {
+				out["camera.front.height"] = strconv.FormatInt(int64(front.GetHeight()), 10)
+			}
+			if front.GetFps() > 0 {
+				out["camera.front.fps"] = strconv.FormatInt(int64(front.GetFps()), 10)
+			}
 		}
 		if back := camera.GetBack(); back != nil {
-			out["camera.back.width"] = strconv.FormatInt(int64(back.GetWidth()), 10)
-			out["camera.back.height"] = strconv.FormatInt(int64(back.GetHeight()), 10)
-			out["camera.back.fps"] = strconv.FormatInt(int64(back.GetFps()), 10)
+			if back.GetWidth() > 0 {
+				out["camera.back.width"] = strconv.FormatInt(int64(back.GetWidth()), 10)
+			}
+			if back.GetHeight() > 0 {
+				out["camera.back.height"] = strconv.FormatInt(int64(back.GetHeight()), 10)
+			}
+			if back.GetFps() > 0 {
+				out["camera.back.fps"] = strconv.FormatInt(int64(back.GetFps()), 10)
+			}
 		}
 	}
 	if sensors := caps.GetSensors(); sensors != nil {

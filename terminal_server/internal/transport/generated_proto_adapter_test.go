@@ -62,6 +62,35 @@ func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesToDataMapPresenceOnlyForSparseMediaProbes(t *testing.T) {
+	got := capabilitiesToDataMap(&capabilitiesv1.DeviceCapabilities{
+		DeviceId: "device-1",
+		Camera:   &capabilitiesv1.CameraCapability{},
+		Microphone: &capabilitiesv1.AudioInputCapability{
+			Channels: 0,
+		},
+		Speakers: &capabilitiesv1.AudioOutputCapability{
+			Channels: 0,
+		},
+	})
+
+	if got["camera.present"] != "true" {
+		t.Fatalf("camera.present = %q, want true", got["camera.present"])
+	}
+	if got["microphone.present"] != "true" {
+		t.Fatalf("microphone.present = %q, want true", got["microphone.present"])
+	}
+	if got["speakers.present"] != "true" {
+		t.Fatalf("speakers.present = %q, want true", got["speakers.present"])
+	}
+	if _, ok := got["microphone.channels"]; ok {
+		t.Fatalf("microphone.channels should be omitted when value is zero")
+	}
+	if _, ok := got["camera.front.width"]; ok {
+		t.Fatalf("camera.front.width should be omitted when no lens dimensions were provided")
+	}
+}
+
 func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{

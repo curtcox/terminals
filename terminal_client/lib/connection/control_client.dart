@@ -49,82 +49,8 @@ class TerminalControlGrpcClient implements TerminalControlClient {
 
   /// Builds a canonical register message for session bootstrap.
   static ConnectRequest registerRequest({
-    required String deviceId,
-    required String deviceName,
-    required String deviceType,
-    required String platform,
-    int? screenWidth,
-    int? screenHeight,
-    double? screenDensity,
-    bool? screenTouch,
-    bool keyboardPhysical = true,
-    String keyboardLayout = 'en-US',
-    String pointerType = 'touch_or_mouse',
-    bool pointerHover = true,
-    int speakerChannels = 2,
-    List<int> speakerSampleRates = const [44100, 48000],
-    int microphoneChannels = 1,
-    List<int> microphoneSampleRates = const [16000, 44100, 48000],
-    List<String> edgeRuntimes = const <String>[],
-    List<String> edgeOperators = const <String>[],
-    int edgeCPURealtime = 0,
-    int edgeGPURealtime = 0,
-    int edgeNPURealtime = 0,
-    int edgeMemMB = 0,
-    int edgeAudioRetentionSec = 0,
-    int edgeVideoRetentionSec = 0,
-    int edgeSensorRetentionSec = 0,
-    int edgeRadioRetentionSec = 0,
-    double edgeSyncErrorMs = 0,
-    bool edgeMicArray = false,
-    bool edgeCameraIntrinsics = false,
-    bool edgeCompass = false,
+    required DeviceCapabilities capabilities,
   }) {
-    final capabilities = DeviceCapabilities()
-      ..deviceId = deviceId
-      ..identity = (DeviceIdentity()
-        ..deviceName = deviceName
-        ..deviceType = deviceType
-        ..platform = platform)
-      ..keyboard = (KeyboardCapability()
-        ..physical = keyboardPhysical
-        ..layout = keyboardLayout)
-      ..pointer = (PointerCapability()
-        ..type = pointerType
-        ..hover = pointerHover)
-      ..speakers = (AudioOutputCapability()
-        ..channels = speakerChannels
-        ..sampleRates.addAll(speakerSampleRates))
-      ..microphone = (AudioInputCapability()
-        ..channels = microphoneChannels
-        ..sampleRates.addAll(microphoneSampleRates))
-      ..edge = (EdgeCapability()
-        ..runtimes.addAll(edgeRuntimes)
-        ..operators.addAll(edgeOperators)
-        ..compute = (EdgeComputeCapability()
-          ..cpuRealtime = edgeCPURealtime
-          ..gpuRealtime = edgeGPURealtime
-          ..npuRealtime = edgeNPURealtime
-          ..memMb = edgeMemMB)
-        ..retention = (EdgeRetentionCapability()
-          ..audioSec = edgeAudioRetentionSec
-          ..videoSec = edgeVideoRetentionSec
-          ..sensorSec = edgeSensorRetentionSec
-          ..radioSec = edgeRadioRetentionSec)
-        ..timing = (EdgeTimingCapability()..syncErrorMs = edgeSyncErrorMs)
-        ..geometry = (EdgeGeometryCapability()
-          ..micArray = edgeMicArray
-          ..cameraIntrinsics = edgeCameraIntrinsics
-          ..compass = edgeCompass));
-
-    if (screenWidth != null || screenHeight != null || screenDensity != null) {
-      capabilities.screen = (ScreenCapability()
-        ..width = screenWidth ?? 0
-        ..height = screenHeight ?? 0
-        ..density = screenDensity ?? 1.0
-        ..touch = screenTouch ?? false);
-    }
-
     return ConnectRequest()
       ..register = (RegisterDevice()..capabilities = capabilities);
   }

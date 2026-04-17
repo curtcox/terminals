@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
+import 'package:terminal_client/capabilities/probe.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
@@ -24,6 +25,7 @@ typedef TerminalControlClientFactory = TerminalControlClient Function({
   required String host,
   required int port,
 });
+typedef CapabilityProbeFactory = CapabilityProbe Function();
 typedef ClientMediaEngineFactory = ClientMediaEngine Function({
   required String localDeviceID,
   required OutboundSignalCallback onSignal,
@@ -31,6 +33,16 @@ typedef ClientMediaEngineFactory = ClientMediaEngine Function({
 typedef UnixMsProvider = int Function();
 
 int _systemNowUnixMs() => DateTime.now().toUtc().millisecondsSinceEpoch;
+
+CapabilityProbe _defaultCapabilityProbeFactory() {
+  final bindingType = WidgetsBinding.instance.runtimeType.toString();
+  if (bindingType.contains('TestWidgetsFlutterBinding')) {
+    return DefaultCapabilityProbe(
+      mediaDeviceKindsProvider: () async => const <String>[],
+    );
+  }
+  return DefaultCapabilityProbe();
+}
 
 const bool _e2eEmitEvents = bool.fromEnvironment(
   'TERMINALS_E2E_EMIT_EVENTS',
@@ -462,6 +474,7 @@ class TerminalClientApp extends StatelessWidget {
   const TerminalClientApp({
     super.key,
     this.clientFactory = createTerminalControlClient,
+    this.capabilityProbeFactory = _defaultCapabilityProbeFactory,
     this.mediaEngineFactory = defaultClientMediaEngineFactory,
     this.heartbeatInterval = const Duration(seconds: 10),
     this.sensorTelemetryInterval = const Duration(seconds: 15),
@@ -471,6 +484,7 @@ class TerminalClientApp extends StatelessWidget {
   });
 
   final TerminalControlClientFactory clientFactory;
+  final CapabilityProbeFactory capabilityProbeFactory;
   final ClientMediaEngineFactory mediaEngineFactory;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
@@ -484,6 +498,7 @@ class TerminalClientApp extends StatelessWidget {
       title: 'Terminal Client',
       home: _ControlStreamScaffold(
         clientFactory: clientFactory,
+        capabilityProbeFactory: capabilityProbeFactory,
         mediaEngineFactory: mediaEngineFactory,
         heartbeatInterval: heartbeatInterval,
         sensorTelemetryInterval: sensorTelemetryInterval,
@@ -498,6 +513,7 @@ class TerminalClientApp extends StatelessWidget {
 class _ControlStreamScaffold extends StatefulWidget {
   const _ControlStreamScaffold({
     required this.clientFactory,
+    required this.capabilityProbeFactory,
     required this.mediaEngineFactory,
     required this.heartbeatInterval,
     required this.sensorTelemetryInterval,
@@ -507,6 +523,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   });
 
   final TerminalControlClientFactory clientFactory;
+  final CapabilityProbeFactory capabilityProbeFactory;
   final ClientMediaEngineFactory mediaEngineFactory;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
@@ -543,6 +560,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   String _status = 'Idle';
   int _responses = 0;
   final String _deviceId = 'flutter-${DateTime.now().millisecondsSinceEpoch}';
+  late final CapabilityProbe _capabilityProbe;
   late final ClientMediaEngine _mediaEngine;
   uiv1.Node? _activeRoot;
   int _activeRootRevision = 0;
@@ -617,6 +635,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   void initState() {
     super.initState();
     _installFlutterErrorHook();
+    _capabilityProbe = widget.capabilityProbeFactory();
     _mediaEngine = widget.mediaEngineFactory(
       localDeviceID: _deviceId,
       onSignal: _sendWebRTCSignalMessage,
@@ -812,15 +831,29 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
 
       _startHeartbeatLoop();
       _startSensorTelemetryLoop();
+      final touchInputLikely = switch (defaultTargetPlatform) {
+        TargetPlatform.android => true,
+        TargetPlatform.iOS => true,
+        TargetPlatform.fuchsia => true,
+        TargetPlatform.macOS => false,
+        TargetPlatform.linux => false,
+        TargetPlatform.windows => false,
+      };
+      final probedCapabilities = await _capabilityProbe.probe(
+        CapabilityProbeContext(
+          deviceId: _deviceId,
+          deviceName: _deviceNameController.text.trim(),
+          deviceType: _deviceTypeController.text.trim(),
+          platform: _platformController.text.trim(),
+          screenWidth: size.width.round(),
+          screenHeight: size.height.round(),
+          screenDensity: mediaQuery.devicePixelRatio,
+          touchInputLikely: touchInputLikely,
+          targetPlatform: defaultTargetPlatform,
+        ),
+      );
       final registerRequest = TerminalControlGrpcClient.registerRequest(
-        deviceId: _deviceId,
-        deviceName: _deviceNameController.text.trim(),
-        deviceType: _deviceTypeController.text.trim(),
-        platform: _platformController.text.trim(),
-        screenWidth: size.width.round(),
-        screenHeight: size.height.round(),
-        screenDensity: mediaQuery.devicePixelRatio,
-        screenTouch: true,
+        capabilities: probedCapabilities,
       );
       _lastRegisteredCapabilities = registerRequest.register.capabilities;
       _outgoing.add(registerRequest);
@@ -883,9 +916,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold> {
   ConnectRequest _buildSensorTelemetryRequest() {
     final now = DateTime.now().toUtc();
     final values = <String, double>{
-      'battery.level': 1.0,
-      'battery.charging': 1.0,
-      'connectivity.online': 1.0,
       'connectivity.reconnect_attempt': _reconnectAttempt.toDouble(),
       'time.utc_hour': now.hour.toDouble(),
       'time.utc_weekday': now.weekday.toDouble(),

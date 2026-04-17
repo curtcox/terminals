@@ -91,8 +91,7 @@ void main() {
     expect(sensorRequests.length, greaterThanOrEqualTo(2));
     expect(
       sensorRequests.every((request) =>
-          request.sensor.values.containsKey('battery.level') &&
-          request.sensor.values.containsKey('connectivity.online') &&
+          request.sensor.values.containsKey('connectivity.reconnect_attempt') &&
           request.sensor.values.containsKey('time.utc_hour')),
       isTrue,
     );
