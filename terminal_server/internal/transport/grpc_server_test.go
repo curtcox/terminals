@@ -217,7 +217,6 @@ func TestServerGeneratedGRPCRoundTripRegisterAndHeartbeat(t *testing.T) {
 	conn, err := grpc.NewClient(
 		s.Address(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	if err != nil {
 		t.Fatalf("grpc.NewClient() error = %v", err)

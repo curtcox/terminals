@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'dart:html' as html;
-import 'dart:indexed_db' as idb;
 import 'dart:typed_data';
 
 import 'bundle_store_backend.dart';
@@ -21,7 +20,8 @@ class _WebBundleStoreBackend implements BundleStoreBackend {
     }
     final tx = db.transaction(_storeName, 'readonly');
     final store = tx.objectStore(_storeName);
-    await for (final cursor in store.openCursor(autoAdvance: true)) {
+    final cursorStream = store.openCursor(autoAdvance: true) as Stream<dynamic>;
+    await for (final cursor in cursorStream) {
       final key = cursor.key;
       final value = cursor.value;
       if (key is String && value is ByteBuffer) {
@@ -60,7 +60,7 @@ class _WebBundleStoreBackend implements BundleStoreBackend {
 BundleStoreBackend createPlatformBundleStoreBackend() =>
     _WebBundleStoreBackend();
 
-Future<idb.Database?> _openDatabase() async {
+Future<dynamic> _openDatabase() async {
   final indexedDb = html.window.indexedDB;
   if (indexedDb == null) {
     return null;
@@ -69,16 +69,13 @@ Future<idb.Database?> _openDatabase() async {
     return await indexedDb.open(
       _databaseName,
       version: _databaseVersion,
-      onUpgradeNeeded: (event) {
-        final target = event.target;
-        if (target is! idb.Request) {
-          return;
-        }
-        final db = target.result;
-        if (db is! idb.Database) {
-          return;
-        }
-        if (!(db.objectStoreNames?.contains(_storeName) ?? false)) {
+      onUpgradeNeeded: (dynamic event) {
+        final target = event?.target;
+        final db = target?.result;
+        final objectStoreNames = db?.objectStoreNames;
+        final hasStore = objectStoreNames != null &&
+            objectStoreNames.contains(_storeName) == true;
+        if (!hasStore) {
           db.createObjectStore(_storeName);
         }
       },

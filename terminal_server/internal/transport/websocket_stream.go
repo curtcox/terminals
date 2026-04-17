@@ -16,7 +16,7 @@ type WebSocketProtoStream struct {
 }
 
 // NewWebSocketProtoStream creates a protobuf websocket stream adapter.
-func NewWebSocketProtoStream(conn *websocket.Conn, ctx context.Context) WebSocketProtoStream {
+func NewWebSocketProtoStream(ctx context.Context, conn *websocket.Conn) WebSocketProtoStream {
 	return WebSocketProtoStream{conn: conn, ctx: ctx}
 }
 

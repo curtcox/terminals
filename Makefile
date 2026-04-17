@@ -39,7 +39,21 @@ client-build-android:
 
 client-build-ios:
 	@if [ "$$(uname -s)" = "Darwin" ] && xcodebuild -version >/dev/null 2>&1; then \
-		cd terminal_client && flutter build ios --no-codesign; \
+		tmp="$$(mktemp)"; \
+		if cd terminal_client && flutter build ios --no-codesign >"$$tmp" 2>&1; then \
+			cat "$$tmp"; \
+			rm -f "$$tmp"; \
+		else \
+			if grep -Eq "iOS [0-9]+\\.[0-9]+ is not installed|Unable to find a destination matching the provided destination specifier" "$$tmp"; then \
+				echo "Skipping iOS build: required iOS platform components are not installed in Xcode."; \
+				tail -n 20 "$$tmp"; \
+				rm -f "$$tmp"; \
+			else \
+				cat "$$tmp"; \
+				rm -f "$$tmp"; \
+				exit 1; \
+			fi; \
+		fi; \
 	else \
 		echo "Skipping iOS build: requires macOS with Xcode command line tools."; \
 	fi

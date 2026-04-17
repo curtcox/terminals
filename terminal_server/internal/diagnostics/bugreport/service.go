@@ -1,3 +1,4 @@
+// Package bugreport stores and retrieves diagnostics bug reports.
 package bugreport
 
 import (
