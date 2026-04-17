@@ -648,8 +648,40 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   bool _hasRegisterAck = false;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
   bool _appIsForeground = true;
+  Size _lastKnownLogicalSize = Size.zero;
+  double _lastKnownDevicePixelRatio = 1.0;
+  String _lastKnownOrientation = 'unknown';
+  TextDirection _lastKnownTextDirection = TextDirection.ltr;
 
   int _nowUnixMs() => widget.nowUnixMsProvider();
+
+  Size _currentLogicalSize() {
+    if (_lastKnownLogicalSize.width > 0 && _lastKnownLogicalSize.height > 0) {
+      return _lastKnownLogicalSize;
+    }
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) {
+      return Size.zero;
+    }
+    final view = views.first;
+    final dpr = view.devicePixelRatio <= 0 ? 1.0 : view.devicePixelRatio;
+    return Size(
+      view.physicalSize.width / dpr,
+      view.physicalSize.height / dpr,
+    );
+  }
+
+  double _currentDevicePixelRatio() {
+    if (_lastKnownDevicePixelRatio > 0) {
+      return _lastKnownDevicePixelRatio;
+    }
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) {
+      return 1.0;
+    }
+    final dpr = views.first.devicePixelRatio;
+    return dpr <= 0 ? 1.0 : dpr;
+  }
 
   bool get _hasActiveControlSession =>
       _shouldStayConnected && _incoming != null && _client != null;
@@ -714,8 +746,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim());
-    final mediaQuery = MediaQuery.of(context);
-    final size = mediaQuery.size;
+    final size = _currentLogicalSize();
     if (host.isEmpty || port == null || port <= 0 || port > 65535) {
       _shouldStayConnected = false;
       _hasRegisterAck = false;
@@ -876,7 +907,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           platform: _platformController.text.trim(),
           screenWidth: size.width.round(),
           screenHeight: size.height.round(),
-          screenDensity: mediaQuery.devicePixelRatio,
+          screenDensity: _currentDevicePixelRatio(),
           touchInputLikely: touchInputLikely,
           targetPlatform: defaultTargetPlatform,
         ),
@@ -1259,10 +1290,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     final timezone = dispatcher.locale.toLanguageTag().isNotEmpty
         ? DateTime.now().timeZoneName
         : '';
-    final mediaQuery = MediaQuery.maybeOf(context);
-    final size = mediaQuery?.size;
-    final devicePixelRatio = mediaQuery?.devicePixelRatio ?? 1.0;
-    final orientation = mediaQuery?.orientation.name ?? 'unknown';
+    final size = _currentLogicalSize();
+    final devicePixelRatio = _currentDevicePixelRatio();
+    final orientation = _lastKnownOrientation;
 
     final runtime = diagv1.RuntimeState()
       ..activeUiRoot = (_activeRoot?.deepCopy() ?? uiv1.Node())
@@ -1310,8 +1340,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ..batteryLevel = (_lastSensorSnapshot['battery.level'] ?? 0).toDouble()
       ..batteryCharging =
           (_lastSensorSnapshot['battery.charging'] ?? 0).toDouble() >= 0.5
-      ..screenWidthPx = size?.width.round() ?? 0
-      ..screenHeightPx = size?.height.round() ?? 0
+      ..screenWidthPx = size.width.round()
+      ..screenHeightPx = size.height.round()
       ..devicePixelRatio = devicePixelRatio
       ..orientation = orientation;
     hardware.sensorSnapshot.addAll(_lastSensorSnapshot);
@@ -1634,11 +1664,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (!mounted) {
       return;
     }
-    final direction = Directionality.of(context);
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) {
+      return;
+    }
     SemanticsService.sendAnnouncement(
-      View.of(context),
+      views.first,
       'Bug reference word ${identifier.word}. Code ${identifier.code}',
-      direction,
+      _lastKnownTextDirection,
     );
   }
 
@@ -2094,6 +2127,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    _lastKnownLogicalSize = mediaQuery.size;
+    _lastKnownDevicePixelRatio = mediaQuery.devicePixelRatio;
+    _lastKnownOrientation = mediaQuery.orientation.name;
+    final directionality = Directionality.maybeOf(context);
+    if (directionality != null) {
+      _lastKnownTextDirection = directionality;
+    }
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showBugReportDialog,
