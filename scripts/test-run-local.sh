@@ -252,7 +252,7 @@ test_bootstrap_web_and_auto_port_selection() {
     fail "expected web bootstrap to create terminal_client/web/index.html"
   fi
 
-  assert_contains "${output_file}" "Using ports: grpc=50051 admin=50054 photo=50052"
+  assert_contains "${output_file}" "Using ports: grpc=50051 control_ws=50055 admin=50054 photo=50052"
   assert_contains "${output_file}" "Test mode: startup checks passed."
   assert_contains "${output_file}" "Browser client URL: http://localhost:58080"
   assert_contains "${SANDBOX_DIR}/commands.log" "go mod download"
@@ -263,6 +263,32 @@ test_bootstrap_web_and_auto_port_selection() {
   assert_contains "${SANDBOX_DIR}/commands.log" "flutter run -d web-server"
 
   echo "PASS: web bootstrap and auto-port selection work"
+}
+
+test_duplicate_explicit_ports_fail_early() {
+  reset_sandbox
+  : >"${SANDBOX_DIR}/commands.log"
+  local output_file="${SANDBOX_DIR}/test-output.log"
+
+  set +e
+  (
+    cd "${SANDBOX_DIR}"
+    TERMINALS_ADMIN_HTTP_PORT=59998 \
+    TERMINALS_CONTROL_WS_PORT=59998 \
+    RUN_LOCAL_TEST_MODE=true \
+    RUN_LOCAL_CLIENT_STARTUP_DELAY_SECONDS=0.1 \
+    RUN_LOCAL_TEST_COMMAND_LOG="${SANDBOX_DIR}/commands.log" \
+    ./scripts/run-local.sh --skip-bootstrap
+  ) >"${output_file}" 2>&1
+  local status=$?
+  set -e
+
+  if [[ "${status}" -eq 0 ]]; then
+    fail "expected failure for duplicate explicit admin/control websocket ports"
+  fi
+
+  assert_contains "${output_file}" "control websocket port 59998 conflicts with another selected local port"
+  echo "PASS: duplicate explicit ports fail early with a clear message"
 }
 
 test_real_smoke_run_local() {
@@ -299,6 +325,7 @@ main() {
   test_skip_bootstrap_requires_web_support
   test_explicit_busy_port_fails_early
   test_bootstrap_web_and_auto_port_selection
+  test_duplicate_explicit_ports_fail_early
   if [[ "${RUN_REAL_SMOKE}" == "true" ]]; then
     test_real_smoke_run_local
   else

@@ -26,6 +26,7 @@ CLIENT_PID=""
 BROWSER_OPENER_PID=""
 CLIENT_FOREGROUND="false"
 HAS_ERROR="false"
+RESERVED_PORTS=()
 
 usage() {
   cat <<'EOF'
@@ -136,6 +137,25 @@ is_port_available() {
   return 0
 }
 
+is_port_reserved() {
+  local port="$1"
+  local reserved_port
+  for reserved_port in "${RESERVED_PORTS[@]:-}"; do
+    if [[ -z "${reserved_port}" ]]; then
+      continue
+    fi
+    if [[ "${reserved_port}" == "${port}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+reserve_port() {
+  local port="$1"
+  RESERVED_PORTS+=("${port}")
+}
+
 find_available_port() {
   local start_port="$1"
   local max_tries="$2"
@@ -143,7 +163,7 @@ find_available_port() {
   local i
 
   for ((i = 0; i < max_tries; i++)); do
-    if is_port_available "${candidate}"; then
+    if is_port_available "${candidate}" && ! is_port_reserved "${candidate}"; then
       echo "${candidate}"
       return 0
     fi
@@ -158,12 +178,20 @@ require_available_port() {
   local label="$2"
   local env_name="$3"
 
+  if is_port_reserved "${port}"; then
+    fail "${label} port ${port} conflicts with another selected local port (set ${env_name} to a unique open port or unset it for auto-selection)"
+  fi
+
   if ! is_port_available "${port}"; then
     fail "${label} port ${port} is already in use (set ${env_name} to an open port or unset it for auto-selection)"
   fi
+
+  reserve_port "${port}"
 }
 
 resolve_ports() {
+  RESERVED_PORTS=()
+
   if [[ -n "${GRPC_PORT}" ]]; then
     require_available_port "${GRPC_PORT}" "gRPC" "TERMINALS_GRPC_PORT"
   else
@@ -171,6 +199,7 @@ resolve_ports() {
     if [[ -z "${GRPC_PORT}" ]]; then
       fail "unable to find open port for gRPC starting at 50051"
     fi
+    reserve_port "${GRPC_PORT}"
   fi
 
   if [[ -n "${ADMIN_PORT}" ]]; then
@@ -180,6 +209,7 @@ resolve_ports() {
     if [[ -z "${ADMIN_PORT}" ]]; then
       fail "unable to find open port for admin HTTP starting at 50053"
     fi
+    reserve_port "${ADMIN_PORT}"
   fi
 
   if [[ -n "${CONTROL_WS_PORT}" ]]; then
@@ -189,6 +219,7 @@ resolve_ports() {
     if [[ -z "${CONTROL_WS_PORT}" ]]; then
       fail "unable to find open port for control websocket starting at 50054"
     fi
+    reserve_port "${CONTROL_WS_PORT}"
   fi
 
   if [[ -n "${PHOTO_PORT}" ]]; then
@@ -198,6 +229,7 @@ resolve_ports() {
     if [[ -z "${PHOTO_PORT}" ]]; then
       fail "unable to find open port for photo frame HTTP starting at 50052"
     fi
+    reserve_port "${PHOTO_PORT}"
   fi
 
   if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
