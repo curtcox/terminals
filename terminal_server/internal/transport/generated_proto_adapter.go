@@ -493,7 +493,30 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 	}
 	if edge := caps.GetEdge(); edge != nil {
 		out["edge.runtimes"] = strings.Join(edge.GetRuntimes(), ",")
-		out["edge.operators"] = strings.Join(edge.GetOperators(), ",")
+		operators := edge.GetOperators()
+		out["edge.operators"] = strings.Join(operators, ",")
+		foregroundOnly := false
+		backgroundCapable := false
+		for _, operator := range operators {
+			normalized := strings.TrimSpace(strings.ToLower(operator))
+			switch normalized {
+			case "monitor.foreground_only", "monitor.tier.foreground_only":
+				foregroundOnly = true
+				out["monitor.foreground_only"] = "true"
+				out["monitor.support_tier"] = "foreground_only"
+			case "monitor.background_capable", "monitor.tier.background_capable":
+				backgroundCapable = true
+				out["monitor.background_capable"] = "true"
+				out["monitor.support_tier"] = "background_capable"
+			case "monitor.lifecycle.foreground":
+				out["monitor.runtime_state"] = "foreground"
+			case "monitor.lifecycle.background":
+				out["monitor.runtime_state"] = "background"
+			}
+		}
+		if foregroundOnly && !backgroundCapable {
+			out["monitor.background_capable"] = "false"
+		}
 		if compute := edge.GetCompute(); compute != nil {
 			out["edge.compute.cpu_realtime"] = strconv.FormatInt(int64(compute.GetCpuRealtime()), 10)
 			out["edge.compute.gpu_realtime"] = strconv.FormatInt(int64(compute.GetGpuRealtime()), 10)

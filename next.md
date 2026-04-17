@@ -1,1 +1,1 @@
-Implement Stage 8 monitoring support tiers (lifecycle-aware scheduling + placement gating).
+Await review feedback on Stage 8 monitoring tier implementation.

@@ -18,6 +18,18 @@ Ambient intelligence scenarios.
 - [x] **Placement engine**: Ship zone/role metadata on devices plus the `PlacementEngine` API (`Find`, `NearestWith`, `DevicesInZone`, `DevicesWithRole`). Ambient scenarios target "the kitchen" or "the child's room" by scope, not device ID. See [placement.md](placement.md).
 - [x] **Analyzer nodes emit events**: The media planner's analyzer nodes publish `Event{Kind: "sound.detected", ...}` onto the intent/event bus; scenarios subscribe rather than polling. See [io-abstraction.md](io-abstraction.md#router-responsibilities).
 
+## Monitoring Support Tiers
+
+Stage 8 defines transport-advertised monitoring support tiers that placement can enforce for background roles:
+
+- `foreground_only`: Monitoring is supported only while the app is in foreground. Clients advertise `monitor.support_tier=foreground_only` and do not claim background guarantees.
+- `background_capable`: Reserved for clients that implement OS-backed scheduling (e.g., WorkManager/BGTask-backed flows) and explicitly advertise `monitor.support_tier=background_capable`.
+
+Current policy in this repo:
+
+- Web, macOS, Linux, Windows: `foreground_only`
+- Android, iOS: currently `foreground_only` until dedicated background schedulers are implemented and validated
+
 ## Milestone
 
 "Tell me when the dishwasher stops" works end to end.

@@ -27,6 +27,14 @@ void main() {
     expect(capabilities.hasSpeakers(), isFalse);
     expect(capabilities.hasEdge(), isTrue);
     expect(capabilities.edge.operators, contains('monitor.foreground_only'));
+    expect(
+      capabilities.edge.operators,
+      contains('monitor.tier.foreground_only'),
+    );
+    expect(
+      capabilities.edge.operators,
+      contains('monitor.lifecycle.foreground'),
+    );
   });
 
   test('probe includes media capabilities when devices are detected', () async {

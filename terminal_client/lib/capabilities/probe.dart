@@ -33,6 +33,16 @@ abstract class CapabilityProbe {
   Future<capv1.DeviceCapabilities> probe(CapabilityProbeContext context);
 }
 
+class MonitoringSupportTier {
+  const MonitoringSupportTier({
+    required this.supportTier,
+    required this.operators,
+  });
+
+  final String supportTier;
+  final List<String> operators;
+}
+
 class DefaultCapabilityProbe implements CapabilityProbe {
   DefaultCapabilityProbe({
     MediaDeviceKindsProvider? mediaDeviceKindsProvider,
@@ -48,6 +58,9 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     final hasAudioOutput = mediaKinds.contains('audiooutput');
     final hasCamera = mediaKinds.contains('videoinput');
     final hasKeyboard = _isLikelyKeyboardPlatform(context.targetPlatform);
+    final monitoringTier = _monitoringSupportTierForPlatform(
+      context.targetPlatform,
+    );
 
     final capabilities = capv1.DeviceCapabilities()
       ..deviceId = context.deviceId
@@ -85,7 +98,7 @@ class DefaultCapabilityProbe implements CapabilityProbe {
       ..wifiSignalStrength = true;
     capabilities.edge = (capv1.EdgeCapability()
       ..runtimes.addAll(<String>['dart'])
-      ..operators.addAll(<String>['monitor.foreground_only'])
+      ..operators.addAll(monitoringTier.operators)
       ..retention = (capv1.EdgeRetentionCapability()
         ..audioSec = 120
         ..videoSec = 120
@@ -106,6 +119,27 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     } catch (_) {
       return <String>{};
     }
+  }
+}
+
+MonitoringSupportTier _monitoringSupportTierForPlatform(
+  TargetPlatform platform,
+) {
+  switch (platform) {
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+    case TargetPlatform.macOS:
+    case TargetPlatform.windows:
+    case TargetPlatform.linux:
+    case TargetPlatform.fuchsia:
+      return const MonitoringSupportTier(
+        supportTier: 'foreground_only',
+        operators: <String>[
+          'monitor.foreground_only',
+          'monitor.tier.foreground_only',
+          'monitor.lifecycle.foreground',
+        ],
+      );
   }
 }
 

@@ -102,6 +102,37 @@ void main() {
     expect(find.textContaining('Stream-ready acks: 0'), findsOneWidget);
   });
 
+  testWidgets('pauses heartbeat loop while app is backgrounded', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        heartbeatInterval: const Duration(milliseconds: 40),
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final beforePause = harness.lastClient.requests
+        .where((request) => request.hasHeartbeat())
+        .length;
+    expect(beforePause, greaterThan(0));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final afterPause = harness.lastClient.requests
+        .where((request) => request.hasHeartbeat())
+        .length;
+    expect(afterPause, beforePause);
+  });
+
   testWidgets('reconnect creates a new control client after stream failure', (
     WidgetTester tester,
   ) async {

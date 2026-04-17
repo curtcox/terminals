@@ -91,6 +91,30 @@ func TestCapabilitiesToDataMapPresenceOnlyForSparseMediaProbes(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesToDataMapIncludesMonitoringTierKeys(t *testing.T) {
+	got := capabilitiesToDataMap(&capabilitiesv1.DeviceCapabilities{
+		DeviceId: "device-monitor",
+		Edge: &capabilitiesv1.EdgeCapability{
+			Operators: []string{
+				"monitor.tier.foreground_only",
+				"monitor.lifecycle.background",
+			},
+		},
+	})
+	if got["monitor.support_tier"] != "foreground_only" {
+		t.Fatalf("monitor.support_tier = %q, want foreground_only", got["monitor.support_tier"])
+	}
+	if got["monitor.foreground_only"] != "true" {
+		t.Fatalf("monitor.foreground_only = %q, want true", got["monitor.foreground_only"])
+	}
+	if got["monitor.background_capable"] != "false" {
+		t.Fatalf("monitor.background_capable = %q, want false", got["monitor.background_capable"])
+	}
+	if got["monitor.runtime_state"] != "background" {
+		t.Fatalf("monitor.runtime_state = %q, want background", got["monitor.runtime_state"])
+	}
+}
+
 func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{

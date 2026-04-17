@@ -652,10 +652,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   int _nowUnixMs() => widget.nowUnixMsProvider();
 
+  bool get _hasActiveControlSession =>
+      _shouldStayConnected && _incoming != null && _client != null;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    _appIsForeground =
+        lifecycleState == null || lifecycleState == AppLifecycleState.resumed;
     _installFlutterErrorHook();
     _capabilityProbe = widget.capabilityProbeFactory();
     _mediaEngine = widget.mediaEngineFactory(
@@ -853,8 +859,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         },
       );
 
-      _startHeartbeatLoop();
-      _startSensorTelemetryLoop();
+      _syncMonitoringLoops();
       final touchInputLikely = switch (defaultTargetPlatform) {
         TargetPlatform.android => true,
         TargetPlatform.iOS => true,
@@ -881,6 +886,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       );
       _lastRegisteredCapabilities = registerRequest.register.capabilities;
       _outgoing.add(registerRequest);
+      _sendLifecycleCapabilityUpdate();
       final initialHeartbeatUnixMs =
           DateTime.now().toUtc().millisecondsSinceEpoch;
       _lastHeartbeatUnixMs = initialHeartbeatUnixMs;
@@ -912,7 +918,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   void _startHeartbeatLoop() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(widget.heartbeatInterval, (_) {
-      if (!_shouldStayConnected || _deviceId.isEmpty) {
+      if (!_hasActiveControlSession || _deviceId.isEmpty || !_appIsForeground) {
         return;
       }
       final unixMs = DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -930,11 +936,66 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   void _startSensorTelemetryLoop() {
     _sensorTimer?.cancel();
     _sensorTimer = Timer.periodic(widget.sensorTelemetryInterval, (_) {
-      if (!_shouldStayConnected || _deviceId.isEmpty || !_appIsForeground) {
+      if (!_hasActiveControlSession || _deviceId.isEmpty || !_appIsForeground) {
         return;
       }
       _sendSensorTelemetry();
     });
+  }
+
+  void _syncMonitoringLoops() {
+    if (_hasActiveControlSession && _appIsForeground) {
+      _startHeartbeatLoop();
+      _startSensorTelemetryLoop();
+      return;
+    }
+    _stopHeartbeatLoop();
+    _stopSensorTelemetryLoop();
+  }
+
+  void _sendLifecycleCapabilityUpdate() {
+    final current = _lastRegisteredCapabilities;
+    if (current == null || !_hasActiveControlSession) {
+      return;
+    }
+    final updated = current.deepCopy();
+    final edge = updated.hasEdge()
+        ? updated.edge
+        : (updated.edge = capv1.EdgeCapability());
+    final nextLifecycleOperator = _appIsForeground
+        ? 'monitor.lifecycle.foreground'
+        : 'monitor.lifecycle.background';
+    final nextOperators = edge.operators
+        .where(
+          (operator) =>
+              operator != 'monitor.lifecycle.foreground' &&
+              operator != 'monitor.lifecycle.background',
+        )
+        .toList(growable: true)
+      ..add(nextLifecycleOperator);
+    edge.operators
+      ..clear()
+      ..addAll(_dedupeOperators(nextOperators));
+
+    _lastRegisteredCapabilities = updated;
+    _outgoing.add(
+      ConnectRequest()
+        ..capability = (CapabilityUpdate()..capabilities = updated),
+    );
+  }
+
+  List<String> _dedupeOperators(List<String> operators) {
+    final seen = <String>{};
+    final deduped = <String>[];
+    for (final raw in operators) {
+      final normalized = raw.trim();
+      if (normalized.isEmpty || seen.contains(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      deduped.add(normalized);
+    }
+    return deduped;
   }
 
   ConnectRequest _buildSensorTelemetryRequest() {
@@ -1817,8 +1878,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     String notificationOverride = '',
   }) async {
     _recordClientLog('warn', 'control stream closed: $status');
-    _stopHeartbeatLoop();
-    _stopSensorTelemetryLoop();
     _incoming = null;
     _hasRegisterAck = false;
     _drainPendingBugReportsAsFailed('stream closed before bug report ack');
@@ -1836,6 +1895,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         }
       });
     }
+    _syncMonitoringLoops();
     _scheduleReconnect();
   }
 
@@ -1930,8 +1990,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _hasRegisterAck = false;
     _reconnectAttempt = 0;
     _cancelReconnectTimer();
-    _stopHeartbeatLoop();
-    _stopSensorTelemetryLoop();
+    _syncMonitoringLoops();
     _drainPendingBugReportsAsFailed('stream stopped before bug report ack');
     await _incoming?.cancel();
     _incoming = null;
@@ -1956,6 +2015,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final wasForeground = _appIsForeground;
     switch (state) {
       case AppLifecycleState.resumed:
         _appIsForeground = true;
@@ -1967,6 +2027,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         _appIsForeground = false;
         break;
     }
+    if (_appIsForeground == wasForeground) {
+      return;
+    }
+    _syncMonitoringLoops();
+    _sendLifecycleCapabilityUpdate();
   }
 
   @override

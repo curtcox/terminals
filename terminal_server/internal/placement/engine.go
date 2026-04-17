@@ -198,6 +198,20 @@ func matchesScope(d device.Device, scope scenario.TargetScope) bool {
 		if !found {
 			return false
 		}
+		if roleRequiresBackgroundSupport(role) && !deviceSupportsBackgroundMonitoring(d) {
+			return false
+		}
 	}
 	return true
+}
+
+func roleRequiresBackgroundSupport(role string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(role)), "background")
+}
+
+func deviceSupportsBackgroundMonitoring(d device.Device) bool {
+	if hasCapability(d, "monitor.background_capable") {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(d.Capabilities["monitor.support_tier"]), "background_capable")
 }

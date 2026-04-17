@@ -97,3 +97,36 @@ func TestFindRequiredCaps(t *testing.T) {
 		t.Fatalf("Find(camera) = %+v, want camera-1", got)
 	}
 }
+
+func TestFindBackgroundRoleSkipsForegroundOnlyDevices(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{
+		DeviceID: "foreground-only",
+		Capabilities: device.CapabilitySet{
+			"monitor.support_tier":       "foreground_only",
+			"monitor.background_capable": "false",
+		},
+	})
+	_, _ = devices.Register(device.Manifest{
+		DeviceID: "background-capable",
+		Capabilities: device.CapabilitySet{
+			"monitor.support_tier":       "background_capable",
+			"monitor.background_capable": "true",
+		},
+	})
+	_ = devices.UpdatePlacement("foreground-only", device.PlacementMetadata{
+		Roles: []string{"background_monitor"},
+	})
+	_ = devices.UpdatePlacement("background-capable", device.PlacementMetadata{
+		Roles: []string{"background_monitor"},
+	})
+
+	engine := NewManagerBackedEngine(devices)
+	got, err := engine.DevicesWithRole(context.Background(), "background_monitor")
+	if err != nil {
+		t.Fatalf("DevicesWithRole(background_monitor) error = %v", err)
+	}
+	if len(got) != 1 || got[0].DeviceID != "background-capable" {
+		t.Fatalf("DevicesWithRole(background_monitor) = %+v, want [background-capable]", got)
+	}
+}
