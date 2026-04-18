@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/capabilities/probe.dart';
@@ -34,6 +37,7 @@ typedef ClientMediaEngineFactory = ClientMediaEngine Function({
 });
 typedef AudioPlaybackFactory = AudioPlayback Function();
 typedef UnixMsProvider = int Function();
+typedef BugReportScreenshotCapture = Future<List<int>> Function();
 
 int _systemNowUnixMs() => DateTime.now().toUtc().millisecondsSinceEpoch;
 
@@ -649,6 +653,7 @@ class TerminalClientApp extends StatelessWidget {
     this.reconnectDelayBase = const Duration(seconds: 2),
     this.reconnectDelayMaxSeconds = 30,
     this.nowUnixMsProvider = _systemNowUnixMs,
+    this.bugReportScreenshotCapture,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -660,6 +665,7 @@ class TerminalClientApp extends StatelessWidget {
   final Duration reconnectDelayBase;
   final int reconnectDelayMaxSeconds;
   final UnixMsProvider nowUnixMsProvider;
+  final BugReportScreenshotCapture? bugReportScreenshotCapture;
 
   @override
   Widget build(BuildContext context) {
@@ -675,6 +681,7 @@ class TerminalClientApp extends StatelessWidget {
         reconnectDelayBase: reconnectDelayBase,
         reconnectDelayMaxSeconds: reconnectDelayMaxSeconds,
         nowUnixMsProvider: nowUnixMsProvider,
+        bugReportScreenshotCapture: bugReportScreenshotCapture,
       ),
     );
   }
@@ -691,6 +698,7 @@ class _ControlStreamScaffold extends StatefulWidget {
     required this.reconnectDelayBase,
     required this.reconnectDelayMaxSeconds,
     required this.nowUnixMsProvider,
+    required this.bugReportScreenshotCapture,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -702,6 +710,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   final Duration reconnectDelayBase;
   final int reconnectDelayMaxSeconds;
   final UnixMsProvider nowUnixMsProvider;
+  final BugReportScreenshotCapture? bugReportScreenshotCapture;
 
   @override
   State<_ControlStreamScaffold> createState() => _ControlStreamScaffoldState();
@@ -709,6 +718,7 @@ class _ControlStreamScaffold extends StatefulWidget {
 
 class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     with WidgetsBindingObserver {
+  final GlobalKey _bugReportScreenshotKey = GlobalKey();
   final TextEditingController _hostController = TextEditingController(
     text: _defaultControlHost,
   );
@@ -1985,6 +1995,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }) async {
     final now = DateTime.now().toLocal();
     final identifier = bugIdentifier ?? _buildBugIdentifier(now);
+    final screenshotPng = await _captureBugReportScreenshot();
     final bugReport = diagv1.BugReport()
       ..reporterDeviceId = _deviceId
       ..subjectDeviceId = subjectDeviceID
@@ -1992,6 +2003,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ..description = description
       ..timestampUnixMs = Int64(now.toUtc().millisecondsSinceEpoch)
       ..clientContext = _buildClientContext();
+    if (screenshotPng.isNotEmpty) {
+      bugReport.screenshotPng = screenshotPng;
+      bugReport.sourceHints['screenshot_byte_count'] =
+          screenshotPng.length.toString();
+    }
     bugReport.tags.addAll(<String>[
       ...tags,
       'bug_word:${identifier.word}',
@@ -2207,6 +2223,60 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       tags: draft.tags,
       bugIdentifier: draft.identifier,
     );
+  }
+
+  Future<List<int>> _captureBugReportScreenshot() async {
+    try {
+      final overrideCapture = widget.bugReportScreenshotCapture;
+      if (overrideCapture != null) {
+        return await overrideCapture();
+      }
+      final bindingType = WidgetsBinding.instance.runtimeType.toString();
+      if (bindingType.contains('TestWidgetsFlutterBinding')) {
+        return const <int>[];
+      }
+      if (!mounted) {
+        return const <int>[];
+      }
+      final screenshotContext = _bugReportScreenshotKey.currentContext;
+      if (screenshotContext == null) {
+        return const <int>[];
+      }
+      final renderObject = screenshotContext.findRenderObject();
+      if (renderObject is! RenderRepaintBoundary) {
+        return const <int>[];
+      }
+      final pixelRatio = math.min(
+        1.0,
+        View.maybeOf(screenshotContext)?.devicePixelRatio ??
+            _lastKnownDevicePixelRatio,
+      );
+      final image = await renderObject.toImage(
+        pixelRatio: pixelRatio > 0 ? pixelRatio : 1.0,
+      );
+      try {
+        final byteData = await image.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+        if (byteData == null) {
+          return const <int>[];
+        }
+        return Uint8List.sublistView(
+          byteData.buffer.asUint8List(
+            byteData.offsetInBytes,
+            byteData.lengthInBytes,
+          ),
+        );
+      } finally {
+        image.dispose();
+      }
+    } catch (error) {
+      _recordClientLog(
+        'warn',
+        'bug report screenshot capture failed error=$error',
+      );
+      return const <int>[];
+    }
   }
 
   _BugIdentifier _buildBugIdentifier(DateTime nowLocal) {
@@ -2782,185 +2852,188 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (directionality != null) {
       _lastKnownTextDirection = directionality;
     }
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showBugReportDialog,
-        icon: const Icon(Icons.bug_report_outlined),
-        label: const Text('Report Bug'),
-      ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: _hostController,
-                  decoration: const InputDecoration(
-                    labelText: 'Server Host',
-                    hintText: '127.0.0.1',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    ElevatedButton(
-                      onPressed: _isScanning ? null : _scanForServers,
-                      child: Text(_isScanning ? 'Scanning...' : 'Scan LAN'),
+    return RepaintBoundary(
+      key: _bugReportScreenshotKey,
+      child: Scaffold(
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _showBugReportDialog,
+          icon: const Icon(Icons.bug_report_outlined),
+          label: const Text('Report Bug'),
+        ),
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _hostController,
+                    decoration: const InputDecoration(
+                      labelText: 'Server Host',
+                      hintText: '127.0.0.1',
                     ),
-                  ],
-                ),
-                if (_discoveredServers.isNotEmpty) ...[
+                  ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey<String?>(_selectedDiscoveredServer),
-                    initialValue: _selectedDiscoveredServer,
-                    decoration:
-                        const InputDecoration(labelText: 'Discovered Server'),
-                    items: _discoveredServers
-                        .map(
-                          (server) => DropdownMenuItem<String>(
-                            value: '${server.host}:${server.port}',
-                            child: Text(
-                              '${server.name} (${server.host}:${server.port})',
+                  Row(
+                    children: [
+                      ElevatedButton(
+                        onPressed: _isScanning ? null : _scanForServers,
+                        child: Text(_isScanning ? 'Scanning...' : 'Scan LAN'),
+                      ),
+                    ],
+                  ),
+                  if (_discoveredServers.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey<String?>(_selectedDiscoveredServer),
+                      initialValue: _selectedDiscoveredServer,
+                      decoration:
+                          const InputDecoration(labelText: 'Discovered Server'),
+                      items: _discoveredServers
+                          .map(
+                            (server) => DropdownMenuItem<String>(
+                              value: '${server.host}:${server.port}',
+                              child: Text(
+                                '${server.name} (${server.host}:${server.port})',
+                              ),
                             ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-                      final parts = value.split(':');
-                      if (parts.length != 2) {
-                        return;
-                      }
-                      setState(() {
-                        _selectedDiscoveredServer = value;
-                        _hostController.text = parts[0];
-                        final selected = _selectedServerMetadata();
-                        final parsedPort = int.tryParse(parts[1]);
-                        _portController.text = _grpcPortFor(
-                          selected,
-                          parsedPort ?? _defaultGrpcPort,
-                        ).toString();
-                      });
-                    },
-                  ),
-                ],
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _portController,
-                  decoration: const InputDecoration(labelText: 'Server Port'),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _deviceNameController,
-                  decoration: const InputDecoration(labelText: 'Device Name'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _deviceTypeController,
-                  decoration: const InputDecoration(labelText: 'Device Type'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _platformController,
-                  decoration: const InputDecoration(labelText: 'Platform'),
-                ),
-                const SizedBox(height: 20),
-                Text('Control Stream: $_status'),
-                const SizedBox(height: 12),
-                Text('Responses: $_responses'),
-                Text(
-                  'Media routes: ${_routesByStreamID.length}  Active streams: ${_activeStreamsByID.length}  Signals: ${_recentWebRTCSignals.length}',
-                ),
-                Text(
-                  'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount  Capability ack gen: $_lastCapabilityAckGeneration',
-                ),
-                if (_playAudioCount > 0)
-                  Text(
-                    'Play audio msgs: $_playAudioCount  Last play bytes: $_lastPlayAudioBytes  Last play target: $_lastPlayAudioDeviceID  Last play source: $_lastPlayAudioSource',
-                  ),
-                if (_photoFrameAssetBaseURL.isNotEmpty)
-                  Text('Photo frame assets: $_photoFrameAssetBaseURL'),
-                if (_lastNotification.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text('Notification: $_lastNotification'),
-                ],
-                if (_bugReceiptState != _BugReceiptState.none) ...[
-                  const SizedBox(height: 12),
-                  _buildBugReceiptPanel(),
-                ],
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 12,
-                  children: [
-                    ElevatedButton(
-                      onPressed: _startStream,
-                      child: const Text('Connect Stream'),
-                    ),
-                    OutlinedButton(
-                      onPressed: _stopStream,
-                      child: const Text('Disconnect'),
-                    ),
-                    OutlinedButton(
-                      onPressed: _sendRuntimeStatusQuery,
-                      child: const Text('Runtime Status'),
-                    ),
-                    OutlinedButton(
-                      onPressed: _sendDeviceStatusQuery,
-                      child: const Text('Device Status'),
-                    ),
-                    OutlinedButton(
-                      onPressed: _sendPlaybackArtifactsQuery,
-                      child: const Text('List Playback Artifacts'),
-                    ),
-                    OutlinedButton(
-                      onPressed: _sendPlaybackMetadataQuery,
-                      child: const Text('Playback Metadata'),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) {
+                          return;
+                        }
+                        final parts = value.split(':');
+                        if (parts.length != 2) {
+                          return;
+                        }
+                        setState(() {
+                          _selectedDiscoveredServer = value;
+                          _hostController.text = parts[0];
+                          final selected = _selectedServerMetadata();
+                          final parsedPort = int.tryParse(parts[1]);
+                          _portController.text = _grpcPortFor(
+                            selected,
+                            parsedPort ?? _defaultGrpcPort,
+                          ).toString();
+                        });
+                      },
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _playbackArtifactIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'Playback Artifact ID',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _playbackTargetDeviceIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'Playback Target Device ID',
-                    hintText: 'Defaults to this device',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildDiagnosticsPanel(),
-                if (_activeRoot != null) ...[
-                  const SizedBox(height: 24),
-                  const Divider(),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    height: 320,
-                    child: AnimatedSwitcher(
-                      duration: _activeTransitionDuration,
-                      switchInCurve: Curves.easeOut,
-                      switchOutCurve: Curves.easeIn,
-                      transitionBuilder: _buildTransition,
-                      child: KeyedSubtree(
-                        key: ValueKey<int>(_activeRootRevision),
-                        child: _renderNode(_activeRoot!),
+                  TextField(
+                    controller: _portController,
+                    decoration: const InputDecoration(labelText: 'Server Port'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _deviceNameController,
+                    decoration: const InputDecoration(labelText: 'Device Name'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _deviceTypeController,
+                    decoration: const InputDecoration(labelText: 'Device Type'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _platformController,
+                    decoration: const InputDecoration(labelText: 'Platform'),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Control Stream: $_status'),
+                  const SizedBox(height: 12),
+                  Text('Responses: $_responses'),
+                  Text(
+                    'Media routes: ${_routesByStreamID.length}  Active streams: ${_activeStreamsByID.length}  Signals: ${_recentWebRTCSignals.length}',
+                  ),
+                  Text(
+                    'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount  Capability ack gen: $_lastCapabilityAckGeneration',
+                  ),
+                  if (_playAudioCount > 0)
+                    Text(
+                      'Play audio msgs: $_playAudioCount  Last play bytes: $_lastPlayAudioBytes  Last play target: $_lastPlayAudioDeviceID  Last play source: $_lastPlayAudioSource',
+                    ),
+                  if (_photoFrameAssetBaseURL.isNotEmpty)
+                    Text('Photo frame assets: $_photoFrameAssetBaseURL'),
+                  if (_lastNotification.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text('Notification: $_lastNotification'),
+                  ],
+                  if (_bugReceiptState != _BugReceiptState.none) ...[
+                    const SizedBox(height: 12),
+                    _buildBugReceiptPanel(),
+                  ],
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 12,
+                    children: [
+                      ElevatedButton(
+                        onPressed: _startStream,
+                        child: const Text('Connect Stream'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _stopStream,
+                        child: const Text('Disconnect'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _sendRuntimeStatusQuery,
+                        child: const Text('Runtime Status'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _sendDeviceStatusQuery,
+                        child: const Text('Device Status'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _sendPlaybackArtifactsQuery,
+                        child: const Text('List Playback Artifacts'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _sendPlaybackMetadataQuery,
+                        child: const Text('Playback Metadata'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _playbackArtifactIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Playback Artifact ID',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _playbackTargetDeviceIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Playback Target Device ID',
+                      hintText: 'Defaults to this device',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildDiagnosticsPanel(),
+                  if (_activeRoot != null) ...[
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 320,
+                      child: AnimatedSwitcher(
+                        duration: _activeTransitionDuration,
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: _buildTransition,
+                        child: KeyedSubtree(
+                          key: ValueKey<int>(_activeRootRevision),
+                          child: _renderNode(_activeRoot!),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

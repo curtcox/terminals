@@ -21,6 +21,7 @@ terminal_client/.flutter-plugins-dependencies
 terminal_client/.packages
 terminal_client/build/
 terminal_client/pubspec.lock
+.pub-cache/
 
 # Proto/codegen
 api/gen/

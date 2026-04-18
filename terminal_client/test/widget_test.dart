@@ -463,6 +463,61 @@ void main() {
     expect(find.textContaining('Receipt ID: bug-rcpt-123'), findsOneWidget);
   });
 
+  testWidgets('attaches screenshot bytes to submitted bug reports', (
+    WidgetTester tester,
+  ) async {
+    const screenshotBytes = <int>[0x89, 0x50, 0x4e, 0x47];
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        bugReportScreenshotCapture: () async => screenshotBytes,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'server_bug_button'
+                ..button = (uiv1.ButtonWidget()
+                  ..label = 'Report a bug'
+                  ..action = 'bug_report:subject-1'),
+            ))),
+    );
+    await tester.pump();
+
+    final serverBugButton = find.text('Report a bug');
+    await tester.ensureVisible(serverBugButton);
+    await tester.pumpAndSettle();
+    await tester.tap(serverBugButton);
+    await tester.pump();
+
+    final bugReportRequest = harness.lastClient.requests.lastWhere(
+      (request) => request.hasBugReport(),
+    );
+    expect(bugReportRequest.bugReport.screenshotPng, screenshotBytes);
+    expect(
+      bugReportRequest.bugReport.sourceHints['screenshot_byte_count'],
+      screenshotBytes.length.toString(),
+    );
+  });
+
   testWidgets('shows bug report receipt error when ack has no report id', (
     WidgetTester tester,
   ) async {
