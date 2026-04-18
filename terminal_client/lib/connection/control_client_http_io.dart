@@ -9,9 +9,17 @@ import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'control_client.dart';
 
 class TerminalControlHttpClient implements TerminalControlClient {
-  TerminalControlHttpClient({required this.baseUri});
+  TerminalControlHttpClient({
+    required this.baseUri,
+    this.desiredDeviceId = '',
+    this.resumeToken = '',
+    this.onResumeToken,
+  });
 
   final Uri baseUri;
+  final String desiredDeviceId;
+  final String resumeToken;
+  final void Function(String token)? onResumeToken;
   final HttpClient _http = HttpClient();
 
   StreamSubscription<ConnectRequest>? _outgoingSub;
@@ -44,7 +52,9 @@ class TerminalControlHttpClient implements TerminalControlClient {
         ..sessionId = _sessionId!
         ..transportHello = (TransportHello()
           ..protocolVersion = wireProtocolVersion
-          ..supportedCarriers.add(CarrierKind.CARRIER_KIND_HTTP));
+          ..supportedCarriers.add(CarrierKind.CARRIER_KIND_HTTP)
+          ..desiredDeviceId = desiredDeviceId
+          ..resumeToken = resumeToken);
       await _postPoll(hello);
     } catch (error) {
       controller.addError(error);
@@ -101,6 +111,13 @@ class TerminalControlHttpClient implements TerminalControlClient {
       return acc;
     });
     final envelope = WireEnvelope.fromBuffer(payload);
+    if (envelope.hasTransportHelloAck()) {
+      final token = envelope.transportHelloAck.resumeToken.trim();
+      if (token.isNotEmpty) {
+        onResumeToken?.call(token);
+      }
+      return;
+    }
     if (envelope.hasServerMessage()) {
       controller.add(envelope.serverMessage);
     }
@@ -140,6 +157,14 @@ class TerminalControlHttpClient implements TerminalControlClient {
 
 TerminalControlClient createTerminalControlHttpClient({
   required Uri baseUri,
+  String desiredDeviceId = '',
+  String resumeToken = '',
+  void Function(String token)? onResumeToken,
 }) {
-  return TerminalControlHttpClient(baseUri: baseUri);
+  return TerminalControlHttpClient(
+    baseUri: baseUri,
+    desiredDeviceId: desiredDeviceId,
+    resumeToken: resumeToken,
+    onResumeToken: onResumeToken,
+  );
 }

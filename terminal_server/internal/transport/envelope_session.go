@@ -2,6 +2,8 @@ package transport
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +14,11 @@ import (
 )
 
 const currentWireProtocolVersion = 1
+
+var envelopeResumeRegistry = struct {
+	mu     sync.Mutex
+	tokens map[string]time.Time
+}{tokens: map[string]time.Time{}}
 
 // EnvelopeStream is the non-gRPC control stream contract carrying WireEnvelope frames.
 type EnvelopeStream interface {
@@ -141,24 +148,60 @@ func (e *envelopeProtoStream) handleHello(hello *controlv1.TransportHello, reque
 	if version == 0 {
 		version = currentWireProtocolVersion
 	}
-	e.protocolVersion = version
+	if version != currentWireProtocolVersion {
+		e.outSeq++
+		if err := e.stream.WriteEnvelope(&controlv1.WireEnvelope{
+			ProtocolVersion: currentWireProtocolVersion,
+			SessionId:       requestedSessionID,
+			Sequence:        e.outSeq,
+			Payload: &controlv1.WireEnvelope_TransportError{
+				TransportError: &controlv1.TransportError{
+					Code:    "unsupported_protocol_version",
+					Message: fmt.Sprintf("client=%d server=%d", version, currentWireProtocolVersion),
+				},
+			},
+		}); err != nil {
+			return err
+		}
+		return fmt.Errorf("unsupported protocol version: client=%d server=%d", version, currentWireProtocolVersion)
+	}
+	if !carrierSupportedByHello(hello.GetSupportedCarriers(), e.stream.Carrier()) {
+		e.outSeq++
+		if err := e.stream.WriteEnvelope(&controlv1.WireEnvelope{
+			ProtocolVersion: currentWireProtocolVersion,
+			SessionId:       requestedSessionID,
+			Sequence:        e.outSeq,
+			Payload: &controlv1.WireEnvelope_TransportError{
+				TransportError: &controlv1.TransportError{
+					Code:    "unsupported_carrier",
+					Message: fmt.Sprintf("carrier %s not declared in transport hello", e.stream.Carrier().String()),
+				},
+			},
+		}); err != nil {
+			return err
+		}
+		return fmt.Errorf("carrier %s not declared in transport hello", e.stream.Carrier().String())
+	}
+	e.protocolVersion = currentWireProtocolVersion
 	if requestedSessionID != "" {
 		e.sessionID = requestedSessionID
 	} else {
 		e.sessionID = fmt.Sprintf("%s-%d", e.stream.Carrier().String(), time.Now().UTC().UnixNano())
 	}
+	resumeToken := resolveResumeToken(hello.GetResumeToken())
 	e.outSeq++
 	ackSeq := e.outSeq
 	ack := &controlv1.WireEnvelope{
-		ProtocolVersion: version,
+		ProtocolVersion: currentWireProtocolVersion,
 		SessionId:       e.sessionID,
 		Sequence:        ackSeq,
 		Payload: &controlv1.WireEnvelope_TransportHelloAck{
 			TransportHelloAck: &controlv1.TransportHelloAck{
-				AcceptedProtocolVersion: version,
-				NegotiatedCarrier:      e.stream.Carrier(),
-				SessionId:              e.sessionID,
-				HeartbeatIntervalMs:    30000,
+				AcceptedProtocolVersion: currentWireProtocolVersion,
+				NegotiatedCarrier:       e.stream.Carrier(),
+				SessionId:               e.sessionID,
+				ResumeToken:             resumeToken,
+				HeartbeatIntervalMs:     30000,
 			},
 		},
 	}
@@ -167,4 +210,45 @@ func (e *envelopeProtoStream) handleHello(hello *controlv1.TransportHello, reque
 	}
 	e.helloAcked = true
 	return nil
+}
+
+func carrierSupportedByHello(supported []controlv1.CarrierKind, carrier controlv1.CarrierKind) bool {
+	if len(supported) == 0 {
+		return true
+	}
+	for _, candidate := range supported {
+		if candidate == carrier {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveResumeToken(provided string) string {
+	token := provided
+	envelopeResumeRegistry.mu.Lock()
+	defer envelopeResumeRegistry.mu.Unlock()
+	if token != "" {
+		if _, ok := envelopeResumeRegistry.tokens[token]; ok {
+			envelopeResumeRegistry.tokens[token] = time.Now().UTC()
+			return token
+		}
+	}
+	for {
+		token = issueResumeToken()
+		if _, exists := envelopeResumeRegistry.tokens[token]; exists {
+			continue
+		}
+		envelopeResumeRegistry.tokens[token] = time.Now().UTC()
+		return token
+	}
+}
+
+func issueResumeToken() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		fallback := time.Now().UTC().UnixNano()
+		return fmt.Sprintf("resume-%d", fallback)
+	}
+	return "resume-" + hex.EncodeToString(buf)
 }

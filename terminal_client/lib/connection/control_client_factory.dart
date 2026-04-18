@@ -19,17 +19,35 @@ class ControlClientTransportHint {
   static String websocketPath = '/control';
   static String? tcpEndpoint;
   static String? httpEndpoint;
+  static String desiredDeviceId = '';
+  static String resumeToken = '';
 
   static void configure({
     required ControlCarrierKind carrier,
     String wsPath = '/control',
     String? tcp,
     String? http,
+    String? desiredDeviceIdHint,
+    String? resumeTokenHint,
   }) {
     preferredCarrier = carrier;
     websocketPath = wsPath;
     tcpEndpoint = tcp;
     httpEndpoint = http;
+    if (desiredDeviceIdHint != null) {
+      desiredDeviceId = desiredDeviceIdHint;
+    }
+    if (resumeTokenHint != null) {
+      resumeToken = resumeTokenHint;
+    }
+  }
+
+  static void captureResumeToken(String token) {
+    final trimmed = token.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    resumeToken = trimmed;
   }
 }
 
@@ -41,12 +59,17 @@ TerminalControlClient createTerminalControlClient({
   String? websocketPath,
   String? tcpEndpoint,
   String? httpEndpoint,
+  String? desiredDeviceId,
+  String? resumeToken,
 }) {
   final preferred =
       preferredCarrier ?? ControlClientTransportHint.preferredCarrier;
   final wsPath = websocketPath ?? ControlClientTransportHint.websocketPath;
   final tcpHint = tcpEndpoint ?? ControlClientTransportHint.tcpEndpoint;
   final httpHint = httpEndpoint ?? ControlClientTransportHint.httpEndpoint;
+  final desiredDeviceIdHint =
+      desiredDeviceId ?? ControlClientTransportHint.desiredDeviceId;
+  final resumeTokenHint = resumeToken ?? ControlClientTransportHint.resumeToken;
   if (kIsWeb && preferred != ControlCarrierKind.websocket) {
     return UnsupportedTerminalControlClient(
       'Selected control carrier is unavailable in web runtime: $preferred',
@@ -58,6 +81,9 @@ TerminalControlClient createTerminalControlClient({
       port: port,
       path: wsPath,
       secure: Uri.base.scheme == 'https',
+      desiredDeviceId: desiredDeviceIdHint,
+      resumeToken: resumeTokenHint,
+      onResumeToken: ControlClientTransportHint.captureResumeToken,
     );
   }
   if (preferred == ControlCarrierKind.tcp) {
@@ -65,11 +91,19 @@ TerminalControlClient createTerminalControlClient({
     return tcp_client.createTerminalControlTcpClient(
       host: endpoint.$1,
       port: endpoint.$2,
+      desiredDeviceId: desiredDeviceIdHint,
+      resumeToken: resumeTokenHint,
+      onResumeToken: ControlClientTransportHint.captureResumeToken,
     );
   }
   if (preferred == ControlCarrierKind.http) {
     final uri = _parseHttpEndpoint(httpHint, host);
-    return http_client.createTerminalControlHttpClient(baseUri: uri);
+    return http_client.createTerminalControlHttpClient(
+      baseUri: uri,
+      desiredDeviceId: desiredDeviceIdHint,
+      resumeToken: resumeTokenHint,
+      onResumeToken: ControlClientTransportHint.captureResumeToken,
+    );
   }
   return TerminalControlGrpcClient(host: host, port: port);
 }

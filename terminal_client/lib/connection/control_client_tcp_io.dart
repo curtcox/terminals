@@ -12,10 +12,16 @@ class TerminalControlTcpClient implements TerminalControlClient {
   TerminalControlTcpClient({
     required this.host,
     required this.port,
+    this.desiredDeviceId = '',
+    this.resumeToken = '',
+    this.onResumeToken,
   });
 
   final String host;
   final int port;
+  final String desiredDeviceId;
+  final String resumeToken;
+  final void Function(String token)? onResumeToken;
 
   Socket? _socket;
   StreamSubscription<ConnectRequest>? _outgoingSub;
@@ -48,7 +54,9 @@ class TerminalControlTcpClient implements TerminalControlClient {
         ..sessionId = _newSessionId()
         ..transportHello = (TransportHello()
           ..protocolVersion = wireProtocolVersion
-          ..supportedCarriers.add(CarrierKind.CARRIER_KIND_TCP));
+          ..supportedCarriers.add(CarrierKind.CARRIER_KIND_TCP)
+          ..desiredDeviceId = desiredDeviceId
+          ..resumeToken = resumeToken);
       _writeEnvelope(socket, hello);
 
       _incomingSub = socket.listen(
@@ -57,6 +65,13 @@ class TerminalControlTcpClient implements TerminalControlClient {
           while (_frameDecoder.hasFrame) {
             final frame = _frameDecoder.takeFrame();
             final envelope = WireEnvelope.fromBuffer(frame);
+            if (envelope.hasTransportHelloAck()) {
+              final token = envelope.transportHelloAck.resumeToken.trim();
+              if (token.isNotEmpty) {
+                onResumeToken?.call(token);
+              }
+              continue;
+            }
             if (envelope.hasServerMessage()) {
               controller.add(envelope.serverMessage);
             }
@@ -117,8 +132,17 @@ class TerminalControlTcpClient implements TerminalControlClient {
 TerminalControlClient createTerminalControlTcpClient({
   required String host,
   required int port,
+  String desiredDeviceId = '',
+  String resumeToken = '',
+  void Function(String token)? onResumeToken,
 }) {
-  return TerminalControlTcpClient(host: host, port: port);
+  return TerminalControlTcpClient(
+    host: host,
+    port: port,
+    desiredDeviceId: desiredDeviceId,
+    resumeToken: resumeToken,
+    onResumeToken: onResumeToken,
+  );
 }
 
 class _FrameDecoder {

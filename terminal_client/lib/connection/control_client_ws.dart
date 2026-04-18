@@ -15,6 +15,9 @@ class TerminalControlWebSocketClient implements TerminalControlClient {
     required this.port,
     this.path = '/control',
     this.secure = false,
+    this.desiredDeviceId = '',
+    this.resumeToken = '',
+    this.onResumeToken,
   }) : _channel = WebSocketChannel.connect(
           Uri(
             scheme: secure ? 'wss' : 'ws',
@@ -28,6 +31,9 @@ class TerminalControlWebSocketClient implements TerminalControlClient {
   final int port;
   final String path;
   final bool secure;
+  final String desiredDeviceId;
+  final String resumeToken;
+  final void Function(String token)? onResumeToken;
   final WebSocketChannel _channel;
 
   @override
@@ -69,6 +75,13 @@ class TerminalControlWebSocketClient implements TerminalControlClient {
           return;
         }
         final envelope = WireEnvelope.fromBuffer(bytes);
+        if (envelope.hasTransportHelloAck()) {
+          final token = envelope.transportHelloAck.resumeToken.trim();
+          if (token.isNotEmpty) {
+            onResumeToken?.call(token);
+          }
+          return;
+        }
         if (envelope.hasServerMessage()) {
           controller.add(envelope.serverMessage);
         }
@@ -98,7 +111,9 @@ class TerminalControlWebSocketClient implements TerminalControlClient {
       ..sessionId = _newSessionId()
       ..transportHello = (TransportHello()
         ..protocolVersion = wireProtocolVersion
-        ..supportedCarriers.add(CarrierKind.CARRIER_KIND_WEBSOCKET));
+        ..supportedCarriers.add(CarrierKind.CARRIER_KIND_WEBSOCKET)
+        ..desiredDeviceId = desiredDeviceId
+        ..resumeToken = resumeToken);
     _channel.sink.add(Uint8List.fromList(helloEnvelope.writeToBuffer()));
   }
 

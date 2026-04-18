@@ -1057,6 +1057,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         wsPath: _websocketPathFor(selectedServer),
         tcp: selectedServer?.tcpEndpoint,
         http: selectedServer?.httpEndpoint,
+        desiredDeviceIdHint: _deviceId,
+        resumeTokenHint: ControlClientTransportHint.resumeToken,
       );
       _client = widget.clientFactory(
         host: target.host,
