@@ -6,6 +6,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="${ROOT_DIR}/.tmp"
 SERVER_LOG="${TMP_DIR}/run-local-server.log"
 CLIENT_LOG="${TMP_DIR}/run-local-client.log"
+LOG_ARCHIVES="${RUN_LOCAL_LOG_ARCHIVES:-3}"
+# Hard cap on any single log file written by this script. Per-process RLIMIT_FSIZE
+# (`ulimit -f`) protects against runaway logging that previously filled the disk.
+LOG_MAX_KB="${RUN_LOCAL_LOG_MAX_KB:-524288}"  # 512 MiB default
+# Real stderr/stdout preserved so diagnostics never get redirected into a log file
+# (which caused a self-referential tail loop that grew to 712 GB). Writes via >&3/>&4
+# always go to the terminal that launched the script, even from a redirected subshell.
+exec 3>&2 4>&1
 
 GRPC_PORT="${TERMINALS_GRPC_PORT:-}"
 CONTROL_WS_PORT="${TERMINALS_CONTROL_WS_PORT:-}"
@@ -40,24 +48,42 @@ Options:
 EOF
 }
 
-print_log_tail() {
+report_log_path() {
   local file="$1"
   local label="$2"
   if [[ -f "${file}" ]]; then
-    echo "--- ${label} (tail) ---" >&2
-    tail -n 120 "${file}" >&2 || true
-    echo "--- end ${label} ---" >&2
+    echo "--- ${label}: ${file} ---" >&3
   else
-    echo "--- ${label} missing: ${file} ---" >&2
+    echo "--- ${label} missing: ${file} ---" >&3
   fi
+}
+
+rotate_log() {
+  # Rename file → file.1 → ... → file.${LOG_ARCHIVES}. Older archives are dropped.
+  local file="$1"
+  if [[ ! -e "${file}" ]]; then
+    return 0
+  fi
+  local i="${LOG_ARCHIVES}"
+  if [[ -e "${file}.${i}" ]]; then
+    rm -f -- "${file}.${i}"
+  fi
+  while (( i > 1 )); do
+    local prev=$((i - 1))
+    if [[ -e "${file}.${prev}" ]]; then
+      mv -f -- "${file}.${prev}" "${file}.${i}"
+    fi
+    i=$((i - 1))
+  done
+  mv -f -- "${file}" "${file}.1"
 }
 
 fail() {
   local message="$1"
   HAS_ERROR="true"
-  echo "ERROR: ${message}" >&2
-  print_log_tail "${SERVER_LOG}" "server log"
-  print_log_tail "${CLIENT_LOG}" "client log"
+  echo "ERROR: ${message}" >&3
+  report_log_path "${SERVER_LOG}" "server log"
+  report_log_path "${CLIENT_LOG}" "client log"
   exit 1
 }
 
@@ -82,9 +108,11 @@ on_err() {
   local exit_code="$?"
   local line_no="$1"
   HAS_ERROR="true"
-  echo "ERROR: command failed at line ${line_no}: ${BASH_COMMAND}" >&2
-  print_log_tail "${SERVER_LOG}" "server log"
-  print_log_tail "${CLIENT_LOG}" "client log"
+  # Always write to the saved real stderr (fd 3) — never to whatever fd 2 happens
+  # to be, because in backgrounded subshells fd 2 is redirected into the server log.
+  echo "ERROR: command failed at line ${line_no}: ${BASH_COMMAND}" >&3
+  report_log_path "${SERVER_LOG}" "server log"
+  report_log_path "${CLIENT_LOG}" "client log"
   exit "${exit_code}"
 }
 
@@ -92,7 +120,7 @@ on_exit() {
   local exit_code="$1"
   cleanup
   if [[ "${HAS_ERROR}" == "true" || "${exit_code}" -ne 0 ]]; then
-    echo "Exiting with errors. See logs above or in ${TMP_DIR}." >&2
+    echo "Exiting with errors. Logs in ${TMP_DIR}." >&3
   fi
 }
 
@@ -342,9 +370,18 @@ bootstrap() {
 }
 
 start_server() {
+  rotate_log "${SERVER_LOG}"
   : >"${SERVER_LOG}"
   echo "Starting server..."
   (
+    # Disarm ERR/errtrace inside the redirected subshell. Otherwise the inherited
+    # trap would write diagnostics to fd 2 — which is the server log here — and a
+    # tail-of-self loop filled the disk with 712 GB of duplicated lines.
+    trap - ERR
+    set +E
+    # Hard cap on any single write stream (RLIMIT_FSIZE). Runaway output gets a
+    # SIGXFSZ instead of eating the disk.
+    ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
     cd "${ROOT_DIR}/terminal_server"
     TERMINALS_GRPC_PORT="${GRPC_PORT}" \
     TERMINALS_CONTROL_WS_PORT="${CONTROL_WS_PORT}" \
@@ -362,6 +399,7 @@ start_server() {
 }
 
 start_client() {
+  rotate_log "${CLIENT_LOG}"
   : >"${CLIENT_LOG}"
   echo "Starting local client (${CLIENT_DEVICE})..."
 
@@ -390,6 +428,9 @@ start_client() {
 
     set +e
     (
+      trap - ERR
+      set +E
+      ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
       cd "${ROOT_DIR}/terminal_client"
       flutter run \
         -d web-server \
@@ -407,6 +448,9 @@ start_client() {
   fi
 
   (
+    trap - ERR
+    set +E
+    ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
     cd "${ROOT_DIR}/terminal_client"
     if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
       flutter run \
@@ -476,8 +520,11 @@ monitor_processes() {
 
 main() {
   mkdir -p "${TMP_DIR}"
-  : >"${SERVER_LOG}"
-  : >"${CLIENT_LOG}"
+  # Rotate, don't truncate — start_server/start_client will rotate again just
+  # before each run, but rotating here too means a failed parse_args still
+  # preserves the previous run's logs as .1.
+  rotate_log "${SERVER_LOG}"
+  rotate_log "${CLIENT_LOG}"
   parse_args "$@"
   resolve_ports
   echo "Using ports: grpc=${GRPC_PORT} control_ws=${CONTROL_WS_PORT} admin=${ADMIN_PORT} photo=${PHOTO_PORT}"

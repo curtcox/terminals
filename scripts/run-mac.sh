@@ -6,6 +6,27 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER_LOG_DIR="${ROOT_DIR}/.tmp"
 SERVER_LOG="${SERVER_LOG_DIR}/run-mac-server.log"
 CLIENT_LOG="${SERVER_LOG_DIR}/run-mac-client.log"
+LOG_ARCHIVES="${RUN_MAC_LOG_ARCHIVES:-3}"
+LOG_MAX_KB="${RUN_MAC_LOG_MAX_KB:-524288}"  # 512 MiB per-file RLIMIT_FSIZE cap
+
+rotate_log() {
+  local file="$1"
+  if [[ ! -e "${file}" ]]; then
+    return 0
+  fi
+  local i="${LOG_ARCHIVES}"
+  if [[ -e "${file}.${i}" ]]; then
+    rm -f -- "${file}.${i}"
+  fi
+  while (( i > 1 )); do
+    local prev=$((i - 1))
+    if [[ -e "${file}.${prev}" ]]; then
+      mv -f -- "${file}.${prev}" "${file}.${i}"
+    fi
+    i=$((i - 1))
+  done
+  mv -f -- "${file}" "${file}.1"
+}
 GRPC_PORT="${TERMINALS_GRPC_PORT:-50051}"
 ADMIN_PORT="${TERMINALS_ADMIN_HTTP_PORT:-50053}"
 PHOTO_PORT="${TERMINALS_PHOTO_FRAME_HTTP_PORT:-50052}"
@@ -64,8 +85,11 @@ wait_for_log() {
   return 1
 }
 
+rotate_log "${SERVER_LOG}"
 echo "Starting server..."
 (
+  # Runaway-log guard: cap per-file writes so nothing can fill the disk again.
+  ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
   cd "${ROOT_DIR}/terminal_server"
   TERMINALS_GRPC_PORT="${GRPC_PORT}" \
   TERMINALS_ADMIN_HTTP_PORT="${ADMIN_PORT}" \
@@ -82,7 +106,9 @@ fi
 
 echo "Server ready on 127.0.0.1:${GRPC_PORT}"
 echo "Starting macOS client (interactive)..."
+rotate_log "${CLIENT_LOG}"
 (
+  ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
   cd "${ROOT_DIR}/terminal_client"
   flutter run -d macos
 ) >"${CLIENT_LOG}" 2>&1 &

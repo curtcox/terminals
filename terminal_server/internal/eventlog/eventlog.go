@@ -70,24 +70,36 @@ func New(cfg Config) (*Logger, error) {
 
 	runID := makeRunID()
 	pid := os.Getpid()
+	serverID := strings.TrimSpace(cfg.ServerID)
+	serverVersion := strings.TrimSpace(cfg.ServerVersion)
 	async.SetWriteFailureCallback(makeWriteFailureEmitter(writeFailureEmitterConfig{
 		stderr:        os.Stderr,
 		runID:         runID,
 		pid:           pid,
-		serverID:      strings.TrimSpace(cfg.ServerID),
-		serverVersion: strings.TrimSpace(cfg.ServerVersion),
+		serverID:      serverID,
+		serverVersion: serverVersion,
 	}))
 	h := &enrichHandler{
-		next:          newJSONHandler(async, parseLevel(cfg.Level)),
-		runID:         runID,
-		pid:           pid,
-		serverID:      strings.TrimSpace(cfg.ServerID),
-		serverVersion: strings.TrimSpace(cfg.ServerVersion),
-		seq:           &atomic.Uint64{},
+		next:      newJSONHandler(async, parseLevel(cfg.Level)),
+		seq:       &atomic.Uint64{},
+		component: "main",
 	}
-	base := slog.New(h).With(
-		slog.String("component", "main"),
-	)
+	base := slog.New(h)
+	// Emit the per-run invariants exactly once as a header event rather than
+	// tagging every line with run_id/pid/server_id/server_version. Downstream
+	// readers should parse this event to attribute later lines to a run.
+	headerAttrs := []any{
+		"event", "log.run_started",
+		"run_id", runID,
+		"pid", pid,
+	}
+	if serverID != "" {
+		headerAttrs = append(headerAttrs, "server_id", serverID)
+	}
+	if serverVersion != "" {
+		headerAttrs = append(headerAttrs, "server_version", serverVersion)
+	}
+	base.Info("log run started", headerAttrs...)
 	return &Logger{logger: base, writer: rw, async: async, runID: runID, pid: pid}, nil
 }
 
@@ -349,13 +361,14 @@ func (a *stdLogAdapter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// enrichHandler adds a monotonic seq to every record and resolves a single
+// component attr per record. Per-run invariants (run_id/pid/server_id/
+// server_version) are NOT added here — they are emitted once as a "log.run_started"
+// header event to avoid inflating every line.
 type enrichHandler struct {
-	next          slog.Handler
-	runID         string
-	serverID      string
-	serverVersion string
-	pid           int
-	seq           *atomic.Uint64
+	next      slog.Handler
+	seq       *atomic.Uint64
+	component string
 }
 
 func (h *enrichHandler) Enabled(ctx context.Context, level slog.Level) bool {
@@ -364,50 +377,59 @@ func (h *enrichHandler) Enabled(ctx context.Context, level slog.Level) bool {
 
 func (h *enrichHandler) Handle(ctx context.Context, r slog.Record) error {
 	nr := slog.NewRecord(r.Time, r.Level, r.Message, r.PC)
-	hasComponent := false
+	// Strip any "component" attrs from the record; we'll re-add exactly one.
+	// First occurrence wins — if a call-site overrides the handler-scoped
+	// component, that's the value we keep.
+	recordComponent := ""
 	r.Attrs(func(a slog.Attr) bool {
 		if a.Key == "component" {
-			hasComponent = true
+			if recordComponent == "" {
+				recordComponent = a.Value.String()
+			}
+			return true
 		}
 		nr.AddAttrs(a)
 		return true
 	})
-	if !hasComponent {
-		nr.AddAttrs(slog.String("component", "main"))
+	comp := recordComponent
+	if comp == "" {
+		comp = h.component
+	}
+	if comp == "" {
+		comp = "main"
 	}
 	nr.AddAttrs(
-		slog.String("run_id", h.runID),
-		slog.Int("pid", h.pid),
+		slog.String("component", comp),
 		slog.Uint64("seq", h.seq.Add(1)),
 	)
-	if h.serverID != "" {
-		nr.AddAttrs(slog.String("server_id", h.serverID))
-	}
-	if h.serverVersion != "" {
-		nr.AddAttrs(slog.String("server_version", h.serverVersion))
-	}
 	return h.next.Handle(ctx, nr)
 }
 
+// WithAttrs intercepts any "component" attr so it never reaches the downstream
+// JSON handler's With-chain (which would otherwise emit it alongside the one we
+// add in Handle, producing duplicate keys).
 func (h *enrichHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	passThrough := make([]slog.Attr, 0, len(attrs))
+	comp := h.component
+	for _, a := range attrs {
+		if a.Key == "component" {
+			comp = a.Value.String()
+			continue
+		}
+		passThrough = append(passThrough, a)
+	}
 	return &enrichHandler{
-		next:          h.next.WithAttrs(attrs),
-		runID:         h.runID,
-		serverID:      h.serverID,
-		serverVersion: h.serverVersion,
-		pid:           h.pid,
-		seq:           h.seq,
+		next:      h.next.WithAttrs(passThrough),
+		seq:       h.seq,
+		component: comp,
 	}
 }
 
 func (h *enrichHandler) WithGroup(name string) slog.Handler {
 	return &enrichHandler{
-		next:          h.next.WithGroup(name),
-		runID:         h.runID,
-		serverID:      h.serverID,
-		serverVersion: h.serverVersion,
-		pid:           h.pid,
-		seq:           h.seq,
+		next:      h.next.WithGroup(name),
+		seq:       h.seq,
+		component: h.component,
 	}
 }
 
