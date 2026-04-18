@@ -380,6 +380,135 @@ Duration calculateReconnectDelay({
   return Duration(milliseconds: delayMs);
 }
 
+ControlCarrierKind? carrierKindFromPriorityName(String raw) {
+  switch (raw.trim().toLowerCase()) {
+    case 'grpc':
+      return ControlCarrierKind.grpc;
+    case 'websocket':
+    case 'ws':
+      return ControlCarrierKind.websocket;
+    case 'tcp':
+      return ControlCarrierKind.tcp;
+    case 'http':
+      return ControlCarrierKind.http;
+    default:
+      return null;
+  }
+}
+
+bool isCarrierSupportedOnRuntime(
+  ControlCarrierKind carrier, {
+  required bool isWebRuntime,
+}) {
+  if (isWebRuntime) {
+    return carrier == ControlCarrierKind.websocket;
+  }
+  return true;
+}
+
+List<ControlCarrierKind> buildCarrierPreference({
+  required bool isWebRuntime,
+  required List<String> serverPriority,
+  ControlCarrierKind? lastSuccessfulCarrier,
+}) {
+  final defaults = isWebRuntime
+      ? const <ControlCarrierKind>[ControlCarrierKind.websocket]
+      : const <ControlCarrierKind>[
+          ControlCarrierKind.grpc,
+          ControlCarrierKind.websocket,
+          ControlCarrierKind.tcp,
+          ControlCarrierKind.http,
+        ];
+  if (serverPriority.isEmpty) {
+    return defaults;
+  }
+
+  final ordered = <ControlCarrierKind>[];
+  for (final raw in serverPriority) {
+    final carrier = carrierKindFromPriorityName(raw);
+    if (carrier == null) {
+      continue;
+    }
+    if (isWebRuntime && carrier != ControlCarrierKind.websocket) {
+      continue;
+    }
+    if (!ordered.contains(carrier)) {
+      ordered.add(carrier);
+    }
+  }
+
+  final preferred = ordered.isEmpty ? defaults : ordered;
+  final filtered = preferred
+      .where(
+        (carrier) =>
+            isCarrierSupportedOnRuntime(carrier, isWebRuntime: isWebRuntime),
+      )
+      .toSet()
+      .toList(growable: true);
+  if (filtered.isEmpty) {
+    return defaults
+        .where(
+          (carrier) =>
+              isCarrierSupportedOnRuntime(carrier, isWebRuntime: isWebRuntime),
+        )
+        .toList(growable: false);
+  }
+  if (lastSuccessfulCarrier != null && filtered.contains(lastSuccessfulCarrier)) {
+    filtered
+      ..remove(lastSuccessfulCarrier)
+      ..insert(0, lastSuccessfulCarrier);
+  }
+  return filtered;
+}
+
+String classifyCarrierFailure({
+  required String stage,
+  required String rawError,
+}) {
+  final lower = rawError.toLowerCase();
+  final trimmedStage = stage.trim().toLowerCase();
+
+  if (lower.contains('unsupported_protocol_version') ||
+      lower.contains('unsupported protocol version') ||
+      lower.contains('transport hello rejected protocol version')) {
+    return 'protocol_version';
+  }
+  if (lower.contains('unsupported_carrier') ||
+      lower.contains('not declared in transport hello')) {
+    return 'carrier_mismatch';
+  }
+  if (lower.contains('failed host lookup') ||
+      lower.contains('name or service not known') ||
+      lower.contains('nodename nor servname provided')) {
+    return 'dns';
+  }
+  if (lower.contains('connection refused')) {
+    return 'tcp_connect';
+  }
+  if (lower.contains('certificate') ||
+      lower.contains('tls') ||
+      lower.contains('ssl') ||
+      lower.contains('handshake')) {
+    return 'tls_or_handshake';
+  }
+  if (lower.contains('upgrade rejected') || lower.contains('http 403')) {
+    return 'upgrade_rejected';
+  }
+  if (lower.contains('timed out') || lower.contains('timeout')) {
+    return 'timeout';
+  }
+  if (trimmedStage == 'stream_closed' || lower.contains('stream closed')) {
+    return 'stream_closed';
+  }
+  if (trimmedStage == 'connect') {
+    return 'connect_error';
+  }
+  if (trimmedStage == 'stream') {
+    return 'stream_error';
+  }
+  return 'unknown';
+}
+
 class TransportErrorDiagnosis {
   const TransportErrorDiagnosis({
     required this.summary,
@@ -420,6 +549,7 @@ class _CarrierAttemptDiagnostic {
     required this.carrier,
     required this.endpoint,
     required this.stage,
+    required this.failureClass,
     required this.error,
     required this.elapsed,
   });
@@ -427,6 +557,7 @@ class _CarrierAttemptDiagnostic {
   final ControlCarrierKind carrier;
   final String endpoint;
   final String stage;
+  final String failureClass;
   final String error;
   final Duration elapsed;
 }
@@ -728,68 +859,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   List<ControlCarrierKind> _carrierPreference(DiscoveredServer? server) {
-    final defaults = kIsWeb
-        ? const <ControlCarrierKind>[ControlCarrierKind.websocket]
-        : const <ControlCarrierKind>[
-            ControlCarrierKind.grpc,
-            ControlCarrierKind.websocket,
-            ControlCarrierKind.tcp,
-            ControlCarrierKind.http,
-          ];
-    if (server == null || server.priority.isEmpty) {
-      return defaults;
-    }
-    final ordered = <ControlCarrierKind>[];
-    for (final raw in server.priority) {
-      final carrier = _carrierFromName(raw);
-      if (carrier == null) {
-        continue;
-      }
-      if (kIsWeb && carrier != ControlCarrierKind.websocket) {
-        continue;
-      }
-      if (!ordered.contains(carrier)) {
-        ordered.add(carrier);
-      }
-    }
-    final preferred = ordered.isEmpty ? defaults : ordered;
-    final filtered = preferred
-        .where(_carrierSupportedOnRuntime)
-        .toSet()
-        .toList(growable: true);
-    if (filtered.isEmpty) {
-      return defaults.where(_carrierSupportedOnRuntime).toList(growable: false);
-    }
-    if (_lastSuccessfulCarrier != null &&
-        filtered.contains(_lastSuccessfulCarrier)) {
-      filtered
-        ..remove(_lastSuccessfulCarrier)
-        ..insert(0, _lastSuccessfulCarrier!);
-    }
-    return filtered;
-  }
-
-  bool _carrierSupportedOnRuntime(ControlCarrierKind carrier) {
-    if (kIsWeb) {
-      return carrier == ControlCarrierKind.websocket;
-    }
-    return true;
-  }
-
-  ControlCarrierKind? _carrierFromName(String raw) {
-    switch (raw.trim().toLowerCase()) {
-      case 'grpc':
-        return ControlCarrierKind.grpc;
-      case 'websocket':
-      case 'ws':
-        return ControlCarrierKind.websocket;
-      case 'tcp':
-        return ControlCarrierKind.tcp;
-      case 'http':
-        return ControlCarrierKind.http;
-      default:
-        return null;
-    }
+    return buildCarrierPreference(
+      isWebRuntime: kIsWeb,
+      serverPriority: server?.priority ?? const <String>[],
+      lastSuccessfulCarrier: _lastSuccessfulCarrier,
+    );
   }
 
   String _websocketPathFor(DiscoveredServer? server) {
@@ -926,6 +1000,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       final elapsedMs = attempt.elapsed.inMilliseconds;
       lines.add(
         '${_carrierName(attempt.carrier)} failed at ${attempt.stage} '
+        '[${attempt.failureClass}] '
         '(${attempt.endpoint}) after ${elapsedMs}ms: ${attempt.error}',
       );
     }
@@ -2261,6 +2336,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         carrier: carrier,
         endpoint: endpoint,
         stage: stage,
+        failureClass: classifyCarrierFailure(stage: stage, rawError: rawError),
         error: rawError,
         elapsed: elapsed,
       ),

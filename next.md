@@ -1,4 +1,2 @@
-1. Run Flutter widget tests in an environment with Flutter SDK installed (`terminal_client/test/widget_test.dart`).
-2. Manually validate fallback order and immediate failover (gRPC → WebSocket → TCP → HTTP) with local server/client.
-3. Validate resume-token reuse across reconnects, including a carrier switch reconnect and protocol/carrier rejection paths.
-4. Confirm local diagnostic report quality when all carriers fail (status text + attempt breakdown).
+1. Run Flutter widget tests in a Flutter-enabled environment to validate [terminal_client/test/widget_test.dart](terminal_client/test/widget_test.dart).
+2. Manually validate fallback progression and diagnostics quality end-to-end against a local server/client run.

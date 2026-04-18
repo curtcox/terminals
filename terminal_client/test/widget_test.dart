@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:grpc/grpc.dart';
 import 'package:terminal_client/connection/control_client.dart';
+import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart'
     as diagv1;
@@ -41,6 +42,23 @@ void main() {
     expect(
       diagnosis.notificationText(),
       contains('Server is unreachable or transport is unavailable'),
+    );
+  });
+
+  test('buildCarrierPreference respects priority and last successful carrier', () {
+    final ordered = buildCarrierPreference(
+      isWebRuntime: false,
+      serverPriority: const <String>['http', 'tcp', 'websocket', 'grpc'],
+      lastSuccessfulCarrier: ControlCarrierKind.websocket,
+    );
+    expect(
+      ordered,
+      <ControlCarrierKind>[
+        ControlCarrierKind.websocket,
+        ControlCarrierKind.http,
+        ControlCarrierKind.tcp,
+        ControlCarrierKind.grpc,
+      ],
     );
   });
 
@@ -158,6 +176,59 @@ void main() {
     }
     expect(harness.createdClients.length, 2);
   });
+
+  testWidgets(
+    'reconnect can switch carriers and then prefer last successful carrier',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness(failConnectAttempts: 1);
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          reconnectDelayBase: const Duration(milliseconds: 30),
+          reconnectDelayMaxSeconds: 1,
+        ),
+      );
+
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+
+      for (var i = 0; i < 80; i++) {
+        if (harness.createdClients.length >= 2) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(harness.createdClients.length, 2);
+      expect(
+        harness.requestedCarriers.take(2).toList(),
+        <ControlCarrierKind>[
+          ControlCarrierKind.grpc,
+          ControlCarrierKind.websocket,
+        ],
+      );
+
+      harness.createdClients[1].emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pump();
+
+      await harness.createdClients[1].closeStream();
+      await tester.pump();
+
+      for (var i = 0; i < 120; i++) {
+        if (harness.createdClients.length >= 3) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(harness.createdClients.length, 3);
+      expect(harness.requestedCarriers[2], ControlCarrierKind.websocket);
+    },
+  );
 
   testWidgets('connection attempt immediately falls back to next carrier', (
     WidgetTester tester,
@@ -1616,6 +1687,7 @@ class _FakeClientHarness {
   final List<_FakeTerminalControlClient> createdClients =
       <_FakeTerminalControlClient>[];
   final List<_FakeMediaEngine> createdMediaEngines = <_FakeMediaEngine>[];
+  final List<ControlCarrierKind> requestedCarriers = <ControlCarrierKind>[];
   final bool failFirstConnectStream;
   final int failConnectAttempts;
 
@@ -1625,6 +1697,7 @@ class _FakeClientHarness {
     required String host,
     required int port,
   }) {
+    requestedCarriers.add(ControlClientTransportHint.preferredCarrier);
     final client = _FakeTerminalControlClient(
       host: host,
       port: port,
@@ -1777,9 +1850,18 @@ class _FakeTerminalControlClient implements TerminalControlClient {
   @override
   Future<void> shutdown() async {
     await _requestSubscription?.cancel();
+    if (!_responses.isClosed) {
+      await _responses.close();
+    }
   }
 
   void emitResponse(ConnectResponse response) {
     _responses.add(response);
+  }
+
+  Future<void> closeStream() async {
+    if (!_responses.isClosed) {
+      await _responses.close();
+    }
   }
 }
