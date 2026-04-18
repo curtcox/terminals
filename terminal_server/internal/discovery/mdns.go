@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/mdns"
@@ -16,6 +17,11 @@ type ServiceInfo struct {
 	Name        string
 	Port        int
 	Version     string
+	GRPC        string
+	WebSocket   string
+	TCP         string
+	HTTP        string
+	Priority    []string
 }
 
 // Advertiser exposes lifecycle hooks for mDNS service advertisement.
@@ -46,6 +52,22 @@ type MDNSAdvertiser struct {
 func NewMDNSAdvertiser() *MDNSAdvertiser {
 	return &MDNSAdvertiser{
 		newZone: func(svc ServiceInfo) (*mdns.MDNSService, error) {
+			txt := []string{fmt.Sprintf("version=%s", svc.Version), fmt.Sprintf("name=%s", svc.Name)}
+			if grpc := strings.TrimSpace(svc.GRPC); grpc != "" {
+				txt = append(txt, fmt.Sprintf("grpc=%s", grpc))
+			}
+			if ws := strings.TrimSpace(svc.WebSocket); ws != "" {
+				txt = append(txt, fmt.Sprintf("ws=%s", ws))
+			}
+			if tcp := strings.TrimSpace(svc.TCP); tcp != "" {
+				txt = append(txt, fmt.Sprintf("tcp=%s", tcp))
+			}
+			if httpAddr := strings.TrimSpace(svc.HTTP); httpAddr != "" {
+				txt = append(txt, fmt.Sprintf("http=%s", httpAddr))
+			}
+			if len(svc.Priority) > 0 {
+				txt = append(txt, fmt.Sprintf("priority=%s", strings.Join(svc.Priority, ",")))
+			}
 			return mdns.NewMDNSService(
 				svc.Name,
 				svc.ServiceType,
@@ -53,7 +75,7 @@ func NewMDNSAdvertiser() *MDNSAdvertiser {
 				"",
 				svc.Port,
 				nil,
-				[]string{fmt.Sprintf("version=%s", svc.Version)},
+				txt,
 			)
 		},
 		newServer: mdns.NewServer,

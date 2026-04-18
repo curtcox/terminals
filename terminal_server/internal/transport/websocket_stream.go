@@ -9,47 +9,48 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// WebSocketProtoStream adapts a websocket connection to the shared ProtoStream interface.
-type WebSocketProtoStream struct {
+// WebSocketEnvelopeStream adapts a websocket connection to WireEnvelope framing.
+type WebSocketEnvelopeStream struct {
 	conn *websocket.Conn
 	ctx  context.Context
 }
 
-// NewWebSocketProtoStream creates a protobuf websocket stream adapter.
-func NewWebSocketProtoStream(ctx context.Context, conn *websocket.Conn) WebSocketProtoStream {
-	return WebSocketProtoStream{conn: conn, ctx: ctx}
+// NewWebSocketEnvelopeStream creates a websocket envelope stream adapter.
+func NewWebSocketEnvelopeStream(ctx context.Context, conn *websocket.Conn) WebSocketEnvelopeStream {
+	return WebSocketEnvelopeStream{conn: conn, ctx: ctx}
 }
 
-// RecvProto reads one websocket binary frame and decodes a ConnectRequest.
-func (s WebSocketProtoStream) RecvProto() (ProtoClientEnvelope, error) {
+// ReadEnvelope reads one websocket binary frame and decodes a WireEnvelope.
+func (s WebSocketEnvelopeStream) ReadEnvelope() (*controlv1.WireEnvelope, error) {
 	var payload []byte
 	if err := websocket.Message.Receive(s.conn, &payload); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("receive websocket envelope: %w", err)
 	}
-	request := &controlv1.ConnectRequest{}
-	if err := proto.Unmarshal(payload, request); err != nil {
-		return nil, fmt.Errorf("decode websocket connect request: %w", err)
+	envelope := &controlv1.WireEnvelope{}
+	if err := proto.Unmarshal(payload, envelope); err != nil {
+		return nil, fmt.Errorf("decode websocket envelope: %w", err)
 	}
-	return request, nil
+	return envelope, nil
 }
 
-// SendProto encodes one ConnectResponse and writes it as a websocket binary frame.
-func (s WebSocketProtoStream) SendProto(envelope ProtoServerEnvelope) error {
-	response, ok := envelope.(*controlv1.ConnectResponse)
-	if !ok {
-		return fmt.Errorf("unexpected proto server envelope %T", envelope)
-	}
-	payload, err := proto.Marshal(response)
+// WriteEnvelope encodes one WireEnvelope and writes it as a websocket binary frame.
+func (s WebSocketEnvelopeStream) WriteEnvelope(envelope *controlv1.WireEnvelope) error {
+	payload, err := proto.Marshal(envelope)
 	if err != nil {
-		return fmt.Errorf("encode websocket connect response: %w", err)
+		return fmt.Errorf("encode websocket envelope: %w", err)
 	}
 	if err := websocket.Message.Send(s.conn, payload); err != nil {
-		return fmt.Errorf("send websocket connect response: %w", err)
+		return fmt.Errorf("send websocket envelope: %w", err)
 	}
 	return nil
 }
 
 // Context returns the parent request context.
-func (s WebSocketProtoStream) Context() context.Context {
+func (s WebSocketEnvelopeStream) Context() context.Context {
 	return s.ctx
+}
+
+// Carrier returns websocket carrier metadata for hello negotiation.
+func (s WebSocketEnvelopeStream) Carrier() controlv1.CarrierKind {
+	return controlv1.CarrierKind_CARRIER_KIND_WEBSOCKET
 }

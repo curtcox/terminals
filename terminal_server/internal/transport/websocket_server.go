@@ -88,8 +88,8 @@ func (s *WebSocketServer) Start(context.Context) error {
 			if req != nil {
 				ctx = req.Context()
 			}
-			stream := NewWebSocketProtoStream(ctx, conn)
-			if err := s.transport.Connect(stream); err != nil {
+			stream := NewWebSocketEnvelopeStream(ctx, conn)
+			if err := s.transport.ConnectEnvelope(stream); err != nil {
 				eventlog.Emit(context.Background(), "transport.websocket.session.error", slog.LevelError, "websocket control session ended with error",
 					slog.String("component", "transport.websocket"),
 					slog.Any("error", err),

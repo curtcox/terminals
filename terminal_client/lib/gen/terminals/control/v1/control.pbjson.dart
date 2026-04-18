@@ -20,6 +20,24 @@ import '../../diagnostics/v1/diagnostics.pbjson.dart' as $1;
 import '../../io/v1/io.pbjson.dart' as $0;
 import '../../ui/v1/ui.pbjson.dart' as $2;
 
+@$core.Deprecated('Use carrierKindDescriptor instead')
+const CarrierKind$json = {
+  '1': 'CarrierKind',
+  '2': [
+    {'1': 'CARRIER_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'CARRIER_KIND_GRPC', '2': 1},
+    {'1': 'CARRIER_KIND_WEBSOCKET', '2': 2},
+    {'1': 'CARRIER_KIND_TCP', '2': 3},
+    {'1': 'CARRIER_KIND_HTTP', '2': 4},
+  ],
+};
+
+/// Descriptor for `CarrierKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List carrierKindDescriptor = $convert.base64Decode(
+    'CgtDYXJyaWVyS2luZBIcChhDQVJSSUVSX0tJTkRfVU5TUEVDSUZJRUQQABIVChFDQVJSSUVSX0'
+    'tJTkRfR1JQQxABEhoKFkNBUlJJRVJfS0lORF9XRUJTT0NLRVQQAhIUChBDQVJSSUVSX0tJTkRf'
+    'VENQEAMSFQoRQ0FSUklFUl9LSU5EX0hUVFAQBA==');
+
 @$core.Deprecated('Use commandActionDescriptor instead')
 const CommandAction$json = {
   '1': 'CommandAction',
@@ -78,6 +96,201 @@ final $typed_data.Uint8List controlErrorCodeDescriptor = $convert.base64Decode(
     'RfVEVYVBAFEjAKLENPTlRST0xfRVJST1JfQ09ERV9NSVNTSU5HX0NPTU1BTkRfREVWSUNFX0lE'
     'EAYSKQolQ09OVFJPTF9FUlJPUl9DT0RFX1BST1RPQ09MX1ZJT0xBVElPThAHEh4KGkNPTlRST0'
     'xfRVJST1JfQ09ERV9VTktOT1dOEGM=');
+
+@$core.Deprecated('Use transportHelloDescriptor instead')
+const TransportHello$json = {
+  '1': 'TransportHello',
+  '2': [
+    {'1': 'protocol_version', '3': 1, '4': 1, '5': 13, '10': 'protocolVersion'},
+    {
+      '1': 'supported_carriers',
+      '3': 2,
+      '4': 3,
+      '5': 14,
+      '6': '.terminals.control.v1.CarrierKind',
+      '10': 'supportedCarriers'
+    },
+    {'1': 'desired_device_id', '3': 3, '4': 1, '5': 9, '10': 'desiredDeviceId'},
+    {'1': 'resume_token', '3': 4, '4': 1, '5': 9, '10': 'resumeToken'},
+  ],
+};
+
+/// Descriptor for `TransportHello`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List transportHelloDescriptor = $convert.base64Decode(
+    'Cg5UcmFuc3BvcnRIZWxsbxIpChBwcm90b2NvbF92ZXJzaW9uGAEgASgNUg9wcm90b2NvbFZlcn'
+    'Npb24SUAoSc3VwcG9ydGVkX2NhcnJpZXJzGAIgAygOMiEudGVybWluYWxzLmNvbnRyb2wudjEu'
+    'Q2FycmllcktpbmRSEXN1cHBvcnRlZENhcnJpZXJzEioKEWRlc2lyZWRfZGV2aWNlX2lkGAMgAS'
+    'gJUg9kZXNpcmVkRGV2aWNlSWQSIQoMcmVzdW1lX3Rva2VuGAQgASgJUgtyZXN1bWVUb2tlbg==');
+
+@$core.Deprecated('Use transportHelloAckDescriptor instead')
+const TransportHelloAck$json = {
+  '1': 'TransportHelloAck',
+  '2': [
+    {
+      '1': 'accepted_protocol_version',
+      '3': 1,
+      '4': 1,
+      '5': 13,
+      '10': 'acceptedProtocolVersion'
+    },
+    {
+      '1': 'negotiated_carrier',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.control.v1.CarrierKind',
+      '10': 'negotiatedCarrier'
+    },
+    {'1': 'session_id', '3': 3, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'resume_token', '3': 4, '4': 1, '5': 9, '10': 'resumeToken'},
+    {
+      '1': 'heartbeat_interval_ms',
+      '3': 5,
+      '4': 1,
+      '5': 3,
+      '10': 'heartbeatIntervalMs'
+    },
+    {
+      '1': 'limits',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.control.v1.TransportHelloAck.LimitsEntry',
+      '10': 'limits'
+    },
+  ],
+  '3': [TransportHelloAck_LimitsEntry$json],
+};
+
+@$core.Deprecated('Use transportHelloAckDescriptor instead')
+const TransportHelloAck_LimitsEntry$json = {
+  '1': 'LimitsEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `TransportHelloAck`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List transportHelloAckDescriptor = $convert.base64Decode(
+    'ChFUcmFuc3BvcnRIZWxsb0FjaxI6ChlhY2NlcHRlZF9wcm90b2NvbF92ZXJzaW9uGAEgASgNUh'
+    'dhY2NlcHRlZFByb3RvY29sVmVyc2lvbhJQChJuZWdvdGlhdGVkX2NhcnJpZXIYAiABKA4yIS50'
+    'ZXJtaW5hbHMuY29udHJvbC52MS5DYXJyaWVyS2luZFIRbmVnb3RpYXRlZENhcnJpZXISHQoKc2'
+    'Vzc2lvbl9pZBgDIAEoCVIJc2Vzc2lvbklkEiEKDHJlc3VtZV90b2tlbhgEIAEoCVILcmVzdW1l'
+    'VG9rZW4SMgoVaGVhcnRiZWF0X2ludGVydmFsX21zGAUgASgDUhNoZWFydGJlYXRJbnRlcnZhbE'
+    '1zEksKBmxpbWl0cxgGIAMoCzIzLnRlcm1pbmFscy5jb250cm9sLnYxLlRyYW5zcG9ydEhlbGxv'
+    'QWNrLkxpbWl0c0VudHJ5UgZsaW1pdHMaOQoLTGltaXRzRW50cnkSEAoDa2V5GAEgASgJUgNrZX'
+    'kSFAoFdmFsdWUYAiABKAlSBXZhbHVlOgI4AQ==');
+
+@$core.Deprecated('Use transportHeartbeatDescriptor instead')
+const TransportHeartbeat$json = {
+  '1': 'TransportHeartbeat',
+  '2': [
+    {'1': 'unix_ms', '3': 1, '4': 1, '5': 3, '10': 'unixMs'},
+  ],
+};
+
+/// Descriptor for `TransportHeartbeat`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List transportHeartbeatDescriptor =
+    $convert.base64Decode(
+        'ChJUcmFuc3BvcnRIZWFydGJlYXQSFwoHdW5peF9tcxgBIAEoA1IGdW5peE1z');
+
+@$core.Deprecated('Use transportErrorDescriptor instead')
+const TransportError$json = {
+  '1': 'TransportError',
+  '2': [
+    {'1': 'code', '3': 1, '4': 1, '5': 9, '10': 'code'},
+    {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
+  ],
+};
+
+/// Descriptor for `TransportError`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List transportErrorDescriptor = $convert.base64Decode(
+    'Cg5UcmFuc3BvcnRFcnJvchISCgRjb2RlGAEgASgJUgRjb2RlEhgKB21lc3NhZ2UYAiABKAlSB2'
+    '1lc3NhZ2U=');
+
+@$core.Deprecated('Use wireEnvelopeDescriptor instead')
+const WireEnvelope$json = {
+  '1': 'WireEnvelope',
+  '2': [
+    {'1': 'protocol_version', '3': 1, '4': 1, '5': 13, '10': 'protocolVersion'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'sequence', '3': 3, '4': 1, '5': 4, '10': 'sequence'},
+    {
+      '1': 'client_message',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.ConnectRequest',
+      '9': 0,
+      '10': 'clientMessage'
+    },
+    {
+      '1': 'server_message',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.ConnectResponse',
+      '9': 0,
+      '10': 'serverMessage'
+    },
+    {
+      '1': 'transport_hello',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.TransportHello',
+      '9': 0,
+      '10': 'transportHello'
+    },
+    {
+      '1': 'transport_hello_ack',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.TransportHelloAck',
+      '9': 0,
+      '10': 'transportHelloAck'
+    },
+    {
+      '1': 'transport_heartbeat',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.TransportHeartbeat',
+      '9': 0,
+      '10': 'transportHeartbeat'
+    },
+    {
+      '1': 'transport_error',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.TransportError',
+      '9': 0,
+      '10': 'transportError'
+    },
+  ],
+  '8': [
+    {'1': 'payload'},
+  ],
+};
+
+/// Descriptor for `WireEnvelope`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List wireEnvelopeDescriptor = $convert.base64Decode(
+    'CgxXaXJlRW52ZWxvcGUSKQoQcHJvdG9jb2xfdmVyc2lvbhgBIAEoDVIPcHJvdG9jb2xWZXJzaW'
+    '9uEh0KCnNlc3Npb25faWQYAiABKAlSCXNlc3Npb25JZBIaCghzZXF1ZW5jZRgDIAEoBFIIc2Vx'
+    'dWVuY2USTQoOY2xpZW50X21lc3NhZ2UYCiABKAsyJC50ZXJtaW5hbHMuY29udHJvbC52MS5Db2'
+    '5uZWN0UmVxdWVzdEgAUg1jbGllbnRNZXNzYWdlEk4KDnNlcnZlcl9tZXNzYWdlGAsgASgLMiUu'
+    'dGVybWluYWxzLmNvbnRyb2wudjEuQ29ubmVjdFJlc3BvbnNlSABSDXNlcnZlck1lc3NhZ2USTw'
+    'oPdHJhbnNwb3J0X2hlbGxvGAwgASgLMiQudGVybWluYWxzLmNvbnRyb2wudjEuVHJhbnNwb3J0'
+    'SGVsbG9IAFIOdHJhbnNwb3J0SGVsbG8SWQoTdHJhbnNwb3J0X2hlbGxvX2FjaxgNIAEoCzInLn'
+    'Rlcm1pbmFscy5jb250cm9sLnYxLlRyYW5zcG9ydEhlbGxvQWNrSABSEXRyYW5zcG9ydEhlbGxv'
+    'QWNrElsKE3RyYW5zcG9ydF9oZWFydGJlYXQYDiABKAsyKC50ZXJtaW5hbHMuY29udHJvbC52MS'
+    '5UcmFuc3BvcnRIZWFydGJlYXRIAFISdHJhbnNwb3J0SGVhcnRiZWF0Ek8KD3RyYW5zcG9ydF9l'
+    'cnJvchgPIAEoCzIkLnRlcm1pbmFscy5jb250cm9sLnYxLlRyYW5zcG9ydEVycm9ySABSDnRyYW'
+    '5zcG9ydEVycm9yQgkKB3BheWxvYWQ=');
 
 @$core.Deprecated('Use connectRequestDescriptor instead')
 const ConnectRequest$json = {

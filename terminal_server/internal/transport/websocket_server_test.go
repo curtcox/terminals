@@ -32,6 +32,7 @@ func TestWebSocketServerRoundTripRegisterAndHeartbeat(t *testing.T) {
 
 	conn := mustDialWebSocket(t, wsServer.Address(), wsServer.Path(), "http://"+wsServer.Address())
 	defer func() { _ = conn.Close() }()
+	mustSendTransportHello(t, conn, "test-session-1")
 
 	register := &controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Register{
@@ -171,6 +172,7 @@ func TestWebSocketServerAllowsLoopbackOriginWithoutExplicitAllowList(t *testing.
 	// endpoints are still on the same host and should be permitted.
 	conn := mustDialWebSocket(t, wsServer.Address(), wsServer.Path(), "http://localhost:60739")
 	defer func() { _ = conn.Close() }()
+	mustSendTransportHello(t, conn, "test-session-2")
 
 	register := &controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Register{
@@ -235,6 +237,7 @@ func TestWebSocketServerRoundTripBugReportAckWithinDeadline(t *testing.T) {
 
 	conn := mustDialWebSocket(t, wsServer.Address(), wsServer.Path(), "http://"+wsServer.Address())
 	defer func() { _ = conn.Close() }()
+	mustSendTransportHello(t, conn, "test-session-3")
 
 	register := &controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Register{
@@ -296,7 +299,18 @@ func mustDialWebSocket(t *testing.T, host, path, origin string) *websocket.Conn 
 
 func mustSendProtoMessage(t *testing.T, conn *websocket.Conn, message proto.Message) {
 	t.Helper()
-	payload, err := proto.Marshal(message)
+
+	request, ok := message.(*controlv1.ConnectRequest)
+	if !ok {
+		t.Fatalf("message type = %T, want *controlv1.ConnectRequest", message)
+	}
+	envelope := &controlv1.WireEnvelope{
+		ProtocolVersion: currentWireProtocolVersion,
+		Payload: &controlv1.WireEnvelope_ClientMessage{
+			ClientMessage: request,
+		},
+	}
+	payload, err := proto.Marshal(envelope)
 	if err != nil {
 		t.Fatalf("proto.Marshal() error = %v", err)
 	}
@@ -311,11 +325,51 @@ func mustReceiveConnectResponse(t *testing.T, conn *websocket.Conn) *controlv1.C
 	if err := websocket.Message.Receive(conn, &payload); err != nil {
 		t.Fatalf("websocket.Message.Receive() error = %v", err)
 	}
-	response := &controlv1.ConnectResponse{}
-	if err := proto.Unmarshal(payload, response); err != nil {
+	envelope := &controlv1.WireEnvelope{}
+	if err := proto.Unmarshal(payload, envelope); err != nil {
 		t.Fatalf("proto.Unmarshal() error = %v", err)
 	}
+	if ack := envelope.GetTransportHelloAck(); ack != nil {
+		if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+			t.Fatalf("conn.SetReadDeadline() error = %v", err)
+		}
+		defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
+		if err := websocket.Message.Receive(conn, &payload); err != nil {
+			t.Fatalf("websocket.Message.Receive() error = %v", err)
+		}
+		envelope = &controlv1.WireEnvelope{}
+		if err := proto.Unmarshal(payload, envelope); err != nil {
+			t.Fatalf("proto.Unmarshal() error = %v", err)
+		}
+	}
+	response := envelope.GetServerMessage()
+	if response == nil {
+		t.Fatalf("envelope payload = %T, want server_message", envelope.Payload)
+	}
 	return response
+}
+
+func mustSendTransportHello(t *testing.T, conn *websocket.Conn, sessionID string) {
+	t.Helper()
+	envelope := &controlv1.WireEnvelope{
+		ProtocolVersion: currentWireProtocolVersion,
+		SessionId:       sessionID,
+		Payload: &controlv1.WireEnvelope_TransportHello{
+			TransportHello: &controlv1.TransportHello{
+				ProtocolVersion: currentWireProtocolVersion,
+				SupportedCarriers: []controlv1.CarrierKind{
+					controlv1.CarrierKind_CARRIER_KIND_WEBSOCKET,
+				},
+			},
+		},
+	}
+	payload, err := proto.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("proto.Marshal() error = %v", err)
+	}
+	if err := websocket.Message.Send(conn, payload); err != nil {
+		t.Fatalf("websocket.Message.Send() error = %v", err)
+	}
 }
 
 func mustReceiveBugReportAckWithin(t *testing.T, conn *websocket.Conn, timeout time.Duration) *diagnosticsv1.BugReportAck {

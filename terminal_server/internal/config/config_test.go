@@ -9,6 +9,10 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_GRPC_PORT", "")
 	t.Setenv("TERMINALS_CONTROL_WS_HOST", "")
 	t.Setenv("TERMINALS_CONTROL_WS_PORT", "")
+	t.Setenv("TERMINALS_CONTROL_TCP_HOST", "")
+	t.Setenv("TERMINALS_CONTROL_TCP_PORT", "")
+	t.Setenv("TERMINALS_CONTROL_HTTP_HOST", "")
+	t.Setenv("TERMINALS_CONTROL_HTTP_PORT", "")
 	t.Setenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS", "")
 	t.Setenv("TERMINALS_ADMIN_HTTP_HOST", "")
 	t.Setenv("TERMINALS_ADMIN_HTTP_PORT", "")
@@ -45,6 +49,18 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.ControlWSPort != 50054 {
 		t.Fatalf("ControlWSPort = %d, want 50054", cfg.ControlWSPort)
+	}
+	if cfg.ControlTCPHost != "0.0.0.0" {
+		t.Fatalf("ControlTCPHost = %q, want 0.0.0.0", cfg.ControlTCPHost)
+	}
+	if cfg.ControlTCPPort != 50055 {
+		t.Fatalf("ControlTCPPort = %d, want 50055", cfg.ControlTCPPort)
+	}
+	if cfg.ControlHTTPHost != "0.0.0.0" {
+		t.Fatalf("ControlHTTPHost = %q, want 0.0.0.0", cfg.ControlHTTPHost)
+	}
+	if cfg.ControlHTTPPort != 50056 {
+		t.Fatalf("ControlHTTPPort = %d, want 50056", cfg.ControlHTTPPort)
 	}
 	if len(cfg.ControlWSAllowedOrigins) != 0 {
 		t.Fatalf("ControlWSAllowedOrigins = %+v, want empty", cfg.ControlWSAllowedOrigins)
@@ -134,6 +150,10 @@ func TestLoadRecordingDirFromEnv(t *testing.T) {
 func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
 	t.Setenv("TERMINALS_CONTROL_WS_HOST", "127.0.0.1")
 	t.Setenv("TERMINALS_CONTROL_WS_PORT", "7002")
+	t.Setenv("TERMINALS_CONTROL_TCP_HOST", "127.0.0.1")
+	t.Setenv("TERMINALS_CONTROL_TCP_PORT", "7003")
+	t.Setenv("TERMINALS_CONTROL_HTTP_HOST", "127.0.0.1")
+	t.Setenv("TERMINALS_CONTROL_HTTP_PORT", "7004")
 	t.Setenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS", "http://localhost:60739,https://example.test")
 	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "/tmp/terminals-photos")
 	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "30")
@@ -155,6 +175,18 @@ func TestLoadPhotoFrameConfigFromEnv(t *testing.T) {
 	}
 	if cfg.ControlWSPort != 7002 {
 		t.Fatalf("ControlWSPort = %d, want 7002", cfg.ControlWSPort)
+	}
+	if cfg.ControlTCPHost != "127.0.0.1" {
+		t.Fatalf("ControlTCPHost = %q, want 127.0.0.1", cfg.ControlTCPHost)
+	}
+	if cfg.ControlTCPPort != 7003 {
+		t.Fatalf("ControlTCPPort = %d, want 7003", cfg.ControlTCPPort)
+	}
+	if cfg.ControlHTTPHost != "127.0.0.1" {
+		t.Fatalf("ControlHTTPHost = %q, want 127.0.0.1", cfg.ControlHTTPHost)
+	}
+	if cfg.ControlHTTPPort != 7004 {
+		t.Fatalf("ControlHTTPPort = %d, want 7004", cfg.ControlHTTPPort)
 	}
 	if len(cfg.ControlWSAllowedOrigins) != 2 ||
 		cfg.ControlWSAllowedOrigins[0] != "http://localhost:60739" ||
@@ -220,6 +252,20 @@ func TestLoadInvalidControlWSPort(t *testing.T) {
 	t.Setenv("TERMINALS_CONTROL_WS_PORT", "bad")
 	if _, err := Load(); err == nil {
 		t.Fatalf("Load() expected error for invalid control websocket port")
+	}
+}
+
+func TestLoadInvalidControlTCPPort(t *testing.T) {
+	t.Setenv("TERMINALS_CONTROL_TCP_PORT", "bad")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid control tcp port")
+	}
+}
+
+func TestLoadInvalidControlHTTPPort(t *testing.T) {
+	t.Setenv("TERMINALS_CONTROL_HTTP_PORT", "bad")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for invalid control http port")
 	}
 }
 

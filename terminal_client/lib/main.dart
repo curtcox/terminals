@@ -686,6 +686,90 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   bool get _hasActiveControlSession =>
       _shouldStayConnected && _incoming != null && _client != null;
 
+  DiscoveredServer? _selectedServerMetadata() {
+    final selected = _selectedDiscoveredServer;
+    if (selected == null || selected.isEmpty) {
+      return null;
+    }
+    for (final server in _discoveredServers) {
+      if ('${server.host}:${server.port}' == selected) {
+        return server;
+      }
+    }
+    return null;
+  }
+
+  List<ControlCarrierKind> _carrierPreference(DiscoveredServer? server) {
+    final defaults = kIsWeb
+        ? const <ControlCarrierKind>[ControlCarrierKind.websocket]
+        : const <ControlCarrierKind>[
+            ControlCarrierKind.grpc,
+            ControlCarrierKind.websocket,
+            ControlCarrierKind.tcp,
+            ControlCarrierKind.http,
+          ];
+    if (server == null || server.priority.isEmpty) {
+      return defaults;
+    }
+    final ordered = <ControlCarrierKind>[];
+    for (final raw in server.priority) {
+      final carrier = _carrierFromName(raw);
+      if (carrier == null) {
+        continue;
+      }
+      if (kIsWeb && carrier != ControlCarrierKind.websocket) {
+        continue;
+      }
+      if (!ordered.contains(carrier)) {
+        ordered.add(carrier);
+      }
+    }
+    if (ordered.isEmpty) {
+      return defaults;
+    }
+    return ordered;
+  }
+
+  ControlCarrierKind? _carrierFromName(String raw) {
+    switch (raw.trim().toLowerCase()) {
+      case 'grpc':
+        return ControlCarrierKind.grpc;
+      case 'websocket':
+      case 'ws':
+        return ControlCarrierKind.websocket;
+      case 'tcp':
+        return ControlCarrierKind.tcp;
+      case 'http':
+        return ControlCarrierKind.http;
+      default:
+        return null;
+    }
+  }
+
+  String _websocketPathFor(DiscoveredServer? server) {
+    final endpoint = server?.websocketEndpoint.trim() ?? '';
+    if (endpoint.isEmpty) {
+      return '/control';
+    }
+    final parsed = Uri.tryParse(endpoint);
+    if (parsed != null && parsed.path.isNotEmpty) {
+      return parsed.path;
+    }
+    return '/control';
+  }
+
+  int _grpcPortFor(DiscoveredServer? server, int fallbackPort) {
+    final endpoint = server?.grpcEndpoint.trim() ?? '';
+    if (endpoint.isEmpty) {
+      return fallbackPort;
+    }
+    final parsed = Uri.tryParse('tcp://$endpoint');
+    if (parsed == null || parsed.port <= 0) {
+      return fallbackPort;
+    }
+    return parsed.port;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -746,6 +830,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim());
+    final selectedServer = _selectedServerMetadata();
+    final carriers = _carrierPreference(selectedServer);
+    final carrier = carriers[userInitiated
+        ? 0
+        : (_reconnectAttempt % (carriers.isEmpty ? 1 : carriers.length))];
     final size = _currentLogicalSize();
     if (host.isEmpty || port == null || port <= 0 || port > 65535) {
       _shouldStayConnected = false;
@@ -772,7 +861,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       if (existingClient != null) {
         await existingClient.shutdown();
       }
-      _client = widget.clientFactory(host: host, port: port);
+      ControlClientTransportHint.configure(
+        carrier: carrier,
+        wsPath: _websocketPathFor(selectedServer),
+        tcp: selectedServer?.tcpEndpoint,
+        http: selectedServer?.httpEndpoint,
+      );
+      _client = widget.clientFactory(
+        host: host,
+        port: port,
+      );
 
       final stream = _client!.connect(_outgoing.stream);
       _incoming = stream.listen(
@@ -2016,9 +2114,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       setState(() {
         _discoveredServers = found;
         if (found.isNotEmpty) {
-          _selectedDiscoveredServer = '${found.first.host}:${found.first.port}';
-          _hostController.text = found.first.host;
-          _portController.text = found.first.port.toString();
+          final first = found.first;
+          _selectedDiscoveredServer = '${first.host}:${first.port}';
+          _hostController.text = first.host;
+          _portController.text = _grpcPortFor(first, first.port).toString();
           _status = 'Found ${found.length} server(s)';
           _lastConnectionStatus = _status;
         } else {
@@ -2193,7 +2292,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                       setState(() {
                         _selectedDiscoveredServer = value;
                         _hostController.text = parts[0];
-                        _portController.text = parts[1];
+                        final selected = _selectedServerMetadata();
+                        final parsedPort = int.tryParse(parts[1]);
+                        _portController.text = _grpcPortFor(
+                          selected,
+                          parsedPort ?? _defaultGrpcPort,
+                        ).toString();
                       });
                     },
                   ),

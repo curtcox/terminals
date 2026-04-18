@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/hashicorp/mdns"
@@ -67,6 +68,47 @@ func TestValidateServiceInfo(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMDNSAdvertiserIncludesTransportMetadata(t *testing.T) {
+	t.Parallel()
+
+	advertiser := NewMDNSAdvertiser()
+	zone, err := advertiser.newZone(ServiceInfo{
+		ServiceType: "_terminals._tcp.local.",
+		Name:        "HomeServer",
+		Port:        50051,
+		Version:     "2",
+		GRPC:        "127.0.0.1:50051",
+		WebSocket:   "ws://127.0.0.1:50054/control",
+		TCP:         "127.0.0.1:50055",
+		HTTP:        "http://127.0.0.1:50056",
+		Priority:    []string{"grpc", "websocket", "tcp", "http"},
+	})
+	if err != nil {
+		t.Fatalf("newZone() error = %v", err)
+	}
+	if zone == nil {
+		t.Fatalf("newZone() = nil")
+	}
+
+	assertTXTContains(t, zone, "version=2")
+	assertTXTContains(t, zone, "name=HomeServer")
+	assertTXTContains(t, zone, "grpc=127.0.0.1:50051")
+	assertTXTContains(t, zone, "ws=ws://127.0.0.1:50054/control")
+	assertTXTContains(t, zone, "tcp=127.0.0.1:50055")
+	assertTXTContains(t, zone, "http=http://127.0.0.1:50056")
+	assertTXTContains(t, zone, "priority=grpc,websocket,tcp,http")
+}
+
+func assertTXTContains(t *testing.T, zone *mdns.MDNSService, expected string) {
+	t.Helper()
+	for _, value := range zone.TXT {
+		if value == expected {
+			return
+		}
+	}
+	t.Fatalf("txt fields = %v, missing %s", zone.TXT, fmt.Sprintf("%q", expected))
 }
 
 func TestMDNSAdvertiserStartStopIdempotent(t *testing.T) {

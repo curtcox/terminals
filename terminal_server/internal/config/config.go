@@ -14,6 +14,10 @@ type Config struct {
 	GRPCPort                      int
 	ControlWSHost                 string
 	ControlWSPort                 int
+	ControlTCPHost                string
+	ControlTCPPort                int
+	ControlHTTPHost               string
+	ControlHTTPPort               int
 	ControlWSAllowedOrigins       []string
 	AdminHTTPHost                 string
 	AdminHTTPPort                 int
@@ -55,6 +59,10 @@ func Load() (Config, error) {
 		GRPCPort:                      50051,
 		ControlWSHost:                 getenv("TERMINALS_CONTROL_WS_HOST", "0.0.0.0"),
 		ControlWSPort:                 50054,
+		ControlTCPHost:                getenv("TERMINALS_CONTROL_TCP_HOST", "0.0.0.0"),
+		ControlTCPPort:                50055,
+		ControlHTTPHost:               getenv("TERMINALS_CONTROL_HTTP_HOST", "0.0.0.0"),
+		ControlHTTPPort:               50056,
 		ControlWSAllowedOrigins:       []string{},
 		AdminHTTPHost:                 getenv("TERMINALS_ADMIN_HTTP_HOST", "0.0.0.0"),
 		AdminHTTPPort:                 50053,
@@ -93,6 +101,16 @@ func Load() (Config, error) {
 		return Config{}, err
 	} else if ok {
 		cfg.ControlWSPort = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_CONTROL_TCP_PORT"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.ControlTCPPort = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_CONTROL_HTTP_PORT"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.ControlHTTPPort = v
 	}
 	if origins := parseCSVStrings(os.Getenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS")); len(origins) > 0 {
 		cfg.ControlWSAllowedOrigins = origins
@@ -184,6 +202,16 @@ func (c Config) GRPCAddress() string {
 // ControlWSAddress returns host:port for the websocket control listener.
 func (c Config) ControlWSAddress() string {
 	return fmt.Sprintf("%s:%d", c.ControlWSHost, c.ControlWSPort)
+}
+
+// ControlTCPAddress returns host:port for the TCP control listener.
+func (c Config) ControlTCPAddress() string {
+	return fmt.Sprintf("%s:%d", c.ControlTCPHost, c.ControlTCPPort)
+}
+
+// ControlHTTPAddress returns host:port for the HTTP fallback control listener.
+func (c Config) ControlHTTPAddress() string {
+	return fmt.Sprintf("%s:%d", c.ControlHTTPHost, c.ControlHTTPPort)
 }
 
 func getenv(k, fallback string) string {

@@ -5,6 +5,8 @@ import 'package:grpc/grpc.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 
+const int wireProtocolVersion = 1;
+
 /// Transport contract used by the app for control-stream lifecycle.
 abstract class TerminalControlClient {
   Stream<ConnectResponse> connect(
@@ -13,6 +15,23 @@ abstract class TerminalControlClient {
   });
 
   Future<void> shutdown();
+}
+
+class UnsupportedTerminalControlClient implements TerminalControlClient {
+  UnsupportedTerminalControlClient(this.reason);
+
+  final String reason;
+
+  @override
+  Stream<ConnectResponse> connect(
+    Stream<ConnectRequest> requests, {
+    CallOptions? options,
+  }) {
+    return Stream<ConnectResponse>.error(UnsupportedError(reason));
+  }
+
+  @override
+  Future<void> shutdown() async {}
 }
 
 /// Thin gRPC client wrapper around TerminalControlService.Connect.

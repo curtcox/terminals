@@ -177,6 +177,8 @@ func main() {
 	grpcServer.ConfigureWebRTCSignalEngine(webrtcEngine)
 	grpcServer.ConfigureBugReportIntake(bugReports)
 	websocketServer := transport.NewWebSocketServer(cfg.ControlWSAddress(), grpcServer, cfg.ControlWSAllowedOrigins)
+	tcpServer := transport.NewTCPServer(cfg.ControlTCPAddress(), grpcServer)
+	httpControlServer := transport.NewHTTPControlServer(cfg.ControlHTTPAddress(), grpcServer)
 	mdns := discovery.NewMDNSAdvertiser()
 
 	logger.Info("terminal server starting", "event", "server.starting", "grpc_address", grpcServer.Address())
@@ -186,6 +188,11 @@ func main() {
 		Name:        cfg.MDNSName,
 		Port:        cfg.GRPCPort,
 		Version:     cfg.Version,
+		GRPC:        cfg.GRPCAddress(),
+		WebSocket:   fmt.Sprintf("ws://%s%s", cfg.ControlWSAddress(), websocketServer.Path()),
+		TCP:         cfg.ControlTCPAddress(),
+		HTTP:        fmt.Sprintf("http://%s", cfg.ControlHTTPAddress()),
+		Priority:    []string{"grpc", "websocket", "tcp", "http"},
 	}); err != nil {
 		logger.Error("start mDNS", "event", "discovery.mdns.failed", "error", err)
 		return
@@ -197,6 +204,14 @@ func main() {
 	}
 	if err := websocketServer.Start(ctx); err != nil {
 		logger.Error("start websocket transport", "event", "transport.websocket.start_failed", "error", err)
+		return
+	}
+	if err := tcpServer.Start(ctx); err != nil {
+		logger.Error("start tcp transport", "event", "transport.tcp.start_failed", "error", err)
+		return
+	}
+	if err := httpControlServer.Start(ctx); err != nil {
+		logger.Error("start http fallback transport", "event", "transport.http.start_failed", "error", err)
 		return
 	}
 
@@ -219,6 +234,8 @@ func main() {
 	}
 	logger.Info("control service ready", "event", "server.started", "server_id", cfg.MDNSName)
 	logger.Info("websocket control ready", "event", "transport.websocket.ready", "websocket_address", websocketServer.Address(), "path", websocketServer.Path())
+	logger.Info("tcp control ready", "event", "transport.tcp.ready", "tcp_address", tcpServer.Address())
+	logger.Info("http fallback control ready", "event", "transport.http.ready", "http_address", httpControlServer.Address())
 	if adminServer != nil {
 		logger.Info("admin dashboard available", "event", "admin.http.ready", "addr", adminServer.Addr)
 	}
@@ -255,6 +272,12 @@ func main() {
 
 	shutdownCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	if err := httpControlServer.Stop(shutdownCtx); err != nil {
+		logger.Error("stop http fallback transport", "event", "transport.http.stop_failed", "error", err)
+	}
+	if err := tcpServer.Stop(shutdownCtx); err != nil {
+		logger.Error("stop tcp transport", "event", "transport.tcp.stop_failed", "error", err)
+	}
 	if err := websocketServer.Stop(shutdownCtx); err != nil {
 		logger.Error("stop websocket transport", "event", "transport.websocket.stop_failed", "error", err)
 	}

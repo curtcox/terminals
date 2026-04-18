@@ -14,6 +14,34 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
+class CarrierKind extends $pb.ProtobufEnum {
+  static const CarrierKind CARRIER_KIND_UNSPECIFIED =
+      CarrierKind._(0, _omitEnumNames ? '' : 'CARRIER_KIND_UNSPECIFIED');
+  static const CarrierKind CARRIER_KIND_GRPC =
+      CarrierKind._(1, _omitEnumNames ? '' : 'CARRIER_KIND_GRPC');
+  static const CarrierKind CARRIER_KIND_WEBSOCKET =
+      CarrierKind._(2, _omitEnumNames ? '' : 'CARRIER_KIND_WEBSOCKET');
+  static const CarrierKind CARRIER_KIND_TCP =
+      CarrierKind._(3, _omitEnumNames ? '' : 'CARRIER_KIND_TCP');
+  static const CarrierKind CARRIER_KIND_HTTP =
+      CarrierKind._(4, _omitEnumNames ? '' : 'CARRIER_KIND_HTTP');
+
+  static const $core.List<CarrierKind> values = <CarrierKind>[
+    CARRIER_KIND_UNSPECIFIED,
+    CARRIER_KIND_GRPC,
+    CARRIER_KIND_WEBSOCKET,
+    CARRIER_KIND_TCP,
+    CARRIER_KIND_HTTP,
+  ];
+
+  static final $core.List<CarrierKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static CarrierKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CarrierKind._(super.value, super.name);
+}
+
 class CommandAction extends $pb.ProtobufEnum {
   static const CommandAction COMMAND_ACTION_UNSPECIFIED =
       CommandAction._(0, _omitEnumNames ? '' : 'COMMAND_ACTION_UNSPECIFIED');

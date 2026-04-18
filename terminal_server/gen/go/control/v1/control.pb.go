@@ -25,6 +25,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type CarrierKind int32
+
+const (
+	CarrierKind_CARRIER_KIND_UNSPECIFIED CarrierKind = 0
+	CarrierKind_CARRIER_KIND_GRPC        CarrierKind = 1
+	CarrierKind_CARRIER_KIND_WEBSOCKET   CarrierKind = 2
+	CarrierKind_CARRIER_KIND_TCP         CarrierKind = 3
+	CarrierKind_CARRIER_KIND_HTTP        CarrierKind = 4
+)
+
+// Enum value maps for CarrierKind.
+var (
+	CarrierKind_name = map[int32]string{
+		0: "CARRIER_KIND_UNSPECIFIED",
+		1: "CARRIER_KIND_GRPC",
+		2: "CARRIER_KIND_WEBSOCKET",
+		3: "CARRIER_KIND_TCP",
+		4: "CARRIER_KIND_HTTP",
+	}
+	CarrierKind_value = map[string]int32{
+		"CARRIER_KIND_UNSPECIFIED": 0,
+		"CARRIER_KIND_GRPC":        1,
+		"CARRIER_KIND_WEBSOCKET":   2,
+		"CARRIER_KIND_TCP":         3,
+		"CARRIER_KIND_HTTP":        4,
+	}
+)
+
+func (x CarrierKind) Enum() *CarrierKind {
+	p := new(CarrierKind)
+	*p = x
+	return p
+}
+
+func (x CarrierKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CarrierKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_control_v1_control_proto_enumTypes[0].Descriptor()
+}
+
+func (CarrierKind) Type() protoreflect.EnumType {
+	return &file_terminals_control_v1_control_proto_enumTypes[0]
+}
+
+func (x CarrierKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CarrierKind.Descriptor instead.
+func (CarrierKind) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{0}
+}
+
 type CommandAction int32
 
 const (
@@ -58,11 +113,11 @@ func (x CommandAction) String() string {
 }
 
 func (CommandAction) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_control_v1_control_proto_enumTypes[0].Descriptor()
+	return file_terminals_control_v1_control_proto_enumTypes[1].Descriptor()
 }
 
 func (CommandAction) Type() protoreflect.EnumType {
-	return &file_terminals_control_v1_control_proto_enumTypes[0]
+	return &file_terminals_control_v1_control_proto_enumTypes[1]
 }
 
 func (x CommandAction) Number() protoreflect.EnumNumber {
@@ -71,7 +126,7 @@ func (x CommandAction) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CommandAction.Descriptor instead.
 func (CommandAction) EnumDescriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{0}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{1}
 }
 
 type CommandKind int32
@@ -110,11 +165,11 @@ func (x CommandKind) String() string {
 }
 
 func (CommandKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_control_v1_control_proto_enumTypes[1].Descriptor()
+	return file_terminals_control_v1_control_proto_enumTypes[2].Descriptor()
 }
 
 func (CommandKind) Type() protoreflect.EnumType {
-	return &file_terminals_control_v1_control_proto_enumTypes[1]
+	return &file_terminals_control_v1_control_proto_enumTypes[2]
 }
 
 func (x CommandKind) Number() protoreflect.EnumNumber {
@@ -123,7 +178,7 @@ func (x CommandKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CommandKind.Descriptor instead.
 func (CommandKind) EnumDescriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{1}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{2}
 }
 
 type ControlErrorCode int32
@@ -177,11 +232,11 @@ func (x ControlErrorCode) String() string {
 }
 
 func (ControlErrorCode) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_control_v1_control_proto_enumTypes[2].Descriptor()
+	return file_terminals_control_v1_control_proto_enumTypes[3].Descriptor()
 }
 
 func (ControlErrorCode) Type() protoreflect.EnumType {
-	return &file_terminals_control_v1_control_proto_enumTypes[2]
+	return &file_terminals_control_v1_control_proto_enumTypes[3]
 }
 
 func (x ControlErrorCode) Number() protoreflect.EnumNumber {
@@ -190,8 +245,426 @@ func (x ControlErrorCode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ControlErrorCode.Descriptor instead.
 func (ControlErrorCode) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{3}
+}
+
+type TransportHello struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ProtocolVersion   uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	SupportedCarriers []CarrierKind          `protobuf:"varint,2,rep,packed,name=supported_carriers,json=supportedCarriers,proto3,enum=terminals.control.v1.CarrierKind" json:"supported_carriers,omitempty"`
+	DesiredDeviceId   string                 `protobuf:"bytes,3,opt,name=desired_device_id,json=desiredDeviceId,proto3" json:"desired_device_id,omitempty"`
+	ResumeToken       string                 `protobuf:"bytes,4,opt,name=resume_token,json=resumeToken,proto3" json:"resume_token,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *TransportHello) Reset() {
+	*x = TransportHello{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransportHello) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransportHello) ProtoMessage() {}
+
+func (x *TransportHello) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransportHello.ProtoReflect.Descriptor instead.
+func (*TransportHello) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *TransportHello) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *TransportHello) GetSupportedCarriers() []CarrierKind {
+	if x != nil {
+		return x.SupportedCarriers
+	}
+	return nil
+}
+
+func (x *TransportHello) GetDesiredDeviceId() string {
+	if x != nil {
+		return x.DesiredDeviceId
+	}
+	return ""
+}
+
+func (x *TransportHello) GetResumeToken() string {
+	if x != nil {
+		return x.ResumeToken
+	}
+	return ""
+}
+
+type TransportHelloAck struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	AcceptedProtocolVersion uint32                 `protobuf:"varint,1,opt,name=accepted_protocol_version,json=acceptedProtocolVersion,proto3" json:"accepted_protocol_version,omitempty"`
+	NegotiatedCarrier       CarrierKind            `protobuf:"varint,2,opt,name=negotiated_carrier,json=negotiatedCarrier,proto3,enum=terminals.control.v1.CarrierKind" json:"negotiated_carrier,omitempty"`
+	SessionId               string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	ResumeToken             string                 `protobuf:"bytes,4,opt,name=resume_token,json=resumeToken,proto3" json:"resume_token,omitempty"`
+	HeartbeatIntervalMs     int64                  `protobuf:"varint,5,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"`
+	Limits                  map[string]string      `protobuf:"bytes,6,rep,name=limits,proto3" json:"limits,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *TransportHelloAck) Reset() {
+	*x = TransportHelloAck{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransportHelloAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransportHelloAck) ProtoMessage() {}
+
+func (x *TransportHelloAck) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransportHelloAck.ProtoReflect.Descriptor instead.
+func (*TransportHelloAck) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TransportHelloAck) GetAcceptedProtocolVersion() uint32 {
+	if x != nil {
+		return x.AcceptedProtocolVersion
+	}
+	return 0
+}
+
+func (x *TransportHelloAck) GetNegotiatedCarrier() CarrierKind {
+	if x != nil {
+		return x.NegotiatedCarrier
+	}
+	return CarrierKind_CARRIER_KIND_UNSPECIFIED
+}
+
+func (x *TransportHelloAck) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *TransportHelloAck) GetResumeToken() string {
+	if x != nil {
+		return x.ResumeToken
+	}
+	return ""
+}
+
+func (x *TransportHelloAck) GetHeartbeatIntervalMs() int64 {
+	if x != nil {
+		return x.HeartbeatIntervalMs
+	}
+	return 0
+}
+
+func (x *TransportHelloAck) GetLimits() map[string]string {
+	if x != nil {
+		return x.Limits
+	}
+	return nil
+}
+
+type TransportHeartbeat struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UnixMs        int64                  `protobuf:"varint,1,opt,name=unix_ms,json=unixMs,proto3" json:"unix_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TransportHeartbeat) Reset() {
+	*x = TransportHeartbeat{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransportHeartbeat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransportHeartbeat) ProtoMessage() {}
+
+func (x *TransportHeartbeat) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransportHeartbeat.ProtoReflect.Descriptor instead.
+func (*TransportHeartbeat) Descriptor() ([]byte, []int) {
 	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{2}
 }
+
+func (x *TransportHeartbeat) GetUnixMs() int64 {
+	if x != nil {
+		return x.UnixMs
+	}
+	return 0
+}
+
+type TransportError struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TransportError) Reset() {
+	*x = TransportError{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransportError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransportError) ProtoMessage() {}
+
+func (x *TransportError) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransportError.ProtoReflect.Descriptor instead.
+func (*TransportError) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TransportError) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *TransportError) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type WireEnvelope struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProtocolVersion uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
+	SessionId       string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Sequence        uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*WireEnvelope_ClientMessage
+	//	*WireEnvelope_ServerMessage
+	//	*WireEnvelope_TransportHello
+	//	*WireEnvelope_TransportHelloAck
+	//	*WireEnvelope_TransportHeartbeat
+	//	*WireEnvelope_TransportError
+	Payload       isWireEnvelope_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WireEnvelope) Reset() {
+	*x = WireEnvelope{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WireEnvelope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WireEnvelope) ProtoMessage() {}
+
+func (x *WireEnvelope) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WireEnvelope.ProtoReflect.Descriptor instead.
+func (*WireEnvelope) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *WireEnvelope) GetProtocolVersion() uint32 {
+	if x != nil {
+		return x.ProtocolVersion
+	}
+	return 0
+}
+
+func (x *WireEnvelope) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *WireEnvelope) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *WireEnvelope) GetPayload() isWireEnvelope_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *WireEnvelope) GetClientMessage() *ConnectRequest {
+	if x != nil {
+		if x, ok := x.Payload.(*WireEnvelope_ClientMessage); ok {
+			return x.ClientMessage
+		}
+	}
+	return nil
+}
+
+func (x *WireEnvelope) GetServerMessage() *ConnectResponse {
+	if x != nil {
+		if x, ok := x.Payload.(*WireEnvelope_ServerMessage); ok {
+			return x.ServerMessage
+		}
+	}
+	return nil
+}
+
+func (x *WireEnvelope) GetTransportHello() *TransportHello {
+	if x != nil {
+		if x, ok := x.Payload.(*WireEnvelope_TransportHello); ok {
+			return x.TransportHello
+		}
+	}
+	return nil
+}
+
+func (x *WireEnvelope) GetTransportHelloAck() *TransportHelloAck {
+	if x != nil {
+		if x, ok := x.Payload.(*WireEnvelope_TransportHelloAck); ok {
+			return x.TransportHelloAck
+		}
+	}
+	return nil
+}
+
+func (x *WireEnvelope) GetTransportHeartbeat() *TransportHeartbeat {
+	if x != nil {
+		if x, ok := x.Payload.(*WireEnvelope_TransportHeartbeat); ok {
+			return x.TransportHeartbeat
+		}
+	}
+	return nil
+}
+
+func (x *WireEnvelope) GetTransportError() *TransportError {
+	if x != nil {
+		if x, ok := x.Payload.(*WireEnvelope_TransportError); ok {
+			return x.TransportError
+		}
+	}
+	return nil
+}
+
+type isWireEnvelope_Payload interface {
+	isWireEnvelope_Payload()
+}
+
+type WireEnvelope_ClientMessage struct {
+	ClientMessage *ConnectRequest `protobuf:"bytes,10,opt,name=client_message,json=clientMessage,proto3,oneof"`
+}
+
+type WireEnvelope_ServerMessage struct {
+	ServerMessage *ConnectResponse `protobuf:"bytes,11,opt,name=server_message,json=serverMessage,proto3,oneof"`
+}
+
+type WireEnvelope_TransportHello struct {
+	TransportHello *TransportHello `protobuf:"bytes,12,opt,name=transport_hello,json=transportHello,proto3,oneof"`
+}
+
+type WireEnvelope_TransportHelloAck struct {
+	TransportHelloAck *TransportHelloAck `protobuf:"bytes,13,opt,name=transport_hello_ack,json=transportHelloAck,proto3,oneof"`
+}
+
+type WireEnvelope_TransportHeartbeat struct {
+	TransportHeartbeat *TransportHeartbeat `protobuf:"bytes,14,opt,name=transport_heartbeat,json=transportHeartbeat,proto3,oneof"`
+}
+
+type WireEnvelope_TransportError struct {
+	TransportError *TransportError `protobuf:"bytes,15,opt,name=transport_error,json=transportError,proto3,oneof"`
+}
+
+func (*WireEnvelope_ClientMessage) isWireEnvelope_Payload() {}
+
+func (*WireEnvelope_ServerMessage) isWireEnvelope_Payload() {}
+
+func (*WireEnvelope_TransportHello) isWireEnvelope_Payload() {}
+
+func (*WireEnvelope_TransportHelloAck) isWireEnvelope_Payload() {}
+
+func (*WireEnvelope_TransportHeartbeat) isWireEnvelope_Payload() {}
+
+func (*WireEnvelope_TransportError) isWireEnvelope_Payload() {}
 
 type ConnectRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -218,7 +691,7 @@ type ConnectRequest struct {
 
 func (x *ConnectRequest) Reset() {
 	*x = ConnectRequest{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[0]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -230,7 +703,7 @@ func (x *ConnectRequest) String() string {
 func (*ConnectRequest) ProtoMessage() {}
 
 func (x *ConnectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[0]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -243,7 +716,7 @@ func (x *ConnectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectRequest.ProtoReflect.Descriptor instead.
 func (*ConnectRequest) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{0}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ConnectRequest) GetPayload() isConnectRequest_Payload {
@@ -479,7 +952,7 @@ type VoiceAudio struct {
 
 func (x *VoiceAudio) Reset() {
 	*x = VoiceAudio{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[1]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -491,7 +964,7 @@ func (x *VoiceAudio) String() string {
 func (*VoiceAudio) ProtoMessage() {}
 
 func (x *VoiceAudio) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[1]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -504,7 +977,7 @@ func (x *VoiceAudio) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VoiceAudio.ProtoReflect.Descriptor instead.
 func (*VoiceAudio) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{1}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *VoiceAudio) GetDeviceId() string {
@@ -567,7 +1040,7 @@ type ConnectResponse struct {
 
 func (x *ConnectResponse) Reset() {
 	*x = ConnectResponse{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[2]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -579,7 +1052,7 @@ func (x *ConnectResponse) String() string {
 func (*ConnectResponse) ProtoMessage() {}
 
 func (x *ConnectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[2]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -592,7 +1065,7 @@ func (x *ConnectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectResponse.ProtoReflect.Descriptor instead.
 func (*ConnectResponse) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{2}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ConnectResponse) GetPayload() isConnectResponse_Payload {
@@ -930,7 +1403,7 @@ type RegisterDevice struct {
 
 func (x *RegisterDevice) Reset() {
 	*x = RegisterDevice{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[3]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -942,7 +1415,7 @@ func (x *RegisterDevice) String() string {
 func (*RegisterDevice) ProtoMessage() {}
 
 func (x *RegisterDevice) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[3]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -955,7 +1428,7 @@ func (x *RegisterDevice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterDevice.ProtoReflect.Descriptor instead.
 func (*RegisterDevice) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{3}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RegisterDevice) GetCapabilities() *v13.DeviceCapabilities {
@@ -976,7 +1449,7 @@ type RegisterAck struct {
 
 func (x *RegisterAck) Reset() {
 	*x = RegisterAck{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[4]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -988,7 +1461,7 @@ func (x *RegisterAck) String() string {
 func (*RegisterAck) ProtoMessage() {}
 
 func (x *RegisterAck) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[4]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1001,7 +1474,7 @@ func (x *RegisterAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterAck.ProtoReflect.Descriptor instead.
 func (*RegisterAck) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{4}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RegisterAck) GetServerId() string {
@@ -1034,7 +1507,7 @@ type CapabilityUpdate struct {
 
 func (x *CapabilityUpdate) Reset() {
 	*x = CapabilityUpdate{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[5]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1046,7 +1519,7 @@ func (x *CapabilityUpdate) String() string {
 func (*CapabilityUpdate) ProtoMessage() {}
 
 func (x *CapabilityUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[5]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1059,7 +1532,7 @@ func (x *CapabilityUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapabilityUpdate.ProtoReflect.Descriptor instead.
 func (*CapabilityUpdate) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{5}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CapabilityUpdate) GetCapabilities() *v13.DeviceCapabilities {
@@ -1078,7 +1551,7 @@ type StreamReady struct {
 
 func (x *StreamReady) Reset() {
 	*x = StreamReady{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[6]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1090,7 +1563,7 @@ func (x *StreamReady) String() string {
 func (*StreamReady) ProtoMessage() {}
 
 func (x *StreamReady) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[6]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1103,7 +1576,7 @@ func (x *StreamReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamReady.ProtoReflect.Descriptor instead.
 func (*StreamReady) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{6}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *StreamReady) GetStreamId() string {
@@ -1128,7 +1601,7 @@ type CommandRequest struct {
 
 func (x *CommandRequest) Reset() {
 	*x = CommandRequest{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[7]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1140,7 +1613,7 @@ func (x *CommandRequest) String() string {
 func (*CommandRequest) ProtoMessage() {}
 
 func (x *CommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[7]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1153,7 +1626,7 @@ func (x *CommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandRequest.ProtoReflect.Descriptor instead.
 func (*CommandRequest) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{7}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CommandRequest) GetRequestId() string {
@@ -1218,7 +1691,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[8]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1230,7 +1703,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[8]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1243,7 +1716,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{8}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CommandResult) GetRequestId() string {
@@ -1291,7 +1764,7 @@ type ControlError struct {
 
 func (x *ControlError) Reset() {
 	*x = ControlError{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[9]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1303,7 +1776,7 @@ func (x *ControlError) String() string {
 func (*ControlError) ProtoMessage() {}
 
 func (x *ControlError) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[9]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1316,7 +1789,7 @@ func (x *ControlError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlError.ProtoReflect.Descriptor instead.
 func (*ControlError) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{9}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ControlError) GetCode() ControlErrorCode {
@@ -1344,7 +1817,7 @@ type WebRTCSignal struct {
 
 func (x *WebRTCSignal) Reset() {
 	*x = WebRTCSignal{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[10]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1356,7 +1829,7 @@ func (x *WebRTCSignal) String() string {
 func (*WebRTCSignal) ProtoMessage() {}
 
 func (x *WebRTCSignal) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[10]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1369,7 +1842,7 @@ func (x *WebRTCSignal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebRTCSignal.ProtoReflect.Descriptor instead.
 func (*WebRTCSignal) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{10}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *WebRTCSignal) GetStreamId() string {
@@ -1403,7 +1876,7 @@ type Heartbeat struct {
 
 func (x *Heartbeat) Reset() {
 	*x = Heartbeat{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[11]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1415,7 +1888,7 @@ func (x *Heartbeat) String() string {
 func (*Heartbeat) ProtoMessage() {}
 
 func (x *Heartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[11]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1428,7 +1901,7 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{11}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Heartbeat) GetDeviceId() string {
@@ -1449,7 +1922,41 @@ var File_terminals_control_v1_control_proto protoreflect.FileDescriptor
 
 const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\n" +
-	"\"terminals/control/v1/control.proto\x12\x14terminals.control.v1\x1a,terminals/capabilities/v1/capabilities.proto\x1a*terminals/diagnostics/v1/diagnostics.proto\x1a\x18terminals/io/v1/io.proto\x1a\x18terminals/ui/v1/ui.proto\"\xe3\a\n" +
+	"\"terminals/control/v1/control.proto\x12\x14terminals.control.v1\x1a,terminals/capabilities/v1/capabilities.proto\x1a*terminals/diagnostics/v1/diagnostics.proto\x1a\x18terminals/io/v1/io.proto\x1a\x18terminals/ui/v1/ui.proto\"\xdc\x01\n" +
+	"\x0eTransportHello\x12)\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12P\n" +
+	"\x12supported_carriers\x18\x02 \x03(\x0e2!.terminals.control.v1.CarrierKindR\x11supportedCarriers\x12*\n" +
+	"\x11desired_device_id\x18\x03 \x01(\tR\x0fdesiredDeviceId\x12!\n" +
+	"\fresume_token\x18\x04 \x01(\tR\vresumeToken\"\x9f\x03\n" +
+	"\x11TransportHelloAck\x12:\n" +
+	"\x19accepted_protocol_version\x18\x01 \x01(\rR\x17acceptedProtocolVersion\x12P\n" +
+	"\x12negotiated_carrier\x18\x02 \x01(\x0e2!.terminals.control.v1.CarrierKindR\x11negotiatedCarrier\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12!\n" +
+	"\fresume_token\x18\x04 \x01(\tR\vresumeToken\x122\n" +
+	"\x15heartbeat_interval_ms\x18\x05 \x01(\x03R\x13heartbeatIntervalMs\x12K\n" +
+	"\x06limits\x18\x06 \x03(\v23.terminals.control.v1.TransportHelloAck.LimitsEntryR\x06limits\x1a9\n" +
+	"\vLimitsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"-\n" +
+	"\x12TransportHeartbeat\x12\x17\n" +
+	"\aunix_ms\x18\x01 \x01(\x03R\x06unixMs\">\n" +
+	"\x0eTransportError\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xf8\x04\n" +
+	"\fWireEnvelope\x12)\n" +
+	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x1a\n" +
+	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12M\n" +
+	"\x0eclient_message\x18\n" +
+	" \x01(\v2$.terminals.control.v1.ConnectRequestH\x00R\rclientMessage\x12N\n" +
+	"\x0eserver_message\x18\v \x01(\v2%.terminals.control.v1.ConnectResponseH\x00R\rserverMessage\x12O\n" +
+	"\x0ftransport_hello\x18\f \x01(\v2$.terminals.control.v1.TransportHelloH\x00R\x0etransportHello\x12Y\n" +
+	"\x13transport_hello_ack\x18\r \x01(\v2'.terminals.control.v1.TransportHelloAckH\x00R\x11transportHelloAck\x12[\n" +
+	"\x13transport_heartbeat\x18\x0e \x01(\v2(.terminals.control.v1.TransportHeartbeatH\x00R\x12transportHeartbeat\x12O\n" +
+	"\x0ftransport_error\x18\x0f \x01(\v2$.terminals.control.v1.TransportErrorH\x00R\x0etransportErrorB\t\n" +
+	"\apayload\"\xe3\a\n" +
 	"\x0eConnectRequest\x12B\n" +
 	"\bregister\x18\x01 \x01(\v2$.terminals.control.v1.RegisterDeviceH\x00R\bregister\x12H\n" +
 	"\n" +
@@ -1553,7 +2060,13 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\apayload\x18\x03 \x01(\tR\apayload\"A\n" +
 	"\tHeartbeat\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
-	"\aunix_ms\x18\x02 \x01(\x03R\x06unixMs*b\n" +
+	"\aunix_ms\x18\x02 \x01(\x03R\x06unixMs*\x8b\x01\n" +
+	"\vCarrierKind\x12\x1c\n" +
+	"\x18CARRIER_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11CARRIER_KIND_GRPC\x10\x01\x12\x1a\n" +
+	"\x16CARRIER_KIND_WEBSOCKET\x10\x02\x12\x14\n" +
+	"\x10CARRIER_KIND_TCP\x10\x03\x12\x15\n" +
+	"\x11CARRIER_KIND_HTTP\x10\x04*b\n" +
 	"\rCommandAction\x12\x1e\n" +
 	"\x1aCOMMAND_ACTION_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14COMMAND_ACTION_START\x10\x01\x12\x17\n" +
@@ -1588,103 +2101,119 @@ func file_terminals_control_v1_control_proto_rawDescGZIP() []byte {
 	return file_terminals_control_v1_control_proto_rawDescData
 }
 
-var file_terminals_control_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_terminals_control_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_terminals_control_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_terminals_control_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_terminals_control_v1_control_proto_goTypes = []any{
-	(CommandAction)(0),             // 0: terminals.control.v1.CommandAction
-	(CommandKind)(0),               // 1: terminals.control.v1.CommandKind
-	(ControlErrorCode)(0),          // 2: terminals.control.v1.ControlErrorCode
-	(*ConnectRequest)(nil),         // 3: terminals.control.v1.ConnectRequest
-	(*VoiceAudio)(nil),             // 4: terminals.control.v1.VoiceAudio
-	(*ConnectResponse)(nil),        // 5: terminals.control.v1.ConnectResponse
-	(*RegisterDevice)(nil),         // 6: terminals.control.v1.RegisterDevice
-	(*RegisterAck)(nil),            // 7: terminals.control.v1.RegisterAck
-	(*CapabilityUpdate)(nil),       // 8: terminals.control.v1.CapabilityUpdate
-	(*StreamReady)(nil),            // 9: terminals.control.v1.StreamReady
-	(*CommandRequest)(nil),         // 10: terminals.control.v1.CommandRequest
-	(*CommandResult)(nil),          // 11: terminals.control.v1.CommandResult
-	(*ControlError)(nil),           // 12: terminals.control.v1.ControlError
-	(*WebRTCSignal)(nil),           // 13: terminals.control.v1.WebRTCSignal
-	(*Heartbeat)(nil),              // 14: terminals.control.v1.Heartbeat
-	nil,                            // 15: terminals.control.v1.RegisterAck.MetadataEntry
-	nil,                            // 16: terminals.control.v1.CommandRequest.ArgumentsEntry
-	nil,                            // 17: terminals.control.v1.CommandResult.DataEntry
-	(*v1.InputEvent)(nil),          // 18: terminals.io.v1.InputEvent
-	(*v1.SensorData)(nil),          // 19: terminals.io.v1.SensorData
-	(*v1.ObservationMessage)(nil),  // 20: terminals.io.v1.ObservationMessage
-	(*v1.ArtifactAvailable)(nil),   // 21: terminals.io.v1.ArtifactAvailable
-	(*v1.FlowStats)(nil),           // 22: terminals.io.v1.FlowStats
-	(*v1.ClockSample)(nil),         // 23: terminals.io.v1.ClockSample
-	(*v11.BugReport)(nil),          // 24: terminals.diagnostics.v1.BugReport
-	(*v12.SetUI)(nil),              // 25: terminals.ui.v1.SetUI
-	(*v1.StartStream)(nil),         // 26: terminals.io.v1.StartStream
-	(*v1.StopStream)(nil),          // 27: terminals.io.v1.StopStream
-	(*v1.PlayAudio)(nil),           // 28: terminals.io.v1.PlayAudio
-	(*v1.ShowMedia)(nil),           // 29: terminals.io.v1.ShowMedia
-	(*v1.RouteStream)(nil),         // 30: terminals.io.v1.RouteStream
-	(*v12.Notification)(nil),       // 31: terminals.ui.v1.Notification
-	(*v12.UpdateUI)(nil),           // 32: terminals.ui.v1.UpdateUI
-	(*v12.TransitionUI)(nil),       // 33: terminals.ui.v1.TransitionUI
-	(*v1.InstallBundle)(nil),       // 34: terminals.io.v1.InstallBundle
-	(*v1.RemoveBundle)(nil),        // 35: terminals.io.v1.RemoveBundle
-	(*v1.StartFlow)(nil),           // 36: terminals.io.v1.StartFlow
-	(*v1.PatchFlow)(nil),           // 37: terminals.io.v1.PatchFlow
-	(*v1.StopFlow)(nil),            // 38: terminals.io.v1.StopFlow
-	(*v1.RequestArtifact)(nil),     // 39: terminals.io.v1.RequestArtifact
-	(*v11.BugReportAck)(nil),       // 40: terminals.diagnostics.v1.BugReportAck
-	(*v13.DeviceCapabilities)(nil), // 41: terminals.capabilities.v1.DeviceCapabilities
+	(CarrierKind)(0),               // 0: terminals.control.v1.CarrierKind
+	(CommandAction)(0),             // 1: terminals.control.v1.CommandAction
+	(CommandKind)(0),               // 2: terminals.control.v1.CommandKind
+	(ControlErrorCode)(0),          // 3: terminals.control.v1.ControlErrorCode
+	(*TransportHello)(nil),         // 4: terminals.control.v1.TransportHello
+	(*TransportHelloAck)(nil),      // 5: terminals.control.v1.TransportHelloAck
+	(*TransportHeartbeat)(nil),     // 6: terminals.control.v1.TransportHeartbeat
+	(*TransportError)(nil),         // 7: terminals.control.v1.TransportError
+	(*WireEnvelope)(nil),           // 8: terminals.control.v1.WireEnvelope
+	(*ConnectRequest)(nil),         // 9: terminals.control.v1.ConnectRequest
+	(*VoiceAudio)(nil),             // 10: terminals.control.v1.VoiceAudio
+	(*ConnectResponse)(nil),        // 11: terminals.control.v1.ConnectResponse
+	(*RegisterDevice)(nil),         // 12: terminals.control.v1.RegisterDevice
+	(*RegisterAck)(nil),            // 13: terminals.control.v1.RegisterAck
+	(*CapabilityUpdate)(nil),       // 14: terminals.control.v1.CapabilityUpdate
+	(*StreamReady)(nil),            // 15: terminals.control.v1.StreamReady
+	(*CommandRequest)(nil),         // 16: terminals.control.v1.CommandRequest
+	(*CommandResult)(nil),          // 17: terminals.control.v1.CommandResult
+	(*ControlError)(nil),           // 18: terminals.control.v1.ControlError
+	(*WebRTCSignal)(nil),           // 19: terminals.control.v1.WebRTCSignal
+	(*Heartbeat)(nil),              // 20: terminals.control.v1.Heartbeat
+	nil,                            // 21: terminals.control.v1.TransportHelloAck.LimitsEntry
+	nil,                            // 22: terminals.control.v1.RegisterAck.MetadataEntry
+	nil,                            // 23: terminals.control.v1.CommandRequest.ArgumentsEntry
+	nil,                            // 24: terminals.control.v1.CommandResult.DataEntry
+	(*v1.InputEvent)(nil),          // 25: terminals.io.v1.InputEvent
+	(*v1.SensorData)(nil),          // 26: terminals.io.v1.SensorData
+	(*v1.ObservationMessage)(nil),  // 27: terminals.io.v1.ObservationMessage
+	(*v1.ArtifactAvailable)(nil),   // 28: terminals.io.v1.ArtifactAvailable
+	(*v1.FlowStats)(nil),           // 29: terminals.io.v1.FlowStats
+	(*v1.ClockSample)(nil),         // 30: terminals.io.v1.ClockSample
+	(*v11.BugReport)(nil),          // 31: terminals.diagnostics.v1.BugReport
+	(*v12.SetUI)(nil),              // 32: terminals.ui.v1.SetUI
+	(*v1.StartStream)(nil),         // 33: terminals.io.v1.StartStream
+	(*v1.StopStream)(nil),          // 34: terminals.io.v1.StopStream
+	(*v1.PlayAudio)(nil),           // 35: terminals.io.v1.PlayAudio
+	(*v1.ShowMedia)(nil),           // 36: terminals.io.v1.ShowMedia
+	(*v1.RouteStream)(nil),         // 37: terminals.io.v1.RouteStream
+	(*v12.Notification)(nil),       // 38: terminals.ui.v1.Notification
+	(*v12.UpdateUI)(nil),           // 39: terminals.ui.v1.UpdateUI
+	(*v12.TransitionUI)(nil),       // 40: terminals.ui.v1.TransitionUI
+	(*v1.InstallBundle)(nil),       // 41: terminals.io.v1.InstallBundle
+	(*v1.RemoveBundle)(nil),        // 42: terminals.io.v1.RemoveBundle
+	(*v1.StartFlow)(nil),           // 43: terminals.io.v1.StartFlow
+	(*v1.PatchFlow)(nil),           // 44: terminals.io.v1.PatchFlow
+	(*v1.StopFlow)(nil),            // 45: terminals.io.v1.StopFlow
+	(*v1.RequestArtifact)(nil),     // 46: terminals.io.v1.RequestArtifact
+	(*v11.BugReportAck)(nil),       // 47: terminals.diagnostics.v1.BugReportAck
+	(*v13.DeviceCapabilities)(nil), // 48: terminals.capabilities.v1.DeviceCapabilities
 }
 var file_terminals_control_v1_control_proto_depIdxs = []int32{
-	6,  // 0: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
-	8,  // 1: terminals.control.v1.ConnectRequest.capability:type_name -> terminals.control.v1.CapabilityUpdate
-	18, // 2: terminals.control.v1.ConnectRequest.input:type_name -> terminals.io.v1.InputEvent
-	19, // 3: terminals.control.v1.ConnectRequest.sensor:type_name -> terminals.io.v1.SensorData
-	9,  // 4: terminals.control.v1.ConnectRequest.stream_ready:type_name -> terminals.control.v1.StreamReady
-	10, // 5: terminals.control.v1.ConnectRequest.command:type_name -> terminals.control.v1.CommandRequest
-	14, // 6: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	13, // 7: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
-	4,  // 8: terminals.control.v1.ConnectRequest.voice_audio:type_name -> terminals.control.v1.VoiceAudio
-	20, // 9: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
-	21, // 10: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
-	22, // 11: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
-	23, // 12: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
-	24, // 13: terminals.control.v1.ConnectRequest.bug_report:type_name -> terminals.diagnostics.v1.BugReport
-	7,  // 14: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
-	25, // 15: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
-	26, // 16: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
-	27, // 17: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
-	28, // 18: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
-	29, // 19: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
-	30, // 20: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
-	31, // 21: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
-	13, // 22: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
-	11, // 23: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
-	14, // 24: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	12, // 25: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
-	32, // 26: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
-	33, // 27: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
-	34, // 28: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
-	35, // 29: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
-	36, // 30: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
-	37, // 31: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
-	38, // 32: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
-	39, // 33: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
-	40, // 34: terminals.control.v1.ConnectResponse.bug_report_ack:type_name -> terminals.diagnostics.v1.BugReportAck
-	41, // 35: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	15, // 36: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
-	41, // 37: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	0,  // 38: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
-	1,  // 39: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
-	16, // 40: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
-	17, // 41: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
-	2,  // 42: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
-	3,  // 43: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
-	5,  // 44: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
-	44, // [44:45] is the sub-list for method output_type
-	43, // [43:44] is the sub-list for method input_type
-	43, // [43:43] is the sub-list for extension type_name
-	43, // [43:43] is the sub-list for extension extendee
-	0,  // [0:43] is the sub-list for field type_name
+	0,  // 0: terminals.control.v1.TransportHello.supported_carriers:type_name -> terminals.control.v1.CarrierKind
+	0,  // 1: terminals.control.v1.TransportHelloAck.negotiated_carrier:type_name -> terminals.control.v1.CarrierKind
+	21, // 2: terminals.control.v1.TransportHelloAck.limits:type_name -> terminals.control.v1.TransportHelloAck.LimitsEntry
+	9,  // 3: terminals.control.v1.WireEnvelope.client_message:type_name -> terminals.control.v1.ConnectRequest
+	11, // 4: terminals.control.v1.WireEnvelope.server_message:type_name -> terminals.control.v1.ConnectResponse
+	4,  // 5: terminals.control.v1.WireEnvelope.transport_hello:type_name -> terminals.control.v1.TransportHello
+	5,  // 6: terminals.control.v1.WireEnvelope.transport_hello_ack:type_name -> terminals.control.v1.TransportHelloAck
+	6,  // 7: terminals.control.v1.WireEnvelope.transport_heartbeat:type_name -> terminals.control.v1.TransportHeartbeat
+	7,  // 8: terminals.control.v1.WireEnvelope.transport_error:type_name -> terminals.control.v1.TransportError
+	12, // 9: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
+	14, // 10: terminals.control.v1.ConnectRequest.capability:type_name -> terminals.control.v1.CapabilityUpdate
+	25, // 11: terminals.control.v1.ConnectRequest.input:type_name -> terminals.io.v1.InputEvent
+	26, // 12: terminals.control.v1.ConnectRequest.sensor:type_name -> terminals.io.v1.SensorData
+	15, // 13: terminals.control.v1.ConnectRequest.stream_ready:type_name -> terminals.control.v1.StreamReady
+	16, // 14: terminals.control.v1.ConnectRequest.command:type_name -> terminals.control.v1.CommandRequest
+	20, // 15: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	19, // 16: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	10, // 17: terminals.control.v1.ConnectRequest.voice_audio:type_name -> terminals.control.v1.VoiceAudio
+	27, // 18: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
+	28, // 19: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
+	29, // 20: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
+	30, // 21: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
+	31, // 22: terminals.control.v1.ConnectRequest.bug_report:type_name -> terminals.diagnostics.v1.BugReport
+	13, // 23: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
+	32, // 24: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
+	33, // 25: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
+	34, // 26: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
+	35, // 27: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
+	36, // 28: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
+	37, // 29: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
+	38, // 30: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
+	19, // 31: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	17, // 32: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
+	20, // 33: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	18, // 34: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
+	39, // 35: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
+	40, // 36: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
+	41, // 37: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
+	42, // 38: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
+	43, // 39: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
+	44, // 40: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
+	45, // 41: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
+	46, // 42: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
+	47, // 43: terminals.control.v1.ConnectResponse.bug_report_ack:type_name -> terminals.diagnostics.v1.BugReportAck
+	48, // 44: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	22, // 45: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
+	48, // 46: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	1,  // 47: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
+	2,  // 48: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
+	23, // 49: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
+	24, // 50: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
+	3,  // 51: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
+	9,  // 52: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
+	11, // 53: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
+	53, // [53:54] is the sub-list for method output_type
+	52, // [52:53] is the sub-list for method input_type
+	52, // [52:52] is the sub-list for extension type_name
+	52, // [52:52] is the sub-list for extension extendee
+	0,  // [0:52] is the sub-list for field type_name
 }
 
 func init() { file_terminals_control_v1_control_proto_init() }
@@ -1692,7 +2221,15 @@ func file_terminals_control_v1_control_proto_init() {
 	if File_terminals_control_v1_control_proto != nil {
 		return
 	}
-	file_terminals_control_v1_control_proto_msgTypes[0].OneofWrappers = []any{
+	file_terminals_control_v1_control_proto_msgTypes[4].OneofWrappers = []any{
+		(*WireEnvelope_ClientMessage)(nil),
+		(*WireEnvelope_ServerMessage)(nil),
+		(*WireEnvelope_TransportHello)(nil),
+		(*WireEnvelope_TransportHelloAck)(nil),
+		(*WireEnvelope_TransportHeartbeat)(nil),
+		(*WireEnvelope_TransportError)(nil),
+	}
+	file_terminals_control_v1_control_proto_msgTypes[5].OneofWrappers = []any{
 		(*ConnectRequest_Register)(nil),
 		(*ConnectRequest_Capability)(nil),
 		(*ConnectRequest_Input)(nil),
@@ -1708,7 +2245,7 @@ func file_terminals_control_v1_control_proto_init() {
 		(*ConnectRequest_ClockSample)(nil),
 		(*ConnectRequest_BugReport)(nil),
 	}
-	file_terminals_control_v1_control_proto_msgTypes[2].OneofWrappers = []any{
+	file_terminals_control_v1_control_proto_msgTypes[7].OneofWrappers = []any{
 		(*ConnectResponse_RegisterAck)(nil),
 		(*ConnectResponse_SetUi)(nil),
 		(*ConnectResponse_StartStream)(nil),
@@ -1736,8 +2273,8 @@ func file_terminals_control_v1_control_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_control_v1_control_proto_rawDesc), len(file_terminals_control_v1_control_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   15,
+			NumEnums:      4,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

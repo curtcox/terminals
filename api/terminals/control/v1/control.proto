@@ -13,6 +13,53 @@ service TerminalControlService {
   rpc Connect(stream ConnectRequest) returns (stream ConnectResponse);
 }
 
+enum CarrierKind {
+  CARRIER_KIND_UNSPECIFIED = 0;
+  CARRIER_KIND_GRPC = 1;
+  CARRIER_KIND_WEBSOCKET = 2;
+  CARRIER_KIND_TCP = 3;
+  CARRIER_KIND_HTTP = 4;
+}
+
+message TransportHello {
+  uint32 protocol_version = 1;
+  repeated CarrierKind supported_carriers = 2;
+  string desired_device_id = 3;
+  string resume_token = 4;
+}
+
+message TransportHelloAck {
+  uint32 accepted_protocol_version = 1;
+  CarrierKind negotiated_carrier = 2;
+  string session_id = 3;
+  string resume_token = 4;
+  int64 heartbeat_interval_ms = 5;
+  map<string, string> limits = 6;
+}
+
+message TransportHeartbeat {
+  int64 unix_ms = 1;
+}
+
+message TransportError {
+  string code = 1;
+  string message = 2;
+}
+
+message WireEnvelope {
+  uint32 protocol_version = 1;
+  string session_id = 2;
+  uint64 sequence = 3;
+  oneof payload {
+    ConnectRequest client_message = 10;
+    ConnectResponse server_message = 11;
+    TransportHello transport_hello = 12;
+    TransportHelloAck transport_hello_ack = 13;
+    TransportHeartbeat transport_heartbeat = 14;
+    TransportError transport_error = 15;
+  }
+}
+
 message ConnectRequest {
   oneof payload {
     RegisterDevice register = 1;

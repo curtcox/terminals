@@ -177,19 +177,7 @@ func (s *Server) Connect(stream ProtoStream) error {
 	if s.control == nil || s.adapter == nil {
 		return ErrControlNotConfigured
 	}
-	handler := NewStreamHandlerWithRuntime(s.control, s.runtime)
-	if s.deviceAudio != nil {
-		handler.SetDeviceAudioPublisher(s.deviceAudio)
-	}
-	if s.recording != nil {
-		handler.SetRecordingManager(s.recording)
-	}
-	if s.webrtc != nil {
-		handler.SetWebRTCSignalEngine(s.webrtc)
-	}
-	if s.bugReports != nil {
-		handler.SetBugReportIntake(s.bugReports)
-	}
+	handler := s.newStreamHandler()
 	ctx, end := eventlog.WithSpan(context.Background(), "grpc:connect")
 	defer end()
 	eventlog.Emit(ctx, "transport.grpc.request.started", slog.LevelInfo, "control stream connect started",
@@ -209,4 +197,49 @@ func (s *Server) Connect(stream ProtoStream) error {
 		slog.Any("error", err),
 	)
 	return err
+}
+
+// ConnectEnvelope handles a non-gRPC control session carrying WireEnvelope frames.
+func (s *Server) ConnectEnvelope(stream EnvelopeStream) error {
+	if s.control == nil || s.adapter == nil {
+		return ErrControlNotConfigured
+	}
+	handler := s.newStreamHandler()
+	ctx, end := eventlog.WithSpan(context.Background(), "carrier:connect")
+	defer end()
+	eventlog.Emit(ctx, "transport.carrier.request.started", slog.LevelInfo, "carrier control session started",
+		slog.String("component", "transport.carrier"),
+		slog.String("carrier", stream.Carrier().String()),
+	)
+	err := RunEnvelopeSession(handler, s.control, stream, s.adapter)
+	status := "ok"
+	level := slog.LevelInfo
+	if err != nil {
+		status = "error"
+		level = slog.LevelError
+	}
+	eventlog.Emit(ctx, "transport.carrier.request.finished", level, "carrier control session finished",
+		slog.String("component", "transport.carrier"),
+		slog.String("carrier", stream.Carrier().String()),
+		slog.String("status", status),
+		slog.Any("error", err),
+	)
+	return err
+}
+
+func (s *Server) newStreamHandler() *StreamHandler {
+	handler := NewStreamHandlerWithRuntime(s.control, s.runtime)
+	if s.deviceAudio != nil {
+		handler.SetDeviceAudioPublisher(s.deviceAudio)
+	}
+	if s.recording != nil {
+		handler.SetRecordingManager(s.recording)
+	}
+	if s.webrtc != nil {
+		handler.SetWebRTCSignalEngine(s.webrtc)
+	}
+	if s.bugReports != nil {
+		handler.SetBugReportIntake(s.bugReports)
+	}
+	return handler
 }

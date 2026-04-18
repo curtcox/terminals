@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -34,13 +35,20 @@ class TerminalControlWebSocketClient implements TerminalControlClient {
     Stream<ConnectRequest> requests, {
     CallOptions? options,
   }) {
+    _sendTransportHello();
     final controller = StreamController<ConnectResponse>();
     StreamSubscription<ConnectRequest>? outgoing;
     StreamSubscription<dynamic>? incoming;
+    var outgoingSequence = 1;
 
     outgoing = requests.listen(
       (ConnectRequest message) {
-        _channel.sink.add(Uint8List.fromList(message.writeToBuffer()));
+        final envelope = WireEnvelope()
+          ..protocolVersion = wireProtocolVersion
+          ..sequence = Int64(outgoingSequence)
+          ..clientMessage = message;
+        outgoingSequence += 1;
+        _channel.sink.add(Uint8List.fromList(envelope.writeToBuffer()));
       },
       onError: controller.addError,
       onDone: () {
@@ -50,16 +58,20 @@ class TerminalControlWebSocketClient implements TerminalControlClient {
 
     incoming = _channel.stream.listen(
       (dynamic data) {
+        late final List<int> bytes;
         if (data is Uint8List) {
-          controller.add(ConnectResponse.fromBuffer(data));
+          bytes = data;
+        } else if (data is List<int>) {
+          bytes = data;
+        } else {
+          controller.addError(StateError(
+              'unexpected websocket frame type ${data.runtimeType}'));
           return;
         }
-        if (data is List<int>) {
-          controller.add(ConnectResponse.fromBuffer(data));
-          return;
+        final envelope = WireEnvelope.fromBuffer(bytes);
+        if (envelope.hasServerMessage()) {
+          controller.add(envelope.serverMessage);
         }
-        controller.addError(
-            StateError('unexpected websocket frame type ${data.runtimeType}'));
       },
       onError: controller.addError,
       onDone: () async {
@@ -79,4 +91,19 @@ class TerminalControlWebSocketClient implements TerminalControlClient {
 
   @override
   Future<void> shutdown() => _channel.sink.close();
+
+  void _sendTransportHello() {
+    final helloEnvelope = WireEnvelope()
+      ..protocolVersion = wireProtocolVersion
+      ..sessionId = _newSessionId()
+      ..transportHello = (TransportHello()
+        ..protocolVersion = wireProtocolVersion
+        ..supportedCarriers.add(CarrierKind.CARRIER_KIND_WEBSOCKET));
+    _channel.sink.add(Uint8List.fromList(helloEnvelope.writeToBuffer()));
+  }
+
+  String _newSessionId() {
+    final epochMs = DateTime.now().toUtc().millisecondsSinceEpoch;
+    return 'ws-$epochMs';
+  }
 }

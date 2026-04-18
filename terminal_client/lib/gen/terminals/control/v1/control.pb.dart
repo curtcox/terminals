@@ -26,6 +26,546 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'control.pbenum.dart';
 
+class TransportHello extends $pb.GeneratedMessage {
+  factory TransportHello({
+    $core.int? protocolVersion,
+    $core.Iterable<CarrierKind>? supportedCarriers,
+    $core.String? desiredDeviceId,
+    $core.String? resumeToken,
+  }) {
+    final result = create();
+    if (protocolVersion != null) result.protocolVersion = protocolVersion;
+    if (supportedCarriers != null)
+      result.supportedCarriers.addAll(supportedCarriers);
+    if (desiredDeviceId != null) result.desiredDeviceId = desiredDeviceId;
+    if (resumeToken != null) result.resumeToken = resumeToken;
+    return result;
+  }
+
+  TransportHello._();
+
+  factory TransportHello.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TransportHello.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TransportHello',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'protocolVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..pc<CarrierKind>(
+        2, _omitFieldNames ? '' : 'supportedCarriers', $pb.PbFieldType.KE,
+        valueOf: CarrierKind.valueOf,
+        enumValues: CarrierKind.values,
+        defaultEnumValue: CarrierKind.CARRIER_KIND_UNSPECIFIED)
+    ..aOS(3, _omitFieldNames ? '' : 'desiredDeviceId')
+    ..aOS(4, _omitFieldNames ? '' : 'resumeToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TransportHello clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TransportHello copyWith(void Function(TransportHello) updates) =>
+      super.copyWith((message) => updates(message as TransportHello))
+          as TransportHello;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TransportHello create() => TransportHello._();
+  @$core.override
+  TransportHello createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TransportHello getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TransportHello>(create);
+  static TransportHello? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get protocolVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set protocolVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProtocolVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProtocolVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<CarrierKind> get supportedCarriers => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $core.String get desiredDeviceId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set desiredDeviceId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDesiredDeviceId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDesiredDeviceId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get resumeToken => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set resumeToken($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasResumeToken() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearResumeToken() => $_clearField(4);
+}
+
+class TransportHelloAck extends $pb.GeneratedMessage {
+  factory TransportHelloAck({
+    $core.int? acceptedProtocolVersion,
+    CarrierKind? negotiatedCarrier,
+    $core.String? sessionId,
+    $core.String? resumeToken,
+    $fixnum.Int64? heartbeatIntervalMs,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? limits,
+  }) {
+    final result = create();
+    if (acceptedProtocolVersion != null)
+      result.acceptedProtocolVersion = acceptedProtocolVersion;
+    if (negotiatedCarrier != null) result.negotiatedCarrier = negotiatedCarrier;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (resumeToken != null) result.resumeToken = resumeToken;
+    if (heartbeatIntervalMs != null)
+      result.heartbeatIntervalMs = heartbeatIntervalMs;
+    if (limits != null) result.limits.addEntries(limits);
+    return result;
+  }
+
+  TransportHelloAck._();
+
+  factory TransportHelloAck.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TransportHelloAck.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TransportHelloAck',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'acceptedProtocolVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aE<CarrierKind>(2, _omitFieldNames ? '' : 'negotiatedCarrier',
+        enumValues: CarrierKind.values)
+    ..aOS(3, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(4, _omitFieldNames ? '' : 'resumeToken')
+    ..aInt64(5, _omitFieldNames ? '' : 'heartbeatIntervalMs')
+    ..m<$core.String, $core.String>(6, _omitFieldNames ? '' : 'limits',
+        entryClassName: 'TransportHelloAck.LimitsEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('terminals.control.v1'))
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TransportHelloAck clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TransportHelloAck copyWith(void Function(TransportHelloAck) updates) =>
+      super.copyWith((message) => updates(message as TransportHelloAck))
+          as TransportHelloAck;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TransportHelloAck create() => TransportHelloAck._();
+  @$core.override
+  TransportHelloAck createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TransportHelloAck getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TransportHelloAck>(create);
+  static TransportHelloAck? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get acceptedProtocolVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set acceptedProtocolVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAcceptedProtocolVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAcceptedProtocolVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  CarrierKind get negotiatedCarrier => $_getN(1);
+  @$pb.TagNumber(2)
+  set negotiatedCarrier(CarrierKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNegotiatedCarrier() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNegotiatedCarrier() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get sessionId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set sessionId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSessionId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSessionId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get resumeToken => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set resumeToken($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasResumeToken() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearResumeToken() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get heartbeatIntervalMs => $_getI64(4);
+  @$pb.TagNumber(5)
+  set heartbeatIntervalMs($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasHeartbeatIntervalMs() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearHeartbeatIntervalMs() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $pb.PbMap<$core.String, $core.String> get limits => $_getMap(5);
+}
+
+class TransportHeartbeat extends $pb.GeneratedMessage {
+  factory TransportHeartbeat({
+    $fixnum.Int64? unixMs,
+  }) {
+    final result = create();
+    if (unixMs != null) result.unixMs = unixMs;
+    return result;
+  }
+
+  TransportHeartbeat._();
+
+  factory TransportHeartbeat.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TransportHeartbeat.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TransportHeartbeat',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'unixMs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TransportHeartbeat clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TransportHeartbeat copyWith(void Function(TransportHeartbeat) updates) =>
+      super.copyWith((message) => updates(message as TransportHeartbeat))
+          as TransportHeartbeat;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TransportHeartbeat create() => TransportHeartbeat._();
+  @$core.override
+  TransportHeartbeat createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TransportHeartbeat getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TransportHeartbeat>(create);
+  static TransportHeartbeat? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get unixMs => $_getI64(0);
+  @$pb.TagNumber(1)
+  set unixMs($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUnixMs() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUnixMs() => $_clearField(1);
+}
+
+class TransportError extends $pb.GeneratedMessage {
+  factory TransportError({
+    $core.String? code,
+    $core.String? message,
+  }) {
+    final result = create();
+    if (code != null) result.code = code;
+    if (message != null) result.message = message;
+    return result;
+  }
+
+  TransportError._();
+
+  factory TransportError.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TransportError.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TransportError',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'code')
+    ..aOS(2, _omitFieldNames ? '' : 'message')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TransportError clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TransportError copyWith(void Function(TransportError) updates) =>
+      super.copyWith((message) => updates(message as TransportError))
+          as TransportError;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TransportError create() => TransportError._();
+  @$core.override
+  TransportError createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TransportError getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TransportError>(create);
+  static TransportError? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get code => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set code($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCode() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCode() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get message => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set message($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMessage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMessage() => $_clearField(2);
+}
+
+enum WireEnvelope_Payload {
+  clientMessage,
+  serverMessage,
+  transportHello,
+  transportHelloAck,
+  transportHeartbeat,
+  transportError,
+  notSet
+}
+
+class WireEnvelope extends $pb.GeneratedMessage {
+  factory WireEnvelope({
+    $core.int? protocolVersion,
+    $core.String? sessionId,
+    $fixnum.Int64? sequence,
+    ConnectRequest? clientMessage,
+    ConnectResponse? serverMessage,
+    TransportHello? transportHello,
+    TransportHelloAck? transportHelloAck,
+    TransportHeartbeat? transportHeartbeat,
+    TransportError? transportError,
+  }) {
+    final result = create();
+    if (protocolVersion != null) result.protocolVersion = protocolVersion;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (sequence != null) result.sequence = sequence;
+    if (clientMessage != null) result.clientMessage = clientMessage;
+    if (serverMessage != null) result.serverMessage = serverMessage;
+    if (transportHello != null) result.transportHello = transportHello;
+    if (transportHelloAck != null) result.transportHelloAck = transportHelloAck;
+    if (transportHeartbeat != null)
+      result.transportHeartbeat = transportHeartbeat;
+    if (transportError != null) result.transportError = transportError;
+    return result;
+  }
+
+  WireEnvelope._();
+
+  factory WireEnvelope.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory WireEnvelope.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, WireEnvelope_Payload>
+      _WireEnvelope_PayloadByTag = {
+    10: WireEnvelope_Payload.clientMessage,
+    11: WireEnvelope_Payload.serverMessage,
+    12: WireEnvelope_Payload.transportHello,
+    13: WireEnvelope_Payload.transportHelloAck,
+    14: WireEnvelope_Payload.transportHeartbeat,
+    15: WireEnvelope_Payload.transportError,
+    0: WireEnvelope_Payload.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WireEnvelope',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [10, 11, 12, 13, 14, 15])
+    ..aI(1, _omitFieldNames ? '' : 'protocolVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'sequence', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOM<ConnectRequest>(10, _omitFieldNames ? '' : 'clientMessage',
+        subBuilder: ConnectRequest.create)
+    ..aOM<ConnectResponse>(11, _omitFieldNames ? '' : 'serverMessage',
+        subBuilder: ConnectResponse.create)
+    ..aOM<TransportHello>(12, _omitFieldNames ? '' : 'transportHello',
+        subBuilder: TransportHello.create)
+    ..aOM<TransportHelloAck>(13, _omitFieldNames ? '' : 'transportHelloAck',
+        subBuilder: TransportHelloAck.create)
+    ..aOM<TransportHeartbeat>(14, _omitFieldNames ? '' : 'transportHeartbeat',
+        subBuilder: TransportHeartbeat.create)
+    ..aOM<TransportError>(15, _omitFieldNames ? '' : 'transportError',
+        subBuilder: TransportError.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WireEnvelope clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WireEnvelope copyWith(void Function(WireEnvelope) updates) =>
+      super.copyWith((message) => updates(message as WireEnvelope))
+          as WireEnvelope;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static WireEnvelope create() => WireEnvelope._();
+  @$core.override
+  WireEnvelope createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static WireEnvelope getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<WireEnvelope>(create);
+  static WireEnvelope? _defaultInstance;
+
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  WireEnvelope_Payload whichPayload() =>
+      _WireEnvelope_PayloadByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  void clearPayload() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.int get protocolVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set protocolVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProtocolVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProtocolVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get sequence => $_getI64(2);
+  @$pb.TagNumber(3)
+  set sequence($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSequence() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSequence() => $_clearField(3);
+
+  @$pb.TagNumber(10)
+  ConnectRequest get clientMessage => $_getN(3);
+  @$pb.TagNumber(10)
+  set clientMessage(ConnectRequest value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasClientMessage() => $_has(3);
+  @$pb.TagNumber(10)
+  void clearClientMessage() => $_clearField(10);
+  @$pb.TagNumber(10)
+  ConnectRequest ensureClientMessage() => $_ensure(3);
+
+  @$pb.TagNumber(11)
+  ConnectResponse get serverMessage => $_getN(4);
+  @$pb.TagNumber(11)
+  set serverMessage(ConnectResponse value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasServerMessage() => $_has(4);
+  @$pb.TagNumber(11)
+  void clearServerMessage() => $_clearField(11);
+  @$pb.TagNumber(11)
+  ConnectResponse ensureServerMessage() => $_ensure(4);
+
+  @$pb.TagNumber(12)
+  TransportHello get transportHello => $_getN(5);
+  @$pb.TagNumber(12)
+  set transportHello(TransportHello value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasTransportHello() => $_has(5);
+  @$pb.TagNumber(12)
+  void clearTransportHello() => $_clearField(12);
+  @$pb.TagNumber(12)
+  TransportHello ensureTransportHello() => $_ensure(5);
+
+  @$pb.TagNumber(13)
+  TransportHelloAck get transportHelloAck => $_getN(6);
+  @$pb.TagNumber(13)
+  set transportHelloAck(TransportHelloAck value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasTransportHelloAck() => $_has(6);
+  @$pb.TagNumber(13)
+  void clearTransportHelloAck() => $_clearField(13);
+  @$pb.TagNumber(13)
+  TransportHelloAck ensureTransportHelloAck() => $_ensure(6);
+
+  @$pb.TagNumber(14)
+  TransportHeartbeat get transportHeartbeat => $_getN(7);
+  @$pb.TagNumber(14)
+  set transportHeartbeat(TransportHeartbeat value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasTransportHeartbeat() => $_has(7);
+  @$pb.TagNumber(14)
+  void clearTransportHeartbeat() => $_clearField(14);
+  @$pb.TagNumber(14)
+  TransportHeartbeat ensureTransportHeartbeat() => $_ensure(7);
+
+  @$pb.TagNumber(15)
+  TransportError get transportError => $_getN(8);
+  @$pb.TagNumber(15)
+  set transportError(TransportError value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasTransportError() => $_has(8);
+  @$pb.TagNumber(15)
+  void clearTransportError() => $_clearField(15);
+  @$pb.TagNumber(15)
+  TransportError ensureTransportError() => $_ensure(8);
+}
+
 enum ConnectRequest_Payload {
   register,
   capability,
