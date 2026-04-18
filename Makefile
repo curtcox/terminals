@@ -28,7 +28,7 @@ client-build:
 	$(MAKE) client-build-web
 
 client-build-web:
-	cd terminal_client && flutter build web
+	cd terminal_client && flutter build web --no-wasm-dry-run
 
 client-build-android:
 	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \

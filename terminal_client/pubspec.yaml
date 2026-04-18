@@ -9,8 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  grpc: ^5.0.0
-  protobuf: ^5.1.0
+  grpc: ^5.1.0
+  protobuf: ^6.0.0
   fixnum: ^1.1.1
   multicast_dns: ^0.3.3
   flutter_webrtc: ^1.2.0
