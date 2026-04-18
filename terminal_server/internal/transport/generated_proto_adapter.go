@@ -649,6 +649,11 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		out["battery.level"] = strconv.FormatFloat(float64(battery.GetLevel()), 'f', -1, 32)
 		out["battery.charging"] = strconv.FormatBool(battery.GetCharging())
 	}
+	if haptics := caps.GetHaptics(); haptics != nil {
+		out["haptics.supported"] = strconv.FormatBool(haptics.GetSupported())
+		out["haptics.vibration"] = strconv.FormatBool(haptics.GetVibration())
+		out["haptics.engine"] = strconv.FormatBool(haptics.GetHapticsEngine())
+	}
 	if edge := caps.GetEdge(); edge != nil {
 		out["edge.runtimes"] = strings.Join(edge.GetRuntimes(), ",")
 		operators := edge.GetOperators()

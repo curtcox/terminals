@@ -25,6 +25,7 @@ void main() {
     expect(capabilities.hasMicrophone(), isFalse);
     expect(capabilities.hasCamera(), isFalse);
     expect(capabilities.hasSpeakers(), isFalse);
+    expect(capabilities.hasHaptics(), isFalse);
     expect(capabilities.hasEdge(), isTrue);
     expect(capabilities.edge.operators, contains('monitor.foreground_only'));
     expect(
@@ -76,6 +77,7 @@ void main() {
     expect(capabilities.hasMicrophone(), isTrue);
     expect(capabilities.hasCamera(), isTrue);
     expect(capabilities.hasSpeakers(), isTrue);
+    expect(capabilities.hasHaptics(), isTrue);
     expect(capabilities.microphone.channels, 1);
     expect(capabilities.microphone.endpoints, isNotEmpty);
     expect(capabilities.camera.endpoints, isNotEmpty);

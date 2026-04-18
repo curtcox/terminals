@@ -19,6 +19,7 @@ message DeviceCapabilities {
   BatteryCapability battery = 19;
   EdgeCapability edge = 20;
   repeated DisplayCapability displays = 21;
+  HapticCapability haptics = 22;
 }
 
 message DeviceIdentity {
@@ -129,6 +130,12 @@ message ConnectivityCapability {
 message BatteryCapability {
   float level = 1;
   bool charging = 2;
+}
+
+message HapticCapability {
+  bool supported = 1;
+  bool vibration = 2;
+  bool haptics_engine = 3;
 }
 
 message EdgeCapability {

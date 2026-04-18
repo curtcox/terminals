@@ -72,6 +72,7 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     final hasAudioOutput = mediaKinds.contains('audiooutput');
     final hasCamera = mediaKinds.contains('videoinput');
     final hasKeyboard = _isLikelyKeyboardPlatform(context.targetPlatform);
+    final supportsHaptics = _supportsHaptics(context.targetPlatform);
     final monitoringTier = _monitoringSupportTierForPlatform(
       context.targetPlatform,
     );
@@ -148,6 +149,12 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     }
     capabilities.connectivity = capv1.ConnectivityCapability()
       ..wifiSignalStrength = true;
+    if (supportsHaptics) {
+      capabilities.haptics = (capv1.HapticCapability()
+        ..supported = true
+        ..vibration = true
+        ..hapticsEngine = true);
+    }
     capabilities.edge = (capv1.EdgeCapability()
       ..runtimes.addAll(<String>['dart'])
       ..operators.addAll(monitoringTier.operators)
@@ -321,6 +328,19 @@ bool _isLikelyKeyboardPlatform(TargetPlatform platform) {
       return true;
     case TargetPlatform.android:
     case TargetPlatform.iOS:
+    case TargetPlatform.fuchsia:
+      return false;
+  }
+}
+
+bool _supportsHaptics(TargetPlatform platform) {
+  switch (platform) {
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+      return true;
+    case TargetPlatform.macOS:
+    case TargetPlatform.windows:
+    case TargetPlatform.linux:
     case TargetPlatform.fuchsia:
       return false;
   }

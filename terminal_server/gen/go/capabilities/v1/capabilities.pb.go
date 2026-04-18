@@ -37,6 +37,7 @@ type DeviceCapabilities struct {
 	Battery       *BatteryCapability      `protobuf:"bytes,19,opt,name=battery,proto3" json:"battery,omitempty"`
 	Edge          *EdgeCapability         `protobuf:"bytes,20,opt,name=edge,proto3" json:"edge,omitempty"`
 	Displays      []*DisplayCapability    `protobuf:"bytes,21,rep,name=displays,proto3" json:"displays,omitempty"`
+	Haptics       *HapticCapability       `protobuf:"bytes,22,opt,name=haptics,proto3" json:"haptics,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -165,6 +166,13 @@ func (x *DeviceCapabilities) GetEdge() *EdgeCapability {
 func (x *DeviceCapabilities) GetDisplays() []*DisplayCapability {
 	if x != nil {
 		return x.Displays
+	}
+	return nil
+}
+
+func (x *DeviceCapabilities) GetHaptics() *HapticCapability {
+	if x != nil {
+		return x.Haptics
 	}
 	return nil
 }
@@ -1241,6 +1249,66 @@ func (x *BatteryCapability) GetCharging() bool {
 	return false
 }
 
+type HapticCapability struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Supported     bool                   `protobuf:"varint,1,opt,name=supported,proto3" json:"supported,omitempty"`
+	Vibration     bool                   `protobuf:"varint,2,opt,name=vibration,proto3" json:"vibration,omitempty"`
+	HapticsEngine bool                   `protobuf:"varint,3,opt,name=haptics_engine,json=hapticsEngine,proto3" json:"haptics_engine,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HapticCapability) Reset() {
+	*x = HapticCapability{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HapticCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HapticCapability) ProtoMessage() {}
+
+func (x *HapticCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HapticCapability.ProtoReflect.Descriptor instead.
+func (*HapticCapability) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *HapticCapability) GetSupported() bool {
+	if x != nil {
+		return x.Supported
+	}
+	return false
+}
+
+func (x *HapticCapability) GetVibration() bool {
+	if x != nil {
+		return x.Vibration
+	}
+	return false
+}
+
+func (x *HapticCapability) GetHapticsEngine() bool {
+	if x != nil {
+		return x.HapticsEngine
+	}
+	return false
+}
+
 type EdgeCapability struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	Runtimes      []string                 `protobuf:"bytes,1,rep,name=runtimes,proto3" json:"runtimes,omitempty"`
@@ -1255,7 +1323,7 @@ type EdgeCapability struct {
 
 func (x *EdgeCapability) Reset() {
 	*x = EdgeCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1267,7 +1335,7 @@ func (x *EdgeCapability) String() string {
 func (*EdgeCapability) ProtoMessage() {}
 
 func (x *EdgeCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1280,7 +1348,7 @@ func (x *EdgeCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeCapability.ProtoReflect.Descriptor instead.
 func (*EdgeCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{17}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *EdgeCapability) GetRuntimes() []string {
@@ -1337,7 +1405,7 @@ type EdgeComputeCapability struct {
 
 func (x *EdgeComputeCapability) Reset() {
 	*x = EdgeComputeCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[18]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1349,7 +1417,7 @@ func (x *EdgeComputeCapability) String() string {
 func (*EdgeComputeCapability) ProtoMessage() {}
 
 func (x *EdgeComputeCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[18]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1362,7 +1430,7 @@ func (x *EdgeComputeCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeComputeCapability.ProtoReflect.Descriptor instead.
 func (*EdgeComputeCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{18}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *EdgeComputeCapability) GetCpuRealtime() int32 {
@@ -1405,7 +1473,7 @@ type EdgeRetentionCapability struct {
 
 func (x *EdgeRetentionCapability) Reset() {
 	*x = EdgeRetentionCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[19]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1417,7 +1485,7 @@ func (x *EdgeRetentionCapability) String() string {
 func (*EdgeRetentionCapability) ProtoMessage() {}
 
 func (x *EdgeRetentionCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[19]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1430,7 +1498,7 @@ func (x *EdgeRetentionCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeRetentionCapability.ProtoReflect.Descriptor instead.
 func (*EdgeRetentionCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{19}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *EdgeRetentionCapability) GetAudioSec() int32 {
@@ -1470,7 +1538,7 @@ type EdgeTimingCapability struct {
 
 func (x *EdgeTimingCapability) Reset() {
 	*x = EdgeTimingCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[20]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1482,7 +1550,7 @@ func (x *EdgeTimingCapability) String() string {
 func (*EdgeTimingCapability) ProtoMessage() {}
 
 func (x *EdgeTimingCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[20]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1495,7 +1563,7 @@ func (x *EdgeTimingCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeTimingCapability.ProtoReflect.Descriptor instead.
 func (*EdgeTimingCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{20}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *EdgeTimingCapability) GetSyncErrorMs() float64 {
@@ -1516,7 +1584,7 @@ type EdgeGeometryCapability struct {
 
 func (x *EdgeGeometryCapability) Reset() {
 	*x = EdgeGeometryCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[21]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1528,7 +1596,7 @@ func (x *EdgeGeometryCapability) String() string {
 func (*EdgeGeometryCapability) ProtoMessage() {}
 
 func (x *EdgeGeometryCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[21]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1541,7 +1609,7 @@ func (x *EdgeGeometryCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeGeometryCapability.ProtoReflect.Descriptor instead.
 func (*EdgeGeometryCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{21}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *EdgeGeometryCapability) GetMicArray() bool {
@@ -1569,7 +1637,7 @@ var File_terminals_capabilities_v1_capabilities_proto protoreflect.FileDescripto
 
 const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\n" +
-	",terminals/capabilities/v1/capabilities.proto\x12\x19terminals.capabilities.v1\"\xe5\a\n" +
+	",terminals/capabilities/v1/capabilities.proto\x12\x19terminals.capabilities.v1\"\xac\b\n" +
 	"\x12DeviceCapabilities\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12E\n" +
 	"\bidentity\x18\x02 \x01(\v2).terminals.capabilities.v1.DeviceIdentityR\bidentity\x12C\n" +
@@ -1587,7 +1655,8 @@ const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\fconnectivity\x18\x12 \x01(\v21.terminals.capabilities.v1.ConnectivityCapabilityR\fconnectivity\x12F\n" +
 	"\abattery\x18\x13 \x01(\v2,.terminals.capabilities.v1.BatteryCapabilityR\abattery\x12=\n" +
 	"\x04edge\x18\x14 \x01(\v2).terminals.capabilities.v1.EdgeCapabilityR\x04edge\x12H\n" +
-	"\bdisplays\x18\x15 \x03(\v2,.terminals.capabilities.v1.DisplayCapabilityR\bdisplays\"n\n" +
+	"\bdisplays\x18\x15 \x03(\v2,.terminals.capabilities.v1.DisplayCapabilityR\bdisplays\x12E\n" +
+	"\ahaptics\x18\x16 \x01(\v2+.terminals.capabilities.v1.HapticCapabilityR\ahaptics\"n\n" +
 	"\x0eDeviceIdentity\x12\x1f\n" +
 	"\vdevice_name\x18\x01 \x01(\tR\n" +
 	"deviceName\x12\x1f\n" +
@@ -1672,7 +1741,11 @@ const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\x03nfc\x18\x05 \x01(\bR\x03nfc\"E\n" +
 	"\x11BatteryCapability\x12\x14\n" +
 	"\x05level\x18\x01 \x01(\x02R\x05level\x12\x1a\n" +
-	"\bcharging\x18\x02 \x01(\bR\bcharging\"\x80\x03\n" +
+	"\bcharging\x18\x02 \x01(\bR\bcharging\"u\n" +
+	"\x10HapticCapability\x12\x1c\n" +
+	"\tsupported\x18\x01 \x01(\bR\tsupported\x12\x1c\n" +
+	"\tvibration\x18\x02 \x01(\bR\tvibration\x12%\n" +
+	"\x0ehaptics_engine\x18\x03 \x01(\bR\rhapticsEngine\"\x80\x03\n" +
 	"\x0eEdgeCapability\x12\x1a\n" +
 	"\bruntimes\x18\x01 \x03(\tR\bruntimes\x12J\n" +
 	"\acompute\x18\x02 \x01(\v20.terminals.capabilities.v1.EdgeComputeCapabilityR\acompute\x12\x1c\n" +
@@ -1710,7 +1783,7 @@ func file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP() []byte {
 	return file_terminals_capabilities_v1_capabilities_proto_rawDescData
 }
 
-var file_terminals_capabilities_v1_capabilities_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_terminals_capabilities_v1_capabilities_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_terminals_capabilities_v1_capabilities_proto_goTypes = []any{
 	(*DeviceCapabilities)(nil),      // 0: terminals.capabilities.v1.DeviceCapabilities
 	(*DeviceIdentity)(nil),          // 1: terminals.capabilities.v1.DeviceIdentity
@@ -1729,11 +1802,12 @@ var file_terminals_capabilities_v1_capabilities_proto_goTypes = []any{
 	(*SensorCapability)(nil),        // 14: terminals.capabilities.v1.SensorCapability
 	(*ConnectivityCapability)(nil),  // 15: terminals.capabilities.v1.ConnectivityCapability
 	(*BatteryCapability)(nil),       // 16: terminals.capabilities.v1.BatteryCapability
-	(*EdgeCapability)(nil),          // 17: terminals.capabilities.v1.EdgeCapability
-	(*EdgeComputeCapability)(nil),   // 18: terminals.capabilities.v1.EdgeComputeCapability
-	(*EdgeRetentionCapability)(nil), // 19: terminals.capabilities.v1.EdgeRetentionCapability
-	(*EdgeTimingCapability)(nil),    // 20: terminals.capabilities.v1.EdgeTimingCapability
-	(*EdgeGeometryCapability)(nil),  // 21: terminals.capabilities.v1.EdgeGeometryCapability
+	(*HapticCapability)(nil),        // 17: terminals.capabilities.v1.HapticCapability
+	(*EdgeCapability)(nil),          // 18: terminals.capabilities.v1.EdgeCapability
+	(*EdgeComputeCapability)(nil),   // 19: terminals.capabilities.v1.EdgeComputeCapability
+	(*EdgeRetentionCapability)(nil), // 20: terminals.capabilities.v1.EdgeRetentionCapability
+	(*EdgeTimingCapability)(nil),    // 21: terminals.capabilities.v1.EdgeTimingCapability
+	(*EdgeGeometryCapability)(nil),  // 22: terminals.capabilities.v1.EdgeGeometryCapability
 }
 var file_terminals_capabilities_v1_capabilities_proto_depIdxs = []int32{
 	1,  // 0: terminals.capabilities.v1.DeviceCapabilities.identity:type_name -> terminals.capabilities.v1.DeviceIdentity
@@ -1747,25 +1821,26 @@ var file_terminals_capabilities_v1_capabilities_proto_depIdxs = []int32{
 	14, // 8: terminals.capabilities.v1.DeviceCapabilities.sensors:type_name -> terminals.capabilities.v1.SensorCapability
 	15, // 9: terminals.capabilities.v1.DeviceCapabilities.connectivity:type_name -> terminals.capabilities.v1.ConnectivityCapability
 	16, // 10: terminals.capabilities.v1.DeviceCapabilities.battery:type_name -> terminals.capabilities.v1.BatteryCapability
-	17, // 11: terminals.capabilities.v1.DeviceCapabilities.edge:type_name -> terminals.capabilities.v1.EdgeCapability
+	18, // 11: terminals.capabilities.v1.DeviceCapabilities.edge:type_name -> terminals.capabilities.v1.EdgeCapability
 	4,  // 12: terminals.capabilities.v1.DeviceCapabilities.displays:type_name -> terminals.capabilities.v1.DisplayCapability
-	3,  // 13: terminals.capabilities.v1.ScreenCapability.safe_area:type_name -> terminals.capabilities.v1.Insets
-	2,  // 14: terminals.capabilities.v1.DisplayCapability.screen:type_name -> terminals.capabilities.v1.ScreenCapability
-	10, // 15: terminals.capabilities.v1.AudioOutputCapability.endpoints:type_name -> terminals.capabilities.v1.AudioEndpoint
-	10, // 16: terminals.capabilities.v1.AudioInputCapability.endpoints:type_name -> terminals.capabilities.v1.AudioEndpoint
-	11, // 17: terminals.capabilities.v1.CameraCapability.front:type_name -> terminals.capabilities.v1.CameraLens
-	11, // 18: terminals.capabilities.v1.CameraCapability.back:type_name -> terminals.capabilities.v1.CameraLens
-	13, // 19: terminals.capabilities.v1.CameraCapability.endpoints:type_name -> terminals.capabilities.v1.CameraEndpoint
-	11, // 20: terminals.capabilities.v1.CameraEndpoint.modes:type_name -> terminals.capabilities.v1.CameraLens
-	18, // 21: terminals.capabilities.v1.EdgeCapability.compute:type_name -> terminals.capabilities.v1.EdgeComputeCapability
-	19, // 22: terminals.capabilities.v1.EdgeCapability.retention:type_name -> terminals.capabilities.v1.EdgeRetentionCapability
-	20, // 23: terminals.capabilities.v1.EdgeCapability.timing:type_name -> terminals.capabilities.v1.EdgeTimingCapability
-	21, // 24: terminals.capabilities.v1.EdgeCapability.geometry:type_name -> terminals.capabilities.v1.EdgeGeometryCapability
-	25, // [25:25] is the sub-list for method output_type
-	25, // [25:25] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	17, // 13: terminals.capabilities.v1.DeviceCapabilities.haptics:type_name -> terminals.capabilities.v1.HapticCapability
+	3,  // 14: terminals.capabilities.v1.ScreenCapability.safe_area:type_name -> terminals.capabilities.v1.Insets
+	2,  // 15: terminals.capabilities.v1.DisplayCapability.screen:type_name -> terminals.capabilities.v1.ScreenCapability
+	10, // 16: terminals.capabilities.v1.AudioOutputCapability.endpoints:type_name -> terminals.capabilities.v1.AudioEndpoint
+	10, // 17: terminals.capabilities.v1.AudioInputCapability.endpoints:type_name -> terminals.capabilities.v1.AudioEndpoint
+	11, // 18: terminals.capabilities.v1.CameraCapability.front:type_name -> terminals.capabilities.v1.CameraLens
+	11, // 19: terminals.capabilities.v1.CameraCapability.back:type_name -> terminals.capabilities.v1.CameraLens
+	13, // 20: terminals.capabilities.v1.CameraCapability.endpoints:type_name -> terminals.capabilities.v1.CameraEndpoint
+	11, // 21: terminals.capabilities.v1.CameraEndpoint.modes:type_name -> terminals.capabilities.v1.CameraLens
+	19, // 22: terminals.capabilities.v1.EdgeCapability.compute:type_name -> terminals.capabilities.v1.EdgeComputeCapability
+	20, // 23: terminals.capabilities.v1.EdgeCapability.retention:type_name -> terminals.capabilities.v1.EdgeRetentionCapability
+	21, // 24: terminals.capabilities.v1.EdgeCapability.timing:type_name -> terminals.capabilities.v1.EdgeTimingCapability
+	22, // 25: terminals.capabilities.v1.EdgeCapability.geometry:type_name -> terminals.capabilities.v1.EdgeGeometryCapability
+	26, // [26:26] is the sub-list for method output_type
+	26, // [26:26] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_terminals_capabilities_v1_capabilities_proto_init() }
@@ -1779,7 +1854,7 @@ func file_terminals_capabilities_v1_capabilities_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_capabilities_v1_capabilities_proto_rawDesc), len(file_terminals_capabilities_v1_capabilities_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

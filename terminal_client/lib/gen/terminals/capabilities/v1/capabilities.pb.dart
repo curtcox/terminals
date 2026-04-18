@@ -32,6 +32,7 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
     BatteryCapability? battery,
     EdgeCapability? edge,
     $core.Iterable<DisplayCapability>? displays,
+    HapticCapability? haptics,
   }) {
     final result = create();
     if (deviceId != null) result.deviceId = deviceId;
@@ -48,6 +49,7 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
     if (battery != null) result.battery = battery;
     if (edge != null) result.edge = edge;
     if (displays != null) result.displays.addAll(displays);
+    if (haptics != null) result.haptics = haptics;
     return result;
   }
 
@@ -92,6 +94,8 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
         subBuilder: EdgeCapability.create)
     ..pPM<DisplayCapability>(21, _omitFieldNames ? '' : 'displays',
         subBuilder: DisplayCapability.create)
+    ..aOM<HapticCapability>(22, _omitFieldNames ? '' : 'haptics',
+        subBuilder: HapticCapability.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -256,6 +260,17 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(21)
   $pb.PbList<DisplayCapability> get displays => $_getList(13);
+
+  @$pb.TagNumber(22)
+  HapticCapability get haptics => $_getN(14);
+  @$pb.TagNumber(22)
+  set haptics(HapticCapability value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasHaptics() => $_has(14);
+  @$pb.TagNumber(22)
+  void clearHaptics() => $_clearField(22);
+  @$pb.TagNumber(22)
+  HapticCapability ensureHaptics() => $_ensure(14);
 }
 
 class DeviceIdentity extends $pb.GeneratedMessage {
@@ -1665,6 +1680,85 @@ class BatteryCapability extends $pb.GeneratedMessage {
   $core.bool hasCharging() => $_has(1);
   @$pb.TagNumber(2)
   void clearCharging() => $_clearField(2);
+}
+
+class HapticCapability extends $pb.GeneratedMessage {
+  factory HapticCapability({
+    $core.bool? supported,
+    $core.bool? vibration,
+    $core.bool? hapticsEngine,
+  }) {
+    final result = create();
+    if (supported != null) result.supported = supported;
+    if (vibration != null) result.vibration = vibration;
+    if (hapticsEngine != null) result.hapticsEngine = hapticsEngine;
+    return result;
+  }
+
+  HapticCapability._();
+
+  factory HapticCapability.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory HapticCapability.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HapticCapability',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'supported')
+    ..aOB(2, _omitFieldNames ? '' : 'vibration')
+    ..aOB(3, _omitFieldNames ? '' : 'hapticsEngine')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HapticCapability clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HapticCapability copyWith(void Function(HapticCapability) updates) =>
+      super.copyWith((message) => updates(message as HapticCapability))
+          as HapticCapability;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HapticCapability create() => HapticCapability._();
+  @$core.override
+  HapticCapability createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static HapticCapability getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HapticCapability>(create);
+  static HapticCapability? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get supported => $_getBF(0);
+  @$pb.TagNumber(1)
+  set supported($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSupported() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSupported() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get vibration => $_getBF(1);
+  @$pb.TagNumber(2)
+  set vibration($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasVibration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearVibration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get hapticsEngine => $_getBF(2);
+  @$pb.TagNumber(3)
+  set hapticsEngine($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHapticsEngine() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHapticsEngine() => $_clearField(3);
 }
 
 class EdgeCapability extends $pb.GeneratedMessage {

@@ -13,18 +13,18 @@ This phase deliberately ignores migration and backward-compatibility concerns. T
 
 ## Deliverables
 
-- [ ] **Explicit capability lifecycle protocol**: Replace one-shot capability registration with `Hello`, `CapabilitySnapshot`, `CapabilityDelta`, and `CapabilityAck`. See [capability-lifecycle.md](capability-lifecycle.md) and [protocol.md](protocol.md).
-- [ ] **Typed capability schema**: Define strongly typed capability messages for display, keyboard, pointer, touch, speaker, microphone, camera, sensors, haptics, and battery. Avoid opaque JSON blobs.
-- [ ] **Generation-based synchronization**: Add monotonically increasing capability generations so the server can reject stale deltas and clients can re-baseline with a fresh snapshot.
-- [ ] **Dynamic display support**: Model display size, density, orientation, safe areas, fullscreen support, and multi-window support as explicit display capability fields. Treat runtime display changes as capability updates, not ad-hoc UI events.
-- [ ] **Multi-endpoint audio/video support**: Model built-in, external, USB, HDMI, and Bluetooth microphones, speakers, and cameras as individually addressable capabilities.
-- [ ] **Client capability monitor**: Add client-side detection for hot-plug peripherals, permission changes, media-route changes, and display geometry changes. Publish batched capability deltas when they occur.
-- [ ] **Server capability registry**: Store the latest accepted capability snapshot per terminal, including generation, timestamps, and derived resources.
-- [ ] **Capability-to-resource compiler**: Compile capability inventory into claimable resources for the claim manager and IO router.
-- [ ] **Claim invalidation on resource loss**: Revoke or degrade active claims when required resources disappear or become unavailable.
-- [ ] **Router patching on capability change**: Patch or tear down live media plans when their source or sink resources change.
-- [ ] **Typed capability events on the bus**: Emit events such as `terminal.capability.updated`, `terminal.resource.lost`, and `terminal.display.resized` so scenarios can react uniformly.
-- [ ] **Tests from the start**: Add proto, client, and server tests for snapshot/delta handling, stale generation rejection, hot-plug behavior, display resize, and claim/routing reactions.
+- [x] **Explicit capability lifecycle protocol**: Replace one-shot capability registration with `Hello`, `CapabilitySnapshot`, `CapabilityDelta`, and `CapabilityAck`. See [capability-lifecycle.md](capability-lifecycle.md) and [protocol.md](protocol.md).
+- [x] **Typed capability schema**: Define strongly typed capability messages for display, keyboard, pointer, touch, speaker, microphone, camera, sensors, haptics, and battery. Avoid opaque JSON blobs.
+- [x] **Generation-based synchronization**: Add monotonically increasing capability generations so the server can reject stale deltas and clients can re-baseline with a fresh snapshot.
+- [x] **Dynamic display support**: Model display size, density, orientation, safe areas, fullscreen support, and multi-window support as explicit display capability fields. Treat runtime display changes as capability updates, not ad-hoc UI events.
+- [x] **Multi-endpoint audio/video support**: Model built-in, external, USB, HDMI, and Bluetooth microphones, speakers, and cameras as individually addressable capabilities.
+- [x] **Client capability monitor**: Add client-side detection for hot-plug peripherals, permission changes, media-route changes, and display geometry changes. Publish batched capability deltas when they occur.
+- [x] **Server capability registry**: Store the latest accepted capability snapshot per terminal, including generation, timestamps, and derived resources.
+- [x] **Capability-to-resource compiler**: Compile capability inventory into claimable resources for the claim manager and IO router.
+- [x] **Claim invalidation on resource loss**: Revoke or degrade active claims when required resources disappear or become unavailable.
+- [x] **Router patching on capability change**: Patch or tear down live media plans when their source or sink resources change.
+- [x] **Typed capability events on the bus**: Emit events such as `terminal.capability.updated`, `terminal.resource.lost`, and `terminal.display.resized` so scenarios can react uniformly.
+- [x] **Tests from the start**: Add proto, client, and server tests for snapshot/delta handling, stale generation rejection, hot-plug behavior, display resize, and claim/routing reactions.
 
 ## Exit Criteria
 

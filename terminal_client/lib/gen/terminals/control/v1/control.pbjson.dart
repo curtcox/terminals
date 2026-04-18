@@ -1144,6 +1144,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.capabilities.v1.EdgeGeometryCapability':
       $3.EdgeGeometryCapability$json,
   '.terminals.capabilities.v1.DisplayCapability': $3.DisplayCapability$json,
+  '.terminals.capabilities.v1.HapticCapability': $3.HapticCapability$json,
   '.terminals.control.v1.CapabilityDelta': CapabilityDelta$json,
   '.terminals.io.v1.InputEvent': $0.InputEvent$json,
   '.terminals.io.v1.KeyEvent': $0.KeyEvent$json,

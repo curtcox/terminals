@@ -124,6 +124,14 @@ const DeviceCapabilities$json = {
       '6': '.terminals.capabilities.v1.DisplayCapability',
       '10': 'displays'
     },
+    {
+      '1': 'haptics',
+      '3': 22,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.HapticCapability',
+      '10': 'haptics'
+    },
   ],
 };
 
@@ -146,7 +154,9 @@ final $typed_data.Uint8List deviceCapabilitiesDescriptor = $convert.base64Decode
     'b25uZWN0aXZpdHkSRgoHYmF0dGVyeRgTIAEoCzIsLnRlcm1pbmFscy5jYXBhYmlsaXRpZXMudj'
     'EuQmF0dGVyeUNhcGFiaWxpdHlSB2JhdHRlcnkSPQoEZWRnZRgUIAEoCzIpLnRlcm1pbmFscy5j'
     'YXBhYmlsaXRpZXMudjEuRWRnZUNhcGFiaWxpdHlSBGVkZ2USSAoIZGlzcGxheXMYFSADKAsyLC'
-    '50ZXJtaW5hbHMuY2FwYWJpbGl0aWVzLnYxLkRpc3BsYXlDYXBhYmlsaXR5UghkaXNwbGF5cw==');
+    '50ZXJtaW5hbHMuY2FwYWJpbGl0aWVzLnYxLkRpc3BsYXlDYXBhYmlsaXR5UghkaXNwbGF5cxJF'
+    'CgdoYXB0aWNzGBYgASgLMisudGVybWluYWxzLmNhcGFiaWxpdGllcy52MS5IYXB0aWNDYXBhYm'
+    'lsaXR5UgdoYXB0aWNz');
 
 @$core.Deprecated('Use deviceIdentityDescriptor instead')
 const DeviceIdentity$json = {
@@ -500,6 +510,22 @@ const BatteryCapability$json = {
 final $typed_data.Uint8List batteryCapabilityDescriptor = $convert.base64Decode(
     'ChFCYXR0ZXJ5Q2FwYWJpbGl0eRIUCgVsZXZlbBgBIAEoAlIFbGV2ZWwSGgoIY2hhcmdpbmcYAi'
     'ABKAhSCGNoYXJnaW5n');
+
+@$core.Deprecated('Use hapticCapabilityDescriptor instead')
+const HapticCapability$json = {
+  '1': 'HapticCapability',
+  '2': [
+    {'1': 'supported', '3': 1, '4': 1, '5': 8, '10': 'supported'},
+    {'1': 'vibration', '3': 2, '4': 1, '5': 8, '10': 'vibration'},
+    {'1': 'haptics_engine', '3': 3, '4': 1, '5': 8, '10': 'hapticsEngine'},
+  ],
+};
+
+/// Descriptor for `HapticCapability`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List hapticCapabilityDescriptor = $convert.base64Decode(
+    'ChBIYXB0aWNDYXBhYmlsaXR5EhwKCXN1cHBvcnRlZBgBIAEoCFIJc3VwcG9ydGVkEhwKCXZpYn'
+    'JhdGlvbhgCIAEoCFIJdmlicmF0aW9uEiUKDmhhcHRpY3NfZW5naW5lGAMgASgIUg1oYXB0aWNz'
+    'RW5naW5l');
 
 @$core.Deprecated('Use edgeCapabilityDescriptor instead')
 const EdgeCapability$json = {

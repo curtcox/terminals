@@ -287,6 +287,11 @@ func TestCapabilitiesToDataMapIncludesEndpointInventory(t *testing.T) {
 				Available:      true,
 			}},
 		},
+		Haptics: &capabilitiesv1.HapticCapability{
+			Supported:     true,
+			Vibration:     true,
+			HapticsEngine: false,
+		},
 	})
 
 	if got["display.count"] != "1" {
@@ -303,6 +308,15 @@ func TestCapabilitiesToDataMapIncludesEndpointInventory(t *testing.T) {
 	}
 	if got["camera.endpoint_count"] != "1" {
 		t.Fatalf("camera.endpoint_count = %q, want 1", got["camera.endpoint_count"])
+	}
+	if got["haptics.supported"] != "true" {
+		t.Fatalf("haptics.supported = %q, want true", got["haptics.supported"])
+	}
+	if got["haptics.vibration"] != "true" {
+		t.Fatalf("haptics.vibration = %q, want true", got["haptics.vibration"])
+	}
+	if got["haptics.engine"] != "false" {
+		t.Fatalf("haptics.engine = %q, want false", got["haptics.engine"])
 	}
 }
 

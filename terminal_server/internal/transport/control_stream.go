@@ -958,6 +958,9 @@ func capabilityResources(caps map[string]string) map[string]struct{} {
 		resources["camera.capture"] = struct{}{}
 		resources["camera.analyze"] = struct{}{}
 	}
+	if truthyCapability(caps["haptics.supported"]) {
+		resources["haptic.primary"] = struct{}{}
+	}
 	if truthyCapability(caps["edge.compute.cpu_realtime"]) {
 		resources[iorouter.ResourceComputeCPUShared] = struct{}{}
 	}
@@ -1050,6 +1053,7 @@ func emitCapabilityEvents(
 	if len(lostResources) == 0 {
 		return
 	}
+	_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.resource.lost")
 	names := make([]string, 0, len(lostResources))
 	for resource := range lostResources {
 		names = append(names, resource)
