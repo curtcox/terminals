@@ -47,7 +47,12 @@ TerminalControlClient createTerminalControlClient({
   final wsPath = websocketPath ?? ControlClientTransportHint.websocketPath;
   final tcpHint = tcpEndpoint ?? ControlClientTransportHint.tcpEndpoint;
   final httpHint = httpEndpoint ?? ControlClientTransportHint.httpEndpoint;
-  if (preferred == ControlCarrierKind.websocket || kIsWeb) {
+  if (kIsWeb && preferred != ControlCarrierKind.websocket) {
+    return UnsupportedTerminalControlClient(
+      'Selected control carrier is unavailable in web runtime: $preferred',
+    );
+  }
+  if (preferred == ControlCarrierKind.websocket) {
     return TerminalControlWebSocketClient(
       host: host,
       port: port,

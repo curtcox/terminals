@@ -159,6 +159,65 @@ void main() {
     expect(harness.createdClients.length, 2);
   });
 
+  testWidgets('connection attempt immediately falls back to next carrier', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness(failConnectAttempts: 1);
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        reconnectDelayBase: const Duration(seconds: 5),
+        reconnectDelayMaxSeconds: 5,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    for (var i = 0; i < 40; i++) {
+      if (harness.createdClients.length >= 2) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+
+    expect(harness.createdClients.length, 2);
+    expect(
+      find.textContaining('failed, trying'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('all failed carriers surface local diagnostic summary', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness(failConnectAttempts: 4);
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        reconnectDelayBase: const Duration(seconds: 5),
+        reconnectDelayMaxSeconds: 5,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    for (var i = 0; i < 80; i++) {
+      if (harness.createdClients.length >= 4) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+
+    expect(harness.createdClients.length, 4);
+    expect(find.textContaining('Control Stream: All control carriers failed'),
+        findsOneWidget);
+    expect(find.textContaining('gRPC failed'), findsOneWidget);
+  });
+
   testWidgets(
     'reconnect re-registers capabilities after control stream failure',
     (WidgetTester tester) async {
@@ -1549,12 +1608,16 @@ void main() {
 }
 
 class _FakeClientHarness {
-  _FakeClientHarness({this.failFirstConnectStream = false});
+  _FakeClientHarness({
+    this.failFirstConnectStream = false,
+    this.failConnectAttempts = 0,
+  });
 
   final List<_FakeTerminalControlClient> createdClients =
       <_FakeTerminalControlClient>[];
   final List<_FakeMediaEngine> createdMediaEngines = <_FakeMediaEngine>[];
   final bool failFirstConnectStream;
+  final int failConnectAttempts;
 
   _FakeTerminalControlClient get lastClient => createdClients.last;
 
@@ -1565,7 +1628,9 @@ class _FakeClientHarness {
     final client = _FakeTerminalControlClient(
       host: host,
       port: port,
-      failOnConnectStream: failFirstConnectStream && createdClients.isEmpty,
+      failOnConnectStream:
+          createdClients.length < failConnectAttempts ||
+          (failFirstConnectStream && createdClients.isEmpty),
     );
     createdClients.add(client);
     return client;

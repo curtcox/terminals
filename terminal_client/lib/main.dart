@@ -415,6 +415,29 @@ class TransportErrorDiagnosis {
   }
 }
 
+class _CarrierAttemptDiagnostic {
+  const _CarrierAttemptDiagnostic({
+    required this.carrier,
+    required this.endpoint,
+    required this.stage,
+    required this.error,
+    required this.elapsed,
+  });
+
+  final ControlCarrierKind carrier;
+  final String endpoint;
+  final String stage;
+  final String error;
+  final Duration elapsed;
+}
+
+class _ConnectionTarget {
+  const _ConnectionTarget({required this.host, required this.port});
+
+  final String host;
+  final int port;
+}
+
 TransportErrorDiagnosis diagnoseTransportError(
   Object error, {
   required bool isWeb,
@@ -637,6 +660,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   String _lastFlutterErrorStack = '';
   int _lastFlutterErrorUnixMs = 0;
   String _lastTransportDiagnostic = '';
+  final List<_CarrierAttemptDiagnostic> _carrierAttemptLog =
+      <_CarrierAttemptDiagnostic>[];
+  List<ControlCarrierKind> _activeCarrierCycle = <ControlCarrierKind>[];
+  int _activeCarrierIndex = 0;
+  ControlCarrierKind? _lastSuccessfulCarrier;
   String _lastBugTokenWord = '';
   String _lastBugTokenCode = '';
   _BugReceiptState _bugReceiptState = _BugReceiptState.none;
@@ -724,10 +752,28 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         ordered.add(carrier);
       }
     }
-    if (ordered.isEmpty) {
-      return defaults;
+    final preferred = ordered.isEmpty ? defaults : ordered;
+    final filtered = preferred
+        .where(_carrierSupportedOnRuntime)
+        .toSet()
+        .toList(growable: true);
+    if (filtered.isEmpty) {
+      return defaults.where(_carrierSupportedOnRuntime).toList(growable: false);
     }
-    return ordered;
+    if (_lastSuccessfulCarrier != null &&
+        filtered.contains(_lastSuccessfulCarrier)) {
+      filtered
+        ..remove(_lastSuccessfulCarrier)
+        ..insert(0, _lastSuccessfulCarrier!);
+    }
+    return filtered;
+  }
+
+  bool _carrierSupportedOnRuntime(ControlCarrierKind carrier) {
+    if (kIsWeb) {
+      return carrier == ControlCarrierKind.websocket;
+    }
+    return true;
   }
 
   ControlCarrierKind? _carrierFromName(String raw) {
@@ -768,6 +814,122 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return fallbackPort;
     }
     return parsed.port;
+  }
+
+  _ConnectionTarget _targetForCarrier({
+    required ControlCarrierKind carrier,
+    required DiscoveredServer? server,
+    required String fallbackHost,
+    required int fallbackPort,
+  }) {
+    switch (carrier) {
+      case ControlCarrierKind.grpc:
+        final endpoint = server?.grpcEndpoint.trim() ?? '';
+        if (endpoint.isEmpty) {
+          return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
+        }
+        final parsed = Uri.tryParse('tcp://$endpoint');
+        if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
+          return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
+        }
+        return _ConnectionTarget(host: parsed.host, port: parsed.port);
+      case ControlCarrierKind.websocket:
+        final endpoint = server?.websocketEndpoint.trim() ?? '';
+        if (endpoint.isEmpty) {
+          return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
+        }
+        final parsed = Uri.tryParse(endpoint);
+        if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
+          return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
+        }
+        return _ConnectionTarget(host: parsed.host, port: parsed.port);
+      case ControlCarrierKind.tcp:
+        final endpoint = server?.tcpEndpoint.trim() ?? '';
+        if (endpoint.isEmpty) {
+          return _ConnectionTarget(host: fallbackHost, port: 50055);
+        }
+        final parsed = Uri.tryParse('tcp://$endpoint');
+        if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
+          return _ConnectionTarget(host: fallbackHost, port: 50055);
+        }
+        return _ConnectionTarget(host: parsed.host, port: parsed.port);
+      case ControlCarrierKind.http:
+        final endpoint = server?.httpEndpoint.trim() ?? '';
+        if (endpoint.isEmpty) {
+          return _ConnectionTarget(host: fallbackHost, port: 50056);
+        }
+        final parsed = Uri.tryParse(endpoint);
+        if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
+          return _ConnectionTarget(host: fallbackHost, port: 50056);
+        }
+        return _ConnectionTarget(host: parsed.host, port: parsed.port);
+    }
+  }
+
+  String _carrierName(ControlCarrierKind carrier) {
+    switch (carrier) {
+      case ControlCarrierKind.grpc:
+        return 'gRPC';
+      case ControlCarrierKind.websocket:
+        return 'WebSocket';
+      case ControlCarrierKind.tcp:
+        return 'TCP';
+      case ControlCarrierKind.http:
+        return 'HTTP';
+    }
+  }
+
+  String _carrierEndpointLabel({
+    required ControlCarrierKind carrier,
+    required DiscoveredServer? server,
+    required String fallbackHost,
+    required int fallbackPort,
+  }) {
+    final target = _targetForCarrier(
+      carrier: carrier,
+      server: server,
+      fallbackHost: fallbackHost,
+      fallbackPort: fallbackPort,
+    );
+    switch (carrier) {
+      case ControlCarrierKind.grpc:
+        return '${target.host}:${target.port}';
+      case ControlCarrierKind.websocket:
+        return 'ws://${target.host}:${target.port}${_websocketPathFor(server)}';
+      case ControlCarrierKind.tcp:
+        return '${target.host}:${target.port}';
+      case ControlCarrierKind.http:
+        return 'http://${target.host}:${target.port}';
+    }
+  }
+
+  void _resetCarrierCycle(List<ControlCarrierKind> carriers) {
+    _activeCarrierCycle = carriers;
+    _activeCarrierIndex = 0;
+    _carrierAttemptLog.clear();
+  }
+
+  bool _moveToNextCarrierInCycle() {
+    if (_activeCarrierIndex + 1 >= _activeCarrierCycle.length) {
+      return false;
+    }
+    _activeCarrierIndex += 1;
+    return true;
+  }
+
+  String _buildCarrierFailureSummary() {
+    if (_carrierAttemptLog.isEmpty) {
+      return 'No carriers were attempted.';
+    }
+    final lines = <String>[];
+    for (final attempt in _carrierAttemptLog) {
+      final elapsedMs = attempt.elapsed.inMilliseconds;
+      lines.add(
+        '${_carrierName(attempt.carrier)} failed at ${attempt.stage} '
+        '(${attempt.endpoint}) after ${elapsedMs}ms: ${attempt.error}',
+      );
+    }
+    return lines.join('\n');
   }
 
   @override
@@ -831,10 +993,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim());
     final selectedServer = _selectedServerMetadata();
-    final carriers = _carrierPreference(selectedServer);
-    final carrier = carriers[userInitiated
-        ? 0
-        : (_reconnectAttempt % (carriers.isEmpty ? 1 : carriers.length))];
     final size = _currentLogicalSize();
     if (host.isEmpty || port == null || port <= 0 || port > 65535) {
       _shouldStayConnected = false;
@@ -846,11 +1004,44 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return;
     }
 
+    if (userInitiated || _activeCarrierCycle.isEmpty) {
+      _resetCarrierCycle(_carrierPreference(selectedServer));
+    }
+    if (_activeCarrierCycle.isEmpty) {
+      _shouldStayConnected = false;
+      _hasRegisterAck = false;
+      setState(() {
+        _status = 'No supported control carrier is available on this runtime';
+        _lastConnectionStatus = _status;
+      });
+      return;
+    }
+    if (_activeCarrierIndex < 0 ||
+        _activeCarrierIndex >= _activeCarrierCycle.length) {
+      _activeCarrierIndex = 0;
+    }
+
+    final carrier = _activeCarrierCycle[_activeCarrierIndex];
+    final target = _targetForCarrier(
+      carrier: carrier,
+      server: selectedServer,
+      fallbackHost: host,
+      fallbackPort: port,
+    );
+    final carrierEndpoint = _carrierEndpointLabel(
+      carrier: carrier,
+      server: selectedServer,
+      fallbackHost: host,
+      fallbackPort: port,
+    );
+    final attemptStartedAt = DateTime.now().toUtc();
+
     _isConnecting = true;
     _hasRegisterAck = false;
     if (mounted) {
       setState(() {
-        _status = userInitiated ? 'Connecting...' : 'Reconnecting...';
+        final verb = userInitiated ? 'Connecting' : 'Reconnecting';
+        _status = '$verb via ${_carrierName(carrier)}...';
         _lastConnectionStatus = _status;
       });
     }
@@ -868,8 +1059,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         http: selectedServer?.httpEndpoint,
       );
       _client = widget.clientFactory(
-        host: host,
-        port: port,
+        host: target.host,
+        port: target.port,
       );
 
       final stream = _client!.connect(_outgoing.stream);
@@ -962,6 +1153,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                 shouldFlushQueuedBugReports = true;
               }
               _hasRegisterAck = true;
+              _lastSuccessfulCarrier = carrier;
+              _carrierAttemptLog.clear();
+              _activeCarrierCycle = <ControlCarrierKind>[];
+              _activeCarrierIndex = 0;
             }
             _applyRegisterMetadata(response);
             if (_e2eEmitEvents && response.hasRegisterAck()) {
@@ -975,15 +1170,33 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         },
         onError: (Object error) {
           final diagnosis = diagnoseTransportError(error, isWeb: kIsWeb);
-          _lastTransportDiagnostic = diagnosis.hasSummary
-              ? diagnosis.notificationText()
-              : diagnosis.rawError;
-          unawaited(_handleStreamClosed(
-            diagnosis.statusText(),
-            notificationOverride: diagnosis.notificationText(),
-          ));
+          unawaited(
+            _handleCarrierAttemptFailure(
+              carrier: carrier,
+              endpoint: carrierEndpoint,
+              stage: 'stream',
+              status: diagnosis.statusText(),
+              rawError: diagnosis.hasSummary
+                  ? diagnosis.notificationText()
+                  : diagnosis.rawError,
+              elapsed: DateTime.now().toUtc().difference(attemptStartedAt),
+            ),
+          );
         },
         onDone: () {
+          if (!_hasRegisterAck) {
+            unawaited(
+              _handleCarrierAttemptFailure(
+                carrier: carrier,
+                endpoint: carrierEndpoint,
+                stage: 'stream_closed',
+                status: 'Disconnected',
+                rawError: 'stream closed before register acknowledgement',
+                elapsed: DateTime.now().toUtc().difference(attemptStartedAt),
+              ),
+            );
+            return;
+          }
           unawaited(_handleStreamClosed('Disconnected'));
         },
       );
@@ -1030,14 +1243,17 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _sendSensorTelemetry();
     } catch (error) {
       final diagnosis = diagnoseTransportError(error, isWeb: kIsWeb);
-      _lastTransportDiagnostic = diagnosis.hasSummary
-          ? diagnosis.notificationText()
-          : diagnosis.rawError;
-      await _handleStreamClosed(
-        diagnosis.hasSummary
+      await _handleCarrierAttemptFailure(
+        carrier: carrier,
+        endpoint: carrierEndpoint,
+        stage: 'connect',
+        status: diagnosis.hasSummary
             ? 'Connection error: ${diagnosis.summary}'
             : 'Connection error: $error',
-        notificationOverride: diagnosis.notificationText(),
+        rawError: diagnosis.hasSummary
+            ? diagnosis.notificationText()
+            : diagnosis.rawError,
+        elapsed: DateTime.now().toUtc().difference(attemptStartedAt),
       );
     } finally {
       _isConnecting = false;
@@ -2030,6 +2246,67 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _reconnectTimer = null;
   }
 
+  Future<void> _handleCarrierAttemptFailure({
+    required ControlCarrierKind carrier,
+    required String endpoint,
+    required String stage,
+    required String status,
+    required String rawError,
+    required Duration elapsed,
+  }) async {
+    _carrierAttemptLog.add(
+      _CarrierAttemptDiagnostic(
+        carrier: carrier,
+        endpoint: endpoint,
+        stage: stage,
+        error: rawError,
+        elapsed: elapsed,
+      ),
+    );
+    _lastTransportDiagnostic =
+        '${_carrierName(carrier)} failed at $stage: $rawError';
+
+    _incoming = null;
+    _hasRegisterAck = false;
+    final existingClient = _client;
+    _client = null;
+    if (existingClient != null) {
+      await existingClient.shutdown();
+    }
+    _syncMonitoringLoops();
+
+    if (_moveToNextCarrierInCycle()) {
+      final nextCarrier = _activeCarrierCycle[_activeCarrierIndex];
+      if (mounted) {
+        setState(() {
+          _status =
+              '${_carrierName(carrier)} failed, trying ${_carrierName(nextCarrier)}...';
+          _lastConnectionStatus = _status;
+          _lastNotification = _lastTransportDiagnostic;
+        });
+      }
+      if (_shouldStayConnected) {
+        unawaited(
+          Future<void>.microtask(() => _startStream(userInitiated: false)),
+        );
+      }
+      return;
+    }
+
+    final summary = _buildCarrierFailureSummary();
+    _lastTransportDiagnostic = summary;
+    if (mounted) {
+      setState(() {
+        _status = 'All control carriers failed';
+        _lastConnectionStatus = _status;
+        _lastNotification = summary;
+      });
+    }
+    _activeCarrierCycle = <ControlCarrierKind>[];
+    _activeCarrierIndex = 0;
+    _scheduleReconnect();
+  }
+
   Future<void> _handleStreamClosed(
     String status, {
     String notificationOverride = '',
@@ -2147,6 +2424,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _shouldStayConnected = false;
     _hasRegisterAck = false;
     _reconnectAttempt = 0;
+    _activeCarrierCycle = <ControlCarrierKind>[];
+    _activeCarrierIndex = 0;
     _cancelReconnectTimer();
     _syncMonitoringLoops();
     _drainPendingBugReportsAsFailed('stream stopped before bug report ack');
