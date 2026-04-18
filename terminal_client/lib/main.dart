@@ -2706,6 +2706,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   Future<void> _scanForServers() async {
+    if (kIsWeb) {
+      setState(() {
+        _status = 'Connected (web origin); LAN scan not required';
+        _lastConnectionStatus = _status;
+      });
+      return;
+    }
     if (_isScanning) {
       return;
     }
@@ -2878,10 +2885,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      ElevatedButton(
-                        onPressed: _isScanning ? null : _scanForServers,
-                        child: Text(_isScanning ? 'Scanning...' : 'Scan LAN'),
-                      ),
+                      if (kIsWeb)
+                        const Chip(
+                          avatar: Icon(Icons.check_circle_outline),
+                          label: Text('Connected'),
+                        )
+                      else
+                        ElevatedButton(
+                          onPressed: _isScanning ? null : _scanForServers,
+                          child: Text(_isScanning ? 'Scanning...' : 'Scan LAN'),
+                        ),
                     ],
                   ),
                   if (_discoveredServers.isNotEmpty) ...[
