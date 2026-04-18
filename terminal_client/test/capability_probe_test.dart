@@ -40,24 +40,23 @@ void main() {
 
   test('probe includes media capabilities when devices are detected', () async {
     final probe = DefaultCapabilityProbe(
-      mediaDeviceInventoryProvider: () async =>
-          const <MediaDeviceDescriptor>[
-            MediaDeviceDescriptor(
-              kind: 'audioinput',
-              deviceId: 'mic-1',
-              label: 'Built-in Microphone',
-            ),
-            MediaDeviceDescriptor(
-              kind: 'videoinput',
-              deviceId: 'cam-1',
-              label: 'USB Camera',
-            ),
-            MediaDeviceDescriptor(
-              kind: 'audiooutput',
-              deviceId: 'spk-1',
-              label: 'Bluetooth Speaker',
-            ),
-          ],
+      mediaDeviceInventoryProvider: () async => const <MediaDeviceDescriptor>[
+        MediaDeviceDescriptor(
+          kind: 'audioinput',
+          deviceId: 'mic-1',
+          label: 'Built-in Microphone',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'videoinput',
+          deviceId: 'cam-1',
+          label: 'USB Camera',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'audiooutput',
+          deviceId: 'spk-1',
+          label: 'Bluetooth Speaker',
+        ),
+      ],
     );
 
     final capabilities = await probe.probe(

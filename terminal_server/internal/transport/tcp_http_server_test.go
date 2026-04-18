@@ -207,7 +207,9 @@ func mustPostHTTPEnvelope(t *testing.T, base, sessionID string, envelope *contro
 	if err != nil {
 		t.Fatalf("http.Post() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("poll status = %d, body=%s", resp.StatusCode, string(body))
@@ -221,7 +223,9 @@ func mustGetHTTPEnvelope(t *testing.T, base, sessionID string) *controlv1.WireEn
 	if err != nil {
 		t.Fatalf("http.Get() error = %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("stream status = %d, body=%s", resp.StatusCode, string(body))

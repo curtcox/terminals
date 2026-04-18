@@ -891,9 +891,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     final display = capabilities.displays.first;
     display
       ..displayId = display.displayId.isEmpty ? 'main' : display.displayId
-      ..displayName = display.displayName.isEmpty
-          ? 'Primary Display'
-          : display.displayName
+      ..displayName =
+          display.displayName.isEmpty ? 'Primary Display' : display.displayName
       ..primary = true
       ..screen = screen.deepCopy();
     return capabilities;
@@ -926,7 +925,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     required String reason,
     bool forceSnapshot = false,
   }) async {
-    if (!_hasActiveControlSession || _deviceId.isEmpty || _capabilityPollInFlight) {
+    if (!_hasActiveControlSession ||
+        _deviceId.isEmpty ||
+        _capabilityPollInFlight) {
       return;
     }
     _capabilityPollInFlight = true;
@@ -1559,7 +1560,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   void _startCapabilityMonitorLoop() {
     _capabilityMonitorTimer?.cancel();
     _capabilityMonitorTimer = Timer.periodic(_capabilityMonitorInterval, (_) {
-      unawaited(_probeAndPublishCapabilityChanges(reason: 'runtime_monitor_poll'));
+      unawaited(
+          _probeAndPublishCapabilityChanges(reason: 'runtime_monitor_poll'));
     });
   }
 

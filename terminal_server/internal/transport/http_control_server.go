@@ -3,7 +3,6 @@ package transport
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -311,8 +310,4 @@ func sessionIDFromPath(path, prefix string) string {
 		return ""
 	}
 	return id
-}
-
-func httpSessionURL(baseAddr, sessionID, endpoint string) string {
-	return fmt.Sprintf("http://%s%s/%s", baseAddr, endpoint, sessionID)
 }

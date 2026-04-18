@@ -161,8 +161,8 @@ void main() {
       TerminalClientApp(
         clientFactory: harness.createClient,
         mediaEngineFactory: harness.createMediaEngine,
-            reconnectDelayBase: const Duration(seconds: 5),
-            reconnectDelayMaxSeconds: 5,
+        reconnectDelayBase: const Duration(seconds: 5),
+        reconnectDelayMaxSeconds: 5,
       ),
     );
 
@@ -218,14 +218,14 @@ void main() {
       );
       await tester.pump();
 
-        final helloCount = harness.createdClients[1].requests
+      final helloCount = harness.createdClients[1].requests
           .where((request) => request.hasHello())
           .length;
-        final capabilitySnapshotCount = harness.createdClients[1].requests
+      final capabilitySnapshotCount = harness.createdClients[1].requests
           .where((request) => request.hasCapabilitySnapshot())
           .length;
-        expect(helloCount, 1);
-        expect(capabilitySnapshotCount, 1);
+      expect(helloCount, 1);
+      expect(capabilitySnapshotCount, 1);
     },
   );
 

@@ -81,6 +81,7 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 			},
 		}, nil
 	case *controlv1.ConnectRequest_Register:
+		//nolint:staticcheck // Legacy register payload remains supported during protocol transition.
 		caps := payload.Register.GetCapabilities()
 		identity := caps.GetIdentity()
 		return ClientMessage{
@@ -93,6 +94,7 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 			},
 		}, nil
 	case *controlv1.ConnectRequest_Capability:
+		//nolint:staticcheck // Legacy capability payload remains supported during protocol transition.
 		caps := payload.Capability.GetCapabilities()
 		return ClientMessage{
 			Capability: &CapabilityUpdateRequest{

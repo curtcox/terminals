@@ -8,7 +8,6 @@ import (
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
-	"github.com/curtcox/terminals/terminal_server/internal/io"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
@@ -163,7 +162,7 @@ func TestHandleMessageCapabilityDeltaRejectsStaleGeneration(t *testing.T) {
 func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
-	router := io.NewRouter()
+	router := iorouter.NewRouter()
 	engine := scenario.NewEngine()
 	scenario.RegisterBuiltins(engine)
 	runtime := scenario.NewRuntime(engine, &scenario.Environment{
@@ -238,7 +237,7 @@ func TestHandleMessageCapabilityDeltaEmitsTypedCapabilityEvents(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
 	broadcaster := ui.NewMemoryBroadcaster()
-	router := io.NewRouter()
+	router := iorouter.NewRouter()
 	engine := scenario.NewEngine()
 	scenario.RegisterBuiltins(engine)
 	runtime := scenario.NewRuntime(engine, &scenario.Environment{
@@ -391,7 +390,7 @@ func TestHandleMessageSensorTriggersActiveScenarioHook(t *testing.T) {
 	scenario.RegisterBuiltins(engine)
 	runtime := scenario.NewRuntime(engine, &scenario.Environment{
 		Devices:   manager,
-		IO:        io.NewRouter(),
+		IO:        iorouter.NewRouter(),
 		Telephony: telephony.NoopBridge{},
 		Storage:   storage.NewMemoryStore(),
 		Scheduler: storage.NewMemoryScheduler(),
@@ -520,7 +519,7 @@ func TestHandleDisconnectStopsRecordingForDisconnectedDeviceRoutes(t *testing.T)
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
 	broadcaster := ui.NewMemoryBroadcaster()
-	router := io.NewRouter()
+	router := iorouter.NewRouter()
 	engine := scenario.NewEngine()
 	scenario.RegisterBuiltins(engine)
 	runtime := scenario.NewRuntime(engine, &scenario.Environment{

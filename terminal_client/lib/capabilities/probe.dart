@@ -59,8 +59,8 @@ class MonitoringSupportTier {
 class DefaultCapabilityProbe implements CapabilityProbe {
   DefaultCapabilityProbe({
     MediaDeviceInventoryProvider? mediaDeviceInventoryProvider,
-  }) : _mediaDeviceKindsProvider =
-            mediaDeviceInventoryProvider ?? _defaultMediaDeviceInventoryProvider;
+  }) : _mediaDeviceKindsProvider = mediaDeviceInventoryProvider ??
+            _defaultMediaDeviceInventoryProvider;
 
   final MediaDeviceInventoryProvider _mediaDeviceKindsProvider;
 
@@ -132,7 +132,8 @@ class DefaultCapabilityProbe implements CapabilityProbe {
         ..maxPoints = 1);
     }
     if (hasAudioOutput) {
-      final outputEndpoints = _audioEndpointsForKind(mediaDevices, 'audiooutput');
+      final outputEndpoints =
+          _audioEndpointsForKind(mediaDevices, 'audiooutput');
       capabilities.speakers = (capv1.AudioOutputCapability()
         ..channels = 2
         ..endpoints.addAll(outputEndpoints));
@@ -271,7 +272,8 @@ MonitoringSupportTier _monitoringSupportTierForPlatform(
   }
 }
 
-Future<List<MediaDeviceDescriptor>> _defaultMediaDeviceInventoryProvider() async {
+Future<List<MediaDeviceDescriptor>>
+    _defaultMediaDeviceInventoryProvider() async {
   final devices = await navigator.mediaDevices.enumerateDevices();
   return devices
       .map(
