@@ -65,8 +65,25 @@ class TerminalControlTcpClient implements TerminalControlClient {
           while (_frameDecoder.hasFrame) {
             final frame = _frameDecoder.takeFrame();
             final envelope = WireEnvelope.fromBuffer(frame);
+            if (envelope.hasTransportError()) {
+              final error = envelope.transportError;
+              controller.addError(
+                StateError('transport error ${error.code}: ${error.message}'),
+              );
+              continue;
+            }
             if (envelope.hasTransportHelloAck()) {
-              final token = envelope.transportHelloAck.resumeToken.trim();
+              final ack = envelope.transportHelloAck;
+              if (ack.acceptedProtocolVersion != wireProtocolVersion) {
+                controller.addError(
+                  StateError(
+                    'transport hello rejected protocol version '
+                    '${ack.acceptedProtocolVersion}',
+                  ),
+                );
+                continue;
+              }
+              final token = ack.resumeToken.trim();
               if (token.isNotEmpty) {
                 onResumeToken?.call(token);
               }

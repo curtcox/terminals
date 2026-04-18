@@ -75,8 +75,25 @@ class TerminalControlWebSocketClient implements TerminalControlClient {
           return;
         }
         final envelope = WireEnvelope.fromBuffer(bytes);
+        if (envelope.hasTransportError()) {
+          final error = envelope.transportError;
+          controller.addError(
+            StateError('transport error ${error.code}: ${error.message}'),
+          );
+          return;
+        }
         if (envelope.hasTransportHelloAck()) {
-          final token = envelope.transportHelloAck.resumeToken.trim();
+          final ack = envelope.transportHelloAck;
+          if (ack.acceptedProtocolVersion != wireProtocolVersion) {
+            controller.addError(
+              StateError(
+                'transport hello rejected protocol version '
+                '${ack.acceptedProtocolVersion}',
+              ),
+            );
+            return;
+          }
+          final token = ack.resumeToken.trim();
           if (token.isNotEmpty) {
             onResumeToken?.call(token);
           }

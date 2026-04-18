@@ -111,8 +111,19 @@ class TerminalControlHttpClient implements TerminalControlClient {
       return acc;
     });
     final envelope = WireEnvelope.fromBuffer(payload);
+    if (envelope.hasTransportError()) {
+      final error = envelope.transportError;
+      throw StateError('transport error ${error.code}: ${error.message}');
+    }
     if (envelope.hasTransportHelloAck()) {
-      final token = envelope.transportHelloAck.resumeToken.trim();
+      final ack = envelope.transportHelloAck;
+      if (ack.acceptedProtocolVersion != wireProtocolVersion) {
+        throw StateError(
+          'transport hello rejected protocol version '
+          '${ack.acceptedProtocolVersion}',
+        );
+      }
+      final token = ack.resumeToken.trim();
       if (token.isNotEmpty) {
         onResumeToken?.call(token);
       }

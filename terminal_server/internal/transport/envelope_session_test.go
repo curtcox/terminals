@@ -137,3 +137,56 @@ func TestEnvelopeHandleHelloIssuesAndReusesResumeToken(t *testing.T) {
 		t.Fatalf("resume token = %q, want %q", ack2.GetResumeToken(), ack1.GetResumeToken())
 	}
 }
+
+func TestEnvelopeHandleHelloReplacesUnknownResumeToken(t *testing.T) {
+	envelopeResumeRegistry.mu.Lock()
+	envelopeResumeRegistry.tokens = map[string]time.Time{}
+	envelopeResumeRegistry.mu.Unlock()
+
+	stream := &testEnvelopeStream{carrier: controlv1.CarrierKind_CARRIER_KIND_HTTP}
+	eps := &envelopeProtoStream{stream: stream}
+	err := eps.handleHello(&controlv1.TransportHello{
+		ProtocolVersion: currentWireProtocolVersion,
+		SupportedCarriers: []controlv1.CarrierKind{
+			controlv1.CarrierKind_CARRIER_KIND_HTTP,
+		},
+		ResumeToken: "resume-unknown-token",
+	}, "session-c")
+	if err != nil {
+		t.Fatalf("handleHello() error = %v", err)
+	}
+	if len(stream.writes) != 1 {
+		t.Fatalf("len(writes) = %d, want 1", len(stream.writes))
+	}
+	ack := stream.writes[0].GetTransportHelloAck()
+	if ack == nil {
+		t.Fatalf("expected transport hello ack")
+	}
+	if ack.GetResumeToken() == "" {
+		t.Fatalf("expected non-empty resume token")
+	}
+	if ack.GetResumeToken() == "resume-unknown-token" {
+		t.Fatalf("unknown resume token should not be reused")
+	}
+}
+
+func TestEnvelopeHandleHelloAllowsEmptySupportedCarriers(t *testing.T) {
+	stream := &testEnvelopeStream{carrier: controlv1.CarrierKind_CARRIER_KIND_WEBSOCKET}
+	eps := &envelopeProtoStream{stream: stream}
+	err := eps.handleHello(&controlv1.TransportHello{
+		ProtocolVersion: currentWireProtocolVersion,
+	}, "session-d")
+	if err != nil {
+		t.Fatalf("handleHello() error = %v", err)
+	}
+	if len(stream.writes) != 1 {
+		t.Fatalf("len(writes) = %d, want 1", len(stream.writes))
+	}
+	ack := stream.writes[0].GetTransportHelloAck()
+	if ack == nil {
+		t.Fatalf("expected transport hello ack")
+	}
+	if ack.GetNegotiatedCarrier() != controlv1.CarrierKind_CARRIER_KIND_WEBSOCKET {
+		t.Fatalf("negotiated carrier = %s, want websocket", ack.GetNegotiatedCarrier().String())
+	}
+}
