@@ -62,20 +62,27 @@ message WireEnvelope {
 
 message ConnectRequest {
   oneof payload {
-    RegisterDevice register = 1;
-    CapabilityUpdate capability = 2;
-    terminals.io.v1.InputEvent input = 3;
-    terminals.io.v1.SensorData sensor = 4;
-    StreamReady stream_ready = 5;
-    CommandRequest command = 6;
-    Heartbeat heartbeat = 7;
-    WebRTCSignal webrtc_signal = 8;
-    VoiceAudio voice_audio = 9;
-    terminals.io.v1.ObservationMessage observation_message = 10;
-    terminals.io.v1.ArtifactAvailable artifact_available = 11;
-    terminals.io.v1.FlowStats flow_stats = 12;
-    terminals.io.v1.ClockSample clock_sample = 13;
-    terminals.diagnostics.v1.BugReport bug_report = 14;
+    Hello hello = 1;
+    CapabilitySnapshot capability_snapshot = 2;
+    CapabilityDelta capability_delta = 3;
+
+    // Deprecated: use hello + capability_snapshot.
+    RegisterDevice register = 20 [deprecated = true];
+    // Deprecated: use capability_delta.
+    CapabilityUpdate capability = 21 [deprecated = true];
+
+    terminals.io.v1.InputEvent input = 4;
+    terminals.io.v1.SensorData sensor = 5;
+    StreamReady stream_ready = 6;
+    CommandRequest command = 7;
+    Heartbeat heartbeat = 8;
+    WebRTCSignal webrtc_signal = 9;
+    VoiceAudio voice_audio = 10;
+    terminals.io.v1.ObservationMessage observation_message = 11;
+    terminals.io.v1.ArtifactAvailable artifact_available = 12;
+    terminals.io.v1.FlowStats flow_stats = 13;
+    terminals.io.v1.ClockSample clock_sample = 14;
+    terminals.diagnostics.v1.BugReport bug_report = 15;
   }
 }
 
@@ -88,28 +95,62 @@ message VoiceAudio {
 
 message ConnectResponse {
   oneof payload {
-    RegisterAck register_ack = 1;
-    terminals.ui.v1.SetUI set_ui = 2;
-    terminals.io.v1.StartStream start_stream = 3;
-    terminals.io.v1.StopStream stop_stream = 4;
-    terminals.io.v1.PlayAudio play_audio = 5;
-    terminals.io.v1.ShowMedia show_media = 6;
-    terminals.io.v1.RouteStream route_stream = 7;
-    terminals.ui.v1.Notification notification = 8;
-    WebRTCSignal webrtc_signal = 9;
-    CommandResult command_result = 10;
-    Heartbeat heartbeat = 11;
-    ControlError error = 12;
-    terminals.ui.v1.UpdateUI update_ui = 13;
-    terminals.ui.v1.TransitionUI transition_ui = 14;
-    terminals.io.v1.InstallBundle install_bundle = 15;
-    terminals.io.v1.RemoveBundle remove_bundle = 16;
-    terminals.io.v1.StartFlow start_flow = 17;
-    terminals.io.v1.PatchFlow patch_flow = 18;
-    terminals.io.v1.StopFlow stop_flow = 19;
-    terminals.io.v1.RequestArtifact request_artifact = 20;
-    terminals.diagnostics.v1.BugReportAck bug_report_ack = 21;
+    HelloAck hello_ack = 1;
+    CapabilityAck capability_ack = 2;
+
+    RegisterAck register_ack = 3;
+    terminals.ui.v1.SetUI set_ui = 4;
+    terminals.io.v1.StartStream start_stream = 5;
+    terminals.io.v1.StopStream stop_stream = 6;
+    terminals.io.v1.PlayAudio play_audio = 7;
+    terminals.io.v1.ShowMedia show_media = 8;
+    terminals.io.v1.RouteStream route_stream = 9;
+    terminals.ui.v1.Notification notification = 10;
+    WebRTCSignal webrtc_signal = 11;
+    CommandResult command_result = 12;
+    Heartbeat heartbeat = 13;
+    ControlError error = 14;
+    terminals.ui.v1.UpdateUI update_ui = 15;
+    terminals.ui.v1.TransitionUI transition_ui = 16;
+    terminals.io.v1.InstallBundle install_bundle = 17;
+    terminals.io.v1.RemoveBundle remove_bundle = 18;
+    terminals.io.v1.StartFlow start_flow = 19;
+    terminals.io.v1.PatchFlow patch_flow = 20;
+    terminals.io.v1.StopFlow stop_flow = 21;
+    terminals.io.v1.RequestArtifact request_artifact = 22;
+    terminals.diagnostics.v1.BugReportAck bug_report_ack = 23;
   }
+}
+
+message Hello {
+  string device_id = 1;
+  terminals.capabilities.v1.DeviceIdentity identity = 2;
+  string client_version = 3;
+}
+
+message HelloAck {
+  string server_id = 1;
+  string session_id = 2;
+  int64 heartbeat_interval_ms = 3;
+}
+
+message CapabilitySnapshot {
+  string device_id = 1;
+  uint64 generation = 2;
+  terminals.capabilities.v1.DeviceCapabilities capabilities = 3;
+}
+
+message CapabilityDelta {
+  string device_id = 1;
+  uint64 generation = 2;
+  terminals.capabilities.v1.DeviceCapabilities capabilities = 3;
+  string reason = 4;
+}
+
+message CapabilityAck {
+  string device_id = 1;
+  uint64 accepted_generation = 2;
+  bool snapshot_applied = 3;
 }
 
 message RegisterDevice {

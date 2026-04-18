@@ -39,6 +39,7 @@ func (s *Session) Run(stream ControlStream) error {
 	}
 
 	var connectedDeviceID string
+	capabilityReady := false
 	var sendMu sync.Mutex
 	send := func(msg ServerMessage) error {
 		sendMu.Lock()
@@ -64,7 +65,7 @@ func (s *Session) Run(stream ControlStream) error {
 			return err
 		}
 
-		if sessionErr := validateSessionMessage(connectedDeviceID, in); sessionErr != nil {
+		if sessionErr := validateSessionMessage(connectedDeviceID, capabilityReady, in); sessionErr != nil {
 			s.handler.NoteProtocolError()
 			if sendErr := send(ServerMessage{
 				ErrorCode: ErrorCodeProtocolViolation,
@@ -77,6 +78,7 @@ func (s *Session) Run(stream ControlStream) error {
 
 		if in.Register != nil {
 			connectedDeviceID = in.Register.DeviceID
+			capabilityReady = true
 			if connectedDeviceID != "" && connectedDeviceID != registeredRelayDeviceID {
 				if registeredRelayDeviceID != "" {
 					globalSessionRelayRegistry.Unregister(registeredRelayDeviceID)
@@ -84,6 +86,15 @@ func (s *Session) Run(stream ControlStream) error {
 				globalSessionRelayRegistry.Register(connectedDeviceID, send)
 				registeredRelayDeviceID = connectedDeviceID
 			}
+		}
+		if in.Hello != nil && connectedDeviceID == "" {
+			connectedDeviceID = in.Hello.DeviceID
+		}
+		if in.CapabilitySnap != nil {
+			if connectedDeviceID == "" {
+				connectedDeviceID = in.CapabilitySnap.DeviceID
+			}
+			capabilityReady = true
 		}
 		if in.Heartbeat != nil && connectedDeviceID == "" {
 			connectedDeviceID = in.Heartbeat.DeviceID
@@ -120,7 +131,7 @@ func (s *Session) Run(stream ControlStream) error {
 	}
 }
 
-func validateSessionMessage(connectedDeviceID string, in ClientMessage) error {
+func validateSessionMessage(connectedDeviceID string, capabilityReady bool, in ClientMessage) error {
 	if in.Register != nil {
 		if in.Register.DeviceID == "" {
 			return fmt.Errorf("register requires device id")
@@ -131,8 +142,53 @@ func validateSessionMessage(connectedDeviceID string, in ClientMessage) error {
 		return nil
 	}
 
+	if in.Hello != nil {
+		if in.Hello.DeviceID == "" {
+			return fmt.Errorf("hello requires device id")
+		}
+		if connectedDeviceID != "" && in.Hello.DeviceID != connectedDeviceID {
+			return fmt.Errorf("hello device id mismatch: connected=%s hello=%s", connectedDeviceID, in.Hello.DeviceID)
+		}
+		return nil
+	}
+
+	if in.CapabilitySnap != nil {
+		if in.CapabilitySnap.DeviceID == "" {
+			return fmt.Errorf("capability snapshot requires device id")
+		}
+		if in.CapabilitySnap.Generation == 0 {
+			return fmt.Errorf("capability snapshot requires generation > 0")
+		}
+		if connectedDeviceID != "" && in.CapabilitySnap.DeviceID != connectedDeviceID {
+			return fmt.Errorf("capability snapshot device id mismatch: connected=%s snapshot=%s", connectedDeviceID, in.CapabilitySnap.DeviceID)
+		}
+		return nil
+	}
+
+	if in.CapabilityDelta != nil {
+		if connectedDeviceID == "" {
+			return fmt.Errorf("hello or register required before capability delta")
+		}
+		if !capabilityReady {
+			return fmt.Errorf("capability snapshot or register required before capability delta")
+		}
+		if in.CapabilityDelta.DeviceID == "" {
+			return fmt.Errorf("capability delta requires device id")
+		}
+		if in.CapabilityDelta.Generation == 0 {
+			return fmt.Errorf("capability delta requires generation > 0")
+		}
+		if in.CapabilityDelta.DeviceID != connectedDeviceID {
+			return fmt.Errorf("capability delta device id mismatch: connected=%s delta=%s", connectedDeviceID, in.CapabilityDelta.DeviceID)
+		}
+		return nil
+	}
+
 	if connectedDeviceID == "" {
-		return fmt.Errorf("register required before other messages")
+		return fmt.Errorf("hello or register required before other messages")
+	}
+	if !capabilityReady {
+		return fmt.Errorf("capability snapshot or register required before other messages")
 	}
 
 	msgDeviceID, hasDeviceID := extractMessageDeviceID(in)
@@ -144,6 +200,12 @@ func validateSessionMessage(connectedDeviceID string, in ClientMessage) error {
 
 func extractMessageDeviceID(in ClientMessage) (string, bool) {
 	switch {
+	case in.Hello != nil:
+		return in.Hello.DeviceID, true
+	case in.CapabilitySnap != nil:
+		return in.CapabilitySnap.DeviceID, true
+	case in.CapabilityDelta != nil:
+		return in.CapabilityDelta.DeviceID, true
 	case in.Capability != nil:
 		return in.Capability.DeviceID, true
 	case in.Heartbeat != nil:

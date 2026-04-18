@@ -41,6 +41,45 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 	}
 
 	switch payload := req.GetPayload().(type) {
+	case *controlv1.ConnectRequest_Hello:
+		hello := payload.Hello
+		identity := hello.GetIdentity()
+		return ClientMessage{
+			Hello: &HelloRequest{
+				DeviceID:      hello.GetDeviceId(),
+				DeviceName:    identity.GetDeviceName(),
+				DeviceType:    identity.GetDeviceType(),
+				Platform:      identity.GetPlatform(),
+				ClientVersion: hello.GetClientVersion(),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_CapabilitySnapshot:
+		caps := payload.CapabilitySnapshot.GetCapabilities()
+		deviceID := payload.CapabilitySnapshot.GetDeviceId()
+		if deviceID == "" {
+			deviceID = caps.GetDeviceId()
+		}
+		return ClientMessage{
+			CapabilitySnap: &CapabilitySnapshotRequest{
+				DeviceID:     deviceID,
+				Generation:   payload.CapabilitySnapshot.GetGeneration(),
+				Capabilities: capabilitiesToDataMap(caps),
+			},
+		}, nil
+	case *controlv1.ConnectRequest_CapabilityDelta:
+		caps := payload.CapabilityDelta.GetCapabilities()
+		deviceID := payload.CapabilityDelta.GetDeviceId()
+		if deviceID == "" {
+			deviceID = caps.GetDeviceId()
+		}
+		return ClientMessage{
+			CapabilityDelta: &CapabilityDeltaRequest{
+				DeviceID:     deviceID,
+				Generation:   payload.CapabilityDelta.GetGeneration(),
+				Reason:       payload.CapabilityDelta.GetReason(),
+				Capabilities: capabilitiesToDataMap(caps),
+			},
+		}, nil
 	case *controlv1.ConnectRequest_Register:
 		caps := payload.Register.GetCapabilities()
 		identity := caps.GetIdentity()
@@ -178,6 +217,26 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 
 func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 	switch {
+	case msg.HelloAck != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_HelloAck{
+				HelloAck: &controlv1.HelloAck{
+					ServerId:            msg.HelloAck.ServerID,
+					SessionId:           msg.HelloAck.SessionID,
+					HeartbeatIntervalMs: msg.HelloAck.HeartbeatIntervalMS,
+				},
+			},
+		}
+	case msg.CapabilityAck != nil:
+		return &controlv1.ConnectResponse{
+			Payload: &controlv1.ConnectResponse_CapabilityAck{
+				CapabilityAck: &controlv1.CapabilityAck{
+					DeviceId:           msg.CapabilityAck.DeviceID,
+					AcceptedGeneration: msg.CapabilityAck.AcceptedGeneration,
+					SnapshotApplied:    msg.CapabilityAck.SnapshotApplied,
+				},
+			},
+		}
 	case msg.RegisterAck != nil:
 		return &controlv1.ConnectResponse{
 			Payload: &controlv1.ConnectResponse_RegisterAck{

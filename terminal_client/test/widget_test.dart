@@ -45,7 +45,8 @@ void main() {
     );
   });
 
-  test('buildCarrierPreference respects priority and last successful carrier', () {
+  test('buildCarrierPreference respects priority and last successful carrier',
+      () {
     final ordered = buildCarrierPreference(
       isWebRuntime: false,
       serverPriority: const <String>['http', 'tcp', 'websocket', 'grpc'],
@@ -1701,8 +1702,7 @@ class _FakeClientHarness {
     final client = _FakeTerminalControlClient(
       host: host,
       port: port,
-      failOnConnectStream:
-          createdClients.length < failConnectAttempts ||
+      failOnConnectStream: createdClients.length < failConnectAttempts ||
           (failFirstConnectStream && createdClients.isEmpty),
     );
     createdClients.add(client);

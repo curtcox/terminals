@@ -27,6 +27,29 @@ type RegisterResponse struct {
 	Initial  ui.Descriptor
 }
 
+// HelloRequest is the transport-neutral hello handshake payload.
+type HelloRequest struct {
+	DeviceID      string
+	DeviceName    string
+	DeviceType    string
+	Platform      string
+	ClientVersion string
+}
+
+// HelloResponse is sent after a successful hello message.
+type HelloResponse struct {
+	ServerID            string
+	SessionID           string
+	HeartbeatIntervalMS int64
+}
+
+// CapabilityLifecycleAck reports accepted capability generation.
+type CapabilityLifecycleAck struct {
+	DeviceID           string
+	AcceptedGeneration uint64
+	SnapshotApplied    bool
+}
+
 // ControlService encapsulates control-plane operations.
 type ControlService struct {
 	serverID string
@@ -74,6 +97,25 @@ func (s *ControlService) Register(_ context.Context, req RegisterRequest) (Regis
 	}, nil
 }
 
+// Hello ensures a device identity record exists before capability sync.
+func (s *ControlService) Hello(_ context.Context, req HelloRequest) (HelloResponse, error) {
+	_, err := s.devices.Register(device.Manifest{
+		DeviceID:     req.DeviceID,
+		DeviceName:   req.DeviceName,
+		DeviceType:   req.DeviceType,
+		Platform:     req.Platform,
+		Capabilities: map[string]string{},
+	})
+	if err != nil {
+		return HelloResponse{}, err
+	}
+	return HelloResponse{
+		ServerID:            s.serverID,
+		SessionID:           req.DeviceID + ":" + strconv.FormatInt(s.now().UTC().UnixMilli(), 10),
+		HeartbeatIntervalMS: 5000,
+	}, nil
+}
+
 // SetRegisterMetadata configures metadata included with each RegisterAck.
 func (s *ControlService) SetRegisterMetadata(metadata map[string]string) {
 	s.metadata = cloneStringMap(metadata)
@@ -87,6 +129,30 @@ func (s *ControlService) Heartbeat(_ context.Context, deviceID string) error {
 // UpdateCapabilities replaces capabilities for a registered device.
 func (s *ControlService) UpdateCapabilities(_ context.Context, deviceID string, caps map[string]string) error {
 	return s.devices.UpdateCapabilities(deviceID, caps)
+}
+
+// ApplyCapabilitySnapshot applies a full capability baseline.
+func (s *ControlService) ApplyCapabilitySnapshot(_ context.Context, deviceID string, generation uint64, caps map[string]string) (CapabilityLifecycleAck, error) {
+	if err := s.devices.ApplyCapabilitySnapshot(deviceID, generation, caps); err != nil {
+		return CapabilityLifecycleAck{}, err
+	}
+	return CapabilityLifecycleAck{
+		DeviceID:           deviceID,
+		AcceptedGeneration: generation,
+		SnapshotApplied:    true,
+	}, nil
+}
+
+// ApplyCapabilityDelta applies a generation-ordered capability update.
+func (s *ControlService) ApplyCapabilityDelta(_ context.Context, deviceID string, generation uint64, caps map[string]string) (CapabilityLifecycleAck, error) {
+	if err := s.devices.ApplyCapabilityDelta(deviceID, generation, caps); err != nil {
+		return CapabilityLifecycleAck{}, err
+	}
+	return CapabilityLifecycleAck{
+		DeviceID:           deviceID,
+		AcceptedGeneration: generation,
+		SnapshotApplied:    false,
+	}, nil
 }
 
 // Disconnect marks a device as disconnected when a control stream ends.

@@ -79,6 +79,72 @@ func TestSessionRunRegisterAndDisconnect(t *testing.T) {
 	}
 }
 
+func TestSessionRunHelloSnapshotDeltaAndDisconnect(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(control)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen", DeviceType: "tablet", Platform: "android"}},
+			{CapabilitySnap: &CapabilitySnapshotRequest{
+				DeviceID:   "device-1",
+				Generation: 1,
+				Capabilities: map[string]string{
+					"screen.width":  "1920",
+					"screen.height": "1080",
+				},
+			}},
+			{CapabilityDelta: &CapabilityDeltaRequest{
+				DeviceID:   "device-1",
+				Generation: 2,
+				Reason:     "display_changed",
+				Capabilities: map[string]string{
+					"screen.width":  "1280",
+					"screen.height": "720",
+				},
+			}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	got, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected registered device")
+	}
+	if got.Generation != 2 {
+		t.Fatalf("generation = %d, want 2", got.Generation)
+	}
+	if got.Capabilities["screen.width"] != "1280" {
+		t.Fatalf("screen.width = %q, want 1280", got.Capabilities["screen.width"])
+	}
+	if got.State != device.StateDisconnected {
+		t.Fatalf("state = %q, want %q", got.State, device.StateDisconnected)
+	}
+
+	hasHelloAck := false
+	hasCapabilityAck := false
+	for _, sent := range stream.sent {
+		if sent.HelloAck != nil {
+			hasHelloAck = true
+		}
+		if sent.CapabilityAck != nil {
+			hasCapabilityAck = true
+		}
+	}
+	if !hasHelloAck {
+		t.Fatalf("expected hello ack")
+	}
+	if !hasCapabilityAck {
+		t.Fatalf("expected capability ack")
+	}
+}
+
 func sessionUIDescriptorHasBugButton(root ui.Descriptor) bool {
 	nodeID := root.ID
 	if nodeID == "" {

@@ -297,26 +297,55 @@ const ConnectRequest$json = {
   '1': 'ConnectRequest',
   '2': [
     {
-      '1': 'register',
+      '1': 'hello',
       '3': 1,
       '4': 1,
       '5': 11,
-      '6': '.terminals.control.v1.RegisterDevice',
+      '6': '.terminals.control.v1.Hello',
       '9': 0,
-      '10': 'register'
+      '10': 'hello'
     },
     {
-      '1': 'capability',
+      '1': 'capability_snapshot',
       '3': 2,
       '4': 1,
       '5': 11,
-      '6': '.terminals.control.v1.CapabilityUpdate',
+      '6': '.terminals.control.v1.CapabilitySnapshot',
       '9': 0,
-      '10': 'capability'
+      '10': 'capabilitySnapshot'
+    },
+    {
+      '1': 'capability_delta',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.CapabilityDelta',
+      '9': 0,
+      '10': 'capabilityDelta'
+    },
+    {
+      '1': 'register',
+      '3': 20,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.RegisterDevice',
+      '8': {'3': true},
+      '9': 0,
+      '10': 'register',
+    },
+    {
+      '1': 'capability',
+      '3': 21,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.CapabilityUpdate',
+      '8': {'3': true},
+      '9': 0,
+      '10': 'capability',
     },
     {
       '1': 'input',
-      '3': 3,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.InputEvent',
@@ -325,7 +354,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'sensor',
-      '3': 4,
+      '3': 5,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.SensorData',
@@ -334,7 +363,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'stream_ready',
-      '3': 5,
+      '3': 6,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.StreamReady',
@@ -343,7 +372,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'command',
-      '3': 6,
+      '3': 7,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.CommandRequest',
@@ -352,7 +381,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'heartbeat',
-      '3': 7,
+      '3': 8,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.Heartbeat',
@@ -361,7 +390,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'webrtc_signal',
-      '3': 8,
+      '3': 9,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.WebRTCSignal',
@@ -370,7 +399,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'voice_audio',
-      '3': 9,
+      '3': 10,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.VoiceAudio',
@@ -379,7 +408,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'observation_message',
-      '3': 10,
+      '3': 11,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.ObservationMessage',
@@ -388,7 +417,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'artifact_available',
-      '3': 11,
+      '3': 12,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.ArtifactAvailable',
@@ -397,7 +426,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'flow_stats',
-      '3': 12,
+      '3': 13,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.FlowStats',
@@ -406,7 +435,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'clock_sample',
-      '3': 13,
+      '3': 14,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.ClockSample',
@@ -415,7 +444,7 @@ const ConnectRequest$json = {
     },
     {
       '1': 'bug_report',
-      '3': 14,
+      '3': 15,
       '4': 1,
       '5': 11,
       '6': '.terminals.diagnostics.v1.BugReport',
@@ -430,24 +459,29 @@ const ConnectRequest$json = {
 
 /// Descriptor for `ConnectRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List connectRequestDescriptor = $convert.base64Decode(
-    'Cg5Db25uZWN0UmVxdWVzdBJCCghyZWdpc3RlchgBIAEoCzIkLnRlcm1pbmFscy5jb250cm9sLn'
-    'YxLlJlZ2lzdGVyRGV2aWNlSABSCHJlZ2lzdGVyEkgKCmNhcGFiaWxpdHkYAiABKAsyJi50ZXJt'
-    'aW5hbHMuY29udHJvbC52MS5DYXBhYmlsaXR5VXBkYXRlSABSCmNhcGFiaWxpdHkSMwoFaW5wdX'
-    'QYAyABKAsyGy50ZXJtaW5hbHMuaW8udjEuSW5wdXRFdmVudEgAUgVpbnB1dBI1CgZzZW5zb3IY'
-    'BCABKAsyGy50ZXJtaW5hbHMuaW8udjEuU2Vuc29yRGF0YUgAUgZzZW5zb3ISRgoMc3RyZWFtX3'
-    'JlYWR5GAUgASgLMiEudGVybWluYWxzLmNvbnRyb2wudjEuU3RyZWFtUmVhZHlIAFILc3RyZWFt'
-    'UmVhZHkSQAoHY29tbWFuZBgGIAEoCzIkLnRlcm1pbmFscy5jb250cm9sLnYxLkNvbW1hbmRSZX'
-    'F1ZXN0SABSB2NvbW1hbmQSPwoJaGVhcnRiZWF0GAcgASgLMh8udGVybWluYWxzLmNvbnRyb2wu'
-    'djEuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdBJJCg13ZWJydGNfc2lnbmFsGAggASgLMiIudGVybW'
-    'luYWxzLmNvbnRyb2wudjEuV2ViUlRDU2lnbmFsSABSDHdlYnJ0Y1NpZ25hbBJDCgt2b2ljZV9h'
-    'dWRpbxgJIAEoCzIgLnRlcm1pbmFscy5jb250cm9sLnYxLlZvaWNlQXVkaW9IAFIKdm9pY2VBdW'
-    'RpbxJWChNvYnNlcnZhdGlvbl9tZXNzYWdlGAogASgLMiMudGVybWluYWxzLmlvLnYxLk9ic2Vy'
-    'dmF0aW9uTWVzc2FnZUgAUhJvYnNlcnZhdGlvbk1lc3NhZ2USUwoSYXJ0aWZhY3RfYXZhaWxhYm'
-    'xlGAsgASgLMiIudGVybWluYWxzLmlvLnYxLkFydGlmYWN0QXZhaWxhYmxlSABSEWFydGlmYWN0'
-    'QXZhaWxhYmxlEjsKCmZsb3dfc3RhdHMYDCABKAsyGi50ZXJtaW5hbHMuaW8udjEuRmxvd1N0YX'
-    'RzSABSCWZsb3dTdGF0cxJBCgxjbG9ja19zYW1wbGUYDSABKAsyHC50ZXJtaW5hbHMuaW8udjEu'
-    'Q2xvY2tTYW1wbGVIAFILY2xvY2tTYW1wbGUSRAoKYnVnX3JlcG9ydBgOIAEoCzIjLnRlcm1pbm'
-    'Fscy5kaWFnbm9zdGljcy52MS5CdWdSZXBvcnRIAFIJYnVnUmVwb3J0QgkKB3BheWxvYWQ=');
+    'Cg5Db25uZWN0UmVxdWVzdBIzCgVoZWxsbxgBIAEoCzIbLnRlcm1pbmFscy5jb250cm9sLnYxLk'
+    'hlbGxvSABSBWhlbGxvElsKE2NhcGFiaWxpdHlfc25hcHNob3QYAiABKAsyKC50ZXJtaW5hbHMu'
+    'Y29udHJvbC52MS5DYXBhYmlsaXR5U25hcHNob3RIAFISY2FwYWJpbGl0eVNuYXBzaG90ElIKEG'
+    'NhcGFiaWxpdHlfZGVsdGEYAyABKAsyJS50ZXJtaW5hbHMuY29udHJvbC52MS5DYXBhYmlsaXR5'
+    'RGVsdGFIAFIPY2FwYWJpbGl0eURlbHRhEkYKCHJlZ2lzdGVyGBQgASgLMiQudGVybWluYWxzLm'
+    'NvbnRyb2wudjEuUmVnaXN0ZXJEZXZpY2VCAhgBSABSCHJlZ2lzdGVyEkwKCmNhcGFiaWxpdHkY'
+    'FSABKAsyJi50ZXJtaW5hbHMuY29udHJvbC52MS5DYXBhYmlsaXR5VXBkYXRlQgIYAUgAUgpjYX'
+    'BhYmlsaXR5EjMKBWlucHV0GAQgASgLMhsudGVybWluYWxzLmlvLnYxLklucHV0RXZlbnRIAFIF'
+    'aW5wdXQSNQoGc2Vuc29yGAUgASgLMhsudGVybWluYWxzLmlvLnYxLlNlbnNvckRhdGFIAFIGc2'
+    'Vuc29yEkYKDHN0cmVhbV9yZWFkeRgGIAEoCzIhLnRlcm1pbmFscy5jb250cm9sLnYxLlN0cmVh'
+    'bVJlYWR5SABSC3N0cmVhbVJlYWR5EkAKB2NvbW1hbmQYByABKAsyJC50ZXJtaW5hbHMuY29udH'
+    'JvbC52MS5Db21tYW5kUmVxdWVzdEgAUgdjb21tYW5kEj8KCWhlYXJ0YmVhdBgIIAEoCzIfLnRl'
+    'cm1pbmFscy5jb250cm9sLnYxLkhlYXJ0YmVhdEgAUgloZWFydGJlYXQSSQoNd2VicnRjX3NpZ2'
+    '5hbBgJIAEoCzIiLnRlcm1pbmFscy5jb250cm9sLnYxLldlYlJUQ1NpZ25hbEgAUgx3ZWJydGNT'
+    'aWduYWwSQwoLdm9pY2VfYXVkaW8YCiABKAsyIC50ZXJtaW5hbHMuY29udHJvbC52MS5Wb2ljZU'
+    'F1ZGlvSABSCnZvaWNlQXVkaW8SVgoTb2JzZXJ2YXRpb25fbWVzc2FnZRgLIAEoCzIjLnRlcm1p'
+    'bmFscy5pby52MS5PYnNlcnZhdGlvbk1lc3NhZ2VIAFISb2JzZXJ2YXRpb25NZXNzYWdlElMKEm'
+    'FydGlmYWN0X2F2YWlsYWJsZRgMIAEoCzIiLnRlcm1pbmFscy5pby52MS5BcnRpZmFjdEF2YWls'
+    'YWJsZUgAUhFhcnRpZmFjdEF2YWlsYWJsZRI7CgpmbG93X3N0YXRzGA0gASgLMhoudGVybWluYW'
+    'xzLmlvLnYxLkZsb3dTdGF0c0gAUglmbG93U3RhdHMSQQoMY2xvY2tfc2FtcGxlGA4gASgLMhwu'
+    'dGVybWluYWxzLmlvLnYxLkNsb2NrU2FtcGxlSABSC2Nsb2NrU2FtcGxlEkQKCmJ1Z19yZXBvcn'
+    'QYDyABKAsyIy50ZXJtaW5hbHMuZGlhZ25vc3RpY3MudjEuQnVnUmVwb3J0SABSCWJ1Z1JlcG9y'
+    'dEIJCgdwYXlsb2Fk');
 
 @$core.Deprecated('Use voiceAudioDescriptor instead')
 const VoiceAudio$json = {
@@ -471,8 +505,26 @@ const ConnectResponse$json = {
   '1': 'ConnectResponse',
   '2': [
     {
-      '1': 'register_ack',
+      '1': 'hello_ack',
       '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.HelloAck',
+      '9': 0,
+      '10': 'helloAck'
+    },
+    {
+      '1': 'capability_ack',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.CapabilityAck',
+      '9': 0,
+      '10': 'capabilityAck'
+    },
+    {
+      '1': 'register_ack',
+      '3': 3,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.RegisterAck',
@@ -481,7 +533,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'set_ui',
-      '3': 2,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.terminals.ui.v1.SetUI',
@@ -490,7 +542,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'start_stream',
-      '3': 3,
+      '3': 5,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.StartStream',
@@ -499,7 +551,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'stop_stream',
-      '3': 4,
+      '3': 6,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.StopStream',
@@ -508,7 +560,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'play_audio',
-      '3': 5,
+      '3': 7,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.PlayAudio',
@@ -517,7 +569,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'show_media',
-      '3': 6,
+      '3': 8,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.ShowMedia',
@@ -526,7 +578,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'route_stream',
-      '3': 7,
+      '3': 9,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.RouteStream',
@@ -535,7 +587,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'notification',
-      '3': 8,
+      '3': 10,
       '4': 1,
       '5': 11,
       '6': '.terminals.ui.v1.Notification',
@@ -544,7 +596,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'webrtc_signal',
-      '3': 9,
+      '3': 11,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.WebRTCSignal',
@@ -553,7 +605,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'command_result',
-      '3': 10,
+      '3': 12,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.CommandResult',
@@ -562,7 +614,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'heartbeat',
-      '3': 11,
+      '3': 13,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.Heartbeat',
@@ -571,7 +623,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'error',
-      '3': 12,
+      '3': 14,
       '4': 1,
       '5': 11,
       '6': '.terminals.control.v1.ControlError',
@@ -580,7 +632,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'update_ui',
-      '3': 13,
+      '3': 15,
       '4': 1,
       '5': 11,
       '6': '.terminals.ui.v1.UpdateUI',
@@ -589,7 +641,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'transition_ui',
-      '3': 14,
+      '3': 16,
       '4': 1,
       '5': 11,
       '6': '.terminals.ui.v1.TransitionUI',
@@ -598,7 +650,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'install_bundle',
-      '3': 15,
+      '3': 17,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.InstallBundle',
@@ -607,7 +659,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'remove_bundle',
-      '3': 16,
+      '3': 18,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.RemoveBundle',
@@ -616,7 +668,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'start_flow',
-      '3': 17,
+      '3': 19,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.StartFlow',
@@ -625,7 +677,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'patch_flow',
-      '3': 18,
+      '3': 20,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.PatchFlow',
@@ -634,7 +686,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'stop_flow',
-      '3': 19,
+      '3': 21,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.StopFlow',
@@ -643,7 +695,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'request_artifact',
-      '3': 20,
+      '3': 22,
       '4': 1,
       '5': 11,
       '6': '.terminals.io.v1.RequestArtifact',
@@ -652,7 +704,7 @@ const ConnectResponse$json = {
     },
     {
       '1': 'bug_report_ack',
-      '3': 21,
+      '3': 23,
       '4': 1,
       '5': 11,
       '6': '.terminals.diagnostics.v1.BugReportAck',
@@ -667,32 +719,150 @@ const ConnectResponse$json = {
 
 /// Descriptor for `ConnectResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List connectResponseDescriptor = $convert.base64Decode(
-    'Cg9Db25uZWN0UmVzcG9uc2USRgoMcmVnaXN0ZXJfYWNrGAEgASgLMiEudGVybWluYWxzLmNvbn'
-    'Ryb2wudjEuUmVnaXN0ZXJBY2tIAFILcmVnaXN0ZXJBY2sSLwoGc2V0X3VpGAIgASgLMhYudGVy'
-    'bWluYWxzLnVpLnYxLlNldFVJSABSBXNldFVpEkEKDHN0YXJ0X3N0cmVhbRgDIAEoCzIcLnRlcm'
-    '1pbmFscy5pby52MS5TdGFydFN0cmVhbUgAUgtzdGFydFN0cmVhbRI+CgtzdG9wX3N0cmVhbRgE'
-    'IAEoCzIbLnRlcm1pbmFscy5pby52MS5TdG9wU3RyZWFtSABSCnN0b3BTdHJlYW0SOwoKcGxheV'
-    '9hdWRpbxgFIAEoCzIaLnRlcm1pbmFscy5pby52MS5QbGF5QXVkaW9IAFIJcGxheUF1ZGlvEjsK'
-    'CnNob3dfbWVkaWEYBiABKAsyGi50ZXJtaW5hbHMuaW8udjEuU2hvd01lZGlhSABSCXNob3dNZW'
-    'RpYRJBCgxyb3V0ZV9zdHJlYW0YByABKAsyHC50ZXJtaW5hbHMuaW8udjEuUm91dGVTdHJlYW1I'
-    'AFILcm91dGVTdHJlYW0SQwoMbm90aWZpY2F0aW9uGAggASgLMh0udGVybWluYWxzLnVpLnYxLk'
-    '5vdGlmaWNhdGlvbkgAUgxub3RpZmljYXRpb24SSQoNd2VicnRjX3NpZ25hbBgJIAEoCzIiLnRl'
-    'cm1pbmFscy5jb250cm9sLnYxLldlYlJUQ1NpZ25hbEgAUgx3ZWJydGNTaWduYWwSTAoOY29tbW'
-    'FuZF9yZXN1bHQYCiABKAsyIy50ZXJtaW5hbHMuY29udHJvbC52MS5Db21tYW5kUmVzdWx0SABS'
-    'DWNvbW1hbmRSZXN1bHQSPwoJaGVhcnRiZWF0GAsgASgLMh8udGVybWluYWxzLmNvbnRyb2wudj'
-    'EuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdBI6CgVlcnJvchgMIAEoCzIiLnRlcm1pbmFscy5jb250'
-    'cm9sLnYxLkNvbnRyb2xFcnJvckgAUgVlcnJvchI4Cgl1cGRhdGVfdWkYDSABKAsyGS50ZXJtaW'
-    '5hbHMudWkudjEuVXBkYXRlVUlIAFIIdXBkYXRlVWkSRAoNdHJhbnNpdGlvbl91aRgOIAEoCzId'
-    'LnRlcm1pbmFscy51aS52MS5UcmFuc2l0aW9uVUlIAFIMdHJhbnNpdGlvblVpEkcKDmluc3RhbG'
-    'xfYnVuZGxlGA8gASgLMh4udGVybWluYWxzLmlvLnYxLkluc3RhbGxCdW5kbGVIAFINaW5zdGFs'
-    'bEJ1bmRsZRJECg1yZW1vdmVfYnVuZGxlGBAgASgLMh0udGVybWluYWxzLmlvLnYxLlJlbW92ZU'
-    'J1bmRsZUgAUgxyZW1vdmVCdW5kbGUSOwoKc3RhcnRfZmxvdxgRIAEoCzIaLnRlcm1pbmFscy5p'
-    'by52MS5TdGFydEZsb3dIAFIJc3RhcnRGbG93EjsKCnBhdGNoX2Zsb3cYEiABKAsyGi50ZXJtaW'
-    '5hbHMuaW8udjEuUGF0Y2hGbG93SABSCXBhdGNoRmxvdxI4CglzdG9wX2Zsb3cYEyABKAsyGS50'
-    'ZXJtaW5hbHMuaW8udjEuU3RvcEZsb3dIAFIIc3RvcEZsb3cSTQoQcmVxdWVzdF9hcnRpZmFjdB'
-    'gUIAEoCzIgLnRlcm1pbmFscy5pby52MS5SZXF1ZXN0QXJ0aWZhY3RIAFIPcmVxdWVzdEFydGlm'
-    'YWN0Ek4KDmJ1Z19yZXBvcnRfYWNrGBUgASgLMiYudGVybWluYWxzLmRpYWdub3N0aWNzLnYxLk'
-    'J1Z1JlcG9ydEFja0gAUgxidWdSZXBvcnRBY2tCCQoHcGF5bG9hZA==');
+    'Cg9Db25uZWN0UmVzcG9uc2USPQoJaGVsbG9fYWNrGAEgASgLMh4udGVybWluYWxzLmNvbnRyb2'
+    'wudjEuSGVsbG9BY2tIAFIIaGVsbG9BY2sSTAoOY2FwYWJpbGl0eV9hY2sYAiABKAsyIy50ZXJt'
+    'aW5hbHMuY29udHJvbC52MS5DYXBhYmlsaXR5QWNrSABSDWNhcGFiaWxpdHlBY2sSRgoMcmVnaX'
+    'N0ZXJfYWNrGAMgASgLMiEudGVybWluYWxzLmNvbnRyb2wudjEuUmVnaXN0ZXJBY2tIAFILcmVn'
+    'aXN0ZXJBY2sSLwoGc2V0X3VpGAQgASgLMhYudGVybWluYWxzLnVpLnYxLlNldFVJSABSBXNldF'
+    'VpEkEKDHN0YXJ0X3N0cmVhbRgFIAEoCzIcLnRlcm1pbmFscy5pby52MS5TdGFydFN0cmVhbUgA'
+    'UgtzdGFydFN0cmVhbRI+CgtzdG9wX3N0cmVhbRgGIAEoCzIbLnRlcm1pbmFscy5pby52MS5TdG'
+    '9wU3RyZWFtSABSCnN0b3BTdHJlYW0SOwoKcGxheV9hdWRpbxgHIAEoCzIaLnRlcm1pbmFscy5p'
+    'by52MS5QbGF5QXVkaW9IAFIJcGxheUF1ZGlvEjsKCnNob3dfbWVkaWEYCCABKAsyGi50ZXJtaW'
+    '5hbHMuaW8udjEuU2hvd01lZGlhSABSCXNob3dNZWRpYRJBCgxyb3V0ZV9zdHJlYW0YCSABKAsy'
+    'HC50ZXJtaW5hbHMuaW8udjEuUm91dGVTdHJlYW1IAFILcm91dGVTdHJlYW0SQwoMbm90aWZpY2'
+    'F0aW9uGAogASgLMh0udGVybWluYWxzLnVpLnYxLk5vdGlmaWNhdGlvbkgAUgxub3RpZmljYXRp'
+    'b24SSQoNd2VicnRjX3NpZ25hbBgLIAEoCzIiLnRlcm1pbmFscy5jb250cm9sLnYxLldlYlJUQ1'
+    'NpZ25hbEgAUgx3ZWJydGNTaWduYWwSTAoOY29tbWFuZF9yZXN1bHQYDCABKAsyIy50ZXJtaW5h'
+    'bHMuY29udHJvbC52MS5Db21tYW5kUmVzdWx0SABSDWNvbW1hbmRSZXN1bHQSPwoJaGVhcnRiZW'
+    'F0GA0gASgLMh8udGVybWluYWxzLmNvbnRyb2wudjEuSGVhcnRiZWF0SABSCWhlYXJ0YmVhdBI6'
+    'CgVlcnJvchgOIAEoCzIiLnRlcm1pbmFscy5jb250cm9sLnYxLkNvbnRyb2xFcnJvckgAUgVlcn'
+    'JvchI4Cgl1cGRhdGVfdWkYDyABKAsyGS50ZXJtaW5hbHMudWkudjEuVXBkYXRlVUlIAFIIdXBk'
+    'YXRlVWkSRAoNdHJhbnNpdGlvbl91aRgQIAEoCzIdLnRlcm1pbmFscy51aS52MS5UcmFuc2l0aW'
+    '9uVUlIAFIMdHJhbnNpdGlvblVpEkcKDmluc3RhbGxfYnVuZGxlGBEgASgLMh4udGVybWluYWxz'
+    'LmlvLnYxLkluc3RhbGxCdW5kbGVIAFINaW5zdGFsbEJ1bmRsZRJECg1yZW1vdmVfYnVuZGxlGB'
+    'IgASgLMh0udGVybWluYWxzLmlvLnYxLlJlbW92ZUJ1bmRsZUgAUgxyZW1vdmVCdW5kbGUSOwoK'
+    'c3RhcnRfZmxvdxgTIAEoCzIaLnRlcm1pbmFscy5pby52MS5TdGFydEZsb3dIAFIJc3RhcnRGbG'
+    '93EjsKCnBhdGNoX2Zsb3cYFCABKAsyGi50ZXJtaW5hbHMuaW8udjEuUGF0Y2hGbG93SABSCXBh'
+    'dGNoRmxvdxI4CglzdG9wX2Zsb3cYFSABKAsyGS50ZXJtaW5hbHMuaW8udjEuU3RvcEZsb3dIAF'
+    'IIc3RvcEZsb3cSTQoQcmVxdWVzdF9hcnRpZmFjdBgWIAEoCzIgLnRlcm1pbmFscy5pby52MS5S'
+    'ZXF1ZXN0QXJ0aWZhY3RIAFIPcmVxdWVzdEFydGlmYWN0Ek4KDmJ1Z19yZXBvcnRfYWNrGBcgAS'
+    'gLMiYudGVybWluYWxzLmRpYWdub3N0aWNzLnYxLkJ1Z1JlcG9ydEFja0gAUgxidWdSZXBvcnRB'
+    'Y2tCCQoHcGF5bG9hZA==');
+
+@$core.Deprecated('Use helloDescriptor instead')
+const Hello$json = {
+  '1': 'Hello',
+  '2': [
+    {'1': 'device_id', '3': 1, '4': 1, '5': 9, '10': 'deviceId'},
+    {
+      '1': 'identity',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.DeviceIdentity',
+      '10': 'identity'
+    },
+    {'1': 'client_version', '3': 3, '4': 1, '5': 9, '10': 'clientVersion'},
+  ],
+};
+
+/// Descriptor for `Hello`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List helloDescriptor = $convert.base64Decode(
+    'CgVIZWxsbxIbCglkZXZpY2VfaWQYASABKAlSCGRldmljZUlkEkUKCGlkZW50aXR5GAIgASgLMi'
+    'kudGVybWluYWxzLmNhcGFiaWxpdGllcy52MS5EZXZpY2VJZGVudGl0eVIIaWRlbnRpdHkSJQoO'
+    'Y2xpZW50X3ZlcnNpb24YAyABKAlSDWNsaWVudFZlcnNpb24=');
+
+@$core.Deprecated('Use helloAckDescriptor instead')
+const HelloAck$json = {
+  '1': 'HelloAck',
+  '2': [
+    {'1': 'server_id', '3': 1, '4': 1, '5': 9, '10': 'serverId'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 9, '10': 'sessionId'},
+    {
+      '1': 'heartbeat_interval_ms',
+      '3': 3,
+      '4': 1,
+      '5': 3,
+      '10': 'heartbeatIntervalMs'
+    },
+  ],
+};
+
+/// Descriptor for `HelloAck`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List helloAckDescriptor = $convert.base64Decode(
+    'CghIZWxsb0FjaxIbCglzZXJ2ZXJfaWQYASABKAlSCHNlcnZlcklkEh0KCnNlc3Npb25faWQYAi'
+    'ABKAlSCXNlc3Npb25JZBIyChVoZWFydGJlYXRfaW50ZXJ2YWxfbXMYAyABKANSE2hlYXJ0YmVh'
+    'dEludGVydmFsTXM=');
+
+@$core.Deprecated('Use capabilitySnapshotDescriptor instead')
+const CapabilitySnapshot$json = {
+  '1': 'CapabilitySnapshot',
+  '2': [
+    {'1': 'device_id', '3': 1, '4': 1, '5': 9, '10': 'deviceId'},
+    {'1': 'generation', '3': 2, '4': 1, '5': 4, '10': 'generation'},
+    {
+      '1': 'capabilities',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.DeviceCapabilities',
+      '10': 'capabilities'
+    },
+  ],
+};
+
+/// Descriptor for `CapabilitySnapshot`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List capabilitySnapshotDescriptor = $convert.base64Decode(
+    'ChJDYXBhYmlsaXR5U25hcHNob3QSGwoJZGV2aWNlX2lkGAEgASgJUghkZXZpY2VJZBIeCgpnZW'
+    '5lcmF0aW9uGAIgASgEUgpnZW5lcmF0aW9uElEKDGNhcGFiaWxpdGllcxgDIAEoCzItLnRlcm1p'
+    'bmFscy5jYXBhYmlsaXRpZXMudjEuRGV2aWNlQ2FwYWJpbGl0aWVzUgxjYXBhYmlsaXRpZXM=');
+
+@$core.Deprecated('Use capabilityDeltaDescriptor instead')
+const CapabilityDelta$json = {
+  '1': 'CapabilityDelta',
+  '2': [
+    {'1': 'device_id', '3': 1, '4': 1, '5': 9, '10': 'deviceId'},
+    {'1': 'generation', '3': 2, '4': 1, '5': 4, '10': 'generation'},
+    {
+      '1': 'capabilities',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.DeviceCapabilities',
+      '10': 'capabilities'
+    },
+    {'1': 'reason', '3': 4, '4': 1, '5': 9, '10': 'reason'},
+  ],
+};
+
+/// Descriptor for `CapabilityDelta`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List capabilityDeltaDescriptor = $convert.base64Decode(
+    'Cg9DYXBhYmlsaXR5RGVsdGESGwoJZGV2aWNlX2lkGAEgASgJUghkZXZpY2VJZBIeCgpnZW5lcm'
+    'F0aW9uGAIgASgEUgpnZW5lcmF0aW9uElEKDGNhcGFiaWxpdGllcxgDIAEoCzItLnRlcm1pbmFs'
+    'cy5jYXBhYmlsaXRpZXMudjEuRGV2aWNlQ2FwYWJpbGl0aWVzUgxjYXBhYmlsaXRpZXMSFgoGcm'
+    'Vhc29uGAQgASgJUgZyZWFzb24=');
+
+@$core.Deprecated('Use capabilityAckDescriptor instead')
+const CapabilityAck$json = {
+  '1': 'CapabilityAck',
+  '2': [
+    {'1': 'device_id', '3': 1, '4': 1, '5': 9, '10': 'deviceId'},
+    {
+      '1': 'accepted_generation',
+      '3': 2,
+      '4': 1,
+      '5': 4,
+      '10': 'acceptedGeneration'
+    },
+    {'1': 'snapshot_applied', '3': 3, '4': 1, '5': 8, '10': 'snapshotApplied'},
+  ],
+};
+
+/// Descriptor for `CapabilityAck`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List capabilityAckDescriptor = $convert.base64Decode(
+    'Cg1DYXBhYmlsaXR5QWNrEhsKCWRldmljZV9pZBgBIAEoCVIIZGV2aWNlSWQSLwoTYWNjZXB0ZW'
+    'RfZ2VuZXJhdGlvbhgCIAEoBFISYWNjZXB0ZWRHZW5lcmF0aW9uEikKEHNuYXBzaG90X2FwcGxp'
+    'ZWQYAyABKAhSD3NuYXBzaG90QXBwbGllZA==');
 
 @$core.Deprecated('Use registerDeviceDescriptor instead')
 const RegisterDevice$json = {
@@ -943,9 +1113,10 @@ const $core.Map<$core.String, $core.dynamic> TerminalControlServiceBase$json = {
 const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
     TerminalControlServiceBase$messageJson = {
   '.terminals.control.v1.ConnectRequest': ConnectRequest$json,
-  '.terminals.control.v1.RegisterDevice': RegisterDevice$json,
-  '.terminals.capabilities.v1.DeviceCapabilities': $3.DeviceCapabilities$json,
+  '.terminals.control.v1.Hello': Hello$json,
   '.terminals.capabilities.v1.DeviceIdentity': $3.DeviceIdentity$json,
+  '.terminals.control.v1.CapabilitySnapshot': CapabilitySnapshot$json,
+  '.terminals.capabilities.v1.DeviceCapabilities': $3.DeviceCapabilities$json,
   '.terminals.capabilities.v1.ScreenCapability': $3.ScreenCapability$json,
   '.terminals.capabilities.v1.KeyboardCapability': $3.KeyboardCapability$json,
   '.terminals.capabilities.v1.PointerCapability': $3.PointerCapability$json,
@@ -969,7 +1140,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       $3.EdgeTimingCapability$json,
   '.terminals.capabilities.v1.EdgeGeometryCapability':
       $3.EdgeGeometryCapability$json,
-  '.terminals.control.v1.CapabilityUpdate': CapabilityUpdate$json,
+  '.terminals.control.v1.CapabilityDelta': CapabilityDelta$json,
   '.terminals.io.v1.InputEvent': $0.InputEvent$json,
   '.terminals.io.v1.KeyEvent': $0.KeyEvent$json,
   '.terminals.io.v1.PointerEvent': $0.PointerEvent$json,
@@ -1040,7 +1211,11 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.diagnostics.v1.ErrorCapture': $1.ErrorCapture$json,
   '.terminals.diagnostics.v1.BugReport.SourceHintsEntry':
       $1.BugReport_SourceHintsEntry$json,
+  '.terminals.control.v1.RegisterDevice': RegisterDevice$json,
+  '.terminals.control.v1.CapabilityUpdate': CapabilityUpdate$json,
   '.terminals.control.v1.ConnectResponse': ConnectResponse$json,
+  '.terminals.control.v1.HelloAck': HelloAck$json,
+  '.terminals.control.v1.CapabilityAck': CapabilityAck$json,
   '.terminals.control.v1.RegisterAck': RegisterAck$json,
   '.terminals.control.v1.RegisterAck.MetadataEntry':
       RegisterAck_MetadataEntry$json,

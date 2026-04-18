@@ -567,8 +567,9 @@ class WireEnvelope extends $pb.GeneratedMessage {
 }
 
 enum ConnectRequest_Payload {
-  register,
-  capability,
+  hello,
+  capabilitySnapshot,
+  capabilityDelta,
   input,
   sensor,
   streamReady,
@@ -581,13 +582,16 @@ enum ConnectRequest_Payload {
   flowStats,
   clockSample,
   bugReport,
+  register,
+  capability,
   notSet
 }
 
 class ConnectRequest extends $pb.GeneratedMessage {
   factory ConnectRequest({
-    RegisterDevice? register,
-    CapabilityUpdate? capability,
+    Hello? hello,
+    CapabilitySnapshot? capabilitySnapshot,
+    CapabilityDelta? capabilityDelta,
     $0.InputEvent? input,
     $0.SensorData? sensor,
     StreamReady? streamReady,
@@ -600,10 +604,14 @@ class ConnectRequest extends $pb.GeneratedMessage {
     $0.FlowStats? flowStats,
     $0.ClockSample? clockSample,
     $1.BugReport? bugReport,
+    @$core.Deprecated('This field is deprecated.') RegisterDevice? register,
+    @$core.Deprecated('This field is deprecated.') CapabilityUpdate? capability,
   }) {
     final result = create();
-    if (register != null) result.register = register;
-    if (capability != null) result.capability = capability;
+    if (hello != null) result.hello = hello;
+    if (capabilitySnapshot != null)
+      result.capabilitySnapshot = capabilitySnapshot;
+    if (capabilityDelta != null) result.capabilityDelta = capabilityDelta;
     if (input != null) result.input = input;
     if (sensor != null) result.sensor = sensor;
     if (streamReady != null) result.streamReady = streamReady;
@@ -617,6 +625,8 @@ class ConnectRequest extends $pb.GeneratedMessage {
     if (flowStats != null) result.flowStats = flowStats;
     if (clockSample != null) result.clockSample = clockSample;
     if (bugReport != null) result.bugReport = bugReport;
+    if (register != null) result.register = register;
+    if (capability != null) result.capability = capability;
     return result;
   }
 
@@ -631,20 +641,23 @@ class ConnectRequest extends $pb.GeneratedMessage {
 
   static const $core.Map<$core.int, ConnectRequest_Payload>
       _ConnectRequest_PayloadByTag = {
-    1: ConnectRequest_Payload.register,
-    2: ConnectRequest_Payload.capability,
-    3: ConnectRequest_Payload.input,
-    4: ConnectRequest_Payload.sensor,
-    5: ConnectRequest_Payload.streamReady,
-    6: ConnectRequest_Payload.command,
-    7: ConnectRequest_Payload.heartbeat,
-    8: ConnectRequest_Payload.webrtcSignal,
-    9: ConnectRequest_Payload.voiceAudio,
-    10: ConnectRequest_Payload.observationMessage,
-    11: ConnectRequest_Payload.artifactAvailable,
-    12: ConnectRequest_Payload.flowStats,
-    13: ConnectRequest_Payload.clockSample,
-    14: ConnectRequest_Payload.bugReport,
+    1: ConnectRequest_Payload.hello,
+    2: ConnectRequest_Payload.capabilitySnapshot,
+    3: ConnectRequest_Payload.capabilityDelta,
+    4: ConnectRequest_Payload.input,
+    5: ConnectRequest_Payload.sensor,
+    6: ConnectRequest_Payload.streamReady,
+    7: ConnectRequest_Payload.command,
+    8: ConnectRequest_Payload.heartbeat,
+    9: ConnectRequest_Payload.webrtcSignal,
+    10: ConnectRequest_Payload.voiceAudio,
+    11: ConnectRequest_Payload.observationMessage,
+    12: ConnectRequest_Payload.artifactAvailable,
+    13: ConnectRequest_Payload.flowStats,
+    14: ConnectRequest_Payload.clockSample,
+    15: ConnectRequest_Payload.bugReport,
+    20: ConnectRequest_Payload.register,
+    21: ConnectRequest_Payload.capability,
     0: ConnectRequest_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -652,36 +665,41 @@ class ConnectRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'terminals.control.v1'),
       createEmptyInstance: create)
-    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
-    ..aOM<RegisterDevice>(1, _omitFieldNames ? '' : 'register',
-        subBuilder: RegisterDevice.create)
-    ..aOM<CapabilityUpdate>(2, _omitFieldNames ? '' : 'capability',
-        subBuilder: CapabilityUpdate.create)
-    ..aOM<$0.InputEvent>(3, _omitFieldNames ? '' : 'input',
+    ..oo(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 21])
+    ..aOM<Hello>(1, _omitFieldNames ? '' : 'hello', subBuilder: Hello.create)
+    ..aOM<CapabilitySnapshot>(2, _omitFieldNames ? '' : 'capabilitySnapshot',
+        subBuilder: CapabilitySnapshot.create)
+    ..aOM<CapabilityDelta>(3, _omitFieldNames ? '' : 'capabilityDelta',
+        subBuilder: CapabilityDelta.create)
+    ..aOM<$0.InputEvent>(4, _omitFieldNames ? '' : 'input',
         subBuilder: $0.InputEvent.create)
-    ..aOM<$0.SensorData>(4, _omitFieldNames ? '' : 'sensor',
+    ..aOM<$0.SensorData>(5, _omitFieldNames ? '' : 'sensor',
         subBuilder: $0.SensorData.create)
-    ..aOM<StreamReady>(5, _omitFieldNames ? '' : 'streamReady',
+    ..aOM<StreamReady>(6, _omitFieldNames ? '' : 'streamReady',
         subBuilder: StreamReady.create)
-    ..aOM<CommandRequest>(6, _omitFieldNames ? '' : 'command',
+    ..aOM<CommandRequest>(7, _omitFieldNames ? '' : 'command',
         subBuilder: CommandRequest.create)
-    ..aOM<Heartbeat>(7, _omitFieldNames ? '' : 'heartbeat',
+    ..aOM<Heartbeat>(8, _omitFieldNames ? '' : 'heartbeat',
         subBuilder: Heartbeat.create)
-    ..aOM<WebRTCSignal>(8, _omitFieldNames ? '' : 'webrtcSignal',
+    ..aOM<WebRTCSignal>(9, _omitFieldNames ? '' : 'webrtcSignal',
         subBuilder: WebRTCSignal.create)
-    ..aOM<VoiceAudio>(9, _omitFieldNames ? '' : 'voiceAudio',
+    ..aOM<VoiceAudio>(10, _omitFieldNames ? '' : 'voiceAudio',
         subBuilder: VoiceAudio.create)
     ..aOM<$0.ObservationMessage>(
-        10, _omitFieldNames ? '' : 'observationMessage',
+        11, _omitFieldNames ? '' : 'observationMessage',
         subBuilder: $0.ObservationMessage.create)
-    ..aOM<$0.ArtifactAvailable>(11, _omitFieldNames ? '' : 'artifactAvailable',
+    ..aOM<$0.ArtifactAvailable>(12, _omitFieldNames ? '' : 'artifactAvailable',
         subBuilder: $0.ArtifactAvailable.create)
-    ..aOM<$0.FlowStats>(12, _omitFieldNames ? '' : 'flowStats',
+    ..aOM<$0.FlowStats>(13, _omitFieldNames ? '' : 'flowStats',
         subBuilder: $0.FlowStats.create)
-    ..aOM<$0.ClockSample>(13, _omitFieldNames ? '' : 'clockSample',
+    ..aOM<$0.ClockSample>(14, _omitFieldNames ? '' : 'clockSample',
         subBuilder: $0.ClockSample.create)
-    ..aOM<$1.BugReport>(14, _omitFieldNames ? '' : 'bugReport',
+    ..aOM<$1.BugReport>(15, _omitFieldNames ? '' : 'bugReport',
         subBuilder: $1.BugReport.create)
+    ..aOM<RegisterDevice>(20, _omitFieldNames ? '' : 'register',
+        subBuilder: RegisterDevice.create)
+    ..aOM<CapabilityUpdate>(21, _omitFieldNames ? '' : 'capability',
+        subBuilder: CapabilityUpdate.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -717,6 +735,9 @@ class ConnectRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   ConnectRequest_Payload whichPayload() =>
       _ConnectRequest_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
@@ -733,161 +754,209 @@ class ConnectRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
-  RegisterDevice get register => $_getN(0);
+  Hello get hello => $_getN(0);
   @$pb.TagNumber(1)
-  set register(RegisterDevice value) => $_setField(1, value);
+  set hello(Hello value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasRegister() => $_has(0);
+  $core.bool hasHello() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRegister() => $_clearField(1);
+  void clearHello() => $_clearField(1);
   @$pb.TagNumber(1)
-  RegisterDevice ensureRegister() => $_ensure(0);
+  Hello ensureHello() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  CapabilityUpdate get capability => $_getN(1);
+  CapabilitySnapshot get capabilitySnapshot => $_getN(1);
   @$pb.TagNumber(2)
-  set capability(CapabilityUpdate value) => $_setField(2, value);
+  set capabilitySnapshot(CapabilitySnapshot value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasCapability() => $_has(1);
+  $core.bool hasCapabilitySnapshot() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCapability() => $_clearField(2);
+  void clearCapabilitySnapshot() => $_clearField(2);
   @$pb.TagNumber(2)
-  CapabilityUpdate ensureCapability() => $_ensure(1);
+  CapabilitySnapshot ensureCapabilitySnapshot() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  $0.InputEvent get input => $_getN(2);
+  CapabilityDelta get capabilityDelta => $_getN(2);
   @$pb.TagNumber(3)
-  set input($0.InputEvent value) => $_setField(3, value);
+  set capabilityDelta(CapabilityDelta value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasInput() => $_has(2);
+  $core.bool hasCapabilityDelta() => $_has(2);
   @$pb.TagNumber(3)
-  void clearInput() => $_clearField(3);
+  void clearCapabilityDelta() => $_clearField(3);
   @$pb.TagNumber(3)
-  $0.InputEvent ensureInput() => $_ensure(2);
+  CapabilityDelta ensureCapabilityDelta() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  $0.SensorData get sensor => $_getN(3);
+  $0.InputEvent get input => $_getN(3);
   @$pb.TagNumber(4)
-  set sensor($0.SensorData value) => $_setField(4, value);
+  set input($0.InputEvent value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasSensor() => $_has(3);
+  $core.bool hasInput() => $_has(3);
   @$pb.TagNumber(4)
-  void clearSensor() => $_clearField(4);
+  void clearInput() => $_clearField(4);
   @$pb.TagNumber(4)
-  $0.SensorData ensureSensor() => $_ensure(3);
+  $0.InputEvent ensureInput() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  StreamReady get streamReady => $_getN(4);
+  $0.SensorData get sensor => $_getN(4);
   @$pb.TagNumber(5)
-  set streamReady(StreamReady value) => $_setField(5, value);
+  set sensor($0.SensorData value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasStreamReady() => $_has(4);
+  $core.bool hasSensor() => $_has(4);
   @$pb.TagNumber(5)
-  void clearStreamReady() => $_clearField(5);
+  void clearSensor() => $_clearField(5);
   @$pb.TagNumber(5)
-  StreamReady ensureStreamReady() => $_ensure(4);
+  $0.SensorData ensureSensor() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  CommandRequest get command => $_getN(5);
+  StreamReady get streamReady => $_getN(5);
   @$pb.TagNumber(6)
-  set command(CommandRequest value) => $_setField(6, value);
+  set streamReady(StreamReady value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasCommand() => $_has(5);
+  $core.bool hasStreamReady() => $_has(5);
   @$pb.TagNumber(6)
-  void clearCommand() => $_clearField(6);
+  void clearStreamReady() => $_clearField(6);
   @$pb.TagNumber(6)
-  CommandRequest ensureCommand() => $_ensure(5);
+  StreamReady ensureStreamReady() => $_ensure(5);
 
   @$pb.TagNumber(7)
-  Heartbeat get heartbeat => $_getN(6);
+  CommandRequest get command => $_getN(6);
   @$pb.TagNumber(7)
-  set heartbeat(Heartbeat value) => $_setField(7, value);
+  set command(CommandRequest value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasHeartbeat() => $_has(6);
+  $core.bool hasCommand() => $_has(6);
   @$pb.TagNumber(7)
-  void clearHeartbeat() => $_clearField(7);
+  void clearCommand() => $_clearField(7);
   @$pb.TagNumber(7)
-  Heartbeat ensureHeartbeat() => $_ensure(6);
+  CommandRequest ensureCommand() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  WebRTCSignal get webrtcSignal => $_getN(7);
+  Heartbeat get heartbeat => $_getN(7);
   @$pb.TagNumber(8)
-  set webrtcSignal(WebRTCSignal value) => $_setField(8, value);
+  set heartbeat(Heartbeat value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasWebrtcSignal() => $_has(7);
+  $core.bool hasHeartbeat() => $_has(7);
   @$pb.TagNumber(8)
-  void clearWebrtcSignal() => $_clearField(8);
+  void clearHeartbeat() => $_clearField(8);
   @$pb.TagNumber(8)
-  WebRTCSignal ensureWebrtcSignal() => $_ensure(7);
+  Heartbeat ensureHeartbeat() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  VoiceAudio get voiceAudio => $_getN(8);
+  WebRTCSignal get webrtcSignal => $_getN(8);
   @$pb.TagNumber(9)
-  set voiceAudio(VoiceAudio value) => $_setField(9, value);
+  set webrtcSignal(WebRTCSignal value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasVoiceAudio() => $_has(8);
+  $core.bool hasWebrtcSignal() => $_has(8);
   @$pb.TagNumber(9)
-  void clearVoiceAudio() => $_clearField(9);
+  void clearWebrtcSignal() => $_clearField(9);
   @$pb.TagNumber(9)
-  VoiceAudio ensureVoiceAudio() => $_ensure(8);
+  WebRTCSignal ensureWebrtcSignal() => $_ensure(8);
 
   @$pb.TagNumber(10)
-  $0.ObservationMessage get observationMessage => $_getN(9);
+  VoiceAudio get voiceAudio => $_getN(9);
   @$pb.TagNumber(10)
-  set observationMessage($0.ObservationMessage value) => $_setField(10, value);
+  set voiceAudio(VoiceAudio value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasObservationMessage() => $_has(9);
+  $core.bool hasVoiceAudio() => $_has(9);
   @$pb.TagNumber(10)
-  void clearObservationMessage() => $_clearField(10);
+  void clearVoiceAudio() => $_clearField(10);
   @$pb.TagNumber(10)
-  $0.ObservationMessage ensureObservationMessage() => $_ensure(9);
+  VoiceAudio ensureVoiceAudio() => $_ensure(9);
 
   @$pb.TagNumber(11)
-  $0.ArtifactAvailable get artifactAvailable => $_getN(10);
+  $0.ObservationMessage get observationMessage => $_getN(10);
   @$pb.TagNumber(11)
-  set artifactAvailable($0.ArtifactAvailable value) => $_setField(11, value);
+  set observationMessage($0.ObservationMessage value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasArtifactAvailable() => $_has(10);
+  $core.bool hasObservationMessage() => $_has(10);
   @$pb.TagNumber(11)
-  void clearArtifactAvailable() => $_clearField(11);
+  void clearObservationMessage() => $_clearField(11);
   @$pb.TagNumber(11)
-  $0.ArtifactAvailable ensureArtifactAvailable() => $_ensure(10);
+  $0.ObservationMessage ensureObservationMessage() => $_ensure(10);
 
   @$pb.TagNumber(12)
-  $0.FlowStats get flowStats => $_getN(11);
+  $0.ArtifactAvailable get artifactAvailable => $_getN(11);
   @$pb.TagNumber(12)
-  set flowStats($0.FlowStats value) => $_setField(12, value);
+  set artifactAvailable($0.ArtifactAvailable value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasFlowStats() => $_has(11);
+  $core.bool hasArtifactAvailable() => $_has(11);
   @$pb.TagNumber(12)
-  void clearFlowStats() => $_clearField(12);
+  void clearArtifactAvailable() => $_clearField(12);
   @$pb.TagNumber(12)
-  $0.FlowStats ensureFlowStats() => $_ensure(11);
+  $0.ArtifactAvailable ensureArtifactAvailable() => $_ensure(11);
 
   @$pb.TagNumber(13)
-  $0.ClockSample get clockSample => $_getN(12);
+  $0.FlowStats get flowStats => $_getN(12);
   @$pb.TagNumber(13)
-  set clockSample($0.ClockSample value) => $_setField(13, value);
+  set flowStats($0.FlowStats value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasClockSample() => $_has(12);
+  $core.bool hasFlowStats() => $_has(12);
   @$pb.TagNumber(13)
-  void clearClockSample() => $_clearField(13);
+  void clearFlowStats() => $_clearField(13);
   @$pb.TagNumber(13)
-  $0.ClockSample ensureClockSample() => $_ensure(12);
+  $0.FlowStats ensureFlowStats() => $_ensure(12);
 
   @$pb.TagNumber(14)
-  $1.BugReport get bugReport => $_getN(13);
+  $0.ClockSample get clockSample => $_getN(13);
   @$pb.TagNumber(14)
-  set bugReport($1.BugReport value) => $_setField(14, value);
+  set clockSample($0.ClockSample value) => $_setField(14, value);
   @$pb.TagNumber(14)
-  $core.bool hasBugReport() => $_has(13);
+  $core.bool hasClockSample() => $_has(13);
   @$pb.TagNumber(14)
-  void clearBugReport() => $_clearField(14);
+  void clearClockSample() => $_clearField(14);
   @$pb.TagNumber(14)
-  $1.BugReport ensureBugReport() => $_ensure(13);
+  $0.ClockSample ensureClockSample() => $_ensure(13);
+
+  @$pb.TagNumber(15)
+  $1.BugReport get bugReport => $_getN(14);
+  @$pb.TagNumber(15)
+  set bugReport($1.BugReport value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasBugReport() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearBugReport() => $_clearField(15);
+  @$pb.TagNumber(15)
+  $1.BugReport ensureBugReport() => $_ensure(14);
+
+  /// Deprecated: use hello + capability_snapshot.
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(20)
+  RegisterDevice get register => $_getN(15);
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(20)
+  set register(RegisterDevice value) => $_setField(20, value);
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(20)
+  $core.bool hasRegister() => $_has(15);
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(20)
+  void clearRegister() => $_clearField(20);
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(20)
+  RegisterDevice ensureRegister() => $_ensure(15);
+
+  /// Deprecated: use capability_delta.
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(21)
+  CapabilityUpdate get capability => $_getN(16);
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(21)
+  set capability(CapabilityUpdate value) => $_setField(21, value);
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(21)
+  $core.bool hasCapability() => $_has(16);
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(21)
+  void clearCapability() => $_clearField(21);
+  @$core.Deprecated('This field is deprecated.')
+  @$pb.TagNumber(21)
+  CapabilityUpdate ensureCapability() => $_ensure(16);
 }
 
 class VoiceAudio extends $pb.GeneratedMessage {
@@ -982,6 +1051,8 @@ class VoiceAudio extends $pb.GeneratedMessage {
 }
 
 enum ConnectResponse_Payload {
+  helloAck,
+  capabilityAck,
   registerAck,
   setUi,
   startStream,
@@ -1008,6 +1079,8 @@ enum ConnectResponse_Payload {
 
 class ConnectResponse extends $pb.GeneratedMessage {
   factory ConnectResponse({
+    HelloAck? helloAck,
+    CapabilityAck? capabilityAck,
     RegisterAck? registerAck,
     $2.SetUI? setUi,
     $0.StartStream? startStream,
@@ -1031,6 +1104,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
     $1.BugReportAck? bugReportAck,
   }) {
     final result = create();
+    if (helloAck != null) result.helloAck = helloAck;
+    if (capabilityAck != null) result.capabilityAck = capabilityAck;
     if (registerAck != null) result.registerAck = registerAck;
     if (setUi != null) result.setUi = setUi;
     if (startStream != null) result.startStream = startStream;
@@ -1066,27 +1141,29 @@ class ConnectResponse extends $pb.GeneratedMessage {
 
   static const $core.Map<$core.int, ConnectResponse_Payload>
       _ConnectResponse_PayloadByTag = {
-    1: ConnectResponse_Payload.registerAck,
-    2: ConnectResponse_Payload.setUi,
-    3: ConnectResponse_Payload.startStream,
-    4: ConnectResponse_Payload.stopStream,
-    5: ConnectResponse_Payload.playAudio,
-    6: ConnectResponse_Payload.showMedia,
-    7: ConnectResponse_Payload.routeStream,
-    8: ConnectResponse_Payload.notification,
-    9: ConnectResponse_Payload.webrtcSignal,
-    10: ConnectResponse_Payload.commandResult,
-    11: ConnectResponse_Payload.heartbeat,
-    12: ConnectResponse_Payload.error,
-    13: ConnectResponse_Payload.updateUi,
-    14: ConnectResponse_Payload.transitionUi,
-    15: ConnectResponse_Payload.installBundle,
-    16: ConnectResponse_Payload.removeBundle,
-    17: ConnectResponse_Payload.startFlow,
-    18: ConnectResponse_Payload.patchFlow,
-    19: ConnectResponse_Payload.stopFlow,
-    20: ConnectResponse_Payload.requestArtifact,
-    21: ConnectResponse_Payload.bugReportAck,
+    1: ConnectResponse_Payload.helloAck,
+    2: ConnectResponse_Payload.capabilityAck,
+    3: ConnectResponse_Payload.registerAck,
+    4: ConnectResponse_Payload.setUi,
+    5: ConnectResponse_Payload.startStream,
+    6: ConnectResponse_Payload.stopStream,
+    7: ConnectResponse_Payload.playAudio,
+    8: ConnectResponse_Payload.showMedia,
+    9: ConnectResponse_Payload.routeStream,
+    10: ConnectResponse_Payload.notification,
+    11: ConnectResponse_Payload.webrtcSignal,
+    12: ConnectResponse_Payload.commandResult,
+    13: ConnectResponse_Payload.heartbeat,
+    14: ConnectResponse_Payload.error,
+    15: ConnectResponse_Payload.updateUi,
+    16: ConnectResponse_Payload.transitionUi,
+    17: ConnectResponse_Payload.installBundle,
+    18: ConnectResponse_Payload.removeBundle,
+    19: ConnectResponse_Payload.startFlow,
+    20: ConnectResponse_Payload.patchFlow,
+    21: ConnectResponse_Payload.stopFlow,
+    22: ConnectResponse_Payload.requestArtifact,
+    23: ConnectResponse_Payload.bugReportAck,
     0: ConnectResponse_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -1115,49 +1192,55 @@ class ConnectResponse extends $pb.GeneratedMessage {
       18,
       19,
       20,
-      21
+      21,
+      22,
+      23
     ])
-    ..aOM<RegisterAck>(1, _omitFieldNames ? '' : 'registerAck',
+    ..aOM<HelloAck>(1, _omitFieldNames ? '' : 'helloAck',
+        subBuilder: HelloAck.create)
+    ..aOM<CapabilityAck>(2, _omitFieldNames ? '' : 'capabilityAck',
+        subBuilder: CapabilityAck.create)
+    ..aOM<RegisterAck>(3, _omitFieldNames ? '' : 'registerAck',
         subBuilder: RegisterAck.create)
-    ..aOM<$2.SetUI>(2, _omitFieldNames ? '' : 'setUi',
+    ..aOM<$2.SetUI>(4, _omitFieldNames ? '' : 'setUi',
         subBuilder: $2.SetUI.create)
-    ..aOM<$0.StartStream>(3, _omitFieldNames ? '' : 'startStream',
+    ..aOM<$0.StartStream>(5, _omitFieldNames ? '' : 'startStream',
         subBuilder: $0.StartStream.create)
-    ..aOM<$0.StopStream>(4, _omitFieldNames ? '' : 'stopStream',
+    ..aOM<$0.StopStream>(6, _omitFieldNames ? '' : 'stopStream',
         subBuilder: $0.StopStream.create)
-    ..aOM<$0.PlayAudio>(5, _omitFieldNames ? '' : 'playAudio',
+    ..aOM<$0.PlayAudio>(7, _omitFieldNames ? '' : 'playAudio',
         subBuilder: $0.PlayAudio.create)
-    ..aOM<$0.ShowMedia>(6, _omitFieldNames ? '' : 'showMedia',
+    ..aOM<$0.ShowMedia>(8, _omitFieldNames ? '' : 'showMedia',
         subBuilder: $0.ShowMedia.create)
-    ..aOM<$0.RouteStream>(7, _omitFieldNames ? '' : 'routeStream',
+    ..aOM<$0.RouteStream>(9, _omitFieldNames ? '' : 'routeStream',
         subBuilder: $0.RouteStream.create)
-    ..aOM<$2.Notification>(8, _omitFieldNames ? '' : 'notification',
+    ..aOM<$2.Notification>(10, _omitFieldNames ? '' : 'notification',
         subBuilder: $2.Notification.create)
-    ..aOM<WebRTCSignal>(9, _omitFieldNames ? '' : 'webrtcSignal',
+    ..aOM<WebRTCSignal>(11, _omitFieldNames ? '' : 'webrtcSignal',
         subBuilder: WebRTCSignal.create)
-    ..aOM<CommandResult>(10, _omitFieldNames ? '' : 'commandResult',
+    ..aOM<CommandResult>(12, _omitFieldNames ? '' : 'commandResult',
         subBuilder: CommandResult.create)
-    ..aOM<Heartbeat>(11, _omitFieldNames ? '' : 'heartbeat',
+    ..aOM<Heartbeat>(13, _omitFieldNames ? '' : 'heartbeat',
         subBuilder: Heartbeat.create)
-    ..aOM<ControlError>(12, _omitFieldNames ? '' : 'error',
+    ..aOM<ControlError>(14, _omitFieldNames ? '' : 'error',
         subBuilder: ControlError.create)
-    ..aOM<$2.UpdateUI>(13, _omitFieldNames ? '' : 'updateUi',
+    ..aOM<$2.UpdateUI>(15, _omitFieldNames ? '' : 'updateUi',
         subBuilder: $2.UpdateUI.create)
-    ..aOM<$2.TransitionUI>(14, _omitFieldNames ? '' : 'transitionUi',
+    ..aOM<$2.TransitionUI>(16, _omitFieldNames ? '' : 'transitionUi',
         subBuilder: $2.TransitionUI.create)
-    ..aOM<$0.InstallBundle>(15, _omitFieldNames ? '' : 'installBundle',
+    ..aOM<$0.InstallBundle>(17, _omitFieldNames ? '' : 'installBundle',
         subBuilder: $0.InstallBundle.create)
-    ..aOM<$0.RemoveBundle>(16, _omitFieldNames ? '' : 'removeBundle',
+    ..aOM<$0.RemoveBundle>(18, _omitFieldNames ? '' : 'removeBundle',
         subBuilder: $0.RemoveBundle.create)
-    ..aOM<$0.StartFlow>(17, _omitFieldNames ? '' : 'startFlow',
+    ..aOM<$0.StartFlow>(19, _omitFieldNames ? '' : 'startFlow',
         subBuilder: $0.StartFlow.create)
-    ..aOM<$0.PatchFlow>(18, _omitFieldNames ? '' : 'patchFlow',
+    ..aOM<$0.PatchFlow>(20, _omitFieldNames ? '' : 'patchFlow',
         subBuilder: $0.PatchFlow.create)
-    ..aOM<$0.StopFlow>(19, _omitFieldNames ? '' : 'stopFlow',
+    ..aOM<$0.StopFlow>(21, _omitFieldNames ? '' : 'stopFlow',
         subBuilder: $0.StopFlow.create)
-    ..aOM<$0.RequestArtifact>(20, _omitFieldNames ? '' : 'requestArtifact',
+    ..aOM<$0.RequestArtifact>(22, _omitFieldNames ? '' : 'requestArtifact',
         subBuilder: $0.RequestArtifact.create)
-    ..aOM<$1.BugReportAck>(21, _omitFieldNames ? '' : 'bugReportAck',
+    ..aOM<$1.BugReportAck>(23, _omitFieldNames ? '' : 'bugReportAck',
         subBuilder: $1.BugReportAck.create)
     ..hasRequiredFields = false;
 
@@ -1201,6 +1284,8 @@ class ConnectResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
   @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
   ConnectResponse_Payload whichPayload() =>
       _ConnectResponse_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
@@ -1224,238 +1309,684 @@ class ConnectResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
   @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
-  RegisterAck get registerAck => $_getN(0);
+  HelloAck get helloAck => $_getN(0);
   @$pb.TagNumber(1)
-  set registerAck(RegisterAck value) => $_setField(1, value);
+  set helloAck(HelloAck value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasRegisterAck() => $_has(0);
+  $core.bool hasHelloAck() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRegisterAck() => $_clearField(1);
+  void clearHelloAck() => $_clearField(1);
   @$pb.TagNumber(1)
-  RegisterAck ensureRegisterAck() => $_ensure(0);
+  HelloAck ensureHelloAck() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  $2.SetUI get setUi => $_getN(1);
+  CapabilityAck get capabilityAck => $_getN(1);
   @$pb.TagNumber(2)
-  set setUi($2.SetUI value) => $_setField(2, value);
+  set capabilityAck(CapabilityAck value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasSetUi() => $_has(1);
+  $core.bool hasCapabilityAck() => $_has(1);
   @$pb.TagNumber(2)
-  void clearSetUi() => $_clearField(2);
+  void clearCapabilityAck() => $_clearField(2);
   @$pb.TagNumber(2)
-  $2.SetUI ensureSetUi() => $_ensure(1);
+  CapabilityAck ensureCapabilityAck() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  $0.StartStream get startStream => $_getN(2);
+  RegisterAck get registerAck => $_getN(2);
   @$pb.TagNumber(3)
-  set startStream($0.StartStream value) => $_setField(3, value);
+  set registerAck(RegisterAck value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasStartStream() => $_has(2);
+  $core.bool hasRegisterAck() => $_has(2);
   @$pb.TagNumber(3)
-  void clearStartStream() => $_clearField(3);
+  void clearRegisterAck() => $_clearField(3);
   @$pb.TagNumber(3)
-  $0.StartStream ensureStartStream() => $_ensure(2);
+  RegisterAck ensureRegisterAck() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  $0.StopStream get stopStream => $_getN(3);
+  $2.SetUI get setUi => $_getN(3);
   @$pb.TagNumber(4)
-  set stopStream($0.StopStream value) => $_setField(4, value);
+  set setUi($2.SetUI value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasStopStream() => $_has(3);
+  $core.bool hasSetUi() => $_has(3);
   @$pb.TagNumber(4)
-  void clearStopStream() => $_clearField(4);
+  void clearSetUi() => $_clearField(4);
   @$pb.TagNumber(4)
-  $0.StopStream ensureStopStream() => $_ensure(3);
+  $2.SetUI ensureSetUi() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  $0.PlayAudio get playAudio => $_getN(4);
+  $0.StartStream get startStream => $_getN(4);
   @$pb.TagNumber(5)
-  set playAudio($0.PlayAudio value) => $_setField(5, value);
+  set startStream($0.StartStream value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasPlayAudio() => $_has(4);
+  $core.bool hasStartStream() => $_has(4);
   @$pb.TagNumber(5)
-  void clearPlayAudio() => $_clearField(5);
+  void clearStartStream() => $_clearField(5);
   @$pb.TagNumber(5)
-  $0.PlayAudio ensurePlayAudio() => $_ensure(4);
+  $0.StartStream ensureStartStream() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  $0.ShowMedia get showMedia => $_getN(5);
+  $0.StopStream get stopStream => $_getN(5);
   @$pb.TagNumber(6)
-  set showMedia($0.ShowMedia value) => $_setField(6, value);
+  set stopStream($0.StopStream value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasShowMedia() => $_has(5);
+  $core.bool hasStopStream() => $_has(5);
   @$pb.TagNumber(6)
-  void clearShowMedia() => $_clearField(6);
+  void clearStopStream() => $_clearField(6);
   @$pb.TagNumber(6)
-  $0.ShowMedia ensureShowMedia() => $_ensure(5);
+  $0.StopStream ensureStopStream() => $_ensure(5);
 
   @$pb.TagNumber(7)
-  $0.RouteStream get routeStream => $_getN(6);
+  $0.PlayAudio get playAudio => $_getN(6);
   @$pb.TagNumber(7)
-  set routeStream($0.RouteStream value) => $_setField(7, value);
+  set playAudio($0.PlayAudio value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasRouteStream() => $_has(6);
+  $core.bool hasPlayAudio() => $_has(6);
   @$pb.TagNumber(7)
-  void clearRouteStream() => $_clearField(7);
+  void clearPlayAudio() => $_clearField(7);
   @$pb.TagNumber(7)
-  $0.RouteStream ensureRouteStream() => $_ensure(6);
+  $0.PlayAudio ensurePlayAudio() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  $2.Notification get notification => $_getN(7);
+  $0.ShowMedia get showMedia => $_getN(7);
   @$pb.TagNumber(8)
-  set notification($2.Notification value) => $_setField(8, value);
+  set showMedia($0.ShowMedia value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasNotification() => $_has(7);
+  $core.bool hasShowMedia() => $_has(7);
   @$pb.TagNumber(8)
-  void clearNotification() => $_clearField(8);
+  void clearShowMedia() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.Notification ensureNotification() => $_ensure(7);
+  $0.ShowMedia ensureShowMedia() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  WebRTCSignal get webrtcSignal => $_getN(8);
+  $0.RouteStream get routeStream => $_getN(8);
   @$pb.TagNumber(9)
-  set webrtcSignal(WebRTCSignal value) => $_setField(9, value);
+  set routeStream($0.RouteStream value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasWebrtcSignal() => $_has(8);
+  $core.bool hasRouteStream() => $_has(8);
   @$pb.TagNumber(9)
-  void clearWebrtcSignal() => $_clearField(9);
+  void clearRouteStream() => $_clearField(9);
   @$pb.TagNumber(9)
-  WebRTCSignal ensureWebrtcSignal() => $_ensure(8);
+  $0.RouteStream ensureRouteStream() => $_ensure(8);
 
   @$pb.TagNumber(10)
-  CommandResult get commandResult => $_getN(9);
+  $2.Notification get notification => $_getN(9);
   @$pb.TagNumber(10)
-  set commandResult(CommandResult value) => $_setField(10, value);
+  set notification($2.Notification value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasCommandResult() => $_has(9);
+  $core.bool hasNotification() => $_has(9);
   @$pb.TagNumber(10)
-  void clearCommandResult() => $_clearField(10);
+  void clearNotification() => $_clearField(10);
   @$pb.TagNumber(10)
-  CommandResult ensureCommandResult() => $_ensure(9);
+  $2.Notification ensureNotification() => $_ensure(9);
 
   @$pb.TagNumber(11)
-  Heartbeat get heartbeat => $_getN(10);
+  WebRTCSignal get webrtcSignal => $_getN(10);
   @$pb.TagNumber(11)
-  set heartbeat(Heartbeat value) => $_setField(11, value);
+  set webrtcSignal(WebRTCSignal value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasHeartbeat() => $_has(10);
+  $core.bool hasWebrtcSignal() => $_has(10);
   @$pb.TagNumber(11)
-  void clearHeartbeat() => $_clearField(11);
+  void clearWebrtcSignal() => $_clearField(11);
   @$pb.TagNumber(11)
-  Heartbeat ensureHeartbeat() => $_ensure(10);
+  WebRTCSignal ensureWebrtcSignal() => $_ensure(10);
 
   @$pb.TagNumber(12)
-  ControlError get error => $_getN(11);
+  CommandResult get commandResult => $_getN(11);
   @$pb.TagNumber(12)
-  set error(ControlError value) => $_setField(12, value);
+  set commandResult(CommandResult value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasError() => $_has(11);
+  $core.bool hasCommandResult() => $_has(11);
   @$pb.TagNumber(12)
-  void clearError() => $_clearField(12);
+  void clearCommandResult() => $_clearField(12);
   @$pb.TagNumber(12)
-  ControlError ensureError() => $_ensure(11);
+  CommandResult ensureCommandResult() => $_ensure(11);
 
   @$pb.TagNumber(13)
-  $2.UpdateUI get updateUi => $_getN(12);
+  Heartbeat get heartbeat => $_getN(12);
   @$pb.TagNumber(13)
-  set updateUi($2.UpdateUI value) => $_setField(13, value);
+  set heartbeat(Heartbeat value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasUpdateUi() => $_has(12);
+  $core.bool hasHeartbeat() => $_has(12);
   @$pb.TagNumber(13)
-  void clearUpdateUi() => $_clearField(13);
+  void clearHeartbeat() => $_clearField(13);
   @$pb.TagNumber(13)
-  $2.UpdateUI ensureUpdateUi() => $_ensure(12);
+  Heartbeat ensureHeartbeat() => $_ensure(12);
 
   @$pb.TagNumber(14)
-  $2.TransitionUI get transitionUi => $_getN(13);
+  ControlError get error => $_getN(13);
   @$pb.TagNumber(14)
-  set transitionUi($2.TransitionUI value) => $_setField(14, value);
+  set error(ControlError value) => $_setField(14, value);
   @$pb.TagNumber(14)
-  $core.bool hasTransitionUi() => $_has(13);
+  $core.bool hasError() => $_has(13);
   @$pb.TagNumber(14)
-  void clearTransitionUi() => $_clearField(14);
+  void clearError() => $_clearField(14);
   @$pb.TagNumber(14)
-  $2.TransitionUI ensureTransitionUi() => $_ensure(13);
+  ControlError ensureError() => $_ensure(13);
 
   @$pb.TagNumber(15)
-  $0.InstallBundle get installBundle => $_getN(14);
+  $2.UpdateUI get updateUi => $_getN(14);
   @$pb.TagNumber(15)
-  set installBundle($0.InstallBundle value) => $_setField(15, value);
+  set updateUi($2.UpdateUI value) => $_setField(15, value);
   @$pb.TagNumber(15)
-  $core.bool hasInstallBundle() => $_has(14);
+  $core.bool hasUpdateUi() => $_has(14);
   @$pb.TagNumber(15)
-  void clearInstallBundle() => $_clearField(15);
+  void clearUpdateUi() => $_clearField(15);
   @$pb.TagNumber(15)
-  $0.InstallBundle ensureInstallBundle() => $_ensure(14);
+  $2.UpdateUI ensureUpdateUi() => $_ensure(14);
 
   @$pb.TagNumber(16)
-  $0.RemoveBundle get removeBundle => $_getN(15);
+  $2.TransitionUI get transitionUi => $_getN(15);
   @$pb.TagNumber(16)
-  set removeBundle($0.RemoveBundle value) => $_setField(16, value);
+  set transitionUi($2.TransitionUI value) => $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasRemoveBundle() => $_has(15);
+  $core.bool hasTransitionUi() => $_has(15);
   @$pb.TagNumber(16)
-  void clearRemoveBundle() => $_clearField(16);
+  void clearTransitionUi() => $_clearField(16);
   @$pb.TagNumber(16)
-  $0.RemoveBundle ensureRemoveBundle() => $_ensure(15);
+  $2.TransitionUI ensureTransitionUi() => $_ensure(15);
 
   @$pb.TagNumber(17)
-  $0.StartFlow get startFlow => $_getN(16);
+  $0.InstallBundle get installBundle => $_getN(16);
   @$pb.TagNumber(17)
-  set startFlow($0.StartFlow value) => $_setField(17, value);
+  set installBundle($0.InstallBundle value) => $_setField(17, value);
   @$pb.TagNumber(17)
-  $core.bool hasStartFlow() => $_has(16);
+  $core.bool hasInstallBundle() => $_has(16);
   @$pb.TagNumber(17)
-  void clearStartFlow() => $_clearField(17);
+  void clearInstallBundle() => $_clearField(17);
   @$pb.TagNumber(17)
-  $0.StartFlow ensureStartFlow() => $_ensure(16);
+  $0.InstallBundle ensureInstallBundle() => $_ensure(16);
 
   @$pb.TagNumber(18)
-  $0.PatchFlow get patchFlow => $_getN(17);
+  $0.RemoveBundle get removeBundle => $_getN(17);
   @$pb.TagNumber(18)
-  set patchFlow($0.PatchFlow value) => $_setField(18, value);
+  set removeBundle($0.RemoveBundle value) => $_setField(18, value);
   @$pb.TagNumber(18)
-  $core.bool hasPatchFlow() => $_has(17);
+  $core.bool hasRemoveBundle() => $_has(17);
   @$pb.TagNumber(18)
-  void clearPatchFlow() => $_clearField(18);
+  void clearRemoveBundle() => $_clearField(18);
   @$pb.TagNumber(18)
-  $0.PatchFlow ensurePatchFlow() => $_ensure(17);
+  $0.RemoveBundle ensureRemoveBundle() => $_ensure(17);
 
   @$pb.TagNumber(19)
-  $0.StopFlow get stopFlow => $_getN(18);
+  $0.StartFlow get startFlow => $_getN(18);
   @$pb.TagNumber(19)
-  set stopFlow($0.StopFlow value) => $_setField(19, value);
+  set startFlow($0.StartFlow value) => $_setField(19, value);
   @$pb.TagNumber(19)
-  $core.bool hasStopFlow() => $_has(18);
+  $core.bool hasStartFlow() => $_has(18);
   @$pb.TagNumber(19)
-  void clearStopFlow() => $_clearField(19);
+  void clearStartFlow() => $_clearField(19);
   @$pb.TagNumber(19)
-  $0.StopFlow ensureStopFlow() => $_ensure(18);
+  $0.StartFlow ensureStartFlow() => $_ensure(18);
 
   @$pb.TagNumber(20)
-  $0.RequestArtifact get requestArtifact => $_getN(19);
+  $0.PatchFlow get patchFlow => $_getN(19);
   @$pb.TagNumber(20)
-  set requestArtifact($0.RequestArtifact value) => $_setField(20, value);
+  set patchFlow($0.PatchFlow value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasRequestArtifact() => $_has(19);
+  $core.bool hasPatchFlow() => $_has(19);
   @$pb.TagNumber(20)
-  void clearRequestArtifact() => $_clearField(20);
+  void clearPatchFlow() => $_clearField(20);
   @$pb.TagNumber(20)
-  $0.RequestArtifact ensureRequestArtifact() => $_ensure(19);
+  $0.PatchFlow ensurePatchFlow() => $_ensure(19);
 
   @$pb.TagNumber(21)
-  $1.BugReportAck get bugReportAck => $_getN(20);
+  $0.StopFlow get stopFlow => $_getN(20);
   @$pb.TagNumber(21)
-  set bugReportAck($1.BugReportAck value) => $_setField(21, value);
+  set stopFlow($0.StopFlow value) => $_setField(21, value);
   @$pb.TagNumber(21)
-  $core.bool hasBugReportAck() => $_has(20);
+  $core.bool hasStopFlow() => $_has(20);
   @$pb.TagNumber(21)
-  void clearBugReportAck() => $_clearField(21);
+  void clearStopFlow() => $_clearField(21);
   @$pb.TagNumber(21)
-  $1.BugReportAck ensureBugReportAck() => $_ensure(20);
+  $0.StopFlow ensureStopFlow() => $_ensure(20);
+
+  @$pb.TagNumber(22)
+  $0.RequestArtifact get requestArtifact => $_getN(21);
+  @$pb.TagNumber(22)
+  set requestArtifact($0.RequestArtifact value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasRequestArtifact() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearRequestArtifact() => $_clearField(22);
+  @$pb.TagNumber(22)
+  $0.RequestArtifact ensureRequestArtifact() => $_ensure(21);
+
+  @$pb.TagNumber(23)
+  $1.BugReportAck get bugReportAck => $_getN(22);
+  @$pb.TagNumber(23)
+  set bugReportAck($1.BugReportAck value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasBugReportAck() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearBugReportAck() => $_clearField(23);
+  @$pb.TagNumber(23)
+  $1.BugReportAck ensureBugReportAck() => $_ensure(22);
+}
+
+class Hello extends $pb.GeneratedMessage {
+  factory Hello({
+    $core.String? deviceId,
+    $3.DeviceIdentity? identity,
+    $core.String? clientVersion,
+  }) {
+    final result = create();
+    if (deviceId != null) result.deviceId = deviceId;
+    if (identity != null) result.identity = identity;
+    if (clientVersion != null) result.clientVersion = clientVersion;
+    return result;
+  }
+
+  Hello._();
+
+  factory Hello.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Hello.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Hello',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'deviceId')
+    ..aOM<$3.DeviceIdentity>(2, _omitFieldNames ? '' : 'identity',
+        subBuilder: $3.DeviceIdentity.create)
+    ..aOS(3, _omitFieldNames ? '' : 'clientVersion')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Hello clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Hello copyWith(void Function(Hello) updates) =>
+      super.copyWith((message) => updates(message as Hello)) as Hello;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Hello create() => Hello._();
+  @$core.override
+  Hello createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Hello getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Hello>(create);
+  static Hello? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get deviceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set deviceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDeviceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeviceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $3.DeviceIdentity get identity => $_getN(1);
+  @$pb.TagNumber(2)
+  set identity($3.DeviceIdentity value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasIdentity() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIdentity() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $3.DeviceIdentity ensureIdentity() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $core.String get clientVersion => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set clientVersion($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasClientVersion() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearClientVersion() => $_clearField(3);
+}
+
+class HelloAck extends $pb.GeneratedMessage {
+  factory HelloAck({
+    $core.String? serverId,
+    $core.String? sessionId,
+    $fixnum.Int64? heartbeatIntervalMs,
+  }) {
+    final result = create();
+    if (serverId != null) result.serverId = serverId;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (heartbeatIntervalMs != null)
+      result.heartbeatIntervalMs = heartbeatIntervalMs;
+    return result;
+  }
+
+  HelloAck._();
+
+  factory HelloAck.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory HelloAck.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HelloAck',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'serverId')
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..aInt64(3, _omitFieldNames ? '' : 'heartbeatIntervalMs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HelloAck clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HelloAck copyWith(void Function(HelloAck) updates) =>
+      super.copyWith((message) => updates(message as HelloAck)) as HelloAck;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HelloAck create() => HelloAck._();
+  @$core.override
+  HelloAck createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static HelloAck getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HelloAck>(create);
+  static HelloAck? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get serverId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set serverId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasServerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearServerId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get heartbeatIntervalMs => $_getI64(2);
+  @$pb.TagNumber(3)
+  set heartbeatIntervalMs($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHeartbeatIntervalMs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHeartbeatIntervalMs() => $_clearField(3);
+}
+
+class CapabilitySnapshot extends $pb.GeneratedMessage {
+  factory CapabilitySnapshot({
+    $core.String? deviceId,
+    $fixnum.Int64? generation,
+    $3.DeviceCapabilities? capabilities,
+  }) {
+    final result = create();
+    if (deviceId != null) result.deviceId = deviceId;
+    if (generation != null) result.generation = generation;
+    if (capabilities != null) result.capabilities = capabilities;
+    return result;
+  }
+
+  CapabilitySnapshot._();
+
+  factory CapabilitySnapshot.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CapabilitySnapshot.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CapabilitySnapshot',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'deviceId')
+    ..a<$fixnum.Int64>(
+        2, _omitFieldNames ? '' : 'generation', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOM<$3.DeviceCapabilities>(3, _omitFieldNames ? '' : 'capabilities',
+        subBuilder: $3.DeviceCapabilities.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CapabilitySnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CapabilitySnapshot copyWith(void Function(CapabilitySnapshot) updates) =>
+      super.copyWith((message) => updates(message as CapabilitySnapshot))
+          as CapabilitySnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CapabilitySnapshot create() => CapabilitySnapshot._();
+  @$core.override
+  CapabilitySnapshot createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CapabilitySnapshot getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CapabilitySnapshot>(create);
+  static CapabilitySnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get deviceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set deviceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDeviceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeviceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get generation => $_getI64(1);
+  @$pb.TagNumber(2)
+  set generation($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $3.DeviceCapabilities get capabilities => $_getN(2);
+  @$pb.TagNumber(3)
+  set capabilities($3.DeviceCapabilities value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCapabilities() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCapabilities() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $3.DeviceCapabilities ensureCapabilities() => $_ensure(2);
+}
+
+class CapabilityDelta extends $pb.GeneratedMessage {
+  factory CapabilityDelta({
+    $core.String? deviceId,
+    $fixnum.Int64? generation,
+    $3.DeviceCapabilities? capabilities,
+    $core.String? reason,
+  }) {
+    final result = create();
+    if (deviceId != null) result.deviceId = deviceId;
+    if (generation != null) result.generation = generation;
+    if (capabilities != null) result.capabilities = capabilities;
+    if (reason != null) result.reason = reason;
+    return result;
+  }
+
+  CapabilityDelta._();
+
+  factory CapabilityDelta.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CapabilityDelta.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CapabilityDelta',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'deviceId')
+    ..a<$fixnum.Int64>(
+        2, _omitFieldNames ? '' : 'generation', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOM<$3.DeviceCapabilities>(3, _omitFieldNames ? '' : 'capabilities',
+        subBuilder: $3.DeviceCapabilities.create)
+    ..aOS(4, _omitFieldNames ? '' : 'reason')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CapabilityDelta clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CapabilityDelta copyWith(void Function(CapabilityDelta) updates) =>
+      super.copyWith((message) => updates(message as CapabilityDelta))
+          as CapabilityDelta;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CapabilityDelta create() => CapabilityDelta._();
+  @$core.override
+  CapabilityDelta createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CapabilityDelta getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CapabilityDelta>(create);
+  static CapabilityDelta? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get deviceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set deviceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDeviceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeviceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get generation => $_getI64(1);
+  @$pb.TagNumber(2)
+  set generation($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $3.DeviceCapabilities get capabilities => $_getN(2);
+  @$pb.TagNumber(3)
+  set capabilities($3.DeviceCapabilities value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCapabilities() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCapabilities() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $3.DeviceCapabilities ensureCapabilities() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.String get reason => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set reason($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasReason() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearReason() => $_clearField(4);
+}
+
+class CapabilityAck extends $pb.GeneratedMessage {
+  factory CapabilityAck({
+    $core.String? deviceId,
+    $fixnum.Int64? acceptedGeneration,
+    $core.bool? snapshotApplied,
+  }) {
+    final result = create();
+    if (deviceId != null) result.deviceId = deviceId;
+    if (acceptedGeneration != null)
+      result.acceptedGeneration = acceptedGeneration;
+    if (snapshotApplied != null) result.snapshotApplied = snapshotApplied;
+    return result;
+  }
+
+  CapabilityAck._();
+
+  factory CapabilityAck.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CapabilityAck.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CapabilityAck',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'deviceId')
+    ..a<$fixnum.Int64>(
+        2, _omitFieldNames ? '' : 'acceptedGeneration', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOB(3, _omitFieldNames ? '' : 'snapshotApplied')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CapabilityAck clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CapabilityAck copyWith(void Function(CapabilityAck) updates) =>
+      super.copyWith((message) => updates(message as CapabilityAck))
+          as CapabilityAck;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CapabilityAck create() => CapabilityAck._();
+  @$core.override
+  CapabilityAck createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CapabilityAck getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CapabilityAck>(create);
+  static CapabilityAck? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get deviceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set deviceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDeviceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeviceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get acceptedGeneration => $_getI64(1);
+  @$pb.TagNumber(2)
+  set acceptedGeneration($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAcceptedGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAcceptedGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get snapshotApplied => $_getBF(2);
+  @$pb.TagNumber(3)
+  set snapshotApplied($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSnapshotApplied() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSnapshotApplied() => $_clearField(3);
 }
 
 class RegisterDevice extends $pb.GeneratedMessage {

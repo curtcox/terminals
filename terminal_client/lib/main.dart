@@ -453,7 +453,8 @@ List<ControlCarrierKind> buildCarrierPreference({
         )
         .toList(growable: false);
   }
-  if (lastSuccessfulCarrier != null && filtered.contains(lastSuccessfulCarrier)) {
+  if (lastSuccessfulCarrier != null &&
+      filtered.contains(lastSuccessfulCarrier)) {
     filtered
       ..remove(lastSuccessfulCarrier)
       ..insert(0, lastSuccessfulCarrier);
@@ -783,6 +784,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       <diagv1.ControlErrorEntry>[];
   final Map<String, double> _lastSensorSnapshot = <String, double>{};
   capv1.DeviceCapabilities? _lastRegisteredCapabilities;
+  int _capabilityGeneration = 0;
+  int _lastCapabilityAckGeneration = 0;
   int _lastHeartbeatUnixMs = 0;
   int _pendingHeartbeatUnixMs = 0;
   double _lastRttMs = 0;
@@ -1113,6 +1116,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
     _isConnecting = true;
     _hasRegisterAck = false;
+    _capabilityGeneration = 0;
+    _lastCapabilityAckGeneration = 0;
     if (mounted) {
       setState(() {
         final verb = userInitiated ? 'Connecting' : 'Reconnecting';
@@ -1235,6 +1240,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               _activeCarrierCycle = <ControlCarrierKind>[];
               _activeCarrierIndex = 0;
             }
+            if (response.hasCapabilityAck()) {
+              _lastCapabilityAckGeneration =
+                  response.capabilityAck.acceptedGeneration.toInt();
+            }
             _applyRegisterMetadata(response);
             if (_e2eEmitEvents && response.hasRegisterAck()) {
               debugPrint('E2E_EVENT: register_ack');
@@ -1300,12 +1309,30 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           targetPlatform: defaultTargetPlatform,
         ),
       );
-      final registerRequest = TerminalControlGrpcClient.registerRequest(
-        capabilities: probedCapabilities,
+      final identity = probedCapabilities.hasIdentity()
+          ? probedCapabilities.identity.deepCopy()
+          : (capv1.DeviceIdentity()
+            ..deviceName = _deviceNameController.text.trim()
+            ..deviceType = _deviceTypeController.text.trim()
+            ..platform = _platformController.text.trim());
+      _outgoing.add(
+        TerminalControlGrpcClient.helloRequest(
+          deviceId: _deviceId,
+          identity: identity,
+          clientVersion: 'terminal_client',
+        ),
       );
-      _lastRegisteredCapabilities = registerRequest.register.capabilities;
-      _outgoing.add(registerRequest);
-      _sendLifecycleCapabilityUpdate();
+
+      _capabilityGeneration = 1;
+      _lastRegisteredCapabilities = probedCapabilities.deepCopy();
+      _outgoing.add(
+        TerminalControlGrpcClient.capabilitySnapshotRequest(
+          deviceId: _deviceId,
+          generation: _capabilityGeneration,
+          capabilities: _lastRegisteredCapabilities!,
+        ),
+      );
+      _sendLifecycleCapabilityUpdate(reason: 'lifecycle_state');
       final initialHeartbeatUnixMs =
           DateTime.now().toUtc().millisecondsSinceEpoch;
       _lastHeartbeatUnixMs = initialHeartbeatUnixMs;
@@ -1375,7 +1402,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _stopSensorTelemetryLoop();
   }
 
-  void _sendLifecycleCapabilityUpdate() {
+  void _sendLifecycleCapabilityUpdate({String reason = 'lifecycle_state'}) {
     final current = _lastRegisteredCapabilities;
     if (current == null || !_hasActiveControlSession) {
       return;
@@ -1400,9 +1427,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ..addAll(_dedupeOperators(nextOperators));
 
     _lastRegisteredCapabilities = updated;
+    _capabilityGeneration += 1;
     _outgoing.add(
-      ConnectRequest()
-        ..capability = (CapabilityUpdate()..capabilities = updated),
+      TerminalControlGrpcClient.capabilityDeltaRequest(
+        deviceId: _deviceId,
+        generation: _capabilityGeneration,
+        capabilities: updated,
+        reason: reason,
+      ),
     );
   }
 
@@ -2501,6 +2533,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   Future<void> _stopStream() async {
     _shouldStayConnected = false;
     _hasRegisterAck = false;
+    _capabilityGeneration = 0;
+    _lastCapabilityAckGeneration = 0;
     _reconnectAttempt = 0;
     _activeCarrierCycle = <ControlCarrierKind>[];
     _activeCarrierIndex = 0;
@@ -2546,7 +2580,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return;
     }
     _syncMonitoringLoops();
-    _sendLifecycleCapabilityUpdate();
+    _sendLifecycleCapabilityUpdate(reason: 'app_lifecycle_change');
   }
 
   @override
@@ -2688,7 +2722,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                   'Media routes: ${_routesByStreamID.length}  Active streams: ${_activeStreamsByID.length}  Signals: ${_recentWebRTCSignals.length}',
                 ),
                 Text(
-                  'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount',
+                  'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount  Capability ack gen: $_lastCapabilityAckGeneration',
                 ),
                 if (_playAudioCount > 0)
                   Text(

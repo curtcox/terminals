@@ -9,6 +9,7 @@ import (
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
@@ -116,6 +117,120 @@ func TestHandleMessageCapabilityAndHeartbeat(t *testing.T) {
 	}
 	if got.LastHeartbeat != now {
 		t.Fatalf("LastHeartbeat = %v, want %v", got.LastHeartbeat, now)
+	}
+}
+
+func TestHandleMessageCapabilityDeltaRejectsStaleGeneration(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Capabilities: map[string]string{
+				"screen.width": "1920",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"screen.width": "1280",
+			},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected stale generation error")
+	}
+	if len(out) != 1 || out[0].ErrorCode != ErrorCodeProtocolViolation {
+		t.Fatalf("error response = %+v, want protocol violation", out)
+	}
+}
+
+func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	router := io.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"microphone.present": "true",
+				"speakers.present":   "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if _, err := router.Claims().Request(context.Background(), []iorouter.Claim{{
+		ActivationID: "activation-1",
+		DeviceID:     "device-1",
+		Resource:     "speaker.main",
+		Mode:         iorouter.ClaimExclusive,
+		Priority:     1,
+	}}); err != nil {
+		t.Fatalf("Claims().Request() error = %v", err)
+	}
+	if err := router.Connect("device-1", "device-2", "audio"); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:     "device-1",
+			Generation:   2,
+			Reason:       "audio_removed",
+			Capabilities: map[string]string{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	if len(router.Claims().Snapshot("device-1")) != 0 {
+		t.Fatalf("expected claims to be released for lost resources")
+	}
+	hasStop := false
+	for _, msg := range out {
+		if msg.StopStream != nil {
+			hasStop = true
+			break
+		}
+	}
+	if !hasStop {
+		t.Fatalf("expected stop_stream response after capability loss")
 	}
 }
 

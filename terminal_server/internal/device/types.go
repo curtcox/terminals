@@ -40,6 +40,9 @@ type Device struct {
 	DeviceType    string
 	Platform      string
 	Capabilities  CapabilitySet
+	Generation    uint64
+	LastSnapshot  time.Time
+	LastDelta     time.Time
 	Placement     PlacementMetadata
 	State         State
 	RegisteredAt  time.Time

@@ -46,6 +46,21 @@ type CapabilityUpdateRequest struct {
 	Capabilities map[string]string
 }
 
+// CapabilitySnapshotRequest is a full capability baseline with generation.
+type CapabilitySnapshotRequest struct {
+	DeviceID     string
+	Generation   uint64
+	Capabilities map[string]string
+}
+
+// CapabilityDeltaRequest is an incremental capability update with generation.
+type CapabilityDeltaRequest struct {
+	DeviceID     string
+	Generation   uint64
+	Reason       string
+	Capabilities map[string]string
+}
+
 func (h *StreamHandler) activeScenarioName(deviceID string) string {
 	if h.runtime == nil || h.runtime.Engine == nil {
 		return ""
@@ -272,6 +287,9 @@ type PlayAudioResponse struct {
 
 // ClientMessage is a one-of control stream message from client to server.
 type ClientMessage struct {
+	Hello           *HelloRequest
+	CapabilitySnap  *CapabilitySnapshotRequest
+	CapabilityDelta *CapabilityDeltaRequest
 	Register        *RegisterRequest
 	Capability      *CapabilityUpdateRequest
 	Heartbeat       *HeartbeatRequest
@@ -291,6 +309,8 @@ type ClientMessage struct {
 
 // ServerMessage is a one-of control stream message from server to client.
 type ServerMessage struct {
+	HelloAck        *HelloResponse
+	CapabilityAck   *CapabilityLifecycleAck
 	RegisterAck     *RegisterResponse
 	CommandAck      string
 	SetUI           *ui.Descriptor
@@ -553,6 +573,56 @@ func (h *StreamHandler) SetPhotoFrameSettings(slides []string, interval time.Dur
 // HandleMessage processes one incoming control message and returns responses.
 func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([]ServerMessage, error) {
 	switch {
+	case msg.Hello != nil:
+		resp, err := h.control.Hello(ctx, *msg.Hello)
+		if err != nil {
+			h.metrics.protocolErrors.Add(1)
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
+		}
+		return []ServerMessage{{HelloAck: &resp}}, nil
+	case msg.CapabilitySnap != nil:
+		h.metrics.capabilityReceived.Add(1)
+		before, _ := h.control.devices.Get(msg.CapabilitySnap.DeviceID)
+		ack, err := h.control.ApplyCapabilitySnapshot(ctx, msg.CapabilitySnap.DeviceID, msg.CapabilitySnap.Generation, msg.CapabilitySnap.Capabilities)
+		if err != nil {
+			h.metrics.protocolErrors.Add(1)
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
+		}
+		after, _ := h.control.devices.Get(msg.CapabilitySnap.DeviceID)
+		out := []ServerMessage{{CapabilityAck: &ack}}
+		if before.Generation == 0 {
+			initial := ui.HelloWorld(after.DeviceName)
+			out = append(out,
+				ServerMessage{RegisterAck: &RegisterResponse{
+					ServerID: h.control.serverID,
+					Message:  "registered",
+					Metadata: cloneStringMap(h.control.metadata),
+					Initial:  initial,
+				}},
+				ServerMessage{SetUI: &initial},
+			)
+			h.rememberSetUI(msg.CapabilitySnap.DeviceID, out)
+		}
+		effects := h.handleCapabilityChangeEffects(ctx, msg.CapabilitySnap.DeviceID, before.Capabilities, after.Capabilities)
+		if len(effects) > 0 {
+			out = append(out, effects...)
+		}
+		return out, nil
+	case msg.CapabilityDelta != nil:
+		h.metrics.capabilityReceived.Add(1)
+		before, _ := h.control.devices.Get(msg.CapabilityDelta.DeviceID)
+		ack, err := h.control.ApplyCapabilityDelta(ctx, msg.CapabilityDelta.DeviceID, msg.CapabilityDelta.Generation, msg.CapabilityDelta.Capabilities)
+		if err != nil {
+			h.metrics.protocolErrors.Add(1)
+			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
+		}
+		after, _ := h.control.devices.Get(msg.CapabilityDelta.DeviceID)
+		out := []ServerMessage{{CapabilityAck: &ack}}
+		effects := h.handleCapabilityChangeEffects(ctx, msg.CapabilityDelta.DeviceID, before.Capabilities, after.Capabilities)
+		if len(effects) > 0 {
+			out = append(out, effects...)
+		}
+		return out, nil
 	case msg.Register != nil:
 		h.metrics.registerReceived.Add(1)
 		resp, err := h.control.Register(ctx, *msg.Register)
@@ -786,6 +856,207 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 	default:
 		h.metrics.protocolErrors.Add(1)
 		return []ServerMessage{{ErrorCode: errorCodeFor(ErrInvalidClientMessage), Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
+	}
+}
+
+func (h *StreamHandler) handleCapabilityChangeEffects(
+	ctx context.Context,
+	deviceID string,
+	beforeCaps map[string]string,
+	afterCaps map[string]string,
+) []ServerMessage {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil
+	}
+
+	lostResources := lostCapabilityResources(beforeCaps, afterCaps)
+	emitCapabilityEvents(ctx, h.runtime, deviceID, beforeCaps, afterCaps, lostResources)
+	if len(lostResources) == 0 || h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+		return nil
+	}
+
+	routeIO, ok := h.runtime.Env.IO.(interface {
+		Claims() *iorouter.ClaimManager
+		RoutesForDevice(deviceID string) []iorouter.Route
+		Disconnect(sourceID, targetID, streamKind string) error
+	})
+	if !ok {
+		return nil
+	}
+
+	claims := routeIO.Claims()
+	if claims != nil {
+		activationIDs := map[string]struct{}{}
+		for _, claim := range claims.Snapshot(deviceID) {
+			if _, exists := lostResources[claim.Resource]; !exists {
+				continue
+			}
+			activationIDs[claim.ActivationID] = struct{}{}
+		}
+		for activationID := range activationIDs {
+			_ = claims.Release(ctx, activationID)
+		}
+	}
+
+	routes := routeIO.RoutesForDevice(deviceID)
+	out := make([]ServerMessage, 0, len(routes))
+	for _, route := range routes {
+		if !shouldDisconnectRouteForLostResources(route, deviceID, lostResources) {
+			continue
+		}
+		if err := routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind); err != nil && !errors.Is(err, iorouter.ErrRouteNotFound) {
+			continue
+		}
+		out = append(out, ServerMessage{
+			StopStream: &StopStreamResponse{StreamID: routeStreamID(route)},
+		})
+	}
+	return out
+}
+
+func lostCapabilityResources(beforeCaps, afterCaps map[string]string) map[string]struct{} {
+	before := capabilityResources(beforeCaps)
+	after := capabilityResources(afterCaps)
+	lost := map[string]struct{}{}
+	for resource := range before {
+		if _, exists := after[resource]; exists {
+			continue
+		}
+		lost[resource] = struct{}{}
+	}
+	return lost
+}
+
+func capabilityResources(caps map[string]string) map[string]struct{} {
+	resources := map[string]struct{}{}
+	if len(caps) == 0 {
+		return resources
+	}
+
+	if caps["screen.width"] != "" && caps["screen.height"] != "" {
+		resources["screen.main"] = struct{}{}
+		resources["screen.overlay"] = struct{}{}
+	}
+	if truthyCapability(caps["keyboard.physical"]) || strings.TrimSpace(caps["keyboard.layout"]) != "" {
+		resources["keyboard.primary"] = struct{}{}
+	}
+	if strings.TrimSpace(caps["pointer.type"]) != "" {
+		resources["pointer.primary"] = struct{}{}
+	}
+	if truthyCapability(caps["touch.supported"]) {
+		resources["touch.primary"] = struct{}{}
+	}
+	if truthyCapability(caps["speakers.present"]) {
+		resources["speaker.main"] = struct{}{}
+	}
+	if truthyCapability(caps["microphone.present"]) {
+		resources["mic.capture"] = struct{}{}
+		resources["mic.analyze"] = struct{}{}
+	}
+	if truthyCapability(caps["camera.present"]) {
+		resources["camera.capture"] = struct{}{}
+		resources["camera.analyze"] = struct{}{}
+	}
+	if truthyCapability(caps["edge.compute.cpu_realtime"]) {
+		resources[iorouter.ResourceComputeCPUShared] = struct{}{}
+	}
+	if truthyCapability(caps["edge.compute.gpu_realtime"]) {
+		resources[iorouter.ResourceComputeGPUShared] = struct{}{}
+	}
+	if truthyCapability(caps["edge.compute.npu_realtime"]) {
+		resources[iorouter.ResourceComputeNPUShared] = struct{}{}
+	}
+	if truthyCapability(caps["edge.retention.audio_sec"]) {
+		resources[iorouter.ResourceBufferAudio] = struct{}{}
+	}
+	if truthyCapability(caps["edge.retention.video_sec"]) {
+		resources[iorouter.ResourceBufferVideo] = struct{}{}
+	}
+	if truthyCapability(caps["edge.retention.sensor_sec"]) {
+		resources[iorouter.ResourceBufferSensor] = struct{}{}
+	}
+	if truthyCapability(caps["edge.retention.radio_sec"]) {
+		resources[iorouter.ResourceBufferRadio] = struct{}{}
+	}
+	if truthyCapability(caps["connectivity.bluetooth_version"]) {
+		resources[iorouter.ResourceRadioBLEScan] = struct{}{}
+	}
+	if truthyCapability(caps["connectivity.wifi_signal_strength"]) {
+		resources[iorouter.ResourceRadioWiFiScan] = struct{}{}
+	}
+	return resources
+}
+
+func truthyCapability(raw string) bool {
+	raw = strings.TrimSpace(strings.ToLower(raw))
+	if raw == "" || raw == "0" || raw == "false" || raw == "no" || raw == "off" {
+		return false
+	}
+	return true
+}
+
+func shouldDisconnectRouteForLostResources(route iorouter.Route, deviceID string, lostResources map[string]struct{}) bool {
+	if len(lostResources) == 0 {
+		return false
+	}
+	streamKind := strings.ToLower(strings.TrimSpace(route.StreamKind))
+	sourceID := strings.TrimSpace(route.SourceID)
+	targetID := strings.TrimSpace(route.TargetID)
+	if sourceID != deviceID && targetID != deviceID {
+		return false
+	}
+
+	_, lostMicCapture := lostResources["mic.capture"]
+	_, lostMicAnalyze := lostResources["mic.analyze"]
+	_, lostSpeaker := lostResources["speaker.main"]
+	_, lostCameraCapture := lostResources["camera.capture"]
+	_, lostCameraAnalyze := lostResources["camera.analyze"]
+	_, lostScreenMain := lostResources["screen.main"]
+	_, lostScreenOverlay := lostResources["screen.overlay"]
+
+	if (lostMicCapture || lostMicAnalyze) && sourceID == deviceID && strings.Contains(streamKind, "audio") {
+		return true
+	}
+	if lostSpeaker && targetID == deviceID && strings.Contains(streamKind, "audio") {
+		return true
+	}
+	if (lostCameraCapture || lostCameraAnalyze) && sourceID == deviceID && strings.Contains(streamKind, "video") {
+		return true
+	}
+	if (lostScreenMain || lostScreenOverlay) && targetID == deviceID && strings.Contains(streamKind, "video") {
+		return true
+	}
+
+	return sourceID == deviceID || targetID == deviceID
+}
+
+func emitCapabilityEvents(
+	ctx context.Context,
+	runtime *scenario.Runtime,
+	deviceID string,
+	beforeCaps map[string]string,
+	afterCaps map[string]string,
+	lostResources map[string]struct{},
+) {
+	if runtime == nil || runtime.Env == nil || runtime.Env.Broadcast == nil {
+		return
+	}
+	targets := []string{deviceID}
+	_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.capability.updated")
+	if beforeCaps["screen.width"] != afterCaps["screen.width"] || beforeCaps["screen.height"] != afterCaps["screen.height"] {
+		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.display.resized")
+	}
+	if len(lostResources) == 0 {
+		return
+	}
+	names := make([]string, 0, len(lostResources))
+	for resource := range lostResources {
+		names = append(names, resource)
+	}
+	sort.Strings(names)
+	for _, resource := range names {
+		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.resource.lost:"+resource)
 	}
 }
 

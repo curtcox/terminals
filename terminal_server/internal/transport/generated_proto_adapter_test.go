@@ -62,6 +62,136 @@ func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
 	}
 }
 
+func TestGeneratedProtoAdapterToInternalHello(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Hello{
+			Hello: &controlv1.Hello{
+				DeviceId: "device-1",
+				Identity: &capabilitiesv1.DeviceIdentity{
+					DeviceName: "Kitchen Display",
+					DeviceType: "tablet",
+					Platform:   "android",
+				},
+				ClientVersion: "1.2.3",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(hello) error = %v", err)
+	}
+	if msg.Hello == nil {
+		t.Fatalf("expected hello message")
+	}
+	if msg.Hello.DeviceID != "device-1" {
+		t.Fatalf("device_id = %q, want device-1", msg.Hello.DeviceID)
+	}
+	if msg.Hello.DeviceName != "Kitchen Display" {
+		t.Fatalf("device_name = %q, want Kitchen Display", msg.Hello.DeviceName)
+	}
+}
+
+func TestGeneratedProtoAdapterToInternalCapabilitySnapshotAndDelta(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+
+	snapshotMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_CapabilitySnapshot{
+			CapabilitySnapshot: &controlv1.CapabilitySnapshot{
+				DeviceId:   "device-1",
+				Generation: 1,
+				Capabilities: &capabilitiesv1.DeviceCapabilities{
+					DeviceId: "device-1",
+					Screen: &capabilitiesv1.ScreenCapability{
+						Width:  1920,
+						Height: 1080,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(capability_snapshot) error = %v", err)
+	}
+	if snapshotMsg.CapabilitySnap == nil {
+		t.Fatalf("expected capability snapshot message")
+	}
+	if snapshotMsg.CapabilitySnap.Generation != 1 {
+		t.Fatalf("snapshot generation = %d, want 1", snapshotMsg.CapabilitySnap.Generation)
+	}
+
+	deltaMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_CapabilityDelta{
+			CapabilityDelta: &controlv1.CapabilityDelta{
+				DeviceId:   "device-1",
+				Generation: 2,
+				Reason:     "display_changed",
+				Capabilities: &capabilitiesv1.DeviceCapabilities{
+					DeviceId: "device-1",
+					Screen: &capabilitiesv1.ScreenCapability{
+						Width:  1280,
+						Height: 720,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(capability_delta) error = %v", err)
+	}
+	if deltaMsg.CapabilityDelta == nil {
+		t.Fatalf("expected capability delta message")
+	}
+	if deltaMsg.CapabilityDelta.Generation != 2 {
+		t.Fatalf("delta generation = %d, want 2", deltaMsg.CapabilityDelta.Generation)
+	}
+	if deltaMsg.CapabilityDelta.Reason != "display_changed" {
+		t.Fatalf("delta reason = %q, want display_changed", deltaMsg.CapabilityDelta.Reason)
+	}
+}
+
+func TestGeneratedProtoAdapterFromInternalHelloAndCapabilityAck(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+
+	env, err := adapter.FromInternal(ServerMessage{
+		HelloAck: &HelloResponse{
+			ServerID:            "srv-1",
+			SessionID:           "device-1:123",
+			HeartbeatIntervalMS: 5000,
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(hello_ack) error = %v", err)
+	}
+	resp, ok := env.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("unexpected proto envelope type %T", env)
+	}
+	if resp.GetHelloAck() == nil {
+		t.Fatalf("expected hello_ack payload")
+	}
+
+	env, err = adapter.FromInternal(ServerMessage{
+		CapabilityAck: &CapabilityLifecycleAck{
+			DeviceID:           "device-1",
+			AcceptedGeneration: 2,
+			SnapshotApplied:    false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(capability_ack) error = %v", err)
+	}
+	resp, ok = env.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("unexpected proto envelope type %T", env)
+	}
+	if resp.GetCapabilityAck() == nil {
+		t.Fatalf("expected capability_ack payload")
+	}
+	if resp.GetCapabilityAck().GetAcceptedGeneration() != 2 {
+		t.Fatalf("accepted_generation = %d, want 2", resp.GetCapabilityAck().GetAcceptedGeneration())
+	}
+}
+
 func TestCapabilitiesToDataMapPresenceOnlyForSparseMediaProbes(t *testing.T) {
 	got := capabilitiesToDataMap(&capabilitiesv1.DeviceCapabilities{
 		DeviceId: "device-1",

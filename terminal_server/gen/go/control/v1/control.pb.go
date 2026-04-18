@@ -670,6 +670,9 @@ type ConnectRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Payload:
 	//
+	//	*ConnectRequest_Hello
+	//	*ConnectRequest_CapabilitySnapshot
+	//	*ConnectRequest_CapabilityDelta
 	//	*ConnectRequest_Register
 	//	*ConnectRequest_Capability
 	//	*ConnectRequest_Input
@@ -726,6 +729,34 @@ func (x *ConnectRequest) GetPayload() isConnectRequest_Payload {
 	return nil
 }
 
+func (x *ConnectRequest) GetHello() *Hello {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectRequest_Hello); ok {
+			return x.Hello
+		}
+	}
+	return nil
+}
+
+func (x *ConnectRequest) GetCapabilitySnapshot() *CapabilitySnapshot {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectRequest_CapabilitySnapshot); ok {
+			return x.CapabilitySnapshot
+		}
+	}
+	return nil
+}
+
+func (x *ConnectRequest) GetCapabilityDelta() *CapabilityDelta {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectRequest_CapabilityDelta); ok {
+			return x.CapabilityDelta
+		}
+	}
+	return nil
+}
+
+// Deprecated: Marked as deprecated in terminals/control/v1/control.proto.
 func (x *ConnectRequest) GetRegister() *RegisterDevice {
 	if x != nil {
 		if x, ok := x.Payload.(*ConnectRequest_Register); ok {
@@ -735,6 +766,7 @@ func (x *ConnectRequest) GetRegister() *RegisterDevice {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in terminals/control/v1/control.proto.
 func (x *ConnectRequest) GetCapability() *CapabilityUpdate {
 	if x != nil {
 		if x, ok := x.Payload.(*ConnectRequest_Capability); ok {
@@ -856,61 +888,85 @@ type isConnectRequest_Payload interface {
 	isConnectRequest_Payload()
 }
 
+type ConnectRequest_Hello struct {
+	Hello *Hello `protobuf:"bytes,1,opt,name=hello,proto3,oneof"`
+}
+
+type ConnectRequest_CapabilitySnapshot struct {
+	CapabilitySnapshot *CapabilitySnapshot `protobuf:"bytes,2,opt,name=capability_snapshot,json=capabilitySnapshot,proto3,oneof"`
+}
+
+type ConnectRequest_CapabilityDelta struct {
+	CapabilityDelta *CapabilityDelta `protobuf:"bytes,3,opt,name=capability_delta,json=capabilityDelta,proto3,oneof"`
+}
+
 type ConnectRequest_Register struct {
-	Register *RegisterDevice `protobuf:"bytes,1,opt,name=register,proto3,oneof"`
+	// Deprecated: use hello + capability_snapshot.
+	//
+	// Deprecated: Marked as deprecated in terminals/control/v1/control.proto.
+	Register *RegisterDevice `protobuf:"bytes,20,opt,name=register,proto3,oneof"`
 }
 
 type ConnectRequest_Capability struct {
-	Capability *CapabilityUpdate `protobuf:"bytes,2,opt,name=capability,proto3,oneof"`
+	// Deprecated: use capability_delta.
+	//
+	// Deprecated: Marked as deprecated in terminals/control/v1/control.proto.
+	Capability *CapabilityUpdate `protobuf:"bytes,21,opt,name=capability,proto3,oneof"`
 }
 
 type ConnectRequest_Input struct {
-	Input *v1.InputEvent `protobuf:"bytes,3,opt,name=input,proto3,oneof"`
+	Input *v1.InputEvent `protobuf:"bytes,4,opt,name=input,proto3,oneof"`
 }
 
 type ConnectRequest_Sensor struct {
-	Sensor *v1.SensorData `protobuf:"bytes,4,opt,name=sensor,proto3,oneof"`
+	Sensor *v1.SensorData `protobuf:"bytes,5,opt,name=sensor,proto3,oneof"`
 }
 
 type ConnectRequest_StreamReady struct {
-	StreamReady *StreamReady `protobuf:"bytes,5,opt,name=stream_ready,json=streamReady,proto3,oneof"`
+	StreamReady *StreamReady `protobuf:"bytes,6,opt,name=stream_ready,json=streamReady,proto3,oneof"`
 }
 
 type ConnectRequest_Command struct {
-	Command *CommandRequest `protobuf:"bytes,6,opt,name=command,proto3,oneof"`
+	Command *CommandRequest `protobuf:"bytes,7,opt,name=command,proto3,oneof"`
 }
 
 type ConnectRequest_Heartbeat struct {
-	Heartbeat *Heartbeat `protobuf:"bytes,7,opt,name=heartbeat,proto3,oneof"`
+	Heartbeat *Heartbeat `protobuf:"bytes,8,opt,name=heartbeat,proto3,oneof"`
 }
 
 type ConnectRequest_WebrtcSignal struct {
-	WebrtcSignal *WebRTCSignal `protobuf:"bytes,8,opt,name=webrtc_signal,json=webrtcSignal,proto3,oneof"`
+	WebrtcSignal *WebRTCSignal `protobuf:"bytes,9,opt,name=webrtc_signal,json=webrtcSignal,proto3,oneof"`
 }
 
 type ConnectRequest_VoiceAudio struct {
-	VoiceAudio *VoiceAudio `protobuf:"bytes,9,opt,name=voice_audio,json=voiceAudio,proto3,oneof"`
+	VoiceAudio *VoiceAudio `protobuf:"bytes,10,opt,name=voice_audio,json=voiceAudio,proto3,oneof"`
 }
 
 type ConnectRequest_ObservationMessage struct {
-	ObservationMessage *v1.ObservationMessage `protobuf:"bytes,10,opt,name=observation_message,json=observationMessage,proto3,oneof"`
+	ObservationMessage *v1.ObservationMessage `protobuf:"bytes,11,opt,name=observation_message,json=observationMessage,proto3,oneof"`
 }
 
 type ConnectRequest_ArtifactAvailable struct {
-	ArtifactAvailable *v1.ArtifactAvailable `protobuf:"bytes,11,opt,name=artifact_available,json=artifactAvailable,proto3,oneof"`
+	ArtifactAvailable *v1.ArtifactAvailable `protobuf:"bytes,12,opt,name=artifact_available,json=artifactAvailable,proto3,oneof"`
 }
 
 type ConnectRequest_FlowStats struct {
-	FlowStats *v1.FlowStats `protobuf:"bytes,12,opt,name=flow_stats,json=flowStats,proto3,oneof"`
+	FlowStats *v1.FlowStats `protobuf:"bytes,13,opt,name=flow_stats,json=flowStats,proto3,oneof"`
 }
 
 type ConnectRequest_ClockSample struct {
-	ClockSample *v1.ClockSample `protobuf:"bytes,13,opt,name=clock_sample,json=clockSample,proto3,oneof"`
+	ClockSample *v1.ClockSample `protobuf:"bytes,14,opt,name=clock_sample,json=clockSample,proto3,oneof"`
 }
 
 type ConnectRequest_BugReport struct {
-	BugReport *v11.BugReport `protobuf:"bytes,14,opt,name=bug_report,json=bugReport,proto3,oneof"`
+	BugReport *v11.BugReport `protobuf:"bytes,15,opt,name=bug_report,json=bugReport,proto3,oneof"`
 }
+
+func (*ConnectRequest_Hello) isConnectRequest_Payload() {}
+
+func (*ConnectRequest_CapabilitySnapshot) isConnectRequest_Payload() {}
+
+func (*ConnectRequest_CapabilityDelta) isConnectRequest_Payload() {}
 
 func (*ConnectRequest_Register) isConnectRequest_Payload() {}
 
@@ -1012,6 +1068,8 @@ type ConnectResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Payload:
 	//
+	//	*ConnectResponse_HelloAck
+	//	*ConnectResponse_CapabilityAck
 	//	*ConnectResponse_RegisterAck
 	//	*ConnectResponse_SetUi
 	//	*ConnectResponse_StartStream
@@ -1071,6 +1129,24 @@ func (*ConnectResponse) Descriptor() ([]byte, []int) {
 func (x *ConnectResponse) GetPayload() isConnectResponse_Payload {
 	if x != nil {
 		return x.Payload
+	}
+	return nil
+}
+
+func (x *ConnectResponse) GetHelloAck() *HelloAck {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_HelloAck); ok {
+			return x.HelloAck
+		}
+	}
+	return nil
+}
+
+func (x *ConnectResponse) GetCapabilityAck() *CapabilityAck {
+	if x != nil {
+		if x, ok := x.Payload.(*ConnectResponse_CapabilityAck); ok {
+			return x.CapabilityAck
+		}
 	}
 	return nil
 }
@@ -1268,89 +1344,101 @@ type isConnectResponse_Payload interface {
 	isConnectResponse_Payload()
 }
 
+type ConnectResponse_HelloAck struct {
+	HelloAck *HelloAck `protobuf:"bytes,1,opt,name=hello_ack,json=helloAck,proto3,oneof"`
+}
+
+type ConnectResponse_CapabilityAck struct {
+	CapabilityAck *CapabilityAck `protobuf:"bytes,2,opt,name=capability_ack,json=capabilityAck,proto3,oneof"`
+}
+
 type ConnectResponse_RegisterAck struct {
-	RegisterAck *RegisterAck `protobuf:"bytes,1,opt,name=register_ack,json=registerAck,proto3,oneof"`
+	RegisterAck *RegisterAck `protobuf:"bytes,3,opt,name=register_ack,json=registerAck,proto3,oneof"`
 }
 
 type ConnectResponse_SetUi struct {
-	SetUi *v12.SetUI `protobuf:"bytes,2,opt,name=set_ui,json=setUi,proto3,oneof"`
+	SetUi *v12.SetUI `protobuf:"bytes,4,opt,name=set_ui,json=setUi,proto3,oneof"`
 }
 
 type ConnectResponse_StartStream struct {
-	StartStream *v1.StartStream `protobuf:"bytes,3,opt,name=start_stream,json=startStream,proto3,oneof"`
+	StartStream *v1.StartStream `protobuf:"bytes,5,opt,name=start_stream,json=startStream,proto3,oneof"`
 }
 
 type ConnectResponse_StopStream struct {
-	StopStream *v1.StopStream `protobuf:"bytes,4,opt,name=stop_stream,json=stopStream,proto3,oneof"`
+	StopStream *v1.StopStream `protobuf:"bytes,6,opt,name=stop_stream,json=stopStream,proto3,oneof"`
 }
 
 type ConnectResponse_PlayAudio struct {
-	PlayAudio *v1.PlayAudio `protobuf:"bytes,5,opt,name=play_audio,json=playAudio,proto3,oneof"`
+	PlayAudio *v1.PlayAudio `protobuf:"bytes,7,opt,name=play_audio,json=playAudio,proto3,oneof"`
 }
 
 type ConnectResponse_ShowMedia struct {
-	ShowMedia *v1.ShowMedia `protobuf:"bytes,6,opt,name=show_media,json=showMedia,proto3,oneof"`
+	ShowMedia *v1.ShowMedia `protobuf:"bytes,8,opt,name=show_media,json=showMedia,proto3,oneof"`
 }
 
 type ConnectResponse_RouteStream struct {
-	RouteStream *v1.RouteStream `protobuf:"bytes,7,opt,name=route_stream,json=routeStream,proto3,oneof"`
+	RouteStream *v1.RouteStream `protobuf:"bytes,9,opt,name=route_stream,json=routeStream,proto3,oneof"`
 }
 
 type ConnectResponse_Notification struct {
-	Notification *v12.Notification `protobuf:"bytes,8,opt,name=notification,proto3,oneof"`
+	Notification *v12.Notification `protobuf:"bytes,10,opt,name=notification,proto3,oneof"`
 }
 
 type ConnectResponse_WebrtcSignal struct {
-	WebrtcSignal *WebRTCSignal `protobuf:"bytes,9,opt,name=webrtc_signal,json=webrtcSignal,proto3,oneof"`
+	WebrtcSignal *WebRTCSignal `protobuf:"bytes,11,opt,name=webrtc_signal,json=webrtcSignal,proto3,oneof"`
 }
 
 type ConnectResponse_CommandResult struct {
-	CommandResult *CommandResult `protobuf:"bytes,10,opt,name=command_result,json=commandResult,proto3,oneof"`
+	CommandResult *CommandResult `protobuf:"bytes,12,opt,name=command_result,json=commandResult,proto3,oneof"`
 }
 
 type ConnectResponse_Heartbeat struct {
-	Heartbeat *Heartbeat `protobuf:"bytes,11,opt,name=heartbeat,proto3,oneof"`
+	Heartbeat *Heartbeat `protobuf:"bytes,13,opt,name=heartbeat,proto3,oneof"`
 }
 
 type ConnectResponse_Error struct {
-	Error *ControlError `protobuf:"bytes,12,opt,name=error,proto3,oneof"`
+	Error *ControlError `protobuf:"bytes,14,opt,name=error,proto3,oneof"`
 }
 
 type ConnectResponse_UpdateUi struct {
-	UpdateUi *v12.UpdateUI `protobuf:"bytes,13,opt,name=update_ui,json=updateUi,proto3,oneof"`
+	UpdateUi *v12.UpdateUI `protobuf:"bytes,15,opt,name=update_ui,json=updateUi,proto3,oneof"`
 }
 
 type ConnectResponse_TransitionUi struct {
-	TransitionUi *v12.TransitionUI `protobuf:"bytes,14,opt,name=transition_ui,json=transitionUi,proto3,oneof"`
+	TransitionUi *v12.TransitionUI `protobuf:"bytes,16,opt,name=transition_ui,json=transitionUi,proto3,oneof"`
 }
 
 type ConnectResponse_InstallBundle struct {
-	InstallBundle *v1.InstallBundle `protobuf:"bytes,15,opt,name=install_bundle,json=installBundle,proto3,oneof"`
+	InstallBundle *v1.InstallBundle `protobuf:"bytes,17,opt,name=install_bundle,json=installBundle,proto3,oneof"`
 }
 
 type ConnectResponse_RemoveBundle struct {
-	RemoveBundle *v1.RemoveBundle `protobuf:"bytes,16,opt,name=remove_bundle,json=removeBundle,proto3,oneof"`
+	RemoveBundle *v1.RemoveBundle `protobuf:"bytes,18,opt,name=remove_bundle,json=removeBundle,proto3,oneof"`
 }
 
 type ConnectResponse_StartFlow struct {
-	StartFlow *v1.StartFlow `protobuf:"bytes,17,opt,name=start_flow,json=startFlow,proto3,oneof"`
+	StartFlow *v1.StartFlow `protobuf:"bytes,19,opt,name=start_flow,json=startFlow,proto3,oneof"`
 }
 
 type ConnectResponse_PatchFlow struct {
-	PatchFlow *v1.PatchFlow `protobuf:"bytes,18,opt,name=patch_flow,json=patchFlow,proto3,oneof"`
+	PatchFlow *v1.PatchFlow `protobuf:"bytes,20,opt,name=patch_flow,json=patchFlow,proto3,oneof"`
 }
 
 type ConnectResponse_StopFlow struct {
-	StopFlow *v1.StopFlow `protobuf:"bytes,19,opt,name=stop_flow,json=stopFlow,proto3,oneof"`
+	StopFlow *v1.StopFlow `protobuf:"bytes,21,opt,name=stop_flow,json=stopFlow,proto3,oneof"`
 }
 
 type ConnectResponse_RequestArtifact struct {
-	RequestArtifact *v1.RequestArtifact `protobuf:"bytes,20,opt,name=request_artifact,json=requestArtifact,proto3,oneof"`
+	RequestArtifact *v1.RequestArtifact `protobuf:"bytes,22,opt,name=request_artifact,json=requestArtifact,proto3,oneof"`
 }
 
 type ConnectResponse_BugReportAck struct {
-	BugReportAck *v11.BugReportAck `protobuf:"bytes,21,opt,name=bug_report_ack,json=bugReportAck,proto3,oneof"`
+	BugReportAck *v11.BugReportAck `protobuf:"bytes,23,opt,name=bug_report_ack,json=bugReportAck,proto3,oneof"`
 }
+
+func (*ConnectResponse_HelloAck) isConnectResponse_Payload() {}
+
+func (*ConnectResponse_CapabilityAck) isConnectResponse_Payload() {}
 
 func (*ConnectResponse_RegisterAck) isConnectResponse_Payload() {}
 
@@ -1394,6 +1482,314 @@ func (*ConnectResponse_RequestArtifact) isConnectResponse_Payload() {}
 
 func (*ConnectResponse_BugReportAck) isConnectResponse_Payload() {}
 
+type Hello struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	Identity      *v13.DeviceIdentity    `protobuf:"bytes,2,opt,name=identity,proto3" json:"identity,omitempty"`
+	ClientVersion string                 `protobuf:"bytes,3,opt,name=client_version,json=clientVersion,proto3" json:"client_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Hello) Reset() {
+	*x = Hello{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Hello) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Hello) ProtoMessage() {}
+
+func (x *Hello) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Hello.ProtoReflect.Descriptor instead.
+func (*Hello) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Hello) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *Hello) GetIdentity() *v13.DeviceIdentity {
+	if x != nil {
+		return x.Identity
+	}
+	return nil
+}
+
+func (x *Hello) GetClientVersion() string {
+	if x != nil {
+		return x.ClientVersion
+	}
+	return ""
+}
+
+type HelloAck struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ServerId            string                 `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	SessionId           string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	HeartbeatIntervalMs int64                  `protobuf:"varint,3,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *HelloAck) Reset() {
+	*x = HelloAck{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HelloAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HelloAck) ProtoMessage() {}
+
+func (x *HelloAck) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HelloAck.ProtoReflect.Descriptor instead.
+func (*HelloAck) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *HelloAck) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *HelloAck) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *HelloAck) GetHeartbeatIntervalMs() int64 {
+	if x != nil {
+		return x.HeartbeatIntervalMs
+	}
+	return 0
+}
+
+type CapabilitySnapshot struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	DeviceId      string                  `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	Generation    uint64                  `protobuf:"varint,2,opt,name=generation,proto3" json:"generation,omitempty"`
+	Capabilities  *v13.DeviceCapabilities `protobuf:"bytes,3,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CapabilitySnapshot) Reset() {
+	*x = CapabilitySnapshot{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CapabilitySnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CapabilitySnapshot) ProtoMessage() {}
+
+func (x *CapabilitySnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CapabilitySnapshot.ProtoReflect.Descriptor instead.
+func (*CapabilitySnapshot) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CapabilitySnapshot) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *CapabilitySnapshot) GetGeneration() uint64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *CapabilitySnapshot) GetCapabilities() *v13.DeviceCapabilities {
+	if x != nil {
+		return x.Capabilities
+	}
+	return nil
+}
+
+type CapabilityDelta struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	DeviceId      string                  `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	Generation    uint64                  `protobuf:"varint,2,opt,name=generation,proto3" json:"generation,omitempty"`
+	Capabilities  *v13.DeviceCapabilities `protobuf:"bytes,3,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
+	Reason        string                  `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CapabilityDelta) Reset() {
+	*x = CapabilityDelta{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CapabilityDelta) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CapabilityDelta) ProtoMessage() {}
+
+func (x *CapabilityDelta) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CapabilityDelta.ProtoReflect.Descriptor instead.
+func (*CapabilityDelta) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CapabilityDelta) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *CapabilityDelta) GetGeneration() uint64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *CapabilityDelta) GetCapabilities() *v13.DeviceCapabilities {
+	if x != nil {
+		return x.Capabilities
+	}
+	return nil
+}
+
+func (x *CapabilityDelta) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type CapabilityAck struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId           string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	AcceptedGeneration uint64                 `protobuf:"varint,2,opt,name=accepted_generation,json=acceptedGeneration,proto3" json:"accepted_generation,omitempty"`
+	SnapshotApplied    bool                   `protobuf:"varint,3,opt,name=snapshot_applied,json=snapshotApplied,proto3" json:"snapshot_applied,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *CapabilityAck) Reset() {
+	*x = CapabilityAck{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CapabilityAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CapabilityAck) ProtoMessage() {}
+
+func (x *CapabilityAck) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CapabilityAck.ProtoReflect.Descriptor instead.
+func (*CapabilityAck) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *CapabilityAck) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *CapabilityAck) GetAcceptedGeneration() uint64 {
+	if x != nil {
+		return x.AcceptedGeneration
+	}
+	return 0
+}
+
+func (x *CapabilityAck) GetSnapshotApplied() bool {
+	if x != nil {
+		return x.SnapshotApplied
+	}
+	return false
+}
+
 type RegisterDevice struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
 	Capabilities  *v13.DeviceCapabilities `protobuf:"bytes,1,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
@@ -1403,7 +1799,7 @@ type RegisterDevice struct {
 
 func (x *RegisterDevice) Reset() {
 	*x = RegisterDevice{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[8]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1415,7 +1811,7 @@ func (x *RegisterDevice) String() string {
 func (*RegisterDevice) ProtoMessage() {}
 
 func (x *RegisterDevice) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[8]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1428,7 +1824,7 @@ func (x *RegisterDevice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterDevice.ProtoReflect.Descriptor instead.
 func (*RegisterDevice) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{8}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RegisterDevice) GetCapabilities() *v13.DeviceCapabilities {
@@ -1449,7 +1845,7 @@ type RegisterAck struct {
 
 func (x *RegisterAck) Reset() {
 	*x = RegisterAck{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[9]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1461,7 +1857,7 @@ func (x *RegisterAck) String() string {
 func (*RegisterAck) ProtoMessage() {}
 
 func (x *RegisterAck) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[9]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1474,7 +1870,7 @@ func (x *RegisterAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterAck.ProtoReflect.Descriptor instead.
 func (*RegisterAck) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{9}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RegisterAck) GetServerId() string {
@@ -1507,7 +1903,7 @@ type CapabilityUpdate struct {
 
 func (x *CapabilityUpdate) Reset() {
 	*x = CapabilityUpdate{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[10]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1519,7 +1915,7 @@ func (x *CapabilityUpdate) String() string {
 func (*CapabilityUpdate) ProtoMessage() {}
 
 func (x *CapabilityUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[10]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1532,7 +1928,7 @@ func (x *CapabilityUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapabilityUpdate.ProtoReflect.Descriptor instead.
 func (*CapabilityUpdate) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{10}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CapabilityUpdate) GetCapabilities() *v13.DeviceCapabilities {
@@ -1551,7 +1947,7 @@ type StreamReady struct {
 
 func (x *StreamReady) Reset() {
 	*x = StreamReady{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[11]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1563,7 +1959,7 @@ func (x *StreamReady) String() string {
 func (*StreamReady) ProtoMessage() {}
 
 func (x *StreamReady) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[11]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1576,7 +1972,7 @@ func (x *StreamReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamReady.ProtoReflect.Descriptor instead.
 func (*StreamReady) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{11}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StreamReady) GetStreamId() string {
@@ -1601,7 +1997,7 @@ type CommandRequest struct {
 
 func (x *CommandRequest) Reset() {
 	*x = CommandRequest{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[12]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1613,7 +2009,7 @@ func (x *CommandRequest) String() string {
 func (*CommandRequest) ProtoMessage() {}
 
 func (x *CommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[12]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1626,7 +2022,7 @@ func (x *CommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandRequest.ProtoReflect.Descriptor instead.
 func (*CommandRequest) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{12}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CommandRequest) GetRequestId() string {
@@ -1691,7 +2087,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[13]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1703,7 +2099,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[13]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1716,7 +2112,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{13}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CommandResult) GetRequestId() string {
@@ -1764,7 +2160,7 @@ type ControlError struct {
 
 func (x *ControlError) Reset() {
 	*x = ControlError{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[14]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1776,7 +2172,7 @@ func (x *ControlError) String() string {
 func (*ControlError) ProtoMessage() {}
 
 func (x *ControlError) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[14]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1789,7 +2185,7 @@ func (x *ControlError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlError.ProtoReflect.Descriptor instead.
 func (*ControlError) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{14}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ControlError) GetCode() ControlErrorCode {
@@ -1817,7 +2213,7 @@ type WebRTCSignal struct {
 
 func (x *WebRTCSignal) Reset() {
 	*x = WebRTCSignal{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[15]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1829,7 +2225,7 @@ func (x *WebRTCSignal) String() string {
 func (*WebRTCSignal) ProtoMessage() {}
 
 func (x *WebRTCSignal) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[15]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1842,7 +2238,7 @@ func (x *WebRTCSignal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebRTCSignal.ProtoReflect.Descriptor instead.
 func (*WebRTCSignal) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{15}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *WebRTCSignal) GetStreamId() string {
@@ -1876,7 +2272,7 @@ type Heartbeat struct {
 
 func (x *Heartbeat) Reset() {
 	*x = Heartbeat{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[16]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1888,7 +2284,7 @@ func (x *Heartbeat) String() string {
 func (*Heartbeat) ProtoMessage() {}
 
 func (x *Heartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[16]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1901,7 +2297,7 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{16}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Heartbeat) GetDeviceId() string {
@@ -1956,28 +2352,31 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\x13transport_hello_ack\x18\r \x01(\v2'.terminals.control.v1.TransportHelloAckH\x00R\x11transportHelloAck\x12[\n" +
 	"\x13transport_heartbeat\x18\x0e \x01(\v2(.terminals.control.v1.TransportHeartbeatH\x00R\x12transportHeartbeat\x12O\n" +
 	"\x0ftransport_error\x18\x0f \x01(\v2$.terminals.control.v1.TransportErrorH\x00R\x0etransportErrorB\t\n" +
-	"\apayload\"\xe3\a\n" +
-	"\x0eConnectRequest\x12B\n" +
-	"\bregister\x18\x01 \x01(\v2$.terminals.control.v1.RegisterDeviceH\x00R\bregister\x12H\n" +
+	"\apayload\"\xd1\t\n" +
+	"\x0eConnectRequest\x123\n" +
+	"\x05hello\x18\x01 \x01(\v2\x1b.terminals.control.v1.HelloH\x00R\x05hello\x12[\n" +
+	"\x13capability_snapshot\x18\x02 \x01(\v2(.terminals.control.v1.CapabilitySnapshotH\x00R\x12capabilitySnapshot\x12R\n" +
+	"\x10capability_delta\x18\x03 \x01(\v2%.terminals.control.v1.CapabilityDeltaH\x00R\x0fcapabilityDelta\x12F\n" +
+	"\bregister\x18\x14 \x01(\v2$.terminals.control.v1.RegisterDeviceB\x02\x18\x01H\x00R\bregister\x12L\n" +
 	"\n" +
-	"capability\x18\x02 \x01(\v2&.terminals.control.v1.CapabilityUpdateH\x00R\n" +
+	"capability\x18\x15 \x01(\v2&.terminals.control.v1.CapabilityUpdateB\x02\x18\x01H\x00R\n" +
 	"capability\x123\n" +
-	"\x05input\x18\x03 \x01(\v2\x1b.terminals.io.v1.InputEventH\x00R\x05input\x125\n" +
-	"\x06sensor\x18\x04 \x01(\v2\x1b.terminals.io.v1.SensorDataH\x00R\x06sensor\x12F\n" +
-	"\fstream_ready\x18\x05 \x01(\v2!.terminals.control.v1.StreamReadyH\x00R\vstreamReady\x12@\n" +
-	"\acommand\x18\x06 \x01(\v2$.terminals.control.v1.CommandRequestH\x00R\acommand\x12?\n" +
-	"\theartbeat\x18\a \x01(\v2\x1f.terminals.control.v1.HeartbeatH\x00R\theartbeat\x12I\n" +
-	"\rwebrtc_signal\x18\b \x01(\v2\".terminals.control.v1.WebRTCSignalH\x00R\fwebrtcSignal\x12C\n" +
-	"\vvoice_audio\x18\t \x01(\v2 .terminals.control.v1.VoiceAudioH\x00R\n" +
+	"\x05input\x18\x04 \x01(\v2\x1b.terminals.io.v1.InputEventH\x00R\x05input\x125\n" +
+	"\x06sensor\x18\x05 \x01(\v2\x1b.terminals.io.v1.SensorDataH\x00R\x06sensor\x12F\n" +
+	"\fstream_ready\x18\x06 \x01(\v2!.terminals.control.v1.StreamReadyH\x00R\vstreamReady\x12@\n" +
+	"\acommand\x18\a \x01(\v2$.terminals.control.v1.CommandRequestH\x00R\acommand\x12?\n" +
+	"\theartbeat\x18\b \x01(\v2\x1f.terminals.control.v1.HeartbeatH\x00R\theartbeat\x12I\n" +
+	"\rwebrtc_signal\x18\t \x01(\v2\".terminals.control.v1.WebRTCSignalH\x00R\fwebrtcSignal\x12C\n" +
+	"\vvoice_audio\x18\n" +
+	" \x01(\v2 .terminals.control.v1.VoiceAudioH\x00R\n" +
 	"voiceAudio\x12V\n" +
-	"\x13observation_message\x18\n" +
-	" \x01(\v2#.terminals.io.v1.ObservationMessageH\x00R\x12observationMessage\x12S\n" +
-	"\x12artifact_available\x18\v \x01(\v2\".terminals.io.v1.ArtifactAvailableH\x00R\x11artifactAvailable\x12;\n" +
+	"\x13observation_message\x18\v \x01(\v2#.terminals.io.v1.ObservationMessageH\x00R\x12observationMessage\x12S\n" +
+	"\x12artifact_available\x18\f \x01(\v2\".terminals.io.v1.ArtifactAvailableH\x00R\x11artifactAvailable\x12;\n" +
 	"\n" +
-	"flow_stats\x18\f \x01(\v2\x1a.terminals.io.v1.FlowStatsH\x00R\tflowStats\x12A\n" +
-	"\fclock_sample\x18\r \x01(\v2\x1c.terminals.io.v1.ClockSampleH\x00R\vclockSample\x12D\n" +
+	"flow_stats\x18\r \x01(\v2\x1a.terminals.io.v1.FlowStatsH\x00R\tflowStats\x12A\n" +
+	"\fclock_sample\x18\x0e \x01(\v2\x1c.terminals.io.v1.ClockSampleH\x00R\vclockSample\x12D\n" +
 	"\n" +
-	"bug_report\x18\x0e \x01(\v2#.terminals.diagnostics.v1.BugReportH\x00R\tbugReportB\t\n" +
+	"bug_report\x18\x0f \x01(\v2#.terminals.diagnostics.v1.BugReportH\x00R\tbugReportB\t\n" +
 	"\apayload\"{\n" +
 	"\n" +
 	"VoiceAudio\x12\x1b\n" +
@@ -1985,36 +2384,64 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\x05audio\x18\x02 \x01(\fR\x05audio\x12\x1f\n" +
 	"\vsample_rate\x18\x03 \x01(\x05R\n" +
 	"sampleRate\x12\x19\n" +
-	"\bis_final\x18\x04 \x01(\bR\aisFinal\"\x92\v\n" +
-	"\x0fConnectResponse\x12F\n" +
-	"\fregister_ack\x18\x01 \x01(\v2!.terminals.control.v1.RegisterAckH\x00R\vregisterAck\x12/\n" +
-	"\x06set_ui\x18\x02 \x01(\v2\x16.terminals.ui.v1.SetUIH\x00R\x05setUi\x12A\n" +
-	"\fstart_stream\x18\x03 \x01(\v2\x1c.terminals.io.v1.StartStreamH\x00R\vstartStream\x12>\n" +
-	"\vstop_stream\x18\x04 \x01(\v2\x1b.terminals.io.v1.StopStreamH\x00R\n" +
+	"\bis_final\x18\x04 \x01(\bR\aisFinal\"\x9f\f\n" +
+	"\x0fConnectResponse\x12=\n" +
+	"\thello_ack\x18\x01 \x01(\v2\x1e.terminals.control.v1.HelloAckH\x00R\bhelloAck\x12L\n" +
+	"\x0ecapability_ack\x18\x02 \x01(\v2#.terminals.control.v1.CapabilityAckH\x00R\rcapabilityAck\x12F\n" +
+	"\fregister_ack\x18\x03 \x01(\v2!.terminals.control.v1.RegisterAckH\x00R\vregisterAck\x12/\n" +
+	"\x06set_ui\x18\x04 \x01(\v2\x16.terminals.ui.v1.SetUIH\x00R\x05setUi\x12A\n" +
+	"\fstart_stream\x18\x05 \x01(\v2\x1c.terminals.io.v1.StartStreamH\x00R\vstartStream\x12>\n" +
+	"\vstop_stream\x18\x06 \x01(\v2\x1b.terminals.io.v1.StopStreamH\x00R\n" +
 	"stopStream\x12;\n" +
 	"\n" +
-	"play_audio\x18\x05 \x01(\v2\x1a.terminals.io.v1.PlayAudioH\x00R\tplayAudio\x12;\n" +
+	"play_audio\x18\a \x01(\v2\x1a.terminals.io.v1.PlayAudioH\x00R\tplayAudio\x12;\n" +
 	"\n" +
-	"show_media\x18\x06 \x01(\v2\x1a.terminals.io.v1.ShowMediaH\x00R\tshowMedia\x12A\n" +
-	"\froute_stream\x18\a \x01(\v2\x1c.terminals.io.v1.RouteStreamH\x00R\vrouteStream\x12C\n" +
-	"\fnotification\x18\b \x01(\v2\x1d.terminals.ui.v1.NotificationH\x00R\fnotification\x12I\n" +
-	"\rwebrtc_signal\x18\t \x01(\v2\".terminals.control.v1.WebRTCSignalH\x00R\fwebrtcSignal\x12L\n" +
-	"\x0ecommand_result\x18\n" +
-	" \x01(\v2#.terminals.control.v1.CommandResultH\x00R\rcommandResult\x12?\n" +
-	"\theartbeat\x18\v \x01(\v2\x1f.terminals.control.v1.HeartbeatH\x00R\theartbeat\x12:\n" +
-	"\x05error\x18\f \x01(\v2\".terminals.control.v1.ControlErrorH\x00R\x05error\x128\n" +
-	"\tupdate_ui\x18\r \x01(\v2\x19.terminals.ui.v1.UpdateUIH\x00R\bupdateUi\x12D\n" +
-	"\rtransition_ui\x18\x0e \x01(\v2\x1d.terminals.ui.v1.TransitionUIH\x00R\ftransitionUi\x12G\n" +
-	"\x0einstall_bundle\x18\x0f \x01(\v2\x1e.terminals.io.v1.InstallBundleH\x00R\rinstallBundle\x12D\n" +
-	"\rremove_bundle\x18\x10 \x01(\v2\x1d.terminals.io.v1.RemoveBundleH\x00R\fremoveBundle\x12;\n" +
+	"show_media\x18\b \x01(\v2\x1a.terminals.io.v1.ShowMediaH\x00R\tshowMedia\x12A\n" +
+	"\froute_stream\x18\t \x01(\v2\x1c.terminals.io.v1.RouteStreamH\x00R\vrouteStream\x12C\n" +
+	"\fnotification\x18\n" +
+	" \x01(\v2\x1d.terminals.ui.v1.NotificationH\x00R\fnotification\x12I\n" +
+	"\rwebrtc_signal\x18\v \x01(\v2\".terminals.control.v1.WebRTCSignalH\x00R\fwebrtcSignal\x12L\n" +
+	"\x0ecommand_result\x18\f \x01(\v2#.terminals.control.v1.CommandResultH\x00R\rcommandResult\x12?\n" +
+	"\theartbeat\x18\r \x01(\v2\x1f.terminals.control.v1.HeartbeatH\x00R\theartbeat\x12:\n" +
+	"\x05error\x18\x0e \x01(\v2\".terminals.control.v1.ControlErrorH\x00R\x05error\x128\n" +
+	"\tupdate_ui\x18\x0f \x01(\v2\x19.terminals.ui.v1.UpdateUIH\x00R\bupdateUi\x12D\n" +
+	"\rtransition_ui\x18\x10 \x01(\v2\x1d.terminals.ui.v1.TransitionUIH\x00R\ftransitionUi\x12G\n" +
+	"\x0einstall_bundle\x18\x11 \x01(\v2\x1e.terminals.io.v1.InstallBundleH\x00R\rinstallBundle\x12D\n" +
+	"\rremove_bundle\x18\x12 \x01(\v2\x1d.terminals.io.v1.RemoveBundleH\x00R\fremoveBundle\x12;\n" +
 	"\n" +
-	"start_flow\x18\x11 \x01(\v2\x1a.terminals.io.v1.StartFlowH\x00R\tstartFlow\x12;\n" +
+	"start_flow\x18\x13 \x01(\v2\x1a.terminals.io.v1.StartFlowH\x00R\tstartFlow\x12;\n" +
 	"\n" +
-	"patch_flow\x18\x12 \x01(\v2\x1a.terminals.io.v1.PatchFlowH\x00R\tpatchFlow\x128\n" +
-	"\tstop_flow\x18\x13 \x01(\v2\x19.terminals.io.v1.StopFlowH\x00R\bstopFlow\x12M\n" +
-	"\x10request_artifact\x18\x14 \x01(\v2 .terminals.io.v1.RequestArtifactH\x00R\x0frequestArtifact\x12N\n" +
-	"\x0ebug_report_ack\x18\x15 \x01(\v2&.terminals.diagnostics.v1.BugReportAckH\x00R\fbugReportAckB\t\n" +
-	"\apayload\"c\n" +
+	"patch_flow\x18\x14 \x01(\v2\x1a.terminals.io.v1.PatchFlowH\x00R\tpatchFlow\x128\n" +
+	"\tstop_flow\x18\x15 \x01(\v2\x19.terminals.io.v1.StopFlowH\x00R\bstopFlow\x12M\n" +
+	"\x10request_artifact\x18\x16 \x01(\v2 .terminals.io.v1.RequestArtifactH\x00R\x0frequestArtifact\x12N\n" +
+	"\x0ebug_report_ack\x18\x17 \x01(\v2&.terminals.diagnostics.v1.BugReportAckH\x00R\fbugReportAckB\t\n" +
+	"\apayload\"\x92\x01\n" +
+	"\x05Hello\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12E\n" +
+	"\bidentity\x18\x02 \x01(\v2).terminals.capabilities.v1.DeviceIdentityR\bidentity\x12%\n" +
+	"\x0eclient_version\x18\x03 \x01(\tR\rclientVersion\"z\n" +
+	"\bHelloAck\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x122\n" +
+	"\x15heartbeat_interval_ms\x18\x03 \x01(\x03R\x13heartbeatIntervalMs\"\xa4\x01\n" +
+	"\x12CapabilitySnapshot\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x02 \x01(\x04R\n" +
+	"generation\x12Q\n" +
+	"\fcapabilities\x18\x03 \x01(\v2-.terminals.capabilities.v1.DeviceCapabilitiesR\fcapabilities\"\xb9\x01\n" +
+	"\x0fCapabilityDelta\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x02 \x01(\x04R\n" +
+	"generation\x12Q\n" +
+	"\fcapabilities\x18\x03 \x01(\v2-.terminals.capabilities.v1.DeviceCapabilitiesR\fcapabilities\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\x88\x01\n" +
+	"\rCapabilityAck\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12/\n" +
+	"\x13accepted_generation\x18\x02 \x01(\x04R\x12acceptedGeneration\x12)\n" +
+	"\x10snapshot_applied\x18\x03 \x01(\bR\x0fsnapshotApplied\"c\n" +
 	"\x0eRegisterDevice\x12Q\n" +
 	"\fcapabilities\x18\x01 \x01(\v2-.terminals.capabilities.v1.DeviceCapabilitiesR\fcapabilities\"\xce\x01\n" +
 	"\vRegisterAck\x12\x1b\n" +
@@ -2102,7 +2529,7 @@ func file_terminals_control_v1_control_proto_rawDescGZIP() []byte {
 }
 
 var file_terminals_control_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_terminals_control_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_terminals_control_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_terminals_control_v1_control_proto_goTypes = []any{
 	(CarrierKind)(0),               // 0: terminals.control.v1.CarrierKind
 	(CommandAction)(0),             // 1: terminals.control.v1.CommandAction
@@ -2116,104 +2543,118 @@ var file_terminals_control_v1_control_proto_goTypes = []any{
 	(*ConnectRequest)(nil),         // 9: terminals.control.v1.ConnectRequest
 	(*VoiceAudio)(nil),             // 10: terminals.control.v1.VoiceAudio
 	(*ConnectResponse)(nil),        // 11: terminals.control.v1.ConnectResponse
-	(*RegisterDevice)(nil),         // 12: terminals.control.v1.RegisterDevice
-	(*RegisterAck)(nil),            // 13: terminals.control.v1.RegisterAck
-	(*CapabilityUpdate)(nil),       // 14: terminals.control.v1.CapabilityUpdate
-	(*StreamReady)(nil),            // 15: terminals.control.v1.StreamReady
-	(*CommandRequest)(nil),         // 16: terminals.control.v1.CommandRequest
-	(*CommandResult)(nil),          // 17: terminals.control.v1.CommandResult
-	(*ControlError)(nil),           // 18: terminals.control.v1.ControlError
-	(*WebRTCSignal)(nil),           // 19: terminals.control.v1.WebRTCSignal
-	(*Heartbeat)(nil),              // 20: terminals.control.v1.Heartbeat
-	nil,                            // 21: terminals.control.v1.TransportHelloAck.LimitsEntry
-	nil,                            // 22: terminals.control.v1.RegisterAck.MetadataEntry
-	nil,                            // 23: terminals.control.v1.CommandRequest.ArgumentsEntry
-	nil,                            // 24: terminals.control.v1.CommandResult.DataEntry
-	(*v1.InputEvent)(nil),          // 25: terminals.io.v1.InputEvent
-	(*v1.SensorData)(nil),          // 26: terminals.io.v1.SensorData
-	(*v1.ObservationMessage)(nil),  // 27: terminals.io.v1.ObservationMessage
-	(*v1.ArtifactAvailable)(nil),   // 28: terminals.io.v1.ArtifactAvailable
-	(*v1.FlowStats)(nil),           // 29: terminals.io.v1.FlowStats
-	(*v1.ClockSample)(nil),         // 30: terminals.io.v1.ClockSample
-	(*v11.BugReport)(nil),          // 31: terminals.diagnostics.v1.BugReport
-	(*v12.SetUI)(nil),              // 32: terminals.ui.v1.SetUI
-	(*v1.StartStream)(nil),         // 33: terminals.io.v1.StartStream
-	(*v1.StopStream)(nil),          // 34: terminals.io.v1.StopStream
-	(*v1.PlayAudio)(nil),           // 35: terminals.io.v1.PlayAudio
-	(*v1.ShowMedia)(nil),           // 36: terminals.io.v1.ShowMedia
-	(*v1.RouteStream)(nil),         // 37: terminals.io.v1.RouteStream
-	(*v12.Notification)(nil),       // 38: terminals.ui.v1.Notification
-	(*v12.UpdateUI)(nil),           // 39: terminals.ui.v1.UpdateUI
-	(*v12.TransitionUI)(nil),       // 40: terminals.ui.v1.TransitionUI
-	(*v1.InstallBundle)(nil),       // 41: terminals.io.v1.InstallBundle
-	(*v1.RemoveBundle)(nil),        // 42: terminals.io.v1.RemoveBundle
-	(*v1.StartFlow)(nil),           // 43: terminals.io.v1.StartFlow
-	(*v1.PatchFlow)(nil),           // 44: terminals.io.v1.PatchFlow
-	(*v1.StopFlow)(nil),            // 45: terminals.io.v1.StopFlow
-	(*v1.RequestArtifact)(nil),     // 46: terminals.io.v1.RequestArtifact
-	(*v11.BugReportAck)(nil),       // 47: terminals.diagnostics.v1.BugReportAck
-	(*v13.DeviceCapabilities)(nil), // 48: terminals.capabilities.v1.DeviceCapabilities
+	(*Hello)(nil),                  // 12: terminals.control.v1.Hello
+	(*HelloAck)(nil),               // 13: terminals.control.v1.HelloAck
+	(*CapabilitySnapshot)(nil),     // 14: terminals.control.v1.CapabilitySnapshot
+	(*CapabilityDelta)(nil),        // 15: terminals.control.v1.CapabilityDelta
+	(*CapabilityAck)(nil),          // 16: terminals.control.v1.CapabilityAck
+	(*RegisterDevice)(nil),         // 17: terminals.control.v1.RegisterDevice
+	(*RegisterAck)(nil),            // 18: terminals.control.v1.RegisterAck
+	(*CapabilityUpdate)(nil),       // 19: terminals.control.v1.CapabilityUpdate
+	(*StreamReady)(nil),            // 20: terminals.control.v1.StreamReady
+	(*CommandRequest)(nil),         // 21: terminals.control.v1.CommandRequest
+	(*CommandResult)(nil),          // 22: terminals.control.v1.CommandResult
+	(*ControlError)(nil),           // 23: terminals.control.v1.ControlError
+	(*WebRTCSignal)(nil),           // 24: terminals.control.v1.WebRTCSignal
+	(*Heartbeat)(nil),              // 25: terminals.control.v1.Heartbeat
+	nil,                            // 26: terminals.control.v1.TransportHelloAck.LimitsEntry
+	nil,                            // 27: terminals.control.v1.RegisterAck.MetadataEntry
+	nil,                            // 28: terminals.control.v1.CommandRequest.ArgumentsEntry
+	nil,                            // 29: terminals.control.v1.CommandResult.DataEntry
+	(*v1.InputEvent)(nil),          // 30: terminals.io.v1.InputEvent
+	(*v1.SensorData)(nil),          // 31: terminals.io.v1.SensorData
+	(*v1.ObservationMessage)(nil),  // 32: terminals.io.v1.ObservationMessage
+	(*v1.ArtifactAvailable)(nil),   // 33: terminals.io.v1.ArtifactAvailable
+	(*v1.FlowStats)(nil),           // 34: terminals.io.v1.FlowStats
+	(*v1.ClockSample)(nil),         // 35: terminals.io.v1.ClockSample
+	(*v11.BugReport)(nil),          // 36: terminals.diagnostics.v1.BugReport
+	(*v12.SetUI)(nil),              // 37: terminals.ui.v1.SetUI
+	(*v1.StartStream)(nil),         // 38: terminals.io.v1.StartStream
+	(*v1.StopStream)(nil),          // 39: terminals.io.v1.StopStream
+	(*v1.PlayAudio)(nil),           // 40: terminals.io.v1.PlayAudio
+	(*v1.ShowMedia)(nil),           // 41: terminals.io.v1.ShowMedia
+	(*v1.RouteStream)(nil),         // 42: terminals.io.v1.RouteStream
+	(*v12.Notification)(nil),       // 43: terminals.ui.v1.Notification
+	(*v12.UpdateUI)(nil),           // 44: terminals.ui.v1.UpdateUI
+	(*v12.TransitionUI)(nil),       // 45: terminals.ui.v1.TransitionUI
+	(*v1.InstallBundle)(nil),       // 46: terminals.io.v1.InstallBundle
+	(*v1.RemoveBundle)(nil),        // 47: terminals.io.v1.RemoveBundle
+	(*v1.StartFlow)(nil),           // 48: terminals.io.v1.StartFlow
+	(*v1.PatchFlow)(nil),           // 49: terminals.io.v1.PatchFlow
+	(*v1.StopFlow)(nil),            // 50: terminals.io.v1.StopFlow
+	(*v1.RequestArtifact)(nil),     // 51: terminals.io.v1.RequestArtifact
+	(*v11.BugReportAck)(nil),       // 52: terminals.diagnostics.v1.BugReportAck
+	(*v13.DeviceIdentity)(nil),     // 53: terminals.capabilities.v1.DeviceIdentity
+	(*v13.DeviceCapabilities)(nil), // 54: terminals.capabilities.v1.DeviceCapabilities
 }
 var file_terminals_control_v1_control_proto_depIdxs = []int32{
 	0,  // 0: terminals.control.v1.TransportHello.supported_carriers:type_name -> terminals.control.v1.CarrierKind
 	0,  // 1: terminals.control.v1.TransportHelloAck.negotiated_carrier:type_name -> terminals.control.v1.CarrierKind
-	21, // 2: terminals.control.v1.TransportHelloAck.limits:type_name -> terminals.control.v1.TransportHelloAck.LimitsEntry
+	26, // 2: terminals.control.v1.TransportHelloAck.limits:type_name -> terminals.control.v1.TransportHelloAck.LimitsEntry
 	9,  // 3: terminals.control.v1.WireEnvelope.client_message:type_name -> terminals.control.v1.ConnectRequest
 	11, // 4: terminals.control.v1.WireEnvelope.server_message:type_name -> terminals.control.v1.ConnectResponse
 	4,  // 5: terminals.control.v1.WireEnvelope.transport_hello:type_name -> terminals.control.v1.TransportHello
 	5,  // 6: terminals.control.v1.WireEnvelope.transport_hello_ack:type_name -> terminals.control.v1.TransportHelloAck
 	6,  // 7: terminals.control.v1.WireEnvelope.transport_heartbeat:type_name -> terminals.control.v1.TransportHeartbeat
 	7,  // 8: terminals.control.v1.WireEnvelope.transport_error:type_name -> terminals.control.v1.TransportError
-	12, // 9: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
-	14, // 10: terminals.control.v1.ConnectRequest.capability:type_name -> terminals.control.v1.CapabilityUpdate
-	25, // 11: terminals.control.v1.ConnectRequest.input:type_name -> terminals.io.v1.InputEvent
-	26, // 12: terminals.control.v1.ConnectRequest.sensor:type_name -> terminals.io.v1.SensorData
-	15, // 13: terminals.control.v1.ConnectRequest.stream_ready:type_name -> terminals.control.v1.StreamReady
-	16, // 14: terminals.control.v1.ConnectRequest.command:type_name -> terminals.control.v1.CommandRequest
-	20, // 15: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	19, // 16: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
-	10, // 17: terminals.control.v1.ConnectRequest.voice_audio:type_name -> terminals.control.v1.VoiceAudio
-	27, // 18: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
-	28, // 19: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
-	29, // 20: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
-	30, // 21: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
-	31, // 22: terminals.control.v1.ConnectRequest.bug_report:type_name -> terminals.diagnostics.v1.BugReport
-	13, // 23: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
-	32, // 24: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
-	33, // 25: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
-	34, // 26: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
-	35, // 27: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
-	36, // 28: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
-	37, // 29: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
-	38, // 30: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
-	19, // 31: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
-	17, // 32: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
-	20, // 33: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	18, // 34: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
-	39, // 35: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
-	40, // 36: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
-	41, // 37: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
-	42, // 38: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
-	43, // 39: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
-	44, // 40: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
-	45, // 41: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
-	46, // 42: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
-	47, // 43: terminals.control.v1.ConnectResponse.bug_report_ack:type_name -> terminals.diagnostics.v1.BugReportAck
-	48, // 44: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	22, // 45: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
-	48, // 46: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	1,  // 47: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
-	2,  // 48: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
-	23, // 49: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
-	24, // 50: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
-	3,  // 51: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
-	9,  // 52: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
-	11, // 53: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
-	53, // [53:54] is the sub-list for method output_type
-	52, // [52:53] is the sub-list for method input_type
-	52, // [52:52] is the sub-list for extension type_name
-	52, // [52:52] is the sub-list for extension extendee
-	0,  // [0:52] is the sub-list for field type_name
+	12, // 9: terminals.control.v1.ConnectRequest.hello:type_name -> terminals.control.v1.Hello
+	14, // 10: terminals.control.v1.ConnectRequest.capability_snapshot:type_name -> terminals.control.v1.CapabilitySnapshot
+	15, // 11: terminals.control.v1.ConnectRequest.capability_delta:type_name -> terminals.control.v1.CapabilityDelta
+	17, // 12: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
+	19, // 13: terminals.control.v1.ConnectRequest.capability:type_name -> terminals.control.v1.CapabilityUpdate
+	30, // 14: terminals.control.v1.ConnectRequest.input:type_name -> terminals.io.v1.InputEvent
+	31, // 15: terminals.control.v1.ConnectRequest.sensor:type_name -> terminals.io.v1.SensorData
+	20, // 16: terminals.control.v1.ConnectRequest.stream_ready:type_name -> terminals.control.v1.StreamReady
+	21, // 17: terminals.control.v1.ConnectRequest.command:type_name -> terminals.control.v1.CommandRequest
+	25, // 18: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	24, // 19: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	10, // 20: terminals.control.v1.ConnectRequest.voice_audio:type_name -> terminals.control.v1.VoiceAudio
+	32, // 21: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
+	33, // 22: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
+	34, // 23: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
+	35, // 24: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
+	36, // 25: terminals.control.v1.ConnectRequest.bug_report:type_name -> terminals.diagnostics.v1.BugReport
+	13, // 26: terminals.control.v1.ConnectResponse.hello_ack:type_name -> terminals.control.v1.HelloAck
+	16, // 27: terminals.control.v1.ConnectResponse.capability_ack:type_name -> terminals.control.v1.CapabilityAck
+	18, // 28: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
+	37, // 29: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
+	38, // 30: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
+	39, // 31: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
+	40, // 32: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
+	41, // 33: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
+	42, // 34: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
+	43, // 35: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
+	24, // 36: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	22, // 37: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
+	25, // 38: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	23, // 39: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
+	44, // 40: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
+	45, // 41: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
+	46, // 42: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
+	47, // 43: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
+	48, // 44: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
+	49, // 45: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
+	50, // 46: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
+	51, // 47: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
+	52, // 48: terminals.control.v1.ConnectResponse.bug_report_ack:type_name -> terminals.diagnostics.v1.BugReportAck
+	53, // 49: terminals.control.v1.Hello.identity:type_name -> terminals.capabilities.v1.DeviceIdentity
+	54, // 50: terminals.control.v1.CapabilitySnapshot.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	54, // 51: terminals.control.v1.CapabilityDelta.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	54, // 52: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	27, // 53: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
+	54, // 54: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	1,  // 55: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
+	2,  // 56: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
+	28, // 57: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
+	29, // 58: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
+	3,  // 59: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
+	9,  // 60: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
+	11, // 61: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
+	61, // [61:62] is the sub-list for method output_type
+	60, // [60:61] is the sub-list for method input_type
+	60, // [60:60] is the sub-list for extension type_name
+	60, // [60:60] is the sub-list for extension extendee
+	0,  // [0:60] is the sub-list for field type_name
 }
 
 func init() { file_terminals_control_v1_control_proto_init() }
@@ -2230,6 +2671,9 @@ func file_terminals_control_v1_control_proto_init() {
 		(*WireEnvelope_TransportError)(nil),
 	}
 	file_terminals_control_v1_control_proto_msgTypes[5].OneofWrappers = []any{
+		(*ConnectRequest_Hello)(nil),
+		(*ConnectRequest_CapabilitySnapshot)(nil),
+		(*ConnectRequest_CapabilityDelta)(nil),
 		(*ConnectRequest_Register)(nil),
 		(*ConnectRequest_Capability)(nil),
 		(*ConnectRequest_Input)(nil),
@@ -2246,6 +2690,8 @@ func file_terminals_control_v1_control_proto_init() {
 		(*ConnectRequest_BugReport)(nil),
 	}
 	file_terminals_control_v1_control_proto_msgTypes[7].OneofWrappers = []any{
+		(*ConnectResponse_HelloAck)(nil),
+		(*ConnectResponse_CapabilityAck)(nil),
 		(*ConnectResponse_RegisterAck)(nil),
 		(*ConnectResponse_SetUi)(nil),
 		(*ConnectResponse_StartStream)(nil),
@@ -2274,7 +2720,7 @@ func file_terminals_control_v1_control_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_control_v1_control_proto_rawDesc), len(file_terminals_control_v1_control_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   21,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

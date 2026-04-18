@@ -74,6 +74,47 @@ class TerminalControlGrpcClient implements TerminalControlClient {
       ..register = (RegisterDevice()..capabilities = capabilities);
   }
 
+  /// Builds a hello message for capability-lifecycle handshake.
+  static ConnectRequest helloRequest({
+    required String deviceId,
+    required DeviceIdentity identity,
+    required String clientVersion,
+  }) {
+    return ConnectRequest()
+      ..hello = (Hello()
+        ..deviceId = deviceId
+        ..identity = identity
+        ..clientVersion = clientVersion);
+  }
+
+  /// Builds a full capability snapshot baseline.
+  static ConnectRequest capabilitySnapshotRequest({
+    required String deviceId,
+    required int generation,
+    required DeviceCapabilities capabilities,
+  }) {
+    return ConnectRequest()
+      ..capabilitySnapshot = (CapabilitySnapshot()
+        ..deviceId = deviceId
+        ..generation = Int64(generation)
+        ..capabilities = capabilities);
+  }
+
+  /// Builds an incremental capability delta update.
+  static ConnectRequest capabilityDeltaRequest({
+    required String deviceId,
+    required int generation,
+    required DeviceCapabilities capabilities,
+    required String reason,
+  }) {
+    return ConnectRequest()
+      ..capabilityDelta = (CapabilityDelta()
+        ..deviceId = deviceId
+        ..generation = Int64(generation)
+        ..capabilities = capabilities
+        ..reason = reason);
+  }
+
   /// Builds a heartbeat message.
   static ConnectRequest heartbeatRequest({
     required String deviceId,

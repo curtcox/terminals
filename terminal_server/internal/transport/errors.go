@@ -1,6 +1,10 @@
 package transport
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/curtcox/terminals/terminal_server/internal/device"
+)
 
 // Stable machine-readable error codes for control stream responses.
 const (
@@ -28,6 +32,8 @@ func errorCodeFor(err error) string {
 		return ErrorCodeMissingText
 	case errors.Is(err, ErrMissingCommandDeviceID):
 		return ErrorCodeMissingDeviceID
+	case errors.Is(err, device.ErrStaleGeneration):
+		return ErrorCodeProtocolViolation
 	default:
 		return ErrorCodeUnknown
 	}

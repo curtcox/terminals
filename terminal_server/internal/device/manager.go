@@ -14,6 +14,9 @@ var (
 	ErrMissingDeviceID = errors.New("missing device id")
 	// ErrDeviceNotFound is returned when a referenced device does not exist.
 	ErrDeviceNotFound = errors.New("device not found")
+	// ErrStaleGeneration is returned when a capability update is older than
+	// the latest accepted generation for the device.
+	ErrStaleGeneration = errors.New("stale capability generation")
 )
 
 // Manager stores all registered devices and their evolving state.
@@ -49,12 +52,53 @@ func (m *Manager) Register(manifest Manifest) (Device, error) {
 	current.DeviceType = manifest.DeviceType
 	current.Platform = manifest.Platform
 	current.Capabilities = cloneCapabilities(manifest.Capabilities)
+	current.Generation = 0
+	current.LastSnapshot = time.Time{}
+	current.LastDelta = time.Time{}
 	current.Placement = clonePlacementMetadata(current.Placement)
 	current.State = StateConnected
 	current.LastHeartbeat = m.now().UTC()
 	m.devices[manifest.DeviceID] = current
 
 	return current, nil
+}
+
+// ApplyCapabilitySnapshot replaces capabilities at a newer generation.
+func (m *Manager) ApplyCapabilitySnapshot(deviceID string, generation uint64, caps CapabilitySet) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	current, exists := m.devices[deviceID]
+	if !exists {
+		return ErrDeviceNotFound
+	}
+	if generation <= current.Generation {
+		return ErrStaleGeneration
+	}
+	current.Capabilities = cloneCapabilities(caps)
+	current.Generation = generation
+	current.LastSnapshot = m.now().UTC()
+	m.devices[deviceID] = current
+	return nil
+}
+
+// ApplyCapabilityDelta applies capability changes at a newer generation.
+func (m *Manager) ApplyCapabilityDelta(deviceID string, generation uint64, caps CapabilitySet) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	current, exists := m.devices[deviceID]
+	if !exists {
+		return ErrDeviceNotFound
+	}
+	if generation <= current.Generation {
+		return ErrStaleGeneration
+	}
+	current.Capabilities = cloneCapabilities(caps)
+	current.Generation = generation
+	current.LastDelta = m.now().UTC()
+	m.devices[deviceID] = current
+	return nil
 }
 
 // UpdateCapabilities replaces the capability set for an existing device.
