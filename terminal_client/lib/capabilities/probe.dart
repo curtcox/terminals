@@ -270,8 +270,8 @@ Future<List<MediaDeviceDescriptor>> _defaultMediaDeviceInventoryProvider() async
       .map(
         (device) => MediaDeviceDescriptor(
           kind: device.kind ?? '',
-          deviceId: device.deviceId ?? '',
-          label: device.label ?? '',
+          deviceId: device.deviceId,
+          label: device.label,
         ),
       )
       .toList(growable: false);

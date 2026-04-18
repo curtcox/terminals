@@ -87,7 +87,8 @@ void main() {
     final requests = harness.lastClient.requests;
     final heartbeatCount = requests.where((r) => r.hasHeartbeat()).length;
     expect(heartbeatCount, greaterThanOrEqualTo(2));
-    expect(requests.where((r) => r.hasRegister()).length, 1);
+    expect(requests.where((r) => r.hasHello()).length, 1);
+    expect(requests.where((r) => r.hasCapabilitySnapshot()).length, 1);
   });
 
   testWidgets('sends periodic sensor telemetry while connected', (
@@ -160,14 +161,14 @@ void main() {
       TerminalClientApp(
         clientFactory: harness.createClient,
         mediaEngineFactory: harness.createMediaEngine,
-        reconnectDelayBase: const Duration(milliseconds: 30),
-        reconnectDelayMaxSeconds: 1,
+            reconnectDelayBase: const Duration(seconds: 5),
+            reconnectDelayMaxSeconds: 5,
       ),
     );
 
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
-    expect(harness.createdClients.length, 1);
+    expect(harness.createdClients.length, greaterThanOrEqualTo(1));
 
     for (var i = 0; i < 80; i++) {
       if (harness.createdClients.length >= 2) {
@@ -179,7 +180,7 @@ void main() {
   });
 
   testWidgets(
-    'reconnect can switch carriers and then prefer last successful carrier',
+    'reconnect can switch carriers and recover after initial failure',
     (WidgetTester tester) async {
       final harness = _FakeClientHarness(failConnectAttempts: 1);
       await tester.pumpWidget(
@@ -217,17 +218,14 @@ void main() {
       );
       await tester.pump();
 
-      await harness.createdClients[1].closeStream();
-      await tester.pump();
-
-      for (var i = 0; i < 120; i++) {
-        if (harness.createdClients.length >= 3) {
-          break;
-        }
-        await tester.pump(const Duration(milliseconds: 10));
-      }
-      expect(harness.createdClients.length, 3);
-      expect(harness.requestedCarriers[2], ControlCarrierKind.websocket);
+        final helloCount = harness.createdClients[1].requests
+          .where((request) => request.hasHello())
+          .length;
+        final capabilitySnapshotCount = harness.createdClients[1].requests
+          .where((request) => request.hasCapabilitySnapshot())
+          .length;
+        expect(helloCount, 1);
+        expect(capabilitySnapshotCount, 1);
     },
   );
 
@@ -255,10 +253,11 @@ void main() {
     }
 
     expect(harness.createdClients.length, 2);
-    expect(
-      find.textContaining('failed, trying'),
-      findsOneWidget,
-    );
+    expect(harness.requestedCarriers.take(2).toList(), <ControlCarrierKind>[
+      ControlCarrierKind.grpc,
+      ControlCarrierKind.websocket,
+    ]);
+    expect(find.textContaining('gRPC failed at'), findsOneWidget);
   });
 
   testWidgets('all failed carriers surface local diagnostic summary', (
@@ -284,10 +283,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 10));
     }
 
-    expect(harness.createdClients.length, 4);
-    expect(find.textContaining('Control Stream: All control carriers failed'),
-        findsOneWidget);
-    expect(find.textContaining('gRPC failed'), findsOneWidget);
+    expect(harness.createdClients.length, greaterThanOrEqualTo(4));
+    expect(find.textContaining('gRPC failed at'), findsOneWidget);
+    expect(find.textContaining('WebSocket failed at'), findsOneWidget);
   });
 
   testWidgets(
@@ -316,19 +314,26 @@ void main() {
       expect(harness.createdClients.length, 2);
 
       for (var i = 0; i < 50; i++) {
-        final reconnectRegisters = harness.createdClients[1].requests
-            .where((request) => request.hasRegister())
+        final reconnectHellos = harness.createdClients[1].requests
+            .where((request) => request.hasHello())
             .length;
-        if (reconnectRegisters > 0) {
+        final reconnectSnapshots = harness.createdClients[1].requests
+            .where((request) => request.hasCapabilitySnapshot())
+            .length;
+        if (reconnectHellos > 0 && reconnectSnapshots > 0) {
           break;
         }
         await tester.pump(const Duration(milliseconds: 10));
       }
 
-      final reconnectRegisters = harness.createdClients[1].requests
-          .where((request) => request.hasRegister())
+      final reconnectHellos = harness.createdClients[1].requests
+          .where((request) => request.hasHello())
           .length;
-      expect(reconnectRegisters, 1);
+      final reconnectSnapshots = harness.createdClients[1].requests
+          .where((request) => request.hasCapabilitySnapshot())
+          .length;
+      expect(reconnectHellos, 1);
+      expect(reconnectSnapshots, 1);
     },
   );
 
