@@ -36,6 +36,7 @@ type DeviceCapabilities struct {
 	Connectivity  *ConnectivityCapability `protobuf:"bytes,18,opt,name=connectivity,proto3" json:"connectivity,omitempty"`
 	Battery       *BatteryCapability      `protobuf:"bytes,19,opt,name=battery,proto3" json:"battery,omitempty"`
 	Edge          *EdgeCapability         `protobuf:"bytes,20,opt,name=edge,proto3" json:"edge,omitempty"`
+	Displays      []*DisplayCapability    `protobuf:"bytes,21,rep,name=displays,proto3" json:"displays,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -161,6 +162,13 @@ func (x *DeviceCapabilities) GetEdge() *EdgeCapability {
 	return nil
 }
 
+func (x *DeviceCapabilities) GetDisplays() []*DisplayCapability {
+	if x != nil {
+		return x.Displays
+	}
+	return nil
+}
+
 type DeviceIdentity struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DeviceName    string                 `protobuf:"bytes,1,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
@@ -222,13 +230,17 @@ func (x *DeviceIdentity) GetPlatform() string {
 }
 
 type ScreenCapability struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Width         int32                  `protobuf:"varint,1,opt,name=width,proto3" json:"width,omitempty"`
-	Height        int32                  `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
-	Density       float64                `protobuf:"fixed64,3,opt,name=density,proto3" json:"density,omitempty"`
-	Touch         bool                   `protobuf:"varint,4,opt,name=touch,proto3" json:"touch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Width                int32                  `protobuf:"varint,1,opt,name=width,proto3" json:"width,omitempty"`
+	Height               int32                  `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
+	Density              float64                `protobuf:"fixed64,3,opt,name=density,proto3" json:"density,omitempty"`
+	Touch                bool                   `protobuf:"varint,4,opt,name=touch,proto3" json:"touch,omitempty"`
+	Orientation          string                 `protobuf:"bytes,5,opt,name=orientation,proto3" json:"orientation,omitempty"`
+	FullscreenSupported  bool                   `protobuf:"varint,6,opt,name=fullscreen_supported,json=fullscreenSupported,proto3" json:"fullscreen_supported,omitempty"`
+	MultiWindowSupported bool                   `protobuf:"varint,7,opt,name=multi_window_supported,json=multiWindowSupported,proto3" json:"multi_window_supported,omitempty"`
+	SafeArea             *Insets                `protobuf:"bytes,8,opt,name=safe_area,json=safeArea,proto3" json:"safe_area,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ScreenCapability) Reset() {
@@ -289,6 +301,170 @@ func (x *ScreenCapability) GetTouch() bool {
 	return false
 }
 
+func (x *ScreenCapability) GetOrientation() string {
+	if x != nil {
+		return x.Orientation
+	}
+	return ""
+}
+
+func (x *ScreenCapability) GetFullscreenSupported() bool {
+	if x != nil {
+		return x.FullscreenSupported
+	}
+	return false
+}
+
+func (x *ScreenCapability) GetMultiWindowSupported() bool {
+	if x != nil {
+		return x.MultiWindowSupported
+	}
+	return false
+}
+
+func (x *ScreenCapability) GetSafeArea() *Insets {
+	if x != nil {
+		return x.SafeArea
+	}
+	return nil
+}
+
+type Insets struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Left          int32                  `protobuf:"varint,1,opt,name=left,proto3" json:"left,omitempty"`
+	Top           int32                  `protobuf:"varint,2,opt,name=top,proto3" json:"top,omitempty"`
+	Right         int32                  `protobuf:"varint,3,opt,name=right,proto3" json:"right,omitempty"`
+	Bottom        int32                  `protobuf:"varint,4,opt,name=bottom,proto3" json:"bottom,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Insets) Reset() {
+	*x = Insets{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Insets) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Insets) ProtoMessage() {}
+
+func (x *Insets) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Insets.ProtoReflect.Descriptor instead.
+func (*Insets) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Insets) GetLeft() int32 {
+	if x != nil {
+		return x.Left
+	}
+	return 0
+}
+
+func (x *Insets) GetTop() int32 {
+	if x != nil {
+		return x.Top
+	}
+	return 0
+}
+
+func (x *Insets) GetRight() int32 {
+	if x != nil {
+		return x.Right
+	}
+	return 0
+}
+
+func (x *Insets) GetBottom() int32 {
+	if x != nil {
+		return x.Bottom
+	}
+	return 0
+}
+
+type DisplayCapability struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DisplayId     string                 `protobuf:"bytes,1,opt,name=display_id,json=displayId,proto3" json:"display_id,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Primary       bool                   `protobuf:"varint,3,opt,name=primary,proto3" json:"primary,omitempty"`
+	Screen        *ScreenCapability      `protobuf:"bytes,4,opt,name=screen,proto3" json:"screen,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisplayCapability) Reset() {
+	*x = DisplayCapability{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisplayCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisplayCapability) ProtoMessage() {}
+
+func (x *DisplayCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisplayCapability.ProtoReflect.Descriptor instead.
+func (*DisplayCapability) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DisplayCapability) GetDisplayId() string {
+	if x != nil {
+		return x.DisplayId
+	}
+	return ""
+}
+
+func (x *DisplayCapability) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *DisplayCapability) GetPrimary() bool {
+	if x != nil {
+		return x.Primary
+	}
+	return false
+}
+
+func (x *DisplayCapability) GetScreen() *ScreenCapability {
+	if x != nil {
+		return x.Screen
+	}
+	return nil
+}
+
 type KeyboardCapability struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Physical      bool                   `protobuf:"varint,1,opt,name=physical,proto3" json:"physical,omitempty"`
@@ -299,7 +475,7 @@ type KeyboardCapability struct {
 
 func (x *KeyboardCapability) Reset() {
 	*x = KeyboardCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[3]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -311,7 +487,7 @@ func (x *KeyboardCapability) String() string {
 func (*KeyboardCapability) ProtoMessage() {}
 
 func (x *KeyboardCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[3]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -324,7 +500,7 @@ func (x *KeyboardCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyboardCapability.ProtoReflect.Descriptor instead.
 func (*KeyboardCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{3}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *KeyboardCapability) GetPhysical() bool {
@@ -351,7 +527,7 @@ type PointerCapability struct {
 
 func (x *PointerCapability) Reset() {
 	*x = PointerCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[4]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -363,7 +539,7 @@ func (x *PointerCapability) String() string {
 func (*PointerCapability) ProtoMessage() {}
 
 func (x *PointerCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[4]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -376,7 +552,7 @@ func (x *PointerCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PointerCapability.ProtoReflect.Descriptor instead.
 func (*PointerCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{4}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PointerCapability) GetType() string {
@@ -403,7 +579,7 @@ type TouchCapability struct {
 
 func (x *TouchCapability) Reset() {
 	*x = TouchCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[5]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -415,7 +591,7 @@ func (x *TouchCapability) String() string {
 func (*TouchCapability) ProtoMessage() {}
 
 func (x *TouchCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[5]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -428,7 +604,7 @@ func (x *TouchCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TouchCapability.ProtoReflect.Descriptor instead.
 func (*TouchCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{5}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TouchCapability) GetSupported() bool {
@@ -449,13 +625,14 @@ type AudioOutputCapability struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Channels      int32                  `protobuf:"varint,1,opt,name=channels,proto3" json:"channels,omitempty"`
 	SampleRates   []int32                `protobuf:"varint,2,rep,packed,name=sample_rates,json=sampleRates,proto3" json:"sample_rates,omitempty"`
+	Endpoints     []*AudioEndpoint       `protobuf:"bytes,3,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AudioOutputCapability) Reset() {
 	*x = AudioOutputCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[6]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +644,7 @@ func (x *AudioOutputCapability) String() string {
 func (*AudioOutputCapability) ProtoMessage() {}
 
 func (x *AudioOutputCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[6]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +657,7 @@ func (x *AudioOutputCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AudioOutputCapability.ProtoReflect.Descriptor instead.
 func (*AudioOutputCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{6}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AudioOutputCapability) GetChannels() int32 {
@@ -497,17 +674,25 @@ func (x *AudioOutputCapability) GetSampleRates() []int32 {
 	return nil
 }
 
+func (x *AudioOutputCapability) GetEndpoints() []*AudioEndpoint {
+	if x != nil {
+		return x.Endpoints
+	}
+	return nil
+}
+
 type AudioInputCapability struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Channels      int32                  `protobuf:"varint,1,opt,name=channels,proto3" json:"channels,omitempty"`
 	SampleRates   []int32                `protobuf:"varint,2,rep,packed,name=sample_rates,json=sampleRates,proto3" json:"sample_rates,omitempty"`
+	Endpoints     []*AudioEndpoint       `protobuf:"bytes,3,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AudioInputCapability) Reset() {
 	*x = AudioInputCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[7]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -519,7 +704,7 @@ func (x *AudioInputCapability) String() string {
 func (*AudioInputCapability) ProtoMessage() {}
 
 func (x *AudioInputCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[7]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -532,7 +717,7 @@ func (x *AudioInputCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AudioInputCapability.ProtoReflect.Descriptor instead.
 func (*AudioInputCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{7}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AudioInputCapability) GetChannels() int32 {
@@ -549,6 +734,97 @@ func (x *AudioInputCapability) GetSampleRates() []int32 {
 	return nil
 }
 
+func (x *AudioInputCapability) GetEndpoints() []*AudioEndpoint {
+	if x != nil {
+		return x.Endpoints
+	}
+	return nil
+}
+
+type AudioEndpoint struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	EndpointId     string                 `protobuf:"bytes,1,opt,name=endpoint_id,json=endpointId,proto3" json:"endpoint_id,omitempty"`
+	EndpointName   string                 `protobuf:"bytes,2,opt,name=endpoint_name,json=endpointName,proto3" json:"endpoint_name,omitempty"`
+	ConnectionType string                 `protobuf:"bytes,3,opt,name=connection_type,json=connectionType,proto3" json:"connection_type,omitempty"`
+	Channels       int32                  `protobuf:"varint,4,opt,name=channels,proto3" json:"channels,omitempty"`
+	SampleRates    []int32                `protobuf:"varint,5,rep,packed,name=sample_rates,json=sampleRates,proto3" json:"sample_rates,omitempty"`
+	Available      bool                   `protobuf:"varint,6,opt,name=available,proto3" json:"available,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AudioEndpoint) Reset() {
+	*x = AudioEndpoint{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AudioEndpoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AudioEndpoint) ProtoMessage() {}
+
+func (x *AudioEndpoint) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AudioEndpoint.ProtoReflect.Descriptor instead.
+func (*AudioEndpoint) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AudioEndpoint) GetEndpointId() string {
+	if x != nil {
+		return x.EndpointId
+	}
+	return ""
+}
+
+func (x *AudioEndpoint) GetEndpointName() string {
+	if x != nil {
+		return x.EndpointName
+	}
+	return ""
+}
+
+func (x *AudioEndpoint) GetConnectionType() string {
+	if x != nil {
+		return x.ConnectionType
+	}
+	return ""
+}
+
+func (x *AudioEndpoint) GetChannels() int32 {
+	if x != nil {
+		return x.Channels
+	}
+	return 0
+}
+
+func (x *AudioEndpoint) GetSampleRates() []int32 {
+	if x != nil {
+		return x.SampleRates
+	}
+	return nil
+}
+
+func (x *AudioEndpoint) GetAvailable() bool {
+	if x != nil {
+		return x.Available
+	}
+	return false
+}
+
 type CameraLens struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Width         int32                  `protobuf:"varint,1,opt,name=width,proto3" json:"width,omitempty"`
@@ -560,7 +836,7 @@ type CameraLens struct {
 
 func (x *CameraLens) Reset() {
 	*x = CameraLens{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[8]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -572,7 +848,7 @@ func (x *CameraLens) String() string {
 func (*CameraLens) ProtoMessage() {}
 
 func (x *CameraLens) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[8]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -585,7 +861,7 @@ func (x *CameraLens) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CameraLens.ProtoReflect.Descriptor instead.
 func (*CameraLens) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{8}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CameraLens) GetWidth() int32 {
@@ -613,13 +889,14 @@ type CameraCapability struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Front         *CameraLens            `protobuf:"bytes,1,opt,name=front,proto3" json:"front,omitempty"`
 	Back          *CameraLens            `protobuf:"bytes,2,opt,name=back,proto3" json:"back,omitempty"`
+	Endpoints     []*CameraEndpoint      `protobuf:"bytes,3,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CameraCapability) Reset() {
 	*x = CameraCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[9]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -631,7 +908,7 @@ func (x *CameraCapability) String() string {
 func (*CameraCapability) ProtoMessage() {}
 
 func (x *CameraCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[9]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +921,7 @@ func (x *CameraCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CameraCapability.ProtoReflect.Descriptor instead.
 func (*CameraCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{9}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CameraCapability) GetFront() *CameraLens {
@@ -661,6 +938,97 @@ func (x *CameraCapability) GetBack() *CameraLens {
 	return nil
 }
 
+func (x *CameraCapability) GetEndpoints() []*CameraEndpoint {
+	if x != nil {
+		return x.Endpoints
+	}
+	return nil
+}
+
+type CameraEndpoint struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	EndpointId     string                 `protobuf:"bytes,1,opt,name=endpoint_id,json=endpointId,proto3" json:"endpoint_id,omitempty"`
+	EndpointName   string                 `protobuf:"bytes,2,opt,name=endpoint_name,json=endpointName,proto3" json:"endpoint_name,omitempty"`
+	ConnectionType string                 `protobuf:"bytes,3,opt,name=connection_type,json=connectionType,proto3" json:"connection_type,omitempty"`
+	Facing         string                 `protobuf:"bytes,4,opt,name=facing,proto3" json:"facing,omitempty"`
+	Modes          []*CameraLens          `protobuf:"bytes,5,rep,name=modes,proto3" json:"modes,omitempty"`
+	Available      bool                   `protobuf:"varint,6,opt,name=available,proto3" json:"available,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CameraEndpoint) Reset() {
+	*x = CameraEndpoint{}
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CameraEndpoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CameraEndpoint) ProtoMessage() {}
+
+func (x *CameraEndpoint) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CameraEndpoint.ProtoReflect.Descriptor instead.
+func (*CameraEndpoint) Descriptor() ([]byte, []int) {
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *CameraEndpoint) GetEndpointId() string {
+	if x != nil {
+		return x.EndpointId
+	}
+	return ""
+}
+
+func (x *CameraEndpoint) GetEndpointName() string {
+	if x != nil {
+		return x.EndpointName
+	}
+	return ""
+}
+
+func (x *CameraEndpoint) GetConnectionType() string {
+	if x != nil {
+		return x.ConnectionType
+	}
+	return ""
+}
+
+func (x *CameraEndpoint) GetFacing() string {
+	if x != nil {
+		return x.Facing
+	}
+	return ""
+}
+
+func (x *CameraEndpoint) GetModes() []*CameraLens {
+	if x != nil {
+		return x.Modes
+	}
+	return nil
+}
+
+func (x *CameraEndpoint) GetAvailable() bool {
+	if x != nil {
+		return x.Available
+	}
+	return false
+}
+
 type SensorCapability struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Accelerometer bool                   `protobuf:"varint,1,opt,name=accelerometer,proto3" json:"accelerometer,omitempty"`
@@ -675,7 +1043,7 @@ type SensorCapability struct {
 
 func (x *SensorCapability) Reset() {
 	*x = SensorCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[10]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -687,7 +1055,7 @@ func (x *SensorCapability) String() string {
 func (*SensorCapability) ProtoMessage() {}
 
 func (x *SensorCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[10]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -700,7 +1068,7 @@ func (x *SensorCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SensorCapability.ProtoReflect.Descriptor instead.
 func (*SensorCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{10}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SensorCapability) GetAccelerometer() bool {
@@ -758,7 +1126,7 @@ type ConnectivityCapability struct {
 
 func (x *ConnectivityCapability) Reset() {
 	*x = ConnectivityCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[11]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +1138,7 @@ func (x *ConnectivityCapability) String() string {
 func (*ConnectivityCapability) ProtoMessage() {}
 
 func (x *ConnectivityCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[11]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,7 +1151,7 @@ func (x *ConnectivityCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectivityCapability.ProtoReflect.Descriptor instead.
 func (*ConnectivityCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{11}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ConnectivityCapability) GetBluetoothVersion() string {
@@ -831,7 +1199,7 @@ type BatteryCapability struct {
 
 func (x *BatteryCapability) Reset() {
 	*x = BatteryCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[12]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -843,7 +1211,7 @@ func (x *BatteryCapability) String() string {
 func (*BatteryCapability) ProtoMessage() {}
 
 func (x *BatteryCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[12]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -856,7 +1224,7 @@ func (x *BatteryCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatteryCapability.ProtoReflect.Descriptor instead.
 func (*BatteryCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{12}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *BatteryCapability) GetLevel() float32 {
@@ -887,7 +1255,7 @@ type EdgeCapability struct {
 
 func (x *EdgeCapability) Reset() {
 	*x = EdgeCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[13]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -899,7 +1267,7 @@ func (x *EdgeCapability) String() string {
 func (*EdgeCapability) ProtoMessage() {}
 
 func (x *EdgeCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[13]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -912,7 +1280,7 @@ func (x *EdgeCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeCapability.ProtoReflect.Descriptor instead.
 func (*EdgeCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{13}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *EdgeCapability) GetRuntimes() []string {
@@ -969,7 +1337,7 @@ type EdgeComputeCapability struct {
 
 func (x *EdgeComputeCapability) Reset() {
 	*x = EdgeComputeCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[14]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -981,7 +1349,7 @@ func (x *EdgeComputeCapability) String() string {
 func (*EdgeComputeCapability) ProtoMessage() {}
 
 func (x *EdgeComputeCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[14]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -994,7 +1362,7 @@ func (x *EdgeComputeCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeComputeCapability.ProtoReflect.Descriptor instead.
 func (*EdgeComputeCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{14}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *EdgeComputeCapability) GetCpuRealtime() int32 {
@@ -1037,7 +1405,7 @@ type EdgeRetentionCapability struct {
 
 func (x *EdgeRetentionCapability) Reset() {
 	*x = EdgeRetentionCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[15]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1049,7 +1417,7 @@ func (x *EdgeRetentionCapability) String() string {
 func (*EdgeRetentionCapability) ProtoMessage() {}
 
 func (x *EdgeRetentionCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[15]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1062,7 +1430,7 @@ func (x *EdgeRetentionCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeRetentionCapability.ProtoReflect.Descriptor instead.
 func (*EdgeRetentionCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{15}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *EdgeRetentionCapability) GetAudioSec() int32 {
@@ -1102,7 +1470,7 @@ type EdgeTimingCapability struct {
 
 func (x *EdgeTimingCapability) Reset() {
 	*x = EdgeTimingCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[16]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1114,7 +1482,7 @@ func (x *EdgeTimingCapability) String() string {
 func (*EdgeTimingCapability) ProtoMessage() {}
 
 func (x *EdgeTimingCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[16]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1127,7 +1495,7 @@ func (x *EdgeTimingCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeTimingCapability.ProtoReflect.Descriptor instead.
 func (*EdgeTimingCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{16}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *EdgeTimingCapability) GetSyncErrorMs() float64 {
@@ -1148,7 +1516,7 @@ type EdgeGeometryCapability struct {
 
 func (x *EdgeGeometryCapability) Reset() {
 	*x = EdgeGeometryCapability{}
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1160,7 +1528,7 @@ func (x *EdgeGeometryCapability) String() string {
 func (*EdgeGeometryCapability) ProtoMessage() {}
 
 func (x *EdgeGeometryCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[17]
+	mi := &file_terminals_capabilities_v1_capabilities_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1173,7 +1541,7 @@ func (x *EdgeGeometryCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EdgeGeometryCapability.ProtoReflect.Descriptor instead.
 func (*EdgeGeometryCapability) Descriptor() ([]byte, []int) {
-	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{17}
+	return file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *EdgeGeometryCapability) GetMicArray() bool {
@@ -1201,7 +1569,7 @@ var File_terminals_capabilities_v1_capabilities_proto protoreflect.FileDescripto
 
 const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\n" +
-	",terminals/capabilities/v1/capabilities.proto\x12\x19terminals.capabilities.v1\"\x9b\a\n" +
+	",terminals/capabilities/v1/capabilities.proto\x12\x19terminals.capabilities.v1\"\xe5\a\n" +
 	"\x12DeviceCapabilities\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12E\n" +
 	"\bidentity\x18\x02 \x01(\v2).terminals.capabilities.v1.DeviceIdentityR\bidentity\x12C\n" +
@@ -1218,18 +1586,34 @@ const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\asensors\x18\x11 \x01(\v2+.terminals.capabilities.v1.SensorCapabilityR\asensors\x12U\n" +
 	"\fconnectivity\x18\x12 \x01(\v21.terminals.capabilities.v1.ConnectivityCapabilityR\fconnectivity\x12F\n" +
 	"\abattery\x18\x13 \x01(\v2,.terminals.capabilities.v1.BatteryCapabilityR\abattery\x12=\n" +
-	"\x04edge\x18\x14 \x01(\v2).terminals.capabilities.v1.EdgeCapabilityR\x04edge\"n\n" +
+	"\x04edge\x18\x14 \x01(\v2).terminals.capabilities.v1.EdgeCapabilityR\x04edge\x12H\n" +
+	"\bdisplays\x18\x15 \x03(\v2,.terminals.capabilities.v1.DisplayCapabilityR\bdisplays\"n\n" +
 	"\x0eDeviceIdentity\x12\x1f\n" +
 	"\vdevice_name\x18\x01 \x01(\tR\n" +
 	"deviceName\x12\x1f\n" +
 	"\vdevice_type\x18\x02 \x01(\tR\n" +
 	"deviceType\x12\x1a\n" +
-	"\bplatform\x18\x03 \x01(\tR\bplatform\"p\n" +
+	"\bplatform\x18\x03 \x01(\tR\bplatform\"\xbb\x02\n" +
 	"\x10ScreenCapability\x12\x14\n" +
 	"\x05width\x18\x01 \x01(\x05R\x05width\x12\x16\n" +
 	"\x06height\x18\x02 \x01(\x05R\x06height\x12\x18\n" +
 	"\adensity\x18\x03 \x01(\x01R\adensity\x12\x14\n" +
-	"\x05touch\x18\x04 \x01(\bR\x05touch\"H\n" +
+	"\x05touch\x18\x04 \x01(\bR\x05touch\x12 \n" +
+	"\vorientation\x18\x05 \x01(\tR\vorientation\x121\n" +
+	"\x14fullscreen_supported\x18\x06 \x01(\bR\x13fullscreenSupported\x124\n" +
+	"\x16multi_window_supported\x18\a \x01(\bR\x14multiWindowSupported\x12>\n" +
+	"\tsafe_area\x18\b \x01(\v2!.terminals.capabilities.v1.InsetsR\bsafeArea\"\\\n" +
+	"\x06Insets\x12\x12\n" +
+	"\x04left\x18\x01 \x01(\x05R\x04left\x12\x10\n" +
+	"\x03top\x18\x02 \x01(\x05R\x03top\x12\x14\n" +
+	"\x05right\x18\x03 \x01(\x05R\x05right\x12\x16\n" +
+	"\x06bottom\x18\x04 \x01(\x05R\x06bottom\"\xb4\x01\n" +
+	"\x11DisplayCapability\x12\x1d\n" +
+	"\n" +
+	"display_id\x18\x01 \x01(\tR\tdisplayId\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x18\n" +
+	"\aprimary\x18\x03 \x01(\bR\aprimary\x12C\n" +
+	"\x06screen\x18\x04 \x01(\v2+.terminals.capabilities.v1.ScreenCapabilityR\x06screen\"H\n" +
 	"\x12KeyboardCapability\x12\x1a\n" +
 	"\bphysical\x18\x01 \x01(\bR\bphysical\x12\x16\n" +
 	"\x06layout\x18\x02 \x01(\tR\x06layout\"=\n" +
@@ -1239,21 +1623,40 @@ const file_terminals_capabilities_v1_capabilities_proto_rawDesc = "" +
 	"\x0fTouchCapability\x12\x1c\n" +
 	"\tsupported\x18\x01 \x01(\bR\tsupported\x12\x1d\n" +
 	"\n" +
-	"max_points\x18\x02 \x01(\x05R\tmaxPoints\"V\n" +
+	"max_points\x18\x02 \x01(\x05R\tmaxPoints\"\x9e\x01\n" +
 	"\x15AudioOutputCapability\x12\x1a\n" +
 	"\bchannels\x18\x01 \x01(\x05R\bchannels\x12!\n" +
-	"\fsample_rates\x18\x02 \x03(\x05R\vsampleRates\"U\n" +
+	"\fsample_rates\x18\x02 \x03(\x05R\vsampleRates\x12F\n" +
+	"\tendpoints\x18\x03 \x03(\v2(.terminals.capabilities.v1.AudioEndpointR\tendpoints\"\x9d\x01\n" +
 	"\x14AudioInputCapability\x12\x1a\n" +
 	"\bchannels\x18\x01 \x01(\x05R\bchannels\x12!\n" +
-	"\fsample_rates\x18\x02 \x03(\x05R\vsampleRates\"L\n" +
+	"\fsample_rates\x18\x02 \x03(\x05R\vsampleRates\x12F\n" +
+	"\tendpoints\x18\x03 \x03(\v2(.terminals.capabilities.v1.AudioEndpointR\tendpoints\"\xdb\x01\n" +
+	"\rAudioEndpoint\x12\x1f\n" +
+	"\vendpoint_id\x18\x01 \x01(\tR\n" +
+	"endpointId\x12#\n" +
+	"\rendpoint_name\x18\x02 \x01(\tR\fendpointName\x12'\n" +
+	"\x0fconnection_type\x18\x03 \x01(\tR\x0econnectionType\x12\x1a\n" +
+	"\bchannels\x18\x04 \x01(\x05R\bchannels\x12!\n" +
+	"\fsample_rates\x18\x05 \x03(\x05R\vsampleRates\x12\x1c\n" +
+	"\tavailable\x18\x06 \x01(\bR\tavailable\"L\n" +
 	"\n" +
 	"CameraLens\x12\x14\n" +
 	"\x05width\x18\x01 \x01(\x05R\x05width\x12\x16\n" +
 	"\x06height\x18\x02 \x01(\x05R\x06height\x12\x10\n" +
-	"\x03fps\x18\x03 \x01(\x05R\x03fps\"\x8a\x01\n" +
+	"\x03fps\x18\x03 \x01(\x05R\x03fps\"\xd3\x01\n" +
 	"\x10CameraCapability\x12;\n" +
 	"\x05front\x18\x01 \x01(\v2%.terminals.capabilities.v1.CameraLensR\x05front\x129\n" +
-	"\x04back\x18\x02 \x01(\v2%.terminals.capabilities.v1.CameraLensR\x04back\"\xc5\x01\n" +
+	"\x04back\x18\x02 \x01(\v2%.terminals.capabilities.v1.CameraLensR\x04back\x12G\n" +
+	"\tendpoints\x18\x03 \x03(\v2).terminals.capabilities.v1.CameraEndpointR\tendpoints\"\xf2\x01\n" +
+	"\x0eCameraEndpoint\x12\x1f\n" +
+	"\vendpoint_id\x18\x01 \x01(\tR\n" +
+	"endpointId\x12#\n" +
+	"\rendpoint_name\x18\x02 \x01(\tR\fendpointName\x12'\n" +
+	"\x0fconnection_type\x18\x03 \x01(\tR\x0econnectionType\x12\x16\n" +
+	"\x06facing\x18\x04 \x01(\tR\x06facing\x12;\n" +
+	"\x05modes\x18\x05 \x03(\v2%.terminals.capabilities.v1.CameraLensR\x05modes\x12\x1c\n" +
+	"\tavailable\x18\x06 \x01(\bR\tavailable\"\xc5\x01\n" +
 	"\x10SensorCapability\x12$\n" +
 	"\raccelerometer\x18\x01 \x01(\bR\raccelerometer\x12\x1c\n" +
 	"\tgyroscope\x18\x02 \x01(\bR\tgyroscope\x12\x18\n" +
@@ -1307,51 +1710,62 @@ func file_terminals_capabilities_v1_capabilities_proto_rawDescGZIP() []byte {
 	return file_terminals_capabilities_v1_capabilities_proto_rawDescData
 }
 
-var file_terminals_capabilities_v1_capabilities_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_terminals_capabilities_v1_capabilities_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_terminals_capabilities_v1_capabilities_proto_goTypes = []any{
 	(*DeviceCapabilities)(nil),      // 0: terminals.capabilities.v1.DeviceCapabilities
 	(*DeviceIdentity)(nil),          // 1: terminals.capabilities.v1.DeviceIdentity
 	(*ScreenCapability)(nil),        // 2: terminals.capabilities.v1.ScreenCapability
-	(*KeyboardCapability)(nil),      // 3: terminals.capabilities.v1.KeyboardCapability
-	(*PointerCapability)(nil),       // 4: terminals.capabilities.v1.PointerCapability
-	(*TouchCapability)(nil),         // 5: terminals.capabilities.v1.TouchCapability
-	(*AudioOutputCapability)(nil),   // 6: terminals.capabilities.v1.AudioOutputCapability
-	(*AudioInputCapability)(nil),    // 7: terminals.capabilities.v1.AudioInputCapability
-	(*CameraLens)(nil),              // 8: terminals.capabilities.v1.CameraLens
-	(*CameraCapability)(nil),        // 9: terminals.capabilities.v1.CameraCapability
-	(*SensorCapability)(nil),        // 10: terminals.capabilities.v1.SensorCapability
-	(*ConnectivityCapability)(nil),  // 11: terminals.capabilities.v1.ConnectivityCapability
-	(*BatteryCapability)(nil),       // 12: terminals.capabilities.v1.BatteryCapability
-	(*EdgeCapability)(nil),          // 13: terminals.capabilities.v1.EdgeCapability
-	(*EdgeComputeCapability)(nil),   // 14: terminals.capabilities.v1.EdgeComputeCapability
-	(*EdgeRetentionCapability)(nil), // 15: terminals.capabilities.v1.EdgeRetentionCapability
-	(*EdgeTimingCapability)(nil),    // 16: terminals.capabilities.v1.EdgeTimingCapability
-	(*EdgeGeometryCapability)(nil),  // 17: terminals.capabilities.v1.EdgeGeometryCapability
+	(*Insets)(nil),                  // 3: terminals.capabilities.v1.Insets
+	(*DisplayCapability)(nil),       // 4: terminals.capabilities.v1.DisplayCapability
+	(*KeyboardCapability)(nil),      // 5: terminals.capabilities.v1.KeyboardCapability
+	(*PointerCapability)(nil),       // 6: terminals.capabilities.v1.PointerCapability
+	(*TouchCapability)(nil),         // 7: terminals.capabilities.v1.TouchCapability
+	(*AudioOutputCapability)(nil),   // 8: terminals.capabilities.v1.AudioOutputCapability
+	(*AudioInputCapability)(nil),    // 9: terminals.capabilities.v1.AudioInputCapability
+	(*AudioEndpoint)(nil),           // 10: terminals.capabilities.v1.AudioEndpoint
+	(*CameraLens)(nil),              // 11: terminals.capabilities.v1.CameraLens
+	(*CameraCapability)(nil),        // 12: terminals.capabilities.v1.CameraCapability
+	(*CameraEndpoint)(nil),          // 13: terminals.capabilities.v1.CameraEndpoint
+	(*SensorCapability)(nil),        // 14: terminals.capabilities.v1.SensorCapability
+	(*ConnectivityCapability)(nil),  // 15: terminals.capabilities.v1.ConnectivityCapability
+	(*BatteryCapability)(nil),       // 16: terminals.capabilities.v1.BatteryCapability
+	(*EdgeCapability)(nil),          // 17: terminals.capabilities.v1.EdgeCapability
+	(*EdgeComputeCapability)(nil),   // 18: terminals.capabilities.v1.EdgeComputeCapability
+	(*EdgeRetentionCapability)(nil), // 19: terminals.capabilities.v1.EdgeRetentionCapability
+	(*EdgeTimingCapability)(nil),    // 20: terminals.capabilities.v1.EdgeTimingCapability
+	(*EdgeGeometryCapability)(nil),  // 21: terminals.capabilities.v1.EdgeGeometryCapability
 }
 var file_terminals_capabilities_v1_capabilities_proto_depIdxs = []int32{
 	1,  // 0: terminals.capabilities.v1.DeviceCapabilities.identity:type_name -> terminals.capabilities.v1.DeviceIdentity
 	2,  // 1: terminals.capabilities.v1.DeviceCapabilities.screen:type_name -> terminals.capabilities.v1.ScreenCapability
-	3,  // 2: terminals.capabilities.v1.DeviceCapabilities.keyboard:type_name -> terminals.capabilities.v1.KeyboardCapability
-	4,  // 3: terminals.capabilities.v1.DeviceCapabilities.pointer:type_name -> terminals.capabilities.v1.PointerCapability
-	5,  // 4: terminals.capabilities.v1.DeviceCapabilities.touch:type_name -> terminals.capabilities.v1.TouchCapability
-	6,  // 5: terminals.capabilities.v1.DeviceCapabilities.speakers:type_name -> terminals.capabilities.v1.AudioOutputCapability
-	7,  // 6: terminals.capabilities.v1.DeviceCapabilities.microphone:type_name -> terminals.capabilities.v1.AudioInputCapability
-	9,  // 7: terminals.capabilities.v1.DeviceCapabilities.camera:type_name -> terminals.capabilities.v1.CameraCapability
-	10, // 8: terminals.capabilities.v1.DeviceCapabilities.sensors:type_name -> terminals.capabilities.v1.SensorCapability
-	11, // 9: terminals.capabilities.v1.DeviceCapabilities.connectivity:type_name -> terminals.capabilities.v1.ConnectivityCapability
-	12, // 10: terminals.capabilities.v1.DeviceCapabilities.battery:type_name -> terminals.capabilities.v1.BatteryCapability
-	13, // 11: terminals.capabilities.v1.DeviceCapabilities.edge:type_name -> terminals.capabilities.v1.EdgeCapability
-	8,  // 12: terminals.capabilities.v1.CameraCapability.front:type_name -> terminals.capabilities.v1.CameraLens
-	8,  // 13: terminals.capabilities.v1.CameraCapability.back:type_name -> terminals.capabilities.v1.CameraLens
-	14, // 14: terminals.capabilities.v1.EdgeCapability.compute:type_name -> terminals.capabilities.v1.EdgeComputeCapability
-	15, // 15: terminals.capabilities.v1.EdgeCapability.retention:type_name -> terminals.capabilities.v1.EdgeRetentionCapability
-	16, // 16: terminals.capabilities.v1.EdgeCapability.timing:type_name -> terminals.capabilities.v1.EdgeTimingCapability
-	17, // 17: terminals.capabilities.v1.EdgeCapability.geometry:type_name -> terminals.capabilities.v1.EdgeGeometryCapability
-	18, // [18:18] is the sub-list for method output_type
-	18, // [18:18] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	5,  // 2: terminals.capabilities.v1.DeviceCapabilities.keyboard:type_name -> terminals.capabilities.v1.KeyboardCapability
+	6,  // 3: terminals.capabilities.v1.DeviceCapabilities.pointer:type_name -> terminals.capabilities.v1.PointerCapability
+	7,  // 4: terminals.capabilities.v1.DeviceCapabilities.touch:type_name -> terminals.capabilities.v1.TouchCapability
+	8,  // 5: terminals.capabilities.v1.DeviceCapabilities.speakers:type_name -> terminals.capabilities.v1.AudioOutputCapability
+	9,  // 6: terminals.capabilities.v1.DeviceCapabilities.microphone:type_name -> terminals.capabilities.v1.AudioInputCapability
+	12, // 7: terminals.capabilities.v1.DeviceCapabilities.camera:type_name -> terminals.capabilities.v1.CameraCapability
+	14, // 8: terminals.capabilities.v1.DeviceCapabilities.sensors:type_name -> terminals.capabilities.v1.SensorCapability
+	15, // 9: terminals.capabilities.v1.DeviceCapabilities.connectivity:type_name -> terminals.capabilities.v1.ConnectivityCapability
+	16, // 10: terminals.capabilities.v1.DeviceCapabilities.battery:type_name -> terminals.capabilities.v1.BatteryCapability
+	17, // 11: terminals.capabilities.v1.DeviceCapabilities.edge:type_name -> terminals.capabilities.v1.EdgeCapability
+	4,  // 12: terminals.capabilities.v1.DeviceCapabilities.displays:type_name -> terminals.capabilities.v1.DisplayCapability
+	3,  // 13: terminals.capabilities.v1.ScreenCapability.safe_area:type_name -> terminals.capabilities.v1.Insets
+	2,  // 14: terminals.capabilities.v1.DisplayCapability.screen:type_name -> terminals.capabilities.v1.ScreenCapability
+	10, // 15: terminals.capabilities.v1.AudioOutputCapability.endpoints:type_name -> terminals.capabilities.v1.AudioEndpoint
+	10, // 16: terminals.capabilities.v1.AudioInputCapability.endpoints:type_name -> terminals.capabilities.v1.AudioEndpoint
+	11, // 17: terminals.capabilities.v1.CameraCapability.front:type_name -> terminals.capabilities.v1.CameraLens
+	11, // 18: terminals.capabilities.v1.CameraCapability.back:type_name -> terminals.capabilities.v1.CameraLens
+	13, // 19: terminals.capabilities.v1.CameraCapability.endpoints:type_name -> terminals.capabilities.v1.CameraEndpoint
+	11, // 20: terminals.capabilities.v1.CameraEndpoint.modes:type_name -> terminals.capabilities.v1.CameraLens
+	18, // 21: terminals.capabilities.v1.EdgeCapability.compute:type_name -> terminals.capabilities.v1.EdgeComputeCapability
+	19, // 22: terminals.capabilities.v1.EdgeCapability.retention:type_name -> terminals.capabilities.v1.EdgeRetentionCapability
+	20, // 23: terminals.capabilities.v1.EdgeCapability.timing:type_name -> terminals.capabilities.v1.EdgeTimingCapability
+	21, // 24: terminals.capabilities.v1.EdgeCapability.geometry:type_name -> terminals.capabilities.v1.EdgeGeometryCapability
+	25, // [25:25] is the sub-list for method output_type
+	25, // [25:25] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_terminals_capabilities_v1_capabilities_proto_init() }
@@ -1365,7 +1779,7 @@ func file_terminals_capabilities_v1_capabilities_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_capabilities_v1_capabilities_proto_rawDesc), len(file_terminals_capabilities_v1_capabilities_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

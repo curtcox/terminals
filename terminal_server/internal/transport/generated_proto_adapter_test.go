@@ -245,6 +245,67 @@ func TestCapabilitiesToDataMapIncludesMonitoringTierKeys(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesToDataMapIncludesEndpointInventory(t *testing.T) {
+	got := capabilitiesToDataMap(&capabilitiesv1.DeviceCapabilities{
+		DeviceId: "device-endpoints",
+		Displays: []*capabilitiesv1.DisplayCapability{
+			{
+				DisplayId:   "main",
+				DisplayName: "Primary",
+				Primary:     true,
+				Screen: &capabilitiesv1.ScreenCapability{
+					Width:       1920,
+					Height:      1080,
+					Orientation: "landscape",
+				},
+			},
+		},
+		Microphone: &capabilitiesv1.AudioInputCapability{
+			Endpoints: []*capabilitiesv1.AudioEndpoint{{
+				EndpointId:     "mic-1",
+				EndpointName:   "Built-in Mic",
+				ConnectionType: "built_in",
+				Channels:       1,
+				Available:      true,
+			}},
+		},
+		Speakers: &capabilitiesv1.AudioOutputCapability{
+			Endpoints: []*capabilitiesv1.AudioEndpoint{{
+				EndpointId:     "spk-1",
+				EndpointName:   "Bluetooth Speaker",
+				ConnectionType: "bluetooth",
+				Channels:       2,
+				Available:      true,
+			}},
+		},
+		Camera: &capabilitiesv1.CameraCapability{
+			Endpoints: []*capabilitiesv1.CameraEndpoint{{
+				EndpointId:     "cam-1",
+				EndpointName:   "USB Camera",
+				ConnectionType: "usb",
+				Facing:         "front",
+				Available:      true,
+			}},
+		},
+	})
+
+	if got["display.count"] != "1" {
+		t.Fatalf("display.count = %q, want 1", got["display.count"])
+	}
+	if got["display.0.id"] != "main" {
+		t.Fatalf("display.0.id = %q, want main", got["display.0.id"])
+	}
+	if got["microphone.endpoint_count"] != "1" {
+		t.Fatalf("microphone.endpoint_count = %q, want 1", got["microphone.endpoint_count"])
+	}
+	if got["speakers.endpoint_count"] != "1" {
+		t.Fatalf("speakers.endpoint_count = %q, want 1", got["speakers.endpoint_count"])
+	}
+	if got["camera.endpoint_count"] != "1" {
+		t.Fatalf("camera.endpoint_count = %q, want 1", got["camera.endpoint_count"])
+	}
+}
+
 func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{

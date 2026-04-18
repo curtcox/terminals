@@ -31,6 +31,7 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
     ConnectivityCapability? connectivity,
     BatteryCapability? battery,
     EdgeCapability? edge,
+    $core.Iterable<DisplayCapability>? displays,
   }) {
     final result = create();
     if (deviceId != null) result.deviceId = deviceId;
@@ -46,6 +47,7 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
     if (connectivity != null) result.connectivity = connectivity;
     if (battery != null) result.battery = battery;
     if (edge != null) result.edge = edge;
+    if (displays != null) result.displays.addAll(displays);
     return result;
   }
 
@@ -88,6 +90,8 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
         subBuilder: BatteryCapability.create)
     ..aOM<EdgeCapability>(20, _omitFieldNames ? '' : 'edge',
         subBuilder: EdgeCapability.create)
+    ..pPM<DisplayCapability>(21, _omitFieldNames ? '' : 'displays',
+        subBuilder: DisplayCapability.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -249,6 +253,9 @@ class DeviceCapabilities extends $pb.GeneratedMessage {
   void clearEdge() => $_clearField(20);
   @$pb.TagNumber(20)
   EdgeCapability ensureEdge() => $_ensure(12);
+
+  @$pb.TagNumber(21)
+  $pb.PbList<DisplayCapability> get displays => $_getList(13);
 }
 
 class DeviceIdentity extends $pb.GeneratedMessage {
@@ -336,12 +343,22 @@ class ScreenCapability extends $pb.GeneratedMessage {
     $core.int? height,
     $core.double? density,
     $core.bool? touch,
+    $core.String? orientation,
+    $core.bool? fullscreenSupported,
+    $core.bool? multiWindowSupported,
+    Insets? safeArea,
   }) {
     final result = create();
     if (width != null) result.width = width;
     if (height != null) result.height = height;
     if (density != null) result.density = density;
     if (touch != null) result.touch = touch;
+    if (orientation != null) result.orientation = orientation;
+    if (fullscreenSupported != null)
+      result.fullscreenSupported = fullscreenSupported;
+    if (multiWindowSupported != null)
+      result.multiWindowSupported = multiWindowSupported;
+    if (safeArea != null) result.safeArea = safeArea;
     return result;
   }
 
@@ -363,6 +380,11 @@ class ScreenCapability extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'height')
     ..aD(3, _omitFieldNames ? '' : 'density')
     ..aOB(4, _omitFieldNames ? '' : 'touch')
+    ..aOS(5, _omitFieldNames ? '' : 'orientation')
+    ..aOB(6, _omitFieldNames ? '' : 'fullscreenSupported')
+    ..aOB(7, _omitFieldNames ? '' : 'multiWindowSupported')
+    ..aOM<Insets>(8, _omitFieldNames ? '' : 'safeArea',
+        subBuilder: Insets.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -419,6 +441,228 @@ class ScreenCapability extends $pb.GeneratedMessage {
   $core.bool hasTouch() => $_has(3);
   @$pb.TagNumber(4)
   void clearTouch() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get orientation => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set orientation($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasOrientation() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearOrientation() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get fullscreenSupported => $_getBF(5);
+  @$pb.TagNumber(6)
+  set fullscreenSupported($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasFullscreenSupported() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFullscreenSupported() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get multiWindowSupported => $_getBF(6);
+  @$pb.TagNumber(7)
+  set multiWindowSupported($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasMultiWindowSupported() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMultiWindowSupported() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  Insets get safeArea => $_getN(7);
+  @$pb.TagNumber(8)
+  set safeArea(Insets value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasSafeArea() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSafeArea() => $_clearField(8);
+  @$pb.TagNumber(8)
+  Insets ensureSafeArea() => $_ensure(7);
+}
+
+class Insets extends $pb.GeneratedMessage {
+  factory Insets({
+    $core.int? left,
+    $core.int? top,
+    $core.int? right,
+    $core.int? bottom,
+  }) {
+    final result = create();
+    if (left != null) result.left = left;
+    if (top != null) result.top = top;
+    if (right != null) result.right = right;
+    if (bottom != null) result.bottom = bottom;
+    return result;
+  }
+
+  Insets._();
+
+  factory Insets.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Insets.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Insets',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'left')
+    ..aI(2, _omitFieldNames ? '' : 'top')
+    ..aI(3, _omitFieldNames ? '' : 'right')
+    ..aI(4, _omitFieldNames ? '' : 'bottom')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Insets clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Insets copyWith(void Function(Insets) updates) =>
+      super.copyWith((message) => updates(message as Insets)) as Insets;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Insets create() => Insets._();
+  @$core.override
+  Insets createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Insets getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Insets>(create);
+  static Insets? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get left => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set left($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLeft() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLeft() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get top => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set top($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTop() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTop() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get right => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set right($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRight() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRight() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get bottom => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set bottom($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBottom() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBottom() => $_clearField(4);
+}
+
+class DisplayCapability extends $pb.GeneratedMessage {
+  factory DisplayCapability({
+    $core.String? displayId,
+    $core.String? displayName,
+    $core.bool? primary,
+    ScreenCapability? screen,
+  }) {
+    final result = create();
+    if (displayId != null) result.displayId = displayId;
+    if (displayName != null) result.displayName = displayName;
+    if (primary != null) result.primary = primary;
+    if (screen != null) result.screen = screen;
+    return result;
+  }
+
+  DisplayCapability._();
+
+  factory DisplayCapability.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DisplayCapability.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DisplayCapability',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'displayId')
+    ..aOS(2, _omitFieldNames ? '' : 'displayName')
+    ..aOB(3, _omitFieldNames ? '' : 'primary')
+    ..aOM<ScreenCapability>(4, _omitFieldNames ? '' : 'screen',
+        subBuilder: ScreenCapability.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DisplayCapability clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DisplayCapability copyWith(void Function(DisplayCapability) updates) =>
+      super.copyWith((message) => updates(message as DisplayCapability))
+          as DisplayCapability;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DisplayCapability create() => DisplayCapability._();
+  @$core.override
+  DisplayCapability createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DisplayCapability getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DisplayCapability>(create);
+  static DisplayCapability? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get displayId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set displayId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDisplayId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDisplayId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get displayName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set displayName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDisplayName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDisplayName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get primary => $_getBF(2);
+  @$pb.TagNumber(3)
+  set primary($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPrimary() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPrimary() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  ScreenCapability get screen => $_getN(3);
+  @$pb.TagNumber(4)
+  set screen(ScreenCapability value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasScreen() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearScreen() => $_clearField(4);
+  @$pb.TagNumber(4)
+  ScreenCapability ensureScreen() => $_ensure(3);
 }
 
 class KeyboardCapability extends $pb.GeneratedMessage {
@@ -626,10 +870,12 @@ class AudioOutputCapability extends $pb.GeneratedMessage {
   factory AudioOutputCapability({
     $core.int? channels,
     $core.Iterable<$core.int>? sampleRates,
+    $core.Iterable<AudioEndpoint>? endpoints,
   }) {
     final result = create();
     if (channels != null) result.channels = channels;
     if (sampleRates != null) result.sampleRates.addAll(sampleRates);
+    if (endpoints != null) result.endpoints.addAll(endpoints);
     return result;
   }
 
@@ -649,6 +895,8 @@ class AudioOutputCapability extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'channels')
     ..p<$core.int>(2, _omitFieldNames ? '' : 'sampleRates', $pb.PbFieldType.K3)
+    ..pPM<AudioEndpoint>(3, _omitFieldNames ? '' : 'endpoints',
+        subBuilder: AudioEndpoint.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -682,16 +930,21 @@ class AudioOutputCapability extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<$core.int> get sampleRates => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<AudioEndpoint> get endpoints => $_getList(2);
 }
 
 class AudioInputCapability extends $pb.GeneratedMessage {
   factory AudioInputCapability({
     $core.int? channels,
     $core.Iterable<$core.int>? sampleRates,
+    $core.Iterable<AudioEndpoint>? endpoints,
   }) {
     final result = create();
     if (channels != null) result.channels = channels;
     if (sampleRates != null) result.sampleRates.addAll(sampleRates);
+    if (endpoints != null) result.endpoints.addAll(endpoints);
     return result;
   }
 
@@ -711,6 +964,8 @@ class AudioInputCapability extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'channels')
     ..p<$core.int>(2, _omitFieldNames ? '' : 'sampleRates', $pb.PbFieldType.K3)
+    ..pPM<AudioEndpoint>(3, _omitFieldNames ? '' : 'endpoints',
+        subBuilder: AudioEndpoint.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -743,6 +998,118 @@ class AudioInputCapability extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<$core.int> get sampleRates => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<AudioEndpoint> get endpoints => $_getList(2);
+}
+
+class AudioEndpoint extends $pb.GeneratedMessage {
+  factory AudioEndpoint({
+    $core.String? endpointId,
+    $core.String? endpointName,
+    $core.String? connectionType,
+    $core.int? channels,
+    $core.Iterable<$core.int>? sampleRates,
+    $core.bool? available,
+  }) {
+    final result = create();
+    if (endpointId != null) result.endpointId = endpointId;
+    if (endpointName != null) result.endpointName = endpointName;
+    if (connectionType != null) result.connectionType = connectionType;
+    if (channels != null) result.channels = channels;
+    if (sampleRates != null) result.sampleRates.addAll(sampleRates);
+    if (available != null) result.available = available;
+    return result;
+  }
+
+  AudioEndpoint._();
+
+  factory AudioEndpoint.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory AudioEndpoint.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AudioEndpoint',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'endpointId')
+    ..aOS(2, _omitFieldNames ? '' : 'endpointName')
+    ..aOS(3, _omitFieldNames ? '' : 'connectionType')
+    ..aI(4, _omitFieldNames ? '' : 'channels')
+    ..p<$core.int>(5, _omitFieldNames ? '' : 'sampleRates', $pb.PbFieldType.K3)
+    ..aOB(6, _omitFieldNames ? '' : 'available')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AudioEndpoint clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AudioEndpoint copyWith(void Function(AudioEndpoint) updates) =>
+      super.copyWith((message) => updates(message as AudioEndpoint))
+          as AudioEndpoint;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static AudioEndpoint create() => AudioEndpoint._();
+  @$core.override
+  AudioEndpoint createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static AudioEndpoint getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<AudioEndpoint>(create);
+  static AudioEndpoint? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get endpointId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set endpointId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEndpointId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEndpointId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get endpointName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set endpointName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEndpointName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEndpointName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get connectionType => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set connectionType($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasConnectionType() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearConnectionType() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get channels => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set channels($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasChannels() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearChannels() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<$core.int> get sampleRates => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $core.bool get available => $_getBF(5);
+  @$pb.TagNumber(6)
+  set available($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAvailable() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAvailable() => $_clearField(6);
 }
 
 class CameraLens extends $pb.GeneratedMessage {
@@ -827,10 +1194,12 @@ class CameraCapability extends $pb.GeneratedMessage {
   factory CameraCapability({
     CameraLens? front,
     CameraLens? back,
+    $core.Iterable<CameraEndpoint>? endpoints,
   }) {
     final result = create();
     if (front != null) result.front = front;
     if (back != null) result.back = back;
+    if (endpoints != null) result.endpoints.addAll(endpoints);
     return result;
   }
 
@@ -852,6 +1221,8 @@ class CameraCapability extends $pb.GeneratedMessage {
         subBuilder: CameraLens.create)
     ..aOM<CameraLens>(2, _omitFieldNames ? '' : 'back',
         subBuilder: CameraLens.create)
+    ..pPM<CameraEndpoint>(3, _omitFieldNames ? '' : 'endpoints',
+        subBuilder: CameraEndpoint.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -894,6 +1265,119 @@ class CameraCapability extends $pb.GeneratedMessage {
   void clearBack() => $_clearField(2);
   @$pb.TagNumber(2)
   CameraLens ensureBack() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<CameraEndpoint> get endpoints => $_getList(2);
+}
+
+class CameraEndpoint extends $pb.GeneratedMessage {
+  factory CameraEndpoint({
+    $core.String? endpointId,
+    $core.String? endpointName,
+    $core.String? connectionType,
+    $core.String? facing,
+    $core.Iterable<CameraLens>? modes,
+    $core.bool? available,
+  }) {
+    final result = create();
+    if (endpointId != null) result.endpointId = endpointId;
+    if (endpointName != null) result.endpointName = endpointName;
+    if (connectionType != null) result.connectionType = connectionType;
+    if (facing != null) result.facing = facing;
+    if (modes != null) result.modes.addAll(modes);
+    if (available != null) result.available = available;
+    return result;
+  }
+
+  CameraEndpoint._();
+
+  factory CameraEndpoint.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CameraEndpoint.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CameraEndpoint',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.capabilities.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'endpointId')
+    ..aOS(2, _omitFieldNames ? '' : 'endpointName')
+    ..aOS(3, _omitFieldNames ? '' : 'connectionType')
+    ..aOS(4, _omitFieldNames ? '' : 'facing')
+    ..pPM<CameraLens>(5, _omitFieldNames ? '' : 'modes',
+        subBuilder: CameraLens.create)
+    ..aOB(6, _omitFieldNames ? '' : 'available')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CameraEndpoint clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CameraEndpoint copyWith(void Function(CameraEndpoint) updates) =>
+      super.copyWith((message) => updates(message as CameraEndpoint))
+          as CameraEndpoint;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CameraEndpoint create() => CameraEndpoint._();
+  @$core.override
+  CameraEndpoint createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CameraEndpoint getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CameraEndpoint>(create);
+  static CameraEndpoint? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get endpointId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set endpointId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEndpointId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEndpointId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get endpointName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set endpointName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEndpointName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEndpointName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get connectionType => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set connectionType($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasConnectionType() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearConnectionType() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get facing => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set facing($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFacing() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFacing() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<CameraLens> get modes => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $core.bool get available => $_getBF(5);
+  @$pb.TagNumber(6)
+  set available($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAvailable() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAvailable() => $_clearField(6);
 }
 
 class SensorCapability extends $pb.GeneratedMessage {

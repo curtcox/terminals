@@ -18,6 +18,7 @@ message DeviceCapabilities {
   ConnectivityCapability connectivity = 18;
   BatteryCapability battery = 19;
   EdgeCapability edge = 20;
+  repeated DisplayCapability displays = 21;
 }
 
 message DeviceIdentity {
@@ -31,6 +32,24 @@ message ScreenCapability {
   int32 height = 2;
   double density = 3;
   bool touch = 4;
+  string orientation = 5;
+  bool fullscreen_supported = 6;
+  bool multi_window_supported = 7;
+  Insets safe_area = 8;
+}
+
+message Insets {
+  int32 left = 1;
+  int32 top = 2;
+  int32 right = 3;
+  int32 bottom = 4;
+}
+
+message DisplayCapability {
+  string display_id = 1;
+  string display_name = 2;
+  bool primary = 3;
+  ScreenCapability screen = 4;
 }
 
 message KeyboardCapability {
@@ -51,11 +70,22 @@ message TouchCapability {
 message AudioOutputCapability {
   int32 channels = 1;
   repeated int32 sample_rates = 2;
+  repeated AudioEndpoint endpoints = 3;
 }
 
 message AudioInputCapability {
   int32 channels = 1;
   repeated int32 sample_rates = 2;
+  repeated AudioEndpoint endpoints = 3;
+}
+
+message AudioEndpoint {
+  string endpoint_id = 1;
+  string endpoint_name = 2;
+  string connection_type = 3;
+  int32 channels = 4;
+  repeated int32 sample_rates = 5;
+  bool available = 6;
 }
 
 message CameraLens {
@@ -67,6 +97,16 @@ message CameraLens {
 message CameraCapability {
   CameraLens front = 1;
   CameraLens back = 2;
+  repeated CameraEndpoint endpoints = 3;
+}
+
+message CameraEndpoint {
+  string endpoint_id = 1;
+  string endpoint_name = 2;
+  string connection_type = 3;
+  string facing = 4;
+  repeated CameraLens modes = 5;
+  bool available = 6;
 }
 
 message SensorCapability {

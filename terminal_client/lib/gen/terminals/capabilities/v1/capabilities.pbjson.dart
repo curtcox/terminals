@@ -116,6 +116,14 @@ const DeviceCapabilities$json = {
       '6': '.terminals.capabilities.v1.EdgeCapability',
       '10': 'edge'
     },
+    {
+      '1': 'displays',
+      '3': 21,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.DisplayCapability',
+      '10': 'displays'
+    },
   ],
 };
 
@@ -137,7 +145,8 @@ final $typed_data.Uint8List deviceCapabilitiesDescriptor = $convert.base64Decode
     'gLMjEudGVybWluYWxzLmNhcGFiaWxpdGllcy52MS5Db25uZWN0aXZpdHlDYXBhYmlsaXR5Ugxj'
     'b25uZWN0aXZpdHkSRgoHYmF0dGVyeRgTIAEoCzIsLnRlcm1pbmFscy5jYXBhYmlsaXRpZXMudj'
     'EuQmF0dGVyeUNhcGFiaWxpdHlSB2JhdHRlcnkSPQoEZWRnZRgUIAEoCzIpLnRlcm1pbmFscy5j'
-    'YXBhYmlsaXRpZXMudjEuRWRnZUNhcGFiaWxpdHlSBGVkZ2U=');
+    'YXBhYmlsaXRpZXMudjEuRWRnZUNhcGFiaWxpdHlSBGVkZ2USSAoIZGlzcGxheXMYFSADKAsyLC'
+    '50ZXJtaW5hbHMuY2FwYWJpbGl0aWVzLnYxLkRpc3BsYXlDYXBhYmlsaXR5UghkaXNwbGF5cw==');
 
 @$core.Deprecated('Use deviceIdentityDescriptor instead')
 const DeviceIdentity$json = {
@@ -162,6 +171,29 @@ const ScreenCapability$json = {
     {'1': 'height', '3': 2, '4': 1, '5': 5, '10': 'height'},
     {'1': 'density', '3': 3, '4': 1, '5': 1, '10': 'density'},
     {'1': 'touch', '3': 4, '4': 1, '5': 8, '10': 'touch'},
+    {'1': 'orientation', '3': 5, '4': 1, '5': 9, '10': 'orientation'},
+    {
+      '1': 'fullscreen_supported',
+      '3': 6,
+      '4': 1,
+      '5': 8,
+      '10': 'fullscreenSupported'
+    },
+    {
+      '1': 'multi_window_supported',
+      '3': 7,
+      '4': 1,
+      '5': 8,
+      '10': 'multiWindowSupported'
+    },
+    {
+      '1': 'safe_area',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.Insets',
+      '10': 'safeArea'
+    },
   ],
 };
 
@@ -169,7 +201,51 @@ const ScreenCapability$json = {
 final $typed_data.Uint8List screenCapabilityDescriptor = $convert.base64Decode(
     'ChBTY3JlZW5DYXBhYmlsaXR5EhQKBXdpZHRoGAEgASgFUgV3aWR0aBIWCgZoZWlnaHQYAiABKA'
     'VSBmhlaWdodBIYCgdkZW5zaXR5GAMgASgBUgdkZW5zaXR5EhQKBXRvdWNoGAQgASgIUgV0b3Vj'
-    'aA==');
+    'aBIgCgtvcmllbnRhdGlvbhgFIAEoCVILb3JpZW50YXRpb24SMQoUZnVsbHNjcmVlbl9zdXBwb3'
+    'J0ZWQYBiABKAhSE2Z1bGxzY3JlZW5TdXBwb3J0ZWQSNAoWbXVsdGlfd2luZG93X3N1cHBvcnRl'
+    'ZBgHIAEoCFIUbXVsdGlXaW5kb3dTdXBwb3J0ZWQSPgoJc2FmZV9hcmVhGAggASgLMiEudGVybW'
+    'luYWxzLmNhcGFiaWxpdGllcy52MS5JbnNldHNSCHNhZmVBcmVh');
+
+@$core.Deprecated('Use insetsDescriptor instead')
+const Insets$json = {
+  '1': 'Insets',
+  '2': [
+    {'1': 'left', '3': 1, '4': 1, '5': 5, '10': 'left'},
+    {'1': 'top', '3': 2, '4': 1, '5': 5, '10': 'top'},
+    {'1': 'right', '3': 3, '4': 1, '5': 5, '10': 'right'},
+    {'1': 'bottom', '3': 4, '4': 1, '5': 5, '10': 'bottom'},
+  ],
+};
+
+/// Descriptor for `Insets`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List insetsDescriptor = $convert.base64Decode(
+    'CgZJbnNldHMSEgoEbGVmdBgBIAEoBVIEbGVmdBIQCgN0b3AYAiABKAVSA3RvcBIUCgVyaWdodB'
+    'gDIAEoBVIFcmlnaHQSFgoGYm90dG9tGAQgASgFUgZib3R0b20=');
+
+@$core.Deprecated('Use displayCapabilityDescriptor instead')
+const DisplayCapability$json = {
+  '1': 'DisplayCapability',
+  '2': [
+    {'1': 'display_id', '3': 1, '4': 1, '5': 9, '10': 'displayId'},
+    {'1': 'display_name', '3': 2, '4': 1, '5': 9, '10': 'displayName'},
+    {'1': 'primary', '3': 3, '4': 1, '5': 8, '10': 'primary'},
+    {
+      '1': 'screen',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.ScreenCapability',
+      '10': 'screen'
+    },
+  ],
+};
+
+/// Descriptor for `DisplayCapability`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List displayCapabilityDescriptor = $convert.base64Decode(
+    'ChFEaXNwbGF5Q2FwYWJpbGl0eRIdCgpkaXNwbGF5X2lkGAEgASgJUglkaXNwbGF5SWQSIQoMZG'
+    'lzcGxheV9uYW1lGAIgASgJUgtkaXNwbGF5TmFtZRIYCgdwcmltYXJ5GAMgASgIUgdwcmltYXJ5'
+    'EkMKBnNjcmVlbhgEIAEoCzIrLnRlcm1pbmFscy5jYXBhYmlsaXRpZXMudjEuU2NyZWVuQ2FwYW'
+    'JpbGl0eVIGc2NyZWVu');
 
 @$core.Deprecated('Use keyboardCapabilityDescriptor instead')
 const KeyboardCapability$json = {
@@ -219,13 +295,22 @@ const AudioOutputCapability$json = {
   '2': [
     {'1': 'channels', '3': 1, '4': 1, '5': 5, '10': 'channels'},
     {'1': 'sample_rates', '3': 2, '4': 3, '5': 5, '10': 'sampleRates'},
+    {
+      '1': 'endpoints',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.AudioEndpoint',
+      '10': 'endpoints'
+    },
   ],
 };
 
 /// Descriptor for `AudioOutputCapability`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List audioOutputCapabilityDescriptor = $convert.base64Decode(
     'ChVBdWRpb091dHB1dENhcGFiaWxpdHkSGgoIY2hhbm5lbHMYASABKAVSCGNoYW5uZWxzEiEKDH'
-    'NhbXBsZV9yYXRlcxgCIAMoBVILc2FtcGxlUmF0ZXM=');
+    'NhbXBsZV9yYXRlcxgCIAMoBVILc2FtcGxlUmF0ZXMSRgoJZW5kcG9pbnRzGAMgAygLMigudGVy'
+    'bWluYWxzLmNhcGFiaWxpdGllcy52MS5BdWRpb0VuZHBvaW50UgllbmRwb2ludHM=');
 
 @$core.Deprecated('Use audioInputCapabilityDescriptor instead')
 const AudioInputCapability$json = {
@@ -233,13 +318,42 @@ const AudioInputCapability$json = {
   '2': [
     {'1': 'channels', '3': 1, '4': 1, '5': 5, '10': 'channels'},
     {'1': 'sample_rates', '3': 2, '4': 3, '5': 5, '10': 'sampleRates'},
+    {
+      '1': 'endpoints',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.AudioEndpoint',
+      '10': 'endpoints'
+    },
   ],
 };
 
 /// Descriptor for `AudioInputCapability`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List audioInputCapabilityDescriptor = $convert.base64Decode(
     'ChRBdWRpb0lucHV0Q2FwYWJpbGl0eRIaCghjaGFubmVscxgBIAEoBVIIY2hhbm5lbHMSIQoMc2'
-    'FtcGxlX3JhdGVzGAIgAygFUgtzYW1wbGVSYXRlcw==');
+    'FtcGxlX3JhdGVzGAIgAygFUgtzYW1wbGVSYXRlcxJGCgllbmRwb2ludHMYAyADKAsyKC50ZXJt'
+    'aW5hbHMuY2FwYWJpbGl0aWVzLnYxLkF1ZGlvRW5kcG9pbnRSCWVuZHBvaW50cw==');
+
+@$core.Deprecated('Use audioEndpointDescriptor instead')
+const AudioEndpoint$json = {
+  '1': 'AudioEndpoint',
+  '2': [
+    {'1': 'endpoint_id', '3': 1, '4': 1, '5': 9, '10': 'endpointId'},
+    {'1': 'endpoint_name', '3': 2, '4': 1, '5': 9, '10': 'endpointName'},
+    {'1': 'connection_type', '3': 3, '4': 1, '5': 9, '10': 'connectionType'},
+    {'1': 'channels', '3': 4, '4': 1, '5': 5, '10': 'channels'},
+    {'1': 'sample_rates', '3': 5, '4': 3, '5': 5, '10': 'sampleRates'},
+    {'1': 'available', '3': 6, '4': 1, '5': 8, '10': 'available'},
+  ],
+};
+
+/// Descriptor for `AudioEndpoint`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List audioEndpointDescriptor = $convert.base64Decode(
+    'Cg1BdWRpb0VuZHBvaW50Eh8KC2VuZHBvaW50X2lkGAEgASgJUgplbmRwb2ludElkEiMKDWVuZH'
+    'BvaW50X25hbWUYAiABKAlSDGVuZHBvaW50TmFtZRInCg9jb25uZWN0aW9uX3R5cGUYAyABKAlS'
+    'DmNvbm5lY3Rpb25UeXBlEhoKCGNoYW5uZWxzGAQgASgFUghjaGFubmVscxIhCgxzYW1wbGVfcm'
+    'F0ZXMYBSADKAVSC3NhbXBsZVJhdGVzEhwKCWF2YWlsYWJsZRgGIAEoCFIJYXZhaWxhYmxl');
 
 @$core.Deprecated('Use cameraLensDescriptor instead')
 const CameraLens$json = {
@@ -276,6 +390,14 @@ const CameraCapability$json = {
       '6': '.terminals.capabilities.v1.CameraLens',
       '10': 'back'
     },
+    {
+      '1': 'endpoints',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.CameraEndpoint',
+      '10': 'endpoints'
+    },
   ],
 };
 
@@ -283,7 +405,36 @@ const CameraCapability$json = {
 final $typed_data.Uint8List cameraCapabilityDescriptor = $convert.base64Decode(
     'ChBDYW1lcmFDYXBhYmlsaXR5EjsKBWZyb250GAEgASgLMiUudGVybWluYWxzLmNhcGFiaWxpdG'
     'llcy52MS5DYW1lcmFMZW5zUgVmcm9udBI5CgRiYWNrGAIgASgLMiUudGVybWluYWxzLmNhcGFi'
-    'aWxpdGllcy52MS5DYW1lcmFMZW5zUgRiYWNr');
+    'aWxpdGllcy52MS5DYW1lcmFMZW5zUgRiYWNrEkcKCWVuZHBvaW50cxgDIAMoCzIpLnRlcm1pbm'
+    'Fscy5jYXBhYmlsaXRpZXMudjEuQ2FtZXJhRW5kcG9pbnRSCWVuZHBvaW50cw==');
+
+@$core.Deprecated('Use cameraEndpointDescriptor instead')
+const CameraEndpoint$json = {
+  '1': 'CameraEndpoint',
+  '2': [
+    {'1': 'endpoint_id', '3': 1, '4': 1, '5': 9, '10': 'endpointId'},
+    {'1': 'endpoint_name', '3': 2, '4': 1, '5': 9, '10': 'endpointName'},
+    {'1': 'connection_type', '3': 3, '4': 1, '5': 9, '10': 'connectionType'},
+    {'1': 'facing', '3': 4, '4': 1, '5': 9, '10': 'facing'},
+    {
+      '1': 'modes',
+      '3': 5,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.capabilities.v1.CameraLens',
+      '10': 'modes'
+    },
+    {'1': 'available', '3': 6, '4': 1, '5': 8, '10': 'available'},
+  ],
+};
+
+/// Descriptor for `CameraEndpoint`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List cameraEndpointDescriptor = $convert.base64Decode(
+    'Cg5DYW1lcmFFbmRwb2ludBIfCgtlbmRwb2ludF9pZBgBIAEoCVIKZW5kcG9pbnRJZBIjCg1lbm'
+    'Rwb2ludF9uYW1lGAIgASgJUgxlbmRwb2ludE5hbWUSJwoPY29ubmVjdGlvbl90eXBlGAMgASgJ'
+    'Ug5jb25uZWN0aW9uVHlwZRIWCgZmYWNpbmcYBCABKAlSBmZhY2luZxI7CgVtb2RlcxgFIAMoCz'
+    'IlLnRlcm1pbmFscy5jYXBhYmlsaXRpZXMudjEuQ2FtZXJhTGVuc1IFbW9kZXMSHAoJYXZhaWxh'
+    'YmxlGAYgASgIUglhdmFpbGFibGU=');
 
 @$core.Deprecated('Use sensorCapabilityDescriptor instead')
 const SensorCapability$json = {

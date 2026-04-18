@@ -41,7 +41,7 @@ CapabilityProbe _defaultCapabilityProbeFactory() {
   final bindingType = WidgetsBinding.instance.runtimeType.toString();
   if (bindingType.contains('TestWidgetsFlutterBinding')) {
     return DefaultCapabilityProbe(
-      mediaDeviceKindsProvider: () async => const <String>[],
+      mediaDeviceInventoryProvider: () async => const <MediaDeviceDescriptor>[],
     );
   }
   return DefaultCapabilityProbe();
@@ -88,6 +88,7 @@ const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
 const Duration _bugReportAckTimeout = Duration(seconds: 20);
+const Duration _capabilityMonitorInterval = Duration(seconds: 2);
 const List<String> _bugTokenWords = <String>[
   'ace',
   'actor',
@@ -753,6 +754,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   String? _selectedDiscoveredServer;
   Timer? _heartbeatTimer;
   Timer? _sensorTimer;
+  Timer? _capabilityMonitorTimer;
   Timer? _reconnectTimer;
   bool _shouldStayConnected = false;
   bool _isConnecting = false;
@@ -814,6 +816,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   double _lastKnownDevicePixelRatio = 1.0;
   String _lastKnownOrientation = 'unknown';
   TextDirection _lastKnownTextDirection = TextDirection.ltr;
+  bool _capabilityPollInFlight = false;
+  String _lastCapabilitySignature = '';
 
   int _nowUnixMs() => widget.nowUnixMsProvider();
 
@@ -847,6 +851,154 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   bool get _hasActiveControlSession =>
       _shouldStayConnected && _incoming != null && _client != null;
+
+  String _capabilitySignature(capv1.DeviceCapabilities capabilities) {
+    return capabilities.writeToBuffer().join(',');
+  }
+
+  String _normalizedOrientationFromSize(Size size) {
+    if (size.width <= 0 || size.height <= 0) {
+      return _lastKnownOrientation;
+    }
+    return size.width >= size.height ? 'landscape' : 'portrait';
+  }
+
+  capv1.DeviceCapabilities _applyDisplayMetadata(
+    capv1.DeviceCapabilities capabilities,
+  ) {
+    final size = _currentLogicalSize();
+    final dpr = _currentDevicePixelRatio();
+    final orientation = _normalizedOrientationFromSize(size);
+    final screen = capabilities.hasScreen()
+        ? capabilities.screen
+        : (capabilities.screen = capv1.ScreenCapability());
+    screen
+      ..width = size.width.round()
+      ..height = size.height.round()
+      ..density = dpr
+      ..orientation = orientation
+      ..fullscreenSupported = true
+      ..multiWindowSupported = true
+      ..safeArea = (screen.hasSafeArea() ? screen.safeArea : capv1.Insets())
+      ..safeArea.left = 0
+      ..safeArea.top = 0
+      ..safeArea.right = 0
+      ..safeArea.bottom = 0;
+
+    if (capabilities.displays.isEmpty) {
+      capabilities.displays.add(capv1.DisplayCapability()..displayId = 'main');
+    }
+    final display = capabilities.displays.first;
+    display
+      ..displayId = display.displayId.isEmpty ? 'main' : display.displayId
+      ..displayName = display.displayName.isEmpty
+          ? 'Primary Display'
+          : display.displayName
+      ..primary = true
+      ..screen = screen.deepCopy();
+    return capabilities;
+  }
+
+  capv1.DeviceCapabilities _applyLifecycleOperator(
+    capv1.DeviceCapabilities capabilities,
+  ) {
+    final edge = capabilities.hasEdge()
+        ? capabilities.edge
+        : (capabilities.edge = capv1.EdgeCapability());
+    final lifecycleOperator = _appIsForeground
+        ? 'monitor.lifecycle.foreground'
+        : 'monitor.lifecycle.background';
+    final nextOperators = edge.operators
+        .where(
+          (operator) =>
+              operator != 'monitor.lifecycle.foreground' &&
+              operator != 'monitor.lifecycle.background',
+        )
+        .toList(growable: true)
+      ..add(lifecycleOperator);
+    edge.operators
+      ..clear()
+      ..addAll(_dedupeOperators(nextOperators));
+    return capabilities;
+  }
+
+  Future<void> _probeAndPublishCapabilityChanges({
+    required String reason,
+    bool forceSnapshot = false,
+  }) async {
+    if (!_hasActiveControlSession || _deviceId.isEmpty || _capabilityPollInFlight) {
+      return;
+    }
+    _capabilityPollInFlight = true;
+    try {
+      final touchInputLikely = switch (defaultTargetPlatform) {
+        TargetPlatform.android => true,
+        TargetPlatform.iOS => true,
+        TargetPlatform.fuchsia => true,
+        TargetPlatform.macOS => false,
+        TargetPlatform.linux => false,
+        TargetPlatform.windows => false,
+      };
+      final probedCapabilities = await _capabilityProbe.probe(
+        CapabilityProbeContext(
+          deviceId: _deviceId,
+          deviceName: _deviceNameController.text.trim(),
+          deviceType: _deviceTypeController.text.trim(),
+          platform: _platformController.text.trim(),
+          screenWidth: _currentLogicalSize().width.round(),
+          screenHeight: _currentLogicalSize().height.round(),
+          screenDensity: _currentDevicePixelRatio(),
+          touchInputLikely: touchInputLikely,
+          targetPlatform: defaultTargetPlatform,
+        ),
+      );
+      final nextCapabilities = _applyLifecycleOperator(
+        _applyDisplayMetadata(probedCapabilities.deepCopy()),
+      );
+      final nextSignature = _capabilitySignature(nextCapabilities);
+      final changed = nextSignature != _lastCapabilitySignature;
+      if (!changed && !forceSnapshot) {
+        return;
+      }
+
+      _lastRegisteredCapabilities = nextCapabilities;
+      _lastCapabilitySignature = nextSignature;
+      final nextGeneration = math.max(
+        _capabilityGeneration + 1,
+        _lastCapabilityAckGeneration + 1,
+      );
+      _capabilityGeneration = nextGeneration;
+      if (forceSnapshot) {
+        _outgoing.add(
+          TerminalControlGrpcClient.capabilitySnapshotRequest(
+            deviceId: _deviceId,
+            generation: _capabilityGeneration,
+            capabilities: nextCapabilities,
+          ),
+        );
+        return;
+      }
+      _outgoing.add(
+        TerminalControlGrpcClient.capabilityDeltaRequest(
+          deviceId: _deviceId,
+          generation: _capabilityGeneration,
+          capabilities: nextCapabilities,
+          reason: reason,
+        ),
+      );
+    } finally {
+      _capabilityPollInFlight = false;
+    }
+  }
+
+  bool _isStaleCapabilityGenerationError(ControlError error) {
+    if (error.code != ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION) {
+      return false;
+    }
+    final message = error.message.toLowerCase();
+    return message.contains('stale capability generation') ||
+        (message.contains('generation') && message.contains('stale'));
+  }
 
   DiscoveredServer? _selectedServerMetadata() {
     final selected = _selectedDiscoveredServer;
@@ -1226,6 +1378,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               );
               _recordClientLog('error', response.error.message);
               _failPendingBugReportsForControlError(response.error);
+              if (_isStaleCapabilityGenerationError(response.error)) {
+                unawaited(
+                  _probeAndPublishCapabilityChanges(
+                    reason: 'stale_generation_rebaseline',
+                    forceSnapshot: true,
+                  ),
+                );
+              }
             }
             if (response.hasBugReportAck()) {
               _handleBugReportAck(response.bugReportAck);
@@ -1324,7 +1484,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       );
 
       _capabilityGeneration = 1;
-      _lastRegisteredCapabilities = probedCapabilities.deepCopy();
+      _lastRegisteredCapabilities = _applyLifecycleOperator(
+        _applyDisplayMetadata(probedCapabilities.deepCopy()),
+      );
+      _lastCapabilitySignature = _capabilitySignature(
+        _lastRegisteredCapabilities!,
+      );
       _outgoing.add(
         TerminalControlGrpcClient.capabilitySnapshotRequest(
           deviceId: _deviceId,
@@ -1332,7 +1497,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           capabilities: _lastRegisteredCapabilities!,
         ),
       );
-      _sendLifecycleCapabilityUpdate(reason: 'lifecycle_state');
       final initialHeartbeatUnixMs =
           DateTime.now().toUtc().millisecondsSinceEpoch;
       _lastHeartbeatUnixMs = initialHeartbeatUnixMs;
@@ -1392,50 +1556,30 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     });
   }
 
+  void _startCapabilityMonitorLoop() {
+    _capabilityMonitorTimer?.cancel();
+    _capabilityMonitorTimer = Timer.periodic(_capabilityMonitorInterval, (_) {
+      unawaited(_probeAndPublishCapabilityChanges(reason: 'runtime_monitor_poll'));
+    });
+  }
+
   void _syncMonitoringLoops() {
     if (_hasActiveControlSession && _appIsForeground) {
       _startHeartbeatLoop();
       _startSensorTelemetryLoop();
+      _startCapabilityMonitorLoop();
       return;
     }
     _stopHeartbeatLoop();
     _stopSensorTelemetryLoop();
+    _stopCapabilityMonitorLoop();
   }
 
   void _sendLifecycleCapabilityUpdate({String reason = 'lifecycle_state'}) {
-    final current = _lastRegisteredCapabilities;
-    if (current == null || !_hasActiveControlSession) {
+    if (!_hasActiveControlSession) {
       return;
     }
-    final updated = current.deepCopy();
-    final edge = updated.hasEdge()
-        ? updated.edge
-        : (updated.edge = capv1.EdgeCapability());
-    final nextLifecycleOperator = _appIsForeground
-        ? 'monitor.lifecycle.foreground'
-        : 'monitor.lifecycle.background';
-    final nextOperators = edge.operators
-        .where(
-          (operator) =>
-              operator != 'monitor.lifecycle.foreground' &&
-              operator != 'monitor.lifecycle.background',
-        )
-        .toList(growable: true)
-      ..add(nextLifecycleOperator);
-    edge.operators
-      ..clear()
-      ..addAll(_dedupeOperators(nextOperators));
-
-    _lastRegisteredCapabilities = updated;
-    _capabilityGeneration += 1;
-    _outgoing.add(
-      TerminalControlGrpcClient.capabilityDeltaRequest(
-        deviceId: _deviceId,
-        generation: _capabilityGeneration,
-        capabilities: updated,
-        reason: reason,
-      ),
-    );
+    unawaited(_probeAndPublishCapabilityChanges(reason: reason));
   }
 
   List<String> _dedupeOperators(List<String> operators) {
@@ -2350,6 +2494,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _sensorTimer = null;
   }
 
+  void _stopCapabilityMonitorLoop() {
+    _capabilityMonitorTimer?.cancel();
+    _capabilityMonitorTimer = null;
+  }
+
   void _cancelReconnectTimer() {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
@@ -2584,6 +2733,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   @override
+  void didChangeMetrics() {
+    _sendLifecycleCapabilityUpdate(reason: 'display_geometry_change');
+  }
+
+  @override
   void dispose() {
     _shouldStayConnected = false;
     WidgetsBinding.instance.removeObserver(this);
@@ -2592,6 +2746,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _bugReportAckTimer = null;
     _stopHeartbeatLoop();
     _stopSensorTelemetryLoop();
+    _stopCapabilityMonitorLoop();
     final incoming = _incoming;
     if (incoming != null) {
       unawaited(incoming.cancel());

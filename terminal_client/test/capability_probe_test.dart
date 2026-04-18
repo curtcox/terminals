@@ -5,7 +5,7 @@ import 'package:terminal_client/capabilities/probe.dart';
 void main() {
   test('probe omits media capabilities when no devices are detected', () async {
     final probe = DefaultCapabilityProbe(
-      mediaDeviceKindsProvider: () async => <String>[],
+      mediaDeviceInventoryProvider: () async => const <MediaDeviceDescriptor>[],
     );
 
     final capabilities = await probe.probe(
@@ -39,8 +39,24 @@ void main() {
 
   test('probe includes media capabilities when devices are detected', () async {
     final probe = DefaultCapabilityProbe(
-      mediaDeviceKindsProvider: () async =>
-          <String>['audioinput', 'videoinput', 'audiooutput'],
+      mediaDeviceInventoryProvider: () async =>
+          const <MediaDeviceDescriptor>[
+            MediaDeviceDescriptor(
+              kind: 'audioinput',
+              deviceId: 'mic-1',
+              label: 'Built-in Microphone',
+            ),
+            MediaDeviceDescriptor(
+              kind: 'videoinput',
+              deviceId: 'cam-1',
+              label: 'USB Camera',
+            ),
+            MediaDeviceDescriptor(
+              kind: 'audiooutput',
+              deviceId: 'spk-1',
+              label: 'Bluetooth Speaker',
+            ),
+          ],
     );
 
     final capabilities = await probe.probe(
@@ -61,5 +77,9 @@ void main() {
     expect(capabilities.hasCamera(), isTrue);
     expect(capabilities.hasSpeakers(), isTrue);
     expect(capabilities.microphone.channels, 1);
+    expect(capabilities.microphone.endpoints, isNotEmpty);
+    expect(capabilities.camera.endpoints, isNotEmpty);
+    expect(capabilities.speakers.endpoints, isNotEmpty);
+    expect(capabilities.displays, isNotEmpty);
   });
 }

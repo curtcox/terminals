@@ -934,7 +934,7 @@ func capabilityResources(caps map[string]string) map[string]struct{} {
 		return resources
 	}
 
-	if caps["screen.width"] != "" && caps["screen.height"] != "" {
+	if (caps["screen.width"] != "" && caps["screen.height"] != "") || truthyCapability(caps["display.count"]) {
 		resources["screen.main"] = struct{}{}
 		resources["screen.overlay"] = struct{}{}
 	}
@@ -947,14 +947,14 @@ func capabilityResources(caps map[string]string) map[string]struct{} {
 	if truthyCapability(caps["touch.supported"]) {
 		resources["touch.primary"] = struct{}{}
 	}
-	if truthyCapability(caps["speakers.present"]) {
+	if truthyCapability(caps["speakers.present"]) || truthyCapability(caps["speakers.endpoint_count"]) {
 		resources["speaker.main"] = struct{}{}
 	}
-	if truthyCapability(caps["microphone.present"]) {
+	if truthyCapability(caps["microphone.present"]) || truthyCapability(caps["microphone.endpoint_count"]) {
 		resources["mic.capture"] = struct{}{}
 		resources["mic.analyze"] = struct{}{}
 	}
-	if truthyCapability(caps["camera.present"]) {
+	if truthyCapability(caps["camera.present"]) || truthyCapability(caps["camera.endpoint_count"]) {
 		resources["camera.capture"] = struct{}{}
 		resources["camera.analyze"] = struct{}{}
 	}

@@ -475,6 +475,38 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		out["screen.height"] = strconv.FormatInt(int64(screen.GetHeight()), 10)
 		out["screen.density"] = strconv.FormatFloat(screen.GetDensity(), 'f', -1, 64)
 		out["screen.touch"] = strconv.FormatBool(screen.GetTouch())
+		if orientation := strings.TrimSpace(screen.GetOrientation()); orientation != "" {
+			out["screen.orientation"] = orientation
+		}
+		out["screen.fullscreen_supported"] = strconv.FormatBool(screen.GetFullscreenSupported())
+		out["screen.multi_window_supported"] = strconv.FormatBool(screen.GetMultiWindowSupported())
+		if safeArea := screen.GetSafeArea(); safeArea != nil {
+			out["screen.safe_area.left"] = strconv.FormatInt(int64(safeArea.GetLeft()), 10)
+			out["screen.safe_area.top"] = strconv.FormatInt(int64(safeArea.GetTop()), 10)
+			out["screen.safe_area.right"] = strconv.FormatInt(int64(safeArea.GetRight()), 10)
+			out["screen.safe_area.bottom"] = strconv.FormatInt(int64(safeArea.GetBottom()), 10)
+		}
+	}
+	if displays := caps.GetDisplays(); len(displays) > 0 {
+		out["display.count"] = strconv.FormatInt(int64(len(displays)), 10)
+		for idx, display := range displays {
+			prefix := "display." + strconv.Itoa(idx)
+			if displayID := strings.TrimSpace(display.GetDisplayId()); displayID != "" {
+				out[prefix+".id"] = displayID
+			}
+			if name := strings.TrimSpace(display.GetDisplayName()); name != "" {
+				out[prefix+".name"] = name
+			}
+			out[prefix+".primary"] = strconv.FormatBool(display.GetPrimary())
+			if screen := display.GetScreen(); screen != nil {
+				out[prefix+".width"] = strconv.FormatInt(int64(screen.GetWidth()), 10)
+				out[prefix+".height"] = strconv.FormatInt(int64(screen.GetHeight()), 10)
+				out[prefix+".density"] = strconv.FormatFloat(screen.GetDensity(), 'f', -1, 64)
+				if orientation := strings.TrimSpace(screen.GetOrientation()); orientation != "" {
+					out[prefix+".orientation"] = orientation
+				}
+			}
+		}
 	}
 	if keyboard := caps.GetKeyboard(); keyboard != nil {
 		out["keyboard.physical"] = strconv.FormatBool(keyboard.GetPhysical())
@@ -496,6 +528,26 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		if rates := joinInts(speakers.GetSampleRates()); rates != "" {
 			out["speakers.sample_rates"] = rates
 		}
+		if endpoints := speakers.GetEndpoints(); len(endpoints) > 0 {
+			out["speakers.endpoint_count"] = strconv.FormatInt(int64(len(endpoints)), 10)
+			for idx, endpoint := range endpoints {
+				prefix := "speakers.endpoint." + strconv.Itoa(idx)
+				if endpointID := strings.TrimSpace(endpoint.GetEndpointId()); endpointID != "" {
+					out[prefix+".id"] = endpointID
+				}
+				if endpointName := strings.TrimSpace(endpoint.GetEndpointName()); endpointName != "" {
+					out[prefix+".name"] = endpointName
+				}
+				if connectionType := strings.TrimSpace(endpoint.GetConnectionType()); connectionType != "" {
+					out[prefix+".connection_type"] = connectionType
+				}
+				out[prefix+".channels"] = strconv.FormatInt(int64(endpoint.GetChannels()), 10)
+				if rates := joinInts(endpoint.GetSampleRates()); rates != "" {
+					out[prefix+".sample_rates"] = rates
+				}
+				out[prefix+".available"] = strconv.FormatBool(endpoint.GetAvailable())
+			}
+		}
 	}
 	if mic := caps.GetMicrophone(); mic != nil {
 		out["microphone.present"] = "true"
@@ -504,6 +556,26 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		}
 		if rates := joinInts(mic.GetSampleRates()); rates != "" {
 			out["microphone.sample_rates"] = rates
+		}
+		if endpoints := mic.GetEndpoints(); len(endpoints) > 0 {
+			out["microphone.endpoint_count"] = strconv.FormatInt(int64(len(endpoints)), 10)
+			for idx, endpoint := range endpoints {
+				prefix := "microphone.endpoint." + strconv.Itoa(idx)
+				if endpointID := strings.TrimSpace(endpoint.GetEndpointId()); endpointID != "" {
+					out[prefix+".id"] = endpointID
+				}
+				if endpointName := strings.TrimSpace(endpoint.GetEndpointName()); endpointName != "" {
+					out[prefix+".name"] = endpointName
+				}
+				if connectionType := strings.TrimSpace(endpoint.GetConnectionType()); connectionType != "" {
+					out[prefix+".connection_type"] = connectionType
+				}
+				out[prefix+".channels"] = strconv.FormatInt(int64(endpoint.GetChannels()), 10)
+				if rates := joinInts(endpoint.GetSampleRates()); rates != "" {
+					out[prefix+".sample_rates"] = rates
+				}
+				out[prefix+".available"] = strconv.FormatBool(endpoint.GetAvailable())
+			}
 		}
 	}
 	if camera := caps.GetCamera(); camera != nil {
@@ -528,6 +600,33 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 			}
 			if back.GetFps() > 0 {
 				out["camera.back.fps"] = strconv.FormatInt(int64(back.GetFps()), 10)
+			}
+		}
+		if endpoints := camera.GetEndpoints(); len(endpoints) > 0 {
+			out["camera.endpoint_count"] = strconv.FormatInt(int64(len(endpoints)), 10)
+			for idx, endpoint := range endpoints {
+				prefix := "camera.endpoint." + strconv.Itoa(idx)
+				if endpointID := strings.TrimSpace(endpoint.GetEndpointId()); endpointID != "" {
+					out[prefix+".id"] = endpointID
+				}
+				if endpointName := strings.TrimSpace(endpoint.GetEndpointName()); endpointName != "" {
+					out[prefix+".name"] = endpointName
+				}
+				if connectionType := strings.TrimSpace(endpoint.GetConnectionType()); connectionType != "" {
+					out[prefix+".connection_type"] = connectionType
+				}
+				if facing := strings.TrimSpace(endpoint.GetFacing()); facing != "" {
+					out[prefix+".facing"] = facing
+				}
+				out[prefix+".available"] = strconv.FormatBool(endpoint.GetAvailable())
+				if modes := endpoint.GetModes(); len(modes) > 0 {
+					for modeIndex, mode := range modes {
+						modePrefix := prefix + ".mode." + strconv.Itoa(modeIndex)
+						out[modePrefix+".width"] = strconv.FormatInt(int64(mode.GetWidth()), 10)
+						out[modePrefix+".height"] = strconv.FormatInt(int64(mode.GetHeight()), 10)
+						out[modePrefix+".fps"] = strconv.FormatInt(int64(mode.GetFps()), 10)
+					}
+				}
 			}
 		}
 	}

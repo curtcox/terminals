@@ -298,6 +298,120 @@ func TestSessionRunRejectsPreRegisterMessageButContinues(t *testing.T) {
 	}
 }
 
+func TestSessionRunDefersHeartbeatUntilCapabilitySnapshot(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(control)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			{Heartbeat: &HeartbeatRequest{DeviceID: "device-1"}},
+			{CapabilitySnap: &CapabilitySnapshotRequest{
+				DeviceID:   "device-1",
+				Generation: 1,
+				Capabilities: map[string]string{
+					"screen.width":  "1920",
+					"screen.height": "1080",
+				},
+			}},
+			{Heartbeat: &HeartbeatRequest{DeviceID: "device-1"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(stream.sent) < 3 {
+		t.Fatalf("len(sent) = %d, want at least 3", len(stream.sent))
+	}
+	if stream.sent[1].ErrorCode != ErrorCodeProtocolViolation {
+		t.Fatalf("pre-snapshot message should fail with protocol violation, got %+v", stream.sent[1])
+	}
+
+	got, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected registered device")
+	}
+	if got.LastHeartbeat.IsZero() {
+		t.Fatalf("expected heartbeat after snapshot acceptance")
+	}
+}
+
+func TestSessionRunAllowsSnapshotRebaselineAfterStaleDelta(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(control)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			{CapabilitySnap: &CapabilitySnapshotRequest{
+				DeviceID:   "device-1",
+				Generation: 3,
+				Capabilities: map[string]string{
+					"screen.width":  "1920",
+					"screen.height": "1080",
+				},
+			}},
+			{CapabilityDelta: &CapabilityDeltaRequest{
+				DeviceID:   "device-1",
+				Generation: 2,
+				Reason:     "stale_delta",
+				Capabilities: map[string]string{
+					"screen.width":  "1280",
+					"screen.height": "720",
+				},
+			}},
+			{CapabilitySnap: &CapabilitySnapshotRequest{
+				DeviceID:   "device-1",
+				Generation: 4,
+				Capabilities: map[string]string{
+					"screen.width":  "1366",
+					"screen.height": "768",
+				},
+			}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	got, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected registered device")
+	}
+	if got.Generation != 4 {
+		t.Fatalf("generation = %d, want 4", got.Generation)
+	}
+	if got.Capabilities["screen.width"] != "1366" {
+		t.Fatalf("screen.width = %q, want 1366", got.Capabilities["screen.width"])
+	}
+
+	sawStaleError := false
+	sawRebaselineAck := false
+	for _, msg := range stream.sent {
+		if msg.ErrorCode == ErrorCodeProtocolViolation && msg.Error != "" {
+			sawStaleError = true
+		}
+		if msg.CapabilityAck != nil && msg.CapabilityAck.AcceptedGeneration == 4 {
+			sawRebaselineAck = true
+		}
+	}
+	if !sawStaleError {
+		t.Fatalf("expected stale delta protocol violation")
+	}
+	if !sawRebaselineAck {
+		t.Fatalf("expected capability ack for rebaseline snapshot generation 4")
+	}
+}
+
 func TestSessionRunRejectsDeviceIDMismatchButContinues(t *testing.T) {
 	manager := device.NewManager()
 	control := NewControlService("srv-1", manager)

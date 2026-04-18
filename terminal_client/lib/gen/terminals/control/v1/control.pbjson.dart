@@ -1118,15 +1118,18 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.control.v1.CapabilitySnapshot': CapabilitySnapshot$json,
   '.terminals.capabilities.v1.DeviceCapabilities': $3.DeviceCapabilities$json,
   '.terminals.capabilities.v1.ScreenCapability': $3.ScreenCapability$json,
+  '.terminals.capabilities.v1.Insets': $3.Insets$json,
   '.terminals.capabilities.v1.KeyboardCapability': $3.KeyboardCapability$json,
   '.terminals.capabilities.v1.PointerCapability': $3.PointerCapability$json,
   '.terminals.capabilities.v1.TouchCapability': $3.TouchCapability$json,
   '.terminals.capabilities.v1.AudioOutputCapability':
       $3.AudioOutputCapability$json,
+  '.terminals.capabilities.v1.AudioEndpoint': $3.AudioEndpoint$json,
   '.terminals.capabilities.v1.AudioInputCapability':
       $3.AudioInputCapability$json,
   '.terminals.capabilities.v1.CameraCapability': $3.CameraCapability$json,
   '.terminals.capabilities.v1.CameraLens': $3.CameraLens$json,
+  '.terminals.capabilities.v1.CameraEndpoint': $3.CameraEndpoint$json,
   '.terminals.capabilities.v1.SensorCapability': $3.SensorCapability$json,
   '.terminals.capabilities.v1.ConnectivityCapability':
       $3.ConnectivityCapability$json,
@@ -1140,6 +1143,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       $3.EdgeTimingCapability$json,
   '.terminals.capabilities.v1.EdgeGeometryCapability':
       $3.EdgeGeometryCapability$json,
+  '.terminals.capabilities.v1.DisplayCapability': $3.DisplayCapability$json,
   '.terminals.control.v1.CapabilityDelta': CapabilityDelta$json,
   '.terminals.io.v1.InputEvent': $0.InputEvent$json,
   '.terminals.io.v1.KeyEvent': $0.KeyEvent$json,

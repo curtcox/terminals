@@ -3,7 +3,20 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
     as capv1;
 
-typedef MediaDeviceKindsProvider = Future<List<String>> Function();
+typedef MediaDeviceInventoryProvider = Future<List<MediaDeviceDescriptor>>
+    Function();
+
+class MediaDeviceDescriptor {
+  const MediaDeviceDescriptor({
+    required this.kind,
+    required this.deviceId,
+    required this.label,
+  });
+
+  final String kind;
+  final String deviceId;
+  final String label;
+}
 
 class CapabilityProbeContext {
   const CapabilityProbeContext({
@@ -45,15 +58,16 @@ class MonitoringSupportTier {
 
 class DefaultCapabilityProbe implements CapabilityProbe {
   DefaultCapabilityProbe({
-    MediaDeviceKindsProvider? mediaDeviceKindsProvider,
+    MediaDeviceInventoryProvider? mediaDeviceInventoryProvider,
   }) : _mediaDeviceKindsProvider =
-            mediaDeviceKindsProvider ?? _defaultMediaDeviceKindsProvider;
+            mediaDeviceInventoryProvider ?? _defaultMediaDeviceInventoryProvider;
 
-  final MediaDeviceKindsProvider _mediaDeviceKindsProvider;
+  final MediaDeviceInventoryProvider _mediaDeviceKindsProvider;
 
   @override
   Future<capv1.DeviceCapabilities> probe(CapabilityProbeContext context) async {
-    final mediaKinds = await _probeMediaKinds();
+    final mediaDevices = await _probeMediaDevices();
+    final mediaKinds = mediaDevices.map((device) => device.kind).toSet();
     final hasMicrophone = mediaKinds.contains('audioinput');
     final hasAudioOutput = mediaKinds.contains('audiooutput');
     final hasCamera = mediaKinds.contains('videoinput');
@@ -72,7 +86,38 @@ class DefaultCapabilityProbe implements CapabilityProbe {
         ..width = context.screenWidth
         ..height = context.screenHeight
         ..density = context.screenDensity
-        ..touch = context.touchInputLikely);
+        ..touch = context.touchInputLikely
+        ..orientation = context.screenWidth >= context.screenHeight
+            ? 'landscape'
+            : 'portrait'
+        ..fullscreenSupported = true
+        ..multiWindowSupported = true
+        ..safeArea = (capv1.Insets()
+          ..left = 0
+          ..top = 0
+          ..right = 0
+          ..bottom = 0))
+      ..displays.add(
+        capv1.DisplayCapability()
+          ..displayId = 'main'
+          ..displayName = 'Primary Display'
+          ..primary = true
+          ..screen = (capv1.ScreenCapability()
+            ..width = context.screenWidth
+            ..height = context.screenHeight
+            ..density = context.screenDensity
+            ..touch = context.touchInputLikely
+            ..orientation = context.screenWidth >= context.screenHeight
+                ? 'landscape'
+                : 'portrait'
+            ..fullscreenSupported = true
+            ..multiWindowSupported = true
+            ..safeArea = (capv1.Insets()
+              ..left = 0
+              ..top = 0
+              ..right = 0
+              ..bottom = 0)),
+      );
 
     if (hasKeyboard) {
       capabilities.keyboard = (capv1.KeyboardCapability()..physical = true);
@@ -86,13 +131,20 @@ class DefaultCapabilityProbe implements CapabilityProbe {
         ..maxPoints = 1);
     }
     if (hasAudioOutput) {
-      capabilities.speakers = (capv1.AudioOutputCapability()..channels = 2);
+      final outputEndpoints = _audioEndpointsForKind(mediaDevices, 'audiooutput');
+      capabilities.speakers = (capv1.AudioOutputCapability()
+        ..channels = 2
+        ..endpoints.addAll(outputEndpoints));
     }
     if (hasMicrophone) {
-      capabilities.microphone = (capv1.AudioInputCapability()..channels = 1);
+      final inputEndpoints = _audioEndpointsForKind(mediaDevices, 'audioinput');
+      capabilities.microphone = (capv1.AudioInputCapability()
+        ..channels = 1
+        ..endpoints.addAll(inputEndpoints));
     }
     if (hasCamera) {
-      capabilities.camera = capv1.CameraCapability();
+      capabilities.camera = (capv1.CameraCapability()
+        ..endpoints.addAll(_cameraEndpoints(mediaDevices)));
     }
     capabilities.connectivity = capv1.ConnectivityCapability()
       ..wifiSignalStrength = true;
@@ -108,16 +160,85 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     return capabilities;
   }
 
-  Future<Set<String>> _probeMediaKinds() async {
+  List<capv1.AudioEndpoint> _audioEndpointsForKind(
+    List<MediaDeviceDescriptor> mediaDevices,
+    String kind,
+  ) {
+    final endpoints = <capv1.AudioEndpoint>[];
+    var fallbackIndex = 0;
+    for (final device in mediaDevices) {
+      if (device.kind != kind) {
+        continue;
+      }
+      final endpointId = device.deviceId.trim().isEmpty
+          ? '$kind-$fallbackIndex'
+          : device.deviceId.trim();
+      fallbackIndex += 1;
+      endpoints.add(
+        capv1.AudioEndpoint()
+          ..endpointId = endpointId
+          ..endpointName = _endpointLabelOrDefault(
+            device.label,
+            kind == 'audioinput' ? 'Microphone' : 'Speaker',
+            fallbackIndex,
+          )
+          ..connectionType = _connectionTypeForEndpoint(device.label)
+          ..channels = kind == 'audioinput' ? 1 : 2
+          ..available = true,
+      );
+    }
+    return endpoints;
+  }
+
+  List<capv1.CameraEndpoint> _cameraEndpoints(
+    List<MediaDeviceDescriptor> mediaDevices,
+  ) {
+    final endpoints = <capv1.CameraEndpoint>[];
+    var fallbackIndex = 0;
+    for (final device in mediaDevices) {
+      if (device.kind != 'videoinput') {
+        continue;
+      }
+      final endpointId = device.deviceId.trim().isEmpty
+          ? 'camera-$fallbackIndex'
+          : device.deviceId.trim();
+      fallbackIndex += 1;
+      endpoints.add(
+        capv1.CameraEndpoint()
+          ..endpointId = endpointId
+          ..endpointName = _endpointLabelOrDefault(
+            device.label,
+            'Camera',
+            fallbackIndex,
+          )
+          ..connectionType = _connectionTypeForEndpoint(device.label)
+          ..facing = _cameraFacingForLabel(device.label)
+          ..available = true,
+      );
+    }
+    return endpoints;
+  }
+
+  Future<List<MediaDeviceDescriptor>> _probeMediaDevices() async {
     try {
-      final kinds = await _mediaDeviceKindsProvider();
-      final normalized = kinds
-          .map((kind) => kind.trim().toLowerCase())
-          .where((kind) => kind.isNotEmpty)
-          .toSet();
+      final devices = await _mediaDeviceKindsProvider();
+      final normalized = <MediaDeviceDescriptor>[];
+      for (final device in devices) {
+        final kind = device.kind.trim().toLowerCase();
+        if (kind.isEmpty) {
+          continue;
+        }
+        normalized.add(
+          MediaDeviceDescriptor(
+            kind: kind,
+            deviceId: device.deviceId,
+            label: device.label,
+          ),
+        );
+      }
       return normalized;
     } catch (_) {
-      return <String>{};
+      return <MediaDeviceDescriptor>[];
     }
   }
 }
@@ -143,12 +264,53 @@ MonitoringSupportTier _monitoringSupportTierForPlatform(
   }
 }
 
-Future<List<String>> _defaultMediaDeviceKindsProvider() async {
+Future<List<MediaDeviceDescriptor>> _defaultMediaDeviceInventoryProvider() async {
   final devices = await navigator.mediaDevices.enumerateDevices();
   return devices
-      .map((device) => device.kind)
-      .whereType<String>()
+      .map(
+        (device) => MediaDeviceDescriptor(
+          kind: device.kind ?? '',
+          deviceId: device.deviceId ?? '',
+          label: device.label ?? '',
+        ),
+      )
       .toList(growable: false);
+}
+
+String _endpointLabelOrDefault(String label, String prefix, int index) {
+  final trimmed = label.trim();
+  if (trimmed.isNotEmpty) {
+    return trimmed;
+  }
+  return '$prefix $index';
+}
+
+String _connectionTypeForEndpoint(String label) {
+  final normalized = label.toLowerCase();
+  if (normalized.contains('bluetooth') || normalized.contains('bt')) {
+    return 'bluetooth';
+  }
+  if (normalized.contains('usb')) {
+    return 'usb';
+  }
+  if (normalized.contains('hdmi')) {
+    return 'hdmi';
+  }
+  if (normalized.contains('external')) {
+    return 'external';
+  }
+  return 'built_in';
+}
+
+String _cameraFacingForLabel(String label) {
+  final normalized = label.toLowerCase();
+  if (normalized.contains('back') || normalized.contains('rear')) {
+    return 'back';
+  }
+  if (normalized.contains('front')) {
+    return 'front';
+  }
+  return 'unknown';
 }
 
 bool _isLikelyKeyboardPlatform(TargetPlatform platform) {
