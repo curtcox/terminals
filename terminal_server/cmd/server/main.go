@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -27,10 +28,11 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/diagnostics/bugreport"
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
-	"github.com/curtcox/terminals/terminal_server/internal/io"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/observation"
 	"github.com/curtcox/terminals/terminal_server/internal/placement"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
+	"github.com/curtcox/terminals/terminal_server/internal/repl"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
@@ -40,6 +42,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "repl" {
+		os.Exit(runREPL(os.Stdin, os.Stdout, os.Stderr))
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "load config: %v\n", err)
@@ -72,7 +78,7 @@ func main() {
 	defer endSpan()
 
 	deviceManager := device.NewManager()
-	ioRouter := io.NewRouter()
+	ioRouter := iorouter.NewRouter()
 	audioHub := audio.NewHub()
 	scenarioEngine := scenario.NewEngine()
 	controlService := transport.NewControlService(cfg.MDNSName, deviceManager)
@@ -119,7 +125,7 @@ func main() {
 	})
 	scenario.RegisterBuiltins(scenarioEngine)
 	scenarioRuntime := scenario.NewRuntime(scenarioEngine, environment)
-	ioRouter.MediaPlanner().SetAnalyzerSink(func(event io.AnalyzerEvent) {
+	ioRouter.MediaPlanner().SetAnalyzerSink(func(event iorouter.AnalyzerEvent) {
 		_, _ = scenarioRuntime.HandleEvent(context.Background(), strings.TrimSpace(event.Subject), scenario.EventRecord{
 			Kind:       strings.TrimSpace(event.Kind),
 			Subject:    strings.TrimSpace(event.Subject),
@@ -128,13 +134,14 @@ func main() {
 			OccurredAt: event.OccurredAt,
 		})
 	})
-	ioRouter.MediaPlanner().SetObservationSink(func(observation io.Observation) {
+	ioRouter.MediaPlanner().SetObservationSink(func(observation iorouter.Observation) {
 		observationStore.AddObservation(context.Background(), observation)
 	})
 	if err := scenarioRuntime.RecoverActivations(ctx); err != nil {
 		logger.Error("recover scenario activations", "event", "scenario.recovery.failed", "error", err)
 	}
 	controlStream := transport.NewStreamHandler(controlService)
+	controlStream.SetTerminalREPLAdminURL(fmt.Sprintf("http://127.0.0.1:%d", cfg.AdminHTTPPort))
 	bugReports := bugreport.NewService(cfg.LogDir, deviceManager, scenarioRuntime)
 	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
 	if err != nil {
@@ -305,6 +312,20 @@ func main() {
 	logger.Info("terminal server stopped", "event", "server.stopped")
 }
 
+func runREPL(stdin io.Reader, stdout, stderr io.Writer) int {
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	if err := repl.Run(ctx, stdin, stdout, repl.Options{
+		Prompt:       "repl>",
+		AdminBaseURL: strings.TrimSpace(os.Getenv("TERMINALS_REPL_ADMIN_URL")),
+	}); err != nil {
+		_, _ = fmt.Fprintf(stderr, "repl: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
 type scenarioAnalyzerRunner struct {
 	Sound       scenario.SoundClassifier
 	DeviceAudio scenario.DeviceAudioSubscriber
@@ -314,7 +335,7 @@ func (r scenarioAnalyzerRunner) StartAnalyzer(
 	ctx context.Context,
 	sourceDeviceID string,
 	analyzer string,
-	emit func(io.AnalyzerEvent),
+	emit func(iorouter.AnalyzerEvent),
 ) (func(), error) {
 	if r.Sound == nil || r.DeviceAudio == nil || strings.TrimSpace(sourceDeviceID) == "" {
 		return func() {}, nil
@@ -345,7 +366,7 @@ func (r scenarioAnalyzerRunner) StartAnalyzer(
 				if !ok {
 					return
 				}
-				emit(io.AnalyzerEvent{
+				emit(iorouter.AnalyzerEvent{
 					Kind:    "sound.detected",
 					Subject: strings.TrimSpace(sourceDeviceID),
 					Attributes: map[string]string{
@@ -402,7 +423,7 @@ type worldModelAdapter struct {
 	model *world.Model
 }
 
-func (w worldModelAdapter) LocateEntity(ctx context.Context, query scenario.EntityQuery) (*io.LocationEstimate, error) {
+func (w worldModelAdapter) LocateEntity(ctx context.Context, query scenario.EntityQuery) (*iorouter.LocationEstimate, error) {
 	if w.model == nil {
 		return nil, world.ErrNotFound
 	}

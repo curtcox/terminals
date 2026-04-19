@@ -1,1 +1,1 @@
-1. Run `make all-check` before merging to validate the full repository.
+Implement typed ReplSession lifecycle APIs (create/attach/detach/list/get/terminate) and route terminal activation through those APIs instead of per-device implicit session state.

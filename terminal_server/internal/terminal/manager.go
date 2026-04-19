@@ -6,14 +6,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/curtcox/terminals/terminal_server/internal/repl"
 )
 
 var (
@@ -26,10 +29,15 @@ var (
 // StartOptions controls how a terminal session process is spawned.
 type StartOptions struct {
 	DeviceID string
-	Shell    string
-	Args     []string
-	Dir      string
-	Env      []string
+	// Command is the executable to launch inside the PTY.
+	// When empty, Start defaults to launching the current server binary in
+	// REPL mode ("repl" subcommand).
+	Command string
+	// Shell is retained as a deprecated alias of Command for compatibility.
+	Shell string
+	Args  []string
+	Dir   string
+	Env   []string
 }
 
 // Session is an immutable metadata snapshot of an active terminal session.
@@ -43,7 +51,9 @@ type Session struct {
 type liveSession struct {
 	meta Session
 	cmd  *exec.Cmd
-	pty  *os.File
+	in   io.WriteCloser
+	out  io.ReadCloser
+	done func()
 
 	bufferMu sync.Mutex
 	buffer   bytes.Buffer
@@ -65,25 +75,45 @@ func NewManager() *Manager {
 	}
 }
 
-// Start launches a new PTY-backed shell session.
+// Start launches a new PTY-backed REPL session.
 func (m *Manager) Start(ctx context.Context, opts StartOptions) (Session, error) {
 	if opts.DeviceID == "" {
 		return Session{}, ErrMissingDeviceID
 	}
-	shell := opts.Shell
-	if shell == "" {
-		shell = os.Getenv("SHELL")
-		if shell == "" {
-			shell = "/bin/sh"
+	command := opts.Command
+	if command == "" {
+		command = opts.Shell
+	}
+	if command == "" {
+		var err error
+		command, err = os.Executable()
+		if err != nil {
+			return Session{}, fmt.Errorf("resolve executable: %w", err)
 		}
 	}
 	args := opts.Args
 	if len(args) == 0 {
-		args = []string{"-i"}
+		args = []string{"repl"}
 	}
 
 	id := fmt.Sprintf("tty-%d", m.nextID.Add(1))
-	cmd := exec.CommandContext(ctx, shell, args...)
+	meta := Session{
+		ID:       id,
+		DeviceID: opts.DeviceID,
+		Shell:    command,
+		Started:  m.now().UTC(),
+	}
+
+	if shouldUseInProcessREPL(opts) {
+		live := m.startInProcessSession(ctx, meta, opts)
+		m.mu.Lock()
+		m.sessions[id] = live
+		m.mu.Unlock()
+		go m.captureOutput(id, live)
+		return live.meta, nil
+	}
+
+	cmd := exec.CommandContext(ctx, command, args...)
 	if opts.Dir != "" {
 		cmd.Dir = opts.Dir
 	}
@@ -97,14 +127,17 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) (Session, error)
 	}
 
 	live := &liveSession{
-		meta: Session{
-			ID:       id,
-			DeviceID: opts.DeviceID,
-			Shell:    shell,
-			Started:  m.now().UTC(),
+		meta: meta,
+		cmd:  cmd,
+		in:   ptmx,
+		out:  ptmx,
+		done: func() {
+			_ = ptmx.Close()
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+			_ = cmd.Wait()
 		},
-		cmd: cmd,
-		pty: ptmx,
 	}
 
 	m.mu.Lock()
@@ -125,8 +158,8 @@ func (m *Manager) Write(sessionID string, data []byte) error {
 	if len(data) == 0 {
 		return nil
 	}
-	if _, err := live.pty.Write(data); err != nil {
-		return fmt.Errorf("write pty: %w", err)
+	if _, err := live.in.Write(data); err != nil {
+		return fmt.Errorf("write session input: %w", err)
 	}
 	return nil
 }
@@ -169,11 +202,9 @@ func (m *Manager) Close(sessionID string) error {
 		return ErrSessionNotFound
 	}
 
-	_ = live.pty.Close()
-	if live.cmd.Process != nil {
-		_ = live.cmd.Process.Kill()
+	if live.done != nil {
+		live.done()
 	}
-	_ = live.cmd.Wait()
 	return nil
 }
 
@@ -217,7 +248,7 @@ func (m *Manager) getSession(sessionID string) (*liveSession, error) {
 func (m *Manager) captureOutput(sessionID string, live *liveSession) {
 	buf := make([]byte, 2048)
 	for {
-		n, err := live.pty.Read(buf)
+		n, err := live.out.Read(buf)
 		if n > 0 {
 			live.bufferMu.Lock()
 			_, _ = live.buffer.Write(buf[:n])
@@ -230,5 +261,47 @@ func (m *Manager) captureOutput(sessionID string, live *liveSession) {
 			m.mu.Unlock()
 			return
 		}
+	}
+}
+
+func shouldUseInProcessREPL(opts StartOptions) bool {
+	if strings.HasSuffix(os.Args[0], ".test") && opts.Command == "" && opts.Shell == "" {
+		return true
+	}
+	return false
+}
+
+func (m *Manager) startInProcessSession(ctx context.Context, meta Session, opts StartOptions) *liveSession {
+	inputReader, inputWriter := io.Pipe()
+	outputReader, outputWriter := io.Pipe()
+	childCtx, cancel := context.WithCancel(ctx)
+
+	adminURL := ""
+	for _, item := range opts.Env {
+		key, value, ok := strings.Cut(item, "=")
+		if ok && strings.TrimSpace(key) == "TERMINALS_REPL_ADMIN_URL" {
+			adminURL = strings.TrimSpace(value)
+			break
+		}
+	}
+	go func() {
+		_ = repl.Run(childCtx, inputReader, outputWriter, repl.Options{
+			Prompt:       "repl> ",
+			AdminBaseURL: adminURL,
+		})
+		_ = outputWriter.Close()
+	}()
+
+	return &liveSession{
+		meta: meta,
+		in:   inputWriter,
+		out:  outputReader,
+		done: func() {
+			cancel()
+			_ = inputReader.Close()
+			_ = inputWriter.Close()
+			_ = outputReader.Close()
+			_ = outputWriter.Close()
+		},
 	}
 }

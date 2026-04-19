@@ -400,6 +400,7 @@ type StreamHandler struct {
 	terminalReadDeadline   time.Duration
 	terminalReadInterval   time.Duration
 	terminalUIInterval     time.Duration
+	terminalReplAdminURL   string
 	lastSetUIByDevice      map[string]ui.Descriptor
 	multiWindowResume      map[string]multiWindowResumeState
 	photoFrameSlides       []string
@@ -441,6 +442,7 @@ const (
 	defaultTerminalReadDeadline = 180 * time.Millisecond
 	defaultTerminalReadInterval = 10 * time.Millisecond
 	defaultTerminalUIInterval   = 800 * time.Millisecond
+	defaultTerminalReplAdminURL = "http://127.0.0.1:50053"
 	defaultPhotoFrameInterval   = 12 * time.Second
 	bugReportButtonID           = "global_bug_report_button"
 	bugReportActionPrefix       = "bug_report"
@@ -475,6 +477,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalReadDeadline:   defaultTerminalReadDeadline,
 		terminalReadInterval:   defaultTerminalReadInterval,
 		terminalUIInterval:     defaultTerminalUIInterval,
+		terminalReplAdminURL:   defaultTerminalReplAdminURL,
 		lastSetUIByDevice:      map[string]ui.Descriptor{},
 		multiWindowResume:      map[string]multiWindowResumeState{},
 		photoFrameSlides:       defaultPhotoFrameSlides(),
@@ -517,6 +520,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalReadDeadline:   defaultTerminalReadDeadline,
 		terminalReadInterval:   defaultTerminalReadInterval,
 		terminalUIInterval:     defaultTerminalUIInterval,
+		terminalReplAdminURL:   defaultTerminalReplAdminURL,
 		lastSetUIByDevice:      map[string]ui.Descriptor{},
 		multiWindowResume:      map[string]multiWindowResumeState{},
 		photoFrameSlides:       defaultPhotoFrameSlides(),
@@ -568,6 +572,18 @@ func (h *StreamHandler) SetPhotoFrameSettings(slides []string, interval time.Dur
 	if interval > 0 {
 		h.photoFrameInterval = interval
 	}
+}
+
+// SetTerminalREPLAdminURL configures the base URL used by terminal REPL
+// sessions when they query server control-plane APIs.
+func (h *StreamHandler) SetTerminalREPLAdminURL(baseURL string) {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		baseURL = defaultTerminalReplAdminURL
+	}
+	h.mu.Lock()
+	h.terminalReplAdminURL = baseURL
+	h.mu.Unlock()
 }
 
 // HandleMessage processes one incoming control message and returns responses.
@@ -2296,7 +2312,15 @@ func (h *StreamHandler) ensureTerminalSession(ctx context.Context, deviceID stri
 		return output, nil
 	}
 
-	session, err := h.terminals.Start(ctx, terminal.StartOptions{DeviceID: deviceID})
+	h.mu.Lock()
+	replAdminURL := h.terminalReplAdminURL
+	h.mu.Unlock()
+	session, err := h.terminals.Start(ctx, terminal.StartOptions{
+		DeviceID: deviceID,
+		Env: []string{
+			"TERMINALS_REPL_ADMIN_URL=" + replAdminURL,
+		},
+	})
 	if err != nil {
 		return "", err
 	}
