@@ -40,6 +40,7 @@ type Config struct {
 	LivenessReconcileIntervalSecs int
 	DueTimerProcessIntervalSecs   int
 	SIP                           SIPConfig
+	AI                            AIConfig
 }
 
 // SIPConfig captures the subset of server configuration relevant to the
@@ -50,6 +51,21 @@ type SIPConfig struct {
 	Username    string
 	DisplayName string
 	Password    string
+}
+
+// AIConfig captures REPL-facing AI provider and model selection settings.
+type AIConfig struct {
+	DefaultProvider string
+	DefaultModel    string
+	OpenRouter      AIProviderConfig
+	Ollama          AIProviderConfig
+}
+
+// AIProviderConfig captures one configured AI provider.
+type AIProviderConfig struct {
+	BaseURL   string
+	APIKeyEnv string
+	Models    []string
 }
 
 // Load reads config from environment with sane defaults for local development.
@@ -84,6 +100,19 @@ func Load() (Config, error) {
 		HeartbeatTimeoutSeconds:       120,
 		LivenessReconcileIntervalSecs: 30,
 		DueTimerProcessIntervalSecs:   5,
+		AI: AIConfig{
+			DefaultProvider: getenv("TERMINALS_AI_DEFAULT_PROVIDER", "ollama"),
+			DefaultModel:    getenv("TERMINALS_AI_DEFAULT_MODEL", "llama3.1"),
+			OpenRouter: AIProviderConfig{
+				BaseURL:   getenv("TERMINALS_AI_OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+				APIKeyEnv: getenv("TERMINALS_AI_OPENROUTER_API_KEY_ENV", "OPENROUTER_API_KEY"),
+				Models:    []string{"anthropic/claude-sonnet-4-6"},
+			},
+			Ollama: AIProviderConfig{
+				BaseURL: getenv("TERMINALS_AI_OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+				Models:  []string{"llama3.1"},
+			},
+		},
 	}
 
 	if prefixes := parseCSVStrings(os.Getenv("TERMINALS_WAKE_WORD_PREFIXES")); len(prefixes) > 0 {
@@ -166,6 +195,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	cfg.SIP = sip
+	if models := parseCSVStrings(os.Getenv("TERMINALS_AI_OPENROUTER_MODELS")); len(models) > 0 {
+		cfg.AI.OpenRouter.Models = models
+	}
+	if models := parseCSVStrings(os.Getenv("TERMINALS_AI_OLLAMA_MODELS")); len(models) > 0 {
+		cfg.AI.Ollama.Models = models
+	}
 
 	return cfg, nil
 }

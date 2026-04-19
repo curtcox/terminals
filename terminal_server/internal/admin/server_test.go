@@ -16,6 +16,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/replai"
 	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/terminal"
@@ -175,7 +176,7 @@ func TestStartAndStopScenarioEndpoints(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
 
 	startReq := httptest.NewRequest(http.MethodPost, "/admin/api/scenarios/start", strings.NewReader(url.Values{
 		"scenario":   {"terminal"},
@@ -218,7 +219,7 @@ func TestUpdateDevicePlacementEndpoint(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/api/devices/placement", strings.NewReader(url.Values{
 		"device_id": {"kitchen-1"},
@@ -278,7 +279,7 @@ func testHandler(t *testing.T, cfgOverride ...config.Config) http.Handler {
 			cfg.LogDir = override.LogDir
 		}
 	}
-	return NewHandler(control, runtime, nil, nil, nil, devices, cfg)
+	return NewHandler(control, runtime, nil, nil, nil, nil, devices, cfg)
 }
 
 func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
@@ -298,7 +299,7 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"})
 
 	listReq := httptest.NewRequest(http.MethodGet, "/admin/api/apps", nil)
 	listW := httptest.NewRecorder()
@@ -378,7 +379,7 @@ func TestReplSessionGetAndDeleteEndpoints(t *testing.T) {
 		})
 	}()
 
-	h := NewHandler(control, runtime, replSvc, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, replSvc, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
 
 	getReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/sessions/"+created.Session.ID, nil)
 	getW := httptest.NewRecorder()
@@ -399,6 +400,86 @@ func TestReplSessionGetAndDeleteEndpoints(t *testing.T) {
 	h.ServeHTTP(missingW, missingReq)
 	if missingW.Code != http.StatusNotFound {
 		t.Fatalf("GET after delete status = %d, want 404 body=%s", missingW.Code, missingW.Body.String())
+	}
+}
+
+func TestReplAIEndpoints(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	control := transport.NewControlService("HomeServer", devices)
+	engine := scenario.NewEngine()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	replSvc := replsession.NewService(terminal.NewManager())
+	created, err := replSvc.CreateSession(context.Background(), replsession.CreateSessionRequest{
+		DeviceID: "d1",
+	})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	defer func() {
+		_, _ = replSvc.TerminateSession(context.Background(), replsession.TerminateSessionRequest{
+			SessionID: created.Session.ID,
+		})
+	}()
+	aiSvc := replai.NewService(replSvc, replai.Config{
+		DefaultProvider: "ollama",
+		DefaultModel:    "llama3.1",
+		Providers: []replai.ProviderConfig{
+			{Name: "openrouter", Models: []string{"anthropic/claude-sonnet-4-6"}},
+			{Name: "ollama", Models: []string{"llama3.1"}},
+		},
+	})
+
+	h := NewHandler(control, runtime, replSvc, aiSvc, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+
+	providersReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/ai/providers", nil)
+	providersW := httptest.NewRecorder()
+	h.ServeHTTP(providersW, providersReq)
+	if providersW.Code != http.StatusOK {
+		t.Fatalf("providers status = %d, want 200 body=%s", providersW.Code, providersW.Body.String())
+	}
+	if !strings.Contains(providersW.Body.String(), "openrouter") || !strings.Contains(providersW.Body.String(), "ollama") {
+		t.Fatalf("providers body = %s", providersW.Body.String())
+	}
+
+	modelsReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/ai/models?provider=ollama", nil)
+	modelsW := httptest.NewRecorder()
+	h.ServeHTTP(modelsW, modelsReq)
+	if modelsW.Code != http.StatusOK {
+		t.Fatalf("models status = %d, want 200 body=%s", modelsW.Code, modelsW.Body.String())
+	}
+	if !strings.Contains(modelsW.Body.String(), "llama3.1") {
+		t.Fatalf("models body = %s", modelsW.Body.String())
+	}
+
+	getSelectionReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/ai/selection?session_id="+created.Session.ID, nil)
+	getSelectionW := httptest.NewRecorder()
+	h.ServeHTTP(getSelectionW, getSelectionReq)
+	if getSelectionW.Code != http.StatusOK {
+		t.Fatalf("selection GET status = %d, want 200 body=%s", getSelectionW.Code, getSelectionW.Body.String())
+	}
+	if !strings.Contains(getSelectionW.Body.String(), "\"provider\":\"ollama\"") {
+		t.Fatalf("selection GET body = %s", getSelectionW.Body.String())
+	}
+
+	setSelectionReq := httptest.NewRequest(http.MethodPost, "/admin/api/repl/ai/selection", strings.NewReader(url.Values{
+		"session_id": {created.Session.ID},
+		"provider":   {"openrouter"},
+		"model":      {"anthropic/claude-sonnet-4-6"},
+	}.Encode()))
+	setSelectionReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	setSelectionW := httptest.NewRecorder()
+	h.ServeHTTP(setSelectionW, setSelectionReq)
+	if setSelectionW.Code != http.StatusOK {
+		t.Fatalf("selection POST status = %d, want 200 body=%s", setSelectionW.Code, setSelectionW.Body.String())
+	}
+	if !strings.Contains(setSelectionW.Body.String(), "\"provider\":\"openrouter\"") {
+		t.Fatalf("selection POST body = %s", setSelectionW.Body.String())
 	}
 }
 

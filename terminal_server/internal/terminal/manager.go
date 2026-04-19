@@ -277,17 +277,24 @@ func (m *Manager) startInProcessSession(ctx context.Context, meta Session, opts 
 	childCtx, cancel := context.WithCancel(ctx)
 
 	adminURL := ""
+	replSessionID := ""
 	for _, item := range opts.Env {
 		key, value, ok := strings.Cut(item, "=")
-		if ok && strings.TrimSpace(key) == "TERMINALS_REPL_ADMIN_URL" {
+		if !ok {
+			continue
+		}
+		switch strings.TrimSpace(key) {
+		case "TERMINALS_REPL_ADMIN_URL":
 			adminURL = strings.TrimSpace(value)
-			break
+		case "TERMINALS_REPL_SESSION_ID":
+			replSessionID = strings.TrimSpace(value)
 		}
 	}
 	go func() {
 		_ = repl.Run(childCtx, inputReader, outputWriter, repl.Options{
 			Prompt:       "repl> ",
 			AdminBaseURL: adminURL,
+			SessionID:    replSessionID,
 		})
 		_ = outputWriter.Close()
 	}()

@@ -185,6 +185,7 @@ func (s *Service) CreateSession(ctx context.Context, req CreateSessionRequest) (
 		DeviceID: deviceID,
 		Env: []string{
 			"TERMINALS_REPL_ADMIN_URL=" + strings.TrimSpace(req.ReplAdminURL),
+			"TERMINALS_REPL_SESSION_ID=" + metaID,
 		},
 	})
 	if err != nil {
@@ -377,6 +378,38 @@ func (s *Service) GetSession(_ context.Context, req GetSessionRequest) (*GetSess
 	snap := s.snapshot(live)
 	s.mu.RUnlock()
 	return &GetSessionResponse{Session: snap}, nil
+}
+
+// GetSelection returns the sticky AI provider/model selection for a session.
+func (s *Service) GetSelection(sessionID string) (string, string, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return "", "", ErrMissingSessionID
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return "", "", ErrSessionNotFound
+	}
+	return live.meta.State.SelectedProvider, live.meta.State.SelectedModel, nil
+}
+
+// SetSelection updates the sticky AI provider/model selection for a session.
+func (s *Service) SetSelection(sessionID, provider, model string) error {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return ErrMissingSessionID
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	live.meta.State.SelectedProvider = strings.TrimSpace(provider)
+	live.meta.State.SelectedModel = strings.TrimSpace(model)
+	return nil
 }
 
 // SessionIDForDevice returns the attached session id for a device.

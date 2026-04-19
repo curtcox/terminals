@@ -4,6 +4,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog/query"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/replai"
 	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
@@ -30,11 +32,19 @@ type replSessionService interface {
 	TerminateSession(ctx context.Context, req replsession.TerminateSessionRequest) (*replsession.TerminateSessionResponse, error)
 }
 
+type replAIService interface {
+	ListProviders(ctx context.Context, req replai.ListProvidersRequest) (*replai.ListProvidersResponse, error)
+	ListModels(ctx context.Context, req replai.ListModelsRequest) (*replai.ListModelsResponse, error)
+	GetSelection(ctx context.Context, req replai.GetSelectionRequest) (*replai.GetSelectionResponse, error)
+	SetSelection(ctx context.Context, req replai.SetSelectionRequest) (*replai.SetSelectionResponse, error)
+}
+
 // Handler serves a lightweight admin dashboard and JSON control APIs.
 type Handler struct {
 	control     *transport.ControlService
 	runtime     *scenario.Runtime
 	repl        replSessionService
+	ai          replAIService
 	appRuntime  *appruntime.Runtime
 	syncAppDefs func()
 	devices     *device.Manager
@@ -48,6 +58,7 @@ func NewHandler(
 	control *transport.ControlService,
 	runtime *scenario.Runtime,
 	repl replSessionService,
+	ai replAIService,
 	appRuntime *appruntime.Runtime,
 	syncAppDefs func(),
 	devices *device.Manager,
@@ -57,6 +68,7 @@ func NewHandler(
 		control:     control,
 		runtime:     runtime,
 		repl:        repl,
+		ai:          ai,
 		appRuntime:  appRuntime,
 		syncAppDefs: syncAppDefs,
 		devices:     devices,
@@ -76,6 +88,9 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/activations", h.handleActivations)
 	mux.HandleFunc("/admin/api/repl/sessions", h.handleReplSessions)
 	mux.HandleFunc("/admin/api/repl/sessions/", h.handleReplSession)
+	mux.HandleFunc("/admin/api/repl/ai/providers", h.handleReplAIProviders)
+	mux.HandleFunc("/admin/api/repl/ai/models", h.handleReplAIModels)
+	mux.HandleFunc("/admin/api/repl/ai/selection", h.handleReplAISelection)
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
@@ -91,6 +106,102 @@ func NewHandler(
 	mux.HandleFunc("/bug", h.handleBugNewPage)
 	mux.HandleFunc("/bug/intake", h.handleBugIntake)
 	return h.withRequestLogging(mux)
+}
+
+func (h *Handler) handleReplAIProviders(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.ai == nil {
+		h.writeJSONError(w, http.StatusNotFound, "repl ai service not configured")
+		return
+	}
+	resp, err := h.ai.ListProviders(req.Context(), replai.ListProvidersRequest{})
+	if err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"providers": resp.Providers})
+}
+
+func (h *Handler) handleReplAIModels(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.ai == nil {
+		h.writeJSONError(w, http.StatusNotFound, "repl ai service not configured")
+		return
+	}
+	provider := strings.TrimSpace(req.URL.Query().Get("provider"))
+	resp, err := h.ai.ListModels(req.Context(), replai.ListModelsRequest{Provider: provider})
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, replai.ErrMissingProvider) || errors.Is(err, replai.ErrProviderNotFound) {
+			status = http.StatusBadRequest
+		}
+		h.writeJSONError(w, status, err.Error())
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"provider": resp.Provider,
+		"models":   resp.Models,
+	})
+}
+
+func (h *Handler) handleReplAISelection(w http.ResponseWriter, req *http.Request) {
+	if h.ai == nil {
+		h.writeJSONError(w, http.StatusNotFound, "repl ai service not configured")
+		return
+	}
+	switch req.Method {
+	case http.MethodGet:
+		sessionID := strings.TrimSpace(req.URL.Query().Get("session_id"))
+		resp, err := h.ai.GetSelection(req.Context(), replai.GetSelectionRequest{SessionID: sessionID})
+		if err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, replai.ErrMissingSessionID) ||
+				errors.Is(err, replai.ErrMissingProvider) ||
+				errors.Is(err, replai.ErrMissingModel) ||
+				errors.Is(err, replai.ErrProviderNotFound) {
+				status = http.StatusBadRequest
+			}
+			if errors.Is(err, replsession.ErrSessionNotFound) {
+				status = http.StatusNotFound
+			}
+			h.writeJSONError(w, status, err.Error())
+			return
+		}
+		h.writeJSON(w, http.StatusOK, resp)
+	case http.MethodPost:
+		if err := req.ParseForm(); err != nil {
+			h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+			return
+		}
+		resp, err := h.ai.SetSelection(req.Context(), replai.SetSelectionRequest{
+			SessionID: strings.TrimSpace(req.Form.Get("session_id")),
+			Provider:  strings.TrimSpace(req.Form.Get("provider")),
+			Model:     strings.TrimSpace(req.Form.Get("model")),
+		})
+		if err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, replai.ErrMissingSessionID) ||
+				errors.Is(err, replai.ErrMissingProvider) ||
+				errors.Is(err, replai.ErrMissingModel) ||
+				errors.Is(err, replai.ErrProviderNotFound) {
+				status = http.StatusBadRequest
+			}
+			if errors.Is(err, replsession.ErrSessionNotFound) {
+				status = http.StatusNotFound
+			}
+			h.writeJSONError(w, status, err.Error())
+			return
+		}
+		h.writeJSON(w, http.StatusOK, resp)
+	default:
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 func (h *Handler) handleReplSessions(w http.ResponseWriter, req *http.Request) {

@@ -33,6 +33,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/placement"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/repl"
+	"github.com/curtcox/terminals/terminal_server/internal/replai"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
@@ -142,6 +143,22 @@ func main() {
 	}
 	controlStream := transport.NewStreamHandler(controlService)
 	controlStream.SetTerminalREPLAdminURL(fmt.Sprintf("http://127.0.0.1:%d", cfg.AdminHTTPPort))
+	replAIService := replai.NewService(controlStream.ReplSessions(), replai.Config{
+		DefaultProvider: cfg.AI.DefaultProvider,
+		DefaultModel:    cfg.AI.DefaultModel,
+		Providers: []replai.ProviderConfig{
+			{
+				Name:         "openrouter",
+				DefaultModel: firstModel(cfg.AI.OpenRouter.Models),
+				Models:       cfg.AI.OpenRouter.Models,
+			},
+			{
+				Name:         "ollama",
+				DefaultModel: firstModel(cfg.AI.Ollama.Models),
+				Models:       cfg.AI.Ollama.Models,
+			},
+		},
+	})
 	bugReports := bugreport.NewService(cfg.LogDir, deviceManager, scenarioRuntime)
 	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
 	if err != nil {
@@ -158,6 +175,7 @@ func main() {
 		controlService,
 		scenarioRuntime,
 		controlStream.ReplSessions(),
+		replAIService,
 		appRuntime,
 		func() { registerAppScenarioDefinitions(scenarioEngine, appRuntime) },
 		deviceManager,
@@ -320,6 +338,7 @@ func runREPL(stdin io.Reader, stdout, stderr io.Writer) int {
 	if err := repl.Run(ctx, stdin, stdout, repl.Options{
 		Prompt:       "repl>",
 		AdminBaseURL: strings.TrimSpace(os.Getenv("TERMINALS_REPL_ADMIN_URL")),
+		SessionID:    strings.TrimSpace(os.Getenv("TERMINALS_REPL_SESSION_ID")),
 	}); err != nil {
 		_, _ = fmt.Fprintf(stderr, "repl: %v\n", err)
 		return 1
@@ -687,4 +706,11 @@ func photoFrameAssetBaseURL(cfg config.Config) string {
 		publicHost += ".local"
 	}
 	return fmt.Sprintf("http://%s:%d/photo-frame", publicHost, cfg.PhotoFrameHTTPPort)
+}
+
+func firstModel(models []string) string {
+	if len(models) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(models[0])
 }

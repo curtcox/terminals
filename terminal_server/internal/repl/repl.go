@@ -23,6 +23,7 @@ import (
 type Options struct {
 	Prompt       string
 	AdminBaseURL string
+	SessionID    string
 }
 
 type commandClassification string
@@ -65,6 +66,10 @@ func replCommandSpecs() []commandSpec {
 		{Name: "docs search", Usage: "docs search <query>", Summary: "Search documentation topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
 		{Name: "docs open", Usage: "docs open <topic>", Summary: "Open one documentation topic", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
 		{Name: "docs examples", Usage: "docs examples [filter]", Summary: "List example topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/examples/app-dev-loop"}},
+		{Name: "ai providers", Usage: "ai providers [--json]", Summary: "List configured AI providers", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}},
+		{Name: "ai models", Usage: "ai models [provider] [--json]", Summary: "List models for a provider", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}},
+		{Name: "ai use", Usage: "ai use <provider> <model> [--json]", Summary: "Set sticky provider/model selection for this session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}},
+		{Name: "ai status", Usage: "ai status [--json]", Summary: "Show current provider/model selection for this session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}},
 	}
 }
 
@@ -92,7 +97,7 @@ func Run(ctx context.Context, in io.Reader, out io.Writer, opts Options) error {
 	}
 	prompt += " "
 
-	state := newState(out, opts.AdminBaseURL)
+	state := newState(out, opts.AdminBaseURL, opts.SessionID)
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 1024), 1024*1024)
 
@@ -122,13 +127,18 @@ func Run(ctx context.Context, in io.Reader, out io.Writer, opts Options) error {
 type state struct {
 	out      io.Writer
 	adminURL string
+	session  string
 	client   *http.Client
 }
 
-func newState(out io.Writer, adminBaseURL string) *state {
+func newState(out io.Writer, adminBaseURL, sessionID string) *state {
 	adminBaseURL = strings.TrimSpace(adminBaseURL)
 	if adminBaseURL == "" {
 		adminBaseURL = strings.TrimSpace(os.Getenv("TERMINALS_REPL_ADMIN_URL"))
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		sessionID = strings.TrimSpace(os.Getenv("TERMINALS_REPL_SESSION_ID"))
 	}
 	if adminBaseURL == "" {
 		adminBaseURL = "http://127.0.0.1:50053"
@@ -137,6 +147,7 @@ func newState(out io.Writer, adminBaseURL string) *state {
 	return &state{
 		out:      out,
 		adminURL: adminBaseURL,
+		session:  sessionID,
 		client:   &http.Client{Timeout: 3 * time.Second},
 	}
 }
@@ -207,7 +218,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		fmt.Fprintln(s.out, "bye")
 		return true, nil
-	case "devices", "sessions", "activations", "claims", "app", "config", "docs":
+	case "devices", "sessions", "activations", "claims", "app", "config", "docs", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -494,6 +505,94 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		default:
 			return fmt.Errorf("unknown command: docs %s", sub)
 		}
+	case "ai":
+		switch sub {
+		case "providers":
+			body, err := s.fetchJSON(ctx, "/admin/api/repl/ai/providers")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			items, _ := body["providers"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				models, _ := row["models"].([]any)
+				rows = append(rows, []string{
+					toString(row["name"]),
+					toString(row["default_model"]),
+					strconv.Itoa(len(models)),
+				})
+			}
+			return printTable(s.out, []string{"PROVIDER", "DEFAULT", "MODELS"}, rows)
+		case "models":
+			provider := ""
+			for _, arg := range args[1:] {
+				if strings.HasPrefix(arg, "--") {
+					continue
+				}
+				provider = strings.TrimSpace(arg)
+				break
+			}
+			query := url.Values{}
+			if provider != "" {
+				query.Set("provider", provider)
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/repl/ai/models", query)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			models, _ := body["models"].([]any)
+			for _, model := range models {
+				fmt.Fprintln(s.out, toString(model))
+			}
+			return nil
+		case "use":
+			if len(args) < 3 {
+				return errors.New("usage: ai use <provider> <model>")
+			}
+			if strings.TrimSpace(s.session) == "" {
+				return errors.New("ai session selection requires session id (TERMINALS_REPL_SESSION_ID)")
+			}
+			provider := strings.TrimSpace(args[1])
+			model := strings.TrimSpace(args[2])
+			body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/selection", url.Values{
+				"session_id": {s.session},
+				"provider":   {provider},
+				"model":      {model},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			fmt.Fprintf(s.out, "provider: %s  model: %s (sticky for %s)\n", toString(body["provider"]), toString(body["model"]), s.session)
+			return nil
+		case "status":
+			if strings.TrimSpace(s.session) == "" {
+				return errors.New("ai status requires session id (TERMINALS_REPL_SESSION_ID)")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/repl/ai/selection", url.Values{"session_id": {s.session}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			fmt.Fprintf(s.out, "session: %s\nprovider: %s\nmodel: %s\n", toString(body["session_id"]), toString(body["provider"]), toString(body["model"]))
+			return nil
+		default:
+			return fmt.Errorf("unknown command: ai %s", sub)
+		}
 	default:
 		return fmt.Errorf("unsupported command group: %s", group)
 	}
@@ -501,6 +600,19 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 
 func (s *state) fetchJSON(ctx context.Context, route string) (map[string]any, error) {
 	return s.doJSON(ctx, http.MethodGet, route, "", nil)
+}
+
+func (s *state) fetchJSONQuery(ctx context.Context, route string, query url.Values) (map[string]any, error) {
+	base, err := url.JoinPath(s.adminURL, route)
+	if err != nil {
+		return nil, err
+	}
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return nil, err
+	}
+	parsed.RawQuery = query.Encode()
+	return s.doJSON(ctx, http.MethodGet, parsed.String(), "", nil)
 }
 
 func (s *state) deleteJSON(ctx context.Context, route string) (map[string]any, error) {
@@ -515,9 +627,13 @@ func (s *state) postFormJSON(ctx context.Context, route string, form url.Values)
 }
 
 func (s *state) doJSON(ctx context.Context, method, route, contentType string, body io.Reader) (map[string]any, error) {
-	u, err := url.JoinPath(s.adminURL, route)
-	if err != nil {
-		return nil, err
+	u := strings.TrimSpace(route)
+	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+		var err error
+		u, err = url.JoinPath(s.adminURL, route)
+		if err != nil {
+			return nil, err
+		}
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u, body)
 	if err != nil {

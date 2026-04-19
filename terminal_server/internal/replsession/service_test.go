@@ -92,3 +92,28 @@ func TestServiceLifecycleAndIO(t *testing.T) {
 		t.Fatalf("expected session lookup failure after terminate")
 	}
 }
+
+func TestSelectionPersistence(t *testing.T) {
+	svc := NewService(terminal.NewManager())
+	ctx := context.Background()
+
+	created, err := svc.CreateSession(ctx, CreateSessionRequest{DeviceID: "dev-1"})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	sessionID := created.Session.ID
+	defer func() {
+		_, _ = svc.TerminateSession(ctx, TerminateSessionRequest{SessionID: sessionID})
+	}()
+
+	if err := svc.SetSelection(sessionID, "ollama", "llama3.1"); err != nil {
+		t.Fatalf("SetSelection() error = %v", err)
+	}
+	provider, model, err := svc.GetSelection(sessionID)
+	if err != nil {
+		t.Fatalf("GetSelection() error = %v", err)
+	}
+	if provider != "ollama" || model != "llama3.1" {
+		t.Fatalf("selection = %s/%s, want ollama/llama3.1", provider, model)
+	}
+}
