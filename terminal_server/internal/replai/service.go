@@ -1,3 +1,4 @@
+// Package replai manages sticky AI provider and model selection for REPL sessions.
 package replai
 
 import (
@@ -223,11 +224,12 @@ func (s *Service) resolveProviderAndModel(provider, model string) (string, strin
 		return "", "", fmt.Errorf("%w: %s", ErrProviderNotFound, provider)
 	}
 	if model == "" {
-		if p.DefaultModel != "" {
+		switch {
+		case p.DefaultModel != "":
 			model = p.DefaultModel
-		} else if s.defaultModel != "" {
+		case s.defaultModel != "":
 			model = s.defaultModel
-		} else if len(p.Models) > 0 {
+		case len(p.Models) > 0:
 			model = p.Models[0]
 		}
 	}

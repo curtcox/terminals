@@ -2753,27 +2753,6 @@ func (h *StreamHandler) pollTerminalOutput(deviceID string, force bool) (*Server
 	}, nil
 }
 
-func (h *StreamHandler) appendTerminalOutput(deviceID, chunk string) string {
-	sessionID, ok := h.replSessionIDForDevice(deviceID)
-	if !ok {
-		return ""
-	}
-	output, err := h.replSessions.AppendOutput(sessionID, chunk)
-	if err != nil {
-		return ""
-	}
-	return output
-}
-
-func (h *StreamHandler) shouldEmitTerminalUpdate(deviceID string, force bool) bool {
-	sessionID, ok := h.replSessionIDForDevice(deviceID)
-	if !ok {
-		return false
-	}
-	emit, err := h.replSessions.ShouldEmitUpdate(sessionID, force, h.nowUTC(), h.terminalUIInterval)
-	return err == nil && emit
-}
-
 func (h *StreamHandler) terminalOutputUpdate(sessionID string) *UIUpdate {
 	output, err := h.replSessions.MarkFlushed(sessionID, h.nowUTC())
 	if err != nil {

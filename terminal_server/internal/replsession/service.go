@@ -1,3 +1,4 @@
+// Package replsession manages REPL session lifecycle and attachment state.
 package replsession
 
 import (

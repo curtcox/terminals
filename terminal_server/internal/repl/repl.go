@@ -1,3 +1,4 @@
+// Package repl implements the control-plane REPL used by terminal sessions.
 package repl
 
 import (
@@ -101,22 +102,32 @@ func Run(ctx context.Context, in io.Reader, out io.Writer, opts Options) error {
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 1024), 1024*1024)
 
-	fmt.Fprintf(out, "Terminals REPL (control-plane only). Type 'help' for commands.\n")
-	fmt.Fprint(out, prompt)
+	if _, err := fmt.Fprintf(out, "Terminals REPL (control-plane only). Type 'help' for commands.\n"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(out, prompt); err != nil {
+		return err
+	}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
-			fmt.Fprint(out, prompt)
+			if _, err := fmt.Fprint(out, prompt); err != nil {
+				return err
+			}
 			continue
 		}
 		exit, err := state.eval(ctx, line)
 		if err != nil {
-			fmt.Fprintf(out, "error: %v\n", err)
+			if _, writeErr := fmt.Fprintf(out, "error: %v\n", err); writeErr != nil {
+				return writeErr
+			}
 		}
 		if exit {
 			return nil
 		}
-		fmt.Fprint(out, prompt)
+		if _, err := fmt.Fprint(out, prompt); err != nil {
+			return err
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return err
@@ -174,8 +185,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	cmd := strings.ToLower(tokens[0])
 	switch cmd {
 	case "help":
-		s.printHelp(tokens[1:])
-		return false, nil
+		return false, s.printHelp(tokens[1:])
 	case "describe":
 		if err := s.describeCommand(tokens[1:]); err != nil {
 			return false, err
@@ -187,8 +197,8 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 		}
 		return false, nil
 	case "echo":
-		fmt.Fprintln(s.out, strings.Join(tokens[1:], " "))
-		return false, nil
+		_, err := fmt.Fprintln(s.out, strings.Join(tokens[1:], " "))
+		return false, err
 	case "sleep":
 		if len(tokens) < 2 {
 			return false, errors.New("usage: sleep <seconds>")
@@ -210,14 +220,14 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 			return false, errors.New("usage: printf <text>")
 		}
 		text := decodeEscapes(strings.Join(tokens[1:], " "))
-		fmt.Fprint(s.out, text)
-		return false, nil
+		_, err := fmt.Fprint(s.out, text)
+		return false, err
 	case "clear":
-		fmt.Fprint(s.out, "\033[2J\033[H")
-		return false, nil
+		_, err := fmt.Fprint(s.out, "\033[2J\033[H")
+		return false, err
 	case "exit", "quit":
-		fmt.Fprintln(s.out, "bye")
-		return true, nil
+		_, err := fmt.Fprintln(s.out, "bye")
+		return true, err
 	case "devices", "sessions", "activations", "claims", "app", "config", "docs", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
@@ -312,7 +322,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if err != nil {
 				return err
 			}
-			session, _ := body["session"]
+			session := body["session"]
 			return writeJSON(s.out, session)
 		case "terminate":
 			if len(args) < 2 {
@@ -329,8 +339,8 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if jsonOut {
 				return writeJSON(s.out, body)
 			}
-			fmt.Fprintf(s.out, "OK  terminated session %s\n", sessionID)
-			return nil
+			_, err = fmt.Fprintf(s.out, "OK  terminated session %s\n", sessionID)
+			return err
 		default:
 			return fmt.Errorf("unknown command: sessions %s", sub)
 		}
@@ -365,8 +375,8 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		}
 		claimsByDevice, _ := body["claims_by_device"].(map[string]any)
 		if len(claimsByDevice) == 0 {
-			fmt.Fprintln(s.out, "(no claims)")
-			return nil
+			_, err := fmt.Fprintln(s.out, "(no claims)")
+			return err
 		}
 		deviceIDs := make([]string, 0, len(claimsByDevice))
 		for deviceID := range claimsByDevice {
@@ -374,10 +384,14 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		}
 		sort.Strings(deviceIDs)
 		for _, deviceID := range deviceIDs {
-			fmt.Fprintf(s.out, "%s\n", deviceID)
+			if _, err := fmt.Fprintf(s.out, "%s\n", deviceID); err != nil {
+				return err
+			}
 			claims, _ := claimsByDevice[deviceID].([]any)
 			if len(claims) == 0 {
-				fmt.Fprintln(s.out, "  (none)")
+				if _, err := fmt.Fprintln(s.out, "  (none)"); err != nil {
+					return err
+				}
 				continue
 			}
 			for _, claimAny := range claims {
@@ -385,7 +399,9 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				if claim == nil {
 					continue
 				}
-				fmt.Fprintf(s.out, "  - %s by %s\n", toString(claim["resource"]), toString(claim["activation_id"]))
+				if _, err := fmt.Fprintf(s.out, "  - %s by %s\n", toString(claim["resource"]), toString(claim["activation_id"])); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -428,8 +444,8 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if jsonOut {
 				return writeJSON(s.out, body)
 			}
-			fmt.Fprintf(s.out, "OK  app=%s action=%s version=%s\n", appName, sub, toString(body["version"]))
-			return nil
+			_, err = fmt.Fprintf(s.out, "OK  app=%s action=%s version=%s\n", appName, sub, toString(body["version"]))
+			return err
 		default:
 			return fmt.Errorf("unknown command: app %s", sub)
 		}
@@ -441,7 +457,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		if err != nil {
 			return err
 		}
-		cfg, _ := body["config"]
+		cfg := body["config"]
 		if jsonOut {
 			return writeJSON(s.out, cfg)
 		}
@@ -454,7 +470,9 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return err
 			}
 			for _, topic := range topics {
-				fmt.Fprintln(s.out, topic)
+				if _, err := fmt.Fprintln(s.out, topic); err != nil {
+					return err
+				}
 			}
 			return nil
 		case "search":
@@ -466,13 +484,17 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(s.out, "search results for %q\n", strings.Join(args[1:], " "))
+			if _, err := fmt.Fprintf(s.out, "search results for %q\n", strings.Join(args[1:], " ")); err != nil {
+				return err
+			}
 			if len(matches) == 0 {
-				fmt.Fprintln(s.out, "(no matches)")
-				return nil
+				_, err := fmt.Fprintln(s.out, "(no matches)")
+				return err
 			}
 			for _, topic := range matches {
-				fmt.Fprintf(s.out, "- %s\n", topic)
+				if _, err := fmt.Fprintf(s.out, "- %s\n", topic); err != nil {
+					return err
+				}
 			}
 			return nil
 		case "open":
@@ -485,8 +507,8 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(s.out, string(content))
-			return nil
+			_, err = fmt.Fprintln(s.out, string(content))
+			return err
 		case "examples":
 			filter := ""
 			if len(args) > 1 {
@@ -498,7 +520,9 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			for _, topic := range topics {
 				if filter == "" || strings.Contains(strings.ToLower(topic), filter) {
-					fmt.Fprintln(s.out, topic)
+					if _, err := fmt.Fprintln(s.out, topic); err != nil {
+						return err
+					}
 				}
 			}
 			return nil
@@ -552,7 +576,9 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			models, _ := body["models"].([]any)
 			for _, model := range models {
-				fmt.Fprintln(s.out, toString(model))
+				if _, err := fmt.Fprintln(s.out, toString(model)); err != nil {
+					return err
+				}
 			}
 			return nil
 		case "use":
@@ -575,8 +601,8 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if jsonOut {
 				return writeJSON(s.out, body)
 			}
-			fmt.Fprintf(s.out, "provider: %s  model: %s (sticky for %s)\n", toString(body["provider"]), toString(body["model"]), s.session)
-			return nil
+			_, err = fmt.Fprintf(s.out, "provider: %s  model: %s (sticky for %s)\n", toString(body["provider"]), toString(body["model"]), s.session)
+			return err
 		case "status":
 			if strings.TrimSpace(s.session) == "" {
 				return errors.New("ai status requires session id (TERMINALS_REPL_SESSION_ID)")
@@ -588,8 +614,8 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if jsonOut {
 				return writeJSON(s.out, body)
 			}
-			fmt.Fprintf(s.out, "session: %s\nprovider: %s\nmodel: %s\n", toString(body["session_id"]), toString(body["provider"]), toString(body["model"]))
-			return nil
+			_, err = fmt.Fprintf(s.out, "session: %s\nprovider: %s\nmodel: %s\n", toString(body["session_id"]), toString(body["provider"]), toString(body["model"]))
+			return err
 		default:
 			return fmt.Errorf("unknown command: ai %s", sub)
 		}
@@ -646,7 +672,9 @@ func (s *state) doJSON(ctx context.Context, method, route, contentType string, b
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("admin request failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
@@ -658,16 +686,15 @@ func (s *state) doJSON(ctx context.Context, method, route, contentType string, b
 	return payload, nil
 }
 
-func (s *state) printHelp(args []string) {
+func (s *state) printHelp(args []string) error {
 	query := strings.TrimSpace(strings.ToLower(strings.Join(args, " ")))
 	if query != "" {
 		spec, ok := replCommandSpec(query)
 		if !ok {
-			fmt.Fprintf(s.out, "unknown command %q\n", query)
-			return
+			_, err := fmt.Fprintf(s.out, "unknown command %q\n", query)
+			return err
 		}
-		s.renderCommandSpec(spec)
-		return
+		return s.renderCommandSpec(spec)
 	}
 
 	rows := make([][]string, 0, len(replCommandSpecs()))
@@ -676,8 +703,11 @@ func (s *state) printHelp(args []string) {
 	for _, spec := range specs {
 		rows = append(rows, []string{spec.Usage, string(spec.Classification), spec.Summary})
 	}
-	_ = printTable(s.out, []string{"COMMAND", "CLASS", "SUMMARY"}, rows)
-	fmt.Fprintln(s.out, "Run `help <command>` or `describe <command>` for details.")
+	if err := printTable(s.out, []string{"COMMAND", "CLASS", "SUMMARY"}, rows); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintln(s.out, "Run `help <command>` or `describe <command>` for details.")
+	return err
 }
 
 func (s *state) describeCommand(args []string) error {
@@ -689,8 +719,7 @@ func (s *state) describeCommand(args []string) error {
 	if !ok {
 		return fmt.Errorf("unknown command: %s", query)
 	}
-	s.renderCommandSpec(spec)
-	return nil
+	return s.renderCommandSpec(spec)
 }
 
 func (s *state) completeCommand(args []string) error {
@@ -700,25 +729,38 @@ func (s *state) completeCommand(args []string) error {
 	prefix := strings.TrimSpace(strings.ToLower(strings.Join(args, " ")))
 	matches := suggestCommands(prefix, 32)
 	if len(matches) == 0 {
-		fmt.Fprintln(s.out, "(no completions)")
-		return nil
+		_, err := fmt.Fprintln(s.out, "(no completions)")
+		return err
 	}
 	for _, match := range matches {
-		fmt.Fprintln(s.out, match)
+		if _, err := fmt.Fprintln(s.out, match); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (s *state) renderCommandSpec(spec commandSpec) {
-	fmt.Fprintf(s.out, "%s\n", spec.Usage)
-	fmt.Fprintf(s.out, "classification: %s\n", spec.Classification)
-	fmt.Fprintln(s.out, spec.Summary)
+func (s *state) renderCommandSpec(spec commandSpec) error {
+	if _, err := fmt.Fprintf(s.out, "%s\n", spec.Usage); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(s.out, "classification: %s\n", spec.Classification); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(s.out, spec.Summary); err != nil {
+		return err
+	}
 	for _, ex := range spec.Examples {
-		fmt.Fprintf(s.out, "example: %s\n", ex)
+		if _, err := fmt.Fprintf(s.out, "example: %s\n", ex); err != nil {
+			return err
+		}
 	}
 	for _, ref := range spec.RelatedDocs {
-		fmt.Fprintf(s.out, "docs: %s\n", ref)
+		if _, err := fmt.Fprintf(s.out, "docs: %s\n", ref); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func formatUnixMillis(raw any) string {
@@ -973,7 +1015,9 @@ func printTable(out io.Writer, headers []string, rows [][]string) error {
 		}
 		line.WriteString(padRight(h, widths[i]))
 	}
-	fmt.Fprintln(out, line.String())
+	if _, err := fmt.Fprintln(out, line.String()); err != nil {
+		return err
+	}
 	for _, row := range rows {
 		line.Reset()
 		for i := range headers {
@@ -986,7 +1030,9 @@ func printTable(out io.Writer, headers []string, rows [][]string) error {
 			}
 			line.WriteString(padRight(cell, widths[i]))
 		}
-		fmt.Fprintln(out, line.String())
+		if _, err := fmt.Fprintln(out, line.String()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1011,11 +1057,12 @@ func suggestCommands(input string, limit int) []string {
 	for _, spec := range replCommandSpecs() {
 		name := strings.ToLower(spec.Name)
 		score := 1000 + editDistance(input, name)
-		if input == "" {
+		switch {
+		case input == "":
 			score = 0
-		} else if strings.HasPrefix(name, input) {
+		case strings.HasPrefix(name, input):
 			score = 0
-		} else if strings.Contains(name, input) {
+		case strings.Contains(name, input):
 			score = 1
 		}
 		candidates = append(candidates, candidate{name: spec.Name, score: score})

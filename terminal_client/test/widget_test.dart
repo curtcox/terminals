@@ -257,7 +257,7 @@ void main() {
       ControlCarrierKind.grpc,
       ControlCarrierKind.websocket,
     ]);
-    expect(find.textContaining('gRPC failed at'), findsOneWidget);
+    expect(find.textContaining('Notification: gRPC failed at'), findsOneWidget);
   });
 
   testWidgets('all failed carriers surface local diagnostic summary', (
@@ -284,8 +284,10 @@ void main() {
     }
 
     expect(harness.createdClients.length, greaterThanOrEqualTo(4));
-    expect(find.textContaining('gRPC failed at'), findsOneWidget);
-    expect(find.textContaining('WebSocket failed at'), findsOneWidget);
+    final notification = tester.widget<Text>(
+      find.textContaining('Notification: gRPC failed at'),
+    );
+    expect(notification.data, contains('WebSocket failed at'));
   });
 
   testWidgets(
@@ -1089,8 +1091,8 @@ void main() {
     await tester.pump();
 
     final dropdown = tester
-      .widgetList<DropdownButton<String>>(find.byType(DropdownButton<String>))
-      .firstWhere((candidate) => candidate.value == 'alpha');
+        .widgetList<DropdownButton<String>>(find.byType(DropdownButton<String>))
+        .firstWhere((candidate) => candidate.value == 'alpha');
     dropdown.onChanged?.call('beta');
     await tester.pump();
 
@@ -1737,7 +1739,8 @@ void main() {
           })),
     );
     await tester.pumpAndSettle();
-    expect(find.textContaining('Diagnostics: scenario_registry'), findsOneWidget);
+    expect(
+        find.textContaining('Diagnostics: scenario_registry'), findsOneWidget);
 
     await tester.tap(
       find.byWidgetPredicate(
@@ -1904,8 +1907,8 @@ void main() {
           request.command.intent == 'terminal',
     );
     expect(launchRequest.command.action, CommandAction.COMMAND_ACTION_START);
-    expect(find.textContaining('Launching application: terminal'),
-        findsOneWidget);
+    expect(
+        find.textContaining('Launching application: terminal'), findsOneWidget);
   });
 
   testWidgets('terminal root renders fullscreen app view',

@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/capabilities/probe.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -581,7 +579,7 @@ class _CarrierAttemptDiagnostic {
   }
 }
 
-String formatCarrierAttempt(_CarrierAttemptDiagnostic attempt) {
+String _formatCarrierAttempt(_CarrierAttemptDiagnostic attempt) {
   final elapsedMs = attempt.elapsed.inMilliseconds;
   return '${attempt.carrierLabel} failed at ${attempt.stage} '
       '[${attempt.failureClass}] (${attempt.endpoint}) '
@@ -1190,7 +1188,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     final lines = <String>[];
     for (final attempt in _carrierAttemptLog) {
-      lines.add(formatCarrierAttempt(attempt));
+      lines.add(_formatCarrierAttempt(attempt));
     }
     return lines.join('\n');
   }
@@ -2872,7 +2870,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         elapsed: elapsed,
       ),
     );
-    final attemptSummary = formatCarrierAttempt(_carrierAttemptLog.last);
+    final attemptSummary = _formatCarrierAttempt(_carrierAttemptLog.last);
     _lastTransportDiagnostic = attemptSummary;
     _recordClientLog(
       'warn',
@@ -3332,7 +3330,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                   _buildDiagnosticsPanel(),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _availableApplicationIntents
+                    initialValue: _availableApplicationIntents
                             .contains(_selectedApplicationIntent)
                         ? _selectedApplicationIntent
                         : _availableApplicationIntents.first,
@@ -3520,7 +3518,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
             const SizedBox(height: 4),
             ...recentAttempts.map(
               (attempt) => Text(
-                formatCarrierAttempt(attempt),
+                _formatCarrierAttempt(attempt),
                 style: const TextStyle(fontSize: 12),
               ),
             ),
