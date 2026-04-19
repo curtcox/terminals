@@ -1089,7 +1089,8 @@ void main() {
     await tester.pump();
 
     final dropdown = tester
-        .widget<DropdownButton<String>>(find.byType(DropdownButton<String>));
+      .widgetList<DropdownButton<String>>(find.byType(DropdownButton<String>))
+      .firstWhere((candidate) => candidate.value == 'alpha');
     dropdown.onChanged?.call('beta');
     await tester.pump();
 
@@ -1184,6 +1185,81 @@ void main() {
         )
         .toList();
     expect(terminalSubmitActions, isEmpty);
+  });
+
+  testWidgets('keeps terminal input focused across terminal output patches',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'terminal_root'
+            ..stack = (uiv1.StackWidget())
+            ..children.addAll([
+              uiv1.Node()
+                ..id = 'terminal_output'
+                ..text = (uiv1.TextWidget()..value = 'repl> '),
+              uiv1.Node()
+                ..id = 'terminal_input'
+                ..textInput =
+                    (uiv1.TextInputWidget()..placeholder = 'Terminal prompt'),
+            ]))),
+    );
+    await tester.pump();
+
+    final terminalField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == 'Terminal prompt',
+    );
+    expect(terminalField, findsOneWidget);
+
+    await tester.tap(terminalField);
+    await tester.pump();
+
+    EditableText editableText = tester.widget<EditableText>(
+      find.descendant(of: terminalField, matching: find.byType(EditableText)),
+    );
+    expect(editableText.focusNode.hasFocus, isTrue);
+
+    await tester.enterText(terminalField, 'h');
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'terminal_output'
+          ..node = (uiv1.Node()
+            ..id = 'terminal_output'
+            ..text = (uiv1.TextWidget()..value = 'repl> h'))),
+    );
+    await tester.pump();
+
+    editableText = tester.widget<EditableText>(
+      find.descendant(of: terminalField, matching: find.byType(EditableText)),
+    );
+    expect(editableText.focusNode.hasFocus, isTrue);
+
+    await tester.enterText(terminalField, 'he');
+    await tester.pump();
+
+    final keyEvents = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasKey())
+        .map((request) => request.input.key.text)
+        .toList();
+    expect(keyEvents.where((text) => text == 'h').length, 1);
+    expect(keyEvents.where((text) => text == 'e').length, 1);
   });
 
   testWidgets('renders overlay primitive with layered children',
@@ -1602,6 +1678,14 @@ void main() {
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
 
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pump();
+
     expect(find.textContaining('Diagnostics: none'), findsOneWidget);
 
     await tester.tap(find.text('Runtime Status'));
@@ -1629,6 +1713,53 @@ void main() {
     expect(find.textContaining('Diagnostics: runtime_status'), findsOneWidget);
     expect(find.textContaining('active_routes=1'), findsOneWidget);
     expect(find.textContaining('media_streams_active=2'), findsOneWidget);
+    expect(find.text('terminal (REPL)'), findsOneWidget);
+
+    await tester.tap(find.text('Refresh Applications'));
+    await tester.pump();
+    final appRegistryRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_SYSTEM &&
+          request.command.intent == 'scenario_registry',
+    );
+    final appRegistryRequestID = appRegistryRequest.command.requestId;
+    expect(appRegistryRequestID, isNotEmpty);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = appRegistryRequestID
+          ..notification = 'System query: scenario_registry'
+          ..data.addAll({
+            'red_alert': 'priority=100',
+            'intercom': 'priority=50',
+          })),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Diagnostics: scenario_registry'), findsOneWidget);
+
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is DropdownButtonFormField<String> &&
+            widget.decoration.labelText == 'Available Application',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('red_alert').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open Application'));
+    await tester.pump();
+    final launchRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_MANUAL &&
+          request.command.intent == 'red_alert',
+    );
+    expect(launchRequest.command.action, CommandAction.COMMAND_ACTION_START);
+    expect(launchRequest.command.deviceId, isNotEmpty);
 
     await tester.tap(find.text('Device Status'));
     await tester.pump();
@@ -1736,6 +1867,78 @@ void main() {
     expect(find.textContaining('artifact_id=route:device-a'), findsOneWidget);
     expect(find.textContaining('target_device_id=kitchen-display'),
         findsOneWidget);
+  });
+
+  testWidgets('open application queues launch until register ack',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+
+    await tester.tap(find.text('Open Application'));
+    await tester.pump();
+
+    expect(
+      find.textContaining('Connecting control stream to open application:'),
+      findsOneWidget,
+    );
+    expect(harness.createdClients, isNotEmpty);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pump();
+
+    final launchRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_MANUAL &&
+          request.command.intent == 'terminal',
+    );
+    expect(launchRequest.command.action, CommandAction.COMMAND_ACTION_START);
+    expect(find.textContaining('Launching application: terminal'),
+        findsOneWidget);
+  });
+
+  testWidgets('terminal root renders fullscreen app view',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'terminal_root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'terminal_output'
+                ..text = (uiv1.TextWidget()..value = 'repl>'),
+            ))),
+    );
+    await tester.pump();
+
+    expect(find.text('repl>'), findsOneWidget);
+    expect(find.text('Server Host'), findsNothing);
+    expect(find.text('Connect Stream'), findsNothing);
   });
 }
 

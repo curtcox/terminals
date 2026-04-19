@@ -754,6 +754,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   String _lastNotification = '';
   final TextEditingController _terminalInputController =
       TextEditingController();
+  final FocusNode _terminalInputFocusNode = FocusNode(
+    debugLabel: 'terminal_input',
+  );
   final TextEditingController _playbackArtifactIdController =
       TextEditingController();
   final TextEditingController _playbackTargetDeviceIdController =
@@ -784,8 +787,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   int _debugCommandSeq = 0;
   String _pendingRuntimeStatusRequestID = '';
   String _pendingDeviceStatusRequestID = '';
+  String _pendingScenarioRegistryRequestID = '';
   String _pendingPlaybackArtifactsRequestID = '';
   String _pendingPlaybackMetadataRequestID = '';
+  List<String> _availableApplicationIntents = <String>['terminal'];
+  String _selectedApplicationIntent = 'terminal';
+  String _pendingLaunchApplicationIntent = '';
   String _diagnosticsTitle = 'none';
   Map<String, String> _diagnosticsData = <String, String>{};
   String _photoFrameAssetBaseURL = '';
@@ -1406,6 +1413,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                 shouldFlushQueuedBugReports = true;
               }
               _hasRegisterAck = true;
+              _sendScenarioRegistryQuery();
+              if (_pendingLaunchApplicationIntent.isNotEmpty) {
+                final pendingIntent = _pendingLaunchApplicationIntent;
+                _pendingLaunchApplicationIntent = '';
+                _sendApplicationLaunchCommand(pendingIntent);
+              }
               _lastSuccessfulCarrier = carrier;
               _carrierAttemptLog.clear();
               _activeCarrierCycle = <ControlCarrierKind>[];
@@ -1673,6 +1686,61 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     );
   }
 
+  void _sendScenarioRegistryQuery() {
+    final requestID = _nextDebugRequestID('debug-scenario-registry');
+    _pendingScenarioRegistryRequestID = requestID;
+    _outgoing.add(
+      ConnectRequest()
+        ..command = (CommandRequest()
+          ..requestId = requestID
+          ..kind = CommandKind.COMMAND_KIND_SYSTEM
+          ..intent = 'scenario_registry'),
+    );
+  }
+
+  void _launchSelectedApplication() {
+    final intent = _selectedApplicationIntent.trim();
+    if (intent.isEmpty) {
+      setState(() {
+        _status = 'Command error';
+        _lastNotification = 'Select an application before launching';
+      });
+      return;
+    }
+    if (!_hasActiveControlSession || !_hasRegisterAck) {
+      setState(() {
+        _pendingLaunchApplicationIntent = intent;
+        _status = 'Connecting';
+        _lastNotification =
+            'Connecting control stream to open application: $intent';
+      });
+      if (!_hasActiveControlSession && !_isConnecting) {
+        unawaited(_startStream(userInitiated: true));
+      }
+      return;
+    }
+    _sendApplicationLaunchCommand(intent);
+  }
+
+  void _sendApplicationLaunchCommand(String intent) {
+    _outgoing.add(
+      ConnectRequest()
+        ..command = (CommandRequest()
+          ..requestId = _nextDebugRequestID('launch-app')
+          ..deviceId = _deviceId
+          ..action = CommandAction.COMMAND_ACTION_START
+          ..kind = CommandKind.COMMAND_KIND_MANUAL
+          ..intent = intent),
+    );
+    if (mounted) {
+      setState(() {
+        _lastNotification = 'Launching application: $intent';
+      });
+      return;
+    }
+    _lastNotification = 'Launching application: $intent';
+  }
+
   void _sendPlaybackArtifactsQuery() {
     final requestID = _nextDebugRequestID('debug-playback-artifacts');
     _pendingPlaybackArtifactsRequestID = requestID;
@@ -1724,6 +1792,26 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return '';
   }
 
+  void _refreshAvailableApplications(Map<String, String> data) {
+    final discovered = data.keys
+        .map((key) => key.trim())
+        .where((key) => key.isNotEmpty)
+        .toSet();
+    discovered.remove('terminal');
+    final sorted = discovered.toList()..sort();
+    _availableApplicationIntents = <String>['terminal', ...sorted];
+    if (!_availableApplicationIntents.contains(_selectedApplicationIntent)) {
+      _selectedApplicationIntent = _availableApplicationIntents.first;
+    }
+  }
+
+  String _applicationLabel(String intent) {
+    if (intent == 'terminal') {
+      return 'terminal (REPL)';
+    }
+    return intent;
+  }
+
   void _applyDiagnosticsResponse(ConnectResponse response) {
     if (!response.hasCommandResult()) {
       return;
@@ -1741,6 +1829,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         requestID == _pendingDeviceStatusRequestID) {
       diagnosticsTitle = 'device_status';
     } else if (requestID.isNotEmpty &&
+        requestID == _pendingScenarioRegistryRequestID) {
+      diagnosticsTitle = 'scenario_registry';
+    } else if (requestID.isNotEmpty &&
         requestID == _pendingPlaybackArtifactsRequestID) {
       diagnosticsTitle = 'list_playback_artifacts';
     } else if (requestID.isNotEmpty &&
@@ -1750,6 +1841,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       diagnosticsTitle = 'runtime_status';
     } else if (result.notification == 'System query: device_status') {
       diagnosticsTitle = 'device_status';
+    } else if (result.notification == 'System query: scenario_registry') {
+      diagnosticsTitle = 'scenario_registry';
     } else if (result.notification == 'System query: list_playback_artifacts') {
       diagnosticsTitle = 'list_playback_artifacts';
     } else if (result.notification == 'Playback metadata ready') {
@@ -1766,6 +1859,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       if (firstArtifactID.isNotEmpty) {
         _playbackArtifactIdController.text = firstArtifactID;
       }
+    } else if (diagnosticsTitle == 'scenario_registry') {
+      _refreshAvailableApplications(data);
     }
   }
 
@@ -1822,6 +1917,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ..unixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
       ..level = level
       ..message = message;
+    debugPrint('[client][$level] $message');
     _appendBounded<diagv1.LogEntry>(
       _recentLogs,
       entry,
@@ -2843,6 +2939,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _deviceTypeController.dispose();
     _platformController.dispose();
     _terminalInputController.dispose();
+    _terminalInputFocusNode.dispose();
     _playbackArtifactIdController.dispose();
     _playbackTargetDeviceIdController.dispose();
     _restoreFlutterErrorHook();
@@ -2858,6 +2955,24 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     final directionality = Directionality.maybeOf(context);
     if (directionality != null) {
       _lastKnownTextDirection = directionality;
+    }
+    final showTerminalFullscreen = _isTerminalRoot(_activeRoot);
+    if (showTerminalFullscreen) {
+      return RepaintBoundary(
+        key: _bugReportScreenshotKey,
+        child: Scaffold(
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: _showBugReportDialog,
+            icon: const Icon(Icons.bug_report_outlined),
+            label: const Text('Report Bug'),
+          ),
+          body: SafeArea(
+            child: SizedBox.expand(
+              child: _renderNode(_activeRoot!),
+            ),
+          ),
+        ),
+      );
     }
     return RepaintBoundary(
       key: _bugReportScreenshotKey,
@@ -3027,6 +3142,46 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                   ),
                   const SizedBox(height: 12),
                   _buildDiagnosticsPanel(),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _availableApplicationIntents.contains(
+                            _selectedApplicationIntent)
+                        ? _selectedApplicationIntent
+                        : _availableApplicationIntents.first,
+                    decoration: const InputDecoration(
+                      labelText: 'Available Application',
+                    ),
+                    items: _availableApplicationIntents
+                        .map(
+                          (intent) => DropdownMenuItem<String>(
+                            value: intent,
+                            child: Text(_applicationLabel(intent)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() {
+                        _selectedApplicationIntent = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 12,
+                    children: [
+                      OutlinedButton(
+                        onPressed: _launchSelectedApplication,
+                        child: const Text('Open Application'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _sendScenarioRegistryQuery,
+                        child: const Text('Refresh Applications'),
+                      ),
+                    ],
+                  ),
                   if (_activeRoot != null) ...[
                     const SizedBox(height: 24),
                     const Divider(),
@@ -3513,8 +3668,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   Future<void> _sendKeyText(String text) async {
     if (_deviceId.isEmpty || text.isEmpty) {
+      _recordClientLog('warn', '_sendKeyText called with deviceId.isEmpty=${_deviceId.isEmpty} text.isEmpty=${text.isEmpty}');
       return;
     }
+    _recordClientLog('info', 'sending key text: ${text.replaceAll(String.fromCharCode(127), '<DEL>')}');
     _outgoing.add(
       ConnectRequest()
         ..input = (iov1.InputEvent()
@@ -3539,6 +3696,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return node.id;
     }
     return node.props['id'] ?? '';
+  }
+
+  bool _isTerminalRoot(uiv1.Node? node) {
+    if (node == null) {
+      return false;
+    }
+    return _nodeId(node).trim() == 'terminal_root';
   }
 
   Widget _renderNode(uiv1.Node node) {
@@ -3608,31 +3772,43 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       case uiv1.Node_Widget.textInput:
         final componentId = _nodeId(node);
         final isTerminalInput = componentId == 'terminal_input';
+        if (isTerminalInput && _terminalInputController.text != _terminalInputShadow) {
+          _recordClientLog('warn', 'terminal_input shadow mismatch on render: controller="${_terminalInputController.text}" shadow="$_terminalInputShadow"');
+          _terminalInputShadow = _terminalInputController.text;
+        }
         return TextField(
           controller: _terminalInputController,
+          focusNode: isTerminalInput ? _terminalInputFocusNode : null,
           decoration: InputDecoration(
             hintText: node.textInput.placeholder,
           ),
-          autofocus: node.textInput.autofocus,
+          // Terminal input receives frequent server-driven output patches.
+          // Re-applying autofocus on each rebuild can cause single-character
+          // replace behavior on web, so keep autofocus off for this field.
+          autofocus: isTerminalInput ? false : node.textInput.autofocus,
           onChanged: (value) {
-            if (!isTerminalInput) {
-              return;
-            }
-            final previous = _terminalInputShadow;
-            if (value.startsWith(previous) && value.length > previous.length) {
-              final inserted = value.substring(previous.length);
-              if (inserted.isNotEmpty) {
-                unawaited(_sendKeyText(inserted));
+              if (isTerminalInput) {
+                final previous = _terminalInputShadow;
+                _recordClientLog('info', 'terminal_input.onChanged: prev="$previous" new="$value" controller.text="${_terminalInputController.text}"');
+                if (value.startsWith(previous) && value.length > previous.length) {
+                  final inserted = value.substring(previous.length);
+                  if (inserted.isNotEmpty) {
+                    _recordClientLog('info', 'detected insertion: "$inserted"');
+                    unawaited(_sendKeyText(inserted));
+                  }
+                } else if (previous.startsWith(value) &&
+                    previous.length > value.length) {
+                  final removed = previous.length - value.length;
+                  if (removed > 0) {
+                    _recordClientLog('info', 'detected $removed backspace(s)');
+                    unawaited(
+                        _sendKeyText(List<String>.filled(removed, '\b').join()));
+                  }
+                } else if (value != previous) {
+                  _recordClientLog('warn', 'shadow sync lost: shadow="$previous" controller="$value" (no clear insertion/deletion)');
+                }
+                _terminalInputShadow = value;
               }
-            } else if (previous.startsWith(value) &&
-                previous.length > value.length) {
-              final removed = previous.length - value.length;
-              if (removed > 0) {
-                unawaited(
-                    _sendKeyText(List<String>.filled(removed, '\b').join()));
-              }
-            }
-            _terminalInputShadow = value;
           },
           onSubmitted: (value) async {
             if (isTerminalInput) {

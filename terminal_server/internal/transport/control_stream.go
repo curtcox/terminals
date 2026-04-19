@@ -2409,6 +2409,13 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	}
 	if fromKey {
 		text = normalizeTerminalKeyText(text)
+		eventlog.Emit(ctx, "terminal.input.received", slog.LevelDebug, "terminal key input received",
+			slog.String("component", "transport.input"),
+			slog.String("device_id", deviceID),
+			slog.String("component_id", componentID),
+			slog.Int("text_len", len(text)),
+			slog.String("text", strings.NewReplacer("\n", "\\n", "\r", "\\r", "\b", "\\b", "\x7f", "<DEL>").Replace(text)),
+		)
 	}
 	if !fromKey && !strings.HasSuffix(text, "\n") {
 		text += "\n"
