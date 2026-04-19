@@ -53,14 +53,14 @@ func TerminalViewWithOutput(deviceID, output string) Descriptor {
 		"value": "Terminal session on " + deviceID,
 		"style": "monospace",
 		"color": "#39FF14",
-	}), New("scroll", map[string]string{
+	}), New("expand", nil, New("scroll", map[string]string{
 		"id": "terminal_output_scroll",
 	}, New("text", map[string]string{
 		"id":    "terminal_output",
 		"value": output,
 		"style": "monospace",
 		"color": "#E8E8E8",
-	})), New("text_input", map[string]string{
+	}))), New("text_input", map[string]string{
 		"id":          "terminal_input",
 		"placeholder": "Type command and press enter",
 		"autofocus":   "true",

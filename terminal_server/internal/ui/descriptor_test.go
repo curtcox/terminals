@@ -40,6 +40,19 @@ func TestTerminalViewIncludesRefreshButton(t *testing.T) {
 		t.Fatalf("children = %d, want at least 4", len(d.Children))
 	}
 
+	if d.Children[1].Type != "expand" {
+		t.Fatalf("child[1].Type = %q, want expand", d.Children[1].Type)
+	}
+	if len(d.Children[1].Children) != 1 {
+		t.Fatalf("expand child count = %d, want 1", len(d.Children[1].Children))
+	}
+	if d.Children[1].Children[0].Type != "scroll" {
+		t.Fatalf("expand child type = %q, want scroll", d.Children[1].Children[0].Type)
+	}
+	if d.Children[1].Children[0].Props["id"] != "terminal_output_scroll" {
+		t.Fatalf("scroll id = %q, want terminal_output_scroll", d.Children[1].Children[0].Props["id"])
+	}
+
 	var found bool
 	for _, child := range d.Children {
 		if child.Type != "button" {
