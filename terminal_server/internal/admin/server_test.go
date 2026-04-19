@@ -16,7 +16,9 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
+	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
@@ -349,6 +351,54 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	}
 	if rolledBack["version"] != "1.0.0" {
 		t.Fatalf("rolled back version = %v, want 1.0.0", rolledBack["version"])
+	}
+}
+
+func TestReplSessionGetAndDeleteEndpoints(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	control := transport.NewControlService("HomeServer", devices)
+	engine := scenario.NewEngine()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	replSvc := replsession.NewService(terminal.NewManager())
+	created, err := replSvc.CreateSession(context.Background(), replsession.CreateSessionRequest{
+		DeviceID: "d1",
+	})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	defer func() {
+		_, _ = replSvc.TerminateSession(context.Background(), replsession.TerminateSessionRequest{
+			SessionID: created.Session.ID,
+		})
+	}()
+
+	h := NewHandler(control, runtime, replSvc, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+
+	getReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/sessions/"+created.Session.ID, nil)
+	getW := httptest.NewRecorder()
+	h.ServeHTTP(getW, getReq)
+	if getW.Code != http.StatusOK {
+		t.Fatalf("GET repl session status = %d, want 200 body=%s", getW.Code, getW.Body.String())
+	}
+
+	delReq := httptest.NewRequest(http.MethodDelete, "/admin/api/repl/sessions/"+created.Session.ID, nil)
+	delW := httptest.NewRecorder()
+	h.ServeHTTP(delW, delReq)
+	if delW.Code != http.StatusOK {
+		t.Fatalf("DELETE repl session status = %d, want 200 body=%s", delW.Code, delW.Body.String())
+	}
+
+	missingReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/sessions/"+created.Session.ID, nil)
+	missingW := httptest.NewRecorder()
+	h.ServeHTTP(missingW, missingReq)
+	if missingW.Code != http.StatusNotFound {
+		t.Fatalf("GET after delete status = %d, want 404 body=%s", missingW.Code, missingW.Body.String())
 	}
 }
 

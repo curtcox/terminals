@@ -25,6 +25,59 @@ type Options struct {
 	AdminBaseURL string
 }
 
+type commandClassification string
+
+const (
+	commandReadOnly commandClassification = "read_only"
+	commandMutating commandClassification = "mutating"
+)
+
+type commandSpec struct {
+	Name           string
+	Usage          string
+	Summary        string
+	Classification commandClassification
+	Examples       []string
+	RelatedDocs    []string
+}
+
+func replCommandSpecs() []commandSpec {
+	return []commandSpec{
+		{Name: "help", Usage: "help [command]", Summary: "Show REPL help or help for one command", Classification: commandReadOnly, Examples: []string{"help", "help app reload"}},
+		{Name: "describe", Usage: "describe <command>", Summary: "Show a detailed command description", Classification: commandReadOnly, Examples: []string{"describe sessions terminate"}},
+		{Name: "complete", Usage: "complete <prefix>", Summary: "List command completions for a prefix", Classification: commandReadOnly, Examples: []string{"complete app r"}},
+		{Name: "echo", Usage: "echo <text>", Summary: "Print text", Classification: commandReadOnly},
+		{Name: "sleep", Usage: "sleep <seconds>", Summary: "Sleep for N seconds", Classification: commandReadOnly},
+		{Name: "printf", Usage: "printf <text>", Summary: "Print text without newline (supports \\xNN escapes)", Classification: commandReadOnly},
+		{Name: "clear", Usage: "clear", Summary: "Clear terminal display", Classification: commandReadOnly},
+		{Name: "exit", Usage: "exit", Summary: "Exit REPL", Classification: commandReadOnly},
+		{Name: "devices ls", Usage: "devices ls [--json]", Summary: "List devices", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/devices"}},
+		{Name: "sessions ls", Usage: "sessions ls [--json]", Summary: "List REPL sessions", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/sessions"}},
+		{Name: "sessions show", Usage: "sessions show <session>", Summary: "Show one REPL session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/sessions"}},
+		{Name: "sessions terminate", Usage: "sessions terminate <session>", Summary: "Terminate one REPL session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sessions"}},
+		{Name: "activations ls", Usage: "activations ls [--json]", Summary: "List active scenario by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/activations"}},
+		{Name: "claims tree", Usage: "claims tree [--json]", Summary: "Show claims grouped by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/claims"}},
+		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "app reload", Usage: "app reload <app> [--json]", Summary: "Reload an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "app rollback", Usage: "app rollback <app> [--json]", Summary: "Rollback an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "config show", Usage: "config show [--json]", Summary: "Show effective config", Classification: commandReadOnly},
+		{Name: "docs ls", Usage: "docs ls", Summary: "List documentation topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
+		{Name: "docs search", Usage: "docs search <query>", Summary: "Search documentation topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
+		{Name: "docs open", Usage: "docs open <topic>", Summary: "Open one documentation topic", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
+		{Name: "docs examples", Usage: "docs examples [filter]", Summary: "List example topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/examples/app-dev-loop"}},
+	}
+}
+
+func replCommandSpec(name string) (commandSpec, bool) {
+	name = strings.ToLower(strings.TrimSpace(name))
+	for _, spec := range replCommandSpecs() {
+		if strings.EqualFold(spec.Name, name) {
+			return spec, true
+		}
+	}
+	return commandSpec{}, false
+}
+
 // Run executes the Terminals control-plane REPL over stdin/stdout.
 func Run(ctx context.Context, in io.Reader, out io.Writer, opts Options) error {
 	if in == nil {
@@ -110,7 +163,17 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	cmd := strings.ToLower(tokens[0])
 	switch cmd {
 	case "help":
-		s.printHelp()
+		s.printHelp(tokens[1:])
+		return false, nil
+	case "describe":
+		if err := s.describeCommand(tokens[1:]); err != nil {
+			return false, err
+		}
+		return false, nil
+	case "complete":
+		if err := s.completeCommand(tokens[1:]); err != nil {
+			return false, err
+		}
 		return false, nil
 	case "echo":
 		fmt.Fprintln(s.out, strings.Join(tokens[1:], " "))
@@ -147,7 +210,12 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "devices", "sessions", "activations", "claims", "app", "config", "docs":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
-		return false, fmt.Errorf("unknown command: %s", tokens[0])
+		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
+		suggestions := suggestCommands(input, 3)
+		if len(suggestions) == 0 {
+			return false, fmt.Errorf("unknown command: %s", tokens[0])
+		}
+		return false, fmt.Errorf("unknown command: %s (try: %s)", tokens[0], strings.Join(suggestions, ", "))
 	}
 }
 
@@ -235,6 +303,23 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			session, _ := body["session"]
 			return writeJSON(s.out, session)
+		case "terminate":
+			if len(args) < 2 {
+				return errors.New("usage: sessions terminate <session>")
+			}
+			sessionID := strings.TrimSpace(args[1])
+			if sessionID == "" {
+				return errors.New("usage: sessions terminate <session>")
+			}
+			body, err := s.deleteJSON(ctx, "/admin/api/repl/sessions/"+url.PathEscape(sessionID))
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			fmt.Fprintf(s.out, "OK  terminated session %s\n", sessionID)
+			return nil
 		default:
 			return fmt.Errorf("unknown command: sessions %s", sub)
 		}
@@ -294,26 +379,49 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		}
 		return nil
 	case "app":
-		if sub != "ls" {
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/apps")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			apps, _ := body["apps"].([]any)
+			rows := make([][]string, 0, len(apps))
+			for _, appAny := range apps {
+				app, _ := appAny.(map[string]any)
+				if app == nil {
+					continue
+				}
+				rows = append(rows, []string{toString(app["name"]), toString(app["version"])})
+			}
+			return printTable(s.out, []string{"APP", "VERSION"}, rows)
+		case "reload", "rollback":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: app %s <app>", sub)
+			}
+			appName := strings.TrimSpace(args[1])
+			if appName == "" {
+				return fmt.Errorf("usage: app %s <app>", sub)
+			}
+			route := "/admin/api/apps/reload"
+			if sub == "rollback" {
+				route = "/admin/api/apps/rollback"
+			}
+			body, err := s.postFormJSON(ctx, route, url.Values{"app": {appName}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			fmt.Fprintf(s.out, "OK  app=%s action=%s version=%s\n", appName, sub, toString(body["version"]))
+			return nil
+		default:
 			return fmt.Errorf("unknown command: app %s", sub)
 		}
-		body, err := s.fetchJSON(ctx, "/admin/api/apps")
-		if err != nil {
-			return err
-		}
-		if jsonOut {
-			return writeJSON(s.out, body)
-		}
-		apps, _ := body["apps"].([]any)
-		rows := make([][]string, 0, len(apps))
-		for _, appAny := range apps {
-			app, _ := appAny.(map[string]any)
-			if app == nil {
-				continue
-			}
-			rows = append(rows, []string{toString(app["name"]), toString(app["version"])})
-		}
-		return printTable(s.out, []string{"APP", "VERSION"}, rows)
 	case "config":
 		if sub != "show" {
 			return fmt.Errorf("unknown command: config %s", sub)
@@ -392,13 +500,31 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 }
 
 func (s *state) fetchJSON(ctx context.Context, route string) (map[string]any, error) {
+	return s.doJSON(ctx, http.MethodGet, route, "", nil)
+}
+
+func (s *state) deleteJSON(ctx context.Context, route string) (map[string]any, error) {
+	return s.doJSON(ctx, http.MethodDelete, route, "", nil)
+}
+
+func (s *state) postFormJSON(ctx context.Context, route string, form url.Values) (map[string]any, error) {
+	if form == nil {
+		form = url.Values{}
+	}
+	return s.doJSON(ctx, http.MethodPost, route, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+}
+
+func (s *state) doJSON(ctx context.Context, method, route, contentType string, body io.Reader) (map[string]any, error) {
 	u, err := url.JoinPath(s.adminURL, route)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, method, u, body)
 	if err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(contentType) != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -416,21 +542,67 @@ func (s *state) fetchJSON(ctx context.Context, route string) (map[string]any, er
 	return payload, nil
 }
 
-func (s *state) printHelp() {
-	fmt.Fprintln(s.out, "help                         Show this help")
-	fmt.Fprintln(s.out, "echo <text>                  Print text")
-	fmt.Fprintln(s.out, "sleep <seconds>              Sleep for N seconds")
-	fmt.Fprintln(s.out, "printf <text>                Print text without newline (supports \\xNN escapes)")
-	fmt.Fprintln(s.out, "devices ls [--json]          List devices")
-	fmt.Fprintln(s.out, "sessions ls [--json]         List REPL sessions")
-	fmt.Fprintln(s.out, "sessions show <session>      Show one REPL session")
-	fmt.Fprintln(s.out, "activations ls [--json]      List active scenario by device")
-	fmt.Fprintln(s.out, "claims tree [--json]         Show claims grouped by device")
-	fmt.Fprintln(s.out, "app ls [--json]              List loaded apps")
-	fmt.Fprintln(s.out, "config show [--json]         Show effective config")
-	fmt.Fprintln(s.out, "docs <ls|search|open|examples>")
-	fmt.Fprintln(s.out, "clear                        Clear terminal")
-	fmt.Fprintln(s.out, "exit                         Exit REPL")
+func (s *state) printHelp(args []string) {
+	query := strings.TrimSpace(strings.ToLower(strings.Join(args, " ")))
+	if query != "" {
+		spec, ok := replCommandSpec(query)
+		if !ok {
+			fmt.Fprintf(s.out, "unknown command %q\n", query)
+			return
+		}
+		s.renderCommandSpec(spec)
+		return
+	}
+
+	rows := make([][]string, 0, len(replCommandSpecs()))
+	specs := replCommandSpecs()
+	sort.Slice(specs, func(i, j int) bool { return specs[i].Name < specs[j].Name })
+	for _, spec := range specs {
+		rows = append(rows, []string{spec.Usage, string(spec.Classification), spec.Summary})
+	}
+	_ = printTable(s.out, []string{"COMMAND", "CLASS", "SUMMARY"}, rows)
+	fmt.Fprintln(s.out, "Run `help <command>` or `describe <command>` for details.")
+}
+
+func (s *state) describeCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: describe <command>")
+	}
+	query := strings.TrimSpace(strings.ToLower(strings.Join(args, " ")))
+	spec, ok := replCommandSpec(query)
+	if !ok {
+		return fmt.Errorf("unknown command: %s", query)
+	}
+	s.renderCommandSpec(spec)
+	return nil
+}
+
+func (s *state) completeCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: complete <prefix>")
+	}
+	prefix := strings.TrimSpace(strings.ToLower(strings.Join(args, " ")))
+	matches := suggestCommands(prefix, 32)
+	if len(matches) == 0 {
+		fmt.Fprintln(s.out, "(no completions)")
+		return nil
+	}
+	for _, match := range matches {
+		fmt.Fprintln(s.out, match)
+	}
+	return nil
+}
+
+func (s *state) renderCommandSpec(spec commandSpec) {
+	fmt.Fprintf(s.out, "%s\n", spec.Usage)
+	fmt.Fprintf(s.out, "classification: %s\n", spec.Classification)
+	fmt.Fprintln(s.out, spec.Summary)
+	for _, ex := range spec.Examples {
+		fmt.Fprintf(s.out, "example: %s\n", ex)
+	}
+	for _, ref := range spec.RelatedDocs {
+		fmt.Fprintf(s.out, "docs: %s\n", ref)
+	}
 }
 
 func formatUnixMillis(raw any) string {
@@ -708,4 +880,84 @@ func padRight(s string, width int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", width-len(s))
+}
+
+func suggestCommands(input string, limit int) []string {
+	input = strings.TrimSpace(strings.ToLower(input))
+	if limit <= 0 {
+		limit = 1
+	}
+	type candidate struct {
+		name  string
+		score int
+	}
+	candidates := make([]candidate, 0, len(replCommandSpecs()))
+	for _, spec := range replCommandSpecs() {
+		name := strings.ToLower(spec.Name)
+		score := 1000 + editDistance(input, name)
+		if input == "" {
+			score = 0
+		} else if strings.HasPrefix(name, input) {
+			score = 0
+		} else if strings.Contains(name, input) {
+			score = 1
+		}
+		candidates = append(candidates, candidate{name: spec.Name, score: score})
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score == candidates[j].score {
+			return candidates[i].name < candidates[j].name
+		}
+		return candidates[i].score < candidates[j].score
+	})
+	out := make([]string, 0, limit)
+	for _, cand := range candidates {
+		if len(out) >= limit {
+			break
+		}
+		out = append(out, cand.name)
+	}
+	return out
+}
+
+func editDistance(a, b string) int {
+	ar := []rune(a)
+	br := []rune(b)
+	if len(ar) == 0 {
+		return len(br)
+	}
+	if len(br) == 0 {
+		return len(ar)
+	}
+	dp := make([][]int, len(ar)+1)
+	for i := range dp {
+		dp[i] = make([]int, len(br)+1)
+		dp[i][0] = i
+	}
+	for j := 0; j <= len(br); j++ {
+		dp[0][j] = j
+	}
+	for i := 1; i <= len(ar); i++ {
+		for j := 1; j <= len(br); j++ {
+			cost := 1
+			if ar[i-1] == br[j-1] {
+				cost = 0
+			}
+			del := dp[i-1][j] + 1
+			ins := dp[i][j-1] + 1
+			sub := dp[i-1][j-1] + cost
+			dp[i][j] = minInt(del, ins, sub)
+		}
+	}
+	return dp[len(ar)][len(br)]
+}
+
+func minInt(vals ...int) int {
+	out := vals[0]
+	for _, v := range vals[1:] {
+		if v < out {
+			out = v
+		}
+	}
+	return out
 }

@@ -1,1 +1,1 @@
-Implement Phase B REPL command registry metadata (read_only|mutating), completion, and describe/help plumbing on typed command specs.
+Implement the `ai` command group (`providers`, `models`, `use`, `status`) on top of typed server AI interfaces.

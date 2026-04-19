@@ -27,6 +27,7 @@ import (
 type replSessionService interface {
 	ListSessions(ctx context.Context, req replsession.ListSessionsRequest) (*replsession.ListSessionsResponse, error)
 	GetSession(ctx context.Context, req replsession.GetSessionRequest) (*replsession.GetSessionResponse, error)
+	TerminateSession(ctx context.Context, req replsession.TerminateSessionRequest) (*replsession.TerminateSessionResponse, error)
 }
 
 // Handler serves a lightweight admin dashboard and JSON control APIs.
@@ -110,10 +111,6 @@ func (h *Handler) handleReplSessions(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) handleReplSession(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
-		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 	if h.repl == nil {
 		h.writeJSONError(w, http.StatusNotFound, "repl session service not configured")
 		return
@@ -123,12 +120,26 @@ func (h *Handler) handleReplSession(w http.ResponseWriter, req *http.Request) {
 		h.writeJSONError(w, http.StatusBadRequest, "session id is required")
 		return
 	}
-	session, err := h.repl.GetSession(req.Context(), replsession.GetSessionRequest{SessionID: sessionID})
-	if err != nil {
-		h.writeJSONError(w, http.StatusNotFound, err.Error())
-		return
+	switch req.Method {
+	case http.MethodGet:
+		session, err := h.repl.GetSession(req.Context(), replsession.GetSessionRequest{SessionID: sessionID})
+		if err != nil {
+			h.writeJSONError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		h.writeJSON(w, http.StatusOK, map[string]any{"session": session.Session})
+	case http.MethodDelete:
+		if _, err := h.repl.TerminateSession(req.Context(), replsession.TerminateSessionRequest{SessionID: sessionID}); err != nil {
+			h.writeJSONError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		h.writeJSON(w, http.StatusOK, map[string]any{
+			"status":     "ok",
+			"session_id": sessionID,
+		})
+	default:
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
-	h.writeJSON(w, http.StatusOK, map[string]any{"session": session.Session})
 }
 
 func (h *Handler) handleDashboard(w http.ResponseWriter, _ *http.Request) {

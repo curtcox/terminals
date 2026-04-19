@@ -3,6 +3,8 @@ package repl
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -40,5 +42,65 @@ func TestRunSemicolonSleepPrintf(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "ok") {
 		t.Fatalf("expected printf escape output, got %q", out.String())
+	}
+}
+
+func TestDescribeAndComplete(t *testing.T) {
+	in := strings.NewReader("describe app reload\ncomplete app r\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "app reload <app> [--json]") {
+		t.Fatalf("missing describe usage output: %q", text)
+	}
+	if !strings.Contains(text, "classification: mutating") {
+		t.Fatalf("missing mutating classification in describe output: %q", text)
+	}
+	if !strings.Contains(text, "app reload") {
+		t.Fatalf("missing completion match: %q", text)
+	}
+}
+
+func TestMutatingCommandsUseAdminAPIs(t *testing.T) {
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodDelete && req.URL.Path == "/admin/api/repl/sessions/repl-9":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","session_id":"repl-9"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/apps/reload":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","version":"1.2.3"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/apps/rollback":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","version":"1.2.2"}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("sessions terminate repl-9\napp reload sound_watch\napp rollback sound_watch\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{
+		Prompt:       "repl>",
+		AdminBaseURL: admin.URL,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "OK  terminated session repl-9") {
+		t.Fatalf("missing terminate success output: %q", text)
+	}
+	if !strings.Contains(text, "OK  app=sound_watch action=reload version=1.2.3") {
+		t.Fatalf("missing reload success output: %q", text)
+	}
+	if !strings.Contains(text, "OK  app=sound_watch action=rollback version=1.2.2") {
+		t.Fatalf("missing rollback success output: %q", text)
 	}
 }
