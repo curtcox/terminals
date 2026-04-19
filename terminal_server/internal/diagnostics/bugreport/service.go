@@ -159,6 +159,19 @@ func (s *Service) file(ctx context.Context, in *diagnosticsv1.BugReport, isAutod
 	if report.GetReportId() == "" {
 		report.ReportId = makeReportID(now)
 	}
+	if existing, ok, err := s.Get(report.GetReportId()); err != nil {
+		return nil, fmt.Errorf("check existing bug report: %w", err)
+	} else if ok {
+		eventlog.Emit(eventlog.WithCorrelation(ctx, existing.Summary.CorrelationID), "bug.report.ack_replayed", slog.LevelInfo, "bug report ack replayed",
+			slog.String("component", "diagnostics.bugreport"),
+			slog.String("report_id", existing.Summary.ReportID),
+			slog.String("correlation_id", existing.Summary.CorrelationID),
+			slog.String("reporter_device_id", existing.Summary.ReporterDeviceID),
+			slog.String("subject_device_id", existing.Summary.SubjectDeviceID),
+			slog.String("report_path", existing.Summary.ReportPath),
+		)
+		return ackFromRecord(existing, "ack_replayed"), nil
+	}
 	if report.ReporterDeviceId == "" && report.GetClientContext() != nil && report.GetClientContext().GetIdentity() != nil {
 		report.ReporterDeviceId = strings.TrimSpace(report.GetClientContext().GetIdentity().GetDeviceId())
 	}
@@ -305,6 +318,21 @@ func (s *Service) file(ctx context.Context, in *diagnosticsv1.BugReport, isAutod
 			return "filed"
 		}(),
 	}, nil
+}
+
+func ackFromRecord(rec Record, message string) *diagnosticsv1.BugReportAck {
+	status := diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED
+	if rec.Summary.Status == diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT.String() {
+		status = diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT
+	}
+	return &diagnosticsv1.BugReportAck{
+		ReportId:                 rec.Summary.ReportID,
+		CorrelationId:            rec.Summary.CorrelationID,
+		Status:                   status,
+		ReportPath:               rec.Summary.ReportPath,
+		MergedAutodetectReportId: rec.Summary.MergedAutodetectID,
+		Message:                  message,
+	}
 }
 
 // List returns summaries sorted newest-first.

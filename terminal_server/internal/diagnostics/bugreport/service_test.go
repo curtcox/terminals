@@ -194,3 +194,50 @@ func TestServiceFileReturnsAckWhenEventQueryIsSlow(t *testing.T) {
 		t.Fatalf("File() elapsed = %v, want <= 150ms when event query is slow", elapsed)
 	}
 }
+
+func TestServiceFileReplaysAckForExistingReportID(t *testing.T) {
+	logDir := t.TempDir()
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "rep-1"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "sub-1"})
+
+	svc := NewService(logDir, devices, nil)
+	firstAck, err := svc.File(context.Background(), &diagnosticsv1.BugReport{
+		ReportId:         "clientbug-1",
+		ReporterDeviceId: "rep-1",
+		SubjectDeviceId:  "sub-1",
+		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON,
+		Description:      "first attempt",
+	})
+	if err != nil {
+		t.Fatalf("first File() error = %v", err)
+	}
+
+	replayAck, err := svc.File(context.Background(), &diagnosticsv1.BugReport{
+		ReportId:         "clientbug-1",
+		ReporterDeviceId: "rep-1",
+		SubjectDeviceId:  "sub-1",
+		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON,
+		Description:      "replayed after reconnect",
+	})
+	if err != nil {
+		t.Fatalf("replay File() error = %v", err)
+	}
+	if replayAck.GetReportId() != firstAck.GetReportId() {
+		t.Fatalf("replay report id = %q, want %q", replayAck.GetReportId(), firstAck.GetReportId())
+	}
+	if replayAck.GetCorrelationId() != firstAck.GetCorrelationId() {
+		t.Fatalf("replay correlation id = %q, want %q", replayAck.GetCorrelationId(), firstAck.GetCorrelationId())
+	}
+	if replayAck.GetMessage() != "ack_replayed" {
+		t.Fatalf("replay message = %q, want ack_replayed", replayAck.GetMessage())
+	}
+
+	items, err := svc.List()
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("List() len = %d, want 1", len(items))
+	}
+}

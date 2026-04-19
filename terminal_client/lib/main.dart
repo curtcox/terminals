@@ -566,6 +566,26 @@ class _CarrierAttemptDiagnostic {
   final String failureClass;
   final String error;
   final Duration elapsed;
+
+  String get carrierLabel {
+    switch (carrier) {
+      case ControlCarrierKind.grpc:
+        return 'gRPC';
+      case ControlCarrierKind.websocket:
+        return 'WebSocket';
+      case ControlCarrierKind.tcp:
+        return 'TCP';
+      case ControlCarrierKind.http:
+        return 'HTTP';
+    }
+  }
+}
+
+String formatCarrierAttempt(_CarrierAttemptDiagnostic attempt) {
+  final elapsedMs = attempt.elapsed.inMilliseconds;
+  return '${attempt.carrierLabel} failed at ${attempt.stage} '
+      '[${attempt.failureClass}] (${attempt.endpoint}) '
+      'after ${elapsedMs}ms: ${attempt.error}';
 }
 
 class _ConnectionTarget {
@@ -1170,14 +1190,136 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     final lines = <String>[];
     for (final attempt in _carrierAttemptLog) {
-      final elapsedMs = attempt.elapsed.inMilliseconds;
-      lines.add(
-        '${_carrierName(attempt.carrier)} failed at ${attempt.stage} '
-        '[${attempt.failureClass}] '
-        '(${attempt.endpoint}) after ${elapsedMs}ms: ${attempt.error}',
-      );
+      lines.add(formatCarrierAttempt(attempt));
     }
     return lines.join('\n');
+  }
+
+  String _sanitizeBugReportIdComponent(String raw) {
+    final normalized = raw
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+'), '')
+        .replaceAll(RegExp(r'-+$'), '');
+    if (normalized.isEmpty) {
+      return 'unknown';
+    }
+    return normalized;
+  }
+
+  String _buildLocalBugReportId({
+    required DateTime now,
+    required _BugIdentifier identifier,
+    required String subjectDeviceID,
+  }) {
+    final reporter = _sanitizeBugReportIdComponent(_deviceId);
+    final subject = _sanitizeBugReportIdComponent(subjectDeviceID);
+    final code = _sanitizeBugReportIdComponent(identifier.code);
+    return 'clientbug-${now.toUtc().millisecondsSinceEpoch}-$reporter-$subject-$code';
+  }
+
+  String _bugTransportContextSuffix() {
+    final diagnostic = _lastTransportDiagnostic.trim();
+    if (diagnostic.isEmpty) {
+      return '';
+    }
+    return ' Last transport diagnostic: $diagnostic';
+  }
+
+  void _requeuePendingBugReportsForRetry(String reason) {
+    if (_pendingBugReports.isEmpty) {
+      return;
+    }
+    final pending = List<_PendingBugReport>.from(_pendingBugReports);
+    _pendingBugReports.clear();
+    _queuedBugReports.insertAll(
+      0,
+      pending
+          .map(
+            (item) => _QueuedBugReport(
+              bugReport: item.bugReport.deepCopy(),
+              identifier: item.identifier,
+              firstQueuedUnixMs: item.firstQueuedUnixMs,
+              dispatchAttempts: item.dispatchAttempts,
+            ),
+          )
+          .toList(),
+    );
+    final first = pending.first;
+    _lastBugTokenWord = first.identifier.word;
+    _lastBugTokenCode = first.identifier.code;
+    _recordClientLog(
+      'warn',
+      're-queued ${pending.length} pending bug report(s) after transport failure: $reason',
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _status = 'Bug report retry pending';
+      _lastNotification =
+          'Retrying bug report after transport recovery (word: ${first.identifier.word}, code: ${first.identifier.code}).';
+      _bugReceiptState = _BugReceiptState.waiting;
+      _bugReceiptReportId = '';
+      _bugReceiptDetail =
+          'Still waiting for a positive server receipt for word ${first.identifier.word}, code ${first.identifier.code}. Last failure: $reason';
+    });
+  }
+
+  bool _shouldShowFullscreenStatusOverlay() {
+    return _bugReceiptState != _BugReceiptState.none ||
+        _lastTransportDiagnostic.trim().isNotEmpty ||
+        _lastNotification.trim().isNotEmpty;
+  }
+
+  Widget _buildTransportStatusCard() {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(12),
+      color: Colors.white,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.blueGrey.shade200),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Control Stream: $_status',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            if (_lastNotification.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                _lastNotification,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+            if (_bugReceiptState != _BugReceiptState.none) ...[
+              const SizedBox(height: 8),
+              _buildBugReceiptPanel(),
+            ],
+            if (_lastTransportDiagnostic.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Transport Diagnostics',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              SelectableText(
+                _lastTransportDiagnostic,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1421,8 +1563,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               }
               _lastSuccessfulCarrier = carrier;
               _carrierAttemptLog.clear();
-              _activeCarrierCycle = <ControlCarrierKind>[];
-              _activeCarrierIndex = 0;
             }
             if (response.hasCapabilityAck()) {
               _lastCapabilityAckGeneration =
@@ -1454,6 +1594,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           );
         },
         onDone: () {
+          if (!_shouldStayConnected) {
+            return;
+          }
           if (!_hasRegisterAck) {
             unawaited(
               _handleCarrierAttemptFailure(
@@ -1467,7 +1610,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
             );
             return;
           }
-          unawaited(_handleStreamClosed('Disconnected'));
+          unawaited(
+            _handleCarrierAttemptFailure(
+              carrier: carrier,
+              endpoint: carrierEndpoint,
+              stage: 'stream_closed',
+              status: 'Disconnected',
+              rawError: 'stream closed after register acknowledgement',
+              elapsed: DateTime.now().toUtc().difference(attemptStartedAt),
+            ),
+          );
         },
       );
 
@@ -2093,6 +2245,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     final identifier = bugIdentifier ?? _buildBugIdentifier(now);
     final screenshotPng = await _captureBugReportScreenshot();
     final bugReport = diagv1.BugReport()
+      ..reportId = _buildLocalBugReportId(
+        now: now,
+        identifier: identifier,
+        subjectDeviceID: subjectDeviceID,
+      )
       ..reporterDeviceId = _deviceId
       ..subjectDeviceId = subjectDeviceID
       ..source = source
@@ -2126,11 +2283,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (!mounted) {
       return;
     }
+    final firstQueuedUnixMs = _nowUnixMs();
     if (_isBugReportTransportReady()) {
       _dispatchBugReport(
         bugReport: bugReport,
         identifier: identifier,
         subjectDeviceID: subjectDeviceID,
+        firstQueuedUnixMs: firstQueuedUnixMs,
+        previousDispatchAttempts: 0,
         replay: false,
       );
       setState(() {
@@ -2149,9 +2309,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
     _queuedBugReports.add(
       _QueuedBugReport(
-        bugReport: bugReport,
+        bugReport: bugReport.deepCopy(),
         identifier: identifier,
-        queuedUnixMs: _nowUnixMs(),
+        firstQueuedUnixMs: firstQueuedUnixMs,
+        dispatchAttempts: 0,
       ),
     );
     final hasActiveStreamAttempt =
@@ -2162,7 +2323,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _recordClientLog(
       'warn',
       'queued bug report while transport not ready for subject=$subjectDeviceID '
-          'word=${identifier.word} code=${identifier.code}',
+          'word=${identifier.word} code=${identifier.code} report_id=${bugReport.reportId}',
     );
     setState(() {
       _lastBugTokenWord = identifier.word;
@@ -2467,13 +2628,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         : 'Bug report filed: $receiptID (word: $tokenWord)';
     _bugReceiptState = _BugReceiptState.received;
     _bugReceiptReportId = receiptID;
-    _bugReceiptDetail = tokenWord.isEmpty
-        ? 'Positive receipt received from server.'
-        : 'Positive receipt received for word $tokenWord, code $tokenCode.';
+    final ackMessage = ack.message.trim();
+    if (ackMessage == 'ack_replayed') {
+      _bugReceiptDetail = tokenWord.isEmpty
+          ? 'Positive receipt recovered after transport failover. The server replayed the original acknowledgement.'
+          : 'Positive receipt recovered after transport failover for word $tokenWord, code $tokenCode.';
+    } else {
+      _bugReceiptDetail = tokenWord.isEmpty
+          ? 'Positive receipt received from server.'
+          : 'Positive receipt received for word $tokenWord, code $tokenCode.';
+    }
     _recordClientLog(
       'info',
       'bug report ack status=${ack.status.name} id=$receiptID '
-          'word=$tokenWord code=$tokenCode',
+          'word=$tokenWord code=$tokenCode message=${ack.message}',
     );
   }
 
@@ -2492,7 +2660,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         'Bug report failed: $reason (word: ${failed.identifier.word}, code: ${failed.identifier.code}).';
     _bugReceiptState = _BugReceiptState.error;
     _bugReceiptReportId = '';
-    _bugReceiptDetail = 'No positive receipt could be generated: $reason.';
+    _bugReceiptDetail =
+        'No positive receipt could be generated: $reason.${_bugTransportContextSuffix()}';
     _recordClientLog(
       'error',
       'bug report rejected by control error code=${error.code.name} '
@@ -2514,22 +2683,29 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     required diagv1.BugReport bugReport,
     required _BugIdentifier identifier,
     required String subjectDeviceID,
+    required int firstQueuedUnixMs,
+    required int previousDispatchAttempts,
     required bool replay,
   }) {
     _outgoing.add(
-      ConnectRequest()..bugReport = bugReport,
+      ConnectRequest()..bugReport = bugReport.deepCopy(),
     );
+    final nextAttempt = previousDispatchAttempts + 1;
     _pendingBugReports.add(
       _PendingBugReport(
+        bugReport: bugReport.deepCopy(),
         identifier: identifier,
+        firstQueuedUnixMs: firstQueuedUnixMs,
         submittedUnixMs: _nowUnixMs(),
+        dispatchAttempts: nextAttempt,
       ),
     );
     _ensureBugReportAckWatchdog();
     _recordClientLog(
       'info',
       '${replay ? 'replayed' : 'submitted'} bug report for subject=$subjectDeviceID '
-          'word=${identifier.word} code=${identifier.code}',
+          'word=${identifier.word} code=${identifier.code} '
+          'report_id=${bugReport.reportId} attempt=$nextAttempt',
     );
   }
 
@@ -2544,9 +2720,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _queuedBugReports.clear();
     for (final item in queued) {
       _dispatchBugReport(
-        bugReport: item.bugReport,
+        bugReport: item.bugReport.deepCopy(),
         identifier: item.identifier,
         subjectDeviceID: item.bugReport.subjectDeviceId,
+        firstQueuedUnixMs: item.firstQueuedUnixMs,
+        previousDispatchAttempts: item.dispatchAttempts,
         replay: true,
       );
     }
@@ -2572,7 +2750,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       final nowUnixMs = _nowUnixMs();
       if (_pendingBugReports.isNotEmpty) {
         final first = _pendingBugReports.first;
-        if (nowUnixMs - first.submittedUnixMs >=
+        if (nowUnixMs - first.firstQueuedUnixMs >=
             _bugReportAckTimeout.inMilliseconds) {
           final failed = _pendingBugReports.removeAt(0);
           _lastBugTokenWord = failed.identifier.word;
@@ -2585,18 +2763,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               _bugReceiptState = _BugReceiptState.error;
               _bugReceiptReportId = '';
               _bugReceiptDetail =
-                  'No positive receipt was generated by the server for word ${failed.identifier.word}, code ${failed.identifier.code}.';
+                  'No positive receipt was generated by the server for word ${failed.identifier.word}, code ${failed.identifier.code}.${_bugTransportContextSuffix()}';
             });
           }
           _recordClientLog(
             'error',
-            'bug report ack timeout word=${failed.identifier.word} code=${failed.identifier.code}',
+            'bug report ack timeout word=${failed.identifier.word} code=${failed.identifier.code} '
+                'attempts=${failed.dispatchAttempts} transport_diagnostic=$_lastTransportDiagnostic',
           );
         }
       } else if (_queuedBugReports.isNotEmpty &&
           _bugReceiptState == _BugReceiptState.waiting) {
         final firstQueued = _queuedBugReports.first;
-        if (nowUnixMs - firstQueued.queuedUnixMs >=
+        if (nowUnixMs - firstQueued.firstQueuedUnixMs >=
             _bugReportAckTimeout.inMilliseconds) {
           _lastBugTokenWord = firstQueued.identifier.word;
           _lastBugTokenCode = firstQueued.identifier.code;
@@ -2608,12 +2787,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               _bugReceiptState = _BugReceiptState.error;
               _bugReceiptReportId = '';
               _bugReceiptDetail =
-                  'No positive receipt could be generated because the report remained queued for more than ${_bugReportAckTimeout.inSeconds}s.';
+                  'No positive receipt could be generated because the report remained queued for more than ${_bugReportAckTimeout.inSeconds}s.${_bugTransportContextSuffix()}';
             });
           }
           _recordClientLog(
             'error',
-            'queued bug report receipt timeout word=${firstQueued.identifier.word} code=${firstQueued.identifier.code}',
+            'queued bug report receipt timeout word=${firstQueued.identifier.word} code=${firstQueued.identifier.code} '
+                'transport_diagnostic=$_lastTransportDiagnostic',
           );
         }
       }
@@ -2680,18 +2860,29 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     required String rawError,
     required Duration elapsed,
   }) async {
+    final failureClass =
+        classifyCarrierFailure(stage: stage, rawError: rawError);
     _carrierAttemptLog.add(
       _CarrierAttemptDiagnostic(
         carrier: carrier,
         endpoint: endpoint,
         stage: stage,
-        failureClass: classifyCarrierFailure(stage: stage, rawError: rawError),
+        failureClass: failureClass,
         error: rawError,
         elapsed: elapsed,
       ),
     );
-    _lastTransportDiagnostic =
-        '${_carrierName(carrier)} failed at $stage: $rawError';
+    final attemptSummary = formatCarrierAttempt(_carrierAttemptLog.last);
+    _lastTransportDiagnostic = attemptSummary;
+    _recordClientLog(
+      'warn',
+      'control carrier failure carrier=${_carrierName(carrier)} stage=$stage '
+          'class=$failureClass endpoint=$endpoint elapsed_ms=${elapsed.inMilliseconds} '
+          'error=$rawError',
+    );
+    if (_shouldStayConnected) {
+      _requeuePendingBugReportsForRetry(attemptSummary);
+    }
 
     _incoming = null;
     _hasRegisterAck = false;
@@ -2704,6 +2895,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
     if (_moveToNextCarrierInCycle()) {
       final nextCarrier = _activeCarrierCycle[_activeCarrierIndex];
+      _recordClientLog(
+        'info',
+        'switching control carrier from ${_carrierName(carrier)} to ${_carrierName(nextCarrier)}',
+      );
       if (mounted) {
         setState(() {
           _status =
@@ -2722,6 +2917,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
     final summary = _buildCarrierFailureSummary();
     _lastTransportDiagnostic = summary;
+    _recordClientLog('error', 'all control carriers failed\n$summary');
     if (mounted) {
       setState(() {
         _status = 'All control carriers failed';
@@ -2731,32 +2927,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     _activeCarrierCycle = <ControlCarrierKind>[];
     _activeCarrierIndex = 0;
-    _scheduleReconnect();
-  }
-
-  Future<void> _handleStreamClosed(
-    String status, {
-    String notificationOverride = '',
-  }) async {
-    _recordClientLog('warn', 'control stream closed: $status');
-    _incoming = null;
-    _hasRegisterAck = false;
-    _drainPendingBugReportsAsFailed('stream closed before bug report ack');
-    final existingClient = _client;
-    _client = null;
-    if (existingClient != null) {
-      await existingClient.shutdown();
-    }
-    if (mounted) {
-      setState(() {
-        _status = status;
-        _lastConnectionStatus = status;
-        if (notificationOverride.isNotEmpty) {
-          _lastNotification = notificationOverride;
-        }
-      });
-    }
-    _syncMonitoringLoops();
     _scheduleReconnect();
   }
 
@@ -2967,8 +3137,21 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
             label: const Text('Report Bug'),
           ),
           body: SafeArea(
-            child: SizedBox.expand(
-              child: _renderNode(_activeRoot!),
+            child: Stack(
+              children: [
+                SizedBox.expand(
+                  child: _renderNode(_activeRoot!),
+                ),
+                if (_shouldShowFullscreenStatusOverlay())
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: _buildTransportStatusCard(),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -3095,6 +3278,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                     const SizedBox(height: 12),
                     _buildBugReceiptPanel(),
                   ],
+                  if (_lastTransportDiagnostic.isNotEmpty ||
+                      _carrierAttemptLog.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildTransportDiagnosticsPanel(),
+                  ],
                   const SizedBox(height: 20),
                   Wrap(
                     spacing: 12,
@@ -3144,8 +3332,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                   _buildDiagnosticsPanel(),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _availableApplicationIntents.contains(
-                            _selectedApplicationIntent)
+                    value: _availableApplicationIntents
+                            .contains(_selectedApplicationIntent)
                         ? _selectedApplicationIntent
                         : _availableApplicationIntents.first,
                     decoration: const InputDecoration(
@@ -3293,6 +3481,50 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransportDiagnosticsPanel() {
+    final recentAttempts = _carrierAttemptLog.reversed.take(4).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blueGrey.shade200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Transport Diagnostics',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          if (_lastTransportDiagnostic.isEmpty)
+            const Text('No transport failures captured yet')
+          else ...[
+            const SizedBox(height: 6),
+            SelectableText(
+              _lastTransportDiagnostic,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+          if (recentAttempts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Recent Carrier Attempts',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            ...recentAttempts.map(
+              (attempt) => Text(
+                formatCarrierAttempt(attempt),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -3668,10 +3900,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   Future<void> _sendKeyText(String text) async {
     if (_deviceId.isEmpty || text.isEmpty) {
-      _recordClientLog('warn', '_sendKeyText called with deviceId.isEmpty=${_deviceId.isEmpty} text.isEmpty=${text.isEmpty}');
+      _recordClientLog('warn',
+          '_sendKeyText called with deviceId.isEmpty=${_deviceId.isEmpty} text.isEmpty=${text.isEmpty}');
       return;
     }
-    _recordClientLog('info', 'sending key text: ${text.replaceAll(String.fromCharCode(127), '<DEL>')}');
+    _recordClientLog('info',
+        'sending key text: ${text.replaceAll(String.fromCharCode(127), '<DEL>')}');
     _outgoing.add(
       ConnectRequest()
         ..input = (iov1.InputEvent()
@@ -3772,8 +4006,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       case uiv1.Node_Widget.textInput:
         final componentId = _nodeId(node);
         final isTerminalInput = componentId == 'terminal_input';
-        if (isTerminalInput && _terminalInputController.text != _terminalInputShadow) {
-          _recordClientLog('warn', 'terminal_input shadow mismatch on render: controller="${_terminalInputController.text}" shadow="$_terminalInputShadow"');
+        if (isTerminalInput &&
+            _terminalInputController.text != _terminalInputShadow) {
+          _recordClientLog('warn',
+              'terminal_input shadow mismatch on render: controller="${_terminalInputController.text}" shadow="$_terminalInputShadow"');
           _terminalInputShadow = _terminalInputController.text;
         }
         return TextField(
@@ -3787,28 +4023,31 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           // replace behavior on web, so keep autofocus off for this field.
           autofocus: isTerminalInput ? false : node.textInput.autofocus,
           onChanged: (value) {
-              if (isTerminalInput) {
-                final previous = _terminalInputShadow;
-                _recordClientLog('info', 'terminal_input.onChanged: prev="$previous" new="$value" controller.text="${_terminalInputController.text}"');
-                if (value.startsWith(previous) && value.length > previous.length) {
-                  final inserted = value.substring(previous.length);
-                  if (inserted.isNotEmpty) {
-                    _recordClientLog('info', 'detected insertion: "$inserted"');
-                    unawaited(_sendKeyText(inserted));
-                  }
-                } else if (previous.startsWith(value) &&
-                    previous.length > value.length) {
-                  final removed = previous.length - value.length;
-                  if (removed > 0) {
-                    _recordClientLog('info', 'detected $removed backspace(s)');
-                    unawaited(
-                        _sendKeyText(List<String>.filled(removed, '\b').join()));
-                  }
-                } else if (value != previous) {
-                  _recordClientLog('warn', 'shadow sync lost: shadow="$previous" controller="$value" (no clear insertion/deletion)');
+            if (isTerminalInput) {
+              final previous = _terminalInputShadow;
+              _recordClientLog('info',
+                  'terminal_input.onChanged: prev="$previous" new="$value" controller.text="${_terminalInputController.text}"');
+              if (value.startsWith(previous) &&
+                  value.length > previous.length) {
+                final inserted = value.substring(previous.length);
+                if (inserted.isNotEmpty) {
+                  _recordClientLog('info', 'detected insertion: "$inserted"');
+                  unawaited(_sendKeyText(inserted));
                 }
-                _terminalInputShadow = value;
+              } else if (previous.startsWith(value) &&
+                  previous.length > value.length) {
+                final removed = previous.length - value.length;
+                if (removed > 0) {
+                  _recordClientLog('info', 'detected $removed backspace(s)');
+                  unawaited(
+                      _sendKeyText(List<String>.filled(removed, '\b').join()));
+                }
+              } else if (value != previous) {
+                _recordClientLog('warn',
+                    'shadow sync lost: shadow="$previous" controller="$value" (no clear insertion/deletion)');
               }
+              _terminalInputShadow = value;
+            }
           },
           onSubmitted: (value) async {
             if (isTerminalInput) {
@@ -4249,22 +4488,30 @@ class _BugReportDraft {
 
 class _PendingBugReport {
   const _PendingBugReport({
+    required this.bugReport,
     required this.identifier,
+    required this.firstQueuedUnixMs,
     required this.submittedUnixMs,
+    required this.dispatchAttempts,
   });
 
+  final diagv1.BugReport bugReport;
   final _BugIdentifier identifier;
+  final int firstQueuedUnixMs;
   final int submittedUnixMs;
+  final int dispatchAttempts;
 }
 
 class _QueuedBugReport {
   const _QueuedBugReport({
     required this.bugReport,
     required this.identifier,
-    required this.queuedUnixMs,
+    required this.firstQueuedUnixMs,
+    required this.dispatchAttempts,
   });
 
   final diagv1.BugReport bugReport;
   final _BugIdentifier identifier;
-  final int queuedUnixMs;
+  final int firstQueuedUnixMs;
+  final int dispatchAttempts;
 }

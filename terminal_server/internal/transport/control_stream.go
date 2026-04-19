@@ -2894,20 +2894,12 @@ func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
 func (h *StreamHandler) readTerminalOutput(_ string, sessionID string) string {
 	readDeadline, readInterval := h.terminalReadSettings()
 	deadline := time.Now().Add(readDeadline)
-	var chunk []byte
 	for time.Now().Before(deadline) {
-		out, err := h.replSessions.ReadAvailable(sessionID, 4096)
+		_, err := h.replSessions.ReadAvailable(sessionID, 4096)
 		if err != nil {
 			break
 		}
-		if len(out) > 0 {
-			chunk = append(chunk, out...)
-		}
 		time.Sleep(readInterval)
-	}
-	if len(chunk) > 0 {
-		output, _ := h.replSessions.AppendOutput(sessionID, string(chunk))
-		return output
 	}
 	output, _ := h.replSessions.Output(sessionID)
 	return output
