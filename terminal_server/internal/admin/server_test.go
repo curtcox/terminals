@@ -173,7 +173,7 @@ func TestStartAndStopScenarioEndpoints(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
 
 	startReq := httptest.NewRequest(http.MethodPost, "/admin/api/scenarios/start", strings.NewReader(url.Values{
 		"scenario":   {"terminal"},
@@ -216,7 +216,7 @@ func TestUpdateDevicePlacementEndpoint(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/api/devices/placement", strings.NewReader(url.Values{
 		"device_id": {"kitchen-1"},
@@ -276,7 +276,7 @@ func testHandler(t *testing.T, cfgOverride ...config.Config) http.Handler {
 			cfg.LogDir = override.LogDir
 		}
 	}
-	return NewHandler(control, runtime, nil, nil, devices, cfg)
+	return NewHandler(control, runtime, nil, nil, nil, devices, cfg)
 }
 
 func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
@@ -296,7 +296,7 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"})
 
 	listReq := httptest.NewRequest(http.MethodGet, "/admin/api/apps", nil)
 	listW := httptest.NewRecorder()

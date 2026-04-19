@@ -157,6 +157,7 @@ func main() {
 	adminServer, err := startAdminServer(cfg, admin.NewHandler(
 		controlService,
 		scenarioRuntime,
+		controlStream.ReplSessions(),
 		appRuntime,
 		func() { registerAppScenarioDefinitions(scenarioEngine, appRuntime) },
 		deviceManager,

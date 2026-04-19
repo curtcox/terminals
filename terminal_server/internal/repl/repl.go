@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -142,7 +144,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		fmt.Fprintln(s.out, "bye")
 		return true, nil
-	case "devices", "activations", "claims", "app", "config", "docs":
+	case "devices", "sessions", "activations", "claims", "app", "config", "docs":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		return false, fmt.Errorf("unknown command: %s", tokens[0])
@@ -192,6 +194,50 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			})
 		}
 		return printTable(s.out, []string{"ID", "ZONE", "CAPS", "STATE"}, rows)
+	case "sessions":
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/repl/sessions")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			items, _ := body["sessions"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				attached, _ := row["attached_devices"].([]any)
+				rows = append(rows, []string{
+					toString(row["id"]),
+					toString(row["owner_activation_id"]),
+					strconv.Itoa(len(attached)),
+					toString(row["idle"]),
+					formatUnixMillis(row["created_at"]),
+				})
+			}
+			return printTable(s.out, []string{"ID", "OWNER", "ATTACHED", "IDLE", "CREATED"}, rows)
+		case "show":
+			if len(args) < 2 {
+				return errors.New("usage: sessions show <session>")
+			}
+			sessionID := strings.TrimSpace(args[1])
+			if sessionID == "" {
+				return errors.New("usage: sessions show <session>")
+			}
+			body, err := s.fetchJSON(ctx, "/admin/api/repl/sessions/"+url.PathEscape(sessionID))
+			if err != nil {
+				return err
+			}
+			session, _ := body["session"]
+			return writeJSON(s.out, session)
+		default:
+			return fmt.Errorf("unknown command: sessions %s", sub)
+		}
 	case "activations":
 		if sub != "ls" {
 			return fmt.Errorf("unknown command: activations %s", sub)
@@ -284,31 +330,58 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 	case "docs":
 		switch sub {
 		case "ls":
-			fmt.Fprintln(s.out, "repl/index")
-			fmt.Fprintln(s.out, "repl/quickstart")
-			fmt.Fprintln(s.out, "repl/commands")
-			fmt.Fprintln(s.out, "repl/examples")
+			topics, err := listDocTopics("docs/repl")
+			if err != nil {
+				return err
+			}
+			for _, topic := range topics {
+				fmt.Fprintln(s.out, topic)
+			}
 			return nil
 		case "search":
 			if len(args) < 2 {
 				return errors.New("usage: docs search <query>")
 			}
+			query := strings.ToLower(strings.TrimSpace(strings.Join(args[1:], " ")))
+			matches, err := searchDocTopics("docs/repl", query)
+			if err != nil {
+				return err
+			}
 			fmt.Fprintf(s.out, "search results for %q\n", strings.Join(args[1:], " "))
-			fmt.Fprintln(s.out, "- repl/quickstart")
-			fmt.Fprintln(s.out, "- repl/commands")
+			if len(matches) == 0 {
+				fmt.Fprintln(s.out, "(no matches)")
+				return nil
+			}
+			for _, topic := range matches {
+				fmt.Fprintf(s.out, "- %s\n", topic)
+			}
 			return nil
 		case "open":
 			if len(args) < 2 {
 				return errors.New("usage: docs open <topic>")
 			}
-			topic := strings.Join(args[1:], " ")
-			fmt.Fprintf(s.out, "docs topic: %s\n", topic)
-			fmt.Fprintln(s.out, "See docs/repl/ for full authored topics.")
+			topic := strings.TrimSpace(strings.Join(args[1:], " "))
+			path := resolveDocTopicPath("docs/repl", topic)
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(s.out, string(content))
 			return nil
 		case "examples":
-			fmt.Fprintln(s.out, "examples/app-dev-loop")
-			fmt.Fprintln(s.out, "examples/inspect-preemption")
-			fmt.Fprintln(s.out, "examples/ai-debug-claim")
+			filter := ""
+			if len(args) > 1 {
+				filter = strings.ToLower(strings.Join(args[1:], " "))
+			}
+			topics, err := listDocTopics(filepath.Join("docs/repl", "examples"))
+			if err != nil {
+				return err
+			}
+			for _, topic := range topics {
+				if filter == "" || strings.Contains(strings.ToLower(topic), filter) {
+					fmt.Fprintln(s.out, topic)
+				}
+			}
 			return nil
 		default:
 			return fmt.Errorf("unknown command: docs %s", sub)
@@ -349,6 +422,8 @@ func (s *state) printHelp() {
 	fmt.Fprintln(s.out, "sleep <seconds>              Sleep for N seconds")
 	fmt.Fprintln(s.out, "printf <text>                Print text without newline (supports \\xNN escapes)")
 	fmt.Fprintln(s.out, "devices ls [--json]          List devices")
+	fmt.Fprintln(s.out, "sessions ls [--json]         List REPL sessions")
+	fmt.Fprintln(s.out, "sessions show <session>      Show one REPL session")
 	fmt.Fprintln(s.out, "activations ls [--json]      List active scenario by device")
 	fmt.Fprintln(s.out, "claims tree [--json]         Show claims grouped by device")
 	fmt.Fprintln(s.out, "app ls [--json]              List loaded apps")
@@ -356,6 +431,114 @@ func (s *state) printHelp() {
 	fmt.Fprintln(s.out, "docs <ls|search|open|examples>")
 	fmt.Fprintln(s.out, "clear                        Clear terminal")
 	fmt.Fprintln(s.out, "exit                         Exit REPL")
+}
+
+func formatUnixMillis(raw any) string {
+	switch typed := raw.(type) {
+	case float64:
+		if typed <= 0 {
+			return ""
+		}
+		return time.UnixMilli(int64(typed)).UTC().Format(time.RFC3339)
+	case int64:
+		if typed <= 0 {
+			return ""
+		}
+		return time.UnixMilli(typed).UTC().Format(time.RFC3339)
+	case json.Number:
+		n, err := typed.Int64()
+		if err != nil || n <= 0 {
+			return ""
+		}
+		return time.UnixMilli(n).UTC().Format(time.RFC3339)
+	case string:
+		if strings.TrimSpace(typed) == "" {
+			return ""
+		}
+		if parsed, err := time.Parse(time.RFC3339Nano, typed); err == nil {
+			return parsed.UTC().Format(time.RFC3339)
+		}
+		if parsed, err := time.Parse(time.RFC3339, typed); err == nil {
+			return parsed.UTC().Format(time.RFC3339)
+		}
+		return typed
+	default:
+		return ""
+	}
+}
+
+func listDocTopics(root string) ([]string, error) {
+	out := make([]string, 0, 32)
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".md" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = strings.TrimSuffix(filepath.ToSlash(rel), ".md")
+		if rel == "index" || rel == "." {
+			out = append(out, "repl/index")
+			return nil
+		}
+		out = append(out, "repl/"+rel)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func searchDocTopics(root, query string) ([]string, error) {
+	if query == "" {
+		return listDocTopics(root)
+	}
+	out := make([]string, 0, 16)
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".md" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		topic := "repl/" + strings.TrimSuffix(filepath.ToSlash(rel), ".md")
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(strings.ToLower(topic), query) || strings.Contains(strings.ToLower(string(content)), query) {
+			out = append(out, topic)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func resolveDocTopicPath(root, topic string) string {
+	topic = strings.TrimSpace(topic)
+	topic = strings.TrimPrefix(topic, "repl/")
+	topic = strings.TrimSuffix(topic, ".md")
+	if topic == "" || topic == "repl" {
+		topic = "index"
+	}
+	return filepath.Join(root, filepath.FromSlash(topic)+".md")
 }
 
 func splitSegments(line string) []string {

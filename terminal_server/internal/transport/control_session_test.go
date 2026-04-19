@@ -544,8 +544,8 @@ func TestSessionRunDisconnectCleansTerminalSession(t *testing.T) {
 	if len(handler.terminals.List()) != 0 {
 		t.Fatalf("expected terminal sessions to be cleaned up on disconnect")
 	}
-	if _, exists := handler.terminalByDevice["d1"]; exists {
-		t.Fatalf("expected terminalByDevice entry removed on disconnect")
+	if sessionID, ok := handler.replSessionIDForDevice("d1"); ok || sessionID != "" {
+		t.Fatalf("expected device session mapping removed on disconnect")
 	}
 }
 

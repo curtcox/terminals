@@ -1,0 +1,3 @@
+# claims
+
+- `claims tree [--json]`

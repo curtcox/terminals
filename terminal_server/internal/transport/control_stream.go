@@ -18,6 +18,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
+	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
@@ -391,22 +392,18 @@ type StreamHandler struct {
 	recent      []CommandEvent
 	recentLimit int
 
-	terminals              *terminal.Manager
-	terminalByDevice       map[string]string
-	terminalOutputByDevice map[string]string
-	terminalDraftByDevice  map[string]string
-	terminalOutputDirty    map[string]bool
-	terminalLastUIFlush    map[string]time.Time
-	terminalReadDeadline   time.Duration
-	terminalReadInterval   time.Duration
-	terminalUIInterval     time.Duration
-	terminalReplAdminURL   string
-	lastSetUIByDevice      map[string]ui.Descriptor
-	multiWindowResume      map[string]multiWindowResumeState
-	photoFrameSlides       []string
-	photoFrameIndexByDev   map[string]int
-	photoFrameLastByDev    map[string]time.Time
-	photoFrameInterval     time.Duration
+	terminals            *terminal.Manager
+	replSessions         *replsession.Service
+	terminalReadDeadline time.Duration
+	terminalReadInterval time.Duration
+	terminalUIInterval   time.Duration
+	terminalReplAdminURL string
+	lastSetUIByDevice    map[string]ui.Descriptor
+	multiWindowResume    map[string]multiWindowResumeState
+	photoFrameSlides     []string
+	photoFrameIndexByDev map[string]int
+	photoFrameLastByDev  map[string]time.Time
+	photoFrameInterval   time.Duration
 
 	mediaStreams      map[string]mediaStreamState
 	sensorsByDevice   map[string]sensorSnapshot
@@ -461,34 +458,31 @@ type CommandEvent struct {
 
 // NewStreamHandler creates a handler for control stream messages.
 func NewStreamHandler(control *ControlService) *StreamHandler {
-	return &StreamHandler{
-		control:                control,
-		metrics:                &Metrics{},
-		seen:                   map[string]ServerMessage{},
-		seenLimit:              1024,
-		recent:                 []CommandEvent{},
-		recentLimit:            200,
-		terminals:              terminal.NewManager(),
-		terminalByDevice:       map[string]string{},
-		terminalOutputByDevice: map[string]string{},
-		terminalDraftByDevice:  map[string]string{},
-		terminalOutputDirty:    map[string]bool{},
-		terminalLastUIFlush:    map[string]time.Time{},
-		terminalReadDeadline:   defaultTerminalReadDeadline,
-		terminalReadInterval:   defaultTerminalReadInterval,
-		terminalUIInterval:     defaultTerminalUIInterval,
-		terminalReplAdminURL:   defaultTerminalReplAdminURL,
-		lastSetUIByDevice:      map[string]ui.Descriptor{},
-		multiWindowResume:      map[string]multiWindowResumeState{},
-		photoFrameSlides:       defaultPhotoFrameSlides(),
-		photoFrameIndexByDev:   map[string]int{},
-		photoFrameLastByDev:    map[string]time.Time{},
-		photoFrameInterval:     defaultPhotoFrameInterval,
-		mediaStreams:           map[string]mediaStreamState{},
-		sensorsByDevice:        map[string]sensorSnapshot{},
-		voiceAudioBuffers:      map[string][]byte{},
-		recording:              recording.NoopManager{},
+	handler := &StreamHandler{
+		control:              control,
+		metrics:              &Metrics{},
+		seen:                 map[string]ServerMessage{},
+		seenLimit:            1024,
+		recent:               []CommandEvent{},
+		recentLimit:          200,
+		terminals:            terminal.NewManager(),
+		terminalReadDeadline: defaultTerminalReadDeadline,
+		terminalReadInterval: defaultTerminalReadInterval,
+		terminalUIInterval:   defaultTerminalUIInterval,
+		terminalReplAdminURL: defaultTerminalReplAdminURL,
+		lastSetUIByDevice:    map[string]ui.Descriptor{},
+		multiWindowResume:    map[string]multiWindowResumeState{},
+		photoFrameSlides:     defaultPhotoFrameSlides(),
+		photoFrameIndexByDev: map[string]int{},
+		photoFrameLastByDev:  map[string]time.Time{},
+		photoFrameInterval:   defaultPhotoFrameInterval,
+		mediaStreams:         map[string]mediaStreamState{},
+		sensorsByDevice:      map[string]sensorSnapshot{},
+		voiceAudioBuffers:    map[string][]byte{},
+		recording:            recording.NoopManager{},
 	}
+	handler.replSessions = replsession.NewService(handler.terminals)
+	return handler
 }
 
 // SetDeviceAudioPublisher wires a live audio publisher so incoming VoiceAudio
@@ -503,35 +497,32 @@ func (h *StreamHandler) SetDeviceAudioPublisher(pub DeviceAudioPublisher) {
 
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
 func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
-	return &StreamHandler{
-		control:                control,
-		runtime:                runtime,
-		metrics:                &Metrics{},
-		seen:                   map[string]ServerMessage{},
-		seenLimit:              1024,
-		recent:                 []CommandEvent{},
-		recentLimit:            200,
-		terminals:              terminal.NewManager(),
-		terminalByDevice:       map[string]string{},
-		terminalOutputByDevice: map[string]string{},
-		terminalDraftByDevice:  map[string]string{},
-		terminalOutputDirty:    map[string]bool{},
-		terminalLastUIFlush:    map[string]time.Time{},
-		terminalReadDeadline:   defaultTerminalReadDeadline,
-		terminalReadInterval:   defaultTerminalReadInterval,
-		terminalUIInterval:     defaultTerminalUIInterval,
-		terminalReplAdminURL:   defaultTerminalReplAdminURL,
-		lastSetUIByDevice:      map[string]ui.Descriptor{},
-		multiWindowResume:      map[string]multiWindowResumeState{},
-		photoFrameSlides:       defaultPhotoFrameSlides(),
-		photoFrameIndexByDev:   map[string]int{},
-		photoFrameLastByDev:    map[string]time.Time{},
-		photoFrameInterval:     defaultPhotoFrameInterval,
-		mediaStreams:           map[string]mediaStreamState{},
-		sensorsByDevice:        map[string]sensorSnapshot{},
-		voiceAudioBuffers:      map[string][]byte{},
-		recording:              recording.NoopManager{},
+	handler := &StreamHandler{
+		control:              control,
+		runtime:              runtime,
+		metrics:              &Metrics{},
+		seen:                 map[string]ServerMessage{},
+		seenLimit:            1024,
+		recent:               []CommandEvent{},
+		recentLimit:          200,
+		terminals:            terminal.NewManager(),
+		terminalReadDeadline: defaultTerminalReadDeadline,
+		terminalReadInterval: defaultTerminalReadInterval,
+		terminalUIInterval:   defaultTerminalUIInterval,
+		terminalReplAdminURL: defaultTerminalReplAdminURL,
+		lastSetUIByDevice:    map[string]ui.Descriptor{},
+		multiWindowResume:    map[string]multiWindowResumeState{},
+		photoFrameSlides:     defaultPhotoFrameSlides(),
+		photoFrameIndexByDev: map[string]int{},
+		photoFrameLastByDev:  map[string]time.Time{},
+		photoFrameInterval:   defaultPhotoFrameInterval,
+		mediaStreams:         map[string]mediaStreamState{},
+		sensorsByDevice:      map[string]sensorSnapshot{},
+		voiceAudioBuffers:    map[string][]byte{},
+		recording:            recording.NoopManager{},
 	}
+	handler.replSessions = replsession.NewService(handler.terminals)
+	return handler
 }
 
 // SetRecordingManager wires stream recording lifecycle hooks used when routes
@@ -584,6 +575,12 @@ func (h *StreamHandler) SetTerminalREPLAdminURL(baseURL string) {
 	h.mu.Lock()
 	h.terminalReplAdminURL = baseURL
 	h.mu.Unlock()
+}
+
+// ReplSessions exposes typed REPL session lifecycle APIs used by admin and
+// other control-plane callers.
+func (h *StreamHandler) ReplSessions() *replsession.Service {
+	return h.replSessions
 }
 
 // HandleMessage processes one incoming control message and returns responses.
@@ -2301,53 +2298,41 @@ func (h *StreamHandler) ensureTerminalSession(ctx context.Context, deviceID stri
 	if strings.TrimSpace(deviceID) == "" {
 		return "", ErrMissingCommandDeviceID
 	}
-
-	h.mu.Lock()
-	sessionID := h.terminalByDevice[deviceID]
-	h.mu.Unlock()
-	if sessionID != "" {
-		h.mu.Lock()
-		output := h.terminalOutputByDevice[deviceID]
-		h.mu.Unlock()
-		return output, nil
+	if h.replSessions == nil {
+		h.replSessions = replsession.NewService(h.terminals)
+	}
+	if existingID, ok := h.replSessions.SessionIDForDevice(deviceID); ok {
+		return h.replSessions.Output(existingID)
 	}
 
 	h.mu.Lock()
 	replAdminURL := h.terminalReplAdminURL
 	h.mu.Unlock()
-	session, err := h.terminals.Start(ctx, terminal.StartOptions{
-		DeviceID: deviceID,
-		Env: []string{
-			"TERMINALS_REPL_ADMIN_URL=" + replAdminURL,
-		},
+	session, err := h.replSessions.CreateSession(ctx, replsession.CreateSessionRequest{
+		DeviceID:          deviceID,
+		OwnerActivationID: "terminal",
+		ReplAdminURL:      replAdminURL,
 	})
 	if err != nil {
 		return "", err
 	}
-
-	h.mu.Lock()
-	h.terminalByDevice[deviceID] = session.ID
-	h.terminalOutputByDevice[deviceID] = ""
-	h.mu.Unlock()
-	return "", nil
+	return h.replSessions.Output(session.Session.ID)
 }
 
 func (h *StreamHandler) terminateTerminalForDevice(deviceID string) {
 	if strings.TrimSpace(deviceID) == "" {
 		return
 	}
-
-	h.mu.Lock()
-	sessionID := h.terminalByDevice[deviceID]
-	delete(h.terminalByDevice, deviceID)
-	delete(h.terminalOutputByDevice, deviceID)
-	delete(h.terminalDraftByDevice, deviceID)
-	delete(h.terminalOutputDirty, deviceID)
-	delete(h.terminalLastUIFlush, deviceID)
-	h.mu.Unlock()
-	if sessionID != "" {
-		_ = h.terminals.Close(sessionID)
+	if h.replSessions == nil {
+		return
 	}
+	sessionID, ok := h.replSessions.SessionIDForDevice(deviceID)
+	if !ok {
+		return
+	}
+	_, _ = h.replSessions.TerminateSession(context.Background(), replsession.TerminateSessionRequest{
+		SessionID: sessionID,
+	})
 }
 
 func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]ServerMessage, error) {
@@ -2369,9 +2354,9 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	switch action {
 	case "change":
 		if componentID == "terminal_input" {
-			h.mu.Lock()
-			h.terminalDraftByDevice[deviceID] = in.Value
-			h.mu.Unlock()
+			if sessionID, ok := h.replSessionIDForDevice(deviceID); ok {
+				_ = h.replSessions.SetDraft(sessionID, deviceID, in.Value)
+			}
 			return nil, nil
 		}
 		if update, ok := h.renderTerminalUIAction(deviceID, componentID, action, in.Value); ok {
@@ -2402,19 +2387,18 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 		}
 	}
 
-	h.mu.Lock()
-	sessionID := h.terminalByDevice[deviceID]
-	h.mu.Unlock()
-	if sessionID == "" {
+	sessionID, ok := h.replSessionIDForDevice(deviceID)
+	if !ok {
 		return nil, nil
 	}
 
 	text := in.Value
 	fromKey := false
 	if text == "" && componentID == "terminal_input" {
-		h.mu.Lock()
-		text = h.terminalDraftByDevice[deviceID]
-		h.mu.Unlock()
+		draft, err := h.replSessions.Draft(sessionID, deviceID)
+		if err == nil {
+			text = draft
+		}
 	}
 	if text == "" {
 		text = in.KeyText
@@ -2429,18 +2413,20 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	if !fromKey && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
-	if err := h.terminals.Write(sessionID, []byte(text)); err != nil {
+	if _, err := h.replSessions.SendInput(ctx, replsession.SendInputRequest{
+		SessionID: sessionID,
+		DeviceID:  deviceID,
+		Input:     text,
+	}); err != nil {
 		return nil, err
 	}
 	if componentID == "terminal_input" {
-		h.mu.Lock()
-		h.terminalDraftByDevice[deviceID] = ""
-		h.mu.Unlock()
+		_ = h.replSessions.ClearDraft(sessionID, deviceID)
 	}
 
 	h.readTerminalOutput(deviceID, sessionID)
 	return []ServerMessage{{
-		UpdateUI: h.terminalOutputUpdate(deviceID),
+		UpdateUI: h.terminalOutputUpdate(sessionID),
 	}}, nil
 }
 
@@ -2718,9 +2704,12 @@ func (h *StreamHandler) renderTerminalUIAction(deviceID, componentID, action, va
 		return nil, false
 	}
 	line := fmt.Sprintf("[ui_action] %s %s = %s\n", componentID, action, value)
-
-	h.appendTerminalOutput(deviceID, line)
-	return h.terminalOutputUpdate(deviceID), true
+	sessionID, ok := h.replSessionIDForDevice(deviceID)
+	if !ok {
+		return nil, false
+	}
+	_, _ = h.replSessions.AppendOutput(sessionID, line)
+	return h.terminalOutputUpdate(sessionID), true
 }
 
 func (h *StreamHandler) pollTerminalOutput(deviceID string, force bool) (*ServerMessage, error) {
@@ -2729,78 +2718,60 @@ func (h *StreamHandler) pollTerminalOutput(deviceID string, force bool) (*Server
 		return nil, nil
 	}
 
-	h.mu.Lock()
-	sessionID := h.terminalByDevice[deviceID]
-	h.mu.Unlock()
-	if sessionID == "" {
+	sessionID, ok := h.replSessionIDForDevice(deviceID)
+	if !ok {
 		return nil, nil
 	}
 
-	chunk, err := h.terminals.ReadAvailable(sessionID, 4096)
+	chunk, err := h.replSessions.ReadAvailable(sessionID, 4096)
 	if err != nil {
 		return nil, err
 	}
 	if len(chunk) == 0 {
-		if !h.shouldEmitTerminalUpdate(deviceID, force) {
+		emit, emitErr := h.replSessions.ShouldEmitUpdate(sessionID, force, h.nowUTC(), h.terminalUIInterval)
+		if emitErr != nil || !emit {
 			return nil, nil
 		}
 		return &ServerMessage{
-			UpdateUI: h.terminalOutputUpdate(deviceID),
+			UpdateUI: h.terminalOutputUpdate(sessionID),
 		}, nil
 	}
 
-	h.appendTerminalOutput(deviceID, string(chunk))
-	if !h.shouldEmitTerminalUpdate(deviceID, force) {
+	emit, emitErr := h.replSessions.ShouldEmitUpdate(sessionID, force, h.nowUTC(), h.terminalUIInterval)
+	if emitErr != nil || !emit {
 		return nil, nil
 	}
 	return &ServerMessage{
-		UpdateUI: h.terminalOutputUpdate(deviceID),
+		UpdateUI: h.terminalOutputUpdate(sessionID),
 	}, nil
 }
 
 func (h *StreamHandler) appendTerminalOutput(deviceID, chunk string) string {
-	h.mu.Lock()
-	existing := h.terminalOutputByDevice[deviceID]
-	if chunk != "" {
-		existing += chunk
-		h.terminalOutputDirty[deviceID] = true
+	sessionID, ok := h.replSessionIDForDevice(deviceID)
+	if !ok {
+		return ""
 	}
-	if len(existing) > 12000 {
-		existing = existing[len(existing)-12000:]
+	output, err := h.replSessions.AppendOutput(sessionID, chunk)
+	if err != nil {
+		return ""
 	}
-	h.terminalOutputByDevice[deviceID] = existing
-	h.mu.Unlock()
-	return existing
+	return output
 }
 
 func (h *StreamHandler) shouldEmitTerminalUpdate(deviceID string, force bool) bool {
-	h.mu.Lock()
-	dirty := h.terminalOutputDirty[deviceID]
-	last := h.terminalLastUIFlush[deviceID]
-	interval := h.terminalUIInterval
-	h.mu.Unlock()
-
-	if !dirty {
+	sessionID, ok := h.replSessionIDForDevice(deviceID)
+	if !ok {
 		return false
 	}
-	if force {
-		return true
-	}
-	if interval <= 0 {
-		interval = defaultTerminalUIInterval
-	}
-	if last.IsZero() {
-		return true
-	}
-	return h.nowUTC().Sub(last) >= interval
+	emit, err := h.replSessions.ShouldEmitUpdate(sessionID, force, h.nowUTC(), h.terminalUIInterval)
+	return err == nil && emit
 }
 
-func (h *StreamHandler) terminalOutputUpdate(deviceID string) *UIUpdate {
-	h.mu.Lock()
-	output := h.terminalOutputByDevice[deviceID]
-	h.terminalOutputDirty[deviceID] = false
-	h.terminalLastUIFlush[deviceID] = h.nowUTC()
-	h.mu.Unlock()
+func (h *StreamHandler) terminalOutputUpdate(sessionID string) *UIUpdate {
+	output, err := h.replSessions.MarkFlushed(sessionID, h.nowUTC())
+	if err != nil {
+		output = ""
+	}
 	return &UIUpdate{
 		ComponentID: "terminal_output",
 		Node:        ui.TerminalOutputPatch(output),
@@ -2913,12 +2884,12 @@ func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
 	}
 }
 
-func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
+func (h *StreamHandler) readTerminalOutput(_ string, sessionID string) string {
 	readDeadline, readInterval := h.terminalReadSettings()
 	deadline := time.Now().Add(readDeadline)
 	var chunk []byte
 	for time.Now().Before(deadline) {
-		out, err := h.terminals.ReadAvailable(sessionID, 4096)
+		out, err := h.replSessions.ReadAvailable(sessionID, 4096)
 		if err != nil {
 			break
 		}
@@ -2927,8 +2898,19 @@ func (h *StreamHandler) readTerminalOutput(deviceID, sessionID string) string {
 		}
 		time.Sleep(readInterval)
 	}
+	if len(chunk) > 0 {
+		output, _ := h.replSessions.AppendOutput(sessionID, string(chunk))
+		return output
+	}
+	output, _ := h.replSessions.Output(sessionID)
+	return output
+}
 
-	return h.appendTerminalOutput(deviceID, string(chunk))
+func (h *StreamHandler) replSessionIDForDevice(deviceID string) (string, bool) {
+	if h.replSessions == nil {
+		return "", false
+	}
+	return h.replSessions.SessionIDForDevice(deviceID)
 }
 
 func (h *StreamHandler) terminalReadSettings() (time.Duration, time.Duration) {

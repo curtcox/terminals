@@ -19,14 +19,21 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog/query"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 )
+
+type replSessionService interface {
+	ListSessions(ctx context.Context, req replsession.ListSessionsRequest) (*replsession.ListSessionsResponse, error)
+	GetSession(ctx context.Context, req replsession.GetSessionRequest) (*replsession.GetSessionResponse, error)
+}
 
 // Handler serves a lightweight admin dashboard and JSON control APIs.
 type Handler struct {
 	control     *transport.ControlService
 	runtime     *scenario.Runtime
+	repl        replSessionService
 	appRuntime  *appruntime.Runtime
 	syncAppDefs func()
 	devices     *device.Manager
@@ -39,6 +46,7 @@ type Handler struct {
 func NewHandler(
 	control *transport.ControlService,
 	runtime *scenario.Runtime,
+	repl replSessionService,
 	appRuntime *appruntime.Runtime,
 	syncAppDefs func(),
 	devices *device.Manager,
@@ -47,6 +55,7 @@ func NewHandler(
 	h := &Handler{
 		control:     control,
 		runtime:     runtime,
+		repl:        repl,
 		appRuntime:  appRuntime,
 		syncAppDefs: syncAppDefs,
 		devices:     devices,
@@ -64,6 +73,8 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/scenarios/start", h.handleStartScenario)
 	mux.HandleFunc("/admin/api/scenarios/stop", h.handleStopScenario)
 	mux.HandleFunc("/admin/api/activations", h.handleActivations)
+	mux.HandleFunc("/admin/api/repl/sessions", h.handleReplSessions)
+	mux.HandleFunc("/admin/api/repl/sessions/", h.handleReplSession)
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
@@ -79,6 +90,45 @@ func NewHandler(
 	mux.HandleFunc("/bug", h.handleBugNewPage)
 	mux.HandleFunc("/bug/intake", h.handleBugIntake)
 	return h.withRequestLogging(mux)
+}
+
+func (h *Handler) handleReplSessions(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.repl == nil {
+		h.writeJSON(w, http.StatusOK, map[string]any{"sessions": []replsession.ReplSession{}})
+		return
+	}
+	list, err := h.repl.ListSessions(req.Context(), replsession.ListSessionsRequest{})
+	if err != nil {
+		h.writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"sessions": list.Sessions})
+}
+
+func (h *Handler) handleReplSession(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.repl == nil {
+		h.writeJSONError(w, http.StatusNotFound, "repl session service not configured")
+		return
+	}
+	sessionID := strings.TrimSpace(strings.TrimPrefix(req.URL.Path, "/admin/api/repl/sessions/"))
+	if sessionID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "session id is required")
+		return
+	}
+	session, err := h.repl.GetSession(req.Context(), replsession.GetSessionRequest{SessionID: sessionID})
+	if err != nil {
+		h.writeJSONError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"session": session.Session})
 }
 
 func (h *Handler) handleDashboard(w http.ResponseWriter, _ *http.Request) {

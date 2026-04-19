@@ -1,1 +1,1 @@
-Implement typed ReplSession lifecycle APIs (create/attach/detach/list/get/terminate) and route terminal activation through those APIs instead of per-device implicit session state.
+Implement Phase B REPL command registry metadata (read_only|mutating), completion, and describe/help plumbing on typed command specs.

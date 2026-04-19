@@ -1,0 +1,3 @@
+# activations
+
+- `activations ls [--json]`
