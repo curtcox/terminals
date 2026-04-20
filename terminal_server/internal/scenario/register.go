@@ -67,6 +67,10 @@ func RegisterBuiltins(engine *Engine) {
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
+		Factory:  func() Scenario { return &ChatScenario{} },
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
 		Factory:  func() Scenario { return &BluetoothPassthroughScenario{} },
 		Priority: PriorityNormal,
 	})

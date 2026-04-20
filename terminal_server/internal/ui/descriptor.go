@@ -1,6 +1,10 @@
 package ui
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+	"time"
+)
 
 const (
 	// GlobalOverlayComponentID is the stable component id used for transient overlays.
@@ -246,6 +250,145 @@ func MultiWindowView(viewerDeviceID string, peerDeviceIDs []string, focusedPeerI
 		"label":  "End multi-window",
 		"action": "multi_window_end",
 	}), GlobalOverlaySlot())
+}
+
+// ChatMessage is one rendered chat log entry. Time is formatted as HH:MM:SS
+// UTC in the view; the caller retains full timestamps.
+type ChatMessage struct {
+	ID       string
+	DeviceID string
+	Name     string
+	Text     string
+	At       time.Time
+}
+
+// ChatComponentIDs are the stable component ids used to patch the chat view.
+const (
+	ChatRootComponentID     = "chat_root"
+	ChatMessagesComponentID = "chat_messages"
+	ChatNameInputID         = "chat_name_input"
+	ChatMessageInputID      = "chat_message_input"
+	ChatHeaderComponentID   = "chat_header"
+)
+
+// Chat action strings recognized by the transport layer.
+const (
+	ChatActionSend       = "chat_send"
+	ChatActionChangeName = "chat_change_name"
+	ChatActionLeave      = "chat_leave"
+)
+
+// ChatIdentityView renders the name-entry step shown before a device has
+// declared a chat identity.
+func ChatIdentityView(deviceID string) Descriptor {
+	return New("stack", map[string]string{
+		"id":         ChatRootComponentID,
+		"background": "#0B1622",
+	}, New("text", map[string]string{
+		"id":    "chat_identity_title",
+		"value": "Chat",
+		"style": "headline",
+		"color": "#E7F0F7",
+	}), New("text", map[string]string{
+		"id":    "chat_identity_prompt",
+		"value": "Choose a display name to join the chat.",
+		"style": "body",
+		"color": "#9CB4CF",
+	}), New("text", map[string]string{
+		"id":    "chat_identity_device",
+		"value": "Terminal: " + deviceID,
+		"style": "body",
+		"color": "#6D839C",
+	}), New("text_input", map[string]string{
+		"id":          ChatNameInputID,
+		"placeholder": "Your name",
+		"autofocus":   "true",
+	}), New("button", map[string]string{
+		"id":     "chat_leave_from_identity",
+		"label":  "Leave chat",
+		"action": ChatActionLeave,
+	}), GlobalOverlaySlot())
+}
+
+// ChatView renders the full chat screen for a joined device.
+func ChatView(deviceID, displayName string, messages []ChatMessage) Descriptor {
+	header := "Chat — " + displayName + " on " + deviceID
+	return New("stack", map[string]string{
+		"id":         ChatRootComponentID,
+		"background": "#0B1622",
+	}, New("text", map[string]string{
+		"id":    ChatHeaderComponentID,
+		"value": header,
+		"style": "headline",
+		"color": "#E7F0F7",
+	}), New("expand", nil, New("scroll", map[string]string{
+		"id":        "chat_messages_scroll",
+		"direction": "vertical",
+	}, ChatMessageList(messages))), New("text_input", map[string]string{
+		"id":          ChatMessageInputID,
+		"placeholder": "Type a message and press enter",
+		"autofocus":   "true",
+	}), New("button", map[string]string{
+		"id":     "chat_change_name_button",
+		"label":  "Change name",
+		"action": ChatActionChangeName,
+	}), New("button", map[string]string{
+		"id":     "chat_leave_button",
+		"label":  "Leave chat",
+		"action": ChatActionLeave,
+	}), GlobalOverlaySlot())
+}
+
+// ChatMessageList renders the scrollable messages column.
+func ChatMessageList(messages []ChatMessage) Descriptor {
+	children := make([]Descriptor, 0, len(messages)+1)
+	if len(messages) == 0 {
+		children = append(children, New("text", map[string]string{
+			"id":    "chat_empty",
+			"value": "No messages yet. Say hi!",
+			"style": "body",
+			"color": "#6D839C",
+		}))
+	}
+	for _, msg := range messages {
+		children = append(children, chatMessageRow(msg))
+	}
+	return New("stack", map[string]string{
+		"id": ChatMessagesComponentID,
+	}, children...)
+}
+
+// ChatHeaderPatch returns an UpdateUI node for the chat header line.
+func ChatHeaderPatch(deviceID, displayName string) Descriptor {
+	return New("text", map[string]string{
+		"id":    ChatHeaderComponentID,
+		"value": "Chat — " + displayName + " on " + deviceID,
+		"style": "headline",
+		"color": "#E7F0F7",
+	})
+}
+
+func chatMessageRow(msg ChatMessage) Descriptor {
+	name := strings.TrimSpace(msg.Name)
+	if name == "" {
+		name = msg.DeviceID
+	}
+	timestamp := msg.At.UTC().Format("15:04:05")
+	meta := timestamp + "  " + name + " (" + msg.DeviceID + ")"
+	return New("stack", map[string]string{
+		"id":         "chat_message_" + msg.ID,
+		"background": "#11202F",
+	}, New("text", map[string]string{
+		"id":    "chat_message_meta_" + msg.ID,
+		"value": meta,
+		"style": "body",
+		"color": "#9CB4CF",
+	}), New("text", map[string]string{
+		"id":    "chat_message_text_" + msg.ID,
+		"value": msg.Text,
+		"style": "body",
+		"color": "#E7F0F7",
+	}))
 }
 
 // PhotoFrameView renders a fullscreen ambient photo layout with keep-awake hints.

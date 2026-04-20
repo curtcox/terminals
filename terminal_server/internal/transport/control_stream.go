@@ -1420,6 +1420,26 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		}
 		return responses
 	}
+	if commandResult.ScenarioStart == "chat" {
+		chatUI := h.chatEntryUI(cmd.DeviceID)
+		responses = append(responses, ServerMessage{SetUI: &chatUI})
+		broadcast := h.chatBroadcastMessagesUpdate(cmd.DeviceID)
+		// skip index 0 (self) since we already pushed the full SetUI
+		if len(broadcast) > 1 {
+			responses = append(responses, broadcast[1:]...)
+		}
+		return responses
+	}
+	if commandResult.ScenarioStop == "chat" {
+		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "chat"); len(restored) > 0 {
+			responses = append(responses, restored...)
+		}
+		broadcast := h.chatBroadcastMessagesUpdate(cmd.DeviceID)
+		if len(broadcast) > 1 {
+			responses = append(responses, broadcast[1:]...)
+		}
+		return responses
+	}
 	if commandResult.ScenarioStart == "multi_window" {
 		peerIDs, focusedPeerID := h.multiWindowPeersAndFocus(cmd.DeviceID)
 		multiWindowUI := ui.MultiWindowView(cmd.DeviceID, peerIDs, focusedPeerID)
@@ -2349,6 +2369,10 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 
 	if strings.HasPrefix(action, bugReportActionPrefix) {
 		return h.handleBugReportUIAction(ctx, deviceID, action, strings.TrimSpace(in.Value))
+	}
+
+	if responses, handled := h.handleChatInput(deviceID, componentID, action, in.Value); handled {
+		return responses, nil
 	}
 
 	switch action {
