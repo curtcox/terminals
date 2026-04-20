@@ -3,6 +3,7 @@ package repl
 import (
 	"bytes"
 	"context"
+	"io"
 	"strings"
 )
 
@@ -48,14 +49,47 @@ type ExecuteResult struct {
 
 // ExecuteCommand runs a REPL command line without interactive prompting.
 func ExecuteCommand(ctx context.Context, line string, opts ExecuteOptions) (ExecuteResult, error) {
+	return ExecuteCommandStream(ctx, line, opts, nil)
+}
+
+// ExecuteCommandStream runs a REPL command and emits output chunks as they are
+// written when onChunk is provided.
+func ExecuteCommandStream(ctx context.Context, line string, opts ExecuteOptions, onChunk func(string) error) (ExecuteResult, error) {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return ExecuteResult{}, nil
 	}
 	var out bytes.Buffer
-	st := newStateWithDocsMode(&out, opts.AdminBaseURL, opts.SessionID, opts.DocsMode)
+	writer := io.Writer(&out)
+	if onChunk != nil {
+		writer = &chunkWriter{
+			base: &out,
+			emit: onChunk,
+		}
+	}
+	st := newStateWithDocsMode(writer, opts.AdminBaseURL, opts.SessionID, opts.DocsMode)
 	_, err := st.eval(ctx, line)
 	return ExecuteResult{Output: out.String()}, err
+}
+
+type chunkWriter struct {
+	base io.Writer
+	emit func(string) error
+}
+
+func (w *chunkWriter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if _, err := w.base.Write(p); err != nil {
+		return 0, err
+	}
+	if w.emit != nil {
+		if err := w.emit(string(p)); err != nil {
+			return 0, err
+		}
+	}
+	return len(p), nil
 }
 
 // CommandSpecs returns a stable snapshot of REPL command metadata.

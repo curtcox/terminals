@@ -213,7 +213,17 @@ func (a *Adapter) SetSessionCapability(sessionID string, capability MutatingCapa
 	return true
 }
 
+func (a *Adapter) SetElicitHook(hook func(context.Context, ElicitRequest) (ElicitResponse, error)) {
+	a.mu.Lock()
+	a.cfg.Elicit = hook
+	a.mu.Unlock()
+}
+
 func (a *Adapter) CallTool(ctx context.Context, req CallToolRequest) (CallToolResponse, error) {
+	return a.CallToolStream(ctx, req, nil)
+}
+
+func (a *Adapter) CallToolStream(ctx context.Context, req CallToolRequest, onChunk func(string) error) (CallToolResponse, error) {
 	tool, ok := a.toolsByName[strings.TrimSpace(req.ToolName)]
 	if !ok {
 		return CallToolResponse{}, ErrUnknownTool
@@ -267,11 +277,11 @@ func (a *Adapter) CallTool(ctx context.Context, req CallToolRequest) (CallToolRe
 		defer release()
 		ctxWithTTL, cancel := context.WithTimeout(ctx, a.cfg.OperationalTTL)
 		defer cancel()
-		result, err := repl.ExecuteCommand(ctxWithTTL, rendered, repl.ExecuteOptions{
+		result, err := repl.ExecuteCommandStream(ctxWithTTL, rendered, repl.ExecuteOptions{
 			AdminBaseURL: a.cfg.AdminBaseURL,
 			SessionID:    req.SessionID,
 			DocsMode:     repl.DocsRenderModeMarkdown,
-		})
+		}, onChunk)
 		if errors.Is(err, context.DeadlineExceeded) {
 			return CallToolResponse{
 				Status:          "error",
@@ -286,11 +296,11 @@ func (a *Adapter) CallTool(ctx context.Context, req CallToolRequest) (CallToolRe
 		}
 		return CallToolResponse{Status: "ok", Output: result.Output, RenderedCommand: rendered, Classification: tool.Classification}, nil
 	}
-	result, err := repl.ExecuteCommand(ctx, rendered, repl.ExecuteOptions{
+	result, err := repl.ExecuteCommandStream(ctx, rendered, repl.ExecuteOptions{
 		AdminBaseURL: a.cfg.AdminBaseURL,
 		SessionID:    req.SessionID,
 		DocsMode:     repl.DocsRenderModeMarkdown,
-	})
+	}, onChunk)
 	if err != nil {
 		return CallToolResponse{Status: "error", ErrorCode: "command_failed", ErrorMessage: err.Error(), RenderedCommand: rendered, Classification: tool.Classification}, nil
 	}
@@ -327,11 +337,14 @@ func (a *Adapter) authorizeMutation(ctx context.Context, sess SessionInfo, tool 
 	case MutatingUnavailable:
 		return CallToolResponse{Status: "error", ErrorCode: "unsupported_client", ErrorMessage: "mutating tools require elicitation or confirmation_id fallback support", RenderedCommand: rendered, Classification: tool.Classification}, nil
 	case MutatingViaElicitation:
-		if a.cfg.Elicit == nil {
+		a.mu.Lock()
+		elicit := a.cfg.Elicit
+		a.mu.Unlock()
+		if elicit == nil {
 			return CallToolResponse{Status: "error", ErrorCode: "elicit_unavailable", ErrorMessage: "elicitation hook is not configured", RenderedCommand: rendered, Classification: tool.Classification}, nil
 		}
 		start := a.cfg.Now()
-		resp, err := a.cfg.Elicit(ctx, ElicitRequest{
+		resp, err := elicit(ctx, ElicitRequest{
 			SessionID:       sess.SessionID,
 			ToolName:        tool.Name,
 			RenderedCommand: rendered,

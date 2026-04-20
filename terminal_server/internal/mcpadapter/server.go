@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -59,6 +60,7 @@ type Server struct {
 	bindings map[string]sessionBinding
 	inflight map[string]context.CancelFunc
 	probes   map[string]string
+	stdio    map[string]*stdioConnection
 }
 
 type sessionBinding struct {
@@ -86,6 +88,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		bindings:     map[string]sessionBinding{},
 		inflight:     map[string]context.CancelFunc{},
 		probes:       map[string]string{},
+		stdio:        map[string]*stdioConnection{},
 	}, nil
 }
 
@@ -122,45 +125,80 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ServeStdio handles stdio JSON-RPC MCP traffic on the current process.
 func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out io.Writer) error {
 	dec := json.NewDecoder(bufio.NewReader(in))
-	enc := json.NewEncoder(out)
-	enc.SetEscapeHTML(false)
+	conn := newStdioConnection(out, s.nextID.Add(1))
+	s.adapter.SetElicitHook(s.elicitViaStdio)
+	var wg sync.WaitGroup
 
-	var connectionSessionID string
 	for {
 		select {
 		case <-ctx.Done():
-			if connectionSessionID != "" {
-				s.closeSession(context.Background(), connectionSessionID)
+			if sessionID := conn.getSessionID(); sessionID != "" {
+				s.closeSession(context.Background(), sessionID)
 			}
+			wg.Wait()
 			return ctx.Err()
 		default:
 		}
 
-		var req rpcRequest
-		if err := dec.Decode(&req); err != nil {
+		var raw map[string]any
+		if err := dec.Decode(&raw); err != nil {
 			if errors.Is(err, io.EOF) {
-				if connectionSessionID != "" {
-					s.closeSession(context.Background(), connectionSessionID)
+				if sessionID := conn.getSessionID(); sessionID != "" {
+					s.closeSession(context.Background(), sessionID)
 				}
+				wg.Wait()
 				return nil
 			}
+			wg.Wait()
 			return err
 		}
-		resp, sessionFromResponse, ok := s.handleRPCRequest(
-			ctx,
-			req,
-			rpcTransportStdio,
-			requestContext{SessionID: connectionSessionID},
-		)
-		if sessionFromResponse != "" {
-			connectionSessionID = sessionFromResponse
-		}
-		if !ok {
+
+		if method := strings.TrimSpace(anyString(raw["method"])); method == "" {
+			if conn.routeResponse(raw) {
+				continue
+			}
 			continue
 		}
-		if err := enc.Encode(resp); err != nil {
-			return err
+		reqRaw, err := json.Marshal(raw)
+		if err != nil {
+			continue
 		}
+		var req rpcRequest
+		if err := json.Unmarshal(reqRaw, &req); err != nil {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(req.Method), "initialize") {
+			resp, sessionFromResponse, ok := s.handleRPCRequest(
+				ctx,
+				req,
+				rpcTransportStdio,
+				requestContext{SessionID: conn.getSessionID(), Stdio: conn},
+			)
+			if sessionFromResponse != "" {
+				conn.setSessionID(sessionFromResponse)
+			}
+			if ok {
+				_ = conn.writeRPCResponse(resp)
+			}
+			continue
+		}
+		wg.Add(1)
+		go func(req rpcRequest) {
+			defer wg.Done()
+			resp, sessionFromResponse, ok := s.handleRPCRequest(
+				ctx,
+				req,
+				rpcTransportStdio,
+				requestContext{SessionID: conn.getSessionID(), Stdio: conn},
+			)
+			if sessionFromResponse != "" {
+				conn.setSessionID(sessionFromResponse)
+			}
+			if !ok {
+				return
+			}
+			_ = conn.writeRPCResponse(resp)
+		}(req)
 	}
 }
 
@@ -174,6 +212,7 @@ const (
 type requestContext struct {
 	SessionID      string
 	ConfirmationID string
+	Stdio          *stdioConnection
 }
 
 func (s *Server) handleRPCRequest(
@@ -235,6 +274,11 @@ func (s *Server) handleRPCRequest(
 			result["fallback_probe_required"] = true
 			result["fallback_probe_token"] = token
 		}
+		if transport == rpcTransportStdio && rc.Stdio != nil {
+			s.mu.Lock()
+			s.stdio[info.SessionID] = rc.Stdio
+			s.mu.Unlock()
+		}
 		return rpcResponse{JSONRPC: "2.0", ID: id, Result: result}, info.SessionID, hasRPCID(id)
 	case "tools/list":
 		tools := s.adapter.Tools()
@@ -282,12 +326,25 @@ func (s *Server) handleRPCRequest(
 				s.removeInflight(sessionID, requestID)
 			}()
 		}
-		toolResp, err := s.adapter.CallTool(callCtx, CallToolRequest{
+		stream := func(string) error { return nil }
+		if transport == rpcTransportStdio && rc.Stdio != nil && requestID != "" {
+			stream = func(chunk string) error {
+				if strings.TrimSpace(chunk) == "" {
+					return nil
+				}
+				return rc.Stdio.sendNotification("notifications/tools/call_output", map[string]any{
+					"session_id": sessionID,
+					"request_id": requestID,
+					"chunk":      chunk,
+				})
+			}
+		}
+		toolResp, err := s.adapter.CallToolStream(callCtx, CallToolRequest{
 			SessionID:          sessionID,
 			ToolName:           toolName,
 			Arguments:          args,
 			MetaConfirmationID: confirmationID,
-		})
+		}, stream)
 		if err != nil {
 			return rpcResponse{
 				JSONRPC: "2.0",
@@ -348,6 +405,7 @@ func (s *Server) closeSession(ctx context.Context, sessionID string) {
 		delete(s.bindings, sessionID)
 	}
 	delete(s.probes, sessionID)
+	delete(s.stdio, sessionID)
 	s.mu.Unlock()
 	if ok {
 		_, _ = s.sessions.DetachSession(ctx, replsession.DetachSessionRequest{
@@ -489,9 +547,42 @@ func parseClientCapabilities(params map[string]any, transport rpcTransport) Clie
 	// by the client or mutating commands remain unavailable for the session.
 	supportsFallback := anyBool(caps["terminals_fallback_confirmation"])
 	if strings.EqualFold(string(transport), string(rpcTransportHTTP)) {
-		return ClientCapabilities{SupportsElicitation: supportsElicitation, SupportsFallbackID: supportsFallback}
+		// HTTP transport in this server is request/response only, so server-originated
+		// elicitation requests cannot be round-tripped. Keep mutating fail-closed unless
+		// fallback confirmation is explicitly negotiated.
+		return ClientCapabilities{SupportsElicitation: false, SupportsFallbackID: supportsFallback}
 	}
 	return ClientCapabilities{SupportsElicitation: supportsElicitation, SupportsFallbackID: supportsFallback}
+}
+
+func (s *Server) elicitViaStdio(ctx context.Context, req ElicitRequest) (ElicitResponse, error) {
+	s.mu.Lock()
+	conn := s.stdio[strings.TrimSpace(req.SessionID)]
+	s.mu.Unlock()
+	if conn == nil {
+		return ElicitResponse{Approved: false}, nil
+	}
+	result, err := conn.sendRequestAndAwait(ctx, "elicitation/create", map[string]any{
+		"title":             "Approve mutating command",
+		"tool_name":         req.ToolName,
+		"rendered_command":  req.RenderedCommand,
+		"classification":    string(req.Classification),
+		"session_id":        req.SessionID,
+		"approval_required": true,
+	})
+	if err != nil {
+		return ElicitResponse{Approved: false}, nil
+	}
+	if anyBool(result["approved"]) {
+		return ElicitResponse{Approved: true}, nil
+	}
+	action := strings.ToLower(strings.TrimSpace(anyString(result["action"])))
+	switch action {
+	case "approve", "approved", "accept", "accepted", "yes":
+		return ElicitResponse{Approved: true}, nil
+	default:
+		return ElicitResponse{Approved: false}, nil
+	}
 }
 
 func parseClientIdentity(params map[string]any) string {
@@ -626,6 +717,110 @@ func sanitizeID(v string) string {
 		return "0"
 	}
 	return out
+}
+
+type stdioConnection struct {
+	enc       *json.Encoder
+	writeMu   sync.Mutex
+	pendingMu sync.Mutex
+	pending   map[string]chan map[string]any
+	nextID    atomic.Uint64
+	sessionMu sync.Mutex
+	sessionID string
+}
+
+func newStdioConnection(out io.Writer, seed uint64) *stdioConnection {
+	enc := json.NewEncoder(out)
+	enc.SetEscapeHTML(false)
+	conn := &stdioConnection{
+		enc:     enc,
+		pending: map[string]chan map[string]any{},
+	}
+	conn.nextID.Store(seed)
+	return conn
+}
+
+func (c *stdioConnection) setSessionID(sessionID string) {
+	c.sessionMu.Lock()
+	c.sessionID = strings.TrimSpace(sessionID)
+	c.sessionMu.Unlock()
+}
+
+func (c *stdioConnection) getSessionID() string {
+	c.sessionMu.Lock()
+	defer c.sessionMu.Unlock()
+	return c.sessionID
+}
+
+func (c *stdioConnection) writeRPCResponse(resp rpcResponse) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return c.enc.Encode(resp)
+}
+
+func (c *stdioConnection) sendNotification(method string, params map[string]any) error {
+	payload := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  method,
+		"params":  params,
+	}
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return c.enc.Encode(payload)
+}
+
+func (c *stdioConnection) sendRequestAndAwait(ctx context.Context, method string, params map[string]any) (map[string]any, error) {
+	id := strconv.FormatUint(c.nextID.Add(1), 10)
+	ch := make(chan map[string]any, 1)
+	c.pendingMu.Lock()
+	c.pending[id] = ch
+	c.pendingMu.Unlock()
+	defer func() {
+		c.pendingMu.Lock()
+		delete(c.pending, id)
+		c.pendingMu.Unlock()
+	}()
+
+	payload := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"method":  method,
+		"params":  params,
+	}
+	c.writeMu.Lock()
+	err := c.enc.Encode(payload)
+	c.writeMu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case resp := <-ch:
+		if errPayload, ok := resp["error"].(map[string]any); ok && len(errPayload) > 0 {
+			return nil, errors.New(strings.TrimSpace(anyString(errPayload["message"])))
+		}
+		return parseAnyMap(resp["result"]), nil
+	}
+}
+
+func (c *stdioConnection) routeResponse(raw map[string]any) bool {
+	id := strings.TrimSpace(anyString(raw["id"]))
+	if id == "" {
+		return false
+	}
+	c.pendingMu.Lock()
+	ch := c.pending[id]
+	c.pendingMu.Unlock()
+	if ch == nil {
+		return false
+	}
+	select {
+	case ch <- raw:
+	default:
+	}
+	return true
 }
 
 type rpcRequest struct {

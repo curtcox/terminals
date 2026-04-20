@@ -203,3 +203,29 @@ func TestOperationalBudgetTTL(t *testing.T) {
 		t.Fatalf("error code = %q, want operational_ttl_exceeded", resp.ErrorCode)
 	}
 }
+
+func TestCallToolStreamEmitsOutputChunks(t *testing.T) {
+	adapter := New(Config{})
+	adapter.OpenSession("repl-mcp-stream-1", "codex", ClientCapabilities{})
+	chunks := make([]string, 0, 2)
+	resp, err := adapter.CallToolStream(context.Background(), CallToolRequest{
+		SessionID: "repl-mcp-stream-1",
+		ToolName:  "echo",
+		Arguments: map[string]any{"text": "hello-stream"},
+	}, func(chunk string) error {
+		chunks = append(chunks, chunk)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("CallToolStream() error = %v", err)
+	}
+	if resp.Status != "ok" {
+		t.Fatalf("status = %q, want ok", resp.Status)
+	}
+	if len(chunks) == 0 {
+		t.Fatalf("expected at least one output chunk")
+	}
+	if !strings.Contains(strings.Join(chunks, ""), "hello-stream") {
+		t.Fatalf("stream chunks missing echoed text: %q", strings.Join(chunks, ""))
+	}
+}

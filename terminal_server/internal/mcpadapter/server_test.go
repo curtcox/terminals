@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -196,6 +197,14 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 	if !withFallback.SupportsFallbackID {
 		t.Fatalf("supports fallback = false, want true when explicitly declared")
 	}
+	withElicitation := parseClientCapabilities(map[string]any{
+		"capabilities": map[string]any{
+			"elicitation": true,
+		},
+	}, rpcTransportHTTP)
+	if withElicitation.SupportsElicitation {
+		t.Fatalf("supports elicitation = true, want false for http request/response transport")
+	}
 }
 
 func TestFallbackProbeRequiredBeforeMutatingFallback(t *testing.T) {
@@ -359,5 +368,250 @@ func postRPCNotification(t *testing.T, url, sessionID string, req rpcRequest) {
 	if resp.StatusCode != http.StatusNoContent {
 		raw, _ := io.ReadAll(resp.Body)
 		t.Fatalf("notification status=%d body=%s", resp.StatusCode, string(raw))
+	}
+}
+
+func TestStdioElicitationRoundTrip(t *testing.T) {
+	adapter := New(Config{})
+	sessions := &fakeSessionService{}
+	server, err := NewServer(ServerConfig{
+		Adapter:      adapter,
+		Sessions:     sessions,
+		AdminBaseURL: "http://127.0.0.1:50053",
+	})
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+
+	serverInR, serverInW := io.Pipe()
+	serverOutR, serverOutW := io.Pipe()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var serveErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		serveErr = server.ServeStdio(ctx, serverInR, serverOutW)
+	}()
+
+	enc := json.NewEncoder(serverInW)
+	dec := json.NewDecoder(serverOutR)
+	msgs := make(chan map[string]any, 16)
+	readErrs := make(chan error, 1)
+	go func() {
+		for {
+			var msg map[string]any
+			if err := dec.Decode(&msg); err != nil {
+				readErrs <- err
+				close(msgs)
+				return
+			}
+			msgs <- msg
+		}
+	}()
+
+	writeClientRPC := func(req map[string]any) {
+		t.Helper()
+		if err := enc.Encode(req); err != nil {
+			t.Fatalf("encode client rpc: %v", err)
+		}
+	}
+	readServerRPC := func() map[string]any {
+		t.Helper()
+		select {
+		case msg, ok := <-msgs:
+			if !ok {
+				select {
+				case err := <-readErrs:
+					t.Fatalf("decode server rpc: %v", err)
+				default:
+					t.Fatalf("decode server rpc: closed")
+				}
+			}
+			return msg
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timeout waiting for server rpc")
+		}
+		return nil
+	}
+
+	writeClientRPC(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "initialize",
+		"params": map[string]any{
+			"clientInfo": map[string]any{"name": "codex", "version": "1"},
+			"capabilities": map[string]any{
+				"elicitation": true,
+			},
+		},
+	})
+	initResp := readServerRPC()
+	initResult := parseAnyMap(initResp["result"])
+	sessionID := strings.TrimSpace(anyString(initResult["session_id"]))
+	if sessionID == "" {
+		t.Fatalf("missing session id in initialize response: %+v", initResp)
+	}
+	if capValue := strings.TrimSpace(anyString(initResult["mutating_capability"])); capValue != string(MutatingViaElicitation) {
+		t.Fatalf("mutating_capability=%q, want %q", capValue, MutatingViaElicitation)
+	}
+
+	writeClientRPC(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      2,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name":      "app_reload",
+			"arguments": map[string]any{"app": "demo"},
+		},
+	})
+
+	elicitReq := readServerRPC()
+	if method := strings.TrimSpace(anyString(elicitReq["method"])); method != "elicitation/create" {
+		t.Fatalf("method=%q, want elicitation/create", method)
+	}
+	elicitID := elicitReq["id"]
+	if elicitID == nil {
+		t.Fatalf("elicitation request missing id: %+v", elicitReq)
+	}
+	writeClientRPC(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      elicitID,
+		"result": map[string]any{
+			"approved": true,
+		},
+	})
+
+	callResp := readServerRPC()
+	callResult := parseAnyMap(callResp["result"])
+	meta := parseAnyMap(callResult["_meta"])
+	if code := strings.TrimSpace(anyString(meta["error_code"])); code == "approval_rejected" || code == "elicit_unavailable" {
+		t.Fatalf("unexpected approval failure meta=%+v", meta)
+	}
+
+	_ = serverInW.Close()
+	_ = serverOutR.Close()
+	wg.Wait()
+	if serveErr != nil && serveErr != context.Canceled {
+		t.Fatalf("ServeStdio() error = %v", serveErr)
+	}
+}
+
+func TestStdioOperationalStreamNotification(t *testing.T) {
+	adapter := New(Config{})
+	sessions := &fakeSessionService{}
+	server, err := NewServer(ServerConfig{
+		Adapter:      adapter,
+		Sessions:     sessions,
+		AdminBaseURL: "http://127.0.0.1:50053",
+	})
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+
+	serverInR, serverInW := io.Pipe()
+	serverOutR, serverOutW := io.Pipe()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- server.ServeStdio(ctx, serverInR, serverOutW)
+	}()
+
+	enc := json.NewEncoder(serverInW)
+	dec := json.NewDecoder(serverOutR)
+	msgs := make(chan map[string]any, 16)
+	readErrs := make(chan error, 1)
+	go func() {
+		for {
+			var msg map[string]any
+			if err := dec.Decode(&msg); err != nil {
+				readErrs <- err
+				close(msgs)
+				return
+			}
+			msgs <- msg
+		}
+	}()
+	send := func(msg map[string]any) {
+		t.Helper()
+		if err := enc.Encode(msg); err != nil {
+			t.Fatalf("encode client rpc: %v", err)
+		}
+	}
+	recv := func() map[string]any {
+		t.Helper()
+		select {
+		case msg, ok := <-msgs:
+			if !ok {
+				select {
+				case err := <-readErrs:
+					t.Fatalf("decode server rpc: %v", err)
+				default:
+					t.Fatalf("decode server rpc: closed")
+				}
+			}
+			return msg
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timeout waiting for server rpc")
+		}
+		return nil
+	}
+
+	send(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "initialize",
+		"params":  map[string]any{"clientInfo": map[string]any{"name": "codex"}},
+	})
+	_ = recv() // initialize response
+
+	send(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      3,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name":      "echo",
+			"arguments": map[string]any{"text": "stream-notify"},
+		},
+	})
+
+	gotFinal := false
+	sawChunk := false
+	for i := 0; i < 5; i++ {
+		msg := recv()
+		if method := strings.TrimSpace(anyString(msg["method"])); method == "notifications/tools/call_output" {
+			params := parseAnyMap(msg["params"])
+			if strings.TrimSpace(anyString(params["request_id"])) != "3" {
+				t.Fatalf("notification request_id=%q, want 3", anyString(params["request_id"]))
+			}
+			if !strings.Contains(anyString(params["chunk"]), "stream-notify") {
+				t.Fatalf("notification chunk=%q missing stream output", anyString(params["chunk"]))
+			}
+			sawChunk = true
+			continue
+		}
+		if strings.TrimSpace(anyString(msg["id"])) == "3" {
+			gotFinal = true
+			break
+		}
+		if _, ok := msg["result"]; ok {
+			gotFinal = true
+			break
+		}
+	}
+	if !gotFinal {
+		t.Fatalf("did not receive final tools/call response")
+	}
+	if !sawChunk {
+		t.Fatalf("did not receive streamed output notification")
+	}
+
+	_ = serverInW.Close()
+	_ = serverOutR.Close()
+	if err := <-done; err != nil && err != context.Canceled {
+		t.Fatalf("ServeStdio() error = %v", err)
 	}
 }
