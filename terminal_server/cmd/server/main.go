@@ -452,12 +452,24 @@ func proxyMCPStdio(ctx context.Context, in io.Reader, out io.Writer, mcpURL stri
 			// Client responses are consumed only while awaiting an in-flight elicitation.
 			continue
 		}
+		// Requests without an id are notifications per JSON-RPC 2.0 §4.1 and
+		// receive no response. Forward them to the server but do not write
+		// anything back to the client — clients validate stdout against a
+		// strict JSON-RPC schema and reject empty envelopes.
+		isNotification := req["id"] == nil
 
 		httpReqPayload := cloneMapAny(req)
 		if strings.EqualFold(method, "initialize") {
 			caps := mcpAnyMap(mcpAnyMap(httpReqPayload["params"])["capabilities"])
 			clientSupportsElicitation = mcpCapabilityEnabled(caps["elicitation"]) || mcpCapabilityEnabled(caps["mcp_elicitation"])
 			if clientSupportsElicitation {
+				// Drive elicitation from the proxy against the client, using the
+				// server's fallback confirmation_id protocol as the wire format.
+				// The server HTTP path has no elicitation hook; if it classified
+				// the session as mutating_via_elicitation it would reject mutating
+				// tool calls with elicit_unavailable.
+				delete(caps, "elicitation")
+				delete(caps, "mcp_elicitation")
 				caps["terminals_fallback_confirmation"] = true
 				params := mcpAnyMap(httpReqPayload["params"])
 				params["capabilities"] = caps
@@ -509,6 +521,9 @@ func proxyMCPStdio(ctx context.Context, in io.Reader, out io.Writer, mcpURL stri
 			}
 		}
 
+		if isNotification {
+			continue
+		}
 		if err := enc.Encode(rpcResp); err != nil {
 			return err
 		}
@@ -565,12 +580,34 @@ func elicitViaProxy(
 	originalRequest map[string]any,
 	confirmationMeta map[string]any,
 ) (bool, error) {
+	toolName := strings.TrimSpace(mcpAnyString(mcpAnyMap(originalRequest["params"])["name"]))
+	rendered := strings.TrimSpace(mcpAnyString(confirmationMeta["rendered_command"]))
+	// Per MCP spec 2025-06-18, elicitation/create requires `message` and
+	// `requestedSchema` (a JSON Schema). Clients treat any other shape as a
+	// malformed request and return action=decline without showing a prompt.
+	message := fmt.Sprintf(
+		"Approve mutating command?\n\nTool: %s\nCommand: %s",
+		toolName,
+		rendered,
+	)
 	params := map[string]any{
-		"title":             "Approve mutating command",
-		"tool_name":         strings.TrimSpace(mcpAnyString(mcpAnyMap(originalRequest["params"])["name"])),
-		"rendered_command":  strings.TrimSpace(mcpAnyString(confirmationMeta["rendered_command"])),
-		"classification":    "mutating",
-		"approval_required": true,
+		"message": message,
+		"requestedSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"approved": map[string]any{
+					"type":        "boolean",
+					"title":       "Approve",
+					"description": "Approve this mutating command",
+				},
+			},
+			"required": []string{"approved"},
+		},
+		// Preserved for older/custom clients that key off these fields.
+		"title":            "Approve mutating command",
+		"tool_name":        toolName,
+		"rendered_command": rendered,
+		"classification":   "mutating",
 	}
 	if err := enc.Encode(map[string]any{
 		"jsonrpc": "2.0",
@@ -598,16 +635,25 @@ func elicitViaProxy(
 			continue
 		}
 		result := mcpAnyMap(msg["result"])
+		// Per MCP spec, an accept response has action=="accept" and the
+		// schema-shaped answer under `content`. Anything else (decline,
+		// cancel, error, or ambiguous shape) counts as not-approved.
+		action := strings.ToLower(strings.TrimSpace(mcpAnyString(result["action"])))
+		content := mcpAnyMap(result["content"])
+		switch action {
+		case "accept", "accepted", "approve", "approved", "yes":
+			if _, hasApproved := content["approved"]; hasApproved {
+				return mcpAnyBool(content["approved"]), nil
+			}
+			return true, nil
+		case "decline", "declined", "reject", "rejected", "no", "cancel", "cancelled", "canceled":
+			return false, nil
+		}
+		// Legacy/custom shapes: direct `approved` at result level.
 		if mcpAnyBool(result["approved"]) {
 			return true, nil
 		}
-		action := strings.ToLower(strings.TrimSpace(mcpAnyString(result["action"])))
-		switch action {
-		case "approve", "approved", "accept", "accepted", "yes":
-			return true, nil
-		default:
-			return false, nil
-		}
+		return false, nil
 	}
 }
 
