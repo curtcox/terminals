@@ -4,15 +4,19 @@ Date verified: 2026-04-20
 Verifier: Claude Code session
 Source plan: [plans/agent-delegation.md](agent-delegation.md)
 
-## Outstanding Issues
+## Resolved Issues
 
-1. Mutating tool calls are unreachable from stock Claude Code / Codex clients over stdio.
-   - Symptom: any `mutating` tool call (e.g. `sessions_terminate`, `app_reload`, `activations_stop`) returns `status=error`, `error_code=unsupported_client`, `"mutating tools require elicitation or confirmation_id fallback support"`. The session is pinned to `mutating_capability=mutating_unavailable` at `initialize`, even when the client advertises `capabilities.elicitation`.
-   - Root cause: `runMCPStdio` / `proxyMCPStdio` in [terminal_server/cmd/server/main.go:391](../terminal_server/cmd/server/main.go:391) implement the `mcp-stdio` subcommand as a unary stdin→`POST /mcp`→stdout proxy. There is no channel for the server to push a server-initiated `elicitation/create` request back through the subprocess. The in-process `Server.ServeStdio` implementation at [terminal_server/internal/mcpadapter/server.go:165](../terminal_server/internal/mcpadapter/server.go:165) does support bidirectional stdio (and is exercised by `server_test.go`), but it is never wired to the `mcp-stdio` subprocess.
-   - Compounding: the HTTP transport path in `parseClientCapabilities` at [terminal_server/internal/mcpadapter/server.go:589](../terminal_server/internal/mcpadapter/server.go:589) forcibly sets `supportsElicitation = false`, so even a direct HTTP client that advertises elicitation is downgraded.
-   - Consequence: the "stop activation → MCP elicitation prompt" verification step in [docs/repl/agents/claude-code-setup.md:55](../docs/repl/agents/claude-code-setup.md:55) cannot succeed with a stock client, and the plan's headline user-experience flow (`activations_stop act_51` with approval) cannot run end-to-end.
-   - Fallback still works only with a non-standard capability advertisement: clients that send `capabilities.terminals_fallback_confirmation: true` receive a proper `confirmation_required` response carrying a `confirmation_id`. Neither Claude Code nor Codex advertises this Terminals-specific capability, so the fallback is effectively unreachable from real clients.
-   - Suggested fix direction: have `mcp-stdio` host a direct in-process MCP connection against the shared adapter (e.g. by calling `ServeStdio` on a per-subprocess connection bound to the running adapter), or upgrade the subprocess↔server link to a bidirectional transport (SSE-backed Streamable HTTP, WebSocket, or gRPC bidi stream) so the server can originate `elicitation/create`. Either path lets `mutating_via_elicitation` apply for Claude Code / Codex as written in the plan.
+1. Mutating tool calls are reachable from stock Claude Code / Codex clients over `mcp-stdio`.
+   - `proxyMCPStdio` now bridges fallback confirmation into a standard MCP `elicitation/create` prompt:
+     1) initialize requests that advertise elicitation are augmented with `capabilities.terminals_fallback_confirmation=true` for the HTTP backend.
+     2) when HTTP returns `confirmation_required`, the proxy emits `elicitation/create` to the stdio client and waits for approval.
+     3) approved requests are replayed with `Mcp-Confirmation-Id`, returning the final tool result to the client.
+   - `initialize` responses are normalized to report `mutating_capability=mutating_via_elicitation` when the client supports elicitation, matching the user-facing behavior.
+   - Coverage added in `terminal_server/cmd/server/main_test.go` (`TestProxyMCPStdioBridgesFallbackConfirmationThroughElicitation`).
+
+2. HTTP capability parsing no longer downgrades advertised elicitation support.
+   - `parseClientCapabilities` now preserves explicit elicitation capability for HTTP clients.
+   - Coverage updated in `terminal_server/internal/mcpadapter/server_test.go` (`TestParseClientCapabilitiesFailClosedFallback`).
 
 ## Verified Working
 

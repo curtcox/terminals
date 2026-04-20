@@ -430,6 +430,8 @@ func proxyMCPStdio(ctx context.Context, in io.Reader, out io.Writer, mcpURL stri
 	enc.SetEscapeHTML(false)
 	client := &http.Client{Timeout: 30 * time.Second}
 	sessionID := ""
+	clientSupportsElicitation := false
+	proxyRequestID := 1000000
 
 	for {
 		select {
@@ -438,49 +440,271 @@ func proxyMCPStdio(ctx context.Context, in io.Reader, out io.Writer, mcpURL stri
 		default:
 		}
 
-		var req any
+		var req map[string]any
 		if err := dec.Decode(&req); err != nil {
 			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err
 		}
-		raw, err := json.Marshal(req)
-		if err != nil {
-			return err
-		}
-		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, mcpURL, strings.NewReader(string(raw)))
-		if err != nil {
-			return err
-		}
-		httpReq.Header.Set("Content-Type", "application/json")
-		if strings.TrimSpace(sessionID) != "" {
-			httpReq.Header.Set(mcpadapter.HeaderSessionID, sessionID)
-		}
-		httpResp, err := client.Do(httpReq)
-		if err != nil {
-			return err
-		}
-		if sid := strings.TrimSpace(httpResp.Header.Get(mcpadapter.HeaderSessionID)); sid != "" {
-			sessionID = sid
-		}
-		if httpResp.StatusCode == http.StatusNoContent {
-			_ = httpResp.Body.Close()
+		method := strings.TrimSpace(mcpAnyString(req["method"]))
+		if method == "" {
+			// Client responses are consumed only while awaiting an in-flight elicitation.
 			continue
 		}
-		if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-			_ = httpResp.Body.Close()
-			return fmt.Errorf("mcp http status %d", httpResp.StatusCode)
+
+		httpReqPayload := cloneMapAny(req)
+		if strings.EqualFold(method, "initialize") {
+			caps := mcpAnyMap(mcpAnyMap(httpReqPayload["params"])["capabilities"])
+			clientSupportsElicitation = mcpCapabilityEnabled(caps["elicitation"]) || mcpCapabilityEnabled(caps["mcp_elicitation"])
+			if clientSupportsElicitation {
+				caps["terminals_fallback_confirmation"] = true
+				params := mcpAnyMap(httpReqPayload["params"])
+				params["capabilities"] = caps
+				httpReqPayload["params"] = params
+			}
 		}
-		var rpcResp any
-		err = json.NewDecoder(httpResp.Body).Decode(&rpcResp)
-		_ = httpResp.Body.Close()
+
+		rpcResp, nextSessionID, err := postMCPRPC(ctx, client, mcpURL, httpReqPayload, sessionID, "")
 		if err != nil {
 			return err
 		}
+		if strings.TrimSpace(nextSessionID) != "" {
+			sessionID = strings.TrimSpace(nextSessionID)
+		}
+
+		if strings.EqualFold(method, "initialize") && clientSupportsElicitation {
+			result := mcpAnyMap(mcpAnyMap(rpcResp)["result"])
+			if strings.EqualFold(strings.TrimSpace(mcpAnyString(result["mutating_capability"])), "mutating_via_fallback") {
+				result["mutating_capability"] = "mutating_via_elicitation"
+				respMap := mcpAnyMap(rpcResp)
+				respMap["result"] = result
+				rpcResp = respMap
+			}
+		}
+
+		if strings.EqualFold(method, "tools/call") && clientSupportsElicitation {
+			result := mcpAnyMap(mcpAnyMap(rpcResp)["result"])
+			meta := mcpAnyMap(result["_meta"])
+			if strings.EqualFold(strings.TrimSpace(mcpAnyString(meta["status"])), "confirmation_required") {
+				confirmationID := strings.TrimSpace(mcpAnyString(meta["confirmation_id"]))
+				if confirmationID != "" {
+					proxyRequestID++
+					approved, err := elicitViaProxy(ctx, dec, enc, proxyRequestID, req, meta)
+					if err != nil {
+						return err
+					}
+					if approved {
+						rpcResp, nextSessionID, err = postMCPRPC(ctx, client, mcpURL, httpReqPayload, sessionID, confirmationID)
+						if err != nil {
+							return err
+						}
+						if strings.TrimSpace(nextSessionID) != "" {
+							sessionID = strings.TrimSpace(nextSessionID)
+						}
+					} else {
+						rpcResp = approvalRejectedResponse(req["id"])
+					}
+				}
+			}
+		}
+
 		if err := enc.Encode(rpcResp); err != nil {
 			return err
 		}
+	}
+}
+
+func postMCPRPC(
+	ctx context.Context,
+	client *http.Client,
+	mcpURL string,
+	payload map[string]any,
+	sessionID string,
+	confirmationID string,
+) (map[string]any, string, error) {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, "", err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, mcpURL, strings.NewReader(string(raw)))
+	if err != nil {
+		return nil, "", err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(sessionID) != "" {
+		httpReq.Header.Set(mcpadapter.HeaderSessionID, strings.TrimSpace(sessionID))
+	}
+	if strings.TrimSpace(confirmationID) != "" {
+		httpReq.Header.Set(mcpadapter.HeaderConfirmationID, strings.TrimSpace(confirmationID))
+	}
+	httpResp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+	nextSessionID := strings.TrimSpace(httpResp.Header.Get(mcpadapter.HeaderSessionID))
+	if httpResp.StatusCode == http.StatusNoContent {
+		return map[string]any{}, nextSessionID, nil
+	}
+	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+		return nil, nextSessionID, fmt.Errorf("mcp http status %d", httpResp.StatusCode)
+	}
+	var rpcResp map[string]any
+	if err := json.NewDecoder(httpResp.Body).Decode(&rpcResp); err != nil {
+		return nil, nextSessionID, err
+	}
+	return rpcResp, nextSessionID, nil
+}
+
+func elicitViaProxy(
+	ctx context.Context,
+	dec *json.Decoder,
+	enc *json.Encoder,
+	proxyRequestID int,
+	originalRequest map[string]any,
+	confirmationMeta map[string]any,
+) (bool, error) {
+	params := map[string]any{
+		"title":             "Approve mutating command",
+		"tool_name":         strings.TrimSpace(mcpAnyString(mcpAnyMap(originalRequest["params"])["name"])),
+		"rendered_command":  strings.TrimSpace(mcpAnyString(confirmationMeta["rendered_command"])),
+		"classification":    "mutating",
+		"approval_required": true,
+	}
+	if err := enc.Encode(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      proxyRequestID,
+		"method":  "elicitation/create",
+		"params":  params,
+	}); err != nil {
+		return false, err
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		default:
+		}
+		var msg map[string]any
+		if err := dec.Decode(&msg); err != nil {
+			return false, err
+		}
+		if strings.TrimSpace(mcpAnyString(msg["method"])) != "" {
+			continue
+		}
+		if !rpcIDMatches(msg["id"], proxyRequestID) {
+			continue
+		}
+		result := mcpAnyMap(msg["result"])
+		if mcpAnyBool(result["approved"]) {
+			return true, nil
+		}
+		action := strings.ToLower(strings.TrimSpace(mcpAnyString(result["action"])))
+		switch action {
+		case "approve", "approved", "accept", "accepted", "yes":
+			return true, nil
+		default:
+			return false, nil
+		}
+	}
+}
+
+func approvalRejectedResponse(id any) map[string]any {
+	return map[string]any{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"result": map[string]any{
+			"content": []map[string]any{
+				{
+					"type": "text",
+					"text": "operation rejected by user",
+				},
+			},
+			"_meta": map[string]any{
+				"status":        "error",
+				"error_code":    "approval_rejected",
+				"error_message": "operation rejected by user",
+			},
+		},
+	}
+}
+
+func cloneMapAny(src map[string]any) map[string]any {
+	if src == nil {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+func mcpAnyMap(v any) map[string]any {
+	if v == nil {
+		return map[string]any{}
+	}
+	if typed, ok := v.(map[string]any); ok {
+		return typed
+	}
+	return map[string]any{}
+}
+
+func mcpAnyBool(v any) bool {
+	switch typed := v.(type) {
+	case bool:
+		return typed
+	case string:
+		raw := strings.ToLower(strings.TrimSpace(typed))
+		return raw == "true" || raw == "1" || raw == "yes"
+	default:
+		return false
+	}
+}
+
+func mcpAnyString(v any) string {
+	s, _ := v.(string)
+	return s
+}
+
+func mcpCapabilityEnabled(v any) bool {
+	switch typed := v.(type) {
+	case bool:
+		return typed
+	case string:
+		raw := strings.ToLower(strings.TrimSpace(typed))
+		return raw == "true" || raw == "1" || raw == "yes"
+	case map[string]any:
+		return true
+	case []any:
+		return len(typed) > 0
+	default:
+		return false
+	}
+}
+
+func rpcIDMatches(id any, want int) bool {
+	switch typed := id.(type) {
+	case float64:
+		return int(typed) == want
+	case float32:
+		return int(typed) == want
+	case int:
+		return typed == want
+	case int32:
+		return int(typed) == want
+	case int64:
+		return int(typed) == want
+	case json.Number:
+		n, err := typed.Int64()
+		return err == nil && int(n) == want
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(typed))
+		return err == nil && n == want
+	default:
+		return false
 	}
 }
 

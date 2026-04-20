@@ -203,8 +203,8 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 			"elicitation": true,
 		},
 	}, rpcTransportHTTP)
-	if withElicitation.SupportsElicitation {
-		t.Fatalf("supports elicitation = true, want false for http request/response transport")
+	if !withElicitation.SupportsElicitation {
+		t.Fatalf("supports elicitation = false, want true when explicitly declared")
 	}
 }
 

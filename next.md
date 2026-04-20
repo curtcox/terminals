@@ -1,1 +1,1 @@
-Summarize completed changes and test results for user review.
+Wait for user validation or follow-up changes.

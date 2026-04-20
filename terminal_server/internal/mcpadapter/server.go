@@ -580,17 +580,12 @@ func (s *Server) emitCallLog(ctx context.Context, sessionID, toolName string, re
 	eventlog.Emit(ctx, "mcp.tool.call", level, "mcp tool call", attrs...)
 }
 
-func parseClientCapabilities(params map[string]any, transport rpcTransport) ClientCapabilities {
+func parseClientCapabilities(params map[string]any, _ rpcTransport) ClientCapabilities {
 	caps := parseAnyMap(params["capabilities"])
 	supportsElicitation := capabilityEnabled(caps["elicitation"]) || capabilityEnabled(caps["mcp_elicitation"])
 	supportsFallback := capabilityEnabled(caps["terminals_fallback_confirmation"]) ||
 		capabilityEnabled(caps["fallback_confirmation"]) ||
 		capabilityEnabled(caps["confirmation_id"])
-	if transport == rpcTransportHTTP {
-		// HTTP transport currently supports server->client streaming notifications,
-		// but not a full server-initiated JSON-RPC request/response round-trip.
-		supportsElicitation = false
-	}
 	return ClientCapabilities{
 		SupportsElicitation: supportsElicitation,
 		SupportsFallbackID:  supportsFallback,
