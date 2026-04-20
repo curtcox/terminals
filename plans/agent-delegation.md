@@ -106,10 +106,10 @@ Users without Claude Code / Codex continue to use `ai use ollama ...` and `ai as
 
 The adapter does these things only:
 
-1. **Advertise tools.** At startup it walks the REPL command registry and publishes one MCP tool per command (Shape A; see [Tool Catalog Shape](#tool-catalog-shape)). Tool names, descriptions, argument schemas, and `read_only | mutating` flags are derived from registry metadata. No hand-maintained duplicate list. Completion and command-describe metadata are exposed as dedicated tools (`repl_complete`, `repl_describe`) for agent discovery.
+1. **Advertise tools.** At startup it walks the REPL command registry and publishes one MCP tool per command (Shape A; see [Tool Catalog Shape](#tool-catalog-shape)). Tool names, descriptions, argument schemas, and `read_only | operational | mutating` classification flags are derived from registry metadata. No hand-maintained duplicate list. Completion and command-describe metadata are exposed as dedicated tools (`repl_complete`, `repl_describe`) for agent discovery. **No `confirm` or `force` argument appears in any tool schema** — approval is not a model-visible arg (see [Approval Model](#approval-model)).
 2. **Dispatch.** Each MCP tool call is translated into a REPL command invocation against the connection's `ReplSession` and routed through the same REPL pipeline that a human-typed command uses. The result stream is returned as the MCP tool result.
 3. **Stream.** Long-running or streaming REPL commands (`logs tail`, `observe tail`, `app logs -f`) map to MCP streaming tool results; see [Streaming](#streaming).
-4. **Enforce the REPL's approval contract.** A `mutating` tool call without `confirm=true` (or its `--force` equivalent in the underlying command) is rejected with a structured "confirmation required" response that the desktop app can surface to the user, exactly like an interactive REPL refusing to execute a mutation without the prompt-yes or `--force`. A `read_only` tool call executes directly. This is the only safety gate; the desktop app's own approval UX is mapped onto it by passing `confirm=true` when the human has approved.
+4. **Enforce the REPL's approval contract out-of-band.** `mutating` calls trigger an MCP elicitation round-trip to the user before dispatch; `operational` calls are metered against a per-session budget; `read_only` calls execute directly. See [Approval Model](#approval-model) for the full contract and the load-bearing design.
 5. **Render docs for agents.** `docs open` / `docs search` called through MCP return plain Markdown (not paged terminal output). This is a rendering mode selection at the dispatcher, not a new command.
 
 The adapter holds **no authority** of its own. If the REPL cannot do something, the adapter cannot do it.
@@ -146,7 +146,7 @@ If the tool count grows uncomfortably large, group related read-only commands un
 
 There is **no** generic `repl_eval` escape hatch. Shape A only. If a command is not in the registry, it is not reachable — through either the REPL or MCP.
 
-Every generated tool's MCP description includes the command synopsis, a short argument reference, its classification (`read_only | mutating`), and a human-readable examples block — all sourced from the same command metadata that powers `help <command>` in the REPL.
+Every generated tool's MCP description includes the command synopsis, a short argument reference, its classification (`read_only | operational | mutating`), a `discouraged_for_agents` hint where applicable (see [Discouragement Hints](#discouragement-hints)), and a human-readable examples block — all sourced from the same command metadata that powers `help <command>` in the REPL.
 
 Two discovery tools are also published, regardless of registry contents:
 
@@ -183,7 +183,7 @@ There is no MCP-only file service. This is a strict consequence of the governing
 
 Several REPL commands are long-lived — `logs tail`, `observe tail`, `app logs -f`, anything that emits a continuous result stream. The MCP adapter surfaces these as streaming tool results.
 
-This requires a streaming-capable dispatch path. The unary `EvalCommand` RPC defined in [repl-and-shell.md](repl-and-shell.md) is not sufficient on its own; the REPL must expose either a streaming variant (e.g., a `ReplStream` RPC) or a session-output subscription that yields `ReplChunk`s until the command completes or is cancelled. Both MCP-2 work (below) and the corresponding REPL-side RPC land together; MCP streaming is blocked on that contract existing.
+This requires a streaming-capable dispatch path beyond the unary `EvalCommand` RPC in [repl-and-shell.md](repl-and-shell.md). Adding it is a **deliverable of this plan** (Phase MCP-1), not a prerequisite in another plan. A streaming REPL dispatch RPC (e.g., `ReplStream`) is introduced alongside the MCP adapter and is usable by any REPL client that needs it — the authoring home is this plan because MCP is the consumer that forces the requirement. A one-line reference note is added to the REPL plan's service contract for discoverability.
 
 A `cancel` message from the desktop app maps to the REPL's existing cancellation path for the in-flight command.
 
@@ -196,22 +196,56 @@ A one-time-per-desktop setup step tells Claude Code / Codex how to reach the MCP
 
 The server ships a generated MCP config snippet for both cases, available through the REPL as `docs open agents/mcp-setup` so a user on a REPL session can copy-paste it into their Claude Code / Codex config.
 
-The MCP adapter advertises its version and the REPL command-registry version on connection. If the registry changes between connection and a subsequent call (for example, after a server restart that loaded a new TAL app exporting REPL commands), the adapter signals a catalog-refresh event so the desktop app re-reads the tool list.
+The MCP adapter advertises its version and the REPL command-registry version on connection. If the registry changes between connection and a subsequent call (for example, after a server restart with an updated build that added or removed REPL commands), the adapter signals a catalog-refresh event so the desktop app re-reads the tool list.
 
 ## Approval Model
 
-The REPL's approval contract is the single source of truth, enforced at the adapter boundary.
+The REPL's approval contract is the single source of truth, enforced at the adapter boundary out-of-band from the tool-call arguments.
 
-- Every mutating MCP tool call must carry `confirm=true` (or its equivalent `--force` argument in the underlying command).
-- Without `confirm=true`, a mutating call returns a structured "confirmation required" response — classification, rendered command, and the argument shape the caller needs to re-send. No mutation has occurred.
-- With `confirm=true`, the call dispatches through the REPL pipeline exactly as if a human had typed the command with `--force` (or had answered "yes" at a confirmation prompt).
-- Read-only calls execute directly, same as the REPL's default for read-only commands.
+### Why approval must be out-of-band
 
-This is identical to what the REPL enforces for human-typed commands and for LLM-proposed commands in the REPL's own `ai` flow ([repl-and-shell.md Security and Permissions](repl-and-shell.md#security-and-permissions)). The desktop app's own human-in-the-loop UX is mapped onto this contract: when the user clicks "Approve" in Claude Code or Codex, the desktop app re-issues the tool call with `confirm=true`. The adapter does not trust the client's UX in lieu of enforcement; it enforces directly.
+A model-visible `confirm=true` argument is **cosmetic**: the model sees the arg in the tool schema, sets it itself, and the adapter has no way to distinguish model-set from human-set. Any gate built on an argument the model can populate adds no safety over trusting the desktop app's UX outright. The adversarial check during review exposed this; the fix below restores the gate's load-bearing property.
 
-There is no "destructive-op gate" beyond what the REPL registry already specifies. If a command is marked as requiring `--force` at the REPL level, it requires `confirm=true` here. If a command is simply `mutating` but not `--force`-only, `confirm=true` suffices. Nothing is special-cased for agents.
+### Primary mechanism: MCP elicitation
 
-Everything the adapter executes is logged through the existing structured session log. `logs query 'session_origin == "mcp"'` and friends work out of the box.
+- `mutating` tool calls: before dispatching, the adapter issues an MCP `elicitRequest` to the client carrying the rendered command string, its arguments, and its classification. MCP clients are obligated to surface elicitations to the user. On user-approve, the adapter dispatches as if a human had typed the command with `--force` (or answered "yes" at the REPL prompt). On user-reject or elicitation timeout, the call returns a structured rejection and no mutation occurs.
+- `operational` tool calls: execute directly, but are metered against a per-session budget; see [Operational Commands](#operational-commands).
+- `read_only` tool calls: execute directly.
+- **No tool schema exposes `confirm` or `force`.** The approval signal arrives only via the elicitation round-trip, which the model cannot fabricate — only the server can originate an elicitation, and only the client-surfaced user can respond. This is what makes the gate load-bearing.
+
+This is the same safety contract the REPL enforces for human-typed commands and for LLM-proposed commands in the REPL's own `ai` flow ([repl-and-shell.md Security and Permissions](repl-and-shell.md#security-and-permissions)): the human approval arrives out of band from the command text.
+
+The desktop app may already prompt the user before issuing the tool call (both Claude Code and Codex do). That prompt is the model → client gate. The adapter's elicitation is the client → server gate. They are distinct and both are cheap. Operators who want to merge them in the client UI may do so; the server does not rely on the client doing anything beyond honoring MCP elicitation.
+
+### Fallback: two-call confirmation_id protocol
+
+For MCP clients that do not yet implement elicitation (spec 2025-06-18 and later), a fallback gate applies:
+
+1. First mutating call returns a `confirmation_required` response carrying a server-issued `confirmation_id` bound to `(session_id, command, canonicalized args, TTL)`.
+2. Client replays the same command with `confirmation_id` passed as a **transport-level header or response-replay token** — not as a tool argument.
+3. Adapter validates the ID (matches session, command, args, not expired, not already consumed) and dispatches.
+
+The ID is never in the model-visible schema and is not forgeable by the model. Clients are expected to wrap this in a user-visible prompt before replaying; clients that auto-replay without user interaction collapse the safety back to cosmetic and the adapter logs `unsafe_confirmation_protocol` with the client identity for operator audit. The expectation is that this fallback is transitional.
+
+### No agent-only gates
+
+There is no "destructive-op gate" specific to agents. The same REPL-registry classification applies identically for humans at the REPL and agents over MCP. Nothing is special-cased.
+
+Everything the adapter executes is logged through the existing structured session log, including elicitation outcomes (approved / rejected / timed-out). `logs query 'session_origin == "mcp"'` and friends work out of the box.
+
+## Operational Commands
+
+A third classification tier sits between `read_only` and `mutating`: **`operational`**. Commands in this tier neither mutate persistent state nor fit the pure one-shot read pattern; they hold resources, open streams, or have externally observable effects. Examples: `logs tail`, `observe tail`, `app logs -f`, any subscription-shaped command.
+
+Why a third tier: treating these as `read_only` and letting agents open unbounded streams lets a runaway agent exhaust buffers, bandwidth, or pipeline capacity without tripping any safety. Treating them as `mutating` and prompting the user for every `logs tail` is ergonomically unacceptable.
+
+Adapter behavior:
+
+- `operational` calls execute directly without elicitation.
+- Each session has a concurrent-stream cap and an aggregate open-duration budget, configured server-side (`agent.operational.max_streams`, `agent.operational.stream_ttl`). Exceeding either returns a structured rate-limited response that the model can reason about and back off from.
+- The cap is the same for human-origin and MCP-origin sessions; humans just rarely hit it.
+
+**This tier is a REPL-plan edit as much as an MCP-plan edit.** The REPL command registry itself grows from `read_only | mutating` to `read_only | operational | mutating`. The list of currently-streaming commands that should be reclassified is small and is called out as a required update in `repl-and-shell.md`. MCP inherits the classification automatically from the registry.
 
 ## Use-Case Coverage
 
@@ -228,29 +262,35 @@ It also lightly extends the **I9/I10** development-agent use cases by letting a 
 
 ### Phase 0 — Prerequisites
 
-- [repl-and-shell.md](repl-and-shell.md) Phases A–D (session substrate, REPL core with command registry + `read_only | mutating` metadata, typed introspection APIs, documentation system).
-- Phase G is **not** a prerequisite. The `ai` command group appears in the MCP tool catalog only after Phase G ships, because the catalog is registry-derived. Until then, agents simply do not see `ai_*` tools — which is fine, since agents do not need them.
-- A streaming-capable REPL RPC (or session-output subscription) is a prerequisite for MCP-2 (streaming). If it does not exist in repl-and-shell.md's Phase A–D deliverables, add it there; MCP-2 is blocked on its existence.
+- [repl-and-shell.md](repl-and-shell.md) Phases A–D (session substrate, REPL core with command registry + classification metadata, typed introspection APIs, documentation system).
+- Phase G is **not** a prerequisite. The `ai` command group appears in the MCP tool catalog only after Phase G ships, because the catalog is registry-derived.
+- **REPL-plan edits required before MCP-1 ships:** extend the classification model from `read_only | mutating` to `read_only | operational | mutating`, reclassify streaming commands (`logs tail`, `observe tail`, `app logs -f`, and peers) as `operational`, and add a discoverability note pointing at this plan's streaming dispatch RPC. These edits live in repl-and-shell.md; they are small and block MCP-1 tool-catalog generation.
 
 ### Phase MCP-1 — Adapter skeleton
 
 - Add a `mcp-adapter` package inside `terminal_server/` that depends only on the REPL command registry.
 - Implement registry-walking tool-catalog generation (Shape A), including `repl_complete` and `repl_describe`.
 - Implement the dispatch path: MCP tool call → REPL command invocation on the connection's `ReplSession` → result returned as MCP tool result.
-- Enforce the `confirm`-or-`--force` contract at the adapter boundary for all `mutating` classifications.
+- **Add the streaming REPL dispatch RPC** (`ReplStream` or equivalent) used by both the MCP adapter for streaming tool results and by any future REPL client that needs it. This is local to this plan's scope; a reference note is added in repl-and-shell.md's service contract.
+- Enforce the approval contract at the adapter boundary:
+  - `mutating` calls trigger an MCP `elicitRequest`; dispatch only on user-approve.
+  - `operational` calls execute directly under per-session budget.
+  - `read_only` calls execute directly.
+  - Fallback `confirmation_id` protocol for clients without elicitation support, delivered via transport-level header or response-replay token (not a tool argument).
+- No tool schema contains `confirm` or `force` arguments.
 - Add `origin=mcp` to `ReplSession` records; surface in `sessions ls` / `sessions show`.
 - Wire session lifecycle: connect creates a session, **disconnect detaches** (moves to `DetachedSession`), explicit terminate or idle timeout ends it.
 - Implement stdio transport and Streamable HTTP transport behind the same dispatcher.
-- Structured logging of every MCP call through the existing log path, with `session_origin == "mcp"`.
+- Structured logging of every MCP call through the existing log path, with `session_origin == "mcp"` and elicitation outcomes.
 - mDNS advertisement of the Streamable HTTP endpoint.
 - Generated config snippet available via `docs open agents/mcp-setup`.
 - Force machine-readable (non-paged) rendering mode for `docs open` / `docs search` when called via MCP.
 
 ### Phase MCP-2 — Streaming and cancellation
 
-- Depends on the streaming-capable REPL RPC from Phase 0.
-- Map REPL commands that stream (`logs tail`, `observe tail`, `app logs -f`) to MCP streaming tool results with backpressure.
+- Map REPL commands classified `operational` and streaming-shaped (`logs tail`, `observe tail`, `app logs -f`) to MCP streaming tool results with backpressure, using the streaming RPC added in MCP-1.
 - Wire MCP `cancel` to the REPL's cancellation path for in-flight commands.
+- Enforce the per-session concurrent-stream cap and stream-TTL budget described in [Operational Commands](#operational-commands).
 
 ### Phase MCP-3 — Discovery polish and setup docs
 
@@ -266,29 +306,38 @@ All three phases are the initial Go work to ship the feature. Once they are in, 
 - The tool catalog is generated from the REPL command registry at server start. Adding or changing a REPL command changes the MCP surface without requiring MCP-adapter code changes.
 - After the MCP adapter is deployed, no further Go server restarts are required to let users do new work through Claude Code / Codex **as long as** that work is reachable via commands already in the REPL registry (TAL authoring, `app reload`, control-plane mutations, scheduler management, observation queries). Adding new REPL commands still requires a restart, same as before.
 - Both stdio and Streamable HTTP transports are supported and documented.
-- Every MCP call is a structured-logged REPL session event, queryable via `logs query`.
-- Mutating MCP calls without `confirm=true` are rejected with a structured confirmation-required response; mutating calls with `confirm=true` dispatch through the same path as a human REPL user typing `--force`. There is no special-case gate for agents.
+- Every MCP call is a structured-logged REPL session event, queryable via `logs query`. Elicitation outcomes (approved / rejected / timed-out) are part of the log record.
+- No MCP tool schema exposes a `confirm` or `force` argument. Approval for `mutating` calls arrives via MCP elicitation (or the transport-level `confirmation_id` fallback). A model cannot self-approve a mutation by setting an argument.
+- `operational`-tier calls execute without elicitation but are subject to a per-session concurrent-stream cap and stream-TTL budget; the same limits apply for human-origin and MCP-origin sessions.
 - `repl_complete` and `repl_describe` are first-class MCP tools.
 - `docs` calls via MCP return machine-readable Markdown, not paged terminal output.
 - MCP-client disconnect detaches the backing `ReplSession`; it does not terminate it. Reattach follows the REPL's existing `DetachedSession` rules.
 - The REPL's own `ai ...` commands continue to work independently and are not affected by this plan. They appear in the MCP tool catalog once Phase G of the REPL plan ships, and not before.
 - No auth is required on the LAN. No authority is exposed that the REPL does not already expose.
 
+## Discouragement Hints
+
+Some REPL commands are technically reachable by agents but rarely useful for them. Rather than hiding or denying tools (which would violate the exact-equivalence rule), the registry carries an optional `discouraged_for_agents` metadata flag. The adapter copies this flag into the MCP tool description so the model can down-rank the tool in planning without the adapter having to enforce a policy.
+
+Current intended uses:
+
+- `ai_*` tools (once REPL Phase G ships): an agent calling the server's LLM from inside its own LLM turn is almost always wasteful; flag them as discouraged.
+- Any future REPL command that exists primarily for human interactive flows (paged doc browsers, confirmation-loop UIs, etc.).
+
+This is a ranking hint, not a gate. The tools are fully callable. The flag is a subset-of-REPL-metadata addition, not an agent-specific restriction; humans at the REPL see the same flag in `describe` output.
+
 ## Decisions Made (previously Open Questions)
 
-Resolved during the first Claude↔Codex review cycle:
+Resolved during the first two Claude↔Codex review cycles:
 
 1. **Tool catalog shape — Shape A only.** No `repl_eval` escape hatch. Flat registry-derived tool list with a 1:1 mapping between mutating commands and MCP tools so intent stays legible to the desktop app's approval UI.
-2. **Approval contract — REPL parity, enforced at the adapter.** Every mutating MCP call requires `confirm=true` (mapping to the REPL's `--force` / prompt-yes). The adapter does not trust desktop-app UI as a substitute. No agent-only "destructive" session flag; the REPL's existing `--force`/`mutating` classification covers everything.
-3. **Session type — keep `ReplSession` with an `origin` field.** No parallel `AgentSession` type. `origin=mcp` distinguishes for metrics and session views.
-4. **File I/O — through REPL commands only.** No direct file-service MCP tool. Agents use whatever file-writing commands the REPL itself exposes. If the REPL plan adds explicit `file read` / `file write` commands later, they become visible to MCP automatically.
-5. **Transport — Streamable HTTP, not legacy HTTP+SSE.** Per the MCP spec's 2025-03-26 and 2025-11-25 revisions, Streamable HTTP is the network transport; SSE is a mechanism within it. Stdio remains as the second transport.
-
-## Still Open
-
-One remaining question worth a second review pass:
-
-1. **Nested `ai` tools via MCP — surfaced or hidden?** The governing rule says nothing is stripped from the registry, so the `ai_*` tools will appear in the MCP catalog once Phase G of the REPL plan ships. But an agent calling the server's LLM from inside its own LLM turn is almost always wasteful. The current plan surfaces the tools with a "typically not useful for agents" note in their descriptions. Alternative: add an MCP-level allowlist/denylist knob that lets operators hide specific REPL tool groups per connection, with `ai_*` denied by default for MCP origins. The denylist is still a *subset* of REPL access, not a superset, so it preserves parity in the "access ≤ REPL" direction. Worth Claude's opinion on whether the extra knob is worth the plan complexity.
+2. **Approval contract — out-of-band, not model-visible.** A `confirm=true` tool argument is cosmetic (the model can set it itself). Approval instead flows through MCP elicitation; a transport-level `confirmation_id` fallback covers clients that don't yet support elicitation. No tool schema exposes `confirm` or `force`.
+3. **Classification tiers — three, not two.** `read_only | operational | mutating`. `operational` covers long-running streams and subscription-shaped commands that have externally observable effects without mutating state; they execute without elicitation but are budget-capped. This is a REPL-plan edit that MCP inherits.
+4. **Session type — keep `ReplSession` with an `origin` field.** No parallel `AgentSession` type. `origin=mcp` distinguishes for metrics and session views.
+5. **File I/O — through REPL commands only.** No direct file-service MCP tool. Agents use whatever file-writing commands the REPL itself exposes.
+6. **Transport — Streamable HTTP, not legacy HTTP+SSE.** Per the MCP spec's 2025-03-26 and 2025-11-25 revisions, Streamable HTTP is the network transport; SSE is a mechanism within it. Stdio remains as the second transport.
+7. **Streaming RPC — added in this plan.** Rather than blocking on a streaming addition to repl-and-shell.md's Phase A–D, the streaming REPL dispatch RPC is a deliverable of MCP-1 with a reference note back-ported into the REPL plan's service contract. Reduces cross-plan sequencing.
+8. **`ai_*` surfacing — surfaced with a `discouraged_for_agents` hint, not denied.** Denying violates exact-equivalence; a ranking hint preserves access parity while nudging agents away from wasteful nested-LLM calls.
 
 ## Related Plans
 
