@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 )
@@ -185,5 +187,90 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 	}, rpcTransportHTTP)
 	if !withFallback.SupportsFallbackID {
 		t.Fatalf("supports fallback = false, want true when explicitly declared")
+	}
+}
+
+func TestHTTPCancelNotificationCancelsInflightToolCall(t *testing.T) {
+	adapter := New(Config{
+		OperationalTTL: 5 * time.Second,
+	})
+	sessions := &fakeSessionService{}
+	server, err := NewServer(ServerConfig{
+		Adapter:      adapter,
+		Sessions:     sessions,
+		AdminBaseURL: "http://127.0.0.1:50053",
+	})
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+	httpServer := httptest.NewServer(http.HandlerFunc(server.ServeHTTP))
+	defer httpServer.Close()
+
+	initResp := postRPC(t, httpServer.URL, "", rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("1"),
+		Method:  "initialize",
+		Params:  mustRawJSON(t, map[string]any{"clientInfo": map[string]any{"name": "codex", "version": "1"}}),
+	})
+	initResult := parseAnyMap(initResp.Result)
+	sessionID := strings.TrimSpace(anyString(initResult["session_id"]))
+	if sessionID == "" {
+		t.Fatalf("initialize response missing session_id")
+	}
+
+	done := make(chan rpcResponse, 1)
+	go func() {
+		done <- postRPC(t, httpServer.URL, sessionID, rpcRequest{
+			JSONRPC: "2.0",
+			ID:      json.RawMessage("99"),
+			Method:  "tools/call",
+			Params: mustRawJSON(t, map[string]any{
+				"name":      "sleep",
+				"arguments": map[string]any{"seconds": "2"},
+			}),
+		})
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	postRPCNotification(t, httpServer.URL, sessionID, rpcRequest{
+		JSONRPC: "2.0",
+		Method:  "notifications/cancelled",
+		Params:  mustRawJSON(t, map[string]any{"requestId": 99}),
+	})
+
+	select {
+	case resp := <-done:
+		result := parseAnyMap(resp.Result)
+		meta := parseAnyMap(result["_meta"])
+		if code := strings.TrimSpace(anyString(meta["error_code"])); code != "command_failed" {
+			t.Fatalf("error_code = %q, want command_failed (canceled)", code)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timed out waiting for canceled tools/call response")
+	}
+}
+
+func postRPCNotification(t *testing.T, url, sessionID string, req rpcRequest) {
+	t.Helper()
+	body, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("json.Marshal(request) error = %v", err)
+	}
+	httpReq, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("http.NewRequest() error = %v", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(sessionID) != "" {
+		httpReq.Header.Set(HeaderSessionID, strings.TrimSpace(sessionID))
+	}
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		t.Fatalf("http.Do() error = %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusNoContent {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("notification status=%d body=%s", resp.StatusCode, string(raw))
 	}
 }

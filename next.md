@@ -1,1 +1,1 @@
-Implement streaming REPL dispatch (ReplStream) and wire MCP cancel/backpressure for operational streaming commands.
+Await review and decide whether to add true chunked MCP streaming for future tail-style REPL commands.

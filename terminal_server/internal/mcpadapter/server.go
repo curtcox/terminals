@@ -57,6 +57,7 @@ type Server struct {
 
 	mu       sync.Mutex
 	bindings map[string]sessionBinding
+	inflight map[string]context.CancelFunc
 }
 
 type sessionBinding struct {
@@ -82,6 +83,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		adminBaseURL: strings.TrimSpace(cfg.AdminBaseURL),
 		now:          now,
 		bindings:     map[string]sessionBinding{},
+		inflight:     map[string]context.CancelFunc{},
 	}, nil
 }
 
@@ -184,6 +186,13 @@ func (s *Server) handleRPCRequest(
 		return rpcResponse{JSONRPC: "2.0", ID: id, Error: &rpcError{Code: -32600, Message: "missing method"}}, "", hasRPCID(id)
 	}
 	switch method {
+	case "notifications/cancelled":
+		params := parseAnyMap(req.Params)
+		requestID := requestIDFromParams(params)
+		if requestID != "" && strings.TrimSpace(rc.SessionID) != "" {
+			s.cancelInflight(rc.SessionID, requestID)
+		}
+		return rpcResponse{}, rc.SessionID, false
 	case "notifications/initialized":
 		return rpcResponse{}, "", false
 	case "initialize":
@@ -248,7 +257,18 @@ func (s *Server) handleRPCRequest(
 			meta := parseAnyMap(params["_meta"])
 			confirmationID = strings.TrimSpace(anyString(meta["terminals_confirmation_id"]))
 		}
-		toolResp, err := s.adapter.CallTool(ctx, CallToolRequest{
+		callCtx := ctx
+		requestID := rpcIDString(id)
+		if requestID != "" {
+			var cancel context.CancelFunc
+			callCtx, cancel = context.WithCancel(ctx)
+			s.addInflight(sessionID, requestID, cancel)
+			defer func() {
+				cancel()
+				s.removeInflight(sessionID, requestID)
+			}()
+		}
+		toolResp, err := s.adapter.CallTool(callCtx, CallToolRequest{
 			SessionID:          sessionID,
 			ToolName:           toolName,
 			Arguments:          args,
@@ -307,6 +327,7 @@ func (s *Server) closeSession(ctx context.Context, sessionID string) {
 	if sessionID == "" {
 		return
 	}
+	s.cancelAllInflightForSession(sessionID)
 	s.mu.Lock()
 	binding, ok := s.bindings[sessionID]
 	if ok {
@@ -320,6 +341,73 @@ func (s *Server) closeSession(ctx context.Context, sessionID string) {
 		})
 	}
 	s.adapter.CloseSession(sessionID)
+}
+
+func (s *Server) addInflight(sessionID, requestID string, cancel context.CancelFunc) {
+	if cancel == nil {
+		return
+	}
+	key := inflightKey(sessionID, requestID)
+	if key == "" {
+		return
+	}
+	s.mu.Lock()
+	s.inflight[key] = cancel
+	s.mu.Unlock()
+}
+
+func (s *Server) removeInflight(sessionID, requestID string) {
+	key := inflightKey(sessionID, requestID)
+	if key == "" {
+		return
+	}
+	s.mu.Lock()
+	delete(s.inflight, key)
+	s.mu.Unlock()
+}
+
+func (s *Server) cancelInflight(sessionID, requestID string) {
+	key := inflightKey(sessionID, requestID)
+	if key == "" {
+		return
+	}
+	s.mu.Lock()
+	cancel := s.inflight[key]
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (s *Server) cancelAllInflightForSession(sessionID string) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return
+	}
+	s.mu.Lock()
+	cancels := make([]context.CancelFunc, 0, len(s.inflight))
+	prefix := sessionID + "|"
+	for key, cancel := range s.inflight {
+		if strings.HasPrefix(key, prefix) {
+			cancels = append(cancels, cancel)
+			delete(s.inflight, key)
+		}
+	}
+	s.mu.Unlock()
+	for _, cancel := range cancels {
+		if cancel != nil {
+			cancel()
+		}
+	}
+}
+
+func inflightKey(sessionID, requestID string) string {
+	sessionID = strings.TrimSpace(sessionID)
+	requestID = strings.TrimSpace(requestID)
+	if sessionID == "" || requestID == "" {
+		return ""
+	}
+	return sessionID + "|" + requestID
 }
 
 func (s *Server) emitCallLog(ctx context.Context, sessionID, toolName string, resp CallToolResponse) {
@@ -391,6 +479,46 @@ func parseAnyMap(v any) map[string]any {
 		}
 	}
 	return map[string]any{}
+}
+
+func requestIDFromParams(params map[string]any) string {
+	if len(params) == 0 {
+		return ""
+	}
+	if reqID := rpcIDStringValue(params["requestId"]); reqID != "" {
+		return reqID
+	}
+	if reqID := rpcIDStringValue(params["request_id"]); reqID != "" {
+		return reqID
+	}
+	return rpcIDStringValue(params["id"])
+}
+
+func rpcIDString(id json.RawMessage) string {
+	var decoded any
+	if err := json.Unmarshal(id, &decoded); err != nil {
+		return strings.TrimSpace(string(id))
+	}
+	return rpcIDStringValue(decoded)
+}
+
+func rpcIDStringValue(v any) string {
+	switch typed := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return strings.TrimSpace(typed)
+	case float64:
+		return strings.TrimSpace(fmt.Sprintf("%.0f", typed))
+	case int:
+		return strings.TrimSpace(fmt.Sprintf("%d", typed))
+	case int64:
+		return strings.TrimSpace(fmt.Sprintf("%d", typed))
+	case json.RawMessage:
+		return rpcIDString(typed)
+	default:
+		return strings.TrimSpace(fmt.Sprintf("%v", typed))
+	}
 }
 
 func toolResult(resp CallToolResponse) map[string]any {
