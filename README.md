@@ -69,6 +69,18 @@ make run-local-smoke-test
 
 Add behavior on the server, not the client. The client remains a generic terminal.
 
+## Agent Delegation (Claude Code / Codex)
+
+The server exposes the REPL command registry to Claude Code and Codex over MCP so an LLM agent can drive the system with exactly the access a REPL user has — no more, no less. See [`plans/agent-delegation.md`](plans/agent-delegation.md) for the design, and the setup guides to enable it:
+
+- [`docs/repl/agents/mcp-setup.md`](docs/repl/agents/mcp-setup.md) — endpoints, transports, auth
+- [`docs/repl/agents/claude-code-setup.md`](docs/repl/agents/claude-code-setup.md)
+- [`docs/repl/agents/codex-setup.md`](docs/repl/agents/codex-setup.md)
+- [`docs/repl/agents/approval-contract.md`](docs/repl/agents/approval-contract.md) — mutating calls require out-of-band user approval
+- [`docs/repl/agents/troubleshooting.md`](docs/repl/agents/troubleshooting.md)
+
+Connected agents benefit from the [`terminals-mcp`](.claude/skills/terminals-mcp/SKILL.md) skill, which teaches effective use of the tool catalog.
+
 ## Event Logging
 
 The server writes structured JSONL events to `TERMINALS_LOG_DIR` (default `logs/`) with size-based rotation (`TERMINALS_LOG_MAX_BYTES`, `TERMINALS_LOG_MAX_ARCHIVES`). Use `term logs ...` for local querying and `/admin/logs` for browser-based filtering.
