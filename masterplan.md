@@ -71,6 +71,8 @@ None of this requires updating the client app. The Flutter client is a generic t
 - [plans/world-model-calibration.md](plans/world-model-calibration.md) — World-model calibration strategy and feedback loops.
 - [plans/sensing-use-case-flows.md](plans/sensing-use-case-flows.md) — End-to-end sensing-centric use-case flows.
 - [plans/bug-reporting.md](plans/bug-reporting.md) — Modality-agnostic, cross-device bug reporting with full client/subject context capture.
+- [plans/repl-and-shell.md](plans/repl-and-shell.md) — Server-side REPL: session model, typed command registry, in-REPL LLM assistance.
+- [plans/agent-delegation.md](plans/agent-delegation.md) — Expose the REPL command surface to Claude Code / Codex desktop apps via MCP so users can delegate the same work without a server restart.
 
 ### Tooling
 
