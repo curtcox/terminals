@@ -352,12 +352,9 @@ func (s *Server) emitCallLog(ctx context.Context, sessionID, toolName string, re
 func parseClientCapabilities(params map[string]any, transport rpcTransport) ClientCapabilities {
 	caps := parseAnyMap(params["capabilities"])
 	supportsElicitation := anyBool(caps["elicitation"])
-	// HTTP always supports fallback confirmation via request headers and stdio
-	// via _meta, unless explicitly disabled by client metadata.
-	supportsFallback := true
-	if raw, ok := caps["terminals_fallback_confirmation"]; ok {
-		supportsFallback = anyBool(raw)
-	}
+	// Fail closed by default: fallback confirmation must be explicitly declared
+	// by the client or mutating commands remain unavailable for the session.
+	supportsFallback := anyBool(caps["terminals_fallback_confirmation"])
 	if strings.EqualFold(string(transport), string(rpcTransportHTTP)) {
 		return ClientCapabilities{SupportsElicitation: supportsElicitation, SupportsFallbackID: supportsFallback}
 	}

@@ -2,7 +2,9 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -37,11 +39,9 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/repl"
 	"github.com/curtcox/terminals/terminal_server/internal/replai"
-	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
-	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 	"github.com/curtcox/terminals/terminal_server/internal/world"
@@ -410,27 +410,74 @@ func runMCPStdio(stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	_ = resp.Body.Close()
 
-	adapter := mcpadapter.New(mcpadapter.Config{
-		AdminBaseURL: adminBaseURL,
-	})
-	sessions := replsession.NewService(terminal.NewManager())
-	server, err := mcpadapter.NewServer(mcpadapter.ServerConfig{
-		Adapter:      adapter,
-		Sessions:     sessions,
-		AdminBaseURL: adminBaseURL,
-	})
-	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "mcp-stdio: configure: %v\n", err)
-		return 1
-	}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	if err := server.ServeStdio(ctx, stdin, stdout); err != nil && !errors.Is(err, context.Canceled) {
+	mcpURL := strings.TrimSuffix(adminBaseURL, "/") + "/mcp"
+	if err := proxyMCPStdio(ctx, stdin, stdout, mcpURL); err != nil && !errors.Is(err, context.Canceled) {
 		_, _ = fmt.Fprintf(stderr, "mcp-stdio: %v\n", err)
 		return 1
 	}
 	return 0
+}
+
+func proxyMCPStdio(ctx context.Context, in io.Reader, out io.Writer, mcpURL string) error {
+	dec := json.NewDecoder(bufio.NewReader(in))
+	enc := json.NewEncoder(out)
+	enc.SetEscapeHTML(false)
+	client := &http.Client{Timeout: 30 * time.Second}
+	sessionID := ""
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		var req any
+		if err := dec.Decode(&req); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		raw, err := json.Marshal(req)
+		if err != nil {
+			return err
+		}
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, mcpURL, strings.NewReader(string(raw)))
+		if err != nil {
+			return err
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		if strings.TrimSpace(sessionID) != "" {
+			httpReq.Header.Set(mcpadapter.HeaderSessionID, sessionID)
+		}
+		httpResp, err := client.Do(httpReq)
+		if err != nil {
+			return err
+		}
+		if sid := strings.TrimSpace(httpResp.Header.Get(mcpadapter.HeaderSessionID)); sid != "" {
+			sessionID = sid
+		}
+		if httpResp.StatusCode == http.StatusNoContent {
+			_ = httpResp.Body.Close()
+			continue
+		}
+		if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+			_ = httpResp.Body.Close()
+			return fmt.Errorf("mcp http status %d", httpResp.StatusCode)
+		}
+		var rpcResp any
+		err = json.NewDecoder(httpResp.Body).Decode(&rpcResp)
+		_ = httpResp.Body.Close()
+		if err != nil {
+			return err
+		}
+		if err := enc.Encode(rpcResp); err != nil {
+			return err
+		}
+	}
 }
 
 type scenarioAnalyzerRunner struct {

@@ -69,6 +69,8 @@ type Config struct {
 	Now                func() time.Time
 	ConfirmationTTL    time.Duration
 	MinHumanLatency    time.Duration
+	OperationalMax     int
+	OperationalTTL     time.Duration
 	Elicit             func(context.Context, ElicitRequest) (ElicitResponse, error)
 	UnsafeConfirmation func(context.Context, UnsafeConfirmationEvent)
 }
@@ -110,6 +112,7 @@ type Adapter struct {
 	mu            sync.Mutex
 	sessions      map[string]SessionInfo
 	confirmations map[string]pendingConfirmation
+	operational   map[string]int
 }
 
 type pendingConfirmation struct {
@@ -133,6 +136,12 @@ func New(cfg Config) *Adapter {
 	if cfg.MinHumanLatency <= 0 {
 		cfg.MinHumanLatency = 500 * time.Millisecond
 	}
+	if cfg.OperationalMax <= 0 {
+		cfg.OperationalMax = 3
+	}
+	if cfg.OperationalTTL <= 0 {
+		cfg.OperationalTTL = 2 * time.Minute
+	}
 	cfg.Now = now
 
 	tools := generateTools()
@@ -147,6 +156,7 @@ func New(cfg Config) *Adapter {
 		registryVersion: computeRegistryVersion(tools),
 		sessions:        map[string]SessionInfo{},
 		confirmations:   map[string]pendingConfirmation{},
+		operational:     map[string]int{},
 	}
 }
 
@@ -236,6 +246,33 @@ func (a *Adapter) CallTool(ctx context.Context, req CallToolRequest) (CallToolRe
 		}
 	}
 
+	if tool.Classification == repl.CommandClassificationOperational {
+		release, budgetDenied := a.acquireOperationalSlot(req.SessionID, rendered, tool.Classification)
+		if budgetDenied != nil {
+			return *budgetDenied, nil
+		}
+		defer release()
+		ctxWithTTL, cancel := context.WithTimeout(ctx, a.cfg.OperationalTTL)
+		defer cancel()
+		result, err := repl.ExecuteCommand(ctxWithTTL, rendered, repl.ExecuteOptions{
+			AdminBaseURL: a.cfg.AdminBaseURL,
+			SessionID:    req.SessionID,
+			DocsMode:     repl.DocsRenderModeMarkdown,
+		})
+		if errors.Is(err, context.DeadlineExceeded) {
+			return CallToolResponse{
+				Status:          "error",
+				ErrorCode:       "operational_ttl_exceeded",
+				ErrorMessage:    "operational command exceeded session stream_ttl budget",
+				RenderedCommand: rendered,
+				Classification:  tool.Classification,
+			}, nil
+		}
+		if err != nil {
+			return CallToolResponse{Status: "error", ErrorCode: "command_failed", ErrorMessage: err.Error(), RenderedCommand: rendered, Classification: tool.Classification}, nil
+		}
+		return CallToolResponse{Status: "ok", Output: result.Output, RenderedCommand: rendered, Classification: tool.Classification}, nil
+	}
 	result, err := repl.ExecuteCommand(ctx, rendered, repl.ExecuteOptions{
 		AdminBaseURL: a.cfg.AdminBaseURL,
 		SessionID:    req.SessionID,
@@ -245,6 +282,31 @@ func (a *Adapter) CallTool(ctx context.Context, req CallToolRequest) (CallToolRe
 		return CallToolResponse{Status: "error", ErrorCode: "command_failed", ErrorMessage: err.Error(), RenderedCommand: rendered, Classification: tool.Classification}, nil
 	}
 	return CallToolResponse{Status: "ok", Output: result.Output, RenderedCommand: rendered, Classification: tool.Classification}, nil
+}
+
+func (a *Adapter) acquireOperationalSlot(sessionID, rendered string, classification repl.CommandClassification) (func(), *CallToolResponse) {
+	a.mu.Lock()
+	if a.operational[sessionID] >= a.cfg.OperationalMax {
+		a.mu.Unlock()
+		return nil, &CallToolResponse{
+			Status:          "error",
+			ErrorCode:       "rate_limited",
+			ErrorMessage:    "operational command budget exceeded for session",
+			RenderedCommand: rendered,
+			Classification:  classification,
+		}
+	}
+	a.operational[sessionID]++
+	a.mu.Unlock()
+	return func() {
+		a.mu.Lock()
+		if a.operational[sessionID] <= 1 {
+			delete(a.operational, sessionID)
+		} else {
+			a.operational[sessionID]--
+		}
+		a.mu.Unlock()
+	}, nil
 }
 
 func (a *Adapter) authorizeMutation(ctx context.Context, sess SessionInfo, tool Tool, rendered, canonicalArgs, metaConfirmationID string) (CallToolResponse, error) {
@@ -451,6 +513,9 @@ func renderCommand(tool Tool, args map[string]any) (rendered string, canonicalAr
 }
 
 func anyString(v any) string {
+	if v == nil {
+		return ""
+	}
 	switch typed := v.(type) {
 	case string:
 		return typed

@@ -1,1 +1,1 @@
-Run a live smoke test: start server, then verify MCP over /mcp and mcp-stdio against a real client.
+Implement streaming REPL dispatch (ReplStream) and wire MCP cancel/backpressure for operational streaming commands.

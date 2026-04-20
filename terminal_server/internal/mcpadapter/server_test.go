@@ -170,3 +170,20 @@ func writeRPCLine(t *testing.T, out *bytes.Buffer, req rpcRequest) {
 	out.Write(b)
 	out.WriteString("\n")
 }
+
+func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
+	caps := parseClientCapabilities(map[string]any{
+		"capabilities": map[string]any{},
+	}, rpcTransportHTTP)
+	if caps.SupportsFallbackID {
+		t.Fatalf("supports fallback = true, want false by default")
+	}
+	withFallback := parseClientCapabilities(map[string]any{
+		"capabilities": map[string]any{
+			"terminals_fallback_confirmation": true,
+		},
+	}, rpcTransportHTTP)
+	if !withFallback.SupportsFallbackID {
+		t.Fatalf("supports fallback = false, want true when explicitly declared")
+	}
+}

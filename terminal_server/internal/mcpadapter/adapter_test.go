@@ -3,6 +3,7 @@ package mcpadapter
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -148,5 +149,57 @@ func TestReplDiscoveryToolCalls(t *testing.T) {
 	}
 	if describeResp.Status != "ok" {
 		t.Fatalf("repl_describe status = %q", describeResp.Status)
+	}
+}
+
+func TestOperationalBudgetConcurrentLimit(t *testing.T) {
+	adapter := New(Config{
+		OperationalMax: 1,
+		OperationalTTL: 2 * time.Second,
+	})
+	adapter.OpenSession("repl-mcp-op-1", "codex", ClientCapabilities{SupportsFallbackID: true})
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_, _ = adapter.CallTool(context.Background(), CallToolRequest{
+			SessionID: "repl-mcp-op-1",
+			ToolName:  "sleep",
+			Arguments: map[string]any{"seconds": "0.2"},
+		})
+	}()
+	time.Sleep(25 * time.Millisecond)
+
+	resp, err := adapter.CallTool(context.Background(), CallToolRequest{
+		SessionID: "repl-mcp-op-1",
+		ToolName:  "sleep",
+		Arguments: map[string]any{"seconds": "0.2"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if resp.ErrorCode != "rate_limited" {
+		t.Fatalf("error code = %q, want rate_limited", resp.ErrorCode)
+	}
+	wg.Wait()
+}
+
+func TestOperationalBudgetTTL(t *testing.T) {
+	adapter := New(Config{
+		OperationalMax: 2,
+		OperationalTTL: 25 * time.Millisecond,
+	})
+	adapter.OpenSession("repl-mcp-op-2", "codex", ClientCapabilities{SupportsFallbackID: true})
+	resp, err := adapter.CallTool(context.Background(), CallToolRequest{
+		SessionID: "repl-mcp-op-2",
+		ToolName:  "sleep",
+		Arguments: map[string]any{"seconds": "0.2"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if resp.ErrorCode != "operational_ttl_exceeded" {
+		t.Fatalf("error code = %q, want operational_ttl_exceeded", resp.ErrorCode)
 	}
 }
