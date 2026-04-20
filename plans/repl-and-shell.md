@@ -125,7 +125,13 @@ Session state must be serializable enough to support suspend/resume and reconnec
 
 ### Design rule
 
-Every REPL command maps to a typed request/response operation in the server control plane. No command drops to a host shell. Each command in the registry declares `read_only | mutating` metadata; the LLM approval pipeline uses that classification directly.
+Every REPL command maps to a typed request/response operation in the server control plane. No command drops to a host shell. Each command in the registry declares `read_only | operational | mutating` metadata; the LLM approval pipeline uses that classification directly.
+
+- `read_only` — pure one-shot reads with no resource hold.
+- `operational` — non-mutating but resource-holding or subscription-shaped: `logs tail`, `observe tail`, `app logs -f`, and similar commands that open streams or have externally observable effects. Budget-capped per session (concurrent-stream and TTL limits) in both REPL and MCP origins; budgets are origin-blind.
+- `mutating` — changes persistent server state. Requires explicit confirmation or `--force` at the REPL; MCP origins carry the approval out-of-band via elicitation or the `confirmation_id` fallback, per [agent-delegation.md](agent-delegation.md#approval-model).
+
+The REPL command-service also exposes a streaming dispatch RPC alongside the unary `EvalCommand` for `operational`-tier commands that emit continuous output. This RPC is introduced in this file's service contract but authored and first consumed in [agent-delegation.md](agent-delegation.md#streaming); any REPL client may use it.
 
 ### Core command groups
 
@@ -678,7 +684,8 @@ Invariants:
 - Every action traverses a typed control-plane API; there is no host-exec primitive.
 - Only clients with keyboard and display capability may launch or attach to REPL sessions.
 - Mutating commands — whether typed by a human or proposed by the LLM — require explicit confirmation or `--force`.
-- LLM tool calls are subject to the same `read_only | mutating` registry classification as human-typed commands; the model cannot escalate by wording.
+- LLM tool calls are subject to the same `read_only | operational | mutating` registry classification as human-typed commands; the model cannot escalate by wording.
+- `operational`-tier commands are budget-capped per session (concurrent-stream and TTL limits); caps are origin-blind and apply equally to human and MCP sessions.
 - Mutating LLM-proposed commands always require a human-in-the-loop approval; there is no `auto-mutating` policy.
 - Session lifecycle events, command execution, and LLM proposals/approvals/rejections are all logged in structured form.
 - API credentials for AI providers live in server config only and are never exposed to the REPL or to the LLM.

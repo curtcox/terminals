@@ -15,7 +15,8 @@ This plan is deliberately symmetric between Claude Code and Codex. Both consume 
 ## Non-Goals
 
 - **No new command surface.** The MCP adapter exposes the REPL command registry. There is no MCP-only tool, no MCP-only file service, no MCP-only authority.
-- **No elevated privileges for agents.** Agents cannot do anything a REPL user cannot. Mutating commands still honor the REPL's `read_only | mutating` classification and its explicit-confirm-or-`--force` contract; there is no out-of-band write path to the host filesystem, no host shell, no direct kernel-object manipulation.
+- **No elevated privileges for agents.** Agents cannot do anything a REPL user cannot. Commands are classified `read_only | operational | mutating` in the REPL command registry; `mutating` calls require out-of-band user approval via MCP elicitation (see [Approval Model](#approval-model)); there is no bypass path to the host filesystem, no host shell, no direct kernel-object manipulation.
+- **No model-visible approval argument.** Tool schemas never expose `confirm` or `force`. Approval is carried out-of-band from the tool arguments so the model cannot self-approve.
 - **No alternate approval path.** The adapter does not offload mutation safety to the desktop app's UI. The REPL's approval contract is enforced at the adapter boundary regardless of which client is on the other end.
 - **No scenario-specific client behavior.** The Flutter client is unaffected.
 - **No Go server hot-reload.** Go code changes still require a server restart. This plan scopes itself to "what the REPL can already do without a restart."
@@ -47,13 +48,13 @@ The user has Claude Code (or Codex) running on their laptop. The Terminals serve
 >
 > **User:** "Yes."
 >
-> **Claude Code / Codex:** *(calls `activations_stop` with `act_51`. Classification is `mutating`, so the adapter requires `confirm=true` on the call. The desktop app, having just gotten the user's "Yes," passes `confirm=true`; the adapter dispatches through the REPL command registry.)* "Stopped. `act_42` resumed on `hallway-screen`."
+> **Claude Code / Codex:** *(calls `activations_stop` with `act_51`. Classification is `mutating`, so the adapter issues an MCP `elicitRequest` showing the rendered command to the user; the user approves in the desktop client; the adapter dispatches through the REPL command registry.)* "Stopped. `act_42` resumed on `hallway-screen`."
 
 A second example — authoring a TAL app:
 
 > **User:** "Write me a TAL app that rings a chime when the dryer beeps."
 >
-> **Claude Code / Codex:** *(calls the same REPL commands a human at the REPL would use to author a TAL app — e.g. `app new`, `ai gen --out ... --write`, `app check`, `app test`, `app reload`. Each mutating call carries `confirm=true` because the desktop app has the user's approval in hand.)* "Wrote `apps/dryer_chime/`, `app check` passed, `app test` passed, reloaded to 0.1.0."
+> **Claude Code / Codex:** *(calls the same REPL commands a human at the REPL would use to author a TAL app — e.g. `app new`, `ai gen --out ... --write`, `app check`, `app test`, `app reload`. Each mutating call triggers an MCP elicitation; the user approves a batch or each step in the desktop client.)* "Wrote `apps/dryer_chime/`, `app check` passed, `app test` passed, reloaded to 0.1.0."
 
 Nothing the agent did required a server restart. Everything the agent did is something a REPL user could also have done by typing.
 
@@ -83,8 +84,8 @@ Users without Claude Code / Codex continue to use `ai use ollama ...` and `ai as
                   │    registry metadata                               │
                   │  • every tool call → REPL dispatch on the          │
                   │    connection's ReplSession → typed control-plane  │
-                  │  • enforces REPL's confirm-or-`--force` contract   │
-                  │    at the adapter boundary                         │
+                  │  • enforces REPL approval out-of-band via MCP     │
+                  │    elicitation (or confirmation_id fallback)       │
                   └───────────────────────┬────────────────────────────┘
                                           │
                                           ▼
@@ -217,15 +218,31 @@ This is the same safety contract the REPL enforces for human-typed commands and 
 
 The desktop app may already prompt the user before issuing the tool call (both Claude Code and Codex do). That prompt is the model → client gate. The adapter's elicitation is the client → server gate. They are distinct and both are cheap. Operators who want to merge them in the client UI may do so; the server does not rely on the client doing anything beyond honoring MCP elicitation.
 
+### Suspicious-approval logging
+
+A silently auto-approving client collapses the gate. The adapter cannot prevent this, but it can surface it to operators. When an elicitation response returns with `elicit_response_latency_ms < 500` (configurable as `agent.approval.min_human_latency_ms`, default 500), the adapter logs `unsafe_confirmation_protocol` with the client identity, session ID, command, a hash of the rendered args, the observed latency, and the approval outcome. The mutation still executes if the elicitation was approved (the adapter does not invent a second refusal), but the event is indexed and visible in `logs query 'kind == "unsafe_confirmation_protocol"'` for audit. Humans virtually never approve in under 500 ms; the threshold exists to flag clients that bypass user interaction.
+
 ### Fallback: two-call confirmation_id protocol
 
-For MCP clients that do not yet implement elicitation (spec 2025-06-18 and later), a fallback gate applies:
+For MCP clients that do not yet implement elicitation (spec 2025-06-18 and later), a fallback gate applies. The protocol has one concrete carrier per transport:
 
-1. First mutating call returns a `confirmation_required` response carrying a server-issued `confirmation_id` bound to `(session_id, command, canonicalized args, TTL)`.
-2. Client replays the same command with `confirmation_id` passed as a **transport-level header or response-replay token** — not as a tool argument.
-3. Adapter validates the ID (matches session, command, args, not expired, not already consumed) and dispatches.
+1. First mutating call returns a `confirmation_required` tool response with a JSON body:
+   ```json
+   {
+     "status": "confirmation_required",
+     "confirmation_id": "<server-generated opaque token>",
+     "expires_at": "<RFC3339 timestamp>",
+     "rendered_command": "activations stop act_51",
+     "classification": "mutating"
+   }
+   ```
+   The `confirmation_id` is server-generated, bound to `(session_id, command, canonicalized args, expires_at)`, single-use, and opaque to the caller.
+2. Client replays the same tool call, carrying the ID out-of-band from tool arguments:
+   - **Streamable HTTP transport:** `Mcp-Confirmation-Id: <id>` HTTP request header on the replay call.
+   - **stdio transport:** `_meta.terminals_confirmation_id` field in the MCP `tools/call` request envelope (MCP's reserved meta slot), alongside the original `arguments` block.
+3. Adapter validates: ID exists, bound session matches, bound command matches, bound canonicalized args match, not expired, not previously consumed. On success, marks consumed and dispatches. On any mismatch, rejects with a fresh `confirmation_required` carrying a new ID.
 
-The ID is never in the model-visible schema and is not forgeable by the model. Clients are expected to wrap this in a user-visible prompt before replaying; clients that auto-replay without user interaction collapse the safety back to cosmetic and the adapter logs `unsafe_confirmation_protocol` with the client identity for operator audit. The expectation is that this fallback is transitional.
+The ID is never in the model-visible tool schema and is not forgeable by the model. Clients are expected to wrap step 2 in a user-visible prompt before replaying; clients that auto-replay without user interaction collapse the safety back to cosmetic, and the adapter logs `unsafe_confirmation_protocol` with the client identity when the round-trip between steps 1 and 2 is under the same latency threshold used for elicitation. The expectation is that this fallback is transitional; new clients should implement elicitation.
 
 ### No agent-only gates
 
@@ -244,6 +261,7 @@ Adapter behavior:
 - `operational` calls execute directly without elicitation.
 - Each session has a concurrent-stream cap and an aggregate open-duration budget, configured server-side (`agent.operational.max_streams`, `agent.operational.stream_ttl`). Exceeding either returns a structured rate-limited response that the model can reason about and back off from.
 - The cap is the same for human-origin and MCP-origin sessions; humans just rarely hit it.
+- **Any service-level rate limiting or backpressure applied to `read_only` or `operational` commands is origin-blind.** If a future rate limit is added to `logs query` or any other read path, it applies equally to human-origin and MCP-origin sessions. There is no agent-only throttle; parity is preserved in the "MCP can do what the REPL can do, no more, no less" direction. An agent that hammers `logs query` in a loop hits the same limits a human scripting against the REPL would.
 
 **This tier is a REPL-plan edit as much as an MCP-plan edit.** The REPL command registry itself grows from `read_only | mutating` to `read_only | operational | mutating`. The list of currently-streaming commands that should be reclassified is small and is called out as a required update in `repl-and-shell.md`. MCP inherits the classification automatically from the registry.
 
