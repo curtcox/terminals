@@ -244,6 +244,19 @@ For MCP clients that do not yet implement elicitation (spec 2025-06-18 and later
 
 The ID is never in the model-visible tool schema and is not forgeable by the model. Clients are expected to wrap step 2 in a user-visible prompt before replaying; clients that auto-replay without user interaction collapse the safety back to cosmetic, and the adapter logs `unsafe_confirmation_protocol` with the client identity when the round-trip between steps 1 and 2 is under the same latency threshold used for elicitation. The expectation is that this fallback is transitional; new clients should implement elicitation.
 
+### Capability negotiation and fail-closed behavior
+
+Neither elicitation nor the fallback carrier can be assumed to work across all MCP clients. Custom HTTP headers may be stripped by middleware or client stacks; some typed MCP clients normalize `tools/call` to `{name, arguments}` only and drop the `_meta` envelope. The adapter therefore negotiates explicitly at connection time:
+
+1. On connect, the adapter reads the client's declared MCP capabilities (including whether it advertises elicitation support) and then issues a **fallback probe**: a no-op `tools/call` that requires the client to echo a server-supplied `_meta` field (stdio) or a custom header (Streamable HTTP) back on a follow-up call. The probe result is cached for the session's lifetime.
+2. The session is classified into one of three capability states based on the probe outcome:
+   - `mutating_via_elicitation` — client supports MCP elicitation; all `mutating` calls use the primary mechanism.
+   - `mutating_via_fallback` — client lacks elicitation but passed the fallback probe; `mutating` calls use the `confirmation_id` protocol.
+   - `mutating_unavailable` — client lacks elicitation and failed the fallback probe. The session is restricted to `read_only` and `operational` calls only. Any `mutating` tool call on such a session returns a structured error (`unsupported_client`) explaining that approval cannot be round-tripped, with a pointer to the setup docs. **The adapter never silently executes a mutation on a session that cannot carry approval.**
+3. The session's capability state is logged and visible in `sessions show <id>`. Operators can audit which connected clients are capable of mutating operations.
+
+This preserves the load-bearing property of the approval gate under client heterogeneity: in the worst case an unsupported client sees a degraded surface, but at no point does the adapter fall through to trusting the model's tool arguments.
+
 ### No agent-only gates
 
 There is no "destructive-op gate" specific to agents. The same REPL-registry classification applies identically for humans at the REPL and agents over MCP. Nothing is special-cased.
@@ -294,8 +307,10 @@ It also lightly extends the **I9/I10** development-agent use cases by letting a 
   - `mutating` calls trigger an MCP `elicitRequest`; dispatch only on user-approve.
   - `operational` calls execute directly under per-session budget.
   - `read_only` calls execute directly.
-  - Fallback `confirmation_id` protocol for clients without elicitation support, delivered via transport-level header or response-replay token (not a tool argument).
+  - Fallback `confirmation_id` protocol for clients without elicitation support, delivered via Streamable HTTP `Mcp-Confirmation-Id` header or stdio `_meta.terminals_confirmation_id` (see [Approval Model → Fallback](#fallback-two-call-confirmation_id-protocol)).
+- **Connection-time capability negotiation** with a fail-closed outcome: clients that support neither elicitation nor the fallback carrier are pinned to `mutating_unavailable` for the session. The adapter never silently executes a mutation on such a session.
 - No tool schema contains `confirm` or `force` arguments.
+- `unsafe_confirmation_protocol` audit event emitted when elicitation or fallback round-trip latency falls below the configured threshold (default 500 ms).
 - Add `origin=mcp` to `ReplSession` records; surface in `sessions ls` / `sessions show`.
 - Wire session lifecycle: connect creates a session, **disconnect detaches** (moves to `DetachedSession`), explicit terminate or idle timeout ends it.
 - Implement stdio transport and Streamable HTTP transport behind the same dispatcher.
@@ -326,6 +341,7 @@ All three phases are the initial Go work to ship the feature. Once they are in, 
 - Both stdio and Streamable HTTP transports are supported and documented.
 - Every MCP call is a structured-logged REPL session event, queryable via `logs query`. Elicitation outcomes (approved / rejected / timed-out) are part of the log record.
 - No MCP tool schema exposes a `confirm` or `force` argument. Approval for `mutating` calls arrives via MCP elicitation (or the transport-level `confirmation_id` fallback). A model cannot self-approve a mutation by setting an argument.
+- Connection-time capability negotiation classifies each session as `mutating_via_elicitation`, `mutating_via_fallback`, or `mutating_unavailable`. Sessions in the third state reject `mutating` tool calls with a structured `unsupported_client` error; the adapter never falls through to trusting the model's arguments.
 - `operational`-tier calls execute without elicitation but are subject to a per-session concurrent-stream cap and stream-TTL budget; the same limits apply for human-origin and MCP-origin sessions.
 - `repl_complete` and `repl_describe` are first-class MCP tools.
 - `docs` calls via MCP return machine-readable Markdown, not paged terminal output.

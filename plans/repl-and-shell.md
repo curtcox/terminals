@@ -297,6 +297,7 @@ type SessionService interface {
 ```go
 type ReplService interface {
     EvalCommand(ctx context.Context, req EvalCommandRequest) (*EvalCommandResponse, error)
+    EvalCommandStream(ctx context.Context, req EvalCommandRequest) (ReplStream, error) // operational-tier streaming; see agent-delegation.md#streaming
     Complete(ctx context.Context, req CompleteRequest) (*CompleteResponse, error)
     DescribeCommand(ctx context.Context, req DescribeCommandRequest) (*DescribeCommandResponse, error)
     SearchDocs(ctx context.Context, req SearchDocsRequest) (*SearchDocsResponse, error)
@@ -701,7 +702,7 @@ Invariants:
 
 ### Phase B — REPL core
 
-- implement parser, command registry (with `read_only | mutating` metadata), completion, paging, and history
+- implement parser, command registry (with `read_only | operational | mutating` metadata), completion, paging, and history
 - support human-readable and machine-readable output formats
 - add command metadata model: synopsis, args, examples, related docs
 - implement `help`, `describe`, and error suggestions
