@@ -3,9 +3,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,14 +31,17 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/discovery"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/mcpadapter"
 	"github.com/curtcox/terminals/terminal_server/internal/observation"
 	"github.com/curtcox/terminals/terminal_server/internal/placement"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/repl"
 	"github.com/curtcox/terminals/terminal_server/internal/replai"
+	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
+	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 	"github.com/curtcox/terminals/terminal_server/internal/world"
@@ -45,6 +50,9 @@ import (
 func main() {
 	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "repl" {
 		os.Exit(runREPL(os.Stdin, os.Stdout, os.Stderr))
+	}
+	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "mcp-stdio" {
+		os.Exit(runMCPStdio(os.Stdin, os.Stdout, os.Stderr))
 	}
 
 	cfg, err := config.Load()
@@ -142,7 +150,31 @@ func main() {
 		logger.Error("recover scenario activations", "event", "scenario.recovery.failed", "error", err)
 	}
 	controlStream := transport.NewStreamHandler(controlService)
-	controlStream.SetTerminalREPLAdminURL(fmt.Sprintf("http://127.0.0.1:%d", cfg.AdminHTTPPort))
+	adminBaseURL := fmt.Sprintf("http://127.0.0.1:%d", cfg.AdminHTTPPort)
+	controlStream.SetTerminalREPLAdminURL(adminBaseURL)
+	mcpAdapter := mcpadapter.New(mcpadapter.Config{
+		AdminBaseURL: adminBaseURL,
+		UnsafeConfirmation: func(ctx context.Context, event mcpadapter.UnsafeConfirmationEvent) {
+			eventlog.Emit(ctx, "unsafe_confirmation_protocol", slog.LevelWarn, "unsafe confirmation protocol observed",
+				slog.String("session_origin", "mcp"),
+				slog.String("session_id", event.SessionID),
+				slog.String("client_id", event.ClientID),
+				slog.String("tool", event.ToolName),
+				slog.String("command_hash", event.CommandHash),
+				slog.Int64("latency_ms", event.Latency.Milliseconds()),
+				slog.String("path", event.Path),
+			)
+		},
+	})
+	mcpServer, err := mcpadapter.NewServer(mcpadapter.ServerConfig{
+		Adapter:      mcpAdapter,
+		Sessions:     controlStream.ReplSessions(),
+		AdminBaseURL: adminBaseURL,
+	})
+	if err != nil {
+		logger.Error("configure mcp adapter", "event", "mcp.configure.failed", "error", err)
+		return
+	}
 	replAIService := replai.NewService(controlStream.ReplSessions(), replai.Config{
 		DefaultProvider: cfg.AI.DefaultProvider,
 		DefaultModel:    cfg.AI.DefaultModel,
@@ -171,7 +203,7 @@ func main() {
 		logger.Error("start photo frame asset server", "event", "transport.http.photo_frame.start_failed", "error", err)
 		return
 	}
-	adminServer, err := startAdminServer(cfg, admin.NewHandler(
+	adminHandler := admin.NewHandler(
 		controlService,
 		scenarioRuntime,
 		controlStream.ReplSessions(),
@@ -180,7 +212,12 @@ func main() {
 		func() { registerAppScenarioDefinitions(scenarioEngine, appRuntime) },
 		deviceManager,
 		cfg,
-	))
+	)
+	adminMux := http.NewServeMux()
+	adminMux.Handle("/mcp", mcpServer)
+	adminMux.Handle("/mcp/", mcpServer)
+	adminMux.Handle("/", adminHandler)
+	adminServer, err := startAdminServer(cfg, adminMux)
 	if err != nil {
 		logger.Error("start admin dashboard", "event", "admin.http.start_failed", "error", err)
 		return
@@ -218,7 +255,8 @@ func main() {
 		WebSocket:   fmt.Sprintf("ws://%s%s", cfg.ControlWSAddress(), websocketServer.Path()),
 		TCP:         cfg.ControlTCPAddress(),
 		HTTP:        fmt.Sprintf("http://%s", cfg.ControlHTTPAddress()),
-		Priority:    []string{"grpc", "websocket", "tcp", "http"},
+		MCP:         mcpEndpointURL(cfg),
+		Priority:    []string{"grpc", "websocket", "tcp", "http", "mcp"},
 	}); err != nil {
 		logger.Error("start mDNS", "event", "discovery.mdns.failed", "error", err)
 		return
@@ -341,6 +379,55 @@ func runREPL(stdin io.Reader, stdout, stderr io.Writer) int {
 		SessionID:    strings.TrimSpace(os.Getenv("TERMINALS_REPL_SESSION_ID")),
 	}); err != nil {
 		_, _ = fmt.Fprintf(stderr, "repl: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func runMCPStdio(stdin io.Reader, stdout, stderr io.Writer) int {
+	cfg, err := config.Load()
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "load config: %v\n", err)
+		return 1
+	}
+	adminBaseURL := fmt.Sprintf("http://127.0.0.1:%d", cfg.AdminHTTPPort)
+	statusURL := strings.TrimSuffix(adminBaseURL, "/") + "/admin/api/status"
+	req, err := http.NewRequest(http.MethodGet, statusURL, nil)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "mcp-stdio: build status probe: %v\n", err)
+		return 1
+	}
+	probeCtx, probeCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer probeCancel()
+	req = req.WithContext(probeCtx)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp == nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		_, _ = fmt.Fprintf(stderr, "mcp-stdio: no running server detected at %s\n", statusURL)
+		return 1
+	}
+	_ = resp.Body.Close()
+
+	adapter := mcpadapter.New(mcpadapter.Config{
+		AdminBaseURL: adminBaseURL,
+	})
+	sessions := replsession.NewService(terminal.NewManager())
+	server, err := mcpadapter.NewServer(mcpadapter.ServerConfig{
+		Adapter:      adapter,
+		Sessions:     sessions,
+		AdminBaseURL: adminBaseURL,
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "mcp-stdio: configure: %v\n", err)
+		return 1
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+	if err := server.ServeStdio(ctx, stdin, stdout); err != nil && !errors.Is(err, context.Canceled) {
+		_, _ = fmt.Fprintf(stderr, "mcp-stdio: %v\n", err)
 		return 1
 	}
 	return 0
@@ -706,6 +793,17 @@ func photoFrameAssetBaseURL(cfg config.Config) string {
 		publicHost += ".local"
 	}
 	return fmt.Sprintf("http://%s:%d/photo-frame", publicHost, cfg.PhotoFrameHTTPPort)
+}
+
+func mcpEndpointURL(cfg config.Config) string {
+	publicHost := strings.TrimSpace(cfg.MDNSName)
+	if publicHost == "" {
+		publicHost = "localhost"
+	}
+	if !strings.Contains(publicHost, ".") {
+		publicHost += ".local"
+	}
+	return fmt.Sprintf("http://%s:%d/mcp", publicHost, cfg.AdminHTTPPort)
 }
 
 func firstModel(models []string) string {

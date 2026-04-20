@@ -21,6 +21,7 @@ type ServiceInfo struct {
 	WebSocket   string
 	TCP         string
 	HTTP        string
+	MCP         string
 	Priority    []string
 }
 
@@ -64,6 +65,9 @@ func NewMDNSAdvertiser() *MDNSAdvertiser {
 			}
 			if httpAddr := strings.TrimSpace(svc.HTTP); httpAddr != "" {
 				txt = append(txt, fmt.Sprintf("http=%s", httpAddr))
+			}
+			if mcpAddr := strings.TrimSpace(svc.MCP); mcpAddr != "" {
+				txt = append(txt, fmt.Sprintf("mcp=%s", mcpAddr))
 			}
 			if len(svc.Priority) > 0 {
 				txt = append(txt, fmt.Sprintf("priority=%s", strings.Join(svc.Priority, ",")))

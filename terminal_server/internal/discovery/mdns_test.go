@@ -83,7 +83,8 @@ func TestMDNSAdvertiserIncludesTransportMetadata(t *testing.T) {
 		WebSocket:   "ws://127.0.0.1:50054/control",
 		TCP:         "127.0.0.1:50055",
 		HTTP:        "http://127.0.0.1:50056",
-		Priority:    []string{"grpc", "websocket", "tcp", "http"},
+		MCP:         "http://127.0.0.1:50053/mcp",
+		Priority:    []string{"grpc", "websocket", "tcp", "http", "mcp"},
 	})
 	if err != nil {
 		t.Fatalf("newZone() error = %v", err)
@@ -98,7 +99,8 @@ func TestMDNSAdvertiserIncludesTransportMetadata(t *testing.T) {
 	assertTXTContains(t, zone, "ws=ws://127.0.0.1:50054/control")
 	assertTXTContains(t, zone, "tcp=127.0.0.1:50055")
 	assertTXTContains(t, zone, "http=http://127.0.0.1:50056")
-	assertTXTContains(t, zone, "priority=grpc,websocket,tcp,http")
+	assertTXTContains(t, zone, "mcp=http://127.0.0.1:50053/mcp")
+	assertTXTContains(t, zone, "priority=grpc,websocket,tcp,http,mcp")
 }
 
 func assertTXTContains(t *testing.T, zone *mdns.MDNSService, expected string) {

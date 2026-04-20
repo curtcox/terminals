@@ -1,1 +1,1 @@
-Wire mcpadapter into server stdio and Streamable HTTP transports, including /mcp endpoint, session lifecycle, and approval logging integration.
+Run a live smoke test: start server, then verify MCP over /mcp and mcp-stdio against a real client.
