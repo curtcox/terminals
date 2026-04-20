@@ -14,9 +14,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -63,9 +65,12 @@ func replCommandSpecs() []commandSpec {
 		{Name: "activations ls", Usage: "activations ls [--json]", Summary: "List active scenario by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/activations"}},
 		{Name: "claims tree", Usage: "claims tree [--json]", Summary: "Show claims grouped by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/claims"}},
 		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "app logs", Usage: "app logs <app> [<query>]", Summary: "Query app-related logs", Classification: commandOperational, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app reload", Usage: "app reload <app> [--json]", Summary: "Reload an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app rollback", Usage: "app rollback <app> [--json]", Summary: "Rollback an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "config show", Usage: "config show [--json]", Summary: "Show effective config", Classification: commandReadOnly},
+		{Name: "logs tail", Usage: "logs tail [<query>]", Summary: "Query recent server logs", Classification: commandOperational, RelatedDocs: []string{"repl/commands/logs"}},
+		{Name: "observe tail", Usage: "observe tail [<query>]", Summary: "Alias for logs tail", Classification: commandOperational, RelatedDocs: []string{"repl/commands/logs"}},
 		{Name: "docs ls", Usage: "docs ls", Summary: "List documentation topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
 		{Name: "docs search", Usage: "docs search <query>", Summary: "Search documentation topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
 		{Name: "docs open", Usage: "docs open <topic>", Summary: "Open one documentation topic", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
@@ -144,6 +149,7 @@ type state struct {
 	session  string
 	client   *http.Client
 	docsMode DocsRenderMode
+	docsRoot string
 }
 
 func newState(out io.Writer, adminBaseURL, sessionID string) *state {
@@ -169,6 +175,7 @@ func newStateWithDocsMode(out io.Writer, adminBaseURL, sessionID string, docsMod
 		session:  sessionID,
 		client:   &http.Client{Timeout: 3 * time.Second},
 		docsMode: normalizeDocsRenderMode(docsMode),
+		docsRoot: resolveDocsRoot(),
 	}
 }
 
@@ -237,11 +244,11 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "activations", "claims", "app", "config", "docs", "ai":
+	case "devices", "sessions", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
-		suggestions := suggestCommands(input, 3)
+		suggestions := suggestApproxCommands(input, 3)
 		if len(suggestions) == 0 {
 			return false, fmt.Errorf("unknown command: %s", tokens[0])
 		}
@@ -457,6 +464,13 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			_, err = fmt.Fprintf(s.out, "OK  app=%s action=%s version=%s\n", appName, sub, toString(body["version"]))
 			return err
+		case "logs":
+			if len(args) < 2 {
+				return errors.New("usage: app logs <app> [query]")
+			}
+			appName := strings.TrimSpace(args[1])
+			query := strings.TrimSpace(strings.Join(args[2:], " "))
+			return s.queryLogs(ctx, appName, query)
 		default:
 			return fmt.Errorf("unknown command: app %s", sub)
 		}
@@ -476,7 +490,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 	case "docs":
 		switch sub {
 		case "ls":
-			topics, err := listDocTopics("docs/repl")
+			topics, err := listDocTopics(s.docsRoot)
 			if err != nil {
 				return err
 			}
@@ -491,7 +505,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return errors.New("usage: docs search <query>")
 			}
 			query := strings.ToLower(strings.TrimSpace(strings.Join(args[1:], " ")))
-			matches, err := searchDocTopics("docs/repl", query)
+			matches, err := searchDocTopics(s.docsRoot, query)
 			if err != nil {
 				return err
 			}
@@ -519,7 +533,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return errors.New("usage: docs open <topic>")
 			}
 			topic := strings.TrimSpace(strings.Join(args[1:], " "))
-			path := resolveDocTopicPath("docs/repl", topic)
+			path := resolveDocTopicPath(s.docsRoot, topic)
 			content, err := os.ReadFile(path)
 			if err != nil {
 				return err
@@ -531,7 +545,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if len(args) > 1 {
 				filter = strings.ToLower(strings.Join(args[1:], " "))
 			}
-			topics, err := listDocTopics(filepath.Join("docs/repl", "examples"))
+			topics, err := listDocTopics(filepath.Join(s.docsRoot, "examples"))
 			if err != nil {
 				return err
 			}
@@ -546,6 +560,18 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		default:
 			return fmt.Errorf("unknown command: docs %s", sub)
 		}
+	case "logs":
+		if sub != "tail" {
+			return fmt.Errorf("unknown command: logs %s", sub)
+		}
+		query := strings.TrimSpace(strings.Join(args[1:], " "))
+		return s.queryLogs(ctx, "", query)
+	case "observe":
+		if sub != "tail" {
+			return fmt.Errorf("unknown command: observe %s", sub)
+		}
+		query := strings.TrimSpace(strings.Join(args[1:], " "))
+		return s.queryLogs(ctx, "", query)
 	case "ai":
 		switch sub {
 		case "providers":
@@ -662,6 +688,38 @@ func (s *state) deleteJSON(ctx context.Context, route string) (map[string]any, e
 	return s.doJSON(ctx, http.MethodDelete, route, "", nil)
 }
 
+func (s *state) fetchTextQuery(ctx context.Context, route string, query url.Values) (string, error) {
+	base, err := url.JoinPath(s.adminURL, route)
+	if err != nil {
+		return "", err
+	}
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
+	parsed.RawQuery = query.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return "", fmt.Errorf("admin request failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
 func (s *state) postFormJSON(ctx context.Context, route string, form url.Values) (map[string]any, error) {
 	if form == nil {
 		form = url.Values{}
@@ -743,8 +801,8 @@ func (s *state) completeCommand(args []string) error {
 	if len(args) == 0 {
 		return errors.New("usage: complete <prefix>")
 	}
-	prefix := strings.TrimSpace(strings.ToLower(strings.Join(args, " ")))
-	matches := suggestCommands(prefix, 32)
+	prefix := strings.ToLower(strings.Join(args, " "))
+	matches := completeCommands(prefix, 32)
 	if len(matches) == 0 {
 		_, err := fmt.Fprintln(s.out, "(no completions)")
 		return err
@@ -783,6 +841,27 @@ func (s *state) renderCommandSpec(spec commandSpec) error {
 		}
 	}
 	return nil
+}
+
+func (s *state) queryLogs(ctx context.Context, appName, query string) error {
+	params := url.Values{}
+	if strings.TrimSpace(appName) != "" {
+		params.Set("app", strings.TrimSpace(appName))
+	}
+	if strings.TrimSpace(query) != "" {
+		params.Set("q", strings.TrimSpace(query))
+	}
+	body, err := s.fetchTextQuery(ctx, "/admin/logs.jsonl", params)
+	if err != nil {
+		return err
+	}
+	body = strings.TrimSpace(body)
+	if body == "" {
+		_, err := fmt.Fprintln(s.out, "(no log records)")
+		return err
+	}
+	_, err = fmt.Fprintln(s.out, body)
+	return err
 }
 
 func formatUnixMillis(raw any) string {
@@ -1090,7 +1169,58 @@ func padRight(s string, width int) string {
 	return s + strings.Repeat(" ", width-len(s))
 }
 
-func suggestCommands(input string, limit int) []string {
+func completeCommands(input string, limit int) []string {
+	input = strings.ToLower(input)
+	trailingSpace := strings.HasSuffix(input, " ")
+	inputTokens := strings.Fields(input)
+	if limit <= 0 {
+		limit = 1
+	}
+	matches := make([]string, 0, len(replCommandSpecs()))
+	for _, spec := range replCommandSpecs() {
+		if commandMatchesPrefix(spec.Name, inputTokens, trailingSpace) {
+			matches = append(matches, spec.Name)
+		}
+	}
+	sort.Strings(matches)
+	if len(matches) > limit {
+		return matches[:limit]
+	}
+	return matches
+}
+
+func commandMatchesPrefix(commandName string, inputTokens []string, trailingSpace bool) bool {
+	if len(inputTokens) == 0 {
+		return true
+	}
+	commandTokens := strings.Fields(strings.ToLower(strings.TrimSpace(commandName)))
+	if len(commandTokens) == 0 {
+		return false
+	}
+	if trailingSpace {
+		if len(inputTokens) >= len(commandTokens) {
+			return false
+		}
+		for i, token := range inputTokens {
+			if commandTokens[i] != token {
+				return false
+			}
+		}
+		return true
+	}
+	if len(inputTokens) > len(commandTokens) {
+		return false
+	}
+	for i := 0; i < len(inputTokens)-1; i++ {
+		if commandTokens[i] != inputTokens[i] {
+			return false
+		}
+	}
+	last := len(inputTokens) - 1
+	return strings.HasPrefix(commandTokens[last], inputTokens[last])
+}
+
+func suggestApproxCommands(input string, limit int) []string {
 	input = strings.TrimSpace(strings.ToLower(input))
 	if limit <= 0 {
 		limit = 1
@@ -1127,6 +1257,65 @@ func suggestCommands(input string, limit int) []string {
 		out = append(out, cand.name)
 	}
 	return out
+}
+
+var (
+	docsRootOnce sync.Once
+	docsRootPath string
+)
+
+func resolveDocsRoot() string {
+	docsRootOnce.Do(func() {
+		docsRootPath = discoverDocsRoot()
+	})
+	return docsRootPath
+}
+
+func discoverDocsRoot() string {
+	envRoot := strings.TrimSpace(os.Getenv("TERMINALS_REPL_DOCS_ROOT"))
+	if envRoot != "" {
+		if dirExists(filepath.Join(envRoot, "docs", "repl")) {
+			return filepath.Join(envRoot, "docs", "repl")
+		}
+		if dirExists(envRoot) && strings.HasSuffix(filepath.ToSlash(envRoot), "/docs/repl") {
+			return envRoot
+		}
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		if found := findDocsRootFrom(cwd); found != "" {
+			return found
+		}
+	}
+	if _, sourceFile, _, ok := runtime.Caller(0); ok {
+		if found := findDocsRootFrom(filepath.Dir(sourceFile)); found != "" {
+			return found
+		}
+	}
+	return filepath.Join("docs", "repl")
+}
+
+func findDocsRootFrom(start string) string {
+	dir := filepath.Clean(strings.TrimSpace(start))
+	if dir == "" {
+		return ""
+	}
+	for {
+		candidate := filepath.Join(dir, "docs", "repl")
+		if dirExists(candidate) {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 func editDistance(a, b string) int {

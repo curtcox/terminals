@@ -237,7 +237,7 @@ func (a *Adapter) CallToolStream(ctx context.Context, req CallToolRequest, onChu
 	}
 
 	if tool.Name == ToolReplComplete {
-		prefix := strings.TrimSpace(anyString(req.Arguments["prefix"]))
+		prefix := anyString(req.Arguments["prefix"])
 		limit := anyInt(req.Arguments["limit"])
 		return CallToolResponse{
 			Status: "ok",

@@ -113,7 +113,7 @@ func DescribeCommand(command string) (CommandSpec, bool) {
 
 // Complete returns command completions for a prefix.
 func Complete(prefix string, limit int) []string {
-	return suggestCommands(prefix, limit)
+	return completeCommands(prefix, limit)
 }
 
 func toPublicCommandSpec(spec commandSpec) CommandSpec {

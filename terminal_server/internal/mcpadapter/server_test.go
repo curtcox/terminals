@@ -186,8 +186,8 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 	caps := parseClientCapabilities(map[string]any{
 		"capabilities": map[string]any{},
 	}, rpcTransportHTTP)
-	if caps.SupportsFallbackID {
-		t.Fatalf("supports fallback = true, want false by default")
+	if !caps.SupportsFallbackID {
+		t.Fatalf("supports fallback = false, want probe-enabled fallback by default")
 	}
 	withFallback := parseClientCapabilities(map[string]any{
 		"capabilities": map[string]any{
@@ -204,6 +204,66 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 	}, rpcTransportHTTP)
 	if withElicitation.SupportsElicitation {
 		t.Fatalf("supports elicitation = true, want false for http request/response transport")
+	}
+}
+
+func TestReplDiscoveryResultIncludesMetadataInVisiblePayload(t *testing.T) {
+	adapter := New(Config{})
+	sessions := &fakeSessionService{}
+	server, err := NewServer(ServerConfig{
+		Adapter:      adapter,
+		Sessions:     sessions,
+		AdminBaseURL: "http://127.0.0.1:50053",
+	})
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+	httpServer := httptest.NewServer(http.HandlerFunc(server.ServeHTTP))
+	defer httpServer.Close()
+
+	initResp := postRPC(t, httpServer.URL, "", rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("1"),
+		Method:  "initialize",
+		Params:  mustRawJSON(t, map[string]any{"clientInfo": map[string]any{"name": "codex"}}),
+	})
+	sessionID := strings.TrimSpace(anyString(parseAnyMap(initResp.Result)["session_id"]))
+	if sessionID == "" {
+		t.Fatalf("initialize response missing session_id")
+	}
+
+	callResp := postRPC(t, httpServer.URL, sessionID, rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("2"),
+		Method:  "tools/call",
+		Params: mustRawJSON(t, map[string]any{
+			"name":      ToolReplComplete,
+			"arguments": map[string]any{"prefix": "sessions ", "limit": 5},
+		}),
+	})
+	callResult := parseAnyMap(callResp.Result)
+	content, _ := callResult["content"].([]any)
+	if len(content) == 0 {
+		t.Fatalf("tools/call content missing")
+	}
+	text := anyString(parseAnyMap(content[0])["text"])
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(text), &payload); err != nil {
+		t.Fatalf("discovery payload is not json: %v text=%q", err, text)
+	}
+	metadata := parseAnyMap(payload["metadata"])
+	if len(metadata) == 0 {
+		t.Fatalf("visible payload missing metadata: %v", payload)
+	}
+	matches, _ := metadata["matches"].([]any)
+	if len(matches) == 0 {
+		if asStrings, ok := metadata["matches"].([]string); ok {
+			if len(asStrings) == 0 {
+				t.Fatalf("metadata.matches missing completion values: %v", metadata)
+			}
+			return
+		}
+		t.Fatalf("metadata.matches missing completion values: %v", metadata)
 	}
 }
 

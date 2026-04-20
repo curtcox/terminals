@@ -17,6 +17,7 @@ func TestToolsIncludeRegistryAndDiscoveryTools(t *testing.T) {
 	foundComplete := false
 	foundDescribe := false
 	foundAppReload := false
+	foundLogsTail := false
 	for _, tool := range tools {
 		switch tool.Name {
 		case ToolReplComplete:
@@ -28,13 +29,18 @@ func TestToolsIncludeRegistryAndDiscoveryTools(t *testing.T) {
 			if tool.Classification != "mutating" {
 				t.Fatalf("app_reload classification = %q", tool.Classification)
 			}
+		case "logs_tail":
+			foundLogsTail = true
+			if tool.Classification != "operational" {
+				t.Fatalf("logs_tail classification = %q", tool.Classification)
+			}
 		}
 		if strings.Contains(tool.Name, "confirm") || strings.Contains(tool.Name, "force") {
 			t.Fatalf("tool catalog should not expose confirm/force controls: %s", tool.Name)
 		}
 	}
-	if !foundComplete || !foundDescribe || !foundAppReload {
-		t.Fatalf("missing expected tools: complete=%v describe=%v app_reload=%v", foundComplete, foundDescribe, foundAppReload)
+	if !foundComplete || !foundDescribe || !foundAppReload || !foundLogsTail {
+		t.Fatalf("missing expected tools: complete=%v describe=%v app_reload=%v logs_tail=%v", foundComplete, foundDescribe, foundAppReload, foundLogsTail)
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -93,9 +92,9 @@ func TestExecuteCommandDocsMarkdownMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Getwd() error = %v", err)
 	}
-	repoRoot := filepath.Clean(filepath.Join(wd, "..", "..", ".."))
-	if chdirErr := os.Chdir(repoRoot); chdirErr != nil {
-		t.Fatalf("Chdir(%q) error = %v", repoRoot, chdirErr)
+	tempWD := t.TempDir()
+	if chdirErr := os.Chdir(tempWD); chdirErr != nil {
+		t.Fatalf("Chdir(%q) error = %v", tempWD, chdirErr)
 	}
 	t.Cleanup(func() {
 		_ = os.Chdir(wd)
@@ -112,6 +111,56 @@ func TestExecuteCommandDocsMarkdownMode(t *testing.T) {
 	}
 	if !strings.Contains(result.Output, "- `repl/commands/app`") {
 		t.Fatalf("markdown docs search missing topic bullet, got %q", result.Output)
+	}
+}
+
+func TestCompletePrefixFiltering(t *testing.T) {
+	logMatches := Complete("l", 20)
+	if len(logMatches) == 0 || logMatches[0] != "logs tail" {
+		t.Fatalf("l completions = %#v, want logs-prefixed command(s)", logMatches)
+	}
+
+	matches := Complete("sessions s", 20)
+	if len(matches) == 0 {
+		t.Fatalf("expected completions for sessions s")
+	}
+	for _, match := range matches {
+		if !strings.HasPrefix(match, "sessions s") {
+			t.Fatalf("completion %q does not match sessions s prefix", match)
+		}
+	}
+
+	matches = Complete("docs o", 20)
+	if len(matches) != 1 || matches[0] != "docs open" {
+		t.Fatalf("docs o completions = %#v, want [docs open]", matches)
+	}
+
+	matches = Complete("sessions ", 20)
+	if len(matches) == 0 {
+		t.Fatalf("expected subcommands for sessions prefix with trailing space")
+	}
+	for _, match := range matches {
+		if !strings.HasPrefix(match, "sessions ") {
+			t.Fatalf("completion %q does not remain under sessions namespace", match)
+		}
+	}
+}
+
+func TestDescribeOperationalLogCommands(t *testing.T) {
+	logsTail, ok := DescribeCommand("logs tail")
+	if !ok {
+		t.Fatalf("DescribeCommand(logs tail) not found")
+	}
+	if logsTail.Classification != CommandClassificationOperational {
+		t.Fatalf("logs tail classification = %q, want %q", logsTail.Classification, CommandClassificationOperational)
+	}
+
+	observeTail, ok := DescribeCommand("observe tail")
+	if !ok {
+		t.Fatalf("DescribeCommand(observe tail) not found")
+	}
+	if observeTail.Classification != CommandClassificationOperational {
+		t.Fatalf("observe tail classification = %q, want %q", observeTail.Classification, CommandClassificationOperational)
 	}
 }
 

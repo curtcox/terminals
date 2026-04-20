@@ -542,17 +542,44 @@ func (s *Server) emitCallLog(ctx context.Context, sessionID, toolName string, re
 
 func parseClientCapabilities(params map[string]any, transport rpcTransport) ClientCapabilities {
 	caps := parseAnyMap(params["capabilities"])
-	supportsElicitation := anyBool(caps["elicitation"])
-	// Fail closed by default: fallback confirmation must be explicitly declared
-	// by the client or mutating commands remain unavailable for the session.
-	supportsFallback := anyBool(caps["terminals_fallback_confirmation"])
+	supportsElicitation := capabilityEnabled(caps["elicitation"]) || capabilityEnabled(caps["mcp_elicitation"])
+	supportsFallback := capabilityEnabled(caps["terminals_fallback_confirmation"]) ||
+		capabilityEnabled(caps["fallback_confirmation"]) ||
+		capabilityEnabled(caps["confirmation_id"])
+	if !supportsFallback {
+		// Probe by default on supported transports so clients that can carry
+		// confirmation IDs do not need a custom initialize capability flag.
+		supportsFallback = true
+	}
 	if strings.EqualFold(string(transport), string(rpcTransportHTTP)) {
 		// HTTP transport in this server is request/response only, so server-originated
 		// elicitation requests cannot be round-tripped. Keep mutating fail-closed unless
-		// fallback confirmation is explicitly negotiated.
+		// fallback confirmation is available.
 		return ClientCapabilities{SupportsElicitation: false, SupportsFallbackID: supportsFallback}
 	}
 	return ClientCapabilities{SupportsElicitation: supportsElicitation, SupportsFallbackID: supportsFallback}
+}
+
+func capabilityEnabled(v any) bool {
+	switch typed := v.(type) {
+	case bool:
+		return typed
+	case string:
+		raw := strings.ToLower(strings.TrimSpace(typed))
+		return raw == "true" || raw == "1" || raw == "yes"
+	case map[string]any:
+		return true
+	case []any:
+		return len(typed) > 0
+	case json.RawMessage:
+		var decoded any
+		if err := json.Unmarshal(typed, &decoded); err != nil {
+			return false
+		}
+		return capabilityEnabled(decoded)
+	default:
+		return false
+	}
 }
 
 func (s *Server) elicitViaStdio(ctx context.Context, req ElicitRequest) (ElicitResponse, error) {
@@ -677,6 +704,9 @@ func toolResult(resp CallToolResponse) map[string]any {
 			"error_message":    resp.ErrorMessage,
 			"confirmation_id":  resp.ConfirmationID,
 			"rendered_command": resp.RenderedCommand,
+		}
+		if len(resp.Metadata) > 0 {
+			payload["metadata"] = resp.Metadata
 		}
 		if !resp.ExpiresAt.IsZero() {
 			payload["expires_at"] = resp.ExpiresAt.UTC().Format(time.RFC3339)
