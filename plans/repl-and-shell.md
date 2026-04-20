@@ -365,7 +365,7 @@ type PendingToolCall struct {
     ToolCallID string
     Command string
     Args map[string]any
-    Classification string // read_only | mutating
+    Classification string // read_only | operational | mutating
     Rendered string
 }
 
