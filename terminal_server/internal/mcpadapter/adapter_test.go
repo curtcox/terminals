@@ -2,6 +2,8 @@ package mcpadapter
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -158,6 +160,98 @@ func TestReplDiscoveryToolCalls(t *testing.T) {
 	}
 }
 
+func TestReplDescribeWithoutCommandReturnsRegistrySummary(t *testing.T) {
+	adapter := New(Config{})
+	adapter.OpenSession("repl-mcp-describe-1", "codex", ClientCapabilities{})
+
+	resp, err := adapter.CallTool(context.Background(), CallToolRequest{
+		SessionID: "repl-mcp-describe-1",
+		ToolName:  ToolReplDescribe,
+		Arguments: map[string]any{},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error = %v", err)
+	}
+	if resp.Status != "ok" {
+		t.Fatalf("status = %q, want ok", resp.Status)
+	}
+	commands, ok := resp.Metadata["commands"]
+	if !ok {
+		t.Fatalf("missing commands metadata in repl_describe summary response")
+	}
+	switch typed := commands.(type) {
+	case []any:
+		if len(typed) == 0 {
+			t.Fatalf("expected non-empty command registry summary")
+		}
+	default:
+		if fmt.Sprintf("%v", typed) == "[]" {
+			t.Fatalf("expected non-empty command registry summary")
+		}
+	}
+}
+
+func TestOptionalPositionalArgsAreNotRequiredInSchemas(t *testing.T) {
+	adapter := New(Config{})
+	tools := adapter.Tools()
+
+	var appLogs Tool
+	var logsTail Tool
+	for _, tool := range tools {
+		switch tool.Name {
+		case "app_logs":
+			appLogs = tool
+		case "logs_tail":
+			logsTail = tool
+		}
+	}
+	if appLogs.Name == "" || logsTail.Name == "" {
+		t.Fatalf("missing expected tools app_logs or logs_tail")
+	}
+
+	appLogsRequired := requiredSchemaFields(appLogs.ArgumentsSchema)
+	if !slices.Contains(appLogsRequired, "app") {
+		t.Fatalf("app_logs required fields = %#v, want app", appLogsRequired)
+	}
+	if slices.Contains(appLogsRequired, "query") {
+		t.Fatalf("app_logs should not require optional query; required=%#v", appLogsRequired)
+	}
+
+	logsTailRequired := requiredSchemaFields(logsTail.ArgumentsSchema)
+	if slices.Contains(logsTailRequired, "query") {
+		t.Fatalf("logs_tail should not require optional query; required=%#v", logsTailRequired)
+	}
+}
+
+func TestOptionalPositionalArgsAreOptionalAtCallTime(t *testing.T) {
+	adapter := New(Config{})
+	adapter.OpenSession("repl-mcp-optional-1", "codex", ClientCapabilities{})
+
+	logsResp, err := adapter.CallTool(context.Background(), CallToolRequest{
+		SessionID: "repl-mcp-optional-1",
+		ToolName:  "logs_tail",
+		Arguments: map[string]any{},
+	})
+	if err != nil {
+		t.Fatalf("logs_tail CallTool() error = %v", err)
+	}
+	if logsResp.ErrorCode == "invalid_arguments" {
+		t.Fatalf("logs_tail returned invalid_arguments for optional query: %+v", logsResp)
+	}
+
+	appLogsResp, err := adapter.CallTool(context.Background(), CallToolRequest{
+		SessionID: "repl-mcp-optional-1",
+		ToolName:  "app_logs",
+		Arguments: map[string]any{"app": "sound_watch"},
+	})
+	if err != nil {
+		t.Fatalf("app_logs CallTool() error = %v", err)
+	}
+	if appLogsResp.ErrorCode == "invalid_arguments" {
+		t.Fatalf("app_logs returned invalid_arguments with required-only args: %+v", appLogsResp)
+	}
+}
+
 func TestOperationalBudgetConcurrentLimit(t *testing.T) {
 	adapter := New(Config{
 		OperationalMax: 1,
@@ -234,4 +328,26 @@ func TestCallToolStreamEmitsOutputChunks(t *testing.T) {
 	if !strings.Contains(strings.Join(chunks, ""), "hello-stream") {
 		t.Fatalf("stream chunks missing echoed text: %q", strings.Join(chunks, ""))
 	}
+}
+
+func requiredSchemaFields(schema map[string]any) []string {
+	raw, ok := schema["required"]
+	if !ok {
+		return nil
+	}
+	typed, ok := raw.([]string)
+	if ok {
+		return typed
+	}
+	anySlice, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(anySlice))
+	for _, item := range anySlice {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }

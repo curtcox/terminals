@@ -248,6 +248,14 @@ func (a *Adapter) CallToolStream(ctx context.Context, req CallToolRequest, onChu
 	}
 	if tool.Name == ToolReplDescribe {
 		name := strings.TrimSpace(anyString(req.Arguments["command"]))
+		if name == "" {
+			return CallToolResponse{
+				Status: "ok",
+				Metadata: map[string]any{
+					"commands": repl.CommandSpecs(),
+				},
+			}, nil
+		}
 		spec, found := repl.DescribeCommand(name)
 		if !found {
 			return CallToolResponse{Status: "error", ErrorCode: "unknown_command", ErrorMessage: "unknown command"}, nil
@@ -445,9 +453,9 @@ func generateTools() []Tool {
 		},
 		Tool{
 			Name:            ToolReplDescribe,
-			Description:     "Mirror REPL describe metadata for one command.",
+			Description:     "Mirror REPL describe metadata for one command, or return registry summary when command is omitted.",
 			Classification:  repl.CommandClassificationReadOnly,
-			ArgumentsSchema: map[string]any{"type": "object", "properties": map[string]any{"command": map[string]any{"type": "string"}}, "required": []string{"command"}},
+			ArgumentsSchema: map[string]any{"type": "object", "properties": map[string]any{"command": map[string]any{"type": "string"}}},
 		},
 	)
 	sort.Slice(base, func(i, j int) bool { return base[i].Name < base[j].Name })
@@ -470,12 +478,14 @@ func buildArgumentsSchema(spec repl.CommandSpec) map[string]any {
 	properties := map[string]any{}
 	required := make([]string, 0, len(params))
 	for _, param := range params {
-		if param == "json" {
-			properties[param] = map[string]any{"type": "boolean", "description": "Return JSON output when command supports --json."}
+		if param.Name == "json" {
+			properties[param.Name] = map[string]any{"type": "boolean", "description": "Return JSON output when command supports --json."}
 			continue
 		}
-		properties[param] = map[string]any{"type": "string"}
-		required = append(required, param)
+		properties[param.Name] = map[string]any{"type": "string"}
+		if !param.Optional {
+			required = append(required, param.Name)
+		}
 	}
 	schema := map[string]any{"type": "object", "properties": properties}
 	if len(required) > 0 {
@@ -484,27 +494,35 @@ func buildArgumentsSchema(spec repl.CommandSpec) map[string]any {
 	return schema
 }
 
-func usageParams(usage string) []string {
+type usageParam struct {
+	Name     string
+	Optional bool
+}
+
+func usageParams(usage string) []usageParam {
 	tokens := strings.Fields(strings.TrimSpace(usage))
 	if len(tokens) <= 1 {
 		return nil
 	}
-	out := make([]string, 0)
+	out := make([]usageParam, 0)
 	for _, token := range tokens[1:] {
 		switch {
 		case token == "[--json]" || token == "--json":
-			out = append(out, "json")
+			out = append(out, usageParam{Name: "json", Optional: true})
 		case strings.HasPrefix(token, "<") && strings.HasSuffix(token, ">"):
 			name := strings.TrimSuffix(strings.TrimPrefix(token, "<"), ">")
 			name = strings.ReplaceAll(name, "-", "_")
-			out = append(out, name)
+			out = append(out, usageParam{Name: name})
 		case strings.HasPrefix(token, "[") && strings.HasSuffix(token, "]"):
 			inner := strings.TrimSuffix(strings.TrimPrefix(token, "["), "]")
 			if strings.HasPrefix(inner, "<") && strings.HasSuffix(inner, ">") {
 				name := strings.TrimSuffix(strings.TrimPrefix(inner, "<"), ">")
 				name = strings.ReplaceAll(name, "-", "_")
-				out = append(out, name)
+				out = append(out, usageParam{Name: name, Optional: true})
+				continue
 			}
+			inner = strings.ReplaceAll(inner, "-", "_")
+			out = append(out, usageParam{Name: inner, Optional: true})
 		}
 	}
 	return out
@@ -519,21 +537,22 @@ func renderCommand(tool Tool, args map[string]any) (rendered string, canonicalAr
 	parts := []string{spec.Name}
 	canonical := make([]string, 0, len(params))
 	for _, param := range params {
-		if param == "json" {
-			if anyBool(args[param]) {
+		if param.Name == "json" {
+			if anyBool(args[param.Name]) {
 				parts = append(parts, "--json")
 				canonical = append(canonical, "json=true")
-			} else {
-				canonical = append(canonical, "json=false")
 			}
 			continue
 		}
-		value := strings.TrimSpace(anyString(args[param]))
+		value := strings.TrimSpace(anyString(args[param.Name]))
 		if value == "" {
-			return "", "", fmt.Errorf("missing required argument: %s", param)
+			if param.Optional {
+				continue
+			}
+			return "", "", fmt.Errorf("missing required argument: %s", param.Name)
 		}
 		parts = append(parts, value)
-		canonical = append(canonical, param+"="+value)
+		canonical = append(canonical, param.Name+"="+value)
 	}
 	return strings.Join(parts, " "), strings.Join(canonical, "|"), nil
 }
