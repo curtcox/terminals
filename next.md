@@ -1,1 +1,1 @@
-Await review and decide whether to add true chunked MCP streaming for future tail-style REPL commands.
+Implement true MCP elicitation round-trips and streaming tool-result transport for operational tail commands.

@@ -58,6 +58,7 @@ type Server struct {
 	mu       sync.Mutex
 	bindings map[string]sessionBinding
 	inflight map[string]context.CancelFunc
+	probes   map[string]string
 }
 
 type sessionBinding struct {
@@ -84,6 +85,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		now:          now,
 		bindings:     map[string]sessionBinding{},
 		inflight:     map[string]context.CancelFunc{},
+		probes:       map[string]string{},
 	}, nil
 }
 
@@ -199,6 +201,10 @@ func (s *Server) handleRPCRequest(
 		params := parseAnyMap(req.Params)
 		clientIdentity := parseClientIdentity(params)
 		caps := parseClientCapabilities(params, transport)
+		requireFallbackProbe := !caps.SupportsElicitation && caps.SupportsFallbackID
+		if requireFallbackProbe {
+			caps.SupportsFallbackID = false
+		}
 		sessionID := strings.TrimSpace(rc.SessionID)
 		if sessionID == "" {
 			sessionID = strings.TrimSpace(anyString(params["session_id"]))
@@ -223,6 +229,11 @@ func (s *Server) handleRPCRequest(
 			"session_id":          info.SessionID,
 			"mutating_capability": string(info.Capability),
 			"registry_version":    s.adapter.RegistryVersion(),
+		}
+		if requireFallbackProbe {
+			token := s.issueFallbackProbe(info.SessionID)
+			result["fallback_probe_required"] = true
+			result["fallback_probe_token"] = token
 		}
 		return rpcResponse{JSONRPC: "2.0", ID: id, Result: result}, info.SessionID, hasRPCID(id)
 	case "tools/list":
@@ -256,6 +267,9 @@ func (s *Server) handleRPCRequest(
 		if confirmationID == "" {
 			meta := parseAnyMap(params["_meta"])
 			confirmationID = strings.TrimSpace(anyString(meta["terminals_confirmation_id"]))
+		}
+		if confirmed := s.confirmFallbackProbe(sessionID, confirmationID); confirmed {
+			confirmationID = ""
 		}
 		callCtx := ctx
 		requestID := rpcIDString(id)
@@ -333,6 +347,7 @@ func (s *Server) closeSession(ctx context.Context, sessionID string) {
 	if ok {
 		delete(s.bindings, sessionID)
 	}
+	delete(s.probes, sessionID)
 	s.mu.Unlock()
 	if ok {
 		_, _ = s.sessions.DetachSession(ctx, replsession.DetachSessionRequest{
@@ -341,6 +356,36 @@ func (s *Server) closeSession(ctx context.Context, sessionID string) {
 		})
 	}
 	s.adapter.CloseSession(sessionID)
+}
+
+func (s *Server) issueFallbackProbe(sessionID string) string {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return ""
+	}
+	token := fmt.Sprintf("probe_%d", s.nextID.Add(1))
+	s.mu.Lock()
+	s.probes[sessionID] = token
+	s.mu.Unlock()
+	return token
+}
+
+func (s *Server) confirmFallbackProbe(sessionID, suppliedToken string) bool {
+	sessionID = strings.TrimSpace(sessionID)
+	suppliedToken = strings.TrimSpace(suppliedToken)
+	if sessionID == "" || suppliedToken == "" {
+		return false
+	}
+	s.mu.Lock()
+	expected := strings.TrimSpace(s.probes[sessionID])
+	if expected == "" || expected != suppliedToken {
+		s.mu.Unlock()
+		return false
+	}
+	delete(s.probes, sessionID)
+	s.mu.Unlock()
+	s.adapter.SetSessionCapability(sessionID, MutatingViaFallback)
+	return true
 }
 
 func (s *Server) addInflight(sessionID, requestID string, cancel context.CancelFunc) {

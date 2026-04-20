@@ -127,6 +127,11 @@ func TestStdioInitializeAndEOFDetaches(t *testing.T) {
 
 func postRPC(t *testing.T, url, sessionID string, req rpcRequest) rpcResponse {
 	t.Helper()
+	return postRPCWithConfirmation(t, url, sessionID, "", req)
+}
+
+func postRPCWithConfirmation(t *testing.T, url, sessionID, confirmationID string, req rpcRequest) rpcResponse {
+	t.Helper()
 	body, err := json.Marshal(req)
 	if err != nil {
 		t.Fatalf("json.Marshal(request) error = %v", err)
@@ -138,6 +143,9 @@ func postRPC(t *testing.T, url, sessionID string, req rpcRequest) rpcResponse {
 	httpReq.Header.Set("Content-Type", "application/json")
 	if strings.TrimSpace(sessionID) != "" {
 		httpReq.Header.Set(HeaderSessionID, strings.TrimSpace(sessionID))
+	}
+	if strings.TrimSpace(confirmationID) != "" {
+		httpReq.Header.Set(HeaderConfirmationID, strings.TrimSpace(confirmationID))
 	}
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
@@ -187,6 +195,85 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 	}, rpcTransportHTTP)
 	if !withFallback.SupportsFallbackID {
 		t.Fatalf("supports fallback = false, want true when explicitly declared")
+	}
+}
+
+func TestFallbackProbeRequiredBeforeMutatingFallback(t *testing.T) {
+	adapter := New(Config{})
+	sessions := &fakeSessionService{}
+	server, err := NewServer(ServerConfig{
+		Adapter:      adapter,
+		Sessions:     sessions,
+		AdminBaseURL: "http://127.0.0.1:50053",
+	})
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+	httpServer := httptest.NewServer(http.HandlerFunc(server.ServeHTTP))
+	defer httpServer.Close()
+
+	initResp := postRPC(t, httpServer.URL, "", rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("1"),
+		Method:  "initialize",
+		Params: mustRawJSON(t, map[string]any{
+			"clientInfo": map[string]any{"name": "codex", "version": "1"},
+			"capabilities": map[string]any{
+				"terminals_fallback_confirmation": true,
+			},
+		}),
+	})
+	initResult := parseAnyMap(initResp.Result)
+	sessionID := strings.TrimSpace(anyString(initResult["session_id"]))
+	if sessionID == "" {
+		t.Fatalf("initialize response missing session_id")
+	}
+	if got := strings.TrimSpace(anyString(initResult["mutating_capability"])); got != string(MutatingUnavailable) {
+		t.Fatalf("mutating_capability = %q, want %q before probe", got, MutatingUnavailable)
+	}
+	probeToken := strings.TrimSpace(anyString(initResult["fallback_probe_token"]))
+	if probeToken == "" {
+		t.Fatalf("expected fallback_probe_token")
+	}
+
+	mutatingBeforeProbe := postRPC(t, httpServer.URL, sessionID, rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("2"),
+		Method:  "tools/call",
+		Params: mustRawJSON(t, map[string]any{
+			"name":      "app_reload",
+			"arguments": map[string]any{"app": "demo"},
+		}),
+	})
+	beforeResult := parseAnyMap(mutatingBeforeProbe.Result)
+	beforeMeta := parseAnyMap(beforeResult["_meta"])
+	if code := strings.TrimSpace(anyString(beforeMeta["error_code"])); code != "unsupported_client" {
+		t.Fatalf("error_code = %q, want unsupported_client before probe", code)
+	}
+
+	_ = postRPCWithConfirmation(t, httpServer.URL, sessionID, probeToken, rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("3"),
+		Method:  "tools/call",
+		Params: mustRawJSON(t, map[string]any{
+			"name":      "echo",
+			"arguments": map[string]any{"text": "probe"},
+		}),
+	})
+
+	mutatingAfterProbe := postRPC(t, httpServer.URL, sessionID, rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("4"),
+		Method:  "tools/call",
+		Params: mustRawJSON(t, map[string]any{
+			"name":      "app_reload",
+			"arguments": map[string]any{"app": "demo"},
+		}),
+	})
+	afterResult := parseAnyMap(mutatingAfterProbe.Result)
+	afterMeta := parseAnyMap(afterResult["_meta"])
+	if status := strings.TrimSpace(anyString(afterMeta["status"])); status != "confirmation_required" {
+		t.Fatalf("status = %q, want confirmation_required after probe", status)
 	}
 }
 

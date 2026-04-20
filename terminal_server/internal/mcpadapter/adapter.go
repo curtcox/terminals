@@ -200,6 +200,19 @@ func (a *Adapter) SessionInfo(sessionID string) (SessionInfo, bool) {
 	return info, ok
 }
 
+func (a *Adapter) SetSessionCapability(sessionID string, capability MutatingCapability) bool {
+	sessionID = strings.TrimSpace(sessionID)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	info, ok := a.sessions[sessionID]
+	if !ok {
+		return false
+	}
+	info.Capability = capability
+	a.sessions[sessionID] = info
+	return true
+}
+
 func (a *Adapter) CallTool(ctx context.Context, req CallToolRequest) (CallToolResponse, error) {
 	tool, ok := a.toolsByName[strings.TrimSpace(req.ToolName)]
 	if !ok {

@@ -17,3 +17,4 @@ Point your desktop client to:
 - `mutating` commands require out-of-band approval.
 - `read_only` and `operational` commands execute directly.
 - Tool schemas do not include `confirm` or `force` fields.
+- Clients using fallback confirmation must complete a one-time `fallback_probe_token` echo before mutating tools are enabled.
