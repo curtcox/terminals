@@ -246,13 +246,13 @@ The ID is never in the model-visible tool schema and is not forgeable by the mod
 
 ### Capability negotiation and fail-closed behavior
 
-Neither elicitation nor the fallback carrier can be assumed to work across all MCP clients. Custom HTTP headers may be stripped by middleware or client stacks; some typed MCP clients normalize `tools/call` to `{name, arguments}` only and drop the `_meta` envelope. The adapter therefore negotiates explicitly at connection time:
+Neither elicitation nor every fallback carrier can be assumed to work across all MCP clients. Custom HTTP headers may be stripped by middleware or client stacks; some typed MCP clients normalize `tools/call` to `{name, arguments}` only and drop the `_meta` envelope. The adapter therefore negotiates explicitly at connection time:
 
-1. On connect, the adapter reads the client's declared MCP capabilities (including whether it advertises elicitation support) and then issues a **fallback probe**: a no-op `tools/call` that requires the client to echo a server-supplied `_meta` field (stdio) or a custom header (Streamable HTTP) back on a follow-up call. The probe result is cached for the session's lifetime.
-2. The session is classified into one of three capability states based on the probe outcome:
+1. On connect, the adapter reads the client's declared MCP capabilities (including whether it advertises elicitation support).
+2. The session is classified into one of three capability states:
    - `mutating_via_elicitation` — client supports MCP elicitation; all `mutating` calls use the primary mechanism.
-   - `mutating_via_fallback` — client lacks elicitation but passed the fallback probe; `mutating` calls use the `confirmation_id` protocol.
-   - `mutating_unavailable` — client lacks elicitation and failed the fallback probe. The session is restricted to `read_only` and `operational` calls only. Any `mutating` tool call on such a session returns a structured error (`unsupported_client`) explaining that approval cannot be round-tripped, with a pointer to the setup docs. **The adapter never silently executes a mutation on a session that cannot carry approval.**
+   - `mutating_via_fallback` — client lacks elicitation and uses the `confirmation_id` protocol for `mutating` calls.
+   - `mutating_unavailable` — client supports neither approval carrier. The session is restricted to `read_only` and `operational` calls only. Any `mutating` tool call on such a session returns a structured error (`unsupported_client`) explaining that approval cannot be round-tripped, with a pointer to the setup docs. **The adapter never silently executes a mutation on a session that cannot carry approval.**
 3. The session's capability state is logged and visible in `sessions show <id>`. Operators can audit which connected clients are capable of mutating operations.
 
 This preserves the load-bearing property of the approval gate under client heterogeneity: in the worst case an unsupported client sees a degraded surface, but at no point does the adapter fall through to trusting the model's tool arguments.

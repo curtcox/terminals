@@ -1,1 +1,1 @@
-No pending tasks.
+Await user validation of the fallback negotiation fix.

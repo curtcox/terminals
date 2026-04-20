@@ -24,12 +24,8 @@ The same limits apply for human-origin and MCP-origin sessions.
 
 For clients that don't yet support elicitation (spec 2025-06-18 and later):
 
-1. On initialize, clients that declare fallback support receive a `fallback_probe_token`.
-2. Client echoes the token once via the fallback carrier to prove the carrier survives the client's transport stack:
-   - Streamable HTTP: `Mcp-Confirmation-Id` request header.
-   - stdio: `_meta.terminals_confirmation_id` field in the `tools/call` envelope.
-3. Probe passes → client is marked `mutating_via_fallback`.
-4. First mutating call returns:
+1. Session is marked `mutating_via_fallback` when elicitation is unavailable.
+2. First mutating call returns:
    ```json
    {
      "status": "confirmation_required",
@@ -39,15 +35,17 @@ For clients that don't yet support elicitation (spec 2025-06-18 and later):
      "classification": "mutating"
    }
    ```
-5. Client surfaces a user prompt, then replays the same call carrying the ID on the fallback carrier.
-6. Adapter validates session-bound + command-bound + arg-bound + not expired + not previously consumed. On success → dispatch. On mismatch → fresh `confirmation_required` with a new ID.
+3. Client surfaces a user prompt, then replays the same call carrying the ID on the fallback carrier:
+   - Streamable HTTP: `Mcp-Confirmation-Id` request header.
+   - stdio: `_meta.terminals_confirmation_id` field in the `tools/call` envelope.
+4. Adapter validates session-bound + command-bound + arg-bound + not expired + not previously consumed. On success → dispatch. On mismatch → fresh `confirmation_required` with a new ID.
 
 ## Fail-closed
 
 A session is classified at connect time into one of three states:
 
 - `mutating_via_elicitation` — client advertises elicitation support.
-- `mutating_via_fallback` — client lacks elicitation but passed the fallback probe.
+- `mutating_via_fallback` — client lacks elicitation but can use transport-level `confirmation_id`.
 - `mutating_unavailable` — client supports neither. Mutating tools return `unsupported_client`. **No silent fallthrough to trusting model arguments.**
 
 State is visible in `sessions show <id>`.

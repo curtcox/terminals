@@ -240,10 +240,6 @@ func (s *Server) handleRPCRequest(
 		params := parseAnyMap(req.Params)
 		clientIdentity := parseClientIdentity(params)
 		caps := parseClientCapabilities(params, transport)
-		requireFallbackProbe := !caps.SupportsElicitation && caps.SupportsFallbackID
-		if requireFallbackProbe {
-			caps.SupportsFallbackID = false
-		}
 		sessionID := strings.TrimSpace(rc.SessionID)
 		if sessionID == "" {
 			sessionID = strings.TrimSpace(anyString(params["session_id"]))
@@ -268,11 +264,6 @@ func (s *Server) handleRPCRequest(
 			"session_id":          info.SessionID,
 			"mutating_capability": string(info.Capability),
 			"registry_version":    s.adapter.RegistryVersion(),
-		}
-		if requireFallbackProbe {
-			token := s.issueFallbackProbe(info.SessionID)
-			result["fallback_probe_required"] = true
-			result["fallback_probe_token"] = token
 		}
 		if transport == rpcTransportStdio && rc.Stdio != nil {
 			s.mu.Lock()
@@ -311,9 +302,6 @@ func (s *Server) handleRPCRequest(
 		if confirmationID == "" {
 			meta := parseAnyMap(params["_meta"])
 			confirmationID = strings.TrimSpace(anyString(meta["terminals_confirmation_id"]))
-		}
-		if confirmed := s.confirmFallbackProbe(sessionID, confirmationID); confirmed {
-			confirmationID = ""
 		}
 		callCtx := ctx
 		requestID := rpcIDString(id)

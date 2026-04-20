@@ -187,7 +187,7 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 		"capabilities": map[string]any{},
 	}, rpcTransportHTTP)
 	if !caps.SupportsFallbackID {
-		t.Fatalf("supports fallback = false, want probe-enabled fallback by default")
+		t.Fatalf("supports fallback = false, want fallback available by default")
 	}
 	withFallback := parseClientCapabilities(map[string]any{
 		"capabilities": map[string]any{
@@ -267,7 +267,7 @@ func TestReplDiscoveryResultIncludesMetadataInVisiblePayload(t *testing.T) {
 	}
 }
 
-func TestFallbackProbeRequiredBeforeMutatingFallback(t *testing.T) {
+func TestMutatingFallbackIsAvailableWithoutProbeHandshake(t *testing.T) {
 	adapter := New(Config{})
 	sessions := &fakeSessionService{}
 	server, err := NewServer(ServerConfig{
@@ -297,15 +297,11 @@ func TestFallbackProbeRequiredBeforeMutatingFallback(t *testing.T) {
 	if sessionID == "" {
 		t.Fatalf("initialize response missing session_id")
 	}
-	if got := strings.TrimSpace(anyString(initResult["mutating_capability"])); got != string(MutatingUnavailable) {
-		t.Fatalf("mutating_capability = %q, want %q before probe", got, MutatingUnavailable)
-	}
-	probeToken := strings.TrimSpace(anyString(initResult["fallback_probe_token"]))
-	if probeToken == "" {
-		t.Fatalf("expected fallback_probe_token")
+	if got := strings.TrimSpace(anyString(initResult["mutating_capability"])); got != string(MutatingViaFallback) {
+		t.Fatalf("mutating_capability = %q, want %q", got, MutatingViaFallback)
 	}
 
-	mutatingBeforeProbe := postRPC(t, httpServer.URL, sessionID, rpcRequest{
+	mutatingCall := postRPC(t, httpServer.URL, sessionID, rpcRequest{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage("2"),
 		Method:  "tools/call",
@@ -314,35 +310,13 @@ func TestFallbackProbeRequiredBeforeMutatingFallback(t *testing.T) {
 			"arguments": map[string]any{"app": "demo"},
 		}),
 	})
-	beforeResult := parseAnyMap(mutatingBeforeProbe.Result)
-	beforeMeta := parseAnyMap(beforeResult["_meta"])
-	if code := strings.TrimSpace(anyString(beforeMeta["error_code"])); code != "unsupported_client" {
-		t.Fatalf("error_code = %q, want unsupported_client before probe", code)
+	result := parseAnyMap(mutatingCall.Result)
+	meta := parseAnyMap(result["_meta"])
+	if status := strings.TrimSpace(anyString(meta["status"])); status != "confirmation_required" {
+		t.Fatalf("status = %q, want confirmation_required", status)
 	}
-
-	_ = postRPCWithConfirmation(t, httpServer.URL, sessionID, probeToken, rpcRequest{
-		JSONRPC: "2.0",
-		ID:      json.RawMessage("3"),
-		Method:  "tools/call",
-		Params: mustRawJSON(t, map[string]any{
-			"name":      "echo",
-			"arguments": map[string]any{"text": "probe"},
-		}),
-	})
-
-	mutatingAfterProbe := postRPC(t, httpServer.URL, sessionID, rpcRequest{
-		JSONRPC: "2.0",
-		ID:      json.RawMessage("4"),
-		Method:  "tools/call",
-		Params: mustRawJSON(t, map[string]any{
-			"name":      "app_reload",
-			"arguments": map[string]any{"app": "demo"},
-		}),
-	})
-	afterResult := parseAnyMap(mutatingAfterProbe.Result)
-	afterMeta := parseAnyMap(afterResult["_meta"])
-	if status := strings.TrimSpace(anyString(afterMeta["status"])); status != "confirmation_required" {
-		t.Fatalf("status = %q, want confirmation_required after probe", status)
+	if confirmationID := strings.TrimSpace(anyString(meta["confirmation_id"])); confirmationID == "" {
+		t.Fatalf("missing confirmation_id in fallback response")
 	}
 }
 
