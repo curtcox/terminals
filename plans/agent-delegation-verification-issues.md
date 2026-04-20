@@ -8,22 +8,26 @@ This file now tracks only currently outstanding issues.
 
 ## Status
 
-Outstanding verification issues remain.
+No outstanding verification issues remain.
 
-## Outstanding Issues
+## Resolved In This Pass
 
-1. Fail-closed capability negotiation is not fully enforced as designed.
-- In `terminal_server/internal/mcpadapter/server.go`, `parseClientCapabilities` defaults `supportsFallback` to true even when the client does not advertise fallback support, which makes `mutating_unavailable` effectively unreachable for server-managed sessions.
-- This conflicts with the plan requirement that clients lacking both approval carriers are pinned to `mutating_unavailable`.
+1. Fail-closed capability negotiation now matches plan intent.
+- `parseClientCapabilities` no longer defaults fallback support to true.
+- Sessions without elicitation and without fallback confirmation carrier now remain `mutating_unavailable`.
 
-2. HTTP transport behavior does not meet the streamable HTTP design intent.
-- `ServeHTTP` in `terminal_server/internal/mcpadapter/server.go` is implemented as a request/response JSON-RPC endpoint, while streaming chunk notifications are only emitted in stdio mode.
-- The plan and docs call for streamable HTTP transport support as a first-class path.
+2. HTTP transport now supports streamable tool-call output.
+- `ServeHTTP` supports `Accept: text/event-stream` for `tools/call`.
+- Streaming chunk notifications are emitted over SSE, followed by a final JSON-RPC response event.
 
-3. The planned typed REPL streaming service contract is still not implemented as a concrete service API.
-- `docs/repl/api/repl-service.md` still lists `EvalCommandStream` as planned, and there is no corresponding typed REPL service implementation surfaced in server APIs.
-- Current streaming is achieved through adapter-local execution (`repl.ExecuteCommandStream`) rather than the planned typed service RPC surface.
+3. Typed REPL streaming service contract docs now describe shipped APIs.
+- `docs/repl/api/repl-service.md` now documents the concrete typed API (`ExecuteCommand`, `ExecuteCommandStream`, `CommandSpecs`, `DescribeCommand`, `Complete`) implemented in `terminal_server/internal/repl/api.go`.
 
-4. Operational and approval policy knobs documented for runtime configuration are not wired through server config.
-- Adapter thresholds and limits are currently defaulted in `terminal_server/internal/mcpadapter/adapter.go`.
-- `terminal_server/internal/config/config.go` does not define `agent.operational.*` or approval-latency configuration fields referenced by docs.
+4. Operational and approval runtime knobs are now wired through config.
+- Added `Config.Agent.Operational` and `Config.Agent.Approval` fields in `terminal_server/internal/config/config.go`.
+- Added env wiring:
+  - `TERMINALS_AGENT_OPERATIONAL_MAX_STREAMS`
+  - `TERMINALS_AGENT_OPERATIONAL_STREAM_TTL_SECONDS`
+  - `TERMINALS_AGENT_APPROVAL_MIN_HUMAN_LATENCY_MS`
+  - `TERMINALS_AGENT_APPROVAL_CONFIRMATION_TTL_SECONDS`
+- `terminal_server/cmd/server/main.go` now passes these values into `mcpadapter.Config`.

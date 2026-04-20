@@ -105,6 +105,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	sessionID := strings.TrimSpace(r.Header.Get(HeaderSessionID))
 	confirmationID := strings.TrimSpace(r.Header.Get(HeaderConfirmationID))
+	if strings.EqualFold(strings.TrimSpace(req.Method), "tools/call") && acceptsEventStream(r.Header.Get("Accept")) {
+		s.serveHTTPToolCallStream(w, r, req, requestContext{SessionID: sessionID, ConfirmationID: confirmationID})
+		return
+	}
 	resp, sessionFromResponse, ok := s.handleRPCRequest(
 		r.Context(),
 		req,
@@ -120,6 +124,41 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) serveHTTPToolCallStream(w http.ResponseWriter, r *http.Request, req rpcRequest, rc requestContext) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	if strings.TrimSpace(rc.SessionID) != "" {
+		w.Header().Set(HeaderSessionID, strings.TrimSpace(rc.SessionID))
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	rc.HTTPStream = func(method string, params map[string]any) error {
+		if err := writeSSEEvent(w, method, params); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+	resp, sessionFromResponse, hasResponse := s.handleRPCRequest(
+		r.Context(),
+		req,
+		rpcTransportHTTP,
+		rc,
+	)
+	if strings.TrimSpace(sessionFromResponse) != "" {
+		w.Header().Set(HeaderSessionID, strings.TrimSpace(sessionFromResponse))
+	}
+	if hasResponse {
+		_ = writeSSEEvent(w, "jsonrpc/response", resp)
+	}
+	_ = writeSSEEvent(w, "done", map[string]any{"ok": hasResponse})
+	flusher.Flush()
 }
 
 // ServeStdio handles stdio JSON-RPC MCP traffic on the current process.
@@ -213,6 +252,7 @@ type requestContext struct {
 	SessionID      string
 	ConfirmationID string
 	Stdio          *stdioConnection
+	HTTPStream     func(method string, params map[string]any) error
 }
 
 func (s *Server) handleRPCRequest(
@@ -321,6 +361,18 @@ func (s *Server) handleRPCRequest(
 					return nil
 				}
 				return rc.Stdio.sendNotification("notifications/tools/call_output", map[string]any{
+					"session_id": sessionID,
+					"request_id": requestID,
+					"chunk":      chunk,
+				})
+			}
+		}
+		if transport == rpcTransportHTTP && rc.HTTPStream != nil && requestID != "" {
+			stream = func(chunk string) error {
+				if strings.TrimSpace(chunk) == "" {
+					return nil
+				}
+				return rc.HTTPStream("notifications/tools/call_output", map[string]any{
 					"session_id": sessionID,
 					"request_id": requestID,
 					"chunk":      chunk,
@@ -534,18 +586,15 @@ func parseClientCapabilities(params map[string]any, transport rpcTransport) Clie
 	supportsFallback := capabilityEnabled(caps["terminals_fallback_confirmation"]) ||
 		capabilityEnabled(caps["fallback_confirmation"]) ||
 		capabilityEnabled(caps["confirmation_id"])
-	if !supportsFallback {
-		// Probe by default on supported transports so clients that can carry
-		// confirmation IDs do not need a custom initialize capability flag.
-		supportsFallback = true
+	if transport == rpcTransportHTTP {
+		// HTTP transport currently supports server->client streaming notifications,
+		// but not a full server-initiated JSON-RPC request/response round-trip.
+		supportsElicitation = false
 	}
-	if strings.EqualFold(string(transport), string(rpcTransportHTTP)) {
-		// HTTP transport in this server is request/response only, so server-originated
-		// elicitation requests cannot be round-tripped. Keep mutating fail-closed unless
-		// fallback confirmation is available.
-		return ClientCapabilities{SupportsElicitation: false, SupportsFallbackID: supportsFallback}
+	return ClientCapabilities{
+		SupportsElicitation: supportsElicitation,
+		SupportsFallbackID:  supportsFallback,
 	}
-	return ClientCapabilities{SupportsElicitation: supportsElicitation, SupportsFallbackID: supportsFallback}
 }
 
 func capabilityEnabled(v any) bool {
@@ -862,4 +911,34 @@ type rpcError struct {
 
 func hasRPCID(id json.RawMessage) bool {
 	return len(strings.TrimSpace(string(id))) > 0
+}
+
+func acceptsEventStream(accept string) bool {
+	for _, token := range strings.Split(accept, ",") {
+		mediaType := strings.TrimSpace(token)
+		if mediaType == "" {
+			continue
+		}
+		if semi := strings.Index(mediaType, ";"); semi >= 0 {
+			mediaType = strings.TrimSpace(mediaType[:semi])
+		}
+		if strings.EqualFold(mediaType, "text/event-stream") {
+			return true
+		}
+	}
+	return false
+}
+
+func writeSSEEvent(w io.Writer, event string, payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "event: %s\n", strings.TrimSpace(event)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", string(data)); err != nil {
+		return err
+	}
+	return nil
 }

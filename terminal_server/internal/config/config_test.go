@@ -33,6 +33,10 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("TERMINALS_DUE_TIMER_PROCESS_INTERVAL_SECONDS", "")
 	t.Setenv("TERMINALS_PHOTO_FRAME_DIR", "")
 	t.Setenv("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", "")
+	t.Setenv("TERMINALS_AGENT_OPERATIONAL_MAX_STREAMS", "")
+	t.Setenv("TERMINALS_AGENT_OPERATIONAL_STREAM_TTL_SECONDS", "")
+	t.Setenv("TERMINALS_AGENT_APPROVAL_MIN_HUMAN_LATENCY_MS", "")
+	t.Setenv("TERMINALS_AGENT_APPROVAL_CONFIRMATION_TTL_SECONDS", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -115,6 +119,42 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if len(cfg.WakeWordPrefixes) != 2 || cfg.WakeWordPrefixes[0] != "assistant" || cfg.WakeWordPrefixes[1] != "hey terminal" {
 		t.Fatalf("WakeWordPrefixes = %+v, want default assistant/hey terminal", cfg.WakeWordPrefixes)
+	}
+	if cfg.Agent.Operational.MaxStreams != 3 {
+		t.Fatalf("Agent.Operational.MaxStreams = %d, want 3", cfg.Agent.Operational.MaxStreams)
+	}
+	if cfg.Agent.Operational.StreamTTLSeconds != 120 {
+		t.Fatalf("Agent.Operational.StreamTTLSeconds = %d, want 120", cfg.Agent.Operational.StreamTTLSeconds)
+	}
+	if cfg.Agent.Approval.MinHumanLatencyMS != 500 {
+		t.Fatalf("Agent.Approval.MinHumanLatencyMS = %d, want 500", cfg.Agent.Approval.MinHumanLatencyMS)
+	}
+	if cfg.Agent.Approval.ConfirmationTTLSeconds != 120 {
+		t.Fatalf("Agent.Approval.ConfirmationTTLSeconds = %d, want 120", cfg.Agent.Approval.ConfirmationTTLSeconds)
+	}
+}
+
+func TestLoadAgentMCPPolicyConfigFromEnv(t *testing.T) {
+	t.Setenv("TERMINALS_AGENT_OPERATIONAL_MAX_STREAMS", "7")
+	t.Setenv("TERMINALS_AGENT_OPERATIONAL_STREAM_TTL_SECONDS", "45")
+	t.Setenv("TERMINALS_AGENT_APPROVAL_MIN_HUMAN_LATENCY_MS", "850")
+	t.Setenv("TERMINALS_AGENT_APPROVAL_CONFIRMATION_TTL_SECONDS", "180")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Agent.Operational.MaxStreams != 7 {
+		t.Fatalf("Agent.Operational.MaxStreams = %d, want 7", cfg.Agent.Operational.MaxStreams)
+	}
+	if cfg.Agent.Operational.StreamTTLSeconds != 45 {
+		t.Fatalf("Agent.Operational.StreamTTLSeconds = %d, want 45", cfg.Agent.Operational.StreamTTLSeconds)
+	}
+	if cfg.Agent.Approval.MinHumanLatencyMS != 850 {
+		t.Fatalf("Agent.Approval.MinHumanLatencyMS = %d, want 850", cfg.Agent.Approval.MinHumanLatencyMS)
+	}
+	if cfg.Agent.Approval.ConfirmationTTLSeconds != 180 {
+		t.Fatalf("Agent.Approval.ConfirmationTTLSeconds = %d, want 180", cfg.Agent.Approval.ConfirmationTTLSeconds)
 	}
 }
 

@@ -153,7 +153,11 @@ func main() {
 	adminBaseURL := fmt.Sprintf("http://127.0.0.1:%d", cfg.AdminHTTPPort)
 	controlStream.SetTerminalREPLAdminURL(adminBaseURL)
 	mcpAdapter := mcpadapter.New(mcpadapter.Config{
-		AdminBaseURL: adminBaseURL,
+		AdminBaseURL:    adminBaseURL,
+		ConfirmationTTL: time.Duration(cfg.Agent.Approval.ConfirmationTTLSeconds) * time.Second,
+		MinHumanLatency: time.Duration(cfg.Agent.Approval.MinHumanLatencyMS) * time.Millisecond,
+		OperationalMax:  cfg.Agent.Operational.MaxStreams,
+		OperationalTTL:  time.Duration(cfg.Agent.Operational.StreamTTLSeconds) * time.Second,
 		UnsafeConfirmation: func(ctx context.Context, event mcpadapter.UnsafeConfirmationEvent) {
 			eventlog.Emit(ctx, "unsafe_confirmation_protocol", slog.LevelWarn, "unsafe confirmation protocol observed",
 				slog.String("session_origin", "mcp"),

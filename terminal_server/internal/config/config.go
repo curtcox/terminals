@@ -41,6 +41,7 @@ type Config struct {
 	DueTimerProcessIntervalSecs   int
 	SIP                           SIPConfig
 	AI                            AIConfig
+	Agent                         AgentConfig
 }
 
 // SIPConfig captures the subset of server configuration relevant to the
@@ -66,6 +67,24 @@ type AIProviderConfig struct {
 	BaseURL   string
 	APIKeyEnv string
 	Models    []string
+}
+
+// AgentConfig captures MCP adapter operational and approval policies.
+type AgentConfig struct {
+	Operational AgentOperationalConfig
+	Approval    AgentApprovalConfig
+}
+
+// AgentOperationalConfig captures operational-tier command limits.
+type AgentOperationalConfig struct {
+	MaxStreams       int
+	StreamTTLSeconds int
+}
+
+// AgentApprovalConfig captures mutating approval thresholds.
+type AgentApprovalConfig struct {
+	MinHumanLatencyMS      int
+	ConfirmationTTLSeconds int
 }
 
 // Load reads config from environment with sane defaults for local development.
@@ -111,6 +130,16 @@ func Load() (Config, error) {
 			Ollama: AIProviderConfig{
 				BaseURL: getenv("TERMINALS_AI_OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
 				Models:  []string{"llama3.1"},
+			},
+		},
+		Agent: AgentConfig{
+			Operational: AgentOperationalConfig{
+				MaxStreams:       3,
+				StreamTTLSeconds: 120,
+			},
+			Approval: AgentApprovalConfig{
+				MinHumanLatencyMS:      500,
+				ConfirmationTTLSeconds: 120,
 			},
 		},
 	}
@@ -183,6 +212,26 @@ func Load() (Config, error) {
 		return Config{}, err
 	} else if ok {
 		cfg.PhotoFrameIntervalSeconds = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_AGENT_OPERATIONAL_MAX_STREAMS"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.Agent.Operational.MaxStreams = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_AGENT_OPERATIONAL_STREAM_TTL_SECONDS"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.Agent.Operational.StreamTTLSeconds = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_AGENT_APPROVAL_MIN_HUMAN_LATENCY_MS"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.Agent.Approval.MinHumanLatencyMS = v
+	}
+	if v, ok, err := parseOptionalInt("TERMINALS_AGENT_APPROVAL_CONFIRMATION_TTL_SECONDS"); err != nil {
+		return Config{}, err
+	} else if ok {
+		cfg.Agent.Approval.ConfirmationTTLSeconds = v
 	}
 	if v, err := parseOptionalBool("TERMINALS_LOG_STDERR"); err != nil {
 		return Config{}, err

@@ -1,6 +1,7 @@
 package mcpadapter
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -186,8 +187,8 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 	caps := parseClientCapabilities(map[string]any{
 		"capabilities": map[string]any{},
 	}, rpcTransportHTTP)
-	if !caps.SupportsFallbackID {
-		t.Fatalf("supports fallback = false, want fallback available by default")
+	if caps.SupportsFallbackID {
+		t.Fatalf("supports fallback = true, want false when no fallback carrier is declared")
 	}
 	withFallback := parseClientCapabilities(map[string]any{
 		"capabilities": map[string]any{
@@ -204,6 +205,124 @@ func TestParseClientCapabilitiesFailClosedFallback(t *testing.T) {
 	}, rpcTransportHTTP)
 	if withElicitation.SupportsElicitation {
 		t.Fatalf("supports elicitation = true, want false for http request/response transport")
+	}
+}
+
+func TestHTTPToolCallCanStreamChunksOverSSE(t *testing.T) {
+	adapter := New(Config{})
+	sessions := &fakeSessionService{}
+	server, err := NewServer(ServerConfig{
+		Adapter:      adapter,
+		Sessions:     sessions,
+		AdminBaseURL: "http://127.0.0.1:50053",
+	})
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+	httpServer := httptest.NewServer(http.HandlerFunc(server.ServeHTTP))
+	defer httpServer.Close()
+
+	initResp := postRPC(t, httpServer.URL, "", rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("1"),
+		Method:  "initialize",
+		Params:  mustRawJSON(t, map[string]any{"clientInfo": map[string]any{"name": "codex"}}),
+	})
+	sessionID := strings.TrimSpace(anyString(parseAnyMap(initResp.Result)["session_id"]))
+	if sessionID == "" {
+		t.Fatalf("initialize response missing session_id")
+	}
+
+	body, err := json.Marshal(rpcRequest{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage("2"),
+		Method:  "tools/call",
+		Params: mustRawJSON(t, map[string]any{
+			"name":      "echo",
+			"arguments": map[string]any{"text": "http-stream"},
+		}),
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal(request) error = %v", err)
+	}
+	httpReq, err := http.NewRequest(http.MethodPost, httpServer.URL, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("http.NewRequest() error = %v", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "text/event-stream")
+	httpReq.Header.Set(HeaderSessionID, sessionID)
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		t.Fatalf("http.Do() error = %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/event-stream") {
+		t.Fatalf("content-type = %q, want text/event-stream", ct)
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	type sseEvent struct {
+		Event string
+		Data  string
+	}
+	events := make([]sseEvent, 0, 4)
+	current := sseEvent{}
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			if strings.TrimSpace(current.Event) != "" {
+				events = append(events, current)
+			}
+			current = sseEvent{}
+			continue
+		}
+		if strings.HasPrefix(line, "event:") {
+			current.Event = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			current.Data = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("scan event stream: %v", err)
+	}
+
+	sawChunk := false
+	sawFinal := false
+	for _, event := range events {
+		switch event.Event {
+		case "notifications/tools/call_output":
+			var payload map[string]any
+			if err := json.Unmarshal([]byte(event.Data), &payload); err != nil {
+				t.Fatalf("decode stream chunk event: %v", err)
+			}
+			if strings.Contains(anyString(payload["chunk"]), "http-stream") {
+				sawChunk = true
+			}
+		case "jsonrpc/response":
+			var rpcResp rpcResponse
+			if err := json.Unmarshal([]byte(event.Data), &rpcResp); err != nil {
+				t.Fatalf("decode final rpc response event: %v", err)
+			}
+			result := parseAnyMap(rpcResp.Result)
+			content, _ := result["content"].([]any)
+			if len(content) == 0 {
+				t.Fatalf("missing content in final rpc response: %+v", result)
+			}
+			text := anyString(parseAnyMap(content[0])["text"])
+			if !strings.Contains(text, "http-stream") {
+				t.Fatalf("final rpc response missing stream text: %q", text)
+			}
+			sawFinal = true
+		}
+	}
+	if !sawChunk {
+		t.Fatalf("missing stream chunk notification event: %+v", events)
+	}
+	if !sawFinal {
+		t.Fatalf("missing final jsonrpc/response event: %+v", events)
 	}
 }
 

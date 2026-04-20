@@ -1,1 +1,1 @@
-Await user validation of the fallback negotiation fix.
+Await user review of agent delegation verification fixes.
