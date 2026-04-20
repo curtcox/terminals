@@ -1,1 +1,1 @@
-Await review feedback and next priority from repl-and-shell.md.
+Wire mcpadapter into server stdio and Streamable HTTP transports, including /mcp endpoint, session lifecycle, and approval logging integration.

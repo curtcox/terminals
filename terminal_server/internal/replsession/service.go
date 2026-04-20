@@ -25,6 +25,16 @@ var (
 	ErrDeviceNotAttached = errors.New("device is not attached to session")
 )
 
+// SessionOrigin distinguishes human and MCP-backed REPL sessions.
+type SessionOrigin string
+
+const (
+	// SessionOriginHuman indicates an interactive human-attached REPL session.
+	SessionOriginHuman SessionOrigin = "human"
+	// SessionOriginMCP indicates an MCP-backed delegated agent session.
+	SessionOriginMCP SessionOrigin = "mcp"
+)
+
 // ReplStateSnapshot captures persisted session state needed for reconnect.
 type ReplStateSnapshot struct {
 	History           []string
@@ -42,6 +52,9 @@ type ReplSession struct {
 	OwnerActivationID string
 	PTYSessionID      string
 	AttachedDevices   []string
+	Origin            SessionOrigin
+	AgentIdentity     string
+	AgentCapability   string
 	CreatedAt         time.Time
 	LastAttachAt      time.Time
 	Idle              bool
@@ -55,6 +68,9 @@ type CreateSessionRequest struct {
 	DeviceID          string
 	OwnerActivationID string
 	ReplAdminURL      string
+	Origin            SessionOrigin
+	AgentIdentity     string
+	AgentCapability   string
 }
 
 // CreateSessionResponse returns the created session snapshot.
@@ -200,6 +216,9 @@ func (s *Service) CreateSession(ctx context.Context, req CreateSessionRequest) (
 			OwnerActivationID: strings.TrimSpace(req.OwnerActivationID),
 			PTYSessionID:      started.ID,
 			AttachedDevices:   []string{deviceID},
+			Origin:            normalizeOrigin(req.Origin),
+			AgentIdentity:     strings.TrimSpace(req.AgentIdentity),
+			AgentCapability:   strings.TrimSpace(req.AgentCapability),
 			CreatedAt:         now,
 			LastAttachAt:      now,
 			Idle:              false,
@@ -221,6 +240,15 @@ func (s *Service) CreateSession(ctx context.Context, req CreateSessionRequest) (
 	s.mu.Unlock()
 
 	return &CreateSessionResponse{Session: s.snapshot(live)}, nil
+}
+
+func normalizeOrigin(origin SessionOrigin) SessionOrigin {
+	switch SessionOrigin(strings.ToLower(strings.TrimSpace(string(origin)))) {
+	case SessionOriginMCP:
+		return SessionOriginMCP
+	default:
+		return SessionOriginHuman
+	}
 }
 
 // AttachSession attaches a device to an existing REPL session.

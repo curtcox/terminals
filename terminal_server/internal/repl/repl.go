@@ -25,22 +25,25 @@ type Options struct {
 	Prompt       string
 	AdminBaseURL string
 	SessionID    string
+	DocsMode     DocsRenderMode
 }
 
 type commandClassification string
 
 const (
-	commandReadOnly commandClassification = "read_only"
-	commandMutating commandClassification = "mutating"
+	commandReadOnly    commandClassification = "read_only"
+	commandOperational commandClassification = "operational"
+	commandMutating    commandClassification = "mutating"
 )
 
 type commandSpec struct {
-	Name           string
-	Usage          string
-	Summary        string
-	Classification commandClassification
-	Examples       []string
-	RelatedDocs    []string
+	Name                 string
+	Usage                string
+	Summary              string
+	Classification       commandClassification
+	Examples             []string
+	RelatedDocs          []string
+	DiscouragedForAgents bool
 }
 
 func replCommandSpecs() []commandSpec {
@@ -49,7 +52,7 @@ func replCommandSpecs() []commandSpec {
 		{Name: "describe", Usage: "describe <command>", Summary: "Show a detailed command description", Classification: commandReadOnly, Examples: []string{"describe sessions terminate"}},
 		{Name: "complete", Usage: "complete <prefix>", Summary: "List command completions for a prefix", Classification: commandReadOnly, Examples: []string{"complete app r"}},
 		{Name: "echo", Usage: "echo <text>", Summary: "Print text", Classification: commandReadOnly},
-		{Name: "sleep", Usage: "sleep <seconds>", Summary: "Sleep for N seconds", Classification: commandReadOnly},
+		{Name: "sleep", Usage: "sleep <seconds>", Summary: "Sleep for N seconds", Classification: commandOperational},
 		{Name: "printf", Usage: "printf <text>", Summary: "Print text without newline (supports \\xNN escapes)", Classification: commandReadOnly},
 		{Name: "clear", Usage: "clear", Summary: "Clear terminal display", Classification: commandReadOnly},
 		{Name: "exit", Usage: "exit", Summary: "Exit REPL", Classification: commandReadOnly},
@@ -67,10 +70,10 @@ func replCommandSpecs() []commandSpec {
 		{Name: "docs search", Usage: "docs search <query>", Summary: "Search documentation topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
 		{Name: "docs open", Usage: "docs open <topic>", Summary: "Open one documentation topic", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/docs"}},
 		{Name: "docs examples", Usage: "docs examples [filter]", Summary: "List example topics", Classification: commandReadOnly, RelatedDocs: []string{"repl/examples/app-dev-loop"}},
-		{Name: "ai providers", Usage: "ai providers [--json]", Summary: "List configured AI providers", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}},
-		{Name: "ai models", Usage: "ai models [provider] [--json]", Summary: "List models for a provider", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}},
-		{Name: "ai use", Usage: "ai use <provider> <model> [--json]", Summary: "Set sticky provider/model selection for this session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}},
-		{Name: "ai status", Usage: "ai status [--json]", Summary: "Show current provider/model selection for this session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}},
+		{Name: "ai providers", Usage: "ai providers [--json]", Summary: "List configured AI providers", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai models", Usage: "ai models [provider] [--json]", Summary: "List models for a provider", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai use", Usage: "ai use <provider> <model> [--json]", Summary: "Set sticky provider/model selection for this session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai status", Usage: "ai status [--json]", Summary: "Show current provider/model selection for this session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 	}
 }
 
@@ -98,7 +101,7 @@ func Run(ctx context.Context, in io.Reader, out io.Writer, opts Options) error {
 	}
 	prompt += " "
 
-	state := newState(out, opts.AdminBaseURL, opts.SessionID)
+	state := newStateWithDocsMode(out, opts.AdminBaseURL, opts.SessionID, opts.DocsMode)
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 1024), 1024*1024)
 
@@ -140,9 +143,14 @@ type state struct {
 	adminURL string
 	session  string
 	client   *http.Client
+	docsMode DocsRenderMode
 }
 
 func newState(out io.Writer, adminBaseURL, sessionID string) *state {
+	return newStateWithDocsMode(out, adminBaseURL, sessionID, DocsRenderModeTerminal)
+}
+
+func newStateWithDocsMode(out io.Writer, adminBaseURL, sessionID string, docsMode DocsRenderMode) *state {
 	adminBaseURL = strings.TrimSpace(adminBaseURL)
 	if adminBaseURL == "" {
 		adminBaseURL = strings.TrimSpace(os.Getenv("TERMINALS_REPL_ADMIN_URL"))
@@ -160,6 +168,7 @@ func newState(out io.Writer, adminBaseURL, sessionID string) *state {
 		adminURL: adminBaseURL,
 		session:  sessionID,
 		client:   &http.Client{Timeout: 3 * time.Second},
+		docsMode: normalizeDocsRenderMode(docsMode),
 	}
 }
 
@@ -300,16 +309,18 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				if row == nil {
 					continue
 				}
-				attached, _ := row["attached_devices"].([]any)
+				attached := toAnySlice(lookupMapAny(row, "attached_devices", "AttachedDevices"))
 				rows = append(rows, []string{
-					toString(row["id"]),
-					toString(row["owner_activation_id"]),
+					toString(lookupMapAny(row, "id", "ID")),
+					toString(lookupMapAny(row, "origin", "Origin")),
+					toString(lookupMapAny(row, "agent_capability", "AgentCapability")),
+					toString(lookupMapAny(row, "owner_activation_id", "OwnerActivationID")),
 					strconv.Itoa(len(attached)),
-					toString(row["idle"]),
-					formatUnixMillis(row["created_at"]),
+					toString(lookupMapAny(row, "idle", "Idle")),
+					formatUnixMillis(lookupMapAny(row, "created_at", "CreatedAt")),
 				})
 			}
-			return printTable(s.out, []string{"ID", "OWNER", "ATTACHED", "IDLE", "CREATED"}, rows)
+			return printTable(s.out, []string{"ID", "ORIGIN", "CAPABILITY", "OWNER", "ATTACHED", "IDLE", "CREATED"}, rows)
 		case "show":
 			if len(args) < 2 {
 				return errors.New("usage: sessions show <session>")
@@ -484,15 +495,21 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if err != nil {
 				return err
 			}
-			if _, err := fmt.Fprintf(s.out, "search results for %q\n", strings.Join(args[1:], " ")); err != nil {
-				return err
-			}
 			if len(matches) == 0 {
 				_, err := fmt.Fprintln(s.out, "(no matches)")
 				return err
 			}
+			if s.docsMode == DocsRenderModeTerminal {
+				if _, err := fmt.Fprintf(s.out, "search results for %q\n", strings.Join(args[1:], " ")); err != nil {
+					return err
+				}
+			}
 			for _, topic := range matches {
-				if _, err := fmt.Fprintf(s.out, "- %s\n", topic); err != nil {
+				line := "- " + topic
+				if s.docsMode == DocsRenderModeMarkdown {
+					line = "- `" + topic + "`"
+				}
+				if _, err := fmt.Fprintln(s.out, line); err != nil {
 					return err
 				}
 			}
@@ -760,6 +777,11 @@ func (s *state) renderCommandSpec(spec commandSpec) error {
 			return err
 		}
 	}
+	if spec.DiscouragedForAgents {
+		if _, err := fmt.Fprintln(s.out, "discouraged_for_agents: true"); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -987,6 +1009,30 @@ func toString(v any) string {
 		return typed.String()
 	default:
 		return fmt.Sprintf("%v", v)
+	}
+}
+
+func lookupMapAny(m map[string]any, keys ...string) any {
+	for _, key := range keys {
+		if value, ok := m[key]; ok {
+			return value
+		}
+	}
+	return nil
+}
+
+func toAnySlice(v any) []any {
+	switch typed := v.(type) {
+	case []any:
+		return typed
+	case []string:
+		out := make([]any, 0, len(typed))
+		for _, item := range typed {
+			out = append(out, item)
+		}
+		return out
+	default:
+		return nil
 	}
 }
 

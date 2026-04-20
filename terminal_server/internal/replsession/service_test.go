@@ -23,6 +23,9 @@ func TestServiceLifecycleAndIO(t *testing.T) {
 	if created.Session.ID == "" {
 		t.Fatalf("expected non-empty session id")
 	}
+	if created.Session.Origin != SessionOriginHuman {
+		t.Fatalf("session origin = %q, want %q", created.Session.Origin, SessionOriginHuman)
+	}
 
 	sessionID := created.Session.ID
 	if _, err := svc.SendInput(ctx, SendInputRequest{
@@ -91,6 +94,30 @@ func TestServiceLifecycleAndIO(t *testing.T) {
 	if _, err := svc.GetSession(ctx, GetSessionRequest{SessionID: sessionID}); err == nil {
 		t.Fatalf("expected session lookup failure after terminate")
 	}
+}
+
+func TestCreateSessionMCPOriginMetadata(t *testing.T) {
+	svc := NewService(terminal.NewManager())
+	ctx := context.Background()
+	created, err := svc.CreateSession(ctx, CreateSessionRequest{
+		DeviceID:        "dev-mcp-1",
+		Origin:          SessionOriginMCP,
+		AgentIdentity:   "codex-desktop",
+		AgentCapability: "mutating_via_elicitation",
+	})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if created.Session.Origin != SessionOriginMCP {
+		t.Fatalf("origin = %q, want %q", created.Session.Origin, SessionOriginMCP)
+	}
+	if created.Session.AgentIdentity != "codex-desktop" {
+		t.Fatalf("agent identity = %q", created.Session.AgentIdentity)
+	}
+	if created.Session.AgentCapability != "mutating_via_elicitation" {
+		t.Fatalf("agent capability = %q", created.Session.AgentCapability)
+	}
+	_, _ = svc.TerminateSession(ctx, TerminateSessionRequest{SessionID: created.Session.ID})
 }
 
 func TestSelectionPersistence(t *testing.T) {

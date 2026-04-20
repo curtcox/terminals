@@ -5,6 +5,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -62,6 +64,54 @@ func TestDescribeAndComplete(t *testing.T) {
 	}
 	if !strings.Contains(text, "app reload") {
 		t.Fatalf("missing completion match: %q", text)
+	}
+}
+
+func TestCommandSpecsExposeOperationalAndDiscouragedFlags(t *testing.T) {
+	specs := CommandSpecs()
+	if len(specs) == 0 {
+		t.Fatalf("CommandSpecs() returned no commands")
+	}
+	sleep, ok := DescribeCommand("sleep")
+	if !ok {
+		t.Fatalf("DescribeCommand(sleep) not found")
+	}
+	if sleep.Classification != CommandClassificationOperational {
+		t.Fatalf("sleep classification = %q, want %q", sleep.Classification, CommandClassificationOperational)
+	}
+	aiUse, ok := DescribeCommand("ai use")
+	if !ok {
+		t.Fatalf("DescribeCommand(ai use) not found")
+	}
+	if !aiUse.DiscouragedForAgents {
+		t.Fatalf("ai use should be discouraged_for_agents")
+	}
+}
+
+func TestExecuteCommandDocsMarkdownMode(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	repoRoot := filepath.Clean(filepath.Join(wd, "..", "..", ".."))
+	if chdirErr := os.Chdir(repoRoot); chdirErr != nil {
+		t.Fatalf("Chdir(%q) error = %v", repoRoot, chdirErr)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(wd)
+	})
+
+	result, err := ExecuteCommand(context.Background(), "docs search app", ExecuteOptions{
+		DocsMode: DocsRenderModeMarkdown,
+	})
+	if err != nil {
+		t.Fatalf("ExecuteCommand(docs search app) error = %v", err)
+	}
+	if strings.Contains(result.Output, "search results for") {
+		t.Fatalf("markdown docs search should omit terminal preamble, got %q", result.Output)
+	}
+	if !strings.Contains(result.Output, "- `repl/commands/app`") {
+		t.Fatalf("markdown docs search missing topic bullet, got %q", result.Output)
 	}
 }
 
