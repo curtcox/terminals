@@ -95,6 +95,7 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/repl/ai/models", h.handleReplAIModels)
 	mux.HandleFunc("/admin/api/repl/ai/selection", h.handleReplAISelection)
 	mux.HandleFunc("/admin/api/identity", h.handleIdentity)
+	mux.HandleFunc("/admin/api/identity/resolve", h.handleIdentityResolve)
 	mux.HandleFunc("/admin/api/session", h.handleInteractiveSessions)
 	mux.HandleFunc("/admin/api/session/create", h.handleInteractiveSessionCreate)
 	mux.HandleFunc("/admin/api/message", h.handleMessages)
@@ -205,6 +206,18 @@ func (h *Handler) handleIdentity(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"identities": h.capability.ListIdentities()})
+}
+
+func (h *Handler) handleIdentityResolve(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	audience := strings.TrimSpace(req.URL.Query().Get("audience"))
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"audience":   audience,
+		"identities": h.capability.ResolveAudience(audience),
+	})
 }
 
 func (h *Handler) handleInteractiveSessions(w http.ResponseWriter, req *http.Request) {

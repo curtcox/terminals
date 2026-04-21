@@ -254,6 +254,7 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 	commands := []string{
 		"identity ls",
+		"identity resolve",
 		"session create",
 		"message post",
 		"board pin",
@@ -302,6 +303,8 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		switch {
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity":
 			_, _ = w.Write([]byte(`{"identities":[{"id":"alice"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity/resolve":
+			_, _ = w.Write([]byte(`{"audience":"group:family","identities":[{"id":"alice"}]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/create":
 			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/post":
@@ -332,6 +335,7 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 
 	in := strings.NewReader(strings.Join([]string{
 		"identity ls",
+		"identity resolve group:family",
 		"session create help room",
 		"message post room-1 hello",
 		"board pin family reminder",
@@ -353,6 +357,9 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	text := out.String()
 	if !strings.Contains(text, "alice") {
 		t.Fatalf("identity output missing: %q", text)
+	}
+	if !strings.Contains(text, "group:family") {
+		t.Fatalf("identity resolve output missing audience label: %q", text)
 	}
 	if !strings.Contains(text, "sess-1") {
 		t.Fatalf("session create output missing: %q", text)

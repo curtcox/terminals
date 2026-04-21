@@ -1,1 +1,1 @@
-Review the capability-closure implementation with the team and choose the next slice (deeper service semantics or simulation coverage).
+Implement session join/leave semantics (service + admin API + REPL command) with simulation-focused tests as the next capability-closure slice.

@@ -63,6 +63,7 @@ func replCommandSpecs() []commandSpec {
 		{Name: "sessions show", Usage: "sessions show <session>", Summary: "Show one REPL session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/sessions"}},
 		{Name: "sessions terminate", Usage: "sessions terminate <session>", Summary: "Terminate one REPL session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sessions"}},
 		{Name: "identity ls", Usage: "identity ls [--json]", Summary: "List identities and audiences", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
+		{Name: "identity resolve", Usage: "identity resolve <audience> [--json]", Summary: "Resolve an audience to identities", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
 		{Name: "session ls", Usage: "session ls [--json]", Summary: "List interactive sessions", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session create", Usage: "session create <kind> <target> [--json]", Summary: "Create a generalized interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "message ls", Usage: "message ls [room] [--json]", Summary: "List messages", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
@@ -384,26 +385,56 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			return fmt.Errorf("unknown command: sessions %s", sub)
 		}
 	case "identity":
-		if sub != "ls" {
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/identity")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			items, _ := body["identities"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				rows = append(rows, []string{toString(row["id"]), toString(row["display_name"])})
+			}
+			return printTable(s.out, []string{"ID", "NAME"}, rows)
+		case "resolve":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: identity resolve <audience>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/identity/resolve", url.Values{"audience": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			audience := toString(body["audience"])
+			if audience != "" {
+				if _, err := fmt.Fprintf(s.out, "audience: %s\n", audience); err != nil {
+					return err
+				}
+			}
+			items, _ := body["identities"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				rows = append(rows, []string{toString(row["id"]), toString(row["display_name"])})
+			}
+			return printTable(s.out, []string{"ID", "NAME"}, rows)
+		default:
 			return fmt.Errorf("unknown command: identity %s", sub)
 		}
-		body, err := s.fetchJSON(ctx, "/admin/api/identity")
-		if err != nil {
-			return err
-		}
-		if jsonOut {
-			return writeJSON(s.out, body)
-		}
-		items, _ := body["identities"].([]any)
-		rows := make([][]string, 0, len(items))
-		for _, item := range items {
-			row, _ := item.(map[string]any)
-			if row == nil {
-				continue
-			}
-			rows = append(rows, []string{toString(row["id"]), toString(row["display_name"])})
-		}
-		return printTable(s.out, []string{"ID", "NAME"}, rows)
 	case "session":
 		switch sub {
 		case "ls":

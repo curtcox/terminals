@@ -11,6 +11,8 @@ import (
 type Identity struct {
 	ID          string    `json:"id"`
 	DisplayName string    `json:"display_name,omitempty"`
+	Groups      []string  `json:"groups,omitempty"`
+	Aliases     []string  `json:"aliases,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -108,7 +110,13 @@ func NewService() *Service {
 		now:   func() time.Time { return now().UTC() },
 		store: map[string]StoreRecord{},
 		identities: []Identity{
-			{ID: "system", DisplayName: "System", CreatedAt: now().UTC()},
+			{
+				ID:          "system",
+				DisplayName: "System",
+				Groups:      []string{"family", "operators"},
+				Aliases:     []string{"admin", "house"},
+				CreatedAt:   now().UTC(),
+			},
 		},
 	}
 	return s
@@ -119,6 +127,45 @@ func (s *Service) ListIdentities() []Identity {
 	defer s.mu.RUnlock()
 	out := append([]Identity(nil), s.identities...)
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+func (s *Service) ResolveAudience(audience string) []Identity {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	audience = strings.TrimSpace(audience)
+	if audience == "" || strings.EqualFold(audience, "all") {
+		return append([]Identity(nil), s.identities...)
+	}
+
+	key := audience
+	value := audience
+	if idx := strings.Index(audience, ":"); idx >= 0 {
+		key = strings.TrimSpace(audience[:idx])
+		value = strings.TrimSpace(audience[idx+1:])
+	}
+	if value == "" {
+		return nil
+	}
+
+	out := make([]Identity, 0)
+	for _, identity := range s.identities {
+		switch strings.ToLower(key) {
+		case "id":
+			if strings.EqualFold(identity.ID, value) {
+				out = append(out, identity)
+			}
+		case "group":
+			if sliceContainsFold(identity.Groups, value) {
+				out = append(out, identity)
+			}
+		case "alias":
+			if sliceContainsFold(identity.Aliases, value) {
+				out = append(out, identity)
+			}
+		}
+	}
 	return out
 }
 
@@ -393,6 +440,15 @@ func defaultIfBlank(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func sliceContainsFold(values []string, needle string) bool {
+	for _, value := range values {
+		if strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(needle)) {
+			return true
+		}
+	}
+	return false
 }
 
 func strconv64(v uint64) string {

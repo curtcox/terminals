@@ -360,6 +360,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 
 	getCases := []string{
 		"/admin/api/identity",
+		"/admin/api/identity/resolve?audience=group:family",
 		"/admin/api/session",
 		"/admin/api/message",
 		"/admin/api/board",
@@ -403,6 +404,18 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("POST %s status = %d, want 200 body=%s", tc.path, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestIdentityResolveEndpointRequiresGET(t *testing.T) {
+	h := testHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/admin/api/identity/resolve", nil)
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405 body=%s", w.Code, w.Body.String())
 	}
 }
 
