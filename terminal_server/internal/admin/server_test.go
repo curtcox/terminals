@@ -363,6 +363,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		"/admin/api/identity/resolve?audience=group:family",
 		"/admin/api/session",
 		"/admin/api/message",
+		"/admin/api/message/unread?identity_id=alice",
 		"/admin/api/board",
 		"/admin/api/artifact",
 		"/admin/api/canvas",
@@ -452,6 +453,81 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		if !strings.Contains(w.Body.String(), sessionID) {
 			t.Fatalf("GET %s missing session id %q in body=%s", path, sessionID, w.Body.String())
 		}
+	}
+
+	postMessageReq := httptest.NewRequest(http.MethodPost, "/admin/api/message/post", strings.NewReader(url.Values{
+		"room": {"room-1"},
+		"text": {"bring milk"},
+	}.Encode()))
+	postMessageReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	postMessageW := httptest.NewRecorder()
+	h.ServeHTTP(postMessageW, postMessageReq)
+	if postMessageW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/message/post status = %d, want 200 body=%s", postMessageW.Code, postMessageW.Body.String())
+	}
+	var posted map[string]any
+	if err := json.Unmarshal(postMessageW.Body.Bytes(), &posted); err != nil {
+		t.Fatalf("decode message post response error = %v", err)
+	}
+	messageMap, _ := posted["message"].(map[string]any)
+	messageID, _ := messageMap["id"].(string)
+	if strings.TrimSpace(messageID) == "" {
+		t.Fatalf("missing message id in response: %s", postMessageW.Body.String())
+	}
+
+	ackReq := httptest.NewRequest(http.MethodPost, "/admin/api/message/ack", strings.NewReader(url.Values{
+		"identity_id": {"alice"},
+		"message_id":  {messageID},
+	}.Encode()))
+	ackReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	ackW := httptest.NewRecorder()
+	h.ServeHTTP(ackW, ackReq)
+	if ackW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/message/ack status = %d, want 200 body=%s", ackW.Code, ackW.Body.String())
+	}
+
+	unreadReq := httptest.NewRequest(http.MethodGet, "/admin/api/message/unread?identity_id=alice&room=room-1", nil)
+	unreadW := httptest.NewRecorder()
+	h.ServeHTTP(unreadW, unreadReq)
+	if unreadW.Code != http.StatusOK {
+		t.Fatalf("GET /admin/api/message/unread status = %d, want 200 body=%s", unreadW.Code, unreadW.Body.String())
+	}
+	if strings.Contains(unreadW.Body.String(), messageID) {
+		t.Fatalf("expected message %q to be acknowledged, unread body=%s", messageID, unreadW.Body.String())
+	}
+
+	createArtifactReq := httptest.NewRequest(http.MethodPost, "/admin/api/artifact/create", strings.NewReader(url.Values{
+		"kind":  {"lesson"},
+		"title": {"math basics"},
+	}.Encode()))
+	createArtifactReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	createArtifactW := httptest.NewRecorder()
+	h.ServeHTTP(createArtifactW, createArtifactReq)
+	if createArtifactW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/artifact/create status = %d, want 200 body=%s", createArtifactW.Code, createArtifactW.Body.String())
+	}
+	var createdArtifact map[string]any
+	if err := json.Unmarshal(createArtifactW.Body.Bytes(), &createdArtifact); err != nil {
+		t.Fatalf("decode artifact create response error = %v", err)
+	}
+	artifactMap, _ := createdArtifact["artifact"].(map[string]any)
+	artifactID, _ := artifactMap["id"].(string)
+	if strings.TrimSpace(artifactID) == "" {
+		t.Fatalf("missing artifact id in response: %s", createArtifactW.Body.String())
+	}
+
+	patchArtifactReq := httptest.NewRequest(http.MethodPost, "/admin/api/artifact/patch", strings.NewReader(url.Values{
+		"artifact_id": {artifactID},
+		"title":       {"math mastery"},
+	}.Encode()))
+	patchArtifactReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	patchArtifactW := httptest.NewRecorder()
+	h.ServeHTTP(patchArtifactW, patchArtifactReq)
+	if patchArtifactW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/artifact/patch status = %d, want 200 body=%s", patchArtifactW.Code, patchArtifactW.Body.String())
+	}
+	if !strings.Contains(patchArtifactW.Body.String(), "math mastery") {
+		t.Fatalf("patched artifact missing updated title: %s", patchArtifactW.Body.String())
 	}
 }
 

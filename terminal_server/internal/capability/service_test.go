@@ -44,3 +44,33 @@ func TestSessionJoinAndLeave(t *testing.T) {
 		t.Fatalf("LeaveSession should remove participant, participants = %+v", left.Participants)
 	}
 }
+
+func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
+	svc := NewService()
+
+	message := svc.PostMessage("room-1", "remember the groceries")
+	unread := svc.ListUnreadMessages("alice", "room-1")
+	if len(unread) != 1 || unread[0].ID != message.ID {
+		t.Fatalf("ListUnreadMessages before ack = %+v, want [%s]", unread, message.ID)
+	}
+	if _, ok := svc.AcknowledgeMessage("alice", message.ID); !ok {
+		t.Fatalf("AcknowledgeMessage(%q,%q) = false, want true", "alice", message.ID)
+	}
+	unread = svc.ListUnreadMessages("alice", "room-1")
+	if len(unread) != 0 {
+		t.Fatalf("ListUnreadMessages after ack = %+v, want none", unread)
+	}
+
+	artifact := svc.CreateArtifact("lesson", "math lesson")
+	patched, ok := svc.PatchArtifact(artifact.ID, "advanced math lesson")
+	if !ok {
+		t.Fatalf("PatchArtifact(%q) reported missing artifact", artifact.ID)
+	}
+	if patched.Title != "advanced math lesson" {
+		t.Fatalf("PatchArtifact title = %q, want %q", patched.Title, "advanced math lesson")
+	}
+	results := svc.Search("advanced")
+	if len(results) == 0 || results[0].ID != artifact.ID {
+		t.Fatalf("Search(advanced) should include patched artifact id %q, got %+v", artifact.ID, results)
+	}
+}

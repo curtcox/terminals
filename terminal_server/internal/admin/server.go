@@ -103,11 +103,14 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/session/join", h.handleInteractiveSessionJoin)
 	mux.HandleFunc("/admin/api/session/leave", h.handleInteractiveSessionLeave)
 	mux.HandleFunc("/admin/api/message", h.handleMessages)
+	mux.HandleFunc("/admin/api/message/unread", h.handleMessageUnread)
 	mux.HandleFunc("/admin/api/message/post", h.handleMessagePost)
+	mux.HandleFunc("/admin/api/message/ack", h.handleMessageAck)
 	mux.HandleFunc("/admin/api/board", h.handleBoard)
 	mux.HandleFunc("/admin/api/board/pin", h.handleBoardPin)
 	mux.HandleFunc("/admin/api/artifact", h.handleArtifacts)
 	mux.HandleFunc("/admin/api/artifact/create", h.handleArtifactCreate)
+	mux.HandleFunc("/admin/api/artifact/patch", h.handleArtifactPatch)
 	mux.HandleFunc("/admin/api/canvas", h.handleCanvas)
 	mux.HandleFunc("/admin/api/canvas/annotate", h.handleCanvasAnnotate)
 	mux.HandleFunc("/admin/api/search", h.handleSearch)
@@ -318,6 +321,18 @@ func (h *Handler) handleMessages(w http.ResponseWriter, req *http.Request) {
 	h.writeJSON(w, http.StatusOK, map[string]any{"messages": h.capability.ListMessages(req.URL.Query().Get("room"))})
 }
 
+func (h *Handler) handleMessageUnread(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	identityID := strings.TrimSpace(req.URL.Query().Get("identity_id"))
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"identity_id": identityID,
+		"messages":    h.capability.ListUnreadMessages(identityID, req.URL.Query().Get("room")),
+	})
+}
+
 func (h *Handler) handleMessagePost(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -329,6 +344,23 @@ func (h *Handler) handleMessagePost(w http.ResponseWriter, req *http.Request) {
 	}
 	message := h.capability.PostMessage(req.Form.Get("room"), req.Form.Get("text"))
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": message})
+}
+
+func (h *Handler) handleMessageAck(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	ack, ok := h.capability.AcknowledgeMessage(req.Form.Get("identity_id"), req.Form.Get("message_id"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "message not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "ack": ack})
 }
 
 func (h *Handler) handleBoard(w http.ResponseWriter, req *http.Request) {
@@ -370,6 +402,23 @@ func (h *Handler) handleArtifactCreate(w http.ResponseWriter, req *http.Request)
 		return
 	}
 	artifact := h.capability.CreateArtifact(req.Form.Get("kind"), req.Form.Get("title"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "artifact": artifact})
+}
+
+func (h *Handler) handleArtifactPatch(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	artifact, ok := h.capability.PatchArtifact(req.Form.Get("artifact_id"), req.Form.Get("title"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "artifact not found")
+		return
+	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "artifact": artifact})
 }
 

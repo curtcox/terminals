@@ -70,6 +70,12 @@ type MemoryEntry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type Acknowledgement struct {
+	IdentityID     string    `json:"identity_id"`
+	SubjectRef     string    `json:"subject_ref"`
+	AcknowledgedAt time.Time `json:"acknowledged_at"`
+}
+
 type RecentItem struct {
 	ID        string    `json:"id"`
 	Kind      string    `json:"kind"`
@@ -108,6 +114,7 @@ type Service struct {
 	recent      []RecentItem
 	store       map[string]StoreRecord
 	bus         []BusEvent
+	acks        map[string]Acknowledgement
 }
 
 func NewService() *Service {
@@ -115,6 +122,7 @@ func NewService() *Service {
 	s := &Service{
 		now:   func() time.Time { return now().UTC() },
 		store: map[string]StoreRecord{},
+		acks:  map[string]Acknowledgement{},
 		identities: []Identity{
 			{
 				ID:          "system",
@@ -302,6 +310,58 @@ func (s *Service) ListMessages(room string) []Message {
 	return out
 }
 
+func (s *Service) AcknowledgeMessage(identityID, messageID string) (Acknowledgement, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	identityID = strings.TrimSpace(identityID)
+	messageID = strings.TrimSpace(messageID)
+	if identityID == "" || messageID == "" {
+		return Acknowledgement{}, false
+	}
+
+	found := false
+	for _, item := range s.messages {
+		if item.ID == messageID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return Acknowledgement{}, false
+	}
+
+	ack := Acknowledgement{
+		IdentityID:     identityID,
+		SubjectRef:     "message:" + messageID,
+		AcknowledgedAt: s.now(),
+	}
+	s.acks[ackKey(identityID, ack.SubjectRef)] = ack
+	s.appendRecentLocked("message", messageID+" ack "+identityID)
+	return ack, true
+}
+
+func (s *Service) ListUnreadMessages(identityID, room string) []Message {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	identityID = strings.TrimSpace(identityID)
+	room = strings.TrimSpace(room)
+
+	out := make([]Message, 0, len(s.messages))
+	for _, item := range s.messages {
+		if room != "" && item.Room != room {
+			continue
+		}
+		if identityID != "" {
+			if _, ok := s.acks[ackKey(identityID, "message:"+item.ID)]; ok {
+				continue
+			}
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
 func (s *Service) PinBoard(board, text string) BoardItem {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -341,6 +401,24 @@ func (s *Service) CreateArtifact(kind, title string) Artifact {
 	s.artifacts = append(s.artifacts, item)
 	s.appendRecentLocked("artifact", item.ID+" "+item.Title)
 	return item
+}
+
+func (s *Service) PatchArtifact(artifactID, title string) (Artifact, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	artifactID = strings.TrimSpace(artifactID)
+	title = strings.TrimSpace(title)
+	for i := range s.artifacts {
+		if s.artifacts[i].ID != artifactID {
+			continue
+		}
+		if title != "" {
+			s.artifacts[i].Title = title
+		}
+		s.appendRecentLocked("artifact", s.artifacts[i].ID+" patch "+s.artifacts[i].Title)
+		return s.artifacts[i], true
+	}
+	return Artifact{}, false
 }
 
 func (s *Service) ListArtifacts() []Artifact {
@@ -559,4 +637,8 @@ func cloneSessions(input []InteractiveSession) []InteractiveSession {
 func cloneSession(item InteractiveSession) InteractiveSession {
 	item.Participants = append([]SessionParticipant(nil), item.Participants...)
 	return item
+}
+
+func ackKey(identityID, subjectRef string) string {
+	return strings.ToLower(strings.TrimSpace(identityID)) + "|" + strings.ToLower(strings.TrimSpace(subjectRef))
 }

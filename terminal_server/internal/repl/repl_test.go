@@ -261,8 +261,11 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"session join",
 		"session leave",
 		"message post",
+		"message unread",
+		"message ack",
 		"board pin",
 		"artifact create",
+		"artifact patch",
 		"canvas annotate",
 		"search query",
 		"memory remember",
@@ -374,10 +377,16 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/post":
 			_, _ = w.Write([]byte(`{"status":"ok","message":{"id":"msg-1"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/message/unread":
+			_, _ = w.Write([]byte(`{"identity_id":"alice","messages":[]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/ack":
+			_, _ = w.Write([]byte(`{"status":"ok","ack":{"message_id":"msg-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/board/pin":
 			_, _ = w.Write([]byte(`{"status":"ok","item":{"id":"pin-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/create":
 			_, _ = w.Write([]byte(`{"status":"ok","artifact":{"id":"art-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/patch":
+			_, _ = w.Write([]byte(`{"status":"ok","artifact":{"id":"art-1","title":"math advanced"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/canvas/annotate":
 			_, _ = w.Write([]byte(`{"status":"ok","annotation":{"id":"ann-1"}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/search":
@@ -403,8 +412,11 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"identity resolve group:family",
 		"session create help room",
 		"message post room-1 hello",
+		"message unread alice room-1",
+		"message ack alice msg-1",
 		"board pin family reminder",
 		"artifact create lesson-1 math",
+		"artifact patch art-1 math advanced",
 		"canvas annotate canvas-1 note",
 		"search query hello",
 		"memory remember kitchen milk",

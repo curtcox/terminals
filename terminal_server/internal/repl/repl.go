@@ -71,11 +71,14 @@ func replCommandSpecs() []commandSpec {
 		{Name: "session join", Usage: "session join <session> <participant> [--json]", Summary: "Join a participant to an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session leave", Usage: "session leave <session> <participant> [--json]", Summary: "Remove a participant from an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "message ls", Usage: "message ls [room] [--json]", Summary: "List messages", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "message unread", Usage: "message unread <identity> [room] [--json]", Summary: "List unread messages for an identity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message post", Usage: "message post <room> <text> [--json]", Summary: "Post a room/direct message", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "message ack", Usage: "message ack <identity> <message> [--json]", Summary: "Acknowledge a message for an identity", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "board ls", Usage: "board ls [board] [--json]", Summary: "List board or bulletin entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/board"}},
 		{Name: "board pin", Usage: "board pin <board> <text> [--json]", Summary: "Pin a bulletin entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/board"}},
 		{Name: "artifact ls", Usage: "artifact ls [--json]", Summary: "List shared artifacts", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "artifact create", Usage: "artifact create <kind> <title> [--json]", Summary: "Create a shared artifact", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
+		{Name: "artifact patch", Usage: "artifact patch <artifact> <title> [--json]", Summary: "Patch shared artifact metadata", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "canvas ls", Usage: "canvas ls [canvas] [--json]", Summary: "List canvas annotations", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/canvas"}},
 		{Name: "canvas annotate", Usage: "canvas annotate <canvas> <text> [--json]", Summary: "Annotate a shared canvas", Classification: commandMutating, RelatedDocs: []string{"repl/commands/canvas"}},
 		{Name: "search query", Usage: "search query <text> [--json]", Summary: "Run unified search", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/search"}},
@@ -604,6 +607,20 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return err
 			}
 			return writeJSON(s.out, body)
+		case "unread":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: message unread <identity> [room]")
+			}
+			query := url.Values{"identity_id": {plain[0]}}
+			if len(plain) > 1 {
+				query.Set("room", plain[1])
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/message/unread", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
 		case "post":
 			plain := nonFlagArgs(args[1:])
 			if len(plain) < 2 {
@@ -624,6 +641,23 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				messageID = toString(msgMap["id"])
 			}
 			_, err = fmt.Fprintf(s.out, "OK  message=%s\n", messageID)
+			return err
+		case "ack":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: message ack <identity> <message>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/message/ack", url.Values{
+				"identity_id": {plain[0]},
+				"message_id":  {plain[1]},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  identity=%s message=%s action=ack\n", plain[0], plain[1])
 			return err
 		default:
 			return fmt.Errorf("unknown command: message %s", sub)
@@ -693,6 +727,23 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				artifactID = toString(itemMap["id"])
 			}
 			_, err = fmt.Fprintf(s.out, "OK  artifact=%s\n", artifactID)
+			return err
+		case "patch":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: artifact patch <artifact> <title>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/artifact/patch", url.Values{
+				"artifact_id": {plain[0]},
+				"title":       {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  artifact=%s action=patch\n", plain[0])
 			return err
 		default:
 			return fmt.Errorf("unknown command: artifact %s", sub)
