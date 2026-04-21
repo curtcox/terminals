@@ -405,6 +405,39 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 			t.Fatalf("POST %s status = %d, want 200 body=%s", tc.path, w.Code, w.Body.String())
 		}
 	}
+
+	createReq := httptest.NewRequest(http.MethodPost, "/admin/api/session/create", strings.NewReader(url.Values{
+		"kind":   {"lesson"},
+		"target": {"math-room"},
+	}.Encode()))
+	createReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	createW := httptest.NewRecorder()
+	h.ServeHTTP(createW, createReq)
+	if createW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/session/create status = %d, want 200 body=%s", createW.Code, createW.Body.String())
+	}
+	var created map[string]any
+	if err := json.Unmarshal(createW.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode session create response error = %v", err)
+	}
+	sessionMap, _ := created["session"].(map[string]any)
+	sessionID, _ := sessionMap["id"].(string)
+	if strings.TrimSpace(sessionID) == "" {
+		t.Fatalf("missing created session id in response: %s", createW.Body.String())
+	}
+
+	for _, path := range []string{"/admin/api/session/join", "/admin/api/session/leave"} {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(url.Values{
+			"session_id":  {sessionID},
+			"participant": {"alice"},
+		}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("POST %s status = %d, want 200 body=%s", path, w.Code, w.Body.String())
+		}
+	}
 }
 
 func TestIdentityResolveEndpointRequiresGET(t *testing.T) {

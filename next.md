@@ -1,1 +1,1 @@
-Implement session join/leave semantics (service + admin API + REPL command) with simulation-focused tests as the next capability-closure slice.
+Implement `session members`/`session show` REPL and admin endpoints to inspect participant state after join/leave.

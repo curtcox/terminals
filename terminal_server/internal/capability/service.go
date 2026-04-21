@@ -17,10 +17,16 @@ type Identity struct {
 }
 
 type InteractiveSession struct {
-	ID        string    `json:"id"`
-	Kind      string    `json:"kind"`
-	Target    string    `json:"target"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string               `json:"id"`
+	Kind         string               `json:"kind"`
+	Target       string               `json:"target"`
+	Participants []SessionParticipant `json:"participants,omitempty"`
+	CreatedAt    time.Time            `json:"created_at"`
+}
+
+type SessionParticipant struct {
+	IdentityID string    `json:"identity_id"`
+	JoinedAt   time.Time `json:"joined_at"`
 }
 
 type Message struct {
@@ -188,7 +194,61 @@ func (s *Service) CreateSession(kind, target string) InteractiveSession {
 func (s *Service) ListSessions() []InteractiveSession {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]InteractiveSession(nil), s.sessions...)
+	return cloneSessions(s.sessions)
+}
+
+func (s *Service) JoinSession(sessionID, participant string) (InteractiveSession, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sessionID = strings.TrimSpace(sessionID)
+	participant = strings.TrimSpace(participant)
+	for i := range s.sessions {
+		if s.sessions[i].ID != sessionID {
+			continue
+		}
+		if participant == "" {
+			return cloneSession(s.sessions[i]), true
+		}
+		for _, existing := range s.sessions[i].Participants {
+			if strings.EqualFold(existing.IdentityID, participant) {
+				return cloneSession(s.sessions[i]), true
+			}
+		}
+		s.sessions[i].Participants = append(s.sessions[i].Participants, SessionParticipant{
+			IdentityID: participant,
+			JoinedAt:   s.now(),
+		})
+		s.appendRecentLocked("session", s.sessions[i].ID+" join "+participant)
+		return cloneSession(s.sessions[i]), true
+	}
+	return InteractiveSession{}, false
+}
+
+func (s *Service) LeaveSession(sessionID, participant string) (InteractiveSession, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sessionID = strings.TrimSpace(sessionID)
+	participant = strings.TrimSpace(participant)
+	for i := range s.sessions {
+		if s.sessions[i].ID != sessionID {
+			continue
+		}
+		if participant != "" {
+			next := s.sessions[i].Participants[:0]
+			for _, existing := range s.sessions[i].Participants {
+				if strings.EqualFold(existing.IdentityID, participant) {
+					continue
+				}
+				next = append(next, existing)
+			}
+			s.sessions[i].Participants = next
+			s.appendRecentLocked("session", s.sessions[i].ID+" leave "+participant)
+		}
+		return cloneSession(s.sessions[i]), true
+	}
+	return InteractiveSession{}, false
 }
 
 func (s *Service) PostMessage(room, text string) Message {
@@ -464,4 +524,17 @@ func strconv64(v uint64) string {
 		v /= 10
 	}
 	return string(buf[i:])
+}
+
+func cloneSessions(input []InteractiveSession) []InteractiveSession {
+	out := make([]InteractiveSession, 0, len(input))
+	for _, item := range input {
+		out = append(out, cloneSession(item))
+	}
+	return out
+}
+
+func cloneSession(item InteractiveSession) InteractiveSession {
+	item.Participants = append([]SessionParticipant(nil), item.Participants...)
+	return item
 }

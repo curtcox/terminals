@@ -98,6 +98,8 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/identity/resolve", h.handleIdentityResolve)
 	mux.HandleFunc("/admin/api/session", h.handleInteractiveSessions)
 	mux.HandleFunc("/admin/api/session/create", h.handleInteractiveSessionCreate)
+	mux.HandleFunc("/admin/api/session/join", h.handleInteractiveSessionJoin)
+	mux.HandleFunc("/admin/api/session/leave", h.handleInteractiveSessionLeave)
 	mux.HandleFunc("/admin/api/message", h.handleMessages)
 	mux.HandleFunc("/admin/api/message/post", h.handleMessagePost)
 	mux.HandleFunc("/admin/api/board", h.handleBoard)
@@ -238,6 +240,40 @@ func (h *Handler) handleInteractiveSessionCreate(w http.ResponseWriter, req *htt
 		return
 	}
 	session := h.capability.CreateSession(req.Form.Get("kind"), req.Form.Get("target"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
+}
+
+func (h *Handler) handleInteractiveSessionJoin(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	session, ok := h.capability.JoinSession(req.Form.Get("session_id"), req.Form.Get("participant"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
+}
+
+func (h *Handler) handleInteractiveSessionLeave(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	session, ok := h.capability.LeaveSession(req.Form.Get("session_id"), req.Form.Get("participant"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
 }
 

@@ -256,6 +256,8 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"identity ls",
 		"identity resolve",
 		"session create",
+		"session join",
+		"session leave",
 		"message post",
 		"board pin",
 		"artifact create",
@@ -271,6 +273,35 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		if _, ok := DescribeCommand(command); !ok {
 			t.Fatalf("DescribeCommand(%q) not found", command)
 		}
+	}
+}
+
+func TestSessionJoinLeaveCommandsUseAdminAPIs(t *testing.T) {
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/join":
+			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1","participants":[{"identity_id":"alice"}]}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/leave":
+			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1","participants":[]}}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("session join sess-1 alice\nsession leave sess-1 alice\nexit\n")
+	var out bytes.Buffer
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "OK  session=sess-1 participant=alice action=join") {
+		t.Fatalf("missing session join output: %q", text)
+	}
+	if !strings.Contains(text, "OK  session=sess-1 participant=alice action=leave") {
+		t.Fatalf("missing session leave output: %q", text)
 	}
 }
 

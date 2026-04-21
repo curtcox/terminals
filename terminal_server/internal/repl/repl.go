@@ -66,6 +66,8 @@ func replCommandSpecs() []commandSpec {
 		{Name: "identity resolve", Usage: "identity resolve <audience> [--json]", Summary: "Resolve an audience to identities", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
 		{Name: "session ls", Usage: "session ls [--json]", Summary: "List interactive sessions", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session create", Usage: "session create <kind> <target> [--json]", Summary: "Create a generalized interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session join", Usage: "session join <session> <participant> [--json]", Summary: "Join a participant to an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session leave", Usage: "session leave <session> <participant> [--json]", Summary: "Remove a participant from an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "message ls", Usage: "message ls [room] [--json]", Summary: "List messages", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message post", Usage: "message post <room> <text> [--json]", Summary: "Post a room/direct message", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "board ls", Usage: "board ls [board] [--json]", Summary: "List board or bulletin entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/board"}},
@@ -475,6 +477,52 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				sessionID = toString(sessionMap["id"])
 			}
 			_, err = fmt.Fprintf(s.out, "OK  session=%s\n", sessionID)
+			return err
+		case "join":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: session join <session> <participant>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/session/join", url.Values{
+				"session_id":  {plain[0]},
+				"participant": {plain[1]},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			sessionID := plain[0]
+			if sessionMap, ok := body["session"].(map[string]any); ok {
+				if id := toString(sessionMap["id"]); id != "" {
+					sessionID = id
+				}
+			}
+			_, err = fmt.Fprintf(s.out, "OK  session=%s participant=%s action=join\n", sessionID, plain[1])
+			return err
+		case "leave":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: session leave <session> <participant>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/session/leave", url.Values{
+				"session_id":  {plain[0]},
+				"participant": {plain[1]},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			sessionID := plain[0]
+			if sessionMap, ok := body["session"].(map[string]any); ok {
+				if id := toString(sessionMap["id"]); id != "" {
+					sessionID = id
+				}
+			}
+			_, err = fmt.Fprintf(s.out, "OK  session=%s participant=%s action=leave\n", sessionID, plain[1])
 			return err
 		default:
 			return fmt.Errorf("unknown command: session %s", sub)

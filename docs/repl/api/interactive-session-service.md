@@ -1,3 +1,8 @@
 # Interactive Session Service
 
-Typed operations for generalized collaborative sessions (create, join, list, close).
+Typed operations for generalized collaborative sessions:
+
+- `CreateSession`
+- `ListSessions`
+- `JoinSession`
+- `LeaveSession`
