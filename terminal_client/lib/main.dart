@@ -11,6 +11,7 @@ import 'package:terminal_client/capabilities/probe.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
+import 'package:terminal_client/connection/reliability.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/edge/artifact_export.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
@@ -102,10 +103,19 @@ const String _bugReportActionPrefix = 'bug_report';
 const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
-const Duration _bugReportAckTimeout = Duration(seconds: 20);
 const Duration _capabilityMonitorInterval = Duration(seconds: 2);
-const Duration _registerAckRetryInterval = Duration(milliseconds: 400);
-const Duration _registerAckTimeout = Duration(seconds: 20);
+const RetryPolicy _bugReportAckRetryPolicy = RetryPolicy(
+  interval: Duration(seconds: 1),
+  maxDuration: Duration(seconds: 20),
+);
+const RetryPolicy _registerAckRetryPolicy = RetryPolicy(
+  interval: Duration(milliseconds: 400),
+  maxDuration: Duration(seconds: 20),
+);
+const RetryPolicy _readinessPolicy = RetryPolicy(
+  interval: Duration(milliseconds: 120),
+  maxDuration: Duration(seconds: 20),
+);
 
 const Set<String> _loopbackHosts = <String>{
   'localhost',
@@ -218,13 +228,30 @@ String buildWebConnectionChipLabel({
   required bool isConnecting,
   required bool shouldStayConnected,
 }) {
-  if (hasRegisterAck) {
-    return 'Connected';
+  final phase = deriveConnectionPhase(
+    shouldStayConnected: shouldStayConnected,
+    isConnecting: isConnecting,
+    hasClient: shouldStayConnected,
+    hasIncoming: shouldStayConnected,
+    hasRegisterAck: hasRegisterAck,
+    hasRecentTransportFailure: false,
+  );
+  return buildConnectionPhaseLabel(phase);
+}
+
+String buildConnectionPhaseLabel(ConnectionPhase phase) {
+  switch (phase) {
+    case ConnectionPhase.disconnected:
+      return 'Not connected';
+    case ConnectionPhase.connecting:
+      return 'Connecting';
+    case ConnectionPhase.connectedUnregistered:
+      return 'Connected (registering)';
+    case ConnectionPhase.registered:
+      return 'Connected';
+    case ConnectionPhase.degraded:
+      return 'Degraded';
   }
-  if (isConnecting || shouldStayConnected) {
-    return 'Connecting';
-  }
-  return 'Not connected';
 }
 
 String buildTransportDiagnosticsClipboardText({
@@ -1039,6 +1066,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   TextDirection _lastKnownTextDirection = TextDirection.ltr;
   bool _capabilityPollInFlight = false;
   String _lastCapabilitySignature = '';
+  late final ConnectionReadinessGateway _readinessGateway;
+  late final ReliableSendDispatcher<ConnectRequest> _reliableSender;
 
   int _nowUnixMs() => widget.nowUnixMsProvider();
 
@@ -1072,6 +1101,52 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   bool get _hasActiveControlSession =>
       _shouldStayConnected && _incoming != null && _client != null;
+
+  ConnectionPhase get _connectionPhase => deriveConnectionPhase(
+        shouldStayConnected: _shouldStayConnected,
+        isConnecting: _isConnecting,
+        hasClient: _client != null,
+        hasIncoming: _incoming != null,
+        hasRegisterAck: _hasRegisterAck,
+        hasRecentTransportFailure: _lastTransportDiagnostic.trim().isNotEmpty,
+      );
+
+  bool get _isConnectionRegistered =>
+      _connectionPhase == ConnectionPhase.registered;
+
+  Future<void> _ensureConnectedForDispatch() async {
+    if (_isConnectionRegistered) {
+      return;
+    }
+    _shouldStayConnected = true;
+    if (!_isConnecting) {
+      await _startStream(userInitiated: true);
+    }
+  }
+
+  Future<SendResult> _sendWhenReady({
+    required OutboundOperation operation,
+    required ConnectRequest request,
+    Future<bool> Function()? waitForAck,
+    Duration? ackTimeout,
+  }) async {
+    final rule = kOutboundRoutingRules[operation] ??
+        const OutboundRoutingRule(
+          mode: SendMode.fireAndForget,
+          safeToReplay: false,
+          requiresAck: false,
+        );
+    if (rule.mode == SendMode.queueUntilReady && _isConnectionRegistered) {
+      _outgoing.add(request);
+      return SendResult.sent;
+    }
+    return _reliableSender.sendWhenReady(
+      request: request,
+      mode: rule.mode,
+      waitForAck: waitForAck,
+      ackTimeout: ackTimeout,
+    );
+  }
 
   String _capabilitySignature(capv1.DeviceCapabilities capabilities) {
     return capabilities.writeToBuffer().join(',');
@@ -1191,21 +1266,27 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       );
       _capabilityGeneration = nextGeneration;
       if (forceSnapshot) {
-        _outgoing.add(
-          TerminalControlGrpcClient.capabilitySnapshotRequest(
-            deviceId: _deviceId,
-            generation: _capabilityGeneration,
-            capabilities: nextCapabilities,
+        unawaited(
+          _sendWhenReady(
+            operation: OutboundOperation.capabilitySnapshot,
+            request: TerminalControlGrpcClient.capabilitySnapshotRequest(
+              deviceId: _deviceId,
+              generation: _capabilityGeneration,
+              capabilities: nextCapabilities,
+            ),
           ),
         );
         return;
       }
-      _outgoing.add(
-        TerminalControlGrpcClient.capabilityDeltaRequest(
-          deviceId: _deviceId,
-          generation: _capabilityGeneration,
-          capabilities: nextCapabilities,
-          reason: reason,
+      unawaited(
+        _sendWhenReady(
+          operation: OutboundOperation.capabilityDelta,
+          request: TerminalControlGrpcClient.capabilityDeltaRequest(
+            deviceId: _deviceId,
+            generation: _capabilityGeneration,
+            capabilities: nextCapabilities,
+            reason: reason,
+          ),
         ),
       );
     } finally {
@@ -1569,6 +1650,15 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     );
     _audioPlayback = widget.audioPlaybackFactory();
     _artifactExporter = DurableArtifactExporter();
+    _readinessGateway = ConnectionReadinessGateway(
+      currentPhase: () => _connectionPhase,
+      startConnection: _ensureConnectedForDispatch,
+      policy: _readinessPolicy,
+    );
+    _reliableSender = ReliableSendDispatcher<ConnectRequest>(
+      sendNow: (request) => _outgoing.add(request),
+      gateway: _readinessGateway,
+    );
     _recordClientLog('info', 'client started');
     if (_e2eEmitEvents) {
       debugPrint('E2E_EVENT: client_started');
@@ -1910,11 +2000,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
             ..deviceName = _deviceNameController.text.trim()
             ..deviceType = _deviceTypeController.text.trim()
             ..platform = _platformController.text.trim());
-      _outgoing.add(
-        TerminalControlGrpcClient.helloRequest(
-          deviceId: _deviceId,
-          identity: identity,
-          clientVersion: 'terminal_client',
+      unawaited(
+        _sendWhenReady(
+          operation: OutboundOperation.bootstrapHello,
+          request: TerminalControlGrpcClient.helloRequest(
+            deviceId: _deviceId,
+            identity: identity,
+            clientVersion: 'terminal_client',
+          ),
         ),
       );
 
@@ -1925,26 +2018,35 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _lastCapabilitySignature = _capabilitySignature(
         _lastRegisteredCapabilities!,
       );
-      _outgoing.add(
-        TerminalControlGrpcClient.registerRequest(
-          capabilities: _lastRegisteredCapabilities!,
+      unawaited(
+        _sendWhenReady(
+          operation: OutboundOperation.bootstrapRegister,
+          request: TerminalControlGrpcClient.registerRequest(
+            capabilities: _lastRegisteredCapabilities!,
+          ),
         ),
       );
-      _outgoing.add(
-        TerminalControlGrpcClient.capabilitySnapshotRequest(
-          deviceId: _deviceId,
-          generation: _capabilityGeneration,
-          capabilities: _lastRegisteredCapabilities!,
+      unawaited(
+        _sendWhenReady(
+          operation: OutboundOperation.bootstrapCapabilitySnapshot,
+          request: TerminalControlGrpcClient.capabilitySnapshotRequest(
+            deviceId: _deviceId,
+            generation: _capabilityGeneration,
+            capabilities: _lastRegisteredCapabilities!,
+          ),
         ),
       );
       final initialHeartbeatUnixMs =
           DateTime.now().toUtc().millisecondsSinceEpoch;
       _lastHeartbeatUnixMs = initialHeartbeatUnixMs;
       _pendingHeartbeatUnixMs = initialHeartbeatUnixMs;
-      _outgoing.add(
-        TerminalControlGrpcClient.heartbeatRequest(
-          deviceId: _deviceId,
-          unixMs: initialHeartbeatUnixMs,
+      unawaited(
+        _sendWhenReady(
+          operation: OutboundOperation.heartbeat,
+          request: TerminalControlGrpcClient.heartbeatRequest(
+            deviceId: _deviceId,
+            unixMs: initialHeartbeatUnixMs,
+          ),
         ),
       );
       _registerAckRetryAttempts = 0;
@@ -1979,10 +2081,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       final unixMs = DateTime.now().toUtc().millisecondsSinceEpoch;
       _lastHeartbeatUnixMs = unixMs;
       _pendingHeartbeatUnixMs = unixMs;
-      _outgoing.add(
-        TerminalControlGrpcClient.heartbeatRequest(
-          deviceId: _deviceId,
-          unixMs: unixMs,
+      unawaited(
+        _sendWhenReady(
+          operation: OutboundOperation.heartbeat,
+          request: TerminalControlGrpcClient.heartbeatRequest(
+            deviceId: _deviceId,
+            unixMs: unixMs,
+          ),
         ),
       );
     });
@@ -2062,7 +2167,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _lastSensorSnapshot
       ..clear()
       ..addAll(request.sensor.values);
-    _outgoing.add(request);
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.sensorTelemetry,
+        request: request,
+      ),
+    );
     final unixMs = request.sensor.unixMs.toInt();
     if (mounted) {
       setState(() {
@@ -2083,36 +2193,48 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   void _sendRuntimeStatusQuery() {
     final requestID = _nextDebugRequestID('debug-runtime-status');
     _pendingRuntimeStatusRequestID = requestID;
-    _outgoing.add(
-      ConnectRequest()
-        ..command = (CommandRequest()
-          ..requestId = requestID
-          ..kind = CommandKind.COMMAND_KIND_SYSTEM
-          ..intent = 'runtime_status'),
+    final request = ConnectRequest()
+      ..command = (CommandRequest()
+        ..requestId = requestID
+        ..kind = CommandKind.COMMAND_KIND_SYSTEM
+        ..intent = 'runtime_status');
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.runtimeQuery,
+        request: request,
+      ),
     );
   }
 
   void _sendDeviceStatusQuery() {
     final requestID = _nextDebugRequestID('debug-device-status');
     _pendingDeviceStatusRequestID = requestID;
-    _outgoing.add(
-      ConnectRequest()
-        ..command = (CommandRequest()
-          ..requestId = requestID
-          ..kind = CommandKind.COMMAND_KIND_SYSTEM
-          ..intent = 'device_status $_deviceId'),
+    final request = ConnectRequest()
+      ..command = (CommandRequest()
+        ..requestId = requestID
+        ..kind = CommandKind.COMMAND_KIND_SYSTEM
+        ..intent = 'device_status $_deviceId');
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.deviceQuery,
+        request: request,
+      ),
     );
   }
 
   void _sendScenarioRegistryQuery() {
     final requestID = _nextDebugRequestID('debug-scenario-registry');
     _pendingScenarioRegistryRequestID = requestID;
-    _outgoing.add(
-      ConnectRequest()
-        ..command = (CommandRequest()
-          ..requestId = requestID
-          ..kind = CommandKind.COMMAND_KIND_SYSTEM
-          ..intent = 'scenario_registry'),
+    final request = ConnectRequest()
+      ..command = (CommandRequest()
+        ..requestId = requestID
+        ..kind = CommandKind.COMMAND_KIND_SYSTEM
+        ..intent = 'scenario_registry');
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.scenarioQuery,
+        request: request,
+      ),
     );
   }
 
@@ -2133,16 +2255,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (_registerAckRetryStartedUnixMs <= 0) {
       _registerAckRetryStartedUnixMs = _nowUnixMs();
     }
-    if (_nowUnixMs() - _registerAckRetryStartedUnixMs >=
-        _registerAckTimeout.inMilliseconds) {
+    final elapsedMs = _nowUnixMs() - _registerAckRetryStartedUnixMs;
+    if (_registerAckRetryPolicy
+        .hasTimedOut(Duration(milliseconds: elapsedMs))) {
       _recordClientLog(
         'warn',
         'register acknowledgement still pending after '
-            '${_registerAckTimeout.inSeconds}s and $_registerAckRetryAttempts retry attempts',
+            '${_registerAckRetryPolicy.maxDuration.inSeconds}s and $_registerAckRetryAttempts retry attempts',
       );
       return;
     }
-    _registerAckRetryTimer = Timer(_registerAckRetryInterval, () {
+    _registerAckRetryTimer = Timer(
+        _registerAckRetryPolicy.delayForAttempt(_registerAckRetryAttempts + 1),
+        () {
       if (_hasRegisterAck ||
           !_hasActiveControlSession ||
           _lastRegisteredCapabilities == null) {
@@ -2150,9 +2275,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         return;
       }
       _registerAckRetryAttempts += 1;
-      _outgoing.add(
-        TerminalControlGrpcClient.registerRequest(
-          capabilities: _lastRegisteredCapabilities!,
+      unawaited(
+        _sendWhenReady(
+          operation: OutboundOperation.bootstrapRegister,
+          request: TerminalControlGrpcClient.registerRequest(
+            capabilities: _lastRegisteredCapabilities!,
+          ),
         ),
       );
       _recordClientLog(
@@ -2173,14 +2301,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       });
       return;
     }
-    if (!_hasActiveControlSession || !_hasRegisterAck) {
+    if (!_isConnectionRegistered) {
       setState(() {
         _pendingLaunchApplicationIntent = intent;
         _status = 'Connecting';
         _lastNotification =
             'Connecting control stream to open application: $intent';
       });
-      if (!_hasActiveControlSession && !_isConnecting) {
+      if (!_isConnecting) {
         unawaited(_startStream(userInitiated: true));
       }
       return;
@@ -2189,14 +2317,18 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   void _sendApplicationLaunchCommand(String intent) {
-    _outgoing.add(
-      ConnectRequest()
-        ..command = (CommandRequest()
-          ..requestId = _nextDebugRequestID('launch-app')
-          ..deviceId = _deviceId
-          ..action = CommandAction.COMMAND_ACTION_START
-          ..kind = CommandKind.COMMAND_KIND_MANUAL
-          ..intent = intent),
+    final request = ConnectRequest()
+      ..command = (CommandRequest()
+        ..requestId = _nextDebugRequestID('launch-app')
+        ..deviceId = _deviceId
+        ..action = CommandAction.COMMAND_ACTION_START
+        ..kind = CommandKind.COMMAND_KIND_MANUAL
+        ..intent = intent);
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.launchApplication,
+        request: request,
+      ),
     );
     if (mounted) {
       setState(() {
@@ -2210,12 +2342,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   void _sendPlaybackArtifactsQuery() {
     final requestID = _nextDebugRequestID('debug-playback-artifacts');
     _pendingPlaybackArtifactsRequestID = requestID;
-    _outgoing.add(
-      ConnectRequest()
-        ..command = (CommandRequest()
-          ..requestId = requestID
-          ..kind = CommandKind.COMMAND_KIND_SYSTEM
-          ..intent = 'list_playback_artifacts'),
+    final request = ConnectRequest()
+      ..command = (CommandRequest()
+        ..requestId = requestID
+        ..kind = CommandKind.COMMAND_KIND_SYSTEM
+        ..intent = 'list_playback_artifacts');
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.playbackArtifactsQuery,
+        request: request,
+      ),
     );
   }
 
@@ -2235,15 +2371,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     final requestID = _nextDebugRequestID('debug-playback-metadata');
     _pendingPlaybackMetadataRequestID = requestID;
-    _outgoing.add(
-      ConnectRequest()
-        ..command = (CommandRequest()
-          ..requestId = requestID
-          ..deviceId = _deviceId
-          ..kind = CommandKind.COMMAND_KIND_MANUAL
-          ..intent = 'playback_metadata'
-          ..arguments['artifact_id'] = artifactID
-          ..arguments['target_device_id'] = targetDeviceID),
+    final request = ConnectRequest()
+      ..command = (CommandRequest()
+        ..requestId = requestID
+        ..deviceId = _deviceId
+        ..kind = CommandKind.COMMAND_KIND_MANUAL
+        ..intent = 'playback_metadata'
+        ..arguments['artifact_id'] = artifactID
+        ..arguments['target_device_id'] = targetDeviceID);
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.playbackMetadataQuery,
+        request: request,
+      ),
     );
   }
 
@@ -2993,10 +3133,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   bool _isBugReportTransportReady() {
-    return _client != null &&
-        _incoming != null &&
-        _shouldStayConnected &&
-        _hasRegisterAck;
+    return _isConnectionRegistered;
   }
 
   void _dispatchBugReport({
@@ -3007,8 +3144,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     required int previousDispatchAttempts,
     required bool replay,
   }) {
-    _outgoing.add(
-      ConnectRequest()..bugReport = bugReport.deepCopy(),
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.bugReport,
+        request: ConnectRequest()..bugReport = bugReport.deepCopy(),
+      ),
     );
     final nextAttempt = previousDispatchAttempts + 1;
     _pendingBugReports.add(
@@ -3066,12 +3206,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (_bugReportAckTimer != null) {
       return;
     }
-    _bugReportAckTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _bugReportAckTimer = Timer.periodic(_bugReportAckRetryPolicy.interval, (_) {
       final nowUnixMs = _nowUnixMs();
       if (_pendingBugReports.isNotEmpty) {
         final first = _pendingBugReports.first;
-        if (nowUnixMs - first.firstQueuedUnixMs >=
-            _bugReportAckTimeout.inMilliseconds) {
+        if (_bugReportAckRetryPolicy.hasTimedOut(
+          Duration(milliseconds: nowUnixMs - first.firstQueuedUnixMs),
+        )) {
           final failed = _pendingBugReports.removeAt(0);
           _lastBugTokenWord = failed.identifier.word;
           _lastBugTokenCode = failed.identifier.code;
@@ -3095,8 +3236,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       } else if (_queuedBugReports.isNotEmpty &&
           _bugReceiptState == _BugReceiptState.waiting) {
         final firstQueued = _queuedBugReports.first;
-        if (nowUnixMs - firstQueued.firstQueuedUnixMs >=
-            _bugReportAckTimeout.inMilliseconds) {
+        if (_bugReportAckRetryPolicy.hasTimedOut(
+          Duration(milliseconds: nowUnixMs - firstQueued.firstQueuedUnixMs),
+        )) {
           _lastBugTokenWord = firstQueued.identifier.word;
           _lastBugTokenCode = firstQueued.identifier.code;
           if (mounted) {
@@ -3107,7 +3249,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               _bugReceiptState = _BugReceiptState.error;
               _bugReceiptReportId = '';
               _bugReceiptDetail =
-                  'No positive receipt could be generated because the report remained queued for more than ${_bugReportAckTimeout.inSeconds}s.${_bugTransportContextSuffix()}';
+                  'No positive receipt could be generated because the report remained queued for more than ${_bugReportAckRetryPolicy.maxDuration.inSeconds}s.${_bugTransportContextSuffix()}';
             });
           }
           _recordClientLog(
@@ -3511,17 +3653,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                       if (kIsWeb)
                         Chip(
                           avatar: Icon(
-                            _hasRegisterAck
+                            _isConnectionRegistered
                                 ? Icons.check_circle_outline
                                 : Icons.sync_outlined,
                           ),
-                          label: Text(
-                            buildWebConnectionChipLabel(
-                              hasRegisterAck: _hasRegisterAck,
-                              isConnecting: _isConnecting,
-                              shouldStayConnected: _shouldStayConnected,
-                            ),
-                          ),
+                          label:
+                              Text(buildConnectionPhaseLabel(_connectionPhase)),
                         )
                       else
                         ElevatedButton(
@@ -3590,6 +3727,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                     decoration: const InputDecoration(labelText: 'Platform'),
                   ),
                   const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    children: [
+                      ElevatedButton(
+                        onPressed: _startStream,
+                        child: const Text('Connect Stream'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _stopStream,
+                        child: const Text('Disconnect'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   _buildBuildParityPanel(),
                   const SizedBox(height: 20),
                   SelectableText('Control Stream: $_status'),
@@ -3610,7 +3761,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                         'Photo frame assets: $_photoFrameAssetBaseURL'),
                   if (_lastNotification.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    SelectableText('Notification: $_lastNotification'),
+                    Text('Notification: $_lastNotification'),
                   ],
                   if (_bugReceiptState != _BugReceiptState.none) ...[
                     const SizedBox(height: 12),
@@ -3625,14 +3776,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                   Wrap(
                     spacing: 12,
                     children: [
-                      ElevatedButton(
-                        onPressed: _startStream,
-                        child: const Text('Connect Stream'),
-                      ),
-                      OutlinedButton(
-                        onPressed: _stopStream,
-                        child: const Text('Disconnect'),
-                      ),
                       OutlinedButton(
                         onPressed: _sendRuntimeStatusQuery,
                         child: const Text('Runtime Status'),
@@ -3896,9 +4039,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       final start = response.startStream;
       if (start.streamId.isNotEmpty) {
         _activeStreamsByID[start.streamId] = start.deepCopy();
-        _outgoing.add(
-          ConnectRequest()
-            ..streamReady = (StreamReady()..streamId = start.streamId),
+        unawaited(
+          _sendWhenReady(
+            operation: OutboundOperation.streamReady,
+            request: ConnectRequest()
+              ..streamReady = (StreamReady()..streamId = start.streamId),
+          ),
         );
         _streamReadyAckCount += 1;
         unawaited(_startMediaStream(start.deepCopy()));
@@ -4034,16 +4180,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     try {
       final payload = await _artifactExporter.exportByID(artifactID);
       final nowUnixMs = _nowUnixMs();
-      _outgoing.add(
-        ConnectRequest()
-          ..artifactAvailable = (iov1.ArtifactAvailable()
-            ..artifact = (iov1.ArtifactRef()
-              ..id = artifactID
-              ..kind = 'artifact.binary'
-              ..source = (iov1.DeviceRef()..deviceId = _deviceId)
-              ..startUnixMs = Int64(nowUnixMs)
-              ..endUnixMs = Int64(nowUnixMs)
-              ..uri = 'local://artifact/$artifactID?bytes=${payload.length}')),
+      unawaited(
+        _sendWhenReady(
+          operation: OutboundOperation.artifactAvailable,
+          request: ConnectRequest()
+            ..artifactAvailable = (iov1.ArtifactAvailable()
+              ..artifact = (iov1.ArtifactRef()
+                ..id = artifactID
+                ..kind = 'artifact.binary'
+                ..source = (iov1.DeviceRef()..deviceId = _deviceId)
+                ..startUnixMs = Int64(nowUnixMs)
+                ..endUnixMs = Int64(nowUnixMs)
+                ..uri =
+                    'local://artifact/$artifactID?bytes=${payload.length}')),
+        ),
       );
       if (mounted) {
         setState(() {
@@ -4205,14 +4355,17 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       );
       return;
     }
-    _outgoing.add(
-      ConnectRequest()
-        ..input = (iov1.InputEvent()
-          ..deviceId = _deviceId
-          ..uiAction = (iov1.UIAction()
-            ..componentId = componentId
-            ..action = action
-            ..value = value)),
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.uiAction,
+        request: ConnectRequest()
+          ..input = (iov1.InputEvent()
+            ..deviceId = _deviceId
+            ..uiAction = (iov1.UIAction()
+              ..componentId = componentId
+              ..action = action
+              ..value = value)),
+      ),
     );
   }
 
@@ -4224,11 +4377,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     _recordClientLog('info',
         'sending key text: ${text.replaceAll(String.fromCharCode(127), '<DEL>')}');
-    _outgoing.add(
-      ConnectRequest()
-        ..input = (iov1.InputEvent()
-          ..deviceId = _deviceId
-          ..key = (iov1.KeyEvent()..text = text)),
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.keyEvent,
+        request: ConnectRequest()
+          ..input = (iov1.InputEvent()
+            ..deviceId = _deviceId
+            ..key = (iov1.KeyEvent()..text = text)),
+      ),
     );
   }
 
@@ -4238,8 +4394,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (streamID.isEmpty || signalType.isEmpty) {
       return;
     }
-    _outgoing.add(
-      ConnectRequest()..webrtcSignal = signal.deepCopy(),
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.webrtcSignal,
+        request: ConnectRequest()..webrtcSignal = signal.deepCopy(),
+      ),
     );
   }
 
