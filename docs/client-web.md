@@ -29,11 +29,14 @@ flutter pub get
 make run-client-web
 
 # Or directly:
-cd terminal_client && flutter build web --no-wasm-dry-run
+cd terminal_client && flutter build web --no-wasm-dry-run --pwa-strategy=none \
+  --dart-define=TERMINALS_BUILD_SHA=$(git rev-parse --short=12 HEAD) \
+  --dart-define=TERMINALS_BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 cd terminal_client && python3 -m http.server 60739 --bind 0.0.0.0 --directory build/web
 ```
 
 This builds the web client and serves `build/web` via a static HTTP server.
+The footer shows `Build` date and `SHA`, making stale deployments easy to identify.
 
 The client will show a discovery/manual-connect screen. If the server is running on the same machine, mDNS discovery should find it automatically. Otherwise, enter the server address manually (e.g. `localhost:50051`).
 

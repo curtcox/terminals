@@ -22,6 +22,7 @@ import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/media/playback.dart';
 import 'package:terminal_client/media/webrtc_engine.dart';
+import 'package:terminal_client/util/browser_host.dart' as browser_host;
 import 'package:terminal_client/util/speech.dart' as speech;
 
 typedef TerminalControlClientFactory = TerminalControlClient Function({
@@ -85,12 +86,153 @@ const int _defaultControlWSPort = int.fromEnvironment(
 );
 const int _defaultControlPort =
     kIsWeb ? _defaultControlWSPort : _defaultGrpcPort;
+const String _buildSha = String.fromEnvironment(
+  'TERMINALS_BUILD_SHA',
+  defaultValue: 'unknown',
+);
+const String _buildDate = String.fromEnvironment(
+  'TERMINALS_BUILD_DATE',
+  defaultValue: 'unknown',
+);
+const String _registerMetadataPhotoFrameBaseURLKey =
+    'photo_frame_asset_base_url';
+const String _registerMetadataServerBuildShaKey = 'server_build_sha';
+const String _registerMetadataServerBuildDateKey = 'server_build_date';
 const String _bugReportActionPrefix = 'bug_report';
 const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
 const Duration _bugReportAckTimeout = Duration(seconds: 20);
 const Duration _capabilityMonitorInterval = Duration(seconds: 2);
+
+const Set<String> _loopbackHosts = <String>{
+  'localhost',
+  '127.0.0.1',
+  '::1',
+};
+
+String resolveInitialControlHost({
+  required bool isWebRuntime,
+  required String configuredHost,
+  required String pageHost,
+}) {
+  final trimmedConfiguredHost = configuredHost.trim();
+  if (!isWebRuntime) {
+    return trimmedConfiguredHost;
+  }
+  final trimmedPageHost = pageHost.trim();
+  if (trimmedPageHost.isEmpty) {
+    return trimmedConfiguredHost;
+  }
+  if (trimmedConfiguredHost.isEmpty) {
+    return trimmedPageHost;
+  }
+  if (_loopbackHosts.contains(trimmedConfiguredHost.toLowerCase())) {
+    return trimmedPageHost;
+  }
+  return trimmedConfiguredHost;
+}
+
+String resolvePageHost({
+  required String browserLocationHost,
+  required String uriBaseHost,
+}) {
+  final fromLocation = browserLocationHost.trim();
+  if (fromLocation.isNotEmpty) {
+    return fromLocation;
+  }
+  return uriBaseHost.trim();
+}
+
+String buildMetadataLabel(
+    {required String buildDate, required String buildSha}) {
+  final normalizedBuildDate = normalizeBuildValue(buildDate);
+  final normalizedBuildSha = normalizeBuildValue(buildSha);
+  return 'Build: $normalizedBuildDate | SHA: $normalizedBuildSha';
+}
+
+String normalizeBuildValue(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return 'unknown';
+  }
+  return trimmed;
+}
+
+String buildVersionParityNote({
+  required String clientBuildDate,
+  required String clientBuildSha,
+  required String serverBuildDate,
+  required String serverBuildSha,
+}) {
+  final normalizedClientSha = normalizeBuildValue(clientBuildSha);
+  final normalizedServerSha = normalizeBuildValue(serverBuildSha);
+  final normalizedClientDate = normalizeBuildValue(clientBuildDate);
+  final normalizedServerDate = normalizeBuildValue(serverBuildDate);
+
+  if (normalizedServerSha == 'unknown' && normalizedServerDate == 'unknown') {
+    return 'Build Match: unknown (awaiting server register ack)';
+  }
+  if (normalizedClientSha != 'unknown' && normalizedServerSha != 'unknown') {
+    if (normalizedClientSha == normalizedServerSha) {
+      if (normalizedClientDate != 'unknown' &&
+          normalizedServerDate != 'unknown' &&
+          normalizedClientDate != normalizedServerDate) {
+        return 'Build Match: same SHA, different build date';
+      }
+      return 'Build Match: same SHA';
+    }
+    return 'Build Match: different SHA';
+  }
+  if (normalizedClientDate != 'unknown' && normalizedServerDate != 'unknown') {
+    if (normalizedClientDate == normalizedServerDate) {
+      return 'Build Match: same build date';
+    }
+    return 'Build Match: different build date';
+  }
+  return 'Build Match: unknown';
+}
+
+String buildTransportDiagnosticsClipboardText({
+  required String lastTransportDiagnostic,
+  required List<String> recentAttempts,
+}) {
+  final lines = <String>['Transport Diagnostics'];
+  final normalizedDiagnostic = lastTransportDiagnostic.trim();
+  if (normalizedDiagnostic.isEmpty) {
+    lines.add('No transport failures captured yet');
+  } else {
+    lines.add(normalizedDiagnostic);
+  }
+  if (recentAttempts.isNotEmpty) {
+    lines.add('Recent Carrier Attempts');
+    lines.addAll(
+      recentAttempts
+          .map((attempt) => attempt.trim())
+          .where((a) => a.isNotEmpty),
+    );
+  }
+  return lines.join('\n');
+}
+
+String buildControlStreamClipboardText({
+  required String status,
+  required String notification,
+  required String transportDiagnostics,
+}) {
+  final lines = <String>['Control Stream: ${status.trim()}'];
+  final normalizedNotification = notification.trim();
+  if (normalizedNotification.isNotEmpty) {
+    lines.add(normalizedNotification);
+  }
+  final normalizedDiagnostics = transportDiagnostics.trim();
+  if (normalizedDiagnostics.isNotEmpty) {
+    lines.add('Transport Diagnostics');
+    lines.add(normalizedDiagnostics);
+  }
+  return lines.join('\n');
+}
+
 const List<String> _bugTokenWords = <String>[
   'ace',
   'actor',
@@ -814,6 +956,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   String _diagnosticsTitle = 'none';
   Map<String, String> _diagnosticsData = <String, String>{};
   String _photoFrameAssetBaseURL = '';
+  String _serverBuildSha = 'unknown';
+  String _serverBuildDate = 'unknown';
   final List<diagv1.UiEventEntry> _recentUiEvents = <diagv1.UiEventEntry>[];
   final List<diagv1.UiActionEntry> _recentUiActions = <diagv1.UiActionEntry>[];
   final List<diagv1.LogEntry> _recentLogs = <diagv1.LogEntry>[];
@@ -1144,18 +1288,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
   }
 
-  String _carrierEndpointLabel({
+  String _carrierEndpointLabelForTarget({
     required ControlCarrierKind carrier,
+    required _ConnectionTarget target,
     required DiscoveredServer? server,
-    required String fallbackHost,
-    required int fallbackPort,
   }) {
-    final target = _targetForCarrier(
-      carrier: carrier,
-      server: server,
-      fallbackHost: fallbackHost,
-      fallbackPort: fallbackPort,
-    );
     switch (carrier) {
       case ControlCarrierKind.grpc:
         return '${target.host}:${target.port}';
@@ -1166,6 +1303,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       case ControlCarrierKind.http:
         return 'http://${target.host}:${target.port}';
     }
+  }
+
+  String _currentPageHost() {
+    return resolvePageHost(
+      browserLocationHost: browser_host.browserLocationHost(),
+      uriBaseHost: Uri.base.host,
+    );
   }
 
   void _resetCarrierCycle(List<ControlCarrierKind> carriers) {
@@ -1272,6 +1416,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   Widget _buildTransportStatusCard() {
+    final blockText = buildControlStreamClipboardText(
+      status: _status,
+      notification: _lastNotification,
+      transportDiagnostics: _lastTransportDiagnostic,
+    );
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(12),
@@ -1287,32 +1436,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Control Stream: $_status',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            if (_lastNotification.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                _lastNotification,
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
+            SelectableText(blockText, style: const TextStyle(fontSize: 12)),
             if (_bugReceiptState != _BugReceiptState.none) ...[
               const SizedBox(height: 8),
               _buildBugReceiptPanel(),
-            ],
-            if (_lastTransportDiagnostic.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Transport Diagnostics',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              SelectableText(
-                _lastTransportDiagnostic,
-                style: const TextStyle(fontSize: 12),
-              ),
             ],
           ],
         ),
@@ -1320,9 +1447,73 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     );
   }
 
+  Widget _buildMetadataFooter() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            Flexible(
+              child: SelectableText(
+                buildMetadataLabel(buildDate: _buildDate, buildSha: _buildSha),
+                textAlign: TextAlign.right,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBuildParityPanel() {
+    final clientLabel =
+        'Client ${buildMetadataLabel(buildDate: _buildDate, buildSha: _buildSha)}';
+    final serverLabel = 'Server ${buildMetadataLabel(
+      buildDate: _serverBuildDate,
+      buildSha: _serverBuildSha,
+    )}';
+    final parityLabel = buildVersionParityNote(
+      clientBuildDate: _buildDate,
+      clientBuildSha: _buildSha,
+      serverBuildDate: _serverBuildDate,
+      serverBuildSha: _serverBuildSha,
+    );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blueGrey.shade200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SelectableText(
+            'Client / Server Build',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(clientLabel, style: const TextStyle(fontSize: 12)),
+          SelectableText(serverLabel, style: const TextStyle(fontSize: 12)),
+          SelectableText(parityLabel, style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    _hostController.text = resolveInitialControlHost(
+      isWebRuntime: kIsWeb,
+      configuredHost: _hostController.text,
+      pageHost: _currentPageHost(),
+    );
     WidgetsBinding.instance.addObserver(this);
     final lifecycleState = WidgetsBinding.instance.lifecycleState;
     _appIsForeground =
@@ -1378,7 +1569,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _cancelReconnectTimer();
     }
 
-    final host = _hostController.text.trim();
+    final pageHost = _currentPageHost();
+    final configuredHost = _hostController.text.trim();
+    final host = resolveInitialControlHost(
+      isWebRuntime: kIsWeb,
+      configuredHost: configuredHost,
+      pageHost: pageHost,
+    );
+    if (host != configuredHost) {
+      _hostController.text = host;
+    }
     final port = int.tryParse(_portController.text.trim());
     final selectedServer = _selectedServerMetadata();
     final size = _currentLogicalSize();
@@ -1410,17 +1610,24 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
 
     final carrier = _activeCarrierCycle[_activeCarrierIndex];
-    final target = _targetForCarrier(
+    final rawTarget = _targetForCarrier(
       carrier: carrier,
       server: selectedServer,
       fallbackHost: host,
       fallbackPort: port,
     );
-    final carrierEndpoint = _carrierEndpointLabel(
+    final target = _ConnectionTarget(
+      host: resolveInitialControlHost(
+        isWebRuntime: kIsWeb,
+        configuredHost: rawTarget.host,
+        pageHost: pageHost,
+      ),
+      port: rawTarget.port,
+    );
+    final carrierEndpoint = _carrierEndpointLabelForTarget(
       carrier: carrier,
+      target: target,
       server: selectedServer,
-      fallbackHost: host,
-      fallbackPort: port,
     );
     final attemptStartedAt = DateTime.now().toUtc();
 
@@ -2019,15 +2226,21 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return;
     }
     final metadata = Map<String, String>.from(response.registerAck.metadata);
-    if (metadata.isEmpty) {
-      return;
-    }
-    _diagnosticsTitle = 'register_ack';
-    _diagnosticsData = metadata;
-    final photoBaseURL = metadata['photo_frame_asset_base_url']?.trim() ?? '';
-    if (photoBaseURL.isNotEmpty) {
-      _photoFrameAssetBaseURL = photoBaseURL;
-      _lastNotification = 'Photo frame asset base URL configured';
+    _serverBuildSha = normalizeBuildValue(
+      metadata[_registerMetadataServerBuildShaKey] ?? '',
+    );
+    _serverBuildDate = normalizeBuildValue(
+      metadata[_registerMetadataServerBuildDateKey] ?? '',
+    );
+    if (metadata.isNotEmpty) {
+      _diagnosticsTitle = 'register_ack';
+      _diagnosticsData = metadata;
+      final photoBaseURL =
+          metadata[_registerMetadataPhotoFrameBaseURLKey]?.trim() ?? '';
+      if (photoBaseURL.isNotEmpty) {
+        _photoFrameAssetBaseURL = photoBaseURL;
+        _lastNotification = 'Photo frame asset base URL configured';
+      }
     }
   }
 
@@ -3134,6 +3347,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
             icon: const Icon(Icons.bug_report_outlined),
             label: const Text('Report Bug'),
           ),
+          bottomNavigationBar: _buildMetadataFooter(),
           body: SafeArea(
             child: Stack(
               children: [
@@ -3163,6 +3377,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           icon: const Icon(Icons.bug_report_outlined),
           label: const Text('Report Bug'),
         ),
+        bottomNavigationBar: _buildMetadataFooter(),
         body: Align(
           alignment: Alignment.topCenter,
           child: SingleChildScrollView(
@@ -3252,25 +3467,28 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                     controller: _platformController,
                     decoration: const InputDecoration(labelText: 'Platform'),
                   ),
-                  const SizedBox(height: 20),
-                  Text('Control Stream: $_status'),
                   const SizedBox(height: 12),
-                  Text('Responses: $_responses'),
-                  Text(
+                  _buildBuildParityPanel(),
+                  const SizedBox(height: 20),
+                  SelectableText('Control Stream: $_status'),
+                  const SizedBox(height: 12),
+                  SelectableText('Responses: $_responses'),
+                  SelectableText(
                     'Media routes: ${_routesByStreamID.length}  Active streams: ${_activeStreamsByID.length}  Signals: ${_recentWebRTCSignals.length}',
                   ),
-                  Text(
+                  SelectableText(
                     'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount  Capability ack gen: $_lastCapabilityAckGeneration',
                   ),
                   if (_playAudioCount > 0)
-                    Text(
+                    SelectableText(
                       'Play audio msgs: $_playAudioCount  Last play bytes: $_lastPlayAudioBytes  Last play target: $_lastPlayAudioDeviceID  Last play source: $_lastPlayAudioSource',
                     ),
                   if (_photoFrameAssetBaseURL.isNotEmpty)
-                    Text('Photo frame assets: $_photoFrameAssetBaseURL'),
+                    SelectableText(
+                        'Photo frame assets: $_photoFrameAssetBaseURL'),
                   if (_lastNotification.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    Text('Notification: $_lastNotification'),
+                    SelectableText('Notification: $_lastNotification'),
                   ],
                   if (_bugReceiptState != _BugReceiptState.none) ...[
                     const SizedBox(height: 12),
@@ -3486,6 +3704,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   Widget _buildTransportDiagnosticsPanel() {
     final recentAttempts = _carrierAttemptLog.reversed.take(4).toList();
+    final blockText = buildTransportDiagnosticsClipboardText(
+      lastTransportDiagnostic: _lastTransportDiagnostic,
+      recentAttempts: recentAttempts
+          .map((attempt) => _formatCarrierAttempt(attempt))
+          .toList(),
+    );
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
@@ -3496,33 +3720,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Transport Diagnostics',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          if (_lastTransportDiagnostic.isEmpty)
-            const Text('No transport failures captured yet')
-          else ...[
-            const SizedBox(height: 6),
-            SelectableText(
-              _lastTransportDiagnostic,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
-          if (recentAttempts.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Recent Carrier Attempts',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            ...recentAttempts.map(
-              (attempt) => Text(
-                _formatCarrierAttempt(attempt),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-          ],
+          SelectableText(blockText, style: const TextStyle(fontSize: 12)),
         ],
       ),
     );

@@ -92,6 +92,18 @@ func TestWebSocketServerRejectsDisallowedOrigin(t *testing.T) {
 	}
 }
 
+func TestSameOriginHostAllowsDifferentPorts(t *testing.T) {
+	if !sameOriginHost("http://192.168.0.138:60739", "192.168.0.138:50054") {
+		t.Fatalf("sameOriginHost should allow same host with different ports")
+	}
+	if !sameOriginHost("http://localhost:60739", "localhost:50054") {
+		t.Fatalf("sameOriginHost should allow loopback host with different ports")
+	}
+	if sameOriginHost("http://evil.example:60739", "192.168.0.138:50054") {
+		t.Fatalf("sameOriginHost should reject different hosts")
+	}
+}
+
 func TestIsLoopbackHostPort(t *testing.T) {
 	cases := []struct {
 		hostPort string

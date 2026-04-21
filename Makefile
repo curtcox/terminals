@@ -3,6 +3,8 @@ LOCAL_BIN := $(ROOT_DIR)/.bin
 LOCAL_FLUTTER_BIN := $(ROOT_DIR)/.sdk/flutter/bin
 CLIENT_WEB_PORT ?= 60739
 CLIENT_WEB_HOST ?= 0.0.0.0
+BUILD_SHA ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 
 .PHONY: server-build server-test server-lint server-coverage \
@@ -28,7 +30,7 @@ client-build:
 	$(MAKE) client-build-web
 
 client-build-web:
-	cd terminal_client && flutter build web --no-wasm-dry-run
+	cd terminal_client && flutter build web --no-wasm-dry-run --dart-define=TERMINALS_BUILD_SHA=$(BUILD_SHA) --dart-define=TERMINALS_BUILD_DATE=$(BUILD_DATE)
 
 client-build-android:
 	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
@@ -106,10 +108,18 @@ all-test: server-test client-test
 all-check: all-lint all-test proto-breaking client-build-all
 
 run-server:
-	cd terminal_server && go run ./cmd/server
+	cd terminal_server && \
+		TERMINALS_GRPC_HOST=0.0.0.0 \
+		TERMINALS_CONTROL_WS_HOST=0.0.0.0 \
+		TERMINALS_CONTROL_TCP_HOST=0.0.0.0 \
+		TERMINALS_CONTROL_HTTP_HOST=0.0.0.0 \
+		TERMINALS_ADMIN_HTTP_HOST=0.0.0.0 \
+		TERMINALS_BUILD_SHA=$(BUILD_SHA) \
+		TERMINALS_BUILD_DATE=$(BUILD_DATE) \
+		go run ./cmd/server
 
 run-client-web:
-	cd terminal_client && flutter build web --no-wasm-dry-run
+	cd terminal_client && flutter build web --no-wasm-dry-run --pwa-strategy=none --dart-define=TERMINALS_BUILD_SHA=$(BUILD_SHA) --dart-define=TERMINALS_BUILD_DATE=$(BUILD_DATE)
 	cd terminal_client && python3 -m http.server $(CLIENT_WEB_PORT) --bind $(CLIENT_WEB_HOST) --directory build/web
 
 run-local:

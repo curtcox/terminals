@@ -167,6 +167,9 @@ func (s *WebSocketServer) handshake(cfg *websocket.Config, req *http.Request) er
 	if sameOrigin(origin, req.Host) {
 		return nil
 	}
+	if sameOriginHost(origin, req.Host) {
+		return nil
+	}
 	if isLoopbackHostPort(req.Host) && loopbackOrigin(origin) {
 		return nil
 	}
@@ -191,6 +194,32 @@ func sameOrigin(origin, host string) bool {
 		return false
 	}
 	return strings.EqualFold(parsed.Host, host)
+}
+
+func sameOriginHost(origin, host string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	originHost := strings.TrimSpace(parsed.Hostname())
+	if originHost == "" {
+		originHost = hostOnly(parsed.Host)
+	}
+	if originHost == "" {
+		return false
+	}
+	return strings.EqualFold(originHost, hostOnly(host))
+}
+
+func hostOnly(hostPort string) string {
+	host := strings.TrimSpace(hostPort)
+	if host == "" {
+		return ""
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return strings.Trim(strings.ToLower(host), "[]")
 }
 
 func loopbackOrigin(origin string) bool {

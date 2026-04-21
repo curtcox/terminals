@@ -47,6 +47,28 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/world"
 )
 
+const (
+	registerMetadataPhotoFrameAssetBaseURLKey = "photo_frame_asset_base_url"
+	registerMetadataServerBuildSHAKey         = "server_build_sha"
+	registerMetadataServerBuildDateKey        = "server_build_date"
+)
+
+func registerAckMetadata(photoBaseURL string) map[string]string {
+	return map[string]string{
+		registerMetadataPhotoFrameAssetBaseURLKey: photoBaseURL,
+		registerMetadataServerBuildSHAKey:         normalizeBuildMetadataValue(os.Getenv("TERMINALS_BUILD_SHA")),
+		registerMetadataServerBuildDateKey:        normalizeBuildMetadataValue(os.Getenv("TERMINALS_BUILD_DATE")),
+	}
+}
+
+func normalizeBuildMetadataValue(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "unknown"
+	}
+	return trimmed
+}
+
 func main() {
 	if len(os.Args) > 1 && strings.TrimSpace(os.Args[1]) == "repl" {
 		os.Exit(runREPL(os.Stdin, os.Stdout, os.Stderr))
@@ -226,9 +248,7 @@ func main() {
 		logger.Error("start admin dashboard", "event", "admin.http.start_failed", "error", err)
 		return
 	}
-	controlService.SetRegisterMetadata(map[string]string{
-		"photo_frame_asset_base_url": photoBaseURL,
-	})
+	controlService.SetRegisterMetadata(registerAckMetadata(photoBaseURL))
 	configurePhotoFrame(controlStream, cfg, photoBaseURL)
 	recordingManager, err := recording.NewDiskManager(cfg.RecordingDir)
 	if err != nil {

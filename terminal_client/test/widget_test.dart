@@ -63,9 +63,208 @@ void main() {
     );
   });
 
+  test('resolveInitialControlHost preserves configured host off web', () {
+    final host = resolveInitialControlHost(
+      isWebRuntime: false,
+      configuredHost: '127.0.0.1',
+      pageHost: '192.168.0.138',
+    );
+    expect(host, '127.0.0.1');
+  });
+
+  test('resolveInitialControlHost uses page host for loopback on web', () {
+    final host = resolveInitialControlHost(
+      isWebRuntime: true,
+      configuredHost: '127.0.0.1',
+      pageHost: '192.168.0.138',
+    );
+    expect(host, '192.168.0.138');
+  });
+
+  test('resolveInitialControlHost uses page host when configured host is empty',
+      () {
+    final host = resolveInitialControlHost(
+      isWebRuntime: true,
+      configuredHost: '   ',
+      pageHost: 'localhost',
+    );
+    expect(host, 'localhost');
+  });
+
+  test('resolveInitialControlHost keeps non-loopback host on web', () {
+    final host = resolveInitialControlHost(
+      isWebRuntime: true,
+      configuredHost: 'terminals.internal',
+      pageHost: '192.168.0.138',
+    );
+    expect(host, 'terminals.internal');
+  });
+
+  test('resolvePageHost prefers browser location host', () {
+    final host = resolvePageHost(
+      browserLocationHost: '192.168.0.138',
+      uriBaseHost: '127.0.0.1',
+    );
+    expect(host, '192.168.0.138');
+  });
+
+  test('resolvePageHost falls back to Uri.base host when location host empty',
+      () {
+    final host = resolvePageHost(
+      browserLocationHost: '   ',
+      uriBaseHost: 'localhost',
+    );
+    expect(host, 'localhost');
+  });
+
+  test('buildMetadataLabel renders date and sha', () {
+    final label = buildMetadataLabel(
+      buildDate: '2026-04-21T14:20:00Z',
+      buildSha: 'abc123def456',
+    );
+    expect(label, 'Build: 2026-04-21T14:20:00Z | SHA: abc123def456');
+  });
+
+  test('buildTransportDiagnosticsClipboardText returns single multiline block',
+      () {
+    final text = buildTransportDiagnosticsClipboardText(
+      lastTransportDiagnostic: 'failed at stream_closed',
+      recentAttempts: const <String>['attempt one', 'attempt two'],
+    );
+    expect(
+      text,
+      'Transport Diagnostics\n'
+      'failed at stream_closed\n'
+      'Recent Carrier Attempts\n'
+      'attempt one\n'
+      'attempt two',
+    );
+  });
+
+  test('buildControlStreamClipboardText returns single multiline block', () {
+    final text = buildControlStreamClipboardText(
+      status: 'All control carriers failed',
+      notification: 'WebSocket failed',
+      transportDiagnostics: 'ws://192.168.0.138:50054/control',
+    );
+    expect(
+      text,
+      'Control Stream: All control carriers failed\n'
+      'WebSocket failed\n'
+      'Transport Diagnostics\n'
+      'ws://192.168.0.138:50054/control',
+    );
+  });
+
+  test('buildVersionParityNote reports same SHA', () {
+    final note = buildVersionParityNote(
+      clientBuildDate: '2026-04-21T14:55:56Z',
+      clientBuildSha: 'ea99b3f38658',
+      serverBuildDate: '2026-04-21T14:56:01Z',
+      serverBuildSha: 'ea99b3f38658',
+    );
+    expect(note, 'Build Match: same SHA, different build date');
+  });
+
+  test('buildVersionParityNote reports different SHA', () {
+    final note = buildVersionParityNote(
+      clientBuildDate: '2026-04-21T14:55:56Z',
+      clientBuildSha: 'ea99b3f38658',
+      serverBuildDate: '2026-04-21T14:55:56Z',
+      serverBuildSha: 'deadbeef0001',
+    );
+    expect(note, 'Build Match: different SHA');
+  });
+
   testWidgets('app renders MaterialApp', (WidgetTester tester) async {
     await tester.pumpWidget(const TerminalClientApp());
     expect(find.byType(MaterialApp), findsOneWidget);
+  });
+
+  testWidgets('app shows build metadata footer', (WidgetTester tester) async {
+    await tester.pumpWidget(const TerminalClientApp());
+    expect(find.textContaining('Build:'), findsWidgets);
+    expect(find.textContaining('SHA:'), findsWidgets);
+    expect(find.textContaining('Client / Server Build'), findsOneWidget);
+    expect(find.textContaining('Build Match:'), findsOneWidget);
+    expect(find.textContaining('Control Stream:'), findsOneWidget);
+    expect(find.text('Connect Stream'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is SelectableText &&
+            (widget.data?.contains('Control Stream:') ?? false),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('transport diagnostics block is selectable after failure', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness(failConnectAttempts: 1);
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        reconnectDelayBase: const Duration(milliseconds: 30),
+        reconnectDelayMaxSeconds: 1,
+      ),
+    );
+
+    final connectButton = find.widgetWithText(ElevatedButton, 'Connect Stream');
+    await tester.ensureVisible(connectButton);
+    await tester.tap(connectButton);
+    await tester.pump();
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is SelectableText &&
+            (widget.data?.contains('Transport Diagnostics') ?? false),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shows server build metadata after register ack', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+      ),
+    );
+
+    final connectButton = find.widgetWithText(ElevatedButton, 'Connect Stream');
+    await tester.ensureVisible(connectButton);
+    await tester.tap(connectButton);
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'
+          ..metadata.addAll({
+            'server_build_sha': 'ea99b3f38658',
+            'server_build_date': '2026-04-21T14:55:56Z',
+          })),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('Client / Server Build'), findsOneWidget);
+    expect(
+      find.textContaining(
+          'Server Build: 2026-04-21T14:55:56Z | SHA: ea99b3f38658'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Build Match:'), findsOneWidget);
   });
 
   testWidgets('sends periodic heartbeat messages while connected', (

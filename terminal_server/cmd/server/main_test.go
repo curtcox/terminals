@@ -207,3 +207,32 @@ func anyBool(v any) bool {
 	b, _ := v.(bool)
 	return b
 }
+
+func TestRegisterAckMetadataIncludesServerBuildInfo(t *testing.T) {
+	t.Setenv("TERMINALS_BUILD_SHA", "ea99b3f38658")
+	t.Setenv("TERMINALS_BUILD_DATE", "2026-04-21T14:55:56Z")
+
+	metadata := registerAckMetadata("http://home.local:50052/photo-frame")
+	if got := metadata[registerMetadataPhotoFrameAssetBaseURLKey]; got != "http://home.local:50052/photo-frame" {
+		t.Fatalf("photo frame metadata = %q, want configured value", got)
+	}
+	if got := metadata[registerMetadataServerBuildSHAKey]; got != "ea99b3f38658" {
+		t.Fatalf("server build sha metadata = %q, want ea99b3f38658", got)
+	}
+	if got := metadata[registerMetadataServerBuildDateKey]; got != "2026-04-21T14:55:56Z" {
+		t.Fatalf("server build date metadata = %q, want 2026-04-21T14:55:56Z", got)
+	}
+}
+
+func TestRegisterAckMetadataDefaultsUnknownBuildInfo(t *testing.T) {
+	t.Setenv("TERMINALS_BUILD_SHA", "")
+	t.Setenv("TERMINALS_BUILD_DATE", "")
+
+	metadata := registerAckMetadata("http://home.local:50052/photo-frame")
+	if got := metadata[registerMetadataServerBuildSHAKey]; got != "unknown" {
+		t.Fatalf("server build sha metadata = %q, want unknown", got)
+	}
+	if got := metadata[registerMetadataServerBuildDateKey]; got != "unknown" {
+		t.Fatalf("server build date metadata = %q, want unknown", got)
+	}
+}
