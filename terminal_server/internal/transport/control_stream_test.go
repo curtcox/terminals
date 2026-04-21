@@ -159,6 +159,62 @@ func TestHandleMessageCapabilityDeltaRejectsStaleGeneration(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCapabilitySnapshotReturnsRegisterAckOnRebaseline(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	service.SetRegisterMetadata(map[string]string{
+		"server_build_sha": "abc123",
+	})
+	handler := NewStreamHandler(service)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"screen.width": "1920",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(initial capability snapshot) error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Capabilities: map[string]string{
+				"screen.width": "1280",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(rebaseline capability snapshot) error = %v", err)
+	}
+
+	hasRegisterAck := false
+	for _, msg := range out {
+		if msg.RegisterAck == nil {
+			continue
+		}
+		hasRegisterAck = true
+		if msg.RegisterAck.Metadata["server_build_sha"] != "abc123" {
+			t.Fatalf("register ack metadata server_build_sha = %q, want abc123", msg.RegisterAck.Metadata["server_build_sha"])
+		}
+		if msg.RegisterAck.Initial.Type != "" {
+			t.Fatalf("register ack initial UI should be empty for rebaseline snapshot")
+		}
+	}
+	if !hasRegisterAck {
+		t.Fatalf("expected register ack on rebaseline capability snapshot")
+	}
+}
+
 func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

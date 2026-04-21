@@ -603,17 +603,16 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		}
 		after, _ := h.control.devices.Get(msg.CapabilitySnap.DeviceID)
 		out := []ServerMessage{{CapabilityAck: &ack}}
+		registerAck := &RegisterResponse{
+			ServerID: h.control.serverID,
+			Message:  "registered",
+			Metadata: cloneStringMap(h.control.metadata),
+		}
+		out = append(out, ServerMessage{RegisterAck: registerAck})
 		if before.Generation == 0 {
 			initial := ui.HelloWorld(after.DeviceName)
-			out = append(out,
-				ServerMessage{RegisterAck: &RegisterResponse{
-					ServerID: h.control.serverID,
-					Message:  "registered",
-					Metadata: cloneStringMap(h.control.metadata),
-					Initial:  initial,
-				}},
-				ServerMessage{SetUI: &initial},
-			)
+			registerAck.Initial = initial
+			out = append(out, ServerMessage{SetUI: &initial})
 			h.rememberSetUI(msg.CapabilitySnap.DeviceID, out)
 		}
 		effects := h.handleCapabilityChangeEffects(ctx, msg.CapabilitySnap.DeviceID, before.Capabilities, after.Capabilities)
