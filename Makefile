@@ -11,6 +11,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
+	skills-validate \
 	all-lint all-test all-check run-server run-client-web \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate
 
@@ -100,6 +101,9 @@ proto-breaking:
 
 proto-generate:
 	cd api && buf generate
+
+skills-validate:
+	./scripts/validate-skills.sh
 
 all-lint: server-lint client-lint proto-lint
 
