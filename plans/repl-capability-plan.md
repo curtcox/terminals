@@ -356,6 +356,11 @@ flows — are thin helpers that delegate to
 filters on top. Ack semantics (modes `seen`/`read`/`heard`/
 `dismissed`/`confirmed`, audience resolution, durability) are
 defined once in [identity-and-audience.md](identity-and-audience.md).
+Actor references are a discriminated union over
+`person`/`device`/`agent`/`anonymous` kinds (full definition in
+[identity-and-audience.md](identity-and-audience.md)); this plan
+relies on that union so that kiosk taps, automated-agent acks, and
+off-device SIP/webhook acks all land through the same typed path.
 This resolves the boundary blur between identity and messaging.
 
 #### Search taxonomy
@@ -577,16 +582,19 @@ modules, REPL `search`/`memory` groups. See
 ### Phase 11 — Bug reporting
 
 Promote [bug-reporting.md](bug-reporting.md) to the five-form rule.
-**Depends on phases 1–4 of `bug-reporting.md`** (core pipeline,
-client context capture, on-device entry points, third-party
-reporting) already having landed; this phase does not rebuild
-that pipeline, it grafts a typed control-plane surface onto it.
-Adds the typed `BugReportService` (`File`, `Get`, `List`,
-`Confirm`), TAL `bug` host module, and REPL `bug` group
-(`bug file`, `bug ls`, `bug show`, `bug confirm`) so that humans
-and agents can exercise B1–B5 end-to-end through the same typed
-control-plane surface. Acknowledgement on bug reports delegates to
-`IdentityService` per the ack-ownership rule.
+**Depends on all five rollout phases of `bug-reporting.md`** —
+core pipeline, client context capture, on-device entry points,
+third-party reporting, and autodetection/dead-device fallback —
+because B1–B5 coverage is only complete once the SIP bug line,
+email-in adapter, NFC tag, and autodetect paths from that plan's
+phase 5 are in. This phase does not rebuild that pipeline, it
+grafts a typed control-plane surface onto it. Adds the typed
+`BugReportService` (`File`, `Get`, `List`, `Confirm`), TAL `bug`
+host module, and REPL `bug` group (`bug file`, `bug ls`,
+`bug show`, `bug confirm`) so that humans and agents can exercise
+B1–B5 end-to-end through the same typed control-plane surface.
+Acknowledgement on bug reports delegates to `IdentityService` per
+the ack-ownership rule.
 
 **Proposed extensions to `bug-reporting.md`**, added here rather
 than in the component plan so the contract lives with intake:

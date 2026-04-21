@@ -129,6 +129,10 @@ identity resolve 'group:kids in zone:upstairs'
 identity prefs mom
 identity ack ls
 identity ack show bulletin_42
+identity ack record bulletin_42 --actor person:mom --mode read
+identity ack record alert_17  --actor device:kitchen-screen --mode dismissed
+identity ack record alert_17  --actor agent:voice-bot --mode confirmed
+identity ack record report_93 --actor anonymous:sip --mode heard
 ```
 
 ## Use Cases Enabled
