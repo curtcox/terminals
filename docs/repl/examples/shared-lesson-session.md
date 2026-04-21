@@ -1,0 +1,3 @@
+# Example: shared-lesson-session
+
+Run `help` for the related command groups and execute the typed flow in REPL.

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
+	"github.com/curtcox/terminals/terminal_server/internal/capability"
 	"github.com/curtcox/terminals/terminal_server/internal/config"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/diagnostics/bugreport"
@@ -49,6 +50,7 @@ type Handler struct {
 	syncAppDefs func()
 	devices     *device.Manager
 	bugReports  *bugreport.Service
+	capability  *capability.Service
 	cfg         config.Config
 	now         func() time.Time
 }
@@ -73,6 +75,7 @@ func NewHandler(
 		syncAppDefs: syncAppDefs,
 		devices:     devices,
 		bugReports:  bugreport.NewService(cfg.LogDir, devices, runtime),
+		capability:  capability.NewService(),
 		cfg:         cfg,
 		now:         time.Now,
 	}
@@ -91,6 +94,27 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/repl/ai/providers", h.handleReplAIProviders)
 	mux.HandleFunc("/admin/api/repl/ai/models", h.handleReplAIModels)
 	mux.HandleFunc("/admin/api/repl/ai/selection", h.handleReplAISelection)
+	mux.HandleFunc("/admin/api/identity", h.handleIdentity)
+	mux.HandleFunc("/admin/api/session", h.handleInteractiveSessions)
+	mux.HandleFunc("/admin/api/session/create", h.handleInteractiveSessionCreate)
+	mux.HandleFunc("/admin/api/message", h.handleMessages)
+	mux.HandleFunc("/admin/api/message/post", h.handleMessagePost)
+	mux.HandleFunc("/admin/api/board", h.handleBoard)
+	mux.HandleFunc("/admin/api/board/pin", h.handleBoardPin)
+	mux.HandleFunc("/admin/api/artifact", h.handleArtifacts)
+	mux.HandleFunc("/admin/api/artifact/create", h.handleArtifactCreate)
+	mux.HandleFunc("/admin/api/canvas", h.handleCanvas)
+	mux.HandleFunc("/admin/api/canvas/annotate", h.handleCanvasAnnotate)
+	mux.HandleFunc("/admin/api/search", h.handleSearch)
+	mux.HandleFunc("/admin/api/memory", h.handleMemoryRecall)
+	mux.HandleFunc("/admin/api/memory/remember", h.handleMemoryRemember)
+	mux.HandleFunc("/admin/api/placement", h.handlePlacement)
+	mux.HandleFunc("/admin/api/recent", h.handleRecent)
+	mux.HandleFunc("/admin/api/store/get", h.handleStoreGet)
+	mux.HandleFunc("/admin/api/store/ls", h.handleStoreList)
+	mux.HandleFunc("/admin/api/store/put", h.handleStorePut)
+	mux.HandleFunc("/admin/api/bus", h.handleBusTail)
+	mux.HandleFunc("/admin/api/bus/emit", h.handleBusEmit)
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
@@ -173,6 +197,232 @@ func (h *Handler) handleChatSend(w http.ResponseWriter, req *http.Request) {
 			"at":        msg.At.UTC().Format(time.RFC3339),
 		},
 	})
+}
+
+func (h *Handler) handleIdentity(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"identities": h.capability.ListIdentities()})
+}
+
+func (h *Handler) handleInteractiveSessions(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"sessions": h.capability.ListSessions()})
+}
+
+func (h *Handler) handleInteractiveSessionCreate(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	session := h.capability.CreateSession(req.Form.Get("kind"), req.Form.Get("target"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
+}
+
+func (h *Handler) handleMessages(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"messages": h.capability.ListMessages(req.URL.Query().Get("room"))})
+}
+
+func (h *Handler) handleMessagePost(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	message := h.capability.PostMessage(req.Form.Get("room"), req.Form.Get("text"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": message})
+}
+
+func (h *Handler) handleBoard(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"items": h.capability.ListBoard(req.URL.Query().Get("board"))})
+}
+
+func (h *Handler) handleBoardPin(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	item := h.capability.PinBoard(req.Form.Get("board"), req.Form.Get("text"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "item": item})
+}
+
+func (h *Handler) handleArtifacts(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"artifacts": h.capability.ListArtifacts()})
+}
+
+func (h *Handler) handleArtifactCreate(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	artifact := h.capability.CreateArtifact(req.Form.Get("kind"), req.Form.Get("title"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "artifact": artifact})
+}
+
+func (h *Handler) handleCanvas(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"annotations": h.capability.ListCanvas(req.URL.Query().Get("canvas"))})
+}
+
+func (h *Handler) handleCanvasAnnotate(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	annotation := h.capability.AnnotateCanvas(req.Form.Get("canvas"), req.Form.Get("text"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "annotation": annotation})
+}
+
+func (h *Handler) handleSearch(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"results": h.capability.Search(req.URL.Query().Get("q"))})
+}
+
+func (h *Handler) handleMemoryRecall(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"memories": h.capability.Recall(req.URL.Query().Get("q"))})
+}
+
+func (h *Handler) handleMemoryRemember(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	memory := h.capability.Remember(req.Form.Get("scope"), req.Form.Get("text"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "memory": memory})
+}
+
+func (h *Handler) handlePlacement(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	placements := make([]map[string]any, 0)
+	for _, d := range h.devices.List() {
+		placements = append(placements, map[string]any{
+			"device_id": d.DeviceID,
+			"zone":      d.Placement.Zone,
+			"roles":     append([]string(nil), d.Placement.Roles...),
+			"mobility":  d.Placement.Mobility,
+			"affinity":  d.Placement.Affinity,
+		})
+	}
+	sort.Slice(placements, func(i, j int) bool {
+		return fmt.Sprintf("%v", placements[i]["device_id"]) < fmt.Sprintf("%v", placements[j]["device_id"])
+	})
+	h.writeJSON(w, http.StatusOK, map[string]any{"placements": placements})
+}
+
+func (h *Handler) handleRecent(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"items": h.capability.ListRecent()})
+}
+
+func (h *Handler) handleStoreGet(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	record, ok := h.capability.StoreGet(req.URL.Query().Get("namespace"), req.URL.Query().Get("key"))
+	if !ok {
+		h.writeJSON(w, http.StatusOK, map[string]any{"record": nil})
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"record": record})
+}
+
+func (h *Handler) handleStoreList(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"records": h.capability.StoreList(req.URL.Query().Get("namespace"))})
+}
+
+func (h *Handler) handleStorePut(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	record := h.capability.StorePut(req.Form.Get("namespace"), req.Form.Get("key"), req.Form.Get("value"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "record": record})
+}
+
+func (h *Handler) handleBusTail(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"events": h.capability.BusTail()})
+}
+
+func (h *Handler) handleBusEmit(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	event := h.capability.BusEmit(req.Form.Get("kind"), req.Form.Get("name"), req.Form.Get("payload"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "event": event})
 }
 
 func (h *Handler) handleReplAIProviders(w http.ResponseWriter, req *http.Request) {

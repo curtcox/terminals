@@ -62,6 +62,27 @@ func replCommandSpecs() []commandSpec {
 		{Name: "sessions ls", Usage: "sessions ls [--json]", Summary: "List REPL sessions", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/sessions"}},
 		{Name: "sessions show", Usage: "sessions show <session>", Summary: "Show one REPL session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/sessions"}},
 		{Name: "sessions terminate", Usage: "sessions terminate <session>", Summary: "Terminate one REPL session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sessions"}},
+		{Name: "identity ls", Usage: "identity ls [--json]", Summary: "List identities and audiences", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
+		{Name: "session ls", Usage: "session ls [--json]", Summary: "List interactive sessions", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session create", Usage: "session create <kind> <target> [--json]", Summary: "Create a generalized interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "message ls", Usage: "message ls [room] [--json]", Summary: "List messages", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "message post", Usage: "message post <room> <text> [--json]", Summary: "Post a room/direct message", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "board ls", Usage: "board ls [board] [--json]", Summary: "List board or bulletin entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/board"}},
+		{Name: "board pin", Usage: "board pin <board> <text> [--json]", Summary: "Pin a bulletin entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/board"}},
+		{Name: "artifact ls", Usage: "artifact ls [--json]", Summary: "List shared artifacts", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/artifact"}},
+		{Name: "artifact create", Usage: "artifact create <kind> <title> [--json]", Summary: "Create a shared artifact", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
+		{Name: "canvas ls", Usage: "canvas ls [canvas] [--json]", Summary: "List canvas annotations", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/canvas"}},
+		{Name: "canvas annotate", Usage: "canvas annotate <canvas> <text> [--json]", Summary: "Annotate a shared canvas", Classification: commandMutating, RelatedDocs: []string{"repl/commands/canvas"}},
+		{Name: "search query", Usage: "search query <text> [--json]", Summary: "Run unified search", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/search"}},
+		{Name: "memory remember", Usage: "memory remember <scope> <text> [--json]", Summary: "Store a memory entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/memory"}},
+		{Name: "memory recall", Usage: "memory recall <text> [--json]", Summary: "Recall memory entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
+		{Name: "placement ls", Usage: "placement ls [--json]", Summary: "List placement metadata", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/placement"}},
+		{Name: "recent ls", Usage: "recent ls [--json]", Summary: "List recent activity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/recent"}},
+		{Name: "store put", Usage: "store put <namespace> <key> <value> [--json]", Summary: "Write typed key-value state", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
+		{Name: "store get", Usage: "store get <namespace> <key> [--json]", Summary: "Read typed key-value state", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
+		{Name: "store ls", Usage: "store ls <namespace> [--json]", Summary: "List typed key-value state", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
+		{Name: "bus emit", Usage: "bus emit <kind> <name> [payload] [--json]", Summary: "Emit typed bus events or intents", Classification: commandMutating, RelatedDocs: []string{"repl/commands/bus"}},
+		{Name: "bus tail", Usage: "bus tail [--json]", Summary: "Tail recent bus events", Classification: commandOperational, RelatedDocs: []string{"repl/commands/bus"}},
 		{Name: "activations ls", Usage: "activations ls [--json]", Summary: "List active scenario by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/activations"}},
 		{Name: "claims tree", Usage: "claims tree [--json]", Summary: "Show claims grouped by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/claims"}},
 		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
@@ -244,7 +265,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
+	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "recent", "store", "bus", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -361,6 +382,366 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			return err
 		default:
 			return fmt.Errorf("unknown command: sessions %s", sub)
+		}
+	case "identity":
+		if sub != "ls" {
+			return fmt.Errorf("unknown command: identity %s", sub)
+		}
+		body, err := s.fetchJSON(ctx, "/admin/api/identity")
+		if err != nil {
+			return err
+		}
+		if jsonOut {
+			return writeJSON(s.out, body)
+		}
+		items, _ := body["identities"].([]any)
+		rows := make([][]string, 0, len(items))
+		for _, item := range items {
+			row, _ := item.(map[string]any)
+			if row == nil {
+				continue
+			}
+			rows = append(rows, []string{toString(row["id"]), toString(row["display_name"])})
+		}
+		return printTable(s.out, []string{"ID", "NAME"}, rows)
+	case "session":
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/session")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			items, _ := body["sessions"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				rows = append(rows, []string{toString(row["id"]), toString(row["kind"]), toString(row["target"])})
+			}
+			return printTable(s.out, []string{"ID", "KIND", "TARGET"}, rows)
+		case "create":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: session create <kind> <target>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/session/create", url.Values{
+				"kind":   {plain[0]},
+				"target": {plain[1]},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			sessionID := ""
+			if sessionMap, ok := body["session"].(map[string]any); ok {
+				sessionID = toString(sessionMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  session=%s\n", sessionID)
+			return err
+		default:
+			return fmt.Errorf("unknown command: session %s", sub)
+		}
+	case "message":
+		switch sub {
+		case "ls":
+			query := url.Values{}
+			plain := nonFlagArgs(args[1:])
+			if len(plain) > 0 {
+				query.Set("room", plain[0])
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/message", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "post":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: message post <room> <text>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/message/post", url.Values{
+				"room": {plain[0]},
+				"text": {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			messageID := ""
+			if msgMap, ok := body["message"].(map[string]any); ok {
+				messageID = toString(msgMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  message=%s\n", messageID)
+			return err
+		default:
+			return fmt.Errorf("unknown command: message %s", sub)
+		}
+	case "board":
+		switch sub {
+		case "ls":
+			query := url.Values{}
+			plain := nonFlagArgs(args[1:])
+			if len(plain) > 0 {
+				query.Set("board", plain[0])
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/board", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "pin":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: board pin <board> <text>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/board/pin", url.Values{
+				"board": {plain[0]},
+				"text":  {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			itemID := ""
+			if itemMap, ok := body["item"].(map[string]any); ok {
+				itemID = toString(itemMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  board_item=%s\n", itemID)
+			return err
+		default:
+			return fmt.Errorf("unknown command: board %s", sub)
+		}
+	case "artifact":
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/artifact")
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "create":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: artifact create <kind> <title>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/artifact/create", url.Values{
+				"kind":  {plain[0]},
+				"title": {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			artifactID := ""
+			if itemMap, ok := body["artifact"].(map[string]any); ok {
+				artifactID = toString(itemMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  artifact=%s\n", artifactID)
+			return err
+		default:
+			return fmt.Errorf("unknown command: artifact %s", sub)
+		}
+	case "canvas":
+		switch sub {
+		case "ls":
+			query := url.Values{}
+			plain := nonFlagArgs(args[1:])
+			if len(plain) > 0 {
+				query.Set("canvas", plain[0])
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/canvas", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "annotate":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: canvas annotate <canvas> <text>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/canvas/annotate", url.Values{
+				"canvas": {plain[0]},
+				"text":   {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			annotationID := ""
+			if itemMap, ok := body["annotation"].(map[string]any); ok {
+				annotationID = toString(itemMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  annotation=%s\n", annotationID)
+			return err
+		default:
+			return fmt.Errorf("unknown command: canvas %s", sub)
+		}
+	case "search":
+		if sub != "query" {
+			return fmt.Errorf("unknown command: search %s", sub)
+		}
+		plain := nonFlagArgs(args[1:])
+		if len(plain) == 0 {
+			return errors.New("usage: search query <text>")
+		}
+		body, err := s.fetchJSONQuery(ctx, "/admin/api/search", url.Values{"q": {strings.Join(plain, " ")}})
+		if err != nil {
+			return err
+		}
+		return writeJSON(s.out, body)
+	case "memory":
+		switch sub {
+		case "remember":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: memory remember <scope> <text>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/memory/remember", url.Values{
+				"scope": {plain[0]},
+				"text":  {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			memoryID := ""
+			if itemMap, ok := body["memory"].(map[string]any); ok {
+				memoryID = toString(itemMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  memory=%s\n", memoryID)
+			return err
+		case "recall":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) == 0 {
+				return errors.New("usage: memory recall <text>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/memory", url.Values{"q": {strings.Join(plain, " ")}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		default:
+			return fmt.Errorf("unknown command: memory %s", sub)
+		}
+	case "placement":
+		if sub != "ls" {
+			return fmt.Errorf("unknown command: placement %s", sub)
+		}
+		body, err := s.fetchJSON(ctx, "/admin/api/placement")
+		if err != nil {
+			return err
+		}
+		return writeJSON(s.out, body)
+	case "recent":
+		if sub != "ls" {
+			return fmt.Errorf("unknown command: recent %s", sub)
+		}
+		body, err := s.fetchJSON(ctx, "/admin/api/recent")
+		if err != nil {
+			return err
+		}
+		return writeJSON(s.out, body)
+	case "store":
+		switch sub {
+		case "put":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 3 {
+				return errors.New("usage: store put <namespace> <key> <value>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/store/put", url.Values{
+				"namespace": {plain[0]},
+				"key":       {plain[1]},
+				"value":     {strings.Join(plain[2:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintln(s.out, "OK  stored")
+			return err
+		case "get":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: store get <namespace> <key>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/store/get", url.Values{
+				"namespace": {plain[0]},
+				"key":       {plain[1]},
+			})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "ls":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: store ls <namespace>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/store/ls", url.Values{
+				"namespace": {plain[0]},
+			})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		default:
+			return fmt.Errorf("unknown command: store %s", sub)
+		}
+	case "bus":
+		switch sub {
+		case "emit":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: bus emit <kind> <name> [payload]")
+			}
+			payload := ""
+			if len(plain) > 2 {
+				payload = strings.Join(plain[2:], " ")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/bus/emit", url.Values{
+				"kind":    {plain[0]},
+				"name":    {plain[1]},
+				"payload": {payload},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			eventID := ""
+			if itemMap, ok := body["event"].(map[string]any); ok {
+				eventID = toString(itemMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  event=%s\n", eventID)
+			return err
+		case "tail":
+			body, err := s.fetchJSON(ctx, "/admin/api/bus")
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		default:
+			return fmt.Errorf("unknown command: bus %s", sub)
 		}
 	case "activations":
 		if sub != "ls" {
@@ -1056,6 +1437,18 @@ func hasFlag(args []string, name string) bool {
 		}
 	}
 	return false
+}
+
+func nonFlagArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for _, arg := range args {
+		trimmed := strings.TrimSpace(arg)
+		if strings.HasPrefix(trimmed, "--") {
+			continue
+		}
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 func decodeEscapes(in string) string {

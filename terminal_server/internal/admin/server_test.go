@@ -355,6 +355,57 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	}
 }
 
+func TestCapabilityClosureEndpoints(t *testing.T) {
+	h := testHandler(t)
+
+	getCases := []string{
+		"/admin/api/identity",
+		"/admin/api/session",
+		"/admin/api/message",
+		"/admin/api/board",
+		"/admin/api/artifact",
+		"/admin/api/canvas",
+		"/admin/api/search?q=hello",
+		"/admin/api/memory?q=hello",
+		"/admin/api/placement",
+		"/admin/api/recent",
+		"/admin/api/store/get?namespace=ns&key=k",
+		"/admin/api/store/ls?namespace=ns",
+		"/admin/api/bus",
+	}
+	for _, path := range getCases {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d, want 200 body=%s", path, w.Code, w.Body.String())
+		}
+	}
+
+	postCases := []struct {
+		path string
+		form url.Values
+	}{
+		{path: "/admin/api/session/create", form: url.Values{"kind": {"help"}, "target": {"room"}}},
+		{path: "/admin/api/message/post", form: url.Values{"room": {"room-1"}, "text": {"hello"}}},
+		{path: "/admin/api/board/pin", form: url.Values{"board": {"family"}, "text": {"note"}}},
+		{path: "/admin/api/artifact/create", form: url.Values{"kind": {"lesson"}, "title": {"math"}}},
+		{path: "/admin/api/canvas/annotate", form: url.Values{"canvas": {"c1"}, "text": {"draw"}}},
+		{path: "/admin/api/memory/remember", form: url.Values{"scope": {"kitchen"}, "text": {"milk"}}},
+		{path: "/admin/api/store/put", form: url.Values{"namespace": {"ns"}, "key": {"k"}, "value": {"v"}}},
+		{path: "/admin/api/bus/emit", form: url.Values{"kind": {"event"}, "name": {"alarm"}, "payload": {"ring"}}},
+	}
+	for _, tc := range postCases {
+		req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("POST %s status = %d, want 200 body=%s", tc.path, w.Code, w.Body.String())
+		}
+	}
+}
+
 func TestReplSessionGetAndDeleteEndpoints(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})

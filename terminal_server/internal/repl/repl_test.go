@@ -250,3 +250,129 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 		t.Fatalf("missing ai status output: %q", text)
 	}
 }
+
+func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
+	commands := []string{
+		"identity ls",
+		"session create",
+		"message post",
+		"board pin",
+		"artifact create",
+		"canvas annotate",
+		"search query",
+		"memory remember",
+		"placement ls",
+		"recent ls",
+		"store put",
+		"bus emit",
+	}
+	for _, command := range commands {
+		if _, ok := DescribeCommand(command); !ok {
+			t.Fatalf("DescribeCommand(%q) not found", command)
+		}
+	}
+}
+
+func TestDocsExamplesIncludeCapabilityClosureTopics(t *testing.T) {
+	result, err := ExecuteCommand(context.Background(), "docs examples", ExecuteOptions{})
+	if err != nil {
+		t.Fatalf("ExecuteCommand(docs examples) error = %v", err)
+	}
+	required := []string{
+		"start-room-chat",
+		"send-direct-message",
+		"pin-family-bulletin",
+		"remote-help-session",
+		"shared-lesson-session",
+		"annotate-shared-canvas",
+		"search-household-memory",
+		"review-learner-progress",
+		"resume-multiplayer-session",
+	}
+	for _, topic := range required {
+		if !strings.Contains(result.Output, topic) {
+			t.Fatalf("docs examples missing %q in output: %q", topic, result.Output)
+		}
+	}
+}
+
+func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity":
+			_, _ = w.Write([]byte(`{"identities":[{"id":"alice"}]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/create":
+			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/post":
+			_, _ = w.Write([]byte(`{"status":"ok","message":{"id":"msg-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/board/pin":
+			_, _ = w.Write([]byte(`{"status":"ok","item":{"id":"pin-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/create":
+			_, _ = w.Write([]byte(`{"status":"ok","artifact":{"id":"art-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/canvas/annotate":
+			_, _ = w.Write([]byte(`{"status":"ok","annotation":{"id":"ann-1"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/search":
+			_, _ = w.Write([]byte(`{"results":[{"id":"msg-1"}]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/memory/remember":
+			_, _ = w.Write([]byte(`{"status":"ok","memory":{"id":"mem-1"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/placement":
+			_, _ = w.Write([]byte(`{"placements":[{"device_id":"d1","zone":"kitchen"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/recent":
+			_, _ = w.Write([]byte(`{"items":[{"id":"evt-1","kind":"message"}]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/store/put":
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/bus/emit":
+			_, _ = w.Write([]byte(`{"status":"ok","event":{"id":"bus-1"}}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader(strings.Join([]string{
+		"identity ls",
+		"session create help room",
+		"message post room-1 hello",
+		"board pin family reminder",
+		"artifact create lesson-1 math",
+		"canvas annotate canvas-1 note",
+		"search query hello",
+		"memory remember kitchen milk",
+		"placement ls",
+		"recent ls",
+		"store put notes key1 value1",
+		"bus emit event alarm",
+		"exit",
+	}, "\n") + "\n")
+	var out bytes.Buffer
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "alice") {
+		t.Fatalf("identity output missing: %q", text)
+	}
+	if !strings.Contains(text, "sess-1") {
+		t.Fatalf("session create output missing: %q", text)
+	}
+	if !strings.Contains(text, "msg-1") {
+		t.Fatalf("message output missing: %q", text)
+	}
+	if !strings.Contains(text, "pin-1") {
+		t.Fatalf("board output missing: %q", text)
+	}
+	if !strings.Contains(text, "art-1") {
+		t.Fatalf("artifact output missing: %q", text)
+	}
+	if !strings.Contains(text, "ann-1") {
+		t.Fatalf("canvas output missing: %q", text)
+	}
+	if !strings.Contains(text, "evt-1") {
+		t.Fatalf("recent output missing: %q", text)
+	}
+	if !strings.Contains(text, "bus-1") {
+		t.Fatalf("bus output missing: %q", text)
+	}
+}
