@@ -60,9 +60,31 @@ Examples:
 A durable record of:
 
 - subject reference,
-- actor,
+- actor reference,
 - time,
 - mode (`seen`, `read`, `heard`, `dismissed`, `confirmed`).
+
+An actor reference is a discriminated union over the
+acknowledging party, not a `person_ref` alone. Supported actor
+kinds:
+
+- `person:<person_id>` — a known person,
+- `device:<device_id>` — a device acting on its own behalf
+  (kiosk tap, M4-style alert acknowledgement, idle-screen
+  dismiss),
+- `agent:<agent_id>` — an automated agent or MCP origin acting
+  under delegated authority (see
+  [agent-delegation.md](agent-delegation.md)),
+- `anonymous:<origin>` — an unattributed ack with an origin tag
+  (e.g., `anonymous:sip`, `anonymous:webhook`) for off-device
+  intake channels with no person identity attached.
+
+This keeps `IdentityService` as the single canonical ack owner
+(per the layering in
+[repl-capability-plan.md](repl-capability-plan.md)) while
+admitting device-level, agent, and anonymous acks without
+inventing a parallel ack substrate on `MessagingService`,
+`ArtifactService`, or the monitoring flows.
 
 ## TAL Host Module
 

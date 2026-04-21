@@ -67,11 +67,14 @@ search 'movie night'
 search --scope messages oven
 search --scope boards groceries
 search related board_post_42
+search timeline --since 24h
 
-timeline --since 24h
 memory show household
 memory links board_post_42
 ```
+
+`timeline`, `related`, and `recent` are subcommands of `search`,
+not top-level REPL groups.
 
 ## Topic Resurfacing
 

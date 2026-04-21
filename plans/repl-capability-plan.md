@@ -77,7 +77,7 @@ execution.
 **Layer 2 — Domain Capabilities.** Typed services for substrates
 that a use case family needs in durable, first-class form:
 identity/audience, collaborative sessions, messaging/boards,
-shared artifacts/canvases, search, memory.
+shared artifacts/canvases, search, memory, bug reporting.
 
 Layer 2 services are implemented *using* Layer 1 primitives
 internally, but they expose their own typed APIs and are the
@@ -90,7 +90,7 @@ directly.
 ┌────────────────────────────────────────────────────────────┐
 │  Layer 2 — Domain Capabilities                             │
 │    identity │ session │ message │ board │ artifact │       │
-│    canvas   │ search  │ memory                              │
+│    canvas   │ search  │ memory  │ bug                       │
 ├────────────────────────────────────────────────────────────┤
 │  Layer 1 — Authoring Substrate                             │
 │    store │ bus │ ui (authoring) │ devices cohort │         │
@@ -155,21 +155,32 @@ store bind <ns> <key> --to <device>:<scenario>   mutating
 Values are structured (JSON-compatible) and versioned. TTL is
 per-record and enforced by the store, not by callers.
 
-#### `ui` — view and patch authoring (G3, G4, G6, G12)
+#### `ui` — view and patch authoring (G3, G4, G6, G10, G12)
 
 ```text
 ui show <device> [--root <id>]                              read_only
 ui push <device> <descriptor-expr> [--root <id>]            mutating
 ui patch <device> <component-id> <descriptor-expr>          mutating
+ui transition <device> <component-id> <transition-expr>     mutating
 ui broadcast <cohort> <descriptor-expr> [--patch <id>]      mutating
 ui subscribe <device> --to <activation|cohort>              mutating
 ui snapshot <device> [--format json]                        read_only
+ui views ls                                                 read_only
+ui views show <view-id>                                     read_only
+ui views rm <view-id>                                       mutating
 ```
 
 A `descriptor-expr` is a small literal form over the closed UI
 primitive set — no new primitives, only a typed way to compose them
-from text. The REPL holds a single reusable descriptor builder that
-the TAL `ui` module, `ui push`, and internal scenarios all share.
+from text. `ui transition` is the authoring form of the existing
+`TransitionUI` primitive from
+[server-driven-ui.md](server-driven-ui.md). Authored views are
+first-class records: `ui push` either publishes inline or binds to
+a named view-id, and `ui views ls/show/rm` lets operators inventory
+and remove REPL-authored views (satisfies the G10 listability
+promise for UI artifacts). The REPL holds a single reusable
+descriptor builder that the TAL `ui` module, `ui push`, and
+internal scenarios all share.
 
 #### `devices cohort` — named device sets (G6)
 
@@ -215,17 +226,32 @@ disableable, and logged when they fire.
 ```text
 scenarios ls                                                read_only
 scenarios show <name>                                       read_only
-scenarios define <name> --match <intent-list> [--priority normal]
+scenarios define <name> --match <intent-list>
+                        [--match event=<kind>]...
+                        [--priority normal]
                          [--on-start <command>]
                          [--on-input <handler-spec>]
+                         [--on-event <kind> <command>]...
+                         [--on-suspend <command>]
+                         [--on-resume <command>]
                          [--on-stop <command>]              mutating
 scenarios undefine <name>                                   mutating
 ```
 
-A minimal inline alternative to a full TAR package. Not TAL — it
-composes existing REPL commands into lifecycle hooks. A real app
-still graduates to a TAR package on disk; inline scenarios exist
-for prototyping, demos, and ops-level one-offs.
+Inline scenarios reach lifecycle parity with the TAR path against
+the actual scenario-engine interface: `ScenarioDefinition.Match`
+(driven by `--match` intent and event predicates),
+`ScenarioDefinition.NewActivation` (driven by the triggering
+`ActivationRequest`), and `ScenarioActivation.Start/Stop/Suspend/
+Resume` (driven by the corresponding `--on-*` hooks). `--on-input`
+and `--on-event` bind incoming user input and bus events to
+command fragments scoped to a live activation; they are not new
+interface methods, they are inline-scenario routing over the
+existing trigger model. Not TAL — it composes existing REPL
+commands into lifecycle hooks. A real app still graduates to a
+TAR package on disk; inline scenarios exist for prototyping,
+demos, and ops-level one-offs. The scenario engine supervisor
+treats Go-defined, TAR-package, and inline scenarios identically.
 
 #### `sim` — virtual devices and scripted verification (G8, G11)
 
@@ -257,7 +283,12 @@ semantics. CI invokes the REPL this way for use-case validation.
 ### Substrate Typed Services
 
 - `StoreService` — TTL, namespaces, watch, scoped binding.
-- `UiService` — `Push`, `Patch`, `Broadcast`, `Subscribe`, `Snapshot`.
+- `UiService` — `Push`, `Patch`, `Transition`, `Broadcast`,
+  `Subscribe`, `Snapshot`, plus authored-view inventory
+  (`ListViews`, `GetView`, `RemoveView`). Authored-view records
+  are REPL-side authoring metadata (who published what, under
+  which view-id), not a change to the `server-driven-ui.md`
+  primitive contract.
 - `BusService` — `Emit`, `Tail`, `Replay`.
 - `HandlerService` — `Register`, `Unregister`, `List`, `Trigger`.
 - `CohortService` — device set CRUD plus live membership evaluation.
@@ -309,6 +340,31 @@ sim).
 | Rooms, DMs, boards, bulletins, threads | [messaging-and-boards.md](messaging-and-boards.md) | `message` | `MessagingService` | `message`, `board` |
 | Durable shared artifacts, canvases, annotations | [shared-artifacts.md](shared-artifacts.md) | `artifact` | `ArtifactService` | `artifact`, `canvas` |
 | Unified search, timeline, household memory | [search-and-memory.md](search-and-memory.md) | `search`, `memory` | `SearchService`, `MemoryService` | `search`, `memory` |
+| Bug reporting and diagnostics | [bug-reporting.md](bug-reporting.md) | `bug` | `BugReportService` | `bug` |
+
+#### Acknowledgement ownership
+
+`IdentityService` is the canonical owner of acknowledgement state.
+`Acknowledgement` records live on `IdentityService` keyed by
+subject reference (message id, bulletin id, alert id, artifact id,
+…) and actor. Other L2 services that expose ack operations —
+`MessagingService.AcknowledgeSubject`, `MessagingService.ListUnread`,
+bulletin-pin ack in `ArtifactService`, alert ack in the monitoring
+flows — are thin helpers that delegate to
+`IdentityService.RecordAcknowledgement` /
+`IdentityService.GetAcknowledgements` and expose convenience
+filters on top. Ack semantics (modes `seen`/`read`/`heard`/
+`dismissed`/`confirmed`, audience resolution, durability) are
+defined once in [identity-and-audience.md](identity-and-audience.md).
+This resolves the boundary blur between identity and messaging.
+
+#### Search taxonomy
+
+`timeline`, `related`, and `recent` are subcommands of `search`
+(e.g., `search timeline --since 24h`), not top-level REPL groups.
+If [search-and-memory.md](search-and-memory.md) examples imply a
+top-level `timeline` group, read them as `search timeline` for the
+purposes of this umbrella.
 
 Revised base documents that Layer 2 touches directly:
 
@@ -334,6 +390,31 @@ Revised base documents that Layer 2 touches directly:
 | Shared canvas / symbols | artifact, session, ui | artifact, canvas, session | Layer 2 (new) |
 | Multiplayer games | session, identity, artifact or store | session, identity, artifact | Layer 2 (new) |
 | Household knowledge / memory | search, memory, message, artifact | search, memory, board, artifact | Layer 2 (new) |
+| Bug reporting and diagnostics (B1–B5) | bug, identity, observe | bug, identity, observe | Layer 2 (new, via [bug-reporting.md](bug-reporting.md)) |
+
+#### Out-of-scope use cases
+
+The following use-case families are *not* closed by this plan
+because they are not application/scenario capabilities. They are
+infrastructure, protocol, or developer-tooling concerns whose
+authoritative home is elsewhere in the masterplan:
+
+- **I1, I2, I3, I11** — device discovery, connection lifecycle,
+  capability handshake, reconnect/restore. Covered by
+  [discovery.md](discovery.md), [protocol.md](protocol.md), and
+  [transport-multiplexing.md](transport-multiplexing.md), not by
+  typed scenario capabilities.
+- **I8** — CI / `make all-check` build-quality gate. Covered by
+  [ci.md](ci.md); the REPL `scripts` + `sim` surfaces are
+  *consumed* by CI but do not replace the repo-wide quality gate.
+- **I9** — developer tooling and documentation conventions.
+  Covered by [../CLAUDE.md](../CLAUDE.md) (project-wide agent and
+  contributor rules) and [agent-config.md](agent-config.md)
+  (agent-facing configuration conventions). No typed runtime
+  service maps to it.
+
+These remain in scope for the project overall; they are excluded
+from the REPL-closure acceptance rule below.
 
 ### Canonical Chat Recipe
 
@@ -388,9 +469,13 @@ the typed service.
 - A user can implement a basic multi-device UI scenario — identity,
   input, log, fan-out, retention — using only REPL commands,
   without Go recompilation, and without new UI primitives.
-- Every use case in [usecases.md](../usecases.md) and
+- Every **application/scenario** use case in
+  [usecases.md](../usecases.md) and
   [plato_inspired_usecases.md](plato_inspired_usecases.md) maps
-  cleanly to REPL-visible typed capabilities.
+  cleanly to REPL-visible typed capabilities. Infrastructure,
+  protocol, and developer-tooling use cases (see
+  §"Out-of-scope use cases" above) are explicitly excluded from
+  this clause; their closure lives in the plans named there.
 - No required use case depends on an app-only service that lacks
   REPL visibility.
 - REPL and TAL expose the same capability families at the same
@@ -438,10 +523,11 @@ rest.
 
 ### Phase 2 — `ui` authoring and `devices cohort`
 
-`UiService` with `Push/Patch/Broadcast/Subscribe/Snapshot`. Cohort
-CRUD backed by live selector evaluation. At the end of this phase,
-a REPL session can drive a screen without Go changes as long as
-inputs are ignored.
+`UiService` with `Push/Patch/Transition/Broadcast/Subscribe/Snapshot`
+plus authored-view inventory (`ListViews/GetView/RemoveView`).
+Cohort CRUD backed by live selector evaluation. At the end of this
+phase, a REPL session can drive a screen without Go changes as
+long as inputs are ignored.
 
 ### Phase 3 — `handlers`
 
@@ -488,7 +574,32 @@ groups. Canonical chat recipe ships here. See
 modules, REPL `search`/`memory` groups. See
 [search-and-memory.md](search-and-memory.md).
 
-### Phase 11 — Documentation, examples, and cross-use-case validation
+### Phase 11 — Bug reporting
+
+Promote [bug-reporting.md](bug-reporting.md) to the five-form rule.
+**Depends on phases 1–4 of `bug-reporting.md`** (core pipeline,
+client context capture, on-device entry points, third-party
+reporting) already having landed; this phase does not rebuild
+that pipeline, it grafts a typed control-plane surface onto it.
+Adds the typed `BugReportService` (`File`, `Get`, `List`,
+`Confirm`), TAL `bug` host module, and REPL `bug` group
+(`bug file`, `bug ls`, `bug show`, `bug confirm`) so that humans
+and agents can exercise B1–B5 end-to-end through the same typed
+control-plane surface. Acknowledgement on bug reports delegates to
+`IdentityService` per the ack-ownership rule.
+
+**Proposed extensions to `bug-reporting.md`**, added here rather
+than in the component plan so the contract lives with intake:
+`BugReportService.Attach(report_id, blob)` to add
+screenshots/audio/logs after initial filing (distinct from the
+inline `screenshot_png`/`audio_wav` fields already in the wire
+contract); and a `bug tail` operational command / `BusService`
+subscription filtered to `bug.report.*` events, equivalent to the
+`/admin/logs` live-tail the bug-reporting plan names as an open
+question. Both graft cleanly onto the existing durable store and
+event-log pipeline.
+
+### Phase 12 — Documentation, examples, and cross-use-case validation
 
 Generated docs for each new service. Worked examples for each
 use-case family. Cross-use-case validation via `scripts run` over a
@@ -511,8 +622,13 @@ seeded simulation fixture.
   [collab-sessions.md](collab-sessions.md),
   [messaging-and-boards.md](messaging-and-boards.md),
   [shared-artifacts.md](shared-artifacts.md),
-  [search-and-memory.md](search-and-memory.md) — Layer 2 domain
+  [search-and-memory.md](search-and-memory.md),
+  [bug-reporting.md](bug-reporting.md) — Layer 2 domain
   plans.
+- [discovery.md](discovery.md), [protocol.md](protocol.md),
+  [transport-multiplexing.md](transport-multiplexing.md),
+  [ci.md](ci.md) — homes for the infrastructure/tooling use cases
+  explicitly excluded from the REPL-closure clause.
 - [usecases.md](../usecases.md) and
   [plato_inspired_usecases.md](plato_inspired_usecases.md) — the
   user stories this plan moves out of Go and into the REPL.

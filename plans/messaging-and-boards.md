@@ -1,6 +1,10 @@
 # Messaging and Boards Plan
 
-See `repl-capability-closure.md` for the overall closure rationale.
+See `repl-capability-plan.md` for the overall closure rationale
+and the layering this plan sits inside. Acknowledgement and
+read-state ownership is defined in `identity-and-audience.md`;
+the ack-related functions named below are thin helpers over
+`IdentityService`, not a parallel ack substrate.
 
 ## Design Principle
 
@@ -39,8 +43,13 @@ Durable conversation and bulletin objects are first-class control-plane resource
 - created time
 - thread parent ref
 - delivery state
-- ack or read state
 - tags
+
+Ack/read state is not stored on `Message`; it lives on
+`IdentityService` as an `Acknowledgement` record keyed by the
+message's `subject_ref`. `MessagingService` reads that state
+through `IdentityService.GetAcknowledgements` when surfacing
+per-actor read/ack status.
 
 ### BoardPost
 
@@ -66,8 +75,10 @@ Suggested functions:
 - `message.pin(subject_ref, audience)`
 - `message.list(scope, filters)`
 - `message.get(message_id)`
-- `message.unread(target_ref)`
-- `message.ack(subject_ref, actor)`
+- `message.unread(target_ref)` — convenience filter; delegates to
+  `identity.ack_status` on the message/room subject refs.
+- `message.ack(subject_ref, actor)` — convenience wrapper;
+  delegates to `identity.ack(subject_ref, actor, mode="read")`.
 
 ## Services
 
@@ -83,8 +94,9 @@ Suggested functions:
 - `PinSubject`
 - `ListMessages`
 - `GetMessage`
-- `ListUnread`
-- `AcknowledgeSubject`
+- `ListUnread` — delegates to `IdentityService.GetAcknowledgements`
+- `AcknowledgeSubject` — delegates to
+  `IdentityService.RecordAcknowledgement`
 
 ## REPL Surface
 
@@ -126,4 +138,6 @@ This plan directly supports:
 - TAL can create and operate room and direct message flows without app-specific storage conventions,
 - REPL can inspect rooms, threads, unread state, and pinned bulletins,
 - messages and boards are searchable and timeline-visible,
-- acknowledgements are durable and typed.
+- acknowledgements are durable and typed, owned by
+  `IdentityService` and reachable from messaging via thin
+  delegating helpers.
