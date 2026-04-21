@@ -193,6 +193,24 @@ String buildVersionParityNote({
   return 'Build Match: unknown';
 }
 
+String buildServerBuildLine({
+  required String serverBuildDate,
+  required String serverBuildSha,
+  required bool hasRegisterAck,
+}) {
+  final normalizedServerSha = normalizeBuildValue(serverBuildSha);
+  final normalizedServerDate = normalizeBuildValue(serverBuildDate);
+  if (!hasRegisterAck &&
+      normalizedServerSha == 'unknown' &&
+      normalizedServerDate == 'unknown') {
+    return 'Server Build: awaiting register ack';
+  }
+  return 'Server ${buildMetadataLabel(
+    buildDate: serverBuildDate,
+    buildSha: serverBuildSha,
+  )}';
+}
+
 String buildTransportDiagnosticsClipboardText({
   required String lastTransportDiagnostic,
   required List<String> recentAttempts,
@@ -1473,10 +1491,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   Widget _buildBuildParityPanel() {
     final clientLabel =
         'Client ${buildMetadataLabel(buildDate: _buildDate, buildSha: _buildSha)}';
-    final serverLabel = 'Server ${buildMetadataLabel(
-      buildDate: _serverBuildDate,
-      buildSha: _serverBuildSha,
-    )}';
+    final serverLabel = buildServerBuildLine(
+      serverBuildDate: _serverBuildDate,
+      serverBuildSha: _serverBuildSha,
+      hasRegisterAck: _hasRegisterAck,
+    );
     final parityLabel = buildVersionParityNote(
       clientBuildDate: _buildDate,
       clientBuildSha: _buildSha,

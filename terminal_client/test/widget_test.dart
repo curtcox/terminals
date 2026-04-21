@@ -176,6 +176,15 @@ void main() {
     expect(note, 'Build Match: different SHA');
   });
 
+  test('buildServerBuildLine reports awaiting register ack before connect', () {
+    final line = buildServerBuildLine(
+      serverBuildDate: 'unknown',
+      serverBuildSha: 'unknown',
+      hasRegisterAck: false,
+    );
+    expect(line, 'Server Build: awaiting register ack');
+  });
+
   testWidgets('app renders MaterialApp', (WidgetTester tester) async {
     await tester.pumpWidget(const TerminalClientApp());
     expect(find.byType(MaterialApp), findsOneWidget);
@@ -187,6 +196,10 @@ void main() {
     expect(find.textContaining('SHA:'), findsWidgets);
     expect(find.textContaining('Client / Server Build'), findsOneWidget);
     expect(find.textContaining('Build Match:'), findsOneWidget);
+    expect(
+      find.textContaining('Server Build: awaiting register ack'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Control Stream:'), findsOneWidget);
     expect(find.text('Connect Stream'), findsOneWidget);
     expect(
