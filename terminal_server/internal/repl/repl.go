@@ -66,6 +66,8 @@ func replCommandSpecs() []commandSpec {
 		{Name: "identity resolve", Usage: "identity resolve <audience> [--json]", Summary: "Resolve an audience to identities", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
 		{Name: "session ls", Usage: "session ls [--json]", Summary: "List interactive sessions", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session create", Usage: "session create <kind> <target> [--json]", Summary: "Create a generalized interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session show", Usage: "session show <session> [--json]", Summary: "Show one interactive session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session members", Usage: "session members <session> [--json]", Summary: "List interactive session participants", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session join", Usage: "session join <session> <participant> [--json]", Summary: "Join a participant to an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session leave", Usage: "session leave <session> <participant> [--json]", Summary: "Remove a participant from an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "message ls", Usage: "message ls [room] [--json]", Summary: "List messages", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
@@ -478,6 +480,68 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			_, err = fmt.Fprintf(s.out, "OK  session=%s\n", sessionID)
 			return err
+		case "show":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: session show <session>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/session/show", url.Values{"session_id": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			sessionMap, _ := body["session"].(map[string]any)
+			if sessionMap == nil {
+				return writeJSON(s.out, body)
+			}
+			rows := [][]string{
+				{"session", toString(sessionMap["id"])},
+				{"kind", toString(sessionMap["kind"])},
+				{"target", toString(sessionMap["target"])},
+			}
+			if err := printTable(s.out, []string{"FIELD", "VALUE"}, rows); err != nil {
+				return err
+			}
+			participants, _ := sessionMap["participants"].([]any)
+			memberRows := make([][]string, 0, len(participants))
+			for _, item := range participants {
+				member, _ := item.(map[string]any)
+				if member == nil {
+					continue
+				}
+				memberRows = append(memberRows, []string{
+					toString(member["identity_id"]),
+					toString(member["joined_at"]),
+				})
+			}
+			return printTable(s.out, []string{"PARTICIPANT", "JOINED_AT"}, memberRows)
+		case "members":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: session members <session>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/session/members", url.Values{"session_id": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			participants, _ := body["participants"].([]any)
+			rows := make([][]string, 0, len(participants))
+			for _, item := range participants {
+				member, _ := item.(map[string]any)
+				if member == nil {
+					continue
+				}
+				rows = append(rows, []string{
+					toString(member["identity_id"]),
+					toString(member["joined_at"]),
+				})
+			}
+			return printTable(s.out, []string{"PARTICIPANT", "JOINED_AT"}, rows)
 		case "join":
 			plain := nonFlagArgs(args[1:])
 			if len(plain) < 2 {

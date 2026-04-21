@@ -438,6 +438,21 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 			t.Fatalf("POST %s status = %d, want 200 body=%s", path, w.Code, w.Body.String())
 		}
 	}
+
+	for _, path := range []string{
+		"/admin/api/session/show?session_id=" + url.QueryEscape(sessionID),
+		"/admin/api/session/members?session_id=" + url.QueryEscape(sessionID),
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d, want 200 body=%s", path, w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), sessionID) {
+			t.Fatalf("GET %s missing session id %q in body=%s", path, sessionID, w.Body.String())
+		}
+	}
 }
 
 func TestIdentityResolveEndpointRequiresGET(t *testing.T) {

@@ -197,6 +197,28 @@ func (s *Service) ListSessions() []InteractiveSession {
 	return cloneSessions(s.sessions)
 }
 
+func (s *Service) GetSession(sessionID string) (InteractiveSession, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	sessionID = strings.TrimSpace(sessionID)
+	for _, session := range s.sessions {
+		if session.ID == sessionID {
+			return cloneSession(session), true
+		}
+	}
+	return InteractiveSession{}, false
+}
+
+func (s *Service) ListSessionParticipants(sessionID string) ([]SessionParticipant, bool) {
+	session, ok := s.GetSession(sessionID)
+	if !ok {
+		return nil, false
+	}
+	participants := append([]SessionParticipant(nil), session.Participants...)
+	return participants, true
+}
+
 func (s *Service) JoinSession(sessionID, participant string) (InteractiveSession, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

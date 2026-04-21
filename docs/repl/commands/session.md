@@ -4,6 +4,8 @@ Typed generalized interactive session commands:
 
 - `session ls`
 - `session create <kind> <target>`
+- `session show <session>`
+- `session members <session>`
 - `session join <session> <participant>`
 - `session leave <session> <participant>`
 

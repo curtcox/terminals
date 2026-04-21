@@ -97,6 +97,8 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/identity", h.handleIdentity)
 	mux.HandleFunc("/admin/api/identity/resolve", h.handleIdentityResolve)
 	mux.HandleFunc("/admin/api/session", h.handleInteractiveSessions)
+	mux.HandleFunc("/admin/api/session/show", h.handleInteractiveSessionShow)
+	mux.HandleFunc("/admin/api/session/members", h.handleInteractiveSessionMembers)
 	mux.HandleFunc("/admin/api/session/create", h.handleInteractiveSessionCreate)
 	mux.HandleFunc("/admin/api/session/join", h.handleInteractiveSessionJoin)
 	mux.HandleFunc("/admin/api/session/leave", h.handleInteractiveSessionLeave)
@@ -228,6 +230,37 @@ func (h *Handler) handleInteractiveSessions(w http.ResponseWriter, req *http.Req
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"sessions": h.capability.ListSessions()})
+}
+
+func (h *Handler) handleInteractiveSessionShow(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	sessionID := strings.TrimSpace(req.URL.Query().Get("session_id"))
+	session, ok := h.capability.GetSession(sessionID)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"session": session})
+}
+
+func (h *Handler) handleInteractiveSessionMembers(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	sessionID := strings.TrimSpace(req.URL.Query().Get("session_id"))
+	participants, ok := h.capability.ListSessionParticipants(sessionID)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"session_id":   sessionID,
+		"participants": participants,
+	})
 }
 
 func (h *Handler) handleInteractiveSessionCreate(w http.ResponseWriter, req *http.Request) {
