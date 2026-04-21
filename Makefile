@@ -109,7 +109,8 @@ run-server:
 	cd terminal_server && go run ./cmd/server
 
 run-client-web:
-	cd terminal_client && flutter run -d web-server --web-port=$(CLIENT_WEB_PORT) --web-hostname=$(CLIENT_WEB_HOST)
+	cd terminal_client && flutter build web --no-wasm-dry-run
+	cd terminal_client && python3 -m http.server $(CLIENT_WEB_PORT) --bind $(CLIENT_WEB_HOST) --directory build/web
 
 run-local:
 	./scripts/run-local.sh

@@ -29,10 +29,11 @@ flutter pub get
 make run-client-web
 
 # Or directly:
-cd terminal_client && flutter run -d web-server
+cd terminal_client && flutter build web --no-wasm-dry-run
+cd terminal_client && python3 -m http.server 60739 --bind 0.0.0.0 --directory build/web
 ```
 
-This starts a local development server (usually at `http://localhost:<port>`). The terminal will print the URL.
+This builds the web client and serves `build/web` via a static HTTP server.
 
 The client will show a discovery/manual-connect screen. If the server is running on the same machine, mDNS discovery should find it automatically. Otherwise, enter the server address manually (e.g. `localhost:50051`).
 
