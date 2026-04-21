@@ -83,4 +83,37 @@ void main() {
     expect(capabilities.speakers.endpoints, isNotEmpty);
     expect(capabilities.displays, isNotEmpty);
   });
+
+  test('probe falls back when media enumeration stalls', () async {
+    final probe = DefaultCapabilityProbe(
+      mediaDeviceInventoryProvider: () async {
+        await Future<void>.delayed(const Duration(seconds: 5));
+        return const <MediaDeviceDescriptor>[
+          MediaDeviceDescriptor(
+            kind: 'audioinput',
+            deviceId: 'mic-delayed',
+            label: 'Delayed Mic',
+          ),
+        ];
+      },
+    );
+
+    final capabilities = await probe.probe(
+      const CapabilityProbeContext(
+        deviceId: 'device-timeout',
+        deviceName: 'Client',
+        deviceType: 'desktop',
+        platform: 'flutter',
+        screenWidth: 1920,
+        screenHeight: 1080,
+        screenDensity: 2.0,
+        touchInputLikely: false,
+        targetPlatform: TargetPlatform.macOS,
+      ),
+    );
+
+    expect(capabilities.hasMicrophone(), isFalse);
+    expect(capabilities.hasCamera(), isFalse);
+    expect(capabilities.hasSpeakers(), isFalse);
+  });
 }

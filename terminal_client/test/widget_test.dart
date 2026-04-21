@@ -185,6 +185,16 @@ void main() {
     expect(line, 'Server Build: awaiting register ack');
   });
 
+  test('buildWebConnectionChipLabel reports not connected before stream starts',
+      () {
+    final label = buildWebConnectionChipLabel(
+      hasRegisterAck: false,
+      isConnecting: false,
+      shouldStayConnected: false,
+    );
+    expect(label, 'Not connected');
+  });
+
   testWidgets('app renders MaterialApp', (WidgetTester tester) async {
     await tester.pumpWidget(const TerminalClientApp());
     expect(find.byType(MaterialApp), findsOneWidget);
@@ -2123,6 +2133,108 @@ void main() {
         find.textContaining('Launching application: terminal'), findsOneWidget);
   });
 
+  testWidgets(
+      'connect bootstrap sends register request so metadata and app list hydrate without reconnect',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    for (var i = 0; i < 80; i++) {
+      if (harness.lastClient.requests.any((request) => request.hasRegister())) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 25));
+    }
+
+    expect(
+      harness.lastClient.requests.any((request) => request.hasRegister()),
+      isTrue,
+      reason: 'bootstrap should include register request on first connect',
+    );
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'
+          ..metadata.addAll({
+            'server_build_sha': 'srv-sha-001',
+            'server_build_date': '2026-04-21T19:15:00Z',
+          })),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Server Build: 2026-04-21T19:15:00Z | SHA: srv-sha-001'),
+      findsOneWidget,
+    );
+
+    final appRegistryRequest = harness.lastClient.requests.lastWhere(
+      (request) =>
+          request.hasCommand() &&
+          request.command.kind == CommandKind.COMMAND_KIND_SYSTEM &&
+          request.command.intent == 'scenario_registry',
+    );
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = appRegistryRequest.command.requestId
+          ..notification = 'System query: scenario_registry'
+          ..data.addAll({
+            'photo_frame': 'priority=40',
+          })),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is DropdownButtonFormField<String> &&
+            widget.decoration.labelText == 'Available Application',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('photo_frame').last, findsOneWidget);
+  });
+
+  testWidgets(
+      'connect bootstrap retries register when transport attaches request stream late',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness(
+      requestSubscriptionDelay: const Duration(milliseconds: 250),
+    );
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+
+    expect(
+      harness.lastClient.requests.any((request) => request.hasRegister()),
+      isTrue,
+      reason:
+          'client should retry bootstrap register even when request stream subscription is delayed',
+    );
+  });
+
   testWidgets('terminal root renders fullscreen app view',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
@@ -2161,6 +2273,7 @@ class _FakeClientHarness {
   _FakeClientHarness({
     this.failFirstConnectStream = false,
     this.failConnectAttempts = 0,
+    this.requestSubscriptionDelay = Duration.zero,
   });
 
   final List<_FakeTerminalControlClient> createdClients =
@@ -2169,6 +2282,7 @@ class _FakeClientHarness {
   final List<ControlCarrierKind> requestedCarriers = <ControlCarrierKind>[];
   final bool failFirstConnectStream;
   final int failConnectAttempts;
+  final Duration requestSubscriptionDelay;
 
   _FakeTerminalControlClient get lastClient => createdClients.last;
 
@@ -2182,6 +2296,7 @@ class _FakeClientHarness {
       port: port,
       failOnConnectStream: createdClients.length < failConnectAttempts ||
           (failFirstConnectStream && createdClients.isEmpty),
+      requestSubscriptionDelay: requestSubscriptionDelay,
     );
     createdClients.add(client);
     return client;
@@ -2303,11 +2418,13 @@ class _FakeTerminalControlClient implements TerminalControlClient {
     required this.host,
     required this.port,
     required this.failOnConnectStream,
+    required this.requestSubscriptionDelay,
   });
 
   final String host;
   final int port;
   final bool failOnConnectStream;
+  final Duration requestSubscriptionDelay;
   final List<ConnectRequest> requests = <ConnectRequest>[];
   final StreamController<ConnectResponse> _responses =
       StreamController<ConnectResponse>.broadcast();
@@ -2318,7 +2435,15 @@ class _FakeTerminalControlClient implements TerminalControlClient {
     Stream<ConnectRequest> requests, {
     CallOptions? options,
   }) {
-    _requestSubscription = requests.listen(this.requests.add);
+    if (requestSubscriptionDelay > Duration.zero) {
+      unawaited(
+        Future<void>.delayed(requestSubscriptionDelay).then((_) {
+          _requestSubscription = requests.listen(this.requests.add);
+        }),
+      );
+    } else {
+      _requestSubscription = requests.listen(this.requests.add);
+    }
     if (failOnConnectStream) {
       return Stream<ConnectResponse>.error(StateError('stream dropped'));
     }

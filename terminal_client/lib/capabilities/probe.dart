@@ -5,6 +5,7 @@ import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.da
 
 typedef MediaDeviceInventoryProvider = Future<List<MediaDeviceDescriptor>>
     Function();
+const Duration _mediaProbeTimeout = Duration(milliseconds: 750);
 
 class MediaDeviceDescriptor {
   const MediaDeviceDescriptor({
@@ -229,7 +230,10 @@ class DefaultCapabilityProbe implements CapabilityProbe {
 
   Future<List<MediaDeviceDescriptor>> _probeMediaDevices() async {
     try {
-      final devices = await _mediaDeviceKindsProvider();
+      final devices = await _mediaDeviceKindsProvider().timeout(
+        _mediaProbeTimeout,
+        onTimeout: () => const <MediaDeviceDescriptor>[],
+      );
       final normalized = <MediaDeviceDescriptor>[];
       for (final device in devices) {
         final kind = device.kind.trim().toLowerCase();

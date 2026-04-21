@@ -104,6 +104,8 @@ const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
 const Duration _bugReportAckTimeout = Duration(seconds: 20);
 const Duration _capabilityMonitorInterval = Duration(seconds: 2);
+const Duration _registerAckRetryInterval = Duration(milliseconds: 400);
+const int _registerAckRetryMaxAttempts = 5;
 
 const Set<String> _loopbackHosts = <String>{
   'localhost',
@@ -209,6 +211,20 @@ String buildServerBuildLine({
     buildDate: serverBuildDate,
     buildSha: serverBuildSha,
   )}';
+}
+
+String buildWebConnectionChipLabel({
+  required bool hasRegisterAck,
+  required bool isConnecting,
+  required bool shouldStayConnected,
+}) {
+  if (hasRegisterAck) {
+    return 'Connected';
+  }
+  if (isConnecting || shouldStayConnected) {
+    return 'Connecting';
+  }
+  return 'Not connected';
 }
 
 String buildTransportDiagnosticsClipboardText({
@@ -1006,6 +1022,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   final List<_QueuedBugReport> _queuedBugReports = <_QueuedBugReport>[];
   final List<_PendingBugReport> _pendingBugReports = <_PendingBugReport>[];
   Timer? _bugReportAckTimer;
+  Timer? _registerAckRetryTimer;
+  int _registerAckRetryAttempts = 0;
   bool _hasRegisterAck = false;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
   bool _appIsForeground = true;
@@ -1651,6 +1669,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     final attemptStartedAt = DateTime.now().toUtc();
 
     _isConnecting = true;
+    _cancelRegisterAckRetry();
     _hasRegisterAck = false;
     _capabilityGeneration = 0;
     _lastCapabilityAckGeneration = 0;
@@ -1775,11 +1794,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               _handleBugReportAck(response.bugReportAck);
             }
             if (response.hasRegisterAck()) {
-              if (!_hasRegisterAck) {
+              final firstRegisterAck = !_hasRegisterAck;
+              if (firstRegisterAck) {
                 shouldFlushQueuedBugReports = true;
+                _sendScenarioRegistryQuery();
               }
               _hasRegisterAck = true;
-              _sendScenarioRegistryQuery();
+              _cancelRegisterAckRetry();
               if (_pendingLaunchApplicationIntent.isNotEmpty) {
                 final pendingIntent = _pendingLaunchApplicationIntent;
                 _pendingLaunchApplicationIntent = '';
@@ -1891,6 +1912,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         _lastRegisteredCapabilities!,
       );
       _outgoing.add(
+        TerminalControlGrpcClient.registerRequest(
+          capabilities: _lastRegisteredCapabilities!,
+        ),
+      );
+      _outgoing.add(
         TerminalControlGrpcClient.capabilitySnapshotRequest(
           deviceId: _deviceId,
           generation: _capabilityGeneration,
@@ -1907,6 +1933,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           unixMs: initialHeartbeatUnixMs,
         ),
       );
+      _registerAckRetryAttempts = 0;
+      _scheduleRegisterAckRetry();
       _recordClientLog('info', 'control stream connected');
       _sendSensorTelemetry();
     } catch (error) {
@@ -2072,6 +2100,48 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           ..kind = CommandKind.COMMAND_KIND_SYSTEM
           ..intent = 'scenario_registry'),
     );
+  }
+
+  void _cancelRegisterAckRetry() {
+    _registerAckRetryTimer?.cancel();
+    _registerAckRetryTimer = null;
+    _registerAckRetryAttempts = 0;
+  }
+
+  void _scheduleRegisterAckRetry() {
+    _registerAckRetryTimer?.cancel();
+    if (_hasRegisterAck ||
+        !_hasActiveControlSession ||
+        _lastRegisteredCapabilities == null) {
+      return;
+    }
+    if (_registerAckRetryAttempts >= _registerAckRetryMaxAttempts) {
+      _recordClientLog(
+        'warn',
+        'register acknowledgement still pending after $_registerAckRetryAttempts retry attempts',
+      );
+      return;
+    }
+    _registerAckRetryTimer = Timer(_registerAckRetryInterval, () {
+      if (_hasRegisterAck ||
+          !_hasActiveControlSession ||
+          _lastRegisteredCapabilities == null) {
+        _cancelRegisterAckRetry();
+        return;
+      }
+      _registerAckRetryAttempts += 1;
+      _outgoing.add(
+        TerminalControlGrpcClient.registerRequest(
+          capabilities: _lastRegisteredCapabilities!,
+        ),
+      );
+      _recordClientLog(
+        'warn',
+        'register acknowledgement pending; retrying bootstrap register '
+            'attempt=$_registerAckRetryAttempts',
+      );
+      _scheduleRegisterAckRetry();
+    });
   }
 
   void _launchSelectedApplication() {
@@ -3115,6 +3185,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
 
     _incoming = null;
+    _cancelRegisterAckRetry();
     _hasRegisterAck = false;
     final existingClient = _client;
     _client = null;
@@ -3256,6 +3327,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   Future<void> _stopStream() async {
     _shouldStayConnected = false;
+    _cancelRegisterAckRetry();
     _hasRegisterAck = false;
     _capabilityGeneration = 0;
     _lastCapabilityAckGeneration = 0;
@@ -3315,6 +3387,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   @override
   void dispose() {
     _shouldStayConnected = false;
+    _cancelRegisterAckRetry();
     WidgetsBinding.instance.removeObserver(this);
     _cancelReconnectTimer();
     _bugReportAckTimer?.cancel();
@@ -3416,9 +3489,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                   Row(
                     children: [
                       if (kIsWeb)
-                        const Chip(
-                          avatar: Icon(Icons.check_circle_outline),
-                          label: Text('Connected'),
+                        Chip(
+                          avatar: Icon(
+                            _hasRegisterAck
+                                ? Icons.check_circle_outline
+                                : Icons.sync_outlined,
+                          ),
+                          label: Text(
+                            buildWebConnectionChipLabel(
+                              hasRegisterAck: _hasRegisterAck,
+                              isConnecting: _isConnecting,
+                              shouldStayConnected: _shouldStayConnected,
+                            ),
+                          ),
                         )
                       else
                         ElevatedButton(
