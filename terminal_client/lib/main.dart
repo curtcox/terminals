@@ -105,7 +105,7 @@ const int _clientContextRecentErrorCap = 32;
 const Duration _bugReportAckTimeout = Duration(seconds: 20);
 const Duration _capabilityMonitorInterval = Duration(seconds: 2);
 const Duration _registerAckRetryInterval = Duration(milliseconds: 400);
-const int _registerAckRetryMaxAttempts = 5;
+const Duration _registerAckTimeout = Duration(seconds: 20);
 
 const Set<String> _loopbackHosts = <String>{
   'localhost',
@@ -847,6 +847,7 @@ class TerminalClientApp extends StatelessWidget {
     this.reconnectDelayBase = const Duration(seconds: 2),
     this.reconnectDelayMaxSeconds = 30,
     this.nowUnixMsProvider = _systemNowUnixMs,
+    this.autoConnectOnStartup = kIsWeb,
     this.bugReportScreenshotCapture,
   });
 
@@ -859,6 +860,7 @@ class TerminalClientApp extends StatelessWidget {
   final Duration reconnectDelayBase;
   final int reconnectDelayMaxSeconds;
   final UnixMsProvider nowUnixMsProvider;
+  final bool autoConnectOnStartup;
   final BugReportScreenshotCapture? bugReportScreenshotCapture;
 
   @override
@@ -875,6 +877,7 @@ class TerminalClientApp extends StatelessWidget {
         reconnectDelayBase: reconnectDelayBase,
         reconnectDelayMaxSeconds: reconnectDelayMaxSeconds,
         nowUnixMsProvider: nowUnixMsProvider,
+        autoConnectOnStartup: autoConnectOnStartup,
         bugReportScreenshotCapture: bugReportScreenshotCapture,
       ),
     );
@@ -892,6 +895,7 @@ class _ControlStreamScaffold extends StatefulWidget {
     required this.reconnectDelayBase,
     required this.reconnectDelayMaxSeconds,
     required this.nowUnixMsProvider,
+    required this.autoConnectOnStartup,
     required this.bugReportScreenshotCapture,
   });
 
@@ -904,6 +908,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   final Duration reconnectDelayBase;
   final int reconnectDelayMaxSeconds;
   final UnixMsProvider nowUnixMsProvider;
+  final bool autoConnectOnStartup;
   final BugReportScreenshotCapture? bugReportScreenshotCapture;
 
   @override
@@ -1024,6 +1029,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   Timer? _bugReportAckTimer;
   Timer? _registerAckRetryTimer;
   int _registerAckRetryAttempts = 0;
+  int _registerAckRetryStartedUnixMs = 0;
   bool _hasRegisterAck = false;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
   bool _appIsForeground = true;
@@ -1570,6 +1576,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (_e2eAutoScanConnect) {
       unawaited(_runE2EAutoConnectFlow());
     }
+    if (widget.autoConnectOnStartup) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _hasActiveControlSession || _isConnecting) {
+          return;
+        }
+        unawaited(_startStream(userInitiated: true));
+      });
+    }
   }
 
   Future<void> _runE2EAutoConnectFlow() async {
@@ -2106,6 +2120,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _registerAckRetryTimer?.cancel();
     _registerAckRetryTimer = null;
     _registerAckRetryAttempts = 0;
+    _registerAckRetryStartedUnixMs = 0;
   }
 
   void _scheduleRegisterAckRetry() {
@@ -2115,10 +2130,15 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         _lastRegisteredCapabilities == null) {
       return;
     }
-    if (_registerAckRetryAttempts >= _registerAckRetryMaxAttempts) {
+    if (_registerAckRetryStartedUnixMs <= 0) {
+      _registerAckRetryStartedUnixMs = _nowUnixMs();
+    }
+    if (_nowUnixMs() - _registerAckRetryStartedUnixMs >=
+        _registerAckTimeout.inMilliseconds) {
       _recordClientLog(
         'warn',
-        'register acknowledgement still pending after $_registerAckRetryAttempts retry attempts',
+        'register acknowledgement still pending after '
+            '${_registerAckTimeout.inSeconds}s and $_registerAckRetryAttempts retry attempts',
       );
       return;
     }

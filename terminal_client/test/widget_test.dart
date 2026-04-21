@@ -200,6 +200,21 @@ void main() {
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 
+  testWidgets('auto-connect starts stream on launch when enabled',
+      (WidgetTester tester) async {
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        autoConnectOnStartup: true,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(harness.createdClients, isNotEmpty);
+  });
+
   testWidgets('app shows build metadata footer', (WidgetTester tester) async {
     await tester.pumpWidget(const TerminalClientApp());
     expect(find.textContaining('Build:'), findsWidgets);
@@ -572,7 +587,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Connect Stream'));
+    final connectButton = find.widgetWithText(ElevatedButton, 'Connect Stream');
+    await tester.ensureVisible(connectButton);
+    await tester.tap(connectButton);
     await tester.pump();
 
     harness.lastClient.emitResponse(
@@ -631,7 +648,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Connect Stream'));
+    final connectButton = find.widgetWithText(ElevatedButton, 'Connect Stream');
+    await tester.ensureVisible(connectButton);
+    await tester.tap(connectButton);
     await tester.pump();
     harness.lastClient.emitResponse(
       ConnectResponse()
@@ -2214,7 +2233,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final harness = _FakeClientHarness(
-      requestSubscriptionDelay: const Duration(milliseconds: 250),
+      requestSubscriptionDelay: const Duration(milliseconds: 2800),
     );
     await tester.pumpWidget(
       TerminalClientApp(
@@ -2225,7 +2244,7 @@ void main() {
 
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 1200));
+    await tester.pump(const Duration(milliseconds: 4200));
 
     expect(
       harness.lastClient.requests.any((request) => request.hasRegister()),
