@@ -1018,8 +1018,7 @@ void main() {
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
     harness.lastClient.emitResponse(
-      ConnectResponse()
-        ..registerAck = (RegisterAck()),
+      ConnectResponse()..registerAck = (RegisterAck()),
     );
     await tester.pump();
 
@@ -1063,8 +1062,7 @@ void main() {
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
     harness.lastClient.emitResponse(
-      ConnectResponse()
-        ..registerAck = (RegisterAck()),
+      ConnectResponse()..registerAck = (RegisterAck()),
     );
     await tester.pump();
 
@@ -1111,8 +1109,7 @@ void main() {
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
     harness.lastClient.emitResponse(
-      ConnectResponse()
-        ..registerAck = (RegisterAck()),
+      ConnectResponse()..registerAck = (RegisterAck()),
     );
     await tester.pump();
 
@@ -1892,6 +1889,94 @@ void main() {
     },
   );
 
+  testWidgets(
+    'privacy.toggle stops local capture before sending capability delta',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final stopBlocker = Completer<void>();
+      final harness = _FakeClientHarness(stopStreamBlocker: stopBlocker);
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pump();
+      final localDeviceID = harness.lastClient.requests
+          .firstWhere((request) => request.hasHello())
+          .hello
+          .deviceId;
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..startStream = (iov1.StartStream()
+            ..streamId = 'audio-stream'
+            ..kind = 'audio'
+            ..sourceDeviceId = localDeviceID
+            ..targetDeviceId = 'device-2'),
+      );
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..startStream = (iov1.StartStream()
+            ..streamId = 'video-stream'
+            ..kind = 'video'
+            ..sourceDeviceId = localDeviceID
+            ..targetDeviceId = 'device-2'),
+      );
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..setUi = (uiv1.SetUI()
+            ..root = (uiv1.Node()
+              ..id = 'terminal_root'
+              ..stack = (uiv1.StackWidget())
+              ..children.add(
+                uiv1.Node()
+                  ..id = 'act:main/privacy_toggle'
+                  ..button = (uiv1.ButtonWidget()
+                    ..label = 'Privacy'
+                    ..action = 'privacy.toggle'),
+              ))),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Privacy'));
+      await tester.pump();
+
+      expect(harness.lastMediaEngine.stopStreamCalls, <String>['audio-stream']);
+      expect(
+        harness.lastClient.requests
+            .where((request) => request.hasCapabilityDelta()),
+        isEmpty,
+        reason: 'capability delta must wait until local capture stop completes',
+      );
+
+      stopBlocker.complete();
+      await tester.pumpAndSettle();
+
+      final capabilityDeltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList();
+      expect(capabilityDeltas, isNotEmpty);
+      expect(
+        harness.lastMediaEngine.stopStreamCalls,
+        containsAll(<String>['audio-stream', 'video-stream']),
+      );
+      final delta = capabilityDeltas.last.capabilityDelta;
+      expect(delta.reason, 'privacy.toggle');
+      expect(delta.capabilities.hasMicrophone(), isFalse);
+      expect(delta.capabilities.hasCamera(), isFalse);
+    },
+  );
+
   testWidgets('handles play_audio responses and tracks playback status',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
@@ -2320,7 +2405,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('Server Build: 2026-04-21T19:15:00Z | SHA: srv-sha-001'),
+      find.textContaining(
+          'Server Build: 2026-04-21T19:15:00Z | SHA: srv-sha-001'),
       findsOneWidget,
     );
 
@@ -2419,6 +2505,7 @@ class _FakeClientHarness {
     this.failFirstConnectStream = false,
     this.failConnectAttempts = 0,
     this.requestSubscriptionDelay = Duration.zero,
+    this.stopStreamBlocker,
   });
 
   final List<_FakeTerminalControlClient> createdClients =
@@ -2428,8 +2515,10 @@ class _FakeClientHarness {
   final bool failFirstConnectStream;
   final int failConnectAttempts;
   final Duration requestSubscriptionDelay;
+  final Completer<void>? stopStreamBlocker;
 
   _FakeTerminalControlClient get lastClient => createdClients.last;
+  _FakeMediaEngine get lastMediaEngine => createdMediaEngines.last;
 
   TerminalControlClient createClient({
     required String host,
@@ -2454,6 +2543,7 @@ class _FakeClientHarness {
     final engine = _FakeMediaEngine(
       localDeviceID: localDeviceID,
       onSignal: onSignal,
+      stopStreamBlocker: stopStreamBlocker,
     );
     createdMediaEngines.add(engine);
     return engine;
@@ -2464,11 +2554,14 @@ class _FakeMediaEngine implements ClientMediaEngine {
   _FakeMediaEngine({
     required this.localDeviceID,
     required this.onSignal,
+    this.stopStreamBlocker,
   });
 
   final String localDeviceID;
   final OutboundSignalCallback onSignal;
+  final Completer<void>? stopStreamBlocker;
   final Set<String> _activeStreamIDs = <String>{};
+  final List<String> stopStreamCalls = <String>[];
   final Map<String, ValueNotifier<MediaStream?>> _remoteStreamsByID =
       <String, ValueNotifier<MediaStream?>>{};
   final Map<String, ValueNotifier<double>> _audioLevelsByID =
@@ -2504,6 +2597,11 @@ class _FakeMediaEngine implements ClientMediaEngine {
 
   @override
   Future<void> stopStream(String streamID) async {
+    stopStreamCalls.add(streamID);
+    final blocker = stopStreamBlocker;
+    if (blocker != null) {
+      await blocker.future;
+    }
     _activeStreamIDs.remove(streamID);
     _remoteStreamsByID
         .putIfAbsent(

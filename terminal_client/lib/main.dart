@@ -1063,6 +1063,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   TextDirection _lastKnownTextDirection = TextDirection.ltr;
   bool _capabilityPollInFlight = false;
   String _lastCapabilitySignature = '';
+  bool _privacyModeEnabled = false;
   late final ConnectionReadinessGateway _readinessGateway;
   late final ReliableSendDispatcher<ConnectRequest> _reliableSender;
   late final RetryController _registerAckRetryController;
@@ -1247,6 +1248,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       final nextCapabilities = _applyLifecycleOperator(
         _applyDisplayMetadata(probedCapabilities.deepCopy()),
       );
+      if (_privacyModeEnabled) {
+        nextCapabilities
+          ..clearMicrophone()
+          ..clearCamera();
+      }
       final nextSignature = _capabilitySignature(nextCapabilities);
       final changed = nextSignature != _lastCapabilitySignature;
       if (!changed && !forceSnapshot) {
@@ -1286,6 +1292,57 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       );
     } finally {
       _capabilityPollInFlight = false;
+    }
+  }
+
+  Future<void> _handlePrivacyToggleAction() async {
+    if (_privacyModeEnabled) {
+      _privacyModeEnabled = false;
+      await _probeAndPublishCapabilityChanges(reason: 'privacy.toggle');
+      return;
+    }
+    await _stopLocalCaptureStreamsForPrivacyMode();
+    if (_lastRegisteredCapabilities == null || _deviceId.isEmpty) {
+      _privacyModeEnabled = true;
+      return;
+    }
+    final nextCapabilities = _lastRegisteredCapabilities!.deepCopy()
+      ..clearMicrophone()
+      ..clearCamera();
+    _privacyModeEnabled = true;
+    _lastRegisteredCapabilities = nextCapabilities;
+    _lastCapabilitySignature = _capabilitySignature(nextCapabilities);
+    _capabilityGeneration = math.max(
+      _capabilityGeneration + 1,
+      _lastCapabilityAckGeneration + 1,
+    );
+    await _sendWhenReady(
+      operation: OutboundOperation.capabilityDelta,
+      request: TerminalControlGrpcClient.capabilityDeltaRequest(
+        deviceId: _deviceId,
+        generation: _capabilityGeneration,
+        capabilities: nextCapabilities,
+        reason: 'privacy.toggle',
+      ),
+    );
+  }
+
+  Future<void> _stopLocalCaptureStreamsForPrivacyMode() async {
+    final streamIDs = _activeStreamsByID.entries
+        .where((entry) {
+          final sourceDeviceID = entry.value.sourceDeviceId.trim();
+          if (sourceDeviceID != _deviceId) {
+            return false;
+          }
+          final kind = entry.value.kind.trim().toLowerCase();
+          return kind.contains('audio') || kind.contains('video');
+        })
+        .map((entry) => entry.key)
+        .toList(growable: false);
+    for (final streamID in streamIDs) {
+      await _mediaEngine.stopStream(streamID);
+      _activeStreamsByID.remove(streamID);
+      _routesByStreamID.remove(streamID);
     }
   }
 
@@ -4333,6 +4390,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       action: action,
       value: value,
     );
+    if (action == 'privacy.toggle') {
+      await _handlePrivacyToggleAction();
+      return;
+    }
     if (action.startsWith(_bugReportActionPrefix)) {
       await _submitBugReportFromAction(
         componentId: componentId,
