@@ -1,1 +1,1 @@
-Review and commit the connection reliability unification changes.
+Share completed reliability-unification changes and test results with the user.

@@ -1115,7 +1115,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _connectionPhase == ConnectionPhase.registered;
 
   Future<void> _ensureConnectedForDispatch() async {
-    if (_isConnectionRegistered) {
+    if (_isConnectionRegistered || _hasActiveControlSession) {
       return;
     }
     _shouldStayConnected = true;
@@ -1136,10 +1136,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           safeToReplay: false,
           requiresAck: false,
         );
-    if (rule.mode == SendMode.queueUntilReady && _isConnectionRegistered) {
-      _outgoing.add(request);
-      return SendResult.sent;
-    }
     return _reliableSender.sendWhenReady(
       request: request,
       mode: rule.mode,
@@ -1222,6 +1218,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     bool forceSnapshot = false,
   }) async {
     if (!_hasActiveControlSession ||
+        !_isConnectionRegistered ||
         _deviceId.isEmpty ||
         _capabilityPollInFlight) {
       return;
@@ -1899,19 +1896,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
             }
             if (response.hasRegisterAck()) {
               final firstRegisterAck = !_hasRegisterAck;
+              _hasRegisterAck = true;
+              _cancelRegisterAckRetry();
+              _lastSuccessfulCarrier = carrier;
+              _carrierAttemptLog.clear();
               if (firstRegisterAck) {
                 shouldFlushQueuedBugReports = true;
                 _sendScenarioRegistryQuery();
               }
-              _hasRegisterAck = true;
-              _cancelRegisterAckRetry();
               if (_pendingLaunchApplicationIntent.isNotEmpty) {
                 final pendingIntent = _pendingLaunchApplicationIntent;
                 _pendingLaunchApplicationIntent = '';
                 _sendApplicationLaunchCommand(pendingIntent);
               }
-              _lastSuccessfulCarrier = carrier;
-              _carrierAttemptLog.clear();
             }
             if (response.hasCapabilityAck()) {
               _lastCapabilityAckGeneration =

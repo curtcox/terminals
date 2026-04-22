@@ -209,27 +209,27 @@ const Map<OutboundOperation, OutboundRoutingRule> kOutboundRoutingRules =
     requiresAck: false,
   ),
   OutboundOperation.runtimeQuery: OutboundRoutingRule(
-    mode: SendMode.fireAndForget,
+    mode: SendMode.queueUntilReady,
     safeToReplay: true,
     requiresAck: false,
   ),
   OutboundOperation.deviceQuery: OutboundRoutingRule(
-    mode: SendMode.fireAndForget,
+    mode: SendMode.queueUntilReady,
     safeToReplay: true,
     requiresAck: false,
   ),
   OutboundOperation.scenarioQuery: OutboundRoutingRule(
-    mode: SendMode.fireAndForget,
+    mode: SendMode.queueUntilReady,
     safeToReplay: true,
     requiresAck: false,
   ),
   OutboundOperation.playbackArtifactsQuery: OutboundRoutingRule(
-    mode: SendMode.fireAndForget,
+    mode: SendMode.queueUntilReady,
     safeToReplay: true,
     requiresAck: false,
   ),
   OutboundOperation.playbackMetadataQuery: OutboundRoutingRule(
-    mode: SendMode.fireAndForget,
+    mode: SendMode.queueUntilReady,
     safeToReplay: true,
     requiresAck: false,
   ),

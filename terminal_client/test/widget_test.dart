@@ -1933,6 +1933,17 @@ void main() {
 
     await tester.tap(find.text('Runtime Status'));
     await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      if (harness.lastClient.requests.any(
+        (request) =>
+            request.hasCommand() &&
+            request.command.kind == CommandKind.COMMAND_KIND_SYSTEM &&
+            request.command.intent == 'runtime_status',
+      )) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 20));
+    }
     final runtimeRequest = harness.lastClient.requests.lastWhere(
       (request) =>
           request.hasCommand() &&
@@ -2150,6 +2161,58 @@ void main() {
     expect(launchRequest.command.action, CommandAction.COMMAND_ACTION_START);
     expect(
         find.textContaining('Launching application: terminal'), findsOneWidget);
+  });
+
+  testWidgets('runtime status query queues until register ack',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    await tester.tap(find.text('Runtime Status'));
+    await tester.pump();
+    expect(
+      harness.lastClient.requests.where(
+        (request) =>
+            request.hasCommand() && request.command.intent == 'runtime_status',
+      ),
+      isEmpty,
+    );
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      if (harness.lastClient.requests.any(
+        (request) =>
+            request.hasCommand() && request.command.intent == 'runtime_status',
+      )) {
+        break;
+      }
+    }
+
+    expect(
+      harness.lastClient.requests.where(
+        (request) =>
+            request.hasCommand() && request.command.intent == 'runtime_status',
+      ),
+      hasLength(1),
+    );
+
+    await tester.pump(const Duration(milliseconds: 150));
   });
 
   testWidgets(
