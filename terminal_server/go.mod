@@ -7,6 +7,7 @@ require (
 	github.com/hashicorp/mdns v1.0.6
 	github.com/pion/rtp v1.10.1
 	github.com/pion/webrtc/v4 v4.2.11
+	golang.org/x/net v0.51.0
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 )
@@ -31,7 +32,6 @@ require (
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/mod v0.32.0 // indirect
-	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
