@@ -128,8 +128,10 @@ Its descriptor composition, using only the closed primitive set:
   inputs to that merge — it renders the result.
 
 When the user activates it, the client emits `io.v1.InputEvent.ui_action
-= UIAction{component_id: "corner", action: "open"}`. The server
-responds by starting an overlay-layer activation that holds
+= UIAction{component_id: "act:<main_activation_id>/__affordance.corner__",
+action: "open"}`. (See **Action routing and component-id scoping**
+below for why the id is not a bare `"corner"`.) The server responds
+by starting an overlay-layer activation that holds
 `display.<id>.overlay` and renders the menu descriptor.
 
 ### Server-enforced reachability invariant
@@ -143,11 +145,11 @@ button" is brittle, as Codex noted. Concretely:
 - `withCornerAffordance` emits a node with a **reserved `id` prefix**
   `__affordance.corner__` and a `UIAction` handler for action
   `corner.open`.
-- The wrapper enforces, in code, minimum hit-target size (for
-  example, >= 44×44 logical px, exact value documented alongside the
-  wrapper), top-of-stack Z-order relative to the scenario's root
-  content, and non-occluded geometry under the current
-  `ScreenCapability.safe_area`.
+- The wrapper enforces, in code, minimum hit-target size (>= 44×44
+  **dp**; Flutter device-independent pixels, i.e. physical px divided
+  by `ScreenCapability.density`), top-of-stack Z-order relative to
+  the scenario's root content, and non-occluded geometry under the
+  current `ScreenCapability.safe_area`.
 - A CI gate validates the **output of the wrapper specifically** for
   every main-layer scenario in the registry: the emitted tree
   contains exactly one node with the reserved id prefix, its props
@@ -175,9 +177,14 @@ mechanism:
   entry, an entry whose referenced scenario no longer exists, or an
   entry whose `replacement_affordance` (if any) does not itself pass
   the typed-wrapper check.
-- PR review process for additions to the allowlist is documented in
-  [ci.md](ci.md); this plan requires the file and the CI check, not
-  a specific review workflow.
+- Review requirement for additions to the allowlist: the file is
+  guarded by a `CODEOWNERS` entry that requires review from the
+  scenario-engine maintainers, enforced by the repo's branch
+  protection. PRs adding entries must fill all four fields
+  (`reason`, `approver`, `expires_at`, optional
+  `replacement_affordance`); a CI check rejects entries missing any
+  required field. This plan ships the allowlist file, its CODEOWNERS
+  line, and the CI validator together in Phase A.
 
 This replaces the client-side escape hatch that was contemplated and
 deferred.
@@ -206,24 +213,56 @@ legally contain the same logical name. Rule:
 
 - **Scenario authors write logical component IDs**
   (e.g. `submit`, `privacy_toggle`) in their descriptor trees.
+  Logical IDs are constrained to `[A-Za-z0-9_.\-]+` (ASCII alnum,
+  underscore, dot, hyphen). Any other character — in particular
+  `:` and `/`, the scoping delimiters — is rejected by the
+  scenario-side validator before the descriptor is ever emitted. The
+  reserved wrapper prefix `__affordance.*` is additionally reserved
+  to wrappers; scenario-authored IDs matching the reserved prefix
+  are rejected.
 - **The descriptor generator rewrites** every `id` field on every
   `ui.v1.Node` it emits to a **server-assigned, globally unique ID**
-  scoped by owning activation (convention:
-  `<activation_id>:<logical_id>`). The client only ever sees the
-  rewritten form.
+  scoped by owning activation. The canonical format is
+  `act:<activation_id>/<logical_id>`, where `<activation_id>`
+  itself is drawn from the scenario runtime's existing activation-id
+  alphabet (`[A-Za-z0-9_\-]+`, no `/` or `:`) so the delimiters are
+  unambiguous. The client only ever sees the rewritten form.
+  A string is considered "already scoped" iff it starts with the
+  literal prefix `act:` followed by a valid activation id, a `/`,
+  and a valid logical id; anything else is "unscoped" and rejected
+  by the server-side validator.
+- **Wrapper-emitted nodes** (e.g. `withCornerAffordance`) are scoped
+  to the activation they wrap. The canonical scoped id for the corner
+  affordance is therefore `act:<main_activation_id>/__affordance.corner__`.
+  There is no separate "wrapper activation"; the wrapper's output
+  lives under the wrapped activation's scope.
+- **`UpdateUI.component_id` targeting** follows the same contract.
+  The server-side generator that emits an `UpdateUI` must rewrite
+  the target `component_id` to the same scoped form that the
+  preceding `SetUI` emitted for that node. A server-side validator
+  rejects any `UpdateUI` whose `component_id` is unscoped or targets
+  a node id not currently present in the action-ownership map.
 - **The server maintains** an action-ownership map from rewritten
   `component_id` → owning activation, populated at `SetUI` /
   `UpdateUI` time and torn down at activation exit.
 - **Incoming `UIAction`s** are routed to the owning activation by
-  lookup. Unknown or stale component IDs are dropped with an
-  observable server-side counter, not delivered.
+  lookup. Unknown or stale component IDs are dropped and accounted
+  for by a named server-side counter
+  `ui.action.unknown_component_total`, labelled by
+  `{reason: "unscoped" | "unknown_activation" | "stale_node"}`,
+  exported alongside the server's other runtime metrics in
+  `internal/observation` and surfaced through the admin observation
+  plane. Integration tests read the counter through the same
+  test-observable handle used by other metrics there; no new
+  observability surface is introduced.
 - **A server-side validator** rejects a `SetUI` whose tree contains a
   duplicate `id` or an unrewritten logical id leaking through. This
   is a scenario-engine bug, not a protocol bug, and should fail
   loudly in tests.
 
 No wire change is required: the scoping lives in the bytes of the
-`id` field, which already exists on every `Node`.
+`id` field, which already exists on every `Node` and in
+`UpdateUI.component_id`.
 
 ### Input routing while the overlay is up
 
@@ -319,8 +358,19 @@ in-protocol timestamps:
 - The Flutter test harness wraps the client's capture producers to
   stamp each produced frame with a **monotonic harness counter** and
   records the counter value at the moment `stopCapture()` returns.
-- The server-side test harness records the counter value on every
-  received frame.
+- **Counter transport (test-only).** The counter does not ride on
+  the wire; existing proto contracts do not carry it. Instead the
+  Flutter integration harness encodes the per-frame counter into the
+  leading bytes of the harness-synthesized frame payload, using a
+  documented 8-byte big-endian prefix on an otherwise synthetic PCM
+  or H.264 payload that only the server-side harness reads. The
+  server under test sees opaque bytes and routes them normally; the
+  server-side test harness wraps the relevant router output, strips
+  the prefix, and records the counter on every received frame. The
+  prefix format is part of the harness and not part of any ship
+  code path. This mechanism is introduced alongside the harness
+  plumbing in Phase D's first deliverable; no proto or field is
+  added.
 - The assertion is: no received frame carries a counter value
   strictly greater than the recorded cutover value. This avoids any
   dependence on wall-clock timestamps that the wire format does not
@@ -480,7 +530,9 @@ screen. Parameterized by user pref + activity override, merged
 server-side, emitting the resulting position/visibility. No new proto
 messages.
 
-Tests (`make server-test`, wired into `make all-check` from day one):
+Tests — all new tests in this phase land in `make server-test` and
+`make client-test` and are reachable from `make all-check` on this
+phase's PR:
 
 - Unit: given a base descriptor and a corner-config input, the
   wrapper produces a descriptor whose tree contains a single
@@ -490,18 +542,33 @@ Tests (`make server-test`, wired into `make all-check` from day one):
   activity's corner. Both → activity wins while active, user pref
   restored on activity exit.
 - Unit: absent config → bottom-right, always visible.
-- **Reachability invariant test**: for every main-layer scenario in
-  the registry (fixture-generated descriptors), the wrapped
-  descriptor is checked for the invariant "a corner-affordance
-  subtree with a `UIAction` handler for `corner.open` exists, or a
-  documented wrapper-level opt-out is present". Failure is a build
-  failure.
+- **Reachability invariant — presence and wiring**: for every
+  main-layer scenario in the registry (fixture-generated
+  descriptors), the wrapped tree contains exactly one node whose
+  `id` matches the reserved scoped prefix
+  `act:*/__affordance.corner__` and whose action handler is wired to
+  `corner.open`, or the scenario has a current entry in the opt-out
+  allowlist. Failure is a build failure.
+- **Reachability invariant — minimum hit-target**: the wrapper's
+  emitted node carries hit-target props satisfying the documented
+  minimum in **logical device-independent pixels** (dp; Flutter
+  convention — physical px divided by `ScreenCapability.density`).
+  The minimum is pinned at `>= 44×44 dp`. Tested at three density
+  fixtures (1.0, 2.0, 3.0) so a regression at any density fails.
+- **Reachability invariant — Z-order**: the wrapper's emitted node
+  is the last child of its containing `Stack` (top-of-stack) in the
+  descriptor root, asserted structurally against the produced
+  `ui.v1.Node` tree.
+- **Reachability invariant — safe-area non-occlusion**: given a
+  fixture `ScreenCapability.safe_area`, the wrapper's emitted
+  position lies inside the safe area. Tested with asymmetric
+  `Insets` (notch on one side) so a wrapper that ignores `safe_area`
+  fails.
 - Widget: given a wrapped descriptor, the Flutter renderer shows the
   affordance at the configured corner and emits a `UIAction` on
-  activation. The emitted `component_id` matches the
-  server-assigned scoped id (prefix `__affordance.corner__`) that
-  the wrapper placed on the node; the test does not hardcode a bare
-  string.
+  activation. The emitted `component_id` equals the
+  server-assigned scoped id that the wrapper placed on the node; the
+  test does not hardcode a bare string.
 - Unit (opt-out governance): the scenario registry refuses to load a
   main-layer scenario that skips `withCornerAffordance` unless an
   entry exists in `affordance_optouts.yaml` with an unexpired
@@ -509,15 +576,25 @@ Tests (`make server-test`, wired into `make all-check` from day one):
 - Unit (opt-out governance): an expired allowlist entry, a reference
   to a missing scenario, or a `replacement_affordance` that fails
   the typed-wrapper check, each cause the build to fail.
+- Unit (CODEOWNERS gating): a CI check parses `CODEOWNERS` and
+  asserts an entry exists matching the path
+  `terminal_server/internal/scenario/affordance_optouts.yaml` and
+  names the scenario-engine maintainers group. Removing or
+  rewriting that entry without an accompanying scenario-engine
+  sign-off fails the build. This pairs with branch protection to
+  make the review requirement enforceable rather than aspirational.
 
 ## Phase B — Menu overlay activation
 
 Implement a scenario whose root descriptor is the menu, and which
 requests `display.<id>.overlay` shared when started. It responds to
-`UIAction{component_id: "corner", action: "open"}` by starting; to
-any `close` action or a second `corner.open` by terminating.
+a `UIAction` whose `component_id` matches the scoped corner id
+(`act:<main_activation_id>/__affordance.corner__`) and action
+`open` by starting; to any `close` action on its own scoped close
+button or a second `corner.open` by terminating.
 
-Tests:
+Tests added in this phase are wired into `make all-check` in this
+phase's PR (`make server-test` + `make client-test`):
 
 - Integration: `corner.open` UIAction from the client stub causes the
   server to grant an overlay claim and emit a `SetUI` on the
@@ -534,15 +611,47 @@ Tests:
   menu's close button) terminates the overlay activation and
   releases its `display.<id>.overlay` claim.
 - Unit (action routing): the descriptor generator rewrites logical
-  `id`s on emitted `ui.v1.Node` trees to scoped ids
-  (`<activation_id>:<logical>`); a `SetUI` that contains a duplicate
-  id or leaks an unrewritten logical id is rejected by the
+  `id`s on emitted `ui.v1.Node` trees to scoped ids in the canonical
+  `act:<activation_id>/<logical_id>` form; a `SetUI` that contains a
+  duplicate id or leaks an unrewritten logical id is rejected by the
   server-side validator.
+- Unit (scoped-id grammar): the validator rejects logical ids with
+  disallowed characters (anything outside `[A-Za-z0-9_.\-]+`, in
+  particular `:` and `/`), rejects scenario-authored ids starting
+  with the reserved `__affordance.` prefix, and rejects legacy
+  colon-form ids (`<activation_id>:<logical>` without the `act:`
+  prefix and `/` separator). These are negative tests intended to
+  fail loudly if the rewriter regresses.
 - Unit (action routing): the action-ownership map is populated at
   `SetUI` / `UpdateUI` time and torn down at activation exit; an
   incoming `UIAction` with an unknown scoped `component_id` is
-  dropped and increments a server-side counter rather than being
-  delivered.
+  dropped and increments the
+  `ui.action.unknown_component_total{reason="unknown_activation"}`
+  counter (or `reason="unscoped"` / `reason="stale_node"` as
+  appropriate) rather than being delivered.
+- Unit (action routing — `UpdateUI` rewrite): a server-emitted
+  `UpdateUI` whose `component_id` is unscoped, or targets a node id
+  not currently in the action-ownership map, is rejected by the
+  validator.
+- Integration (action-map turnover): during a main-layer activation
+  swap, `UIAction`s issued against the new activation's scoped ids
+  are delivered, and `UIAction`s issued against the prior
+  activation's scoped ids increment the unknown-id counter. The
+  unknown-id counter stays at zero for the happy path. Prevents
+  "legitimate actions silently dropped" regressions.
+- Integration (actor-variant menu composition): when the server's
+  policy returns different menu contents for different resolved
+  actors (e.g. restricted admin-only apps hidden from
+  `anonymous:*`), the emitted menu descriptor contents differ
+  accordingly under fixture actors. Asserts that actor-variant
+  composition actually happens in the scenario, not just that
+  restriction is theoretical. **Test seam**: the harness injects
+  resolved actors by stubbing the `IdentityService` interface from
+  [identity-and-audience.md](identity-and-audience.md) (specifically
+  the actor-resolution entry point used by the scenario when
+  composing menu descriptors). Phase B lands a minimal in-memory
+  `IdentityService` fake with `ResolveActor(deviceID) → Actor` plus
+  a loadable fixture mapping; later phases may extend it.
 
 ## Phase C — Overlay input-routing policies
 
@@ -550,7 +659,8 @@ Implement the per-activity routing policy for what the main activation
 receives while the overlay is active: `LIVE`, `PAUSED`, `MIXED`. This
 rides on the existing router; no new wire message.
 
-Tests:
+Tests added in this phase are wired into `make all-check` in this
+phase's PR (`make server-test`):
 
 - Unit (router): each policy produces the expected delivery pattern
   for a synthetic input stream.
@@ -570,7 +680,16 @@ Wire a server-authored `privacy.toggle` UIAction to a client-side
 handler that withdraws/re-adds mic and camera in the terminal's
 capability set.
 
-Tests:
+**First deliverable in this phase**: the capture-wrapper harness
+plumbing (Flutter-side monotonic frame counter on mic and camera
+producers, plus the server-side per-received-frame counter record
+described in **Cutover semantics** above). The cutover assertions
+below depend on this harness. No cutover test is written before
+the harness is in place.
+
+Tests added in this phase are wired into `make all-check` in this
+phase's PR (`make server-test`, `make client-test`, `make
+proto-lint` for the round-trip pin):
 
 - Widget: `privacy.toggle` UIAction triggers a `CapabilityDelta`
   whose embedded `DeviceCapabilities` has the `microphone` and
@@ -617,7 +736,8 @@ not acknowledged as new in the previous revision:
    pluggable winner policy (confidence, first-timestamp, closest
    terminal via the placement engine).
 
-Tests:
+Tests added in this phase are wired into `make all-check` in this
+phase's PR (`make server-test`, `make client-test`):
 
 - Widget: detector is enabled when mic is in capability set; disabled
   on privacy mode (no mic capability). Fixture harness replaces the
@@ -645,7 +765,8 @@ Tests:
 Use existing `CapabilitySnapshot` / `CapabilityDelta` on
 `ScreenCapability`. No new proto.
 
-Tests:
+Tests added in this phase are wired into `make all-check` in this
+phase's PR (`make client-test` + `make server-test`):
 
 - Widget: on connect, a `CapabilitySnapshot` is emitted including
   `ScreenCapability` with current width, height, orientation,
@@ -671,7 +792,8 @@ Tests:
 Reconnect must restore the user-visible state, including an open
 menu overlay.
 
-Tests:
+Tests added in this phase are wired into `make all-check` in this
+phase's PR (`make server-test`):
 
 - Integration: client disconnects while a main-layer app is active;
   on resume, server replays the current main-layer `SetUI` and any
@@ -682,12 +804,13 @@ Tests:
   arrived post-disconnect is idempotent on resume (no ghost overlay
   activation).
 
-## Phase G2 — Idle rendering and identity invariants
+## Phase H — Idle rendering and identity invariants
 
-Covers spec-level claims that the first revision of the plan asserted
+Covers spec-level claims that earlier revisions of the plan asserted
 in prose without a corresponding test.
 
-Tests:
+Tests added in this phase are wired into `make all-check` in this
+phase's PR (`make client-test` + `make server-test`):
 
 - Widget (cold start): on first connect, before any `SetUI` has been
   received, the client renders the server-defined placeholder
@@ -713,11 +836,13 @@ Tests:
   the client never gates on identity and always forwards the
   action. Fixture asserts both sides of this behavior.
 
-## Phase H — End-to-end use cases
+## Phase I — End-to-end use cases
 
 Register in [usecases.md](../usecases.md) and wire into
-`make usecase-validate` per the `usecase-implement` skill. Candidate
-IDs (exact IDs at registration time):
+`make usecase-validate` per the `usecase-implement` skill.
+Tests added in this phase are wired into `make all-check` via
+`make usecase-validate`. Candidate IDs (exact IDs at registration
+time):
 
 - **UI-IDLE-1**: terminal with no user-launched app shows a
   server-driven main-layer descriptor; the corner affordance is
@@ -745,18 +870,31 @@ IDs (exact IDs at registration time):
 Each use case is implemented per `usecase-implement` and must pass
 `make usecase-validate` before the phase ships.
 
-## Phase I — Hardening
+## Phase J — Hardening
 
 Not a feature phase; a cleanup pass.
 
+**CI-gating clause for Phase J.** This phase adds no new runtime
+tests. Its deliverables are lint scripts and audit checks that
+themselves run under `make all-check` on this phase's PR, invoked
+from `make server-lint` (Go audit scripts), `make proto-lint`
+(contract coverage), and `make usecase-validate` (registered
+scenario coverage). The phase is not "done" until these scripts
+are reachable from `make all-check` and every prior phase's gates
+are green on the same PR.
+
 - Confirm every spec claim has a corresponding test citation from
-  one of the phases above; fill any remaining gap.
+  one of the phases above; fill any remaining gap. The audit script
+  lives under `terminal_server/internal/scenario/audit/` and is
+  invoked from `make server-lint`.
 - Confirm no test asserts client-side rendering from within a Go-only
   integration test — those assertions belong in Flutter integration
   tests. A lint script reviews the phase's test matrix for
-  layer-correctness.
+  layer-correctness and runs under `make server-lint`.
 - Confirm CI gating has been real the whole way — no test added to
-  the plan is excluded from `make all-check`.
+  the plan is excluded from `make all-check`. A coverage script
+  enumerates test files touched by Phases A–I and asserts each is
+  transitively reached by a `make all-check` invocation.
 
 ## Deliberate non-tests
 
