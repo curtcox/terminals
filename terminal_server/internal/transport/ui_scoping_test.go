@@ -87,6 +87,51 @@ func TestRewriteAndValidateUpdateUIRejectsUnknownTargets(t *testing.T) {
 	_ = rewritten
 }
 
+func TestUIActionOwnershipTrackerResolveClassifiesStaleNodeWithinActivation(t *testing.T) {
+	tracker := newUIActionOwnershipTracker()
+	tracker.RecordSetUI("device-1", "activation-a", []string{
+		"act:activation-a/old_button",
+	})
+	tracker.RecordSetUI("device-1", "activation-a", []string{
+		"act:activation-a/new_button",
+	})
+
+	_, reason, ok := tracker.Resolve("device-1", "act:activation-a/old_button")
+	if ok {
+		t.Fatalf("Resolve(old_button) ok = true, want false")
+	}
+	if reason != "stale_node" {
+		t.Fatalf("Resolve(old_button) reason = %q, want stale_node", reason)
+	}
+}
+
+func TestUIActionOwnershipTrackerResolveClassifiesUnknownActivationAfterSwap(t *testing.T) {
+	tracker := newUIActionOwnershipTracker()
+	tracker.RecordSetUI("device-1", "activation-a", []string{
+		"act:activation-a/menu.open",
+	})
+	tracker.RecordSetUI("device-1", "activation-b", []string{
+		"act:activation-b/menu.open",
+	})
+	tracker.ForgetActivation("device-1", "activation-a")
+
+	owner, reason, ok := tracker.Resolve("device-1", "act:activation-b/menu.open")
+	if !ok {
+		t.Fatalf("Resolve(new activation) ok = false, reason=%q", reason)
+	}
+	if owner != "activation-b" {
+		t.Fatalf("Resolve(new activation) owner = %q, want activation-b", owner)
+	}
+
+	_, reason, ok = tracker.Resolve("device-1", "act:activation-a/menu.open")
+	if ok {
+		t.Fatalf("Resolve(swapped-out activation) ok = true, want false")
+	}
+	if reason != "unknown_activation" {
+		t.Fatalf("Resolve(swapped-out activation) reason = %q, want unknown_activation", reason)
+	}
+}
+
 func TestMetricsSnapshotIncludesUnknownComponentReasons(t *testing.T) {
 	m := &Metrics{}
 	m.IncUnknownUIActionComponent("unscoped")

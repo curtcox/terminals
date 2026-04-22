@@ -1,1 +1,1 @@
-Add activation-swap tests and enforce stale_node vs unknown_activation counters for inbound UIAction routing.
+Add integration coverage for action-map turnover when main-layer activation IDs change across scenario swaps.

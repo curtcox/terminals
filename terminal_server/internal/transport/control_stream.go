@@ -2657,6 +2657,7 @@ func (h *StreamHandler) closeMenuOverlay(ctx context.Context, deviceID string) (
 		if err := h.releaseMenuOverlayClaim(ctx, state.ActivationID); err != nil {
 			return nil, true, err
 		}
+		h.uiOwners.ForgetActivation(deviceID, state.ActivationID)
 	}
 	return []ServerMessage{{
 		UpdateUI: &UIUpdate{
@@ -3885,6 +3886,7 @@ func (h *StreamHandler) NoteProtocolError() {
 
 // HandleDisconnect releases stream-scoped resources for a disconnected device.
 func (h *StreamHandler) HandleDisconnect(deviceID string) {
+	h.uiOwners.ForgetDevice(deviceID)
 	h.terminateTerminalForDevice(deviceID)
 	h.disconnectRoutesForDevice(deviceID)
 }

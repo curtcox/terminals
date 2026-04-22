@@ -136,6 +136,9 @@ func (t *uiActionOwnershipTracker) RecordSetUI(deviceID, activationID string, co
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if _, exists := t.knownActivations[deviceID]; !exists {
+		t.knownActivations[deviceID] = map[string]struct{}{}
+	}
 	prefix := ownershipActivationPrefix(deviceID, activationID)
 	for key := range t.componentOwner {
 		if strings.HasPrefix(key, prefix) {
@@ -147,12 +150,21 @@ func (t *uiActionOwnershipTracker) RecordSetUI(deviceID, activationID string, co
 		if componentID == "" {
 			continue
 		}
-		t.componentOwner[ownershipKey(deviceID, componentID)] = activationID
+		ownerActivationID := activationID
+		if _, parsedActivationID, _, ok := parseScopedComponentID(componentID); ok {
+			ownerActivationID = parsedActivationID
+		}
+		t.componentOwner[ownershipKey(deviceID, componentID)] = ownerActivationID
+		if ownerActivationID != "" {
+			t.knownActivations[deviceID][ownerActivationID] = struct{}{}
+		}
 	}
-	if _, exists := t.knownActivations[deviceID]; !exists {
-		t.knownActivations[deviceID] = map[string]struct{}{}
+	if activationID != "" {
+		if _, exists := t.knownActivations[deviceID]; !exists {
+			t.knownActivations[deviceID] = map[string]struct{}{}
+		}
+		t.knownActivations[deviceID][activationID] = struct{}{}
 	}
-	t.knownActivations[deviceID][activationID] = struct{}{}
 }
 
 func (t *uiActionOwnershipTracker) RecordUpdate(deviceID, activationID string, componentIDs []string) {
@@ -166,17 +178,26 @@ func (t *uiActionOwnershipTracker) RecordUpdate(deviceID, activationID string, c
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if _, exists := t.knownActivations[deviceID]; !exists {
+		t.knownActivations[deviceID] = map[string]struct{}{}
+	}
 	for _, componentID := range componentIDs {
 		componentID = strings.TrimSpace(componentID)
 		if componentID == "" {
 			continue
 		}
-		t.componentOwner[ownershipKey(deviceID, componentID)] = activationID
+		ownerActivationID := activationID
+		if _, parsedActivationID, _, ok := parseScopedComponentID(componentID); ok {
+			ownerActivationID = parsedActivationID
+		}
+		t.componentOwner[ownershipKey(deviceID, componentID)] = ownerActivationID
+		if ownerActivationID != "" {
+			t.knownActivations[deviceID][ownerActivationID] = struct{}{}
+		}
 	}
-	if _, exists := t.knownActivations[deviceID]; !exists {
-		t.knownActivations[deviceID] = map[string]struct{}{}
+	if activationID != "" {
+		t.knownActivations[deviceID][activationID] = struct{}{}
 	}
-	t.knownActivations[deviceID][activationID] = struct{}{}
 }
 
 func (t *uiActionOwnershipTracker) Resolve(deviceID, componentID string) (string, string, bool) {
@@ -214,6 +235,50 @@ func (t *uiActionOwnershipTracker) HasKnownActivation(deviceID string) bool {
 	defer t.mu.Unlock()
 	activations, exists := t.knownActivations[deviceID]
 	return exists && len(activations) > 0
+}
+
+func (t *uiActionOwnershipTracker) ForgetActivation(deviceID, activationID string) {
+	if t == nil {
+		return
+	}
+	deviceID = strings.TrimSpace(deviceID)
+	activationID = strings.TrimSpace(activationID)
+	if deviceID == "" || activationID == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	prefix := ownershipActivationPrefix(deviceID, activationID)
+	for key := range t.componentOwner {
+		if strings.HasPrefix(key, prefix) {
+			delete(t.componentOwner, key)
+		}
+	}
+	if activations, exists := t.knownActivations[deviceID]; exists {
+		delete(activations, activationID)
+		if len(activations) == 0 {
+			delete(t.knownActivations, deviceID)
+		}
+	}
+}
+
+func (t *uiActionOwnershipTracker) ForgetDevice(deviceID string) {
+	if t == nil {
+		return
+	}
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	devicePrefix := strings.TrimSpace(deviceID) + "|"
+	for key := range t.componentOwner {
+		if strings.HasPrefix(key, devicePrefix) {
+			delete(t.componentOwner, key)
+		}
+	}
+	delete(t.knownActivations, deviceID)
 }
 
 func rewriteAndValidateUpdateUI(deviceID string, update *UIUpdate, tracker *uiActionOwnershipTracker) (*UIUpdate, error) {

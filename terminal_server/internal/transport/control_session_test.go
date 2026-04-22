@@ -150,6 +150,57 @@ func TestSessionRunInputUnknownComponentIncrementsUnscopedCounter(t *testing.T) 
 	}
 }
 
+func TestSessionRunInputUnknownComponentIncrementsStaleNodeCounter(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(control)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			{Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:device-1/__affordance.corner__", Action: "open"}},
+			{Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:menu-overlay:device-1/menu.missing", Action: "open"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	snapshot := handler.metrics.Snapshot()
+	if snapshot[`ui_action_unknown_component_total{reason="stale_node"}`] != "1" {
+		t.Fatalf("stale_node counter = %q, want 1", snapshot[`ui_action_unknown_component_total{reason="stale_node"}`])
+	}
+}
+
+func TestSessionRunInputUnknownComponentIncrementsUnknownActivationCounterAfterOverlayClose(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(control)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			{Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:device-1/__affordance.corner__", Action: "open"}},
+			{Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:menu-overlay:device-1/menu.close", Action: "close"}},
+			{Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:menu-overlay:device-1/menu.close", Action: "close"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	snapshot := handler.metrics.Snapshot()
+	if snapshot[`ui_action_unknown_component_total{reason="unknown_activation"}`] != "1" {
+		t.Fatalf("unknown_activation counter = %q, want 1", snapshot[`ui_action_unknown_component_total{reason="unknown_activation"}`])
+	}
+}
+
 func assertAllNodeIDsScoped(t *testing.T, root ui.Descriptor) {
 	t.Helper()
 	var walk func(node ui.Descriptor)
