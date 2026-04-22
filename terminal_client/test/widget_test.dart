@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:grpc/grpc.dart';
+import 'package:terminal_client/capabilities/probe.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
+import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
+    as capv1;
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart'
     as diagv1;
@@ -479,6 +482,76 @@ void main() {
           .length;
       expect(helloCount, 1);
       expect(capabilitySnapshotCount, 1);
+    },
+  );
+
+  testWidgets(
+    'privacy.toggle off restores mic/camera with fresh generation',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final harness = _FakeClientHarness();
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          capabilityProbeFactory: () => _StaticCapabilityProbe(
+            capv1.DeviceCapabilities()
+              ..microphone = (capv1.AudioInputCapability()
+                ..channels = 1
+                ..endpoints.add(capv1.AudioEndpoint()..endpointId = 'mic-main'))
+              ..camera = (capv1.CameraCapability()
+                ..endpoints.add(
+                  capv1.CameraEndpoint()..endpointId = 'camera-main',
+                )),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..setUi = (uiv1.SetUI()
+            ..root = (uiv1.Node()
+              ..id = 'terminal_root'
+              ..stack = (uiv1.StackWidget())
+              ..children.add(
+                uiv1.Node()
+                  ..id = 'act:main/privacy_toggle'
+                  ..button = (uiv1.ButtonWidget()
+                    ..label = 'Privacy'
+                    ..action = 'privacy.toggle'),
+              ))),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Privacy'));
+      await tester.pumpAndSettle();
+      final firstPrivacyDelta = harness.lastClient.requests
+          .lastWhere((request) => request.hasCapabilityDelta())
+          .capabilityDelta;
+      expect(firstPrivacyDelta.reason, 'privacy.toggle');
+      expect(firstPrivacyDelta.capabilities.hasMicrophone(), isFalse);
+      expect(firstPrivacyDelta.capabilities.hasCamera(), isFalse);
+
+      await tester.tap(find.text('Privacy'));
+      await tester.pumpAndSettle();
+      final capabilityDeltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList();
+      expect(capabilityDeltas.length, greaterThanOrEqualTo(2));
+      final restoredDelta = capabilityDeltas.last.capabilityDelta;
+      expect(restoredDelta.reason, 'privacy.toggle');
+      expect(restoredDelta.generation, greaterThan(firstPrivacyDelta.generation));
+      expect(restoredDelta.capabilities.hasMicrophone(), isTrue);
+      expect(restoredDelta.capabilities.hasCamera(), isTrue);
     },
   );
 
@@ -1947,6 +2020,21 @@ void main() {
               ))),
       );
       await tester.pumpAndSettle();
+      final maxCapabilityGenerationBeforePrivacy = harness.lastClient.requests
+          .where(
+            (request) =>
+                request.hasCapabilitySnapshot() || request.hasCapabilityDelta(),
+          )
+          .map(
+            (request) => request.hasCapabilitySnapshot()
+                ? request.capabilitySnapshot.generation
+                : request.capabilityDelta.generation,
+          )
+          .fold<int>(
+            0,
+            (current, next) =>
+                current > next.toInt() ? current : next.toInt(),
+          );
 
       await tester.tap(find.text('Privacy'));
       await tester.pump();
@@ -1972,6 +2060,10 @@ void main() {
       );
       final delta = capabilityDeltas.last.capabilityDelta;
       expect(delta.reason, 'privacy.toggle');
+      expect(
+        delta.generation.toInt(),
+        greaterThan(maxCapabilityGenerationBeforePrivacy),
+      );
       expect(delta.capabilities.hasMicrophone(), isFalse);
       expect(delta.capabilities.hasCamera(), isFalse);
     },
@@ -2547,6 +2639,17 @@ class _FakeClientHarness {
     );
     createdMediaEngines.add(engine);
     return engine;
+  }
+}
+
+class _StaticCapabilityProbe implements CapabilityProbe {
+  _StaticCapabilityProbe(this.capabilities);
+
+  final capv1.DeviceCapabilities capabilities;
+
+  @override
+  Future<capv1.DeviceCapabilities> probe(CapabilityProbeContext context) async {
+    return capabilities.deepCopy();
   }
 }
 
