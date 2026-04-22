@@ -1,447 +1,601 @@
 # Terminal UI
 
-See [masterplan.md](../masterplan.md) for overall system context, and
-[server-driven-ui.md](server-driven-ui.md) for the descriptor format that
-renders inside the surfaces defined here.
+See [masterplan.md](../masterplan.md) for overall system context. This
+plan specifies the user-facing surface of a terminal with a screen —
+tablets and browsers running the Flutter client — by composing existing
+primitives, not by inventing new wire contracts.
 
-This plan specifies the user-facing surface of a terminal with a screen:
-tablets and browsers running the Flutter client. The client is a generic
-thin client — all scenario-specific behavior stays server-side (see
-[CLAUDE.md](../CLAUDE.md) core rule 1).
+Load-bearing precedents this plan leans on:
+
+- [server-driven-ui.md](server-driven-ui.md) — closed set of
+  `ui.v1` primitives and `SetUI` / `UpdateUI` / `TransitionUI`. Adding
+  a new primitive to satisfy a scenario is forbidden.
+- [io-abstraction.md](io-abstraction.md) — display resources
+  (`display.<id>.main` exclusive, `display.<id>.overlay` shared) and
+  the claim manager that arbitrates them.
+- [bug-reporting.md](bug-reporting.md) — server-composed
+  `withBugReportAffordance` scenario wrapper injects a report button
+  into every root UI tree. The corner affordance in this plan follows
+  the same pattern.
+- [identity-and-audience.md](identity-and-audience.md) — actor forms
+  `person` / `device` / `agent` / `anonymous`, possibly uncertain.
+- [capabilities.proto](../api/terminals/capabilities/v1/capabilities.proto)
+  + `CapabilityDelta` — the existing channel for viewport, orientation,
+  and per-resource availability changes.
+
+The client (see [CLAUDE.md](../CLAUDE.md) core rule 1) remains generic:
+it renders descriptors, captures inputs, plays outputs, reports
+events, detects wake words, and reports capability changes. Nothing
+else.
 
 ## Scope
 
 In scope:
 
-- Screen layout, modes, and transitions on a single terminal
-- How user-selected apps occupy the display
-- The always-present menu affordance
-- Idle behavior, privacy mode, wake-word expectations
-- Orientation and window-size reporting
+- What the screen shows in idle, app, and menu situations
+- How the always-available affordance is composed server-side
+- Privacy mode expressed as a capability change
+- Wake-word expectations and their routing
+- Viewport / orientation reporting via existing capability flow
 
 Out of scope for v1:
 
-- Split-screen and multi-user handoff on a single display
-- Hardware-button or gesture escape hatches that bypass the server-app
-  contract (may be revisited if needed)
+- Split-screen main-layer sharing on one display (distinct main-layer
+  claims must still stay exclusive per the claim manager; overlay
+  sharing is in scope because the resource model already supports it).
+- Multi-user handoff on a single display.
+- A client-side escape hatch that bypasses the server-composed
+  affordance. Replaced with a server-enforced reachability invariant
+  (see below).
 
 ## I/O Model
 
-Inputs and outputs on a single terminal are independently routable and
-server-controlled. A single terminal can simultaneously:
+Inputs and outputs on a single terminal are independently claimable
+resources. The claim manager arbitrates; the client has no opinion.
 
-- Stream its camera, microphone, and keypress/touch events into multiple
-  independent server-side activities.
-- Render a single app full-screen for the local user.
+| Stream / surface              | Resource kind                      | Typical claim binding                             |
+| ----------------------------- | ---------------------------------- | ------------------------------------------------- |
+| Display video + pointer focus | `display.<id>.main` (exclusive)    | One activation at a time (the "current app")      |
+| Overlay video                 | `display.<id>.overlay` (shared)    | Zero or more activations concurrent with main     |
+| Display audio output          | `audio_out.<id>` (exclusive)       | Usually the same activation as `.main`            |
+| Camera (dedicated)            | `camera.<id>.capture` (exclusive)  | One activation                                    |
+| Camera (tap)                  | `camera.<id>.analyze` (shared)     | Many activations in parallel                      |
+| Microphone (dedicated)        | `audio_in.<id>.capture` (exclusive)| One activation                                    |
+| Microphone (tap)              | `audio_in.<id>.analyze` (shared)   | Many activations in parallel                      |
+| Keyboard / touch / pointer    | `keyboard.<id>` / `touch.<id>` / `pointer.<id>` (shared) | Active regardless of privacy mode |
 
-| Stream                       | Direction | Typical binding                                                   |
-| ---------------------------- | --------- | ----------------------------------------------------------------- |
-| Camera video                 | in        | Often fanned out to several activities                            |
-| Microphone audio             | in        | Often fanned out to several activities                            |
-| Keypress / touch events      | in        | Routed by server; active even in privacy mode                     |
-| Display video                | out       | Usually bound to one app full-screen                              |
-| Display audio                | out       | Usually bound to the same app as display video                    |
-| Display pointer / gesture    | in        | Usually bound to the same app as display video                    |
+There is no global "screen mode". The screen state is whatever the
+`.main` and `.overlay` claims currently render — possibly both at
+once.
 
-"Usually" means the default. The server can decompose the bundle at any
-time; the client must not assume display video, audio, and pointer are
-always one unit.
+## Screen Situations
 
-## Screen Modes
+Three common situations, expressed as combinations of claims on the
+primary display's resources. The server-driven UI tree for each is
+composed from the closed primitive set — no new widget, no new wire
+message, no client chrome.
 
-The terminal screen is always in exactly one of these modes. The server
-decides which one; the client renders it.
+### 1. Idle
 
-### 1. Idle mode
+No user-selected app; the server has chosen some activation to hold
+`display.<id>.main`. Typical choices (server-side, not client-side):
 
-The terminal has no user-selected app in focus. The idle screen is fully
-server-driven. Typical server choices include:
+- Still-photo slideshow: `fullscreen` wrapping an `image` rotated by
+  `UpdateUI` on a timer.
+- Live A/V from another terminal: `fullscreen` wrapping a
+  `video_surface` and an `audio_visualizer`.
+- Any other composition of primitives.
 
-- Still photos (slideshow, ambient art)
-- Live audio/video feeds from other terminals
-- Any other server-driven UI descriptor
+The corner affordance (below) is injected into this tree by the same
+scenario wrapper that injects it into app trees.
 
-The client does not pick idle content. It renders what the server sends.
+### 2. App full-screen
 
-The corner menu affordance is still visible in idle mode so the user can
-launch an app or file a bug.
+User launched an app. The activation holds `display.<id>.main`
+exclusive plus `audio_out.<id>` exclusive plus typically
+`pointer.<id>` / `touch.<id>`. Its root descriptor is a
+`FullscreenWidget` wrapping the app UI.
 
-### 2. Full-screen app mode
+### 3. Menu overlaid on current situation
 
-Default for any user-selected app. The entire screen is dedicated to the
-app's rendered UI, **except** for a single small corner icon (see below).
+The menu is **not** a mode. It is a second activation holding
+`display.<id>.overlay` shared, launched in response to a `UIAction`
+from the corner affordance. The underlying main activation continues
+to hold its claims; what happens to its inputs while the overlay is
+up is governed by the input-routing policy for the overlay claim
+(below).
 
-### 3. Menu-overlay mode
+Closing the menu means the overlay activation releases its claim and
+terminates. The main activation never changed state.
 
-A menu is overlaid on top of the current mode (idle or full-screen).
-Opened by selecting the corner icon.
+## The Corner Affordance
 
-## The Corner Icon
+A server-composed element injected into every main-layer UI tree by a
+scenario wrapper (analogous to the existing `withBugReportAffordance`
+in [bug-reporting.md](bug-reporting.md)). Working name:
+`withCornerAffordance`.
 
-A single, always-present affordance by which the user can leave the
-current activity, switch apps, toggle privacy mode, or file a bug.
+Its descriptor composition, using only the closed primitive set:
 
-- **Default position**: bottom-right corner of the screen.
-- **Default visibility**: always visible.
-- **Configurable by**: both the user (persistent preference) and the
-  active activity (situational override from the server). Either can
-  change position (any of the four corners) and visibility rules (e.g.
-  fade on idle, reveal on proximity). The server is trusted to keep the
-  icon reachable. No client-enforced escape hatch in v1.
-- **Selecting it**: overlays the menu on top of the current mode. The
-  underlying app is not dismissed.
+- A `GestureAreaWidget` or a positioned `ButtonWidget` in the
+  user-preferred corner of the layout tree, with
+  `action = "corner.open"`.
+- The positioning is expressed with the existing layout primitives
+  (`padding`, `expand`, `row`, `stack`); no new widget.
+- Visibility, position (one of four corners), and hit-target size are
+  parameters to the wrapper resolved server-side from the merge of
+  user preference and activity override. The client never sees the
+  inputs to that merge — it renders the result.
 
-## Menu Overlay
+When the user activates it, the client emits `io.v1.InputEvent.ui_action
+= UIAction{component_id: "corner", action: "open"}`. The server
+responds by starting an overlay-layer activation that holds
+`display.<id>.overlay` and renders the menu descriptor.
 
-The menu is a server-driven list presented over the current mode.
-Contents include at minimum:
+### Server-enforced reachability invariant
 
-- A list of other apps the user may launch
-- **File a bug** entry
-- **Privacy mode toggle** (enter / exit privacy mode for this terminal)
+Because the affordance is part of a scenario wrapper and not client
+chrome, we can enforce at the server what the client cannot: **every
+main-layer UI descriptor emitted for a terminal with a screen must
+include, somewhere in its tree, a live corner affordance, or an
+explicit wrapper-level opt-out flag that has been reviewed**. A CI
+check walks every scenario's rendered descriptor in a fixture run and
+fails if the invariant is violated.
 
-Diagnostics and terminal settings are not first-class menu entries —
-they are ordinary apps that appear in the app list when appropriate.
+This replaces the client-side escape hatch that was contemplated and
+deferred.
 
-### Behavior of the underlying app while the menu is open
+## The Menu Overlay
 
-The server chooses, per activity, how the underlying app behaves. Three
-modes must all be supported, plus mixes of them:
+A scenario that holds `display.<id>.overlay` shared. Its descriptor is
+an ordinary `ui.v1.Node` tree — likely a `Stack` wrapping a translucent
+background plus a `Stack`/`Row` of `Button` widgets:
 
-1. **Live**: app continues to receive all inputs and drive outputs.
-2. **Paused**: app receives no inputs and its outputs are frozen/muted.
-3. **Mixed**: some streams continue, others are suspended.
+- One `Button` per launchable app (server-chosen list; diagnostics,
+  terminal settings, bug reporting are ordinary entries).
+- One `Button` whose action is `privacy.toggle`.
+- One `Button` whose action is `bug.open` (the existing bug-reporting
+  intent; see [bug-reporting.md](bug-reporting.md)).
 
-The default mix: **audio continues, pointer input is suspended**. This
-is the common case — a user opens the menu mid-call and wants to keep
-hearing the call while the pointer addresses the menu.
+Every interaction is a `UIAction` dispatched via the existing input
+channel. No new control-plane messages.
 
-The client must expose enough state to the server for it to make this
-choice per activity; the client must not hardcode one behavior.
+### Input routing while the overlay is up
 
-## Idle-Screen Details
+The claim manager and router, not the client, decide what the main
+activation receives while the overlay is active. Three observable
+dispositions must be supported:
 
-The idle screen is a server-rendered surface with the corner icon on
-top. If the server has not yet pushed a descriptor, the client shows a
-neutral placeholder. The client does not cache or choose idle content.
+1. **Main stays live**: main activation continues to receive pointer,
+   touch, audio, camera — nothing changes.
+2. **Main paused**: router temporarily stops delivering input events
+   and suspends the main-side media plan on relevant edges.
+3. **Mixed**: scripted per-stream (typical default — audio continues,
+   pointer routes to the overlay).
+
+All three are the existing router behavior of routing inputs to one
+claim or another, or pausing the relevant edges in the media plan.
+Nothing about it is UI-specific. The default mix (audio continues,
+pointer routes to overlay) is the server policy, tested as such.
+
+## Idle Content Rendering
+
+The client renders whatever main-layer descriptor the server has
+currently set via `SetUI`. If no descriptor has yet been received for
+a terminal with a screen, the client renders a minimal server-defined
+placeholder descriptor that ships with the scenario runtime (not an
+ad-hoc client widget). The client does not cache idle content across
+sessions.
 
 ## Privacy Mode
 
-A terminal state, togglable from the menu. When active:
+Expressed as a capability withdrawal. The client is the source of
+truth for its own hardware access.
 
-- The terminal **disables** microphone and video-camera capture.
-- The terminal **continues** to report keypress and touch events.
-- Wake-word detection is suspended (see below).
-- There is **no persistent on-screen indicator** that the terminal is in
-  privacy mode, and no persistent indicator when the mic or camera is
-  live. This is a deliberate choice. If an indicator becomes desirable,
-  it will be added as a server-driven UI element, not a client chrome
-  element.
+- The user toggles privacy mode via the menu's `privacy.toggle`
+  `UIAction` (or any other server-authored entry point).
+- On entering privacy mode, the client:
+  1. Stops local capture on mic and camera *before* emitting the
+     delta.
+  2. Emits a `CapabilityDelta` with `generation = N+1` in which the
+     `microphone` and `camera` fields are cleared (no endpoints,
+     supported = false).
+  3. Disables local wake-word detection.
+- The server's claim manager observes the delta and, per
+  [io-abstraction.md](io-abstraction.md), **invalidates** any claim on
+  the disappeared resources. Activations relying on mic/camera
+  suspend per the existing invalidation path.
+- On exiting privacy mode, the reverse: client re-emits the
+  capabilities with a fresh `generation`, claims re-grant.
 
-Toggling privacy mode is reflected to the server immediately so
-server-side activities relying on that terminal's mic/camera can
-degrade.
+Privacy-mode state is **not** a new field; it is fully expressed by
+the absence of mic/camera in the terminal's current capability
+snapshot. There is no persistent on-screen indicator, and no
+client-chrome indicator. If the server wants one, it composes it into
+the UI descriptor.
+
+### Cutover semantics
+
+The race is between "client decides to enter privacy mode" and
+"in-flight mic/camera frames". The protocol already carries
+`generation` on `CapabilitySnapshot`/`CapabilityDelta`. The rule:
+
+- The client must **not** emit any mic or camera frame after the local
+  cutover timestamp that precedes the delta.
+- The server must drop any mic/camera frame whose producing
+  activation's claim has been invalidated by a capability change.
+- Test fixture asserts that from the moment the delta is sent, zero
+  mic/camera frames reach any server-side activation.
+
+This generalizes the existing capability-invalidation path; nothing
+new is invented.
 
 ## Wake Words
 
 Terminals that support on-device wake-word detection must always be
-listening, **except** when in privacy mode.
+listening **unless privacy mode has withdrawn the microphone
+capability**. Detection emits audio into the existing voice pipeline.
 
-- The set of wake words being listened for, and how each is handled, is
-  situational and controlled by the server. The client exposes a
-  capability (on-device detection of a configurable wake-word set) and
-  reports detections upstream.
-- The client does **not** decide what a wake word means. It reports the
-  event (wake-word id, optional trailing audio) to the server.
-- The server decides the response. Possible responses include silent
-  service of a request, launching an app in the corner-menu sense,
-  or directly indicating to the user (via the display-audio or
-  display-video bundle) that the request is complete or rejected.
+- The client does not interpret wake words. It detects presence,
+  starts or continues streaming audio (as the voice pipeline already
+  does for `VoiceAudio` frames), and emits events via the existing
+  channel.
+- The server decides what to do with the audio — STT, intent routing,
+  activation launch, audible acknowledgement — using the existing
+  voice and intent pipelines.
+- For v1, the set of wake words a given device recognizes is whatever
+  the client's on-device detector is built with. Situational
+  variation in what wake words *mean* is server-side intent routing,
+  not client reconfiguration. If per-activation wake-word vocabularies
+  are needed later, that is a distinct protocol addition with its own
+  plan; this plan does not presume one.
 
-Because the response is server-driven, direct feedback to the user may
-appear as a transient overlay, an audio cue, or any other server-driven
-UI element — not a client-chrome toast.
+### Multi-terminal deduplication
 
-## Identity
+When one utterance is heard by two terminals in the same room, both
+will emit voice events. Dedupe is a server-side policy on the voice
+pipeline, not a client concern. This plan requires that a test exist
+asserting at most one intent is dispatched per utterance within a
+configurable window; it does not prescribe the winner policy.
 
-The client does not render a login screen or identity picker. The
-server tracks user locations (which user is at which terminal) and
-determines who initiated any given action from that context. Most
-actions can be initiated by anyone present; some are restricted, and
-restriction is enforced server-side.
+## Identity and Actors
 
-Implication for this UI plan: menu entries and app lists shown on a
-terminal may legitimately vary by who the server believes is present,
-but the client itself does not gate on identity.
+The client does not render a login or identity picker. Any action
+taken at a terminal is attributed by the server to an `actor` of one
+of the kinds in [identity-and-audience.md](identity-and-audience.md):
+`person:<id>`, `device:<id>`, `agent:<id>`, or `anonymous:<origin>`.
+Attribution may be uncertain; the server's identity/presence policy
+resolves it and may fall back to `device:` when no person can be
+identified with confidence.
 
-## Orientation and Window Size
+Menu contents and permitted actions may legitimately vary with
+resolved actor. The client does not gate on identity.
 
-Both portrait and landscape must be supported on tablets, and arbitrary
-window sizes in the browser client.
+## Viewport and Orientation
 
-- The client reports the current window size and orientation to the
-  server on connect and **on every change** (rotation, window resize,
-  browser zoom that changes effective dimensions).
-- The server may respond with a new UI descriptor; the client re-renders
-  accordingly. The client does not make layout decisions beyond what the
-  descriptor specifies.
-- Full-screen app mode fills whatever the current viewport is — there
-  is no assumed aspect ratio.
+Handled via the existing capability flow, not new messages.
+
+- On connect, the client sends a `CapabilitySnapshot` including
+  `ScreenCapability{width, height, density, orientation,
+  fullscreen_supported, multi_window_supported, safe_area}`.
+- On any change — rotation, window resize, browser zoom that moves
+  effective pixel dimensions, tab foreground/background that changes
+  the `safe_area` — the client sends a `CapabilityDelta` with a fresh
+  `generation`.
+- Rapid changes are coalesced on the client with a short debounce so
+  the server is not flooded; debounce interval is a client constant
+  documented in the client architecture plan.
+- The server decides whether to re-emit `SetUI` or apply `UpdateUI`
+  for any layout variants. The client does not make layout decisions
+  beyond the descriptor.
 
 ## Summary of Client Responsibilities
 
-The Flutter client on a tablet or browser is responsible for:
+The Flutter client on tablet or browser:
 
-1. Rendering the server's UI descriptor for the current mode (idle,
-   full-screen app, menu overlay).
-2. Maintaining the corner icon per server + user configuration and
-   opening the menu overlay on selection.
-3. Capturing camera, microphone, keypress, touch, and pointer events
-   and routing them to the server per current server instructions,
-   respecting privacy mode.
-4. Playing server-provided display video and display audio.
-5. Detecting on-device wake words (when supported and not in privacy
-   mode) and reporting them.
-6. Reporting window size and orientation on connect and on change.
-7. Applying the server-specified behavior (live / paused / mixed) for
-   the underlying app when the menu overlay is open.
+1. Renders `ui.v1` descriptors via `SetUI` / `UpdateUI` /
+   `TransitionUI`.
+2. Emits `InputEvent` (key, pointer, touch, ui_action),
+   `SensorData`, voice audio frames, capability snapshots and deltas
+   per existing contracts.
+3. Captures mic/camera/keyboard/touch/pointer and obeys the server's
+   stream start/stop and route commands.
+4. Plays audio and displays video per existing IO commands.
+5. Detects on-device wake words when mic capability is present.
+6. Emits `CapabilityDelta` on viewport, orientation, or hardware
+   change.
+7. Withdraws mic/camera capability on local privacy-mode toggle; adds
+   them back on exit.
 
-The client does none of the following:
+The client does **not**:
 
-- Pick idle-screen content
-- Interpret wake words
-- Render persistent privacy or capture indicators
-- Render a login or identity screen
-- Decide app layout beyond the server's descriptor
-- Enforce a client-side escape hatch out of a full-screen app
-
-## Implementation Plan
-
-The plan is organized as phases. Each phase lists what ships and, as the
-primary deliverable, the **automated tests** that gate it. No phase is
-"done" until its tests are green under `make all-check`. Tests are
-written alongside (or before) the code, not after.
-
-Test layers in use:
-
-- **Protobuf contract tests** (`make proto-lint`, plus Go-side
-  round-trip tests): the canonical IO shape is defined before any
-  server or client code in a phase.
-- **Go server unit tests** (`make server-test`): state machines,
-  descriptor generation, config merging, privacy gating, wake-word
-  dispatch — all exercised without a client.
-- **Go server integration tests**: in-process server + scripted client
-  stub driving protobuf frames over the real transport, asserting
-  emitted descriptors and side effects.
-- **Flutter widget tests** (`make client-test`): each screen mode, the
-  corner icon, menu overlay, orientation changes, privacy-mode input
-  gating — driven by synthetic descriptors.
-- **Flutter integration tests**: client connected to a stub server,
-  exercising full descriptor round-trips and input routing.
-- **Use-case validation gate** (`usecase-validate` / `make
-  usecase-validate`): end-to-end scenarios registered in
-  [usecases.md](../usecases.md) that assert observable behavior across
-  client and server.
-
-### Phase A — Protocol additions
-
-Extend `api/proto/` with the messages needed by this plan. Nothing else
-in this plan proceeds until Phase A is green.
-
-Messages / fields (names illustrative):
-
-- `ScreenMode` enum: `IDLE`, `APP_FULLSCREEN`, `MENU_OVERLAY`
-- `SetScreenMode` server→client
-- `CornerIconConfig` (corner, visibility rule) — server→client, merged
-  from user pref + activity override server-side
-- `OpenMenuRequest` client→server (user tapped icon)
-- `MenuDescriptor` server→client (apps list, file-bug entry, privacy
-  toggle)
-- `MenuUnderlyingBehavior` per-activity: `LIVE | PAUSED | MIXED` with
-  per-stream overrides (audio/video/pointer)
-- `PrivacyModeState` + toggle request
-- `WakeWordEvent` client→server (wake-word id, optional audio blob
-  reference)
-- `ViewportReport` client→server (width, height, orientation, density)
-
-Tests:
-
-- `make proto-lint` passes.
-- Go round-trip test per new message: marshal → unmarshal → equal.
-- Schema-freeze test: golden files of the descriptor shapes so future
-  refactors don't silently change the wire format.
-
-### Phase B — Server screen-mode state machine
-
-Implement per-terminal mode state in `terminal_server/internal/terminal`
-(or `internal/ui`), driven by server decisions and client events.
-
-Tests (Go unit, `make server-test`):
-
-- Transitions: `IDLE → APP_FULLSCREEN → MENU_OVERLAY → APP_FULLSCREEN`,
-  and closing menu returns to the prior mode (not always `IDLE`).
-- Opening the menu from `IDLE` returns to `IDLE` on close.
-- Launching an app from the menu transitions to `APP_FULLSCREEN` with
-  the new app, closing the menu.
-- Re-entry safety: duplicate `OpenMenuRequest` is idempotent.
-- Reconnect: a reconnecting terminal is told its current mode.
-
-### Phase C — Corner-icon configuration
-
-Implement the merge of user preference and active-activity override,
-server-side, producing a single `CornerIconConfig` sent to the client.
-
-Tests (Go unit):
-
-- User pref alone: rendered as configured.
-- Activity override alone: rendered as configured.
-- Both set: activity wins for the duration of the activity; on exit,
-  the user pref is restored.
-- Absent config: bottom-right, always visible (the documented
-  defaults).
-
-### Phase D — Menu overlay and underlying-app behavior
-
-Server-side: menu construction (apps, file-bug, privacy toggle) and
-`MenuUnderlyingBehavior` dispatch per activity.
-
-Tests (Go unit + integration):
-
-- Menu contents reflect the server's app registry and include the
-  file-bug and privacy-toggle entries.
-- Diagnostics and terminal-settings apps appear as ordinary entries,
-  not as fixed chrome.
-- Underlying behavior: `LIVE`, `PAUSED`, and `MIXED` all round-trip
-  through the protocol and reach the server-side router.
-- Default when an activity does not specify: `MIXED` with
-  audio=continue, pointer=paused. One unit test pins this default so
-  it can't drift accidentally.
-- Input routing: while menu is open in the default mix, pointer events
-  from the terminal are not delivered to the underlying activity;
-  audio capture and playback still are.
-
-### Phase E — Privacy mode
-
-Implement the server-side gate: when a terminal is in privacy mode,
-mic/camera frames from it must not be delivered to any activity;
-keypress and touch must still route normally.
-
-Tests (Go unit + integration):
-
-- Toggling privacy mode updates the terminal's device capability set
-  immediately.
-- Mic/camera frames submitted while in privacy mode are dropped at the
-  server boundary (router never forwards them).
-- Keypress and touch events are still routed.
-- Wake-word detection is suspended on the client while privacy mode
-  is active — asserted by a client widget test that stubs the
-  detector.
-- Exiting privacy mode restores routing without requiring a new
-  activity.
-- No client-chrome privacy indicator is rendered — widget test asserts
-  absence.
-
-### Phase F — Wake-word reporting and response
-
-Server-side dispatch of `WakeWordEvent` based on identity-at-location
-plus server policy.
-
-Tests (Go unit + integration):
-
-- A wake-word event from a terminal with a known occupant is dispatched
-  according to the configured policy for that user.
-- An event from a terminal with no resolved occupant is handled by the
-  default policy (documented separately; tested here for the presence
-  of *some* policy, not a specific outcome).
-- The server can respond with: silent service, activity launch, or a
-  direct user-feedback UI descriptor. One integration test per
-  response kind confirms the client surface.
-- Privacy mode suppresses events at the client boundary — no
-  `WakeWordEvent` reaches the server.
-
-### Phase G — Idle screen
-
-Server emits idle descriptors; the client renders them; the corner
-icon remains reachable.
-
-Tests:
-
-- Go unit test: the idle producer emits a valid descriptor (still
-  photo, live A/V, or arbitrary UI) for a terminal with no active app.
-- Flutter widget test: given an idle descriptor, the client renders it
-  and overlays the corner icon.
-- Integration: entering idle (no app focused) causes the server to
-  push an idle descriptor; launching an app replaces it.
-
-### Phase H — Orientation and viewport reporting
-
-Client reports `ViewportReport` on connect and on every change
-(rotation, resize, zoom that changes effective dimensions); server
-reacts by sending a new descriptor when warranted.
-
-Tests:
-
-- Flutter widget test: rotating the test harness from portrait to
-  landscape emits a `ViewportReport`; resizing the window likewise.
-- Debouncing test: rapid resizes are coalesced so the server is not
-  flooded (thresholds documented in the test).
-- Go unit test: an activity that specifies layout variants returns the
-  appropriate descriptor for a reported viewport.
-
-### Phase I — End-to-end use cases
-
-Register new entries in [usecases.md](../usecases.md) and wire them
-into the validation gate via the `usecase-implement` /
-`usecase-validate` skills. Candidate IDs (exact IDs TBD at
-registration):
-
-- **UI-IDLE-1**: terminal with no app shows a server-driven idle
-  descriptor; corner icon is present.
-- **UI-MENU-1**: tapping the corner icon during a full-screen app
-  opens the menu overlay; closing it returns to the same app.
-- **UI-MENU-2**: while the menu is open in default mix, the
-  underlying app still receives audio but no pointer events.
-- **UI-PRIV-1**: enabling privacy mode stops mic/camera delivery and
-  suspends wake-word detection; keypress/touch still route.
-- **UI-WAKE-1**: a wake word detected on a terminal with a resolved
-  occupant is dispatched according to server policy and the terminal
-  shows the server-chosen feedback (if any).
-- **UI-ROT-1**: rotating the tablet client emits a viewport report
-  and, for an activity with layout variants, triggers a descriptor
-  swap.
-
-Each use case is implemented per the `usecase-implement` workflow and
-must pass `make usecase-validate` before the phase ships.
-
-### Phase J — Regression and CI wiring
-
-- All new Go tests included in `make server-test`.
-- All new Flutter tests included in `make client-test`.
-- Proto round-trip and schema-freeze tests included in
-  `make proto-lint` or a sibling target invoked from `make all-check`.
-- Use-case gate included in `make all-check` (or whatever umbrella
-  target CI runs — see [ci.md](ci.md)).
-- No phase merges without its tests attached to the same commit
-  series; tests do not lag implementation.
-
-### Deliberate non-tests
-
-These are intentionally **not** covered by automated tests in v1:
-
-- Visual appearance (colors, fonts, exact icon glyph) — the server-
-  driven UI descriptors decide this, and visual regression testing
-  is out of scope here.
-- Wake-word detection accuracy — that is a model/device concern,
-  validated separately, not in this plan's gate.
-- Network-partition recovery beyond reconnect of mode state — covered
-  by the connection-reliability plan.
+- Own the corner affordance as chrome; it is a server-composed
+  descriptor element.
+- Maintain a persistent UI-mode enum.
+- Pick idle content.
+- Interpret wake words or decide their meanings.
+- Render a persistent privacy, mic, or camera indicator.
+- Store durable user UI preferences; those live server-side.
 
 ## Open Questions / Future Work
 
-- Whether a client-enforced escape hatch (edge-swipe, long-press) is
-  needed if an activity-configured corner icon ever traps a user. Not
-  in v1 — trust the server-app contract.
-- Split-screen and handoff for multi-user use of a single display.
-- Accessibility affordances (text scaling, reduced motion, high
-  contrast) — these should flow through the server-driven UI descriptor
-  rather than as client-side toggles.
+- Per-activation wake-word vocabularies. Keep out of v1 unless a
+  concrete use case requires it.
+- A protocol-level convention for "soft corner affordance" vs "hard
+  corner affordance" — the reachability invariant as specified is
+  binary. May need nuance for e.g. kiosk demos that truly want no
+  escape.
+- Split-screen on the main layer: would require lifting `display.main`
+  to a tiled, non-exclusive resource. Deferred until a driving use
+  case exists.
+
+---
+
+# Implementation Plan
+
+Each phase's deliverable is the **automated tests** that gate it.
+Tests run under `make all-check` from Phase A onward — CI wiring is
+not deferred. Tests are written alongside or before the code, never
+after.
+
+Test layers in use:
+
+- **Protobuf contract tests** (`make proto-lint` plus Go round-trip
+  tests). This plan adds **no new proto messages** unless a phase
+  below explicitly justifies one.
+- **Go server unit tests** (`make server-test`): descriptor
+  generation, claim-manager interactions, actor resolution policy,
+  privacy-mode cutover, capability-delta handling.
+- **Go server integration tests**: in-process server + scripted client
+  stub driving `ConnectRequest` frames over the real transport,
+  asserting emitted `ConnectResponse` frames and server-side state.
+- **Flutter widget tests** (`make client-test`): renderer behavior
+  for descriptors composed from the closed primitive set, input event
+  emission, capability delta emission.
+- **Flutter integration tests**: client connected to a stub server,
+  driving end-to-end descriptor round-trips.
+- **Use-case validation gate** (`usecase-validate` skill /
+  `make usecase-validate`): end-to-end scenarios registered in
+  [usecases.md](../usecases.md).
+
+## Phase A — Scenario wrapper: `withCornerAffordance`
+
+Implement a Go scenario wrapper that injects a corner affordance into
+the root descriptor of any main-layer activation on a terminal with a
+screen. Parameterized by user pref + activity override, merged
+server-side, emitting the resulting position/visibility. No new proto
+messages.
+
+Tests (`make server-test`, wired into `make all-check` from day one):
+
+- Unit: given a base descriptor and a corner-config input, the
+  wrapper produces a descriptor whose tree contains a single
+  corner-affordance subtree at the specified corner with the
+  specified visibility, and whose other content is unchanged.
+- Unit: user pref alone → user's corner. Activity override alone →
+  activity's corner. Both → activity wins while active, user pref
+  restored on activity exit.
+- Unit: absent config → bottom-right, always visible.
+- **Reachability invariant test**: for every main-layer scenario in
+  the registry (fixture-generated descriptors), the wrapped
+  descriptor is checked for the invariant "a corner-affordance
+  subtree with a `UIAction` handler for `corner.open` exists, or a
+  documented wrapper-level opt-out is present". Failure is a build
+  failure.
+- Widget: given a wrapped descriptor, the Flutter renderer shows the
+  affordance at the configured corner and emits
+  `UIAction{component_id: "corner", action: "open"}` on activation.
+
+## Phase B — Menu overlay activation
+
+Implement a scenario whose root descriptor is the menu, and which
+requests `display.<id>.overlay` shared when started. It responds to
+`UIAction{component_id: "corner", action: "open"}` by starting; to
+any `close` action or a second `corner.open` by terminating.
+
+Tests:
+
+- Integration: `corner.open` UIAction from the client stub causes the
+  server to grant an overlay claim and emit a `SetUI` on the
+  overlay device layer.
+- Integration: the main activation's `display.main` claim is
+  unaffected; re-issuing main-layer `SetUI` is not required.
+- Unit: menu descriptor contents reflect the server's registered
+  apps and always include bug-report and privacy-toggle buttons.
+- Unit: diagnostics and terminal-settings apps appear as ordinary
+  entries when registered; nothing special-cased.
+- Integration: second `corner.open` while menu is up is idempotent
+  (no duplicate overlay activation).
+
+## Phase C — Overlay input-routing policies
+
+Implement the per-activity routing policy for what the main activation
+receives while the overlay is active: `LIVE`, `PAUSED`, `MIXED`. This
+rides on the existing router; no new wire message.
+
+Tests:
+
+- Unit (router): each policy produces the expected delivery pattern
+  for a synthetic input stream.
+- Integration: default policy (`MIXED` with audio=live,
+  pointer=routed-to-overlay) is what gets applied when an activity
+  does not specify. Pinned by an explicit test so the default can't
+  drift.
+- Integration: `LIVE` policy — underlying app receives pointer events
+  while the menu is open.
+- Integration: `PAUSED` policy — underlying app's media-plan edges on
+  the affected streams are torn down by the router, and restored on
+  menu close.
+
+## Phase D — Privacy mode via capability withdrawal
+
+Wire a server-authored `privacy.toggle` UIAction to a client-side
+handler that withdraws/re-adds mic and camera in the terminal's
+capability set.
+
+Tests:
+
+- Widget: `privacy.toggle` UIAction triggers a `CapabilityDelta` with
+  `microphone` and `camera` cleared and a monotonically-incremented
+  `generation`.
+- Widget: local capture stops **before** the delta is emitted; a
+  fixture stub for the capture APIs asserts the stop call precedes
+  the delta send.
+- Integration (race cutover — **blocker** fix): inject mic frames at
+  a fixed rate into the client stub; trigger privacy mode; assert
+  **zero** frames with a capture timestamp after the local cutover
+  reach any server-side activation. Repeat for camera.
+- Integration: any active claim on the terminal's mic/camera is
+  invalidated server-side on the delta.
+- Integration: exiting privacy mode re-emits capabilities with a
+  fresh generation; claim grants resume without requiring a fresh
+  activation start.
+- Widget: **no persistent privacy or capture indicator** in the
+  rendered tree that originates from the client. The test is keyed
+  to a client-chrome namespace, distinct from any indicator the
+  server-composed descriptor may contain, so it can tell the two
+  apart.
+
+## Phase E — Wake words
+
+Client's on-device detector is always live while mic capability is
+present. Detected wake words feed the existing voice pipeline.
+
+Tests:
+
+- Widget: detector is enabled when mic is in capability set; disabled
+  on privacy mode (no mic capability). Fixture harness replaces the
+  detector with a stub.
+- Widget (completes a coverage gap from the spec): with mic
+  capability present and privacy mode off, a simulated utterance
+  causes the voice pipeline to begin streaming `VoiceAudio` frames.
+- Integration (**server-side dedup** — addresses Codex #6.3):
+  two terminals each emit a wake-word-triggered voice stream for
+  the same utterance within a configurable window; server dispatches
+  **at most one** intent. The winner policy is a fixture parameter,
+  not hardcoded by the test.
+- Integration: server response to a detected wake word may be (a)
+  silent service, (b) activation launch, (c) an audible/visible
+  server-composed descriptor update. One test per disposition, with
+  the client assertions performed by the Flutter integration
+  harness — **not** by the Go server test (correcting the original
+  plan's test-layer mistake).
+
+## Phase F — Viewport and orientation via capability delta
+
+Use existing `CapabilitySnapshot` / `CapabilityDelta` on
+`ScreenCapability`. No new proto.
+
+Tests:
+
+- Widget: on connect, a `CapabilitySnapshot` is emitted including
+  `ScreenCapability` with current width, height, orientation,
+  density, `safe_area`.
+- Widget: rotating the test harness emits a `CapabilityDelta` with a
+  fresh generation and the new `orientation`.
+- Widget: resizing the browser window emits a `CapabilityDelta`.
+- Widget: browser zoom change that alters effective pixel dimensions
+  emits a `CapabilityDelta`.
+- Widget: rapid resizes are coalesced; emission count per unit time
+  is bounded, asserted against the documented debounce constant.
+- Integration: connect-time snapshot reaches the server and is
+  usable by scenarios to pick layout variants.
+- Integration: orientation change **while the menu overlay is open**
+  preserves the overlay activation and preserves the main
+  activation's state; both re-render per server descriptors.
+- Integration: browser tab backgrounding / foregrounding is reported
+  as a capability change (via `safe_area` or a documented marker on
+  `ScreenCapability`); this covers Codex #6.6.
+
+## Phase G — Reconnect
+
+Reconnect must restore the user-visible state, including an open
+menu overlay.
+
+Tests:
+
+- Integration: client disconnects while a main-layer app is active;
+  on resume, server replays the current main-layer `SetUI` and any
+  active media plan.
+- Integration: client disconnects **with the menu overlay open**; on
+  resume, both main-layer and overlay-layer state are replayed.
+- Unit: a mid-flight `UIAction` for `corner.open` whose response
+  arrived post-disconnect is idempotent on resume (no ghost overlay
+  activation).
+
+## Phase H — End-to-end use cases
+
+Register in [usecases.md](../usecases.md) and wire into
+`make usecase-validate` per the `usecase-implement` skill. Candidate
+IDs (exact IDs at registration time):
+
+- **UI-IDLE-1**: terminal with no user-launched app shows a
+  server-driven main-layer descriptor; the corner affordance is
+  present.
+- **UI-CORNER-1**: activating the corner affordance opens the menu
+  overlay without disturbing main-layer state.
+- **UI-CORNER-2**: menu-overlay default routing (audio stays live,
+  pointer routes to overlay) is observed in a real round-trip.
+- **UI-PRIV-1**: toggling privacy mode stops mic/camera frame
+  delivery atomically across the capability cutover (no post-cutover
+  frames reach the server), and restores both on exit.
+- **UI-PRIV-2**: wake-word detection is suspended in privacy mode;
+  keypress/touch still route.
+- **UI-WAKE-1**: a wake word heard by a single terminal triggers the
+  server-configured intent and the server-chosen feedback.
+- **UI-WAKE-2**: a wake word heard simultaneously by two terminals
+  dispatches at most one intent.
+- **UI-ROT-1**: rotating the tablet client emits a capability delta
+  and, for a scenario with layout variants, triggers a descriptor
+  swap.
+- **UI-RECON-1**: reconnect-mid-menu restores both layers.
+- **UI-INVARIANT-1**: the reachability invariant check (Phase A)
+  runs against every registered scenario as part of the gate.
+
+Each use case is implemented per `usecase-implement` and must pass
+`make usecase-validate` before the phase ships.
+
+## Phase I — Hardening
+
+Not a feature phase; a cleanup pass.
+
+- Confirm every spec claim has a corresponding test citation from
+  one of the phases above; fill any remaining gap.
+- Confirm no test asserts client-side rendering from within a Go-only
+  integration test — those assertions belong in Flutter integration
+  tests. A lint script reviews the phase's test matrix for
+  layer-correctness.
+- Confirm CI gating has been real the whole way — no test added to
+  the plan is excluded from `make all-check`.
+
+## Deliberate non-tests
+
+Out of scope for this plan's automated gate:
+
+- Visual appearance (colors, fonts, iconography). Server-driven
+  descriptors own this; visual regression testing is a separate
+  concern.
+- Wake-word detection accuracy. A model/device concern, gated
+  elsewhere.
+- Deep network-partition behavior beyond the specific reconnect
+  scenarios in Phase G. The connection-reliability plan covers the
+  rest.
+
+## What this plan is explicitly not adding to the wire
+
+To make Codex's core finding unmistakable, here is the list of
+messages that might tempt a future editor to add and the existing
+contract that subsumes each:
+
+| Tempting new message     | Use existing instead                                   |
+| ------------------------ | ------------------------------------------------------ |
+| `SetScreenMode`          | `SetUI` — modes are descriptor state, not wire state   |
+| `MenuDescriptor`         | A normal `ui.v1.Node` tree in a `SetUI`                |
+| `OpenMenuRequest`        | `io.v1.UIAction{component_id, action}`                 |
+| `CornerIconConfig` wire  | Server-side merge; emitted into the descriptor tree    |
+| `ViewportReport`         | `CapabilityDelta` on `ScreenCapability`                |
+| `SetPrivacyMode` command | `CapabilityDelta` withdrawing mic/camera endpoints     |
+| `WakeWordEvent`          | Existing `VoiceAudio` + intent pipeline                |
+
+If a future need genuinely cannot be expressed within the existing
+contracts, that is a separate plan with its own justification.
