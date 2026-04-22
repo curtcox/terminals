@@ -381,6 +381,117 @@ func TestGeneratedSessionIntercomStopEmitsStopStream(t *testing.T) {
 	}
 }
 
+func TestGeneratedSessionPrivacyToggleCapabilityLossStopsAudioAndVideoRoutes(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	router := io.NewRouter()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	if _, err := router.Claims().Request(context.Background(), []io.Claim{{
+		ActivationID: "activation-mic",
+		DeviceID:     "device-1",
+		Resource:     "mic.capture",
+		Mode:         io.ClaimExclusive,
+		Priority:     1,
+	}, {
+		ActivationID: "activation-camera",
+		DeviceID:     "device-1",
+		Resource:     "camera.capture",
+		Mode:         io.ClaimExclusive,
+		Priority:     1,
+	}}); err != nil {
+		t.Fatalf("Claims().Request() error = %v", err)
+	}
+	if err := router.Connect("device-1", "device-2", "audio"); err != nil {
+		t.Fatalf("Connect(audio) error = %v", err)
+	}
+	if err := router.Connect("device-1", "device-2", "video"); err != nil {
+		t.Fatalf("Connect(video) error = %v", err)
+	}
+
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "device-1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_CapabilitySnapshot{
+					CapabilitySnapshot: &controlv1.CapabilitySnapshot{
+						DeviceId:   "device-1",
+						Generation: 1,
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId:   "device-1",
+							Microphone: &capabilitiesv1.AudioInputCapability{},
+							Camera:     &capabilitiesv1.CameraCapability{},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_CapabilityDelta{
+					CapabilityDelta: &controlv1.CapabilityDelta{
+						DeviceId:   "device-1",
+						Generation: 2,
+						Reason:     "privacy.toggle",
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "device-1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	if len(router.Claims().Snapshot("device-1")) != 0 {
+		t.Fatalf("expected mic/camera claims to be released after privacy.toggle capability withdrawal")
+	}
+
+	stopStreamIDs := map[string]struct{}{}
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok || resp.GetStopStream() == nil {
+			continue
+		}
+		stopStreamIDs[resp.GetStopStream().GetStreamId()] = struct{}{}
+	}
+
+	expectedStopStreamIDs := map[string]struct{}{
+		"route:device-1|device-2|audio": {},
+		"route:device-1|device-2|video": {},
+	}
+	if len(stopStreamIDs) != len(expectedStopStreamIDs) {
+		t.Fatalf("stop_stream count = %d, want %d (ids=%v)", len(stopStreamIDs), len(expectedStopStreamIDs), stopStreamIDs)
+	}
+	for streamID := range expectedStopStreamIDs {
+		if _, ok := stopStreamIDs[streamID]; !ok {
+			t.Fatalf("missing stop_stream for %q (ids=%v)", streamID, stopStreamIDs)
+		}
+	}
+}
+
 func TestGeneratedSessionIntercomFanOutRelaysMediaToPeerSession(t *testing.T) {
 	globalSessionRelayRegistry = newSessionRelayRegistry()
 	t.Cleanup(func() {

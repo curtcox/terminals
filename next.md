@@ -1,1 +1,1 @@
-Extend capability-loss integration coverage to include both audio and video routes, asserting `privacy.toggle` invalidates active mic/camera claims and emits `stop_stream` for each affected route.
+Add a generated-proto integration test that exits privacy mode and verifies capabilities are re-added with a fresh generation and mic/camera claim grants resume without requiring a new activation start.

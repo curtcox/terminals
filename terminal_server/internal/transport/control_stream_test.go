@@ -304,7 +304,7 @@ func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
 			Generation: 1,
 			Capabilities: map[string]string{
 				"microphone.present": "true",
-				"speakers.present":   "true",
+				"camera.present":     "true",
 			},
 		},
 	}); err != nil {
@@ -312,9 +312,15 @@ func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
 	}
 
 	if _, err := router.Claims().Request(context.Background(), []iorouter.Claim{{
-		ActivationID: "activation-1",
+		ActivationID: "activation-mic",
 		DeviceID:     "device-1",
-		Resource:     "speaker.main",
+		Resource:     "mic.capture",
+		Mode:         iorouter.ClaimExclusive,
+		Priority:     1,
+	}, {
+		ActivationID: "activation-camera",
+		DeviceID:     "device-1",
+		Resource:     "camera.capture",
 		Mode:         iorouter.ClaimExclusive,
 		Priority:     1,
 	}}); err != nil {
@@ -323,12 +329,15 @@ func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
 	if err := router.Connect("device-1", "device-2", "audio"); err != nil {
 		t.Fatalf("Connect() error = %v", err)
 	}
+	if err := router.Connect("device-1", "device-2", "video"); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
 
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		CapabilityDelta: &CapabilityDeltaRequest{
 			DeviceID:     "device-1",
 			Generation:   2,
-			Reason:       "audio_removed",
+			Reason:       "privacy.toggle",
 			Capabilities: map[string]string{},
 		},
 	})
@@ -339,15 +348,23 @@ func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
 	if len(router.Claims().Snapshot("device-1")) != 0 {
 		t.Fatalf("expected claims to be released for lost resources")
 	}
-	hasStop := false
+	stopStreamIDs := map[string]struct{}{}
 	for _, msg := range out {
 		if msg.StopStream != nil {
-			hasStop = true
-			break
+			stopStreamIDs[msg.StopStream.StreamID] = struct{}{}
 		}
 	}
-	if !hasStop {
-		t.Fatalf("expected stop_stream response after capability loss")
+	expectedStopStreamIDs := map[string]struct{}{
+		"route:device-1|device-2|audio": {},
+		"route:device-1|device-2|video": {},
+	}
+	if len(stopStreamIDs) != len(expectedStopStreamIDs) {
+		t.Fatalf("stop_stream count = %d, want %d (ids=%v)", len(stopStreamIDs), len(expectedStopStreamIDs), stopStreamIDs)
+	}
+	for streamID := range expectedStopStreamIDs {
+		if _, ok := stopStreamIDs[streamID]; !ok {
+			t.Fatalf("missing stop_stream for %q (ids=%v)", streamID, stopStreamIDs)
+		}
 	}
 }
 
