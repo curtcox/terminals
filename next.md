@@ -1,1 +1,1 @@
-Share completed reliability-unification changes and test results with the user.
+Share completed reliability-unification changes and validated test results with the user.

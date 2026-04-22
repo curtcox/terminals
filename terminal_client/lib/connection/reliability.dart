@@ -323,12 +323,12 @@ const Map<OutboundOperation, OutboundRoutingRule> kOutboundRoutingRules =
     requiresAck: false,
   ),
   OutboundOperation.uiAction: OutboundRoutingRule(
-    mode: SendMode.fireAndForget,
+    mode: SendMode.queueUntilReady,
     safeToReplay: false,
     requiresAck: false,
   ),
   OutboundOperation.keyEvent: OutboundRoutingRule(
-    mode: SendMode.fireAndForget,
+    mode: SendMode.queueUntilReady,
     safeToReplay: false,
     requiresAck: false,
   ),

@@ -326,4 +326,17 @@ void main() {
       expect(sent, <String>['ack-timeout']);
     });
   });
+
+  group('outbound routing rules', () {
+    test('routes user input actions through queue-until-ready reliability', () {
+      expect(
+        kOutboundRoutingRules[OutboundOperation.uiAction]?.mode,
+        SendMode.queueUntilReady,
+      );
+      expect(
+        kOutboundRoutingRules[OutboundOperation.keyEvent]?.mode,
+        SendMode.queueUntilReady,
+      );
+    });
+  });
 }

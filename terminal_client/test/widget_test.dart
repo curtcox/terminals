@@ -319,6 +319,10 @@ void main() {
 
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 140));
 
     final requests = harness.lastClient.requests;
@@ -342,6 +346,10 @@ void main() {
     );
 
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 140));
 
@@ -372,6 +380,10 @@ void main() {
     );
 
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
 
@@ -404,6 +416,10 @@ void main() {
     );
 
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
     await tester.pump();
     expect(harness.createdClients.length, greaterThanOrEqualTo(1));
 
@@ -1001,6 +1017,11 @@ void main() {
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
 
     harness.lastClient.emitResponse(
       ConnectResponse()
@@ -1040,6 +1061,11 @@ void main() {
           mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()),
+    );
     await tester.pump();
 
     harness.lastClient.emitResponse(
@@ -1083,6 +1109,11 @@ void main() {
           mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()),
+    );
     await tester.pump();
 
     harness.lastClient.emitResponse(
@@ -1131,6 +1162,10 @@ void main() {
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
 
     harness.lastClient.emitResponse(
       ConnectResponse()
@@ -1176,6 +1211,10 @@ void main() {
           mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
     await tester.pump();
 
     harness.lastClient.emitResponse(
@@ -1234,6 +1273,10 @@ void main() {
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
 
     harness.lastClient.emitResponse(
       ConnectResponse()
@@ -1268,6 +1311,10 @@ void main() {
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
 
     harness.lastClient.emitResponse(
       ConnectResponse()
@@ -1296,6 +1343,10 @@ void main() {
           mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
     await tester.pump();
 
     harness.lastClient.emitResponse(
@@ -1383,6 +1434,10 @@ void main() {
     );
     await tester.tap(find.text('Connect Stream'));
     await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
 
     harness.lastClient.emitResponse(
       ConnectResponse()
@@ -1441,6 +1496,10 @@ void main() {
           mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
     await tester.pump();
 
     harness.lastClient.emitResponse(
@@ -1606,6 +1665,10 @@ void main() {
           mediaEngineFactory: harness.createMediaEngine),
     );
     await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
     await tester.pump();
 
     harness.lastClient.emitResponse(
