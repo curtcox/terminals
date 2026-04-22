@@ -392,19 +392,20 @@ type StreamHandler struct {
 	recent      []CommandEvent
 	recentLimit int
 
-	terminals            *terminal.Manager
-	replSessions         *replsession.Service
-	terminalReadDeadline time.Duration
-	terminalReadInterval time.Duration
-	terminalUIInterval   time.Duration
-	terminalReplAdminURL string
-	lastSetUIByDevice    map[string]ui.Descriptor
-	menuOverlayByDevice  map[string]menuOverlayState
-	multiWindowResume    map[string]multiWindowResumeState
-	photoFrameSlides     []string
-	photoFrameIndexByDev map[string]int
-	photoFrameLastByDev  map[string]time.Time
-	photoFrameInterval   time.Duration
+	terminals             *terminal.Manager
+	replSessions          *replsession.Service
+	terminalReadDeadline  time.Duration
+	terminalReadInterval  time.Duration
+	terminalUIInterval    time.Duration
+	terminalReplAdminURL  string
+	lastSetUIByDevice     map[string]ui.Descriptor
+	mainUIActivationByDev map[string]string
+	menuOverlayByDevice   map[string]menuOverlayState
+	multiWindowResume     map[string]multiWindowResumeState
+	photoFrameSlides      []string
+	photoFrameIndexByDev  map[string]int
+	photoFrameLastByDev   map[string]time.Time
+	photoFrameInterval    time.Duration
 
 	mediaStreams      map[string]mediaStreamState
 	sensorsByDevice   map[string]sensorSnapshot
@@ -468,29 +469,30 @@ type CommandEvent struct {
 // NewStreamHandler creates a handler for control stream messages.
 func NewStreamHandler(control *ControlService) *StreamHandler {
 	handler := &StreamHandler{
-		control:              control,
-		metrics:              &Metrics{},
-		seen:                 map[string]ServerMessage{},
-		seenLimit:            1024,
-		recent:               []CommandEvent{},
-		recentLimit:          200,
-		terminals:            terminal.NewManager(),
-		terminalReadDeadline: defaultTerminalReadDeadline,
-		terminalReadInterval: defaultTerminalReadInterval,
-		terminalUIInterval:   defaultTerminalUIInterval,
-		terminalReplAdminURL: defaultTerminalReplAdminURL,
-		lastSetUIByDevice:    map[string]ui.Descriptor{},
-		menuOverlayByDevice:  map[string]menuOverlayState{},
-		multiWindowResume:    map[string]multiWindowResumeState{},
-		photoFrameSlides:     defaultPhotoFrameSlides(),
-		photoFrameIndexByDev: map[string]int{},
-		photoFrameLastByDev:  map[string]time.Time{},
-		photoFrameInterval:   defaultPhotoFrameInterval,
-		mediaStreams:         map[string]mediaStreamState{},
-		sensorsByDevice:      map[string]sensorSnapshot{},
-		voiceAudioBuffers:    map[string][]byte{},
-		recording:            recording.NoopManager{},
-		uiOwners:             newUIActionOwnershipTracker(),
+		control:               control,
+		metrics:               &Metrics{},
+		seen:                  map[string]ServerMessage{},
+		seenLimit:             1024,
+		recent:                []CommandEvent{},
+		recentLimit:           200,
+		terminals:             terminal.NewManager(),
+		terminalReadDeadline:  defaultTerminalReadDeadline,
+		terminalReadInterval:  defaultTerminalReadInterval,
+		terminalUIInterval:    defaultTerminalUIInterval,
+		terminalReplAdminURL:  defaultTerminalReplAdminURL,
+		lastSetUIByDevice:     map[string]ui.Descriptor{},
+		mainUIActivationByDev: map[string]string{},
+		menuOverlayByDevice:   map[string]menuOverlayState{},
+		multiWindowResume:     map[string]multiWindowResumeState{},
+		photoFrameSlides:      defaultPhotoFrameSlides(),
+		photoFrameIndexByDev:  map[string]int{},
+		photoFrameLastByDev:   map[string]time.Time{},
+		photoFrameInterval:    defaultPhotoFrameInterval,
+		mediaStreams:          map[string]mediaStreamState{},
+		sensorsByDevice:       map[string]sensorSnapshot{},
+		voiceAudioBuffers:     map[string][]byte{},
+		recording:             recording.NoopManager{},
+		uiOwners:              newUIActionOwnershipTracker(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -509,30 +511,31 @@ func (h *StreamHandler) SetDeviceAudioPublisher(pub DeviceAudioPublisher) {
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
 func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
 	handler := &StreamHandler{
-		control:              control,
-		runtime:              runtime,
-		metrics:              &Metrics{},
-		seen:                 map[string]ServerMessage{},
-		seenLimit:            1024,
-		recent:               []CommandEvent{},
-		recentLimit:          200,
-		terminals:            terminal.NewManager(),
-		terminalReadDeadline: defaultTerminalReadDeadline,
-		terminalReadInterval: defaultTerminalReadInterval,
-		terminalUIInterval:   defaultTerminalUIInterval,
-		terminalReplAdminURL: defaultTerminalReplAdminURL,
-		lastSetUIByDevice:    map[string]ui.Descriptor{},
-		menuOverlayByDevice:  map[string]menuOverlayState{},
-		multiWindowResume:    map[string]multiWindowResumeState{},
-		photoFrameSlides:     defaultPhotoFrameSlides(),
-		photoFrameIndexByDev: map[string]int{},
-		photoFrameLastByDev:  map[string]time.Time{},
-		photoFrameInterval:   defaultPhotoFrameInterval,
-		mediaStreams:         map[string]mediaStreamState{},
-		sensorsByDevice:      map[string]sensorSnapshot{},
-		voiceAudioBuffers:    map[string][]byte{},
-		recording:            recording.NoopManager{},
-		uiOwners:             newUIActionOwnershipTracker(),
+		control:               control,
+		runtime:               runtime,
+		metrics:               &Metrics{},
+		seen:                  map[string]ServerMessage{},
+		seenLimit:             1024,
+		recent:                []CommandEvent{},
+		recentLimit:           200,
+		terminals:             terminal.NewManager(),
+		terminalReadDeadline:  defaultTerminalReadDeadline,
+		terminalReadInterval:  defaultTerminalReadInterval,
+		terminalUIInterval:    defaultTerminalUIInterval,
+		terminalReplAdminURL:  defaultTerminalReplAdminURL,
+		lastSetUIByDevice:     map[string]ui.Descriptor{},
+		mainUIActivationByDev: map[string]string{},
+		menuOverlayByDevice:   map[string]menuOverlayState{},
+		multiWindowResume:     map[string]multiWindowResumeState{},
+		photoFrameSlides:      defaultPhotoFrameSlides(),
+		photoFrameIndexByDev:  map[string]int{},
+		photoFrameLastByDev:   map[string]time.Time{},
+		photoFrameInterval:    defaultPhotoFrameInterval,
+		mediaStreams:          map[string]mediaStreamState{},
+		sensorsByDevice:       map[string]sensorSnapshot{},
+		voiceAudioBuffers:     map[string][]byte{},
+		recording:             recording.NoopManager{},
+		uiOwners:              newUIActionOwnershipTracker(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -3074,7 +3077,11 @@ func (h *StreamHandler) prepareOutboundUI(targetDeviceID string, msg ServerMessa
 			return ServerMessage{}, err
 		}
 		msg.SetUI = &rewritten
-		h.uiOwners.RecordSetUI(targetDeviceID, activationID, componentIDs)
+		mainActivationID := scopedActivationFromComponentIDs(componentIDs, activationID)
+		if priorActivationID := h.swapMainUIActivation(targetDeviceID, mainActivationID); priorActivationID != "" && priorActivationID != mainActivationID {
+			h.uiOwners.ForgetActivation(targetDeviceID, priorActivationID)
+		}
+		h.uiOwners.RecordSetUI(targetDeviceID, mainActivationID, componentIDs)
 	}
 	if msg.UpdateUI != nil {
 		rewritten, err := rewriteAndValidateUpdateUI(targetDeviceID, msg.UpdateUI, nil)
@@ -3109,6 +3116,28 @@ func copyStringMap(in map[string]string) map[string]string {
 		out[key] = value
 	}
 	return out
+}
+
+func scopedActivationFromComponentIDs(componentIDs []string, fallback string) string {
+	for _, componentID := range componentIDs {
+		if _, activationID, _, ok := parseScopedComponentID(componentID); ok {
+			return activationID
+		}
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func (h *StreamHandler) swapMainUIActivation(deviceID, activationID string) string {
+	deviceID = strings.TrimSpace(deviceID)
+	activationID = strings.TrimSpace(activationID)
+	if deviceID == "" || activationID == "" {
+		return ""
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	prior := strings.TrimSpace(h.mainUIActivationByDev[deviceID])
+	h.mainUIActivationByDev[deviceID] = activationID
+	return prior
 }
 
 func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
@@ -3886,6 +3915,9 @@ func (h *StreamHandler) NoteProtocolError() {
 
 // HandleDisconnect releases stream-scoped resources for a disconnected device.
 func (h *StreamHandler) HandleDisconnect(deviceID string) {
+	h.mu.Lock()
+	delete(h.mainUIActivationByDev, strings.TrimSpace(deviceID))
+	h.mu.Unlock()
 	h.uiOwners.ForgetDevice(deviceID)
 	h.terminateTerminalForDevice(deviceID)
 	h.disconnectRoutesForDevice(deviceID)

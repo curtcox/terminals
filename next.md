@@ -1,1 +1,1 @@
-Add integration coverage for action-map turnover when main-layer activation IDs change across scenario swaps.
+Pick the next unimplemented `plans/terminal-ui.md` acceptance test and start with a failing test.

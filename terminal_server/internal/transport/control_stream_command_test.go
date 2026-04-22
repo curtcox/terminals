@@ -1776,6 +1776,68 @@ func TestHandleMessageInputMenuCloseActionReleasesOverlayClaim(t *testing.T) {
 	}
 }
 
+func TestHandleInputActionMapTurnoverDropsPriorMainActivationScopedIDs(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	handler := NewStreamHandler(control)
+
+	initialUI := ui.New("stack", map[string]string{
+		"id": "act:main-a/root",
+	}, ui.New("button", map[string]string{
+		"id":     "act:main-a/__affordance.corner__",
+		"label":  "Menu",
+		"action": "corner.open",
+	}))
+	if _, err := handler.prepareOutboundUI("device-1", ServerMessage{SetUI: &initialUI}); err != nil {
+		t.Fatalf("prepareOutboundUI(initial) error = %v", err)
+	}
+
+	swappedUI := ui.New("stack", map[string]string{
+		"id": "act:main-b/root",
+	}, ui.New("button", map[string]string{
+		"id":     "act:main-b/__affordance.corner__",
+		"label":  "Menu",
+		"action": "corner.open",
+	}))
+	if _, err := handler.prepareOutboundUI("device-1", ServerMessage{SetUI: &swappedUI}); err != nil {
+		t.Fatalf("prepareOutboundUI(swapped) error = %v", err)
+	}
+
+	openNew, err := handler.handleInput(context.Background(), &InputRequest{
+		DeviceID:    "device-1",
+		ComponentID: "act:main-b/__affordance.corner__",
+		Action:      "open",
+	})
+	if err != nil {
+		t.Fatalf("handleInput(new activation) error = %v", err)
+	}
+	if len(openNew) != 1 || openNew[0].UpdateUI == nil {
+		t.Fatalf("expected overlay update for new activation component id, got %+v", openNew)
+	}
+
+	snapshot := handler.metrics.Snapshot()
+	if snapshot[`ui_action_unknown_component_total{reason="unknown_activation"}`] != "0" {
+		t.Fatalf("unknown_activation counter after new action = %q, want 0", snapshot[`ui_action_unknown_component_total{reason="unknown_activation"}`])
+	}
+
+	oldOut, err := handler.handleInput(context.Background(), &InputRequest{
+		DeviceID:    "device-1",
+		ComponentID: "act:main-a/__affordance.corner__",
+		Action:      "open",
+	})
+	if err != nil {
+		t.Fatalf("handleInput(old activation) error = %v", err)
+	}
+	if len(oldOut) != 0 {
+		t.Fatalf("old activation action should be dropped, got %+v", oldOut)
+	}
+
+	snapshot = handler.metrics.Snapshot()
+	if snapshot[`ui_action_unknown_component_total{reason="unknown_activation"}`] != "1" {
+		t.Fatalf("unknown_activation counter after stale action = %q, want 1", snapshot[`ui_action_unknown_component_total{reason="unknown_activation"}`])
+	}
+}
+
 func hasClaim(claims []io.Claim, activationID, resource string) bool {
 	for _, claim := range claims {
 		if claim.ActivationID == activationID && claim.Resource == resource {
