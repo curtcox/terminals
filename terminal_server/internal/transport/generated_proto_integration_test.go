@@ -492,6 +492,122 @@ func TestGeneratedSessionPrivacyToggleCapabilityLossStopsAudioAndVideoRoutes(t *
 	}
 }
 
+func TestGeneratedSessionPrivacyToggleExitReaddsCapabilitiesAndResumesClaims(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	router := io.NewRouter()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Telephony: telephony.NoopBridge{},
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	if _, err := router.Claims().Request(context.Background(), []io.Claim{{
+		ActivationID: "activation-mic",
+		DeviceID:     "device-1",
+		Resource:     "mic.capture",
+		Mode:         io.ClaimExclusive,
+		Priority:     1,
+	}, {
+		ActivationID: "activation-camera",
+		DeviceID:     "device-1",
+		Resource:     "camera.capture",
+		Mode:         io.ClaimExclusive,
+		Priority:     1,
+	}}); err != nil {
+		t.Fatalf("Claims().Request() error = %v", err)
+	}
+
+	stream := &fakeProtoStream{
+		ctx: context.Background(),
+		recvQueue: []ProtoClientEnvelope{
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_Register{
+					Register: &controlv1.RegisterDevice{
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "device-1",
+							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_CapabilitySnapshot{
+					CapabilitySnapshot: &controlv1.CapabilitySnapshot{
+						DeviceId:   "device-1",
+						Generation: 1,
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId:   "device-1",
+							Microphone: &capabilitiesv1.AudioInputCapability{},
+							Camera:     &capabilitiesv1.CameraCapability{},
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_CapabilityDelta{
+					CapabilityDelta: &controlv1.CapabilityDelta{
+						DeviceId:   "device-1",
+						Generation: 2,
+						Reason:     "privacy.toggle",
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId: "device-1",
+						},
+					},
+				},
+			},
+			&controlv1.ConnectRequest{
+				Payload: &controlv1.ConnectRequest_CapabilityDelta{
+					CapabilityDelta: &controlv1.CapabilityDelta{
+						DeviceId:   "device-1",
+						Generation: 3,
+						Reason:     "privacy.toggle",
+						Capabilities: &capabilitiesv1.DeviceCapabilities{
+							DeviceId:   "device-1",
+							Microphone: &capabilitiesv1.AudioInputCapability{},
+							Camera:     &capabilitiesv1.CameraCapability{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := RunProtoSession(handler, control, stream, GeneratedProtoAdapter{}); err != nil {
+		t.Fatalf("RunProtoSession() error = %v", err)
+	}
+
+	registered, ok := devices.Get("device-1")
+	if !ok {
+		t.Fatalf("device-1 should be registered")
+	}
+	if registered.Generation != 3 {
+		t.Fatalf("generation after privacy exit = %d, want 3", registered.Generation)
+	}
+
+	claims := router.Claims().Snapshot("device-1")
+	if len(claims) != 2 {
+		t.Fatalf("active claim count after privacy exit = %d, want 2", len(claims))
+	}
+	claimByResource := map[string]string{}
+	for _, claim := range claims {
+		claimByResource[claim.Resource] = claim.ActivationID
+	}
+	if claimByResource["mic.capture"] != "activation-mic" {
+		t.Fatalf("mic.capture claim owner = %q, want activation-mic", claimByResource["mic.capture"])
+	}
+	if claimByResource["camera.capture"] != "activation-camera" {
+		t.Fatalf("camera.capture claim owner = %q, want activation-camera", claimByResource["camera.capture"])
+	}
+}
+
 func TestGeneratedSessionIntercomFanOutRelaysMediaToPeerSession(t *testing.T) {
 	globalSessionRelayRegistry = newSessionRelayRegistry()
 	t.Cleanup(func() {

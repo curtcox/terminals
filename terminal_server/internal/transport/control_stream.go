@@ -429,9 +429,10 @@ type StreamHandler struct {
 	photoFrameLastByDev   map[string]time.Time
 	photoFrameInterval    time.Duration
 
-	mediaStreams      map[string]mediaStreamState
-	sensorsByDevice   map[string]sensorSnapshot
-	voiceAudioBuffers map[string][]byte
+	mediaStreams            map[string]mediaStreamState
+	sensorsByDevice         map[string]sensorSnapshot
+	voiceAudioBuffers       map[string][]byte
+	suspendedClaimsByDevice map[string][]iorouter.Claim
 
 	deviceAudio DeviceAudioPublisher
 	recording   recording.Manager
@@ -520,32 +521,33 @@ type CommandEvent struct {
 // NewStreamHandler creates a handler for control stream messages.
 func NewStreamHandler(control *ControlService) *StreamHandler {
 	handler := &StreamHandler{
-		control:               control,
-		metrics:               &Metrics{},
-		seen:                  map[string]ServerMessage{},
-		seenLimit:             1024,
-		recent:                []CommandEvent{},
-		recentLimit:           200,
-		terminals:             terminal.NewManager(),
-		terminalReadDeadline:  defaultTerminalReadDeadline,
-		terminalReadInterval:  defaultTerminalReadInterval,
-		terminalUIInterval:    defaultTerminalUIInterval,
-		terminalReplAdminURL:  defaultTerminalReplAdminURL,
-		lastSetUIByDevice:     map[string]ui.Descriptor{},
-		mainUIActivationByDev: map[string]string{},
-		menuOverlayByDevice:   map[string]menuOverlayState{},
-		multiWindowResume:     map[string]multiWindowResumeState{},
-		photoFrameSlides:      defaultPhotoFrameSlides(),
-		photoFrameIndexByDev:  map[string]int{},
-		photoFrameLastByDev:   map[string]time.Time{},
-		photoFrameInterval:    defaultPhotoFrameInterval,
-		mediaStreams:          map[string]mediaStreamState{},
-		sensorsByDevice:       map[string]sensorSnapshot{},
-		voiceAudioBuffers:     map[string][]byte{},
-		recording:             recording.NoopManager{},
-		uiOwners:              newUIActionOwnershipTracker(),
-		menuAppPolicy:         allowAllMenuAppPolicy{},
-		menuOverlayPolicy:     defaultOverlayInputPolicy(),
+		control:                 control,
+		metrics:                 &Metrics{},
+		seen:                    map[string]ServerMessage{},
+		seenLimit:               1024,
+		recent:                  []CommandEvent{},
+		recentLimit:             200,
+		terminals:               terminal.NewManager(),
+		terminalReadDeadline:    defaultTerminalReadDeadline,
+		terminalReadInterval:    defaultTerminalReadInterval,
+		terminalUIInterval:      defaultTerminalUIInterval,
+		terminalReplAdminURL:    defaultTerminalReplAdminURL,
+		lastSetUIByDevice:       map[string]ui.Descriptor{},
+		mainUIActivationByDev:   map[string]string{},
+		menuOverlayByDevice:     map[string]menuOverlayState{},
+		multiWindowResume:       map[string]multiWindowResumeState{},
+		photoFrameSlides:        defaultPhotoFrameSlides(),
+		photoFrameIndexByDev:    map[string]int{},
+		photoFrameLastByDev:     map[string]time.Time{},
+		photoFrameInterval:      defaultPhotoFrameInterval,
+		mediaStreams:            map[string]mediaStreamState{},
+		sensorsByDevice:         map[string]sensorSnapshot{},
+		voiceAudioBuffers:       map[string][]byte{},
+		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
+		recording:               recording.NoopManager{},
+		uiOwners:                newUIActionOwnershipTracker(),
+		menuAppPolicy:           allowAllMenuAppPolicy{},
+		menuOverlayPolicy:       defaultOverlayInputPolicy(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -564,33 +566,34 @@ func (h *StreamHandler) SetDeviceAudioPublisher(pub DeviceAudioPublisher) {
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
 func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
 	handler := &StreamHandler{
-		control:               control,
-		runtime:               runtime,
-		metrics:               &Metrics{},
-		seen:                  map[string]ServerMessage{},
-		seenLimit:             1024,
-		recent:                []CommandEvent{},
-		recentLimit:           200,
-		terminals:             terminal.NewManager(),
-		terminalReadDeadline:  defaultTerminalReadDeadline,
-		terminalReadInterval:  defaultTerminalReadInterval,
-		terminalUIInterval:    defaultTerminalUIInterval,
-		terminalReplAdminURL:  defaultTerminalReplAdminURL,
-		lastSetUIByDevice:     map[string]ui.Descriptor{},
-		mainUIActivationByDev: map[string]string{},
-		menuOverlayByDevice:   map[string]menuOverlayState{},
-		multiWindowResume:     map[string]multiWindowResumeState{},
-		photoFrameSlides:      defaultPhotoFrameSlides(),
-		photoFrameIndexByDev:  map[string]int{},
-		photoFrameLastByDev:   map[string]time.Time{},
-		photoFrameInterval:    defaultPhotoFrameInterval,
-		mediaStreams:          map[string]mediaStreamState{},
-		sensorsByDevice:       map[string]sensorSnapshot{},
-		voiceAudioBuffers:     map[string][]byte{},
-		recording:             recording.NoopManager{},
-		uiOwners:              newUIActionOwnershipTracker(),
-		menuAppPolicy:         allowAllMenuAppPolicy{},
-		menuOverlayPolicy:     defaultOverlayInputPolicy(),
+		control:                 control,
+		runtime:                 runtime,
+		metrics:                 &Metrics{},
+		seen:                    map[string]ServerMessage{},
+		seenLimit:               1024,
+		recent:                  []CommandEvent{},
+		recentLimit:             200,
+		terminals:               terminal.NewManager(),
+		terminalReadDeadline:    defaultTerminalReadDeadline,
+		terminalReadInterval:    defaultTerminalReadInterval,
+		terminalUIInterval:      defaultTerminalUIInterval,
+		terminalReplAdminURL:    defaultTerminalReplAdminURL,
+		lastSetUIByDevice:       map[string]ui.Descriptor{},
+		mainUIActivationByDev:   map[string]string{},
+		menuOverlayByDevice:     map[string]menuOverlayState{},
+		multiWindowResume:       map[string]multiWindowResumeState{},
+		photoFrameSlides:        defaultPhotoFrameSlides(),
+		photoFrameIndexByDev:    map[string]int{},
+		photoFrameLastByDev:     map[string]time.Time{},
+		photoFrameInterval:      defaultPhotoFrameInterval,
+		mediaStreams:            map[string]mediaStreamState{},
+		sensorsByDevice:         map[string]sensorSnapshot{},
+		voiceAudioBuffers:       map[string][]byte{},
+		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
+		recording:               recording.NoopManager{},
+		uiOwners:                newUIActionOwnershipTracker(),
+		menuAppPolicy:           allowAllMenuAppPolicy{},
+		menuOverlayPolicy:       defaultOverlayInputPolicy(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -993,8 +996,12 @@ func (h *StreamHandler) handleCapabilityChangeEffects(
 	}
 
 	lostResources := lostCapabilityResources(beforeCaps, afterCaps)
+	gainedResources := gainedCapabilityResources(beforeCaps, afterCaps)
 	emitCapabilityEvents(ctx, h.runtime, deviceID, beforeCaps, afterCaps, lostResources)
-	if len(lostResources) == 0 || h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+	if len(lostResources) == 0 && len(gainedResources) == 0 {
+		return nil
+	}
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
 		return nil
 	}
 
@@ -1009,20 +1016,31 @@ func (h *StreamHandler) handleCapabilityChangeEffects(
 
 	claims := routeIO.Claims()
 	if claims != nil {
-		activationIDs := map[string]struct{}{}
-		for _, claim := range claims.Snapshot(deviceID) {
-			if _, exists := lostResources[claim.Resource]; !exists {
-				continue
+		if len(lostResources) > 0 {
+			activationIDs := map[string]struct{}{}
+			suspendedClaims := make([]iorouter.Claim, 0)
+			for _, claim := range claims.Snapshot(deviceID) {
+				if _, exists := lostResources[claim.Resource]; !exists {
+					continue
+				}
+				activationIDs[claim.ActivationID] = struct{}{}
+				suspendedClaims = append(suspendedClaims, claim)
 			}
-			activationIDs[claim.ActivationID] = struct{}{}
+			h.rememberSuspendedClaims(deviceID, suspendedClaims)
+			for activationID := range activationIDs {
+				_ = claims.Release(ctx, activationID)
+			}
 		}
-		for activationID := range activationIDs {
-			_ = claims.Release(ctx, activationID)
+		if len(gainedResources) > 0 {
+			h.restoreSuspendedClaims(ctx, claims, deviceID, gainedResources)
 		}
 	}
 
 	routes := routeIO.RoutesForDevice(deviceID)
 	out := make([]ServerMessage, 0, len(routes))
+	if len(lostResources) == 0 {
+		return out
+	}
 	for _, route := range routes {
 		if !shouldDisconnectRouteForLostResources(route, deviceID, lostResources) {
 			continue
@@ -1037,6 +1055,88 @@ func (h *StreamHandler) handleCapabilityChangeEffects(
 	return out
 }
 
+func (h *StreamHandler) rememberSuspendedClaims(deviceID string, claims []iorouter.Claim) {
+	if len(claims) == 0 {
+		return
+	}
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	existing := h.suspendedClaimsByDevice[deviceID]
+	if len(existing) == 0 {
+		h.suspendedClaimsByDevice[deviceID] = append([]iorouter.Claim(nil), claims...)
+		return
+	}
+	seen := map[string]struct{}{}
+	for _, claim := range existing {
+		seen[suspendedClaimKey(claim)] = struct{}{}
+	}
+	for _, claim := range claims {
+		key := suspendedClaimKey(claim)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		existing = append(existing, claim)
+		seen[key] = struct{}{}
+	}
+	h.suspendedClaimsByDevice[deviceID] = existing
+}
+
+func (h *StreamHandler) restoreSuspendedClaims(ctx context.Context, claims *iorouter.ClaimManager, deviceID string, gainedResources map[string]struct{}) {
+	if claims == nil {
+		return
+	}
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return
+	}
+
+	h.mu.Lock()
+	pending := append([]iorouter.Claim(nil), h.suspendedClaimsByDevice[deviceID]...)
+	h.mu.Unlock()
+	if len(pending) == 0 {
+		return
+	}
+
+	activeByKey := map[string]struct{}{}
+	for _, claim := range claims.Snapshot(deviceID) {
+		activeByKey[suspendedClaimKey(claim)] = struct{}{}
+	}
+
+	remaining := make([]iorouter.Claim, 0, len(pending))
+	for _, suspended := range pending {
+		if _, gained := gainedResources[suspended.Resource]; !gained {
+			remaining = append(remaining, suspended)
+			continue
+		}
+		key := suspendedClaimKey(suspended)
+		if _, alreadyActive := activeByKey[key]; alreadyActive {
+			continue
+		}
+		if _, err := claims.Request(ctx, []iorouter.Claim{suspended}); err != nil {
+			remaining = append(remaining, suspended)
+			continue
+		}
+	}
+
+	h.mu.Lock()
+	if len(remaining) == 0 {
+		delete(h.suspendedClaimsByDevice, deviceID)
+	} else {
+		h.suspendedClaimsByDevice[deviceID] = remaining
+	}
+	h.mu.Unlock()
+}
+
+func suspendedClaimKey(claim iorouter.Claim) string {
+	return strings.TrimSpace(claim.DeviceID) + "/" + strings.TrimSpace(claim.Resource) + "/" + strings.TrimSpace(claim.ActivationID)
+}
+
 func lostCapabilityResources(beforeCaps, afterCaps map[string]string) map[string]struct{} {
 	before := capabilityResources(beforeCaps)
 	after := capabilityResources(afterCaps)
@@ -1048,6 +1148,19 @@ func lostCapabilityResources(beforeCaps, afterCaps map[string]string) map[string
 		lost[resource] = struct{}{}
 	}
 	return lost
+}
+
+func gainedCapabilityResources(beforeCaps, afterCaps map[string]string) map[string]struct{} {
+	before := capabilityResources(beforeCaps)
+	after := capabilityResources(afterCaps)
+	gained := map[string]struct{}{}
+	for resource := range after {
+		if _, exists := before[resource]; exists {
+			continue
+		}
+		gained[resource] = struct{}{}
+	}
+	return gained
 }
 
 func capabilityResources(caps map[string]string) map[string]struct{} {
