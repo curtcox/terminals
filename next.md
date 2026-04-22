@@ -1,1 +1,1 @@
-Add Flutter integration coverage for wake-word response dispositions: one test each for silent service, activation launch, and audible/visible server-composed descriptor update.
+Add Flutter widget coverage that on connect emits CapabilitySnapshot with ScreenCapability width, height, orientation, density, and safe_area.

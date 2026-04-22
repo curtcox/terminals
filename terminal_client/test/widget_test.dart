@@ -16,6 +16,7 @@ import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/main.dart';
+import 'package:terminal_client/media/playback.dart';
 import 'package:terminal_client/media/webrtc_engine.dart';
 
 Finder _findClientChromePrivacyOrCaptureIndicators() {
@@ -817,6 +818,185 @@ void main() {
       expect(voiceAudioRequests, isEmpty);
     },
   );
+
+  testWidgets('wake-word response disposition: silent service', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    final detector = _FakeWakeWordDetectorController();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        wakeWordDetectorFactory: () => detector,
+        capabilityProbeFactory: () => _StaticCapabilityProbe(
+          capv1.DeviceCapabilities()
+            ..microphone = (capv1.AudioInputCapability()
+              ..channels = 1
+              ..endpoints.add(capv1.AudioEndpoint()..endpointId = 'mic-main')),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pumpAndSettle();
+
+    detector.simulateUtterance(
+      audio: <int>[11, 12, 13, 14],
+      sampleRate: 16000,
+      isFinal: true,
+    );
+    await tester.pumpAndSettle();
+
+    final voiceAudioRequests = harness.lastClient.requests
+        .where((request) => request.hasVoiceAudio())
+        .toList(growable: false);
+    expect(voiceAudioRequests, hasLength(1));
+    expect(find.text('Notification: '), findsOneWidget);
+    expect(find.text('wake service launched'), findsNothing);
+    expect(find.text('Wake acknowledged'), findsNothing);
+  });
+
+  testWidgets('wake-word response disposition: activation launch', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    final detector = _FakeWakeWordDetectorController();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        wakeWordDetectorFactory: () => detector,
+        capabilityProbeFactory: () => _StaticCapabilityProbe(
+          capv1.DeviceCapabilities()
+            ..microphone = (capv1.AudioInputCapability()
+              ..channels = 1
+              ..endpoints.add(capv1.AudioEndpoint()..endpointId = 'mic-main')),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pumpAndSettle();
+
+    detector.simulateUtterance(
+      audio: <int>[21, 22, 23, 24],
+      sampleRate: 16000,
+      isFinal: true,
+    );
+    await tester.pumpAndSettle();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'terminal_root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'act:wake_service/output'
+                ..text = (uiv1.TextWidget()..value = 'wake service launched'),
+            ))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('wake service launched'), findsOneWidget);
+    expect(find.text('Wake acknowledged'), findsNothing);
+  });
+
+  testWidgets('wake-word response disposition: audible visible descriptor update', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    final detector = _FakeWakeWordDetectorController();
+    final audioPlayback = _FakeAudioPlayback();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        wakeWordDetectorFactory: () => detector,
+        audioPlaybackFactory: () => audioPlayback,
+        capabilityProbeFactory: () => _StaticCapabilityProbe(
+          capv1.DeviceCapabilities()
+            ..microphone = (capv1.AudioInputCapability()
+              ..channels = 1
+              ..endpoints.add(capv1.AudioEndpoint()..endpointId = 'mic-main')),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pumpAndSettle();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'terminal_root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'act:wake_feedback/banner'
+                ..text = (uiv1.TextWidget()..value = 'Waiting for wake response'),
+            ))),
+    );
+    await tester.pumpAndSettle();
+
+    detector.simulateUtterance(
+      audio: <int>[31, 32, 33, 34],
+      sampleRate: 16000,
+      isFinal: true,
+    );
+    await tester.pumpAndSettle();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..playAudio = (iov1.PlayAudio()
+          ..requestId = 'wake-audio-1'
+          ..streamId = 'wake-stream'
+          ..pcmData = <int>[1, 2, 3, 4]),
+    );
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'act:wake_feedback/banner'
+          ..node = (uiv1.Node()
+            ..id = 'act:wake_feedback/banner'
+            ..text = (uiv1.TextWidget()..value = 'Wake acknowledged'))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(audioPlayback.playedRequests, hasLength(1));
+    expect(audioPlayback.playedRequests.single.requestId, 'wake-audio-1');
+    expect(find.text('Wake acknowledged'), findsOneWidget);
+  });
 
   testWidgets('connection attempt immediately falls back to next carrier', (
     WidgetTester tester,
@@ -2942,6 +3122,18 @@ class _FakeWakeWordDetectorController implements WakeWordDetectorController {
         isFinal: isFinal,
       ),
     );
+  }
+
+  @override
+  Future<void> dispose() async {}
+}
+
+class _FakeAudioPlayback implements AudioPlayback {
+  final List<iov1.PlayAudio> playedRequests = <iov1.PlayAudio>[];
+
+  @override
+  Future<void> play(iov1.PlayAudio playAudio) async {
+    playedRequests.add(playAudio.deepCopy());
   }
 
   @override
