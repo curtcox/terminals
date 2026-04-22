@@ -69,6 +69,9 @@ func TestSessionRunRegisterAndDisconnect(t *testing.T) {
 	if !sessionUIDescriptorHasBugButton(*stream.sent[1].SetUI) {
 		t.Fatalf("register SetUI should include bug-report affordance")
 	}
+	if !sessionUIDescriptorHasCornerButton(*stream.sent[1].SetUI, "device-1") {
+		t.Fatalf("register SetUI should include corner affordance")
+	}
 
 	got, ok := manager.Get("device-1")
 	if !ok {
@@ -158,6 +161,24 @@ func sessionUIDescriptorHasBugButton(root ui.Descriptor) bool {
 	}
 	for _, child := range root.Children {
 		if sessionUIDescriptorHasBugButton(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func sessionUIDescriptorHasCornerButton(root ui.Descriptor, ownerID string) bool {
+	nodeID := root.ID
+	if nodeID == "" {
+		nodeID = root.Props["id"]
+	}
+	if nodeID == "act:"+ownerID+"/__affordance.corner__" &&
+		root.Type == "button" &&
+		root.Props["action"] == "corner.open" {
+		return true
+	}
+	for _, child := range root.Children {
+		if sessionUIDescriptorHasCornerButton(child, ownerID) {
 			return true
 		}
 	}

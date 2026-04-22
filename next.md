@@ -1,1 +1,1 @@
-Share completed reliability-unification validation status and test evidence with the user.
+Implement menu overlay activation and route scoped corner.open UIAction to it (red-green-refactor).

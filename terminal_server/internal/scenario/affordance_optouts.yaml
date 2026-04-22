@@ -1,0 +1,12 @@
+# Reviewed temporary exceptions for withCornerAffordance enforcement.
+# Required fields per entry:
+# - scenario_id
+# - reason
+# - approver
+# - expires_at (YYYY-MM-DD)
+#
+# Example:
+# - scenario_id: kiosk_demo
+#   reason: "Temporary locked kiosk flow for trade show."
+#   approver: "@scenario-maintainers"
+#   expires_at: 2026-06-01

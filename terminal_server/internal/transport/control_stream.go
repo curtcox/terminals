@@ -443,6 +443,8 @@ const (
 	defaultPhotoFrameInterval   = 12 * time.Second
 	bugReportButtonID           = "global_bug_report_button"
 	bugReportActionPrefix       = "bug_report"
+	defaultCornerPlacement      = "bottom-right"
+	cornerAffordanceLogicalID   = "__affordance.corner__"
 )
 
 // CommandEvent is a bounded audit record of command handling.
@@ -1081,6 +1083,7 @@ func (h *StreamHandler) decorateBugReportAffordance(deviceID string, msg ServerM
 		return msg
 	}
 	decorated := withBugReportAffordance(*msg.SetUI, strings.TrimSpace(deviceID))
+	decorated = withCornerAffordance(decorated, strings.TrimSpace(deviceID))
 	msg.SetUI = &decorated
 	return msg
 }
@@ -1120,6 +1123,52 @@ func hasBugReportAffordance(node ui.Descriptor) bool {
 	}
 	for _, child := range node.Children {
 		if hasBugReportAffordance(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func withCornerAffordance(root ui.Descriptor, ownerID string) ui.Descriptor {
+	cornerID := scopedAffordanceID(ownerID, cornerAffordanceLogicalID)
+	if hasNodeID(root, cornerID) {
+		return root
+	}
+	button := ui.New("button", map[string]string{
+		"id":         cornerID,
+		"label":      "Menu",
+		"action":     "corner.open",
+		"corner":     defaultCornerPlacement,
+		"visible":    "true",
+		"min_hit_dp": "44",
+	})
+	if root.Type == "stack" {
+		root.Children = append(root.Children, button)
+		return root
+	}
+	return ui.New("stack", map[string]string{
+		"id": "corner_affordance_root",
+	}, root, button)
+}
+
+func scopedAffordanceID(ownerID, logicalID string) string {
+	ownerID = strings.TrimSpace(ownerID)
+	if ownerID == "" {
+		ownerID = "main"
+	}
+	return "act:" + ownerID + "/" + strings.TrimSpace(logicalID)
+}
+
+func hasNodeID(node ui.Descriptor, id string) bool {
+	nodeID := strings.TrimSpace(node.ID)
+	if nodeID == "" {
+		nodeID = strings.TrimSpace(node.Props["id"])
+	}
+	if nodeID == id {
+		return true
+	}
+	for _, child := range node.Children {
+		if hasNodeID(child, id) {
 			return true
 		}
 	}
