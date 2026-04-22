@@ -434,11 +434,12 @@ type StreamHandler struct {
 	voiceAudioBuffers       map[string][]byte
 	suspendedClaimsByDevice map[string][]iorouter.Claim
 
-	deviceAudio DeviceAudioPublisher
-	recording   recording.Manager
-	webrtc      WebRTCSignalEngine
-	bugReports  BugReportIntake
-	uiOwners    *uiActionOwnershipTracker
+	deviceAudio    DeviceAudioPublisher
+	recording      recording.Manager
+	webrtc         WebRTCSignalEngine
+	bugReports     BugReportIntake
+	uiOwners       *uiActionOwnershipTracker
+	wakeWordDedupe *wakeWordDedupeStage
 
 	identityService   IdentityService
 	menuAppPolicy     MenuAppPolicy
@@ -546,6 +547,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
 		recording:               recording.NoopManager{},
 		uiOwners:                newUIActionOwnershipTracker(),
+		wakeWordDedupe:          newWakeWordDedupeStage(0, ""),
 		menuAppPolicy:           allowAllMenuAppPolicy{},
 		menuOverlayPolicy:       defaultOverlayInputPolicy(),
 	}
@@ -592,6 +594,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
 		recording:               recording.NoopManager{},
 		uiOwners:                newUIActionOwnershipTracker(),
+		wakeWordDedupe:          newWakeWordDedupeStage(0, ""),
 		menuAppPolicy:           allowAllMenuAppPolicy{},
 		menuOverlayPolicy:       defaultOverlayInputPolicy(),
 	}
@@ -3758,11 +3761,14 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 		return nil, err
 	}
 	var spoken string
+	var spokenConfidence float64
 	for tr := range transcripts {
 		if tr.IsFinal && tr.Text != "" {
 			spoken = tr.Text
+			spokenConfidence = tr.Confidence
 		} else if spoken == "" && tr.Text != "" {
 			spoken = tr.Text
+			spokenConfidence = tr.Confidence
 		}
 	}
 	spoken = strings.TrimSpace(spoken)
@@ -3779,6 +3785,20 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 		}
 		if normalized := strings.TrimSpace(detection.Command); normalized != "" {
 			spoken = normalized
+		}
+	}
+	if h.wakeWordDedupe != nil {
+		heardAt := time.Now().UTC()
+		if h.control != nil {
+			heardAt = h.control.now().UTC()
+		}
+		if !h.wakeWordDedupe.Allow(wakeWordCandidate{
+			DeviceID:   deviceID,
+			Spoken:     spoken,
+			HeardAt:    heardAt,
+			Confidence: spokenConfidence,
+		}) {
+			return nil, nil
 		}
 	}
 
