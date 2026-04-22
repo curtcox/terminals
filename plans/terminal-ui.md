@@ -215,6 +215,227 @@ The client does none of the following:
 - Decide app layout beyond the server's descriptor
 - Enforce a client-side escape hatch out of a full-screen app
 
+## Implementation Plan
+
+The plan is organized as phases. Each phase lists what ships and, as the
+primary deliverable, the **automated tests** that gate it. No phase is
+"done" until its tests are green under `make all-check`. Tests are
+written alongside (or before) the code, not after.
+
+Test layers in use:
+
+- **Protobuf contract tests** (`make proto-lint`, plus Go-side
+  round-trip tests): the canonical IO shape is defined before any
+  server or client code in a phase.
+- **Go server unit tests** (`make server-test`): state machines,
+  descriptor generation, config merging, privacy gating, wake-word
+  dispatch — all exercised without a client.
+- **Go server integration tests**: in-process server + scripted client
+  stub driving protobuf frames over the real transport, asserting
+  emitted descriptors and side effects.
+- **Flutter widget tests** (`make client-test`): each screen mode, the
+  corner icon, menu overlay, orientation changes, privacy-mode input
+  gating — driven by synthetic descriptors.
+- **Flutter integration tests**: client connected to a stub server,
+  exercising full descriptor round-trips and input routing.
+- **Use-case validation gate** (`usecase-validate` / `make
+  usecase-validate`): end-to-end scenarios registered in
+  [usecases.md](../usecases.md) that assert observable behavior across
+  client and server.
+
+### Phase A — Protocol additions
+
+Extend `api/proto/` with the messages needed by this plan. Nothing else
+in this plan proceeds until Phase A is green.
+
+Messages / fields (names illustrative):
+
+- `ScreenMode` enum: `IDLE`, `APP_FULLSCREEN`, `MENU_OVERLAY`
+- `SetScreenMode` server→client
+- `CornerIconConfig` (corner, visibility rule) — server→client, merged
+  from user pref + activity override server-side
+- `OpenMenuRequest` client→server (user tapped icon)
+- `MenuDescriptor` server→client (apps list, file-bug entry, privacy
+  toggle)
+- `MenuUnderlyingBehavior` per-activity: `LIVE | PAUSED | MIXED` with
+  per-stream overrides (audio/video/pointer)
+- `PrivacyModeState` + toggle request
+- `WakeWordEvent` client→server (wake-word id, optional audio blob
+  reference)
+- `ViewportReport` client→server (width, height, orientation, density)
+
+Tests:
+
+- `make proto-lint` passes.
+- Go round-trip test per new message: marshal → unmarshal → equal.
+- Schema-freeze test: golden files of the descriptor shapes so future
+  refactors don't silently change the wire format.
+
+### Phase B — Server screen-mode state machine
+
+Implement per-terminal mode state in `terminal_server/internal/terminal`
+(or `internal/ui`), driven by server decisions and client events.
+
+Tests (Go unit, `make server-test`):
+
+- Transitions: `IDLE → APP_FULLSCREEN → MENU_OVERLAY → APP_FULLSCREEN`,
+  and closing menu returns to the prior mode (not always `IDLE`).
+- Opening the menu from `IDLE` returns to `IDLE` on close.
+- Launching an app from the menu transitions to `APP_FULLSCREEN` with
+  the new app, closing the menu.
+- Re-entry safety: duplicate `OpenMenuRequest` is idempotent.
+- Reconnect: a reconnecting terminal is told its current mode.
+
+### Phase C — Corner-icon configuration
+
+Implement the merge of user preference and active-activity override,
+server-side, producing a single `CornerIconConfig` sent to the client.
+
+Tests (Go unit):
+
+- User pref alone: rendered as configured.
+- Activity override alone: rendered as configured.
+- Both set: activity wins for the duration of the activity; on exit,
+  the user pref is restored.
+- Absent config: bottom-right, always visible (the documented
+  defaults).
+
+### Phase D — Menu overlay and underlying-app behavior
+
+Server-side: menu construction (apps, file-bug, privacy toggle) and
+`MenuUnderlyingBehavior` dispatch per activity.
+
+Tests (Go unit + integration):
+
+- Menu contents reflect the server's app registry and include the
+  file-bug and privacy-toggle entries.
+- Diagnostics and terminal-settings apps appear as ordinary entries,
+  not as fixed chrome.
+- Underlying behavior: `LIVE`, `PAUSED`, and `MIXED` all round-trip
+  through the protocol and reach the server-side router.
+- Default when an activity does not specify: `MIXED` with
+  audio=continue, pointer=paused. One unit test pins this default so
+  it can't drift accidentally.
+- Input routing: while menu is open in the default mix, pointer events
+  from the terminal are not delivered to the underlying activity;
+  audio capture and playback still are.
+
+### Phase E — Privacy mode
+
+Implement the server-side gate: when a terminal is in privacy mode,
+mic/camera frames from it must not be delivered to any activity;
+keypress and touch must still route normally.
+
+Tests (Go unit + integration):
+
+- Toggling privacy mode updates the terminal's device capability set
+  immediately.
+- Mic/camera frames submitted while in privacy mode are dropped at the
+  server boundary (router never forwards them).
+- Keypress and touch events are still routed.
+- Wake-word detection is suspended on the client while privacy mode
+  is active — asserted by a client widget test that stubs the
+  detector.
+- Exiting privacy mode restores routing without requiring a new
+  activity.
+- No client-chrome privacy indicator is rendered — widget test asserts
+  absence.
+
+### Phase F — Wake-word reporting and response
+
+Server-side dispatch of `WakeWordEvent` based on identity-at-location
+plus server policy.
+
+Tests (Go unit + integration):
+
+- A wake-word event from a terminal with a known occupant is dispatched
+  according to the configured policy for that user.
+- An event from a terminal with no resolved occupant is handled by the
+  default policy (documented separately; tested here for the presence
+  of *some* policy, not a specific outcome).
+- The server can respond with: silent service, activity launch, or a
+  direct user-feedback UI descriptor. One integration test per
+  response kind confirms the client surface.
+- Privacy mode suppresses events at the client boundary — no
+  `WakeWordEvent` reaches the server.
+
+### Phase G — Idle screen
+
+Server emits idle descriptors; the client renders them; the corner
+icon remains reachable.
+
+Tests:
+
+- Go unit test: the idle producer emits a valid descriptor (still
+  photo, live A/V, or arbitrary UI) for a terminal with no active app.
+- Flutter widget test: given an idle descriptor, the client renders it
+  and overlays the corner icon.
+- Integration: entering idle (no app focused) causes the server to
+  push an idle descriptor; launching an app replaces it.
+
+### Phase H — Orientation and viewport reporting
+
+Client reports `ViewportReport` on connect and on every change
+(rotation, resize, zoom that changes effective dimensions); server
+reacts by sending a new descriptor when warranted.
+
+Tests:
+
+- Flutter widget test: rotating the test harness from portrait to
+  landscape emits a `ViewportReport`; resizing the window likewise.
+- Debouncing test: rapid resizes are coalesced so the server is not
+  flooded (thresholds documented in the test).
+- Go unit test: an activity that specifies layout variants returns the
+  appropriate descriptor for a reported viewport.
+
+### Phase I — End-to-end use cases
+
+Register new entries in [usecases.md](../usecases.md) and wire them
+into the validation gate via the `usecase-implement` /
+`usecase-validate` skills. Candidate IDs (exact IDs TBD at
+registration):
+
+- **UI-IDLE-1**: terminal with no app shows a server-driven idle
+  descriptor; corner icon is present.
+- **UI-MENU-1**: tapping the corner icon during a full-screen app
+  opens the menu overlay; closing it returns to the same app.
+- **UI-MENU-2**: while the menu is open in default mix, the
+  underlying app still receives audio but no pointer events.
+- **UI-PRIV-1**: enabling privacy mode stops mic/camera delivery and
+  suspends wake-word detection; keypress/touch still route.
+- **UI-WAKE-1**: a wake word detected on a terminal with a resolved
+  occupant is dispatched according to server policy and the terminal
+  shows the server-chosen feedback (if any).
+- **UI-ROT-1**: rotating the tablet client emits a viewport report
+  and, for an activity with layout variants, triggers a descriptor
+  swap.
+
+Each use case is implemented per the `usecase-implement` workflow and
+must pass `make usecase-validate` before the phase ships.
+
+### Phase J — Regression and CI wiring
+
+- All new Go tests included in `make server-test`.
+- All new Flutter tests included in `make client-test`.
+- Proto round-trip and schema-freeze tests included in
+  `make proto-lint` or a sibling target invoked from `make all-check`.
+- Use-case gate included in `make all-check` (or whatever umbrella
+  target CI runs — see [ci.md](ci.md)).
+- No phase merges without its tests attached to the same commit
+  series; tests do not lag implementation.
+
+### Deliberate non-tests
+
+These are intentionally **not** covered by automated tests in v1:
+
+- Visual appearance (colors, fonts, exact icon glyph) — the server-
+  driven UI descriptors decide this, and visual regression testing
+  is out of scope here.
+- Wake-word detection accuracy — that is a model/device concern,
+  validated separately, not in this plan's gate.
+- Network-partition recovery beyond reconnect of mode state — covered
+  by the connection-reliability plan.
+
 ## Open Questions / Future Work
 
 - Whether a client-enforced escape hatch (edge-swipe, long-press) is
