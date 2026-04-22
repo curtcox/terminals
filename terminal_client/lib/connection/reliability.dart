@@ -70,6 +70,95 @@ class RetryPolicy {
   }
 }
 
+class RetryController {
+  RetryController({
+    required this.policy,
+    DateTime Function()? nowUtc,
+  }) : _nowUtc = nowUtc ?? (() => DateTime.now().toUtc());
+
+  final RetryPolicy policy;
+  final DateTime Function() _nowUtc;
+
+  Timer? _timer;
+  DateTime? _startedAt;
+  int _attempts = 0;
+  bool _running = false;
+
+  bool get isRunning => _running;
+
+  int get attempts => _attempts;
+
+  void start({
+    required bool Function() shouldContinue,
+    required void Function(int attempt) onRetry,
+    void Function(int attempts, Duration elapsed)? onTimeout,
+  }) {
+    stop();
+    _running = true;
+    _attempts = 0;
+    _startedAt = _nowUtc();
+
+    void scheduleNext() {
+      if (!_running) {
+        return;
+      }
+      if (!shouldContinue()) {
+        stop();
+        return;
+      }
+
+      final startedAt = _startedAt;
+      if (startedAt == null) {
+        stop();
+        return;
+      }
+
+      final elapsed = _nowUtc().difference(startedAt);
+      if (policy.hasTimedOut(elapsed)) {
+        _running = false;
+        _timer = null;
+        onTimeout?.call(_attempts, elapsed);
+        return;
+      }
+
+      _timer = Timer(policy.delayForAttempt(_attempts + 1), () {
+        if (!_running) {
+          return;
+        }
+        if (!shouldContinue()) {
+          stop();
+          return;
+        }
+
+        final startedAt = _startedAt;
+        if (startedAt == null) {
+          stop();
+          return;
+        }
+        final elapsed = _nowUtc().difference(startedAt);
+        if (policy.hasTimedOut(elapsed)) {
+          _running = false;
+          _timer = null;
+          onTimeout?.call(_attempts, elapsed);
+          return;
+        }
+
+        _attempts += 1;
+        onRetry(_attempts);
+        scheduleNext();
+      });
+    }
+
+    scheduleNext();
+  }
+
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
+    _running = false;
+  }
+}
+
 enum ReadinessResult {
   ready,
   timeout,

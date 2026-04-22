@@ -110,6 +110,58 @@ void main() {
       expect(policy.hasTimedOut(const Duration(milliseconds: 79)), isFalse);
       expect(policy.hasTimedOut(const Duration(milliseconds: 80)), isTrue);
     });
+
+    test('retry controller executes retries until stop condition', () async {
+      final attempts = <int>[];
+      final reachedThree = Completer<void>();
+      final controller = RetryController(
+        policy: const RetryPolicy(
+          interval: Duration(milliseconds: 10),
+          maxDuration: Duration(milliseconds: 200),
+        ),
+      );
+      controller.start(
+        shouldContinue: () => attempts.length < 3,
+        onRetry: (attempt) {
+          attempts.add(attempt);
+          if (attempt == 3 && !reachedThree.isCompleted) {
+            reachedThree.complete();
+          }
+        },
+      );
+
+      await reachedThree.future.timeout(const Duration(milliseconds: 200));
+      controller.stop();
+
+      expect(attempts, <int>[1, 2, 3]);
+    });
+
+    test('retry controller reports timeout', () async {
+      final timeoutResult = Completer<(int, Duration)>();
+      final controller = RetryController(
+        policy: const RetryPolicy(
+          interval: Duration(milliseconds: 10),
+          maxDuration: Duration(milliseconds: 35),
+        ),
+      );
+      controller.start(
+        shouldContinue: () => true,
+        onRetry: (_) {},
+        onTimeout: (attempts, elapsed) {
+          if (!timeoutResult.isCompleted) {
+            timeoutResult.complete((attempts, elapsed));
+          }
+        },
+      );
+
+      final result = await timeoutResult.future.timeout(
+        const Duration(milliseconds: 250),
+      );
+      controller.stop();
+
+      expect(result.$1, greaterThanOrEqualTo(1));
+      expect(result.$2, greaterThanOrEqualTo(const Duration(milliseconds: 35)));
+    });
   });
 
   group('readiness gateway', () {

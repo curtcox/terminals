@@ -1054,9 +1054,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   final List<_QueuedBugReport> _queuedBugReports = <_QueuedBugReport>[];
   final List<_PendingBugReport> _pendingBugReports = <_PendingBugReport>[];
   Timer? _bugReportAckTimer;
-  Timer? _registerAckRetryTimer;
-  int _registerAckRetryAttempts = 0;
-  int _registerAckRetryStartedUnixMs = 0;
   bool _hasRegisterAck = false;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
   bool _appIsForeground = true;
@@ -1068,6 +1065,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   String _lastCapabilitySignature = '';
   late final ConnectionReadinessGateway _readinessGateway;
   late final ReliableSendDispatcher<ConnectRequest> _reliableSender;
+  late final RetryController _registerAckRetryController;
 
   int _nowUnixMs() => widget.nowUnixMsProvider();
 
@@ -1656,6 +1654,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       sendNow: (request) => _outgoing.add(request),
       gateway: _readinessGateway,
     );
+    _registerAckRetryController = RetryController(
+      policy: _registerAckRetryPolicy,
+      nowUtc: () => DateTime.fromMillisecondsSinceEpoch(
+        _nowUnixMs(),
+        isUtc: true,
+      ),
+    );
     _recordClientLog('info', 'client started');
     if (_e2eEmitEvents) {
       debugPrint('E2E_EVENT: client_started');
@@ -2046,7 +2051,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           ),
         ),
       );
-      _registerAckRetryAttempts = 0;
       _scheduleRegisterAckRetry();
       _recordClientLog('info', 'control stream connected');
       _sendSensorTelemetry();
@@ -2236,57 +2240,42 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   void _cancelRegisterAckRetry() {
-    _registerAckRetryTimer?.cancel();
-    _registerAckRetryTimer = null;
-    _registerAckRetryAttempts = 0;
-    _registerAckRetryStartedUnixMs = 0;
+    _registerAckRetryController.stop();
   }
 
   void _scheduleRegisterAckRetry() {
-    _registerAckRetryTimer?.cancel();
-    if (_hasRegisterAck ||
-        !_hasActiveControlSession ||
-        _lastRegisteredCapabilities == null) {
-      return;
-    }
-    if (_registerAckRetryStartedUnixMs <= 0) {
-      _registerAckRetryStartedUnixMs = _nowUnixMs();
-    }
-    final elapsedMs = _nowUnixMs() - _registerAckRetryStartedUnixMs;
-    if (_registerAckRetryPolicy
-        .hasTimedOut(Duration(milliseconds: elapsedMs))) {
-      _recordClientLog(
-        'warn',
-        'register acknowledgement still pending after '
-            '${_registerAckRetryPolicy.maxDuration.inSeconds}s and $_registerAckRetryAttempts retry attempts',
-      );
-      return;
-    }
-    _registerAckRetryTimer = Timer(
-        _registerAckRetryPolicy.delayForAttempt(_registerAckRetryAttempts + 1),
-        () {
-      if (_hasRegisterAck ||
-          !_hasActiveControlSession ||
-          _lastRegisteredCapabilities == null) {
-        _cancelRegisterAckRetry();
-        return;
-      }
-      _registerAckRetryAttempts += 1;
-      unawaited(
-        _sendWhenReady(
-          operation: OutboundOperation.bootstrapRegister,
-          request: TerminalControlGrpcClient.registerRequest(
-            capabilities: _lastRegisteredCapabilities!,
+    _registerAckRetryController.start(
+      shouldContinue: () =>
+          !_hasRegisterAck &&
+          _hasActiveControlSession &&
+          _lastRegisteredCapabilities != null,
+      onRetry: (attempt) {
+        final capabilities = _lastRegisteredCapabilities;
+        if (capabilities == null) {
+          return;
+        }
+        unawaited(
+          _sendWhenReady(
+            operation: OutboundOperation.bootstrapRegister,
+            request: TerminalControlGrpcClient.registerRequest(
+              capabilities: capabilities,
+            ),
           ),
-        ),
-      );
-      _recordClientLog(
-        'warn',
-        'register acknowledgement pending; retrying bootstrap register '
-            'attempt=$_registerAckRetryAttempts',
-      );
-      _scheduleRegisterAckRetry();
-    });
+        );
+        _recordClientLog(
+          'warn',
+          'register acknowledgement pending; retrying bootstrap register '
+              'attempt=$attempt',
+        );
+      },
+      onTimeout: (attempts, elapsed) {
+        _recordClientLog(
+          'warn',
+          'register acknowledgement still pending after '
+              '${_registerAckRetryPolicy.maxDuration.inSeconds}s and $attempts retry attempts',
+        );
+      },
+    );
   }
 
   void _launchSelectedApplication() {
