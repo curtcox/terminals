@@ -756,9 +756,9 @@ func TestHandleMessageCommandPASystemRelaysReceiverNotifications(t *testing.T) {
 			seenRelay[msg.RelayToDeviceID] = true
 		}
 		if msg.UpdateUI != nil &&
-			msg.UpdateUI.ComponentID == ui.GlobalOverlayComponentID &&
+			(msg.UpdateUI.ComponentID == ui.GlobalOverlayComponentID || strings.HasSuffix(msg.UpdateUI.ComponentID, "/"+ui.GlobalOverlayComponentID)) &&
 			msg.UpdateUI.Node.Type == "overlay" &&
-			msg.UpdateUI.Node.Props["id"] == ui.GlobalOverlayComponentID {
+			(msg.UpdateUI.Node.Props["id"] == ui.GlobalOverlayComponentID || strings.HasSuffix(msg.UpdateUI.Node.Props["id"], "/"+ui.GlobalOverlayComponentID)) {
 			seenOverlayRelay[msg.RelayToDeviceID] = true
 		}
 		if msg.TransitionUI != nil {
@@ -991,8 +991,8 @@ func TestHandleMessageInputTerminal(t *testing.T) {
 	if out[0].UpdateUI == nil {
 		t.Fatalf("expected UpdateUI response for terminal input")
 	}
-	if out[0].UpdateUI.ComponentID != "terminal_output" {
-		t.Fatalf("update component_id = %q, want terminal_output", out[0].UpdateUI.ComponentID)
+	if out[0].UpdateUI.ComponentID != "terminal_output" && !strings.HasSuffix(out[0].UpdateUI.ComponentID, "/terminal_output") {
+		t.Fatalf("update component_id = %q, want terminal_output (scoped or legacy)", out[0].UpdateUI.ComponentID)
 	}
 	if !strings.Contains(out[0].UpdateUI.Node.Props["value"], "terminal-input-test") {
 		t.Fatalf("terminal output patch did not include command marker: %+v", out[0].UpdateUI.Node.Props)
@@ -1177,8 +1177,8 @@ func TestHandleMessageHeartbeatFlushesTerminalOutput(t *testing.T) {
 	if len(heartbeatOut) != 1 || heartbeatOut[0].UpdateUI == nil {
 		t.Fatalf("expected UpdateUI from heartbeat flush, got %+v", heartbeatOut)
 	}
-	if heartbeatOut[0].UpdateUI.ComponentID != "terminal_output" {
-		t.Fatalf("update component_id = %q, want terminal_output", heartbeatOut[0].UpdateUI.ComponentID)
+	if heartbeatOut[0].UpdateUI.ComponentID != "terminal_output" && !strings.HasSuffix(heartbeatOut[0].UpdateUI.ComponentID, "/terminal_output") {
+		t.Fatalf("update component_id = %q, want terminal_output (scoped or legacy)", heartbeatOut[0].UpdateUI.ComponentID)
 	}
 	if heartbeatValue == "" {
 		heartbeatValue = heartbeatOut[0].UpdateUI.Node.Props["value"]
@@ -1842,7 +1842,7 @@ func TestHandleMessageInputRoutesMultiWindowEndActionAndRestoresPriorTerminal(t 
 	sawTerminalRoot := false
 	sawTerminalEnter := false
 	for _, msg := range out {
-		if set := msg.SetUI; set != nil && set.Props["id"] == "terminal_root" {
+		if set := msg.SetUI; set != nil && (set.Props["id"] == "terminal_root" || strings.HasSuffix(set.Props["id"], "/terminal_root")) {
 			sawTerminalRoot = true
 		}
 		if transition := msg.TransitionUI; transition != nil && transition.Transition == "terminal_enter" {

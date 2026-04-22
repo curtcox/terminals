@@ -1,1 +1,1 @@
-Implement scoped component-id rewrite and action-ownership validation/counters for SetUI and UpdateUI.
+Add activation-swap tests and enforce stale_node vs unknown_activation counters for inbound UIAction routing.

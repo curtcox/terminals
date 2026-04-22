@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -80,6 +81,93 @@ func TestSessionRunRegisterAndDisconnect(t *testing.T) {
 	if got.State != device.StateDisconnected {
 		t.Fatalf("state = %q, want %q", got.State, device.StateDisconnected)
 	}
+}
+
+func TestSessionRunScopesSetUIAndUpdateUIPayloads(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        iorouter.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			{Command: &CommandRequest{RequestID: "cmd-terminal", DeviceID: "device-1", Kind: "manual", Intent: "terminal"}},
+			{Input: &InputRequest{DeviceID: "device-1", ComponentID: "terminal_input", Action: "submit", Value: "echo scoped"}},
+		},
+	}
+
+	if err := session.Run(stream); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	for _, sent := range stream.sent {
+		if sent.SetUI != nil {
+			assertAllNodeIDsScoped(t, *sent.SetUI)
+		}
+		if sent.UpdateUI != nil {
+			if _, _, _, ok := parseScopedComponentID(sent.UpdateUI.ComponentID); !ok {
+				t.Fatalf("UpdateUI component_id = %q, want scoped id", sent.UpdateUI.ComponentID)
+			}
+			assertAllNodeIDsScoped(t, sent.UpdateUI.Node)
+		}
+	}
+}
+
+func TestSessionRunInputUnknownComponentIncrementsUnscopedCounter(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(control)
+	session := NewSession(handler, control)
+
+	stream := &fakeStream{
+		ctx: context.Background(),
+		recvQueue: []ClientMessage{
+			{Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"}},
+			{Input: &InputRequest{DeviceID: "device-1", ComponentID: "not_scoped", Action: "open"}},
+		},
+	}
+
+	err := session.Run(stream)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	snapshot := handler.metrics.Snapshot()
+	if snapshot[`ui_action_unknown_component_total{reason="unscoped"}`] != "1" {
+		t.Fatalf("unscoped counter = %q, want 1", snapshot[`ui_action_unknown_component_total{reason="unscoped"}`])
+	}
+}
+
+func assertAllNodeIDsScoped(t *testing.T, root ui.Descriptor) {
+	t.Helper()
+	var walk func(node ui.Descriptor)
+	walk = func(node ui.Descriptor) {
+		nodeID := strings.TrimSpace(node.ID)
+		if nodeID == "" {
+			nodeID = strings.TrimSpace(node.Props["id"])
+		}
+		if nodeID != "" {
+			if _, _, _, ok := parseScopedComponentID(nodeID); !ok {
+				t.Fatalf("node id = %q, want scoped id", nodeID)
+			}
+		}
+		for _, child := range node.Children {
+			walk(child)
+		}
+	}
+	walk(root)
 }
 
 func TestSessionRunHelloSnapshotDeltaAndDisconnect(t *testing.T) {

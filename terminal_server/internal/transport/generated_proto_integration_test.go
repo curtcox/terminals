@@ -685,9 +685,12 @@ func TestGeneratedSessionPASystemRelaysReceiverOverlayAndTransitions(t *testing.
 	receiverOverlayDone := false
 	receiverEnterDone := false
 	waitFor("pa receiver start payloads", stream2.sentCh, func(resp *controlv1.ConnectResponse) bool {
-		if resp.GetUpdateUi() != nil && resp.GetUpdateUi().GetComponentId() == ui.GlobalOverlayComponentID {
-			if got := resp.GetUpdateUi().GetNode().GetProps()["id"]; got != ui.GlobalOverlayComponentID {
-				t.Fatalf("receiver overlay id prop = %q, want %q", got, ui.GlobalOverlayComponentID)
+		if resp.GetUpdateUi() != nil &&
+			(resp.GetUpdateUi().GetComponentId() == ui.GlobalOverlayComponentID ||
+				strings.HasSuffix(resp.GetUpdateUi().GetComponentId(), "/"+ui.GlobalOverlayComponentID)) {
+			if got := resp.GetUpdateUi().GetNode().GetProps()["id"]; got != ui.GlobalOverlayComponentID &&
+				!strings.HasSuffix(got, "/"+ui.GlobalOverlayComponentID) {
+				t.Fatalf("receiver overlay id prop = %q, want scoped or legacy %q", got, ui.GlobalOverlayComponentID)
 			}
 			receiverOverlayDone = true
 		}
@@ -724,9 +727,12 @@ func TestGeneratedSessionPASystemRelaysReceiverOverlayAndTransitions(t *testing.
 	receiverClearDone := false
 	receiverExitDone := false
 	waitFor("pa receiver stop payloads", stream2.sentCh, func(resp *controlv1.ConnectResponse) bool {
-		if resp.GetUpdateUi() != nil && resp.GetUpdateUi().GetComponentId() == ui.GlobalOverlayComponentID {
+		if resp.GetUpdateUi() != nil &&
+			(resp.GetUpdateUi().GetComponentId() == ui.GlobalOverlayComponentID ||
+				strings.HasSuffix(resp.GetUpdateUi().GetComponentId(), "/"+ui.GlobalOverlayComponentID)) {
 			node := resp.GetUpdateUi().GetNode()
-			if node.GetProps()["id"] == ui.GlobalOverlayComponentID &&
+			if (node.GetProps()["id"] == ui.GlobalOverlayComponentID ||
+				strings.HasSuffix(node.GetProps()["id"], "/"+ui.GlobalOverlayComponentID)) &&
 				len(node.GetChildren()) == 0 {
 				receiverClearDone = true
 			}
@@ -995,9 +1001,13 @@ func TestGeneratedSessionPASystemVoiceStopAliasesRelayCleanup(t *testing.T) {
 				if stop := resp.GetStopStream(); stop != nil && stop.GetStreamId() == "route:d1|d2|pa_audio" {
 					peerStopSeen = true
 				}
-				if update := resp.GetUpdateUi(); update != nil && update.GetComponentId() == ui.GlobalOverlayComponentID {
+				if update := resp.GetUpdateUi(); update != nil &&
+					(update.GetComponentId() == ui.GlobalOverlayComponentID ||
+						strings.HasSuffix(update.GetComponentId(), "/"+ui.GlobalOverlayComponentID)) {
 					node := update.GetNode()
-					if node.GetProps()["id"] == ui.GlobalOverlayComponentID && len(node.GetChildren()) == 0 {
+					if (node.GetProps()["id"] == ui.GlobalOverlayComponentID ||
+						strings.HasSuffix(node.GetProps()["id"], "/"+ui.GlobalOverlayComponentID)) &&
+						len(node.GetChildren()) == 0 {
 						peerOverlayClearSeen = true
 					}
 				}
@@ -1855,7 +1865,8 @@ func TestGeneratedSessionMultiWindowEndActionRestoresPriorUIAndTransition(t *tes
 			sawMultiWindowStop = true
 		}
 		if set := resp.GetSetUi(); set != nil {
-			if root := set.GetRoot(); root != nil && root.GetProps()["id"] == "terminal_root" {
+			if root := set.GetRoot(); root != nil &&
+				(root.GetProps()["id"] == "terminal_root" || strings.HasSuffix(root.GetProps()["id"], "/terminal_root")) {
 				sawRestoredTerminalUI = true
 			}
 		}

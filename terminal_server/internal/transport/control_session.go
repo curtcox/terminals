@@ -108,6 +108,10 @@ func (s *Session) Run(stream ControlStream) error {
 				targetDeviceID = relayTarget
 			}
 			msg = s.handler.decorateBugReportAffordance(targetDeviceID, msg)
+			msg, err = s.handler.prepareOutboundUI(targetDeviceID, msg)
+			if err != nil {
+				return err
+			}
 			if msg.RelayToDeviceID != "" {
 				relayMsg := msg
 				relayMsg.RelayToDeviceID = ""

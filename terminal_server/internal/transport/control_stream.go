@@ -414,6 +414,7 @@ type StreamHandler struct {
 	recording   recording.Manager
 	webrtc      WebRTCSignalEngine
 	bugReports  BugReportIntake
+	uiOwners    *uiActionOwnershipTracker
 }
 
 type mediaStreamState struct {
@@ -489,6 +490,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		sensorsByDevice:      map[string]sensorSnapshot{},
 		voiceAudioBuffers:    map[string][]byte{},
 		recording:            recording.NoopManager{},
+		uiOwners:             newUIActionOwnershipTracker(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -530,6 +532,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		sensorsByDevice:      map[string]sensorSnapshot{},
 		voiceAudioBuffers:    map[string][]byte{},
 		recording:            recording.NoopManager{},
+		uiOwners:             newUIActionOwnershipTracker(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -2422,6 +2425,14 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 
 	action := strings.ToLower(strings.TrimSpace(in.Action))
 	componentID := strings.TrimSpace(in.ComponentID)
+	if requiresScopedUIActionComponent(action) && h.uiOwners.HasKnownActivation(deviceID) {
+		if _, reason, ok := h.uiOwners.Resolve(deviceID, componentID); !ok {
+			if h.metrics != nil {
+				h.metrics.IncUnknownUIActionComponent(reason)
+			}
+			return nil, nil
+		}
+	}
 
 	if strings.HasPrefix(action, bugReportActionPrefix) {
 		return h.handleBugReportUIAction(ctx, deviceID, action, strings.TrimSpace(in.Value))
@@ -2518,6 +2529,15 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	return []ServerMessage{{
 		UpdateUI: h.terminalOutputUpdate(sessionID),
 	}}, nil
+}
+
+func requiresScopedUIActionComponent(action string) bool {
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case "open", "close", "corner.open":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDeviceID, action, value string) ([]ServerMessage, error) {
@@ -3038,6 +3058,37 @@ func (h *StreamHandler) nowUTC() time.Time {
 		return h.control.now().UTC()
 	}
 	return time.Now().UTC()
+}
+
+func (h *StreamHandler) prepareOutboundUI(targetDeviceID string, msg ServerMessage) (ServerMessage, error) {
+	targetDeviceID = strings.TrimSpace(targetDeviceID)
+	activationID := targetDeviceID
+	if activationID == "" {
+		activationID = "main"
+	}
+
+	if msg.SetUI != nil {
+		rewritten, componentIDs, err := rewriteDescriptorIDsForActivation(*msg.SetUI, activationID)
+		if err != nil {
+			return ServerMessage{}, err
+		}
+		msg.SetUI = &rewritten
+		h.uiOwners.RecordSetUI(targetDeviceID, activationID, componentIDs)
+	}
+	if msg.UpdateUI != nil {
+		rewritten, err := rewriteAndValidateUpdateUI(targetDeviceID, msg.UpdateUI, nil)
+		if err != nil {
+			return ServerMessage{}, err
+		}
+		msg.UpdateUI = rewritten
+		if _, activationID, _, ok := parseScopedComponentID(rewritten.ComponentID); ok {
+			_, componentIDs, rewriteErr := rewriteDescriptorIDsForActivation(rewritten.Node, activationID)
+			if rewriteErr == nil {
+				h.uiOwners.RecordUpdate(targetDeviceID, activationID, componentIDs)
+			}
+		}
+	}
+	return msg, nil
 }
 
 func normalizeTerminalKeyText(text string) string {

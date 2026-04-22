@@ -541,9 +541,12 @@ func TestWireSessionPASystemRelaysReceiverOverlayAndTransitions(t *testing.T) {
 	receiverOverlayDone := false
 	receiverEnterDone := false
 	waitFor("pa receiver start payloads", stream2.sentCh, func(msg WireServerMessage) bool {
-		if msg.UpdateUI != nil && msg.UpdateUI.ComponentID == ui.GlobalOverlayComponentID {
-			if got := DecodeDataEntries(msg.UpdateUI.Node.Props)["id"]; got != ui.GlobalOverlayComponentID {
-				t.Fatalf("receiver overlay id prop = %q, want %q", got, ui.GlobalOverlayComponentID)
+		if msg.UpdateUI != nil &&
+			(msg.UpdateUI.ComponentID == ui.GlobalOverlayComponentID ||
+				strings.HasSuffix(msg.UpdateUI.ComponentID, "/"+ui.GlobalOverlayComponentID)) {
+			if got := DecodeDataEntries(msg.UpdateUI.Node.Props)["id"]; got != ui.GlobalOverlayComponentID &&
+				!strings.HasSuffix(got, "/"+ui.GlobalOverlayComponentID) {
+				t.Fatalf("receiver overlay id prop = %q, want scoped or legacy %q", got, ui.GlobalOverlayComponentID)
 			}
 			receiverOverlayDone = true
 		}
@@ -576,8 +579,11 @@ func TestWireSessionPASystemRelaysReceiverOverlayAndTransitions(t *testing.T) {
 	receiverClearDone := false
 	receiverExitDone := false
 	waitFor("pa receiver stop payloads", stream2.sentCh, func(msg WireServerMessage) bool {
-		if msg.UpdateUI != nil && msg.UpdateUI.ComponentID == ui.GlobalOverlayComponentID {
-			if DecodeDataEntries(msg.UpdateUI.Node.Props)["id"] == ui.GlobalOverlayComponentID &&
+		if msg.UpdateUI != nil &&
+			(msg.UpdateUI.ComponentID == ui.GlobalOverlayComponentID ||
+				strings.HasSuffix(msg.UpdateUI.ComponentID, "/"+ui.GlobalOverlayComponentID)) {
+			if (DecodeDataEntries(msg.UpdateUI.Node.Props)["id"] == ui.GlobalOverlayComponentID ||
+				strings.HasSuffix(DecodeDataEntries(msg.UpdateUI.Node.Props)["id"], "/"+ui.GlobalOverlayComponentID)) &&
 				len(msg.UpdateUI.Node.Children) == 0 {
 				receiverClearDone = true
 			}
@@ -798,9 +804,13 @@ func TestWireSessionPASystemVoiceStopAliasesRelayCleanup(t *testing.T) {
 				if stop := msg.StopStream; stop != nil && stop.StreamID == "route:d1|d2|pa_audio" {
 					peerStopSeen = true
 				}
-				if update := msg.UpdateUI; update != nil && update.ComponentID == ui.GlobalOverlayComponentID {
+				if update := msg.UpdateUI; update != nil &&
+					(update.ComponentID == ui.GlobalOverlayComponentID ||
+						strings.HasSuffix(update.ComponentID, "/"+ui.GlobalOverlayComponentID)) {
 					nodeProps := DecodeDataEntries(update.Node.Props)
-					if nodeProps["id"] == ui.GlobalOverlayComponentID && len(update.Node.Children) == 0 {
+					if (nodeProps["id"] == ui.GlobalOverlayComponentID ||
+						strings.HasSuffix(nodeProps["id"], "/"+ui.GlobalOverlayComponentID)) &&
+						len(update.Node.Children) == 0 {
 						peerOverlayClearSeen = true
 					}
 				}
@@ -1373,7 +1383,8 @@ func TestWireSessionMultiWindowSetUIIncludesFocusActions(t *testing.T) {
 		}
 		walkNode(*msg.SetUI, func(node uiWireDescriptor) {
 			props := DecodeDataEntries(node.Props)
-			if props["id"] == "multi_window_grid" && props["columns"] == "2" {
+			if (props["id"] == "multi_window_grid" || strings.HasSuffix(props["id"], "/multi_window_grid")) &&
+				props["columns"] == "2" {
 				sawGridColumns = true
 			}
 			if node.Type == "button" && props["action"] == "multi_window_end" {
@@ -1381,7 +1392,7 @@ func TestWireSessionMultiWindowSetUIIncludesFocusActions(t *testing.T) {
 			}
 			if node.Type == "button" && props["action"] == "multi_window_focus:d2" {
 				sawFocusAction = true
-				if props["id"] == "multi_window_focus_d2" {
+				if props["id"] == "multi_window_focus_d2" || strings.HasSuffix(props["id"], "/multi_window_focus_d2") {
 					sawFocusButtonID = true
 				}
 			}
@@ -1401,4 +1412,3 @@ func TestWireSessionMultiWindowSetUIIncludesFocusActions(t *testing.T) {
 		t.Fatalf("expected focus button id multi_window_focus_d2")
 	}
 }
-
