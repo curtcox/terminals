@@ -1,1 +1,1 @@
-Add a Flutter widget test that verifies no persistent client-chrome privacy/capture indicator is rendered after privacy.toggle (distinct from any server-composed indicator IDs).
+Add a Flutter widget test that verifies a simulated utterance starts VoiceAudio streaming when microphone capability is present and privacy mode is off.

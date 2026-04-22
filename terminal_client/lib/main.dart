@@ -38,6 +38,20 @@ typedef ClientMediaEngineFactory = ClientMediaEngine Function({
 typedef AudioPlaybackFactory = AudioPlayback Function();
 typedef UnixMsProvider = int Function();
 typedef BugReportScreenshotCapture = Future<List<int>> Function();
+typedef WakeWordDetectorFactory = WakeWordDetectorController Function();
+
+abstract class WakeWordDetectorController {
+  Future<void> setEnabled(bool enabled);
+  Future<void> dispose();
+}
+
+class NoopWakeWordDetectorController implements WakeWordDetectorController {
+  @override
+  Future<void> setEnabled(bool enabled) async {}
+
+  @override
+  Future<void> dispose() async {}
+}
 
 int _systemNowUnixMs() => DateTime.now().toUtc().millisecondsSinceEpoch;
 
@@ -57,6 +71,10 @@ AudioPlayback _defaultAudioPlaybackFactory() {
     return NoopAudioPlayback();
   }
   return AudioPlayerPlayback();
+}
+
+WakeWordDetectorController _defaultWakeWordDetectorFactory() {
+  return NoopWakeWordDetectorController();
 }
 
 const bool _e2eEmitEvents = bool.fromEnvironment(
@@ -875,6 +893,7 @@ class TerminalClientApp extends StatelessWidget {
     this.reconnectDelayMaxSeconds = 30,
     this.nowUnixMsProvider = _systemNowUnixMs,
     this.autoConnectOnStartup = kIsWeb,
+    this.wakeWordDetectorFactory = _defaultWakeWordDetectorFactory,
     this.bugReportScreenshotCapture,
   });
 
@@ -888,6 +907,7 @@ class TerminalClientApp extends StatelessWidget {
   final int reconnectDelayMaxSeconds;
   final UnixMsProvider nowUnixMsProvider;
   final bool autoConnectOnStartup;
+  final WakeWordDetectorFactory wakeWordDetectorFactory;
   final BugReportScreenshotCapture? bugReportScreenshotCapture;
 
   @override
@@ -905,6 +925,7 @@ class TerminalClientApp extends StatelessWidget {
         reconnectDelayMaxSeconds: reconnectDelayMaxSeconds,
         nowUnixMsProvider: nowUnixMsProvider,
         autoConnectOnStartup: autoConnectOnStartup,
+        wakeWordDetectorFactory: wakeWordDetectorFactory,
         bugReportScreenshotCapture: bugReportScreenshotCapture,
       ),
     );
@@ -923,6 +944,7 @@ class _ControlStreamScaffold extends StatefulWidget {
     required this.reconnectDelayMaxSeconds,
     required this.nowUnixMsProvider,
     required this.autoConnectOnStartup,
+    required this.wakeWordDetectorFactory,
     required this.bugReportScreenshotCapture,
   });
 
@@ -936,6 +958,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   final int reconnectDelayMaxSeconds;
   final UnixMsProvider nowUnixMsProvider;
   final bool autoConnectOnStartup;
+  final WakeWordDetectorFactory wakeWordDetectorFactory;
   final BugReportScreenshotCapture? bugReportScreenshotCapture;
 
   @override
@@ -972,6 +995,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   late final CapabilityProbe _capabilityProbe;
   late final ClientMediaEngine _mediaEngine;
   late final AudioPlayback _audioPlayback;
+  late final WakeWordDetectorController _wakeWordDetector;
   late final DurableArtifactExporter _artifactExporter;
   uiv1.Node? _activeRoot;
   int _activeRootRevision = 0;
@@ -1064,6 +1088,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   bool _capabilityPollInFlight = false;
   String _lastCapabilitySignature = '';
   bool _privacyModeEnabled = false;
+  bool _wakeWordDetectorEnabled = false;
   late final ConnectionReadinessGateway _readinessGateway;
   late final ReliableSendDispatcher<ConnectRequest> _reliableSender;
   late final RetryController _registerAckRetryController;
@@ -1253,6 +1278,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           ..clearMicrophone()
           ..clearCamera();
       }
+      _syncWakeWordDetector(nextCapabilities);
       final nextSignature = _capabilitySignature(nextCapabilities);
       final changed = nextSignature != _lastCapabilitySignature;
       if (!changed && !forceSnapshot) {
@@ -1304,6 +1330,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     await _stopLocalCaptureStreamsForPrivacyMode();
     if (_lastRegisteredCapabilities == null || _deviceId.isEmpty) {
       _privacyModeEnabled = true;
+      _setWakeWordDetectorEnabled(false);
       return;
     }
     final nextCapabilities = _lastRegisteredCapabilities!.deepCopy()
@@ -1312,6 +1339,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _privacyModeEnabled = true;
     _lastRegisteredCapabilities = nextCapabilities;
     _lastCapabilitySignature = _capabilitySignature(nextCapabilities);
+    _syncWakeWordDetector(nextCapabilities);
     _capabilityGeneration = math.max(
       _capabilityGeneration + 1,
       _lastCapabilityAckGeneration + 1,
@@ -1344,6 +1372,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _activeStreamsByID.remove(streamID);
       _routesByStreamID.remove(streamID);
     }
+  }
+
+  void _syncWakeWordDetector(capv1.DeviceCapabilities capabilities) {
+    _setWakeWordDetectorEnabled(
+      capabilities.hasMicrophone() && !_privacyModeEnabled,
+    );
+  }
+
+  void _setWakeWordDetectorEnabled(bool enabled) {
+    if (_wakeWordDetectorEnabled == enabled) {
+      return;
+    }
+    _wakeWordDetectorEnabled = enabled;
+    unawaited(_wakeWordDetector.setEnabled(enabled));
   }
 
   bool _isStaleCapabilityGenerationError(ControlError error) {
@@ -1701,6 +1743,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       onSignal: _sendWebRTCSignalMessage,
     );
     _audioPlayback = widget.audioPlaybackFactory();
+    _wakeWordDetector = widget.wakeWordDetectorFactory();
     _artifactExporter = DurableArtifactExporter();
     _readinessGateway = ConnectionReadinessGateway(
       currentPhase: () => _connectionPhase,
@@ -2074,6 +2117,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _lastRegisteredCapabilities = _applyLifecycleOperator(
         _applyDisplayMetadata(probedCapabilities.deepCopy()),
       );
+      _syncWakeWordDetector(_lastRegisteredCapabilities!);
       _lastCapabilitySignature = _capabilitySignature(
         _lastRegisteredCapabilities!,
       );
@@ -3607,6 +3651,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _outgoing.close();
     unawaited(_mediaEngine.dispose());
     unawaited(_audioPlayback.dispose());
+    unawaited(_wakeWordDetector.dispose());
     final existingClient = _client;
     if (existingClient != null) {
       unawaited(existingClient.shutdown());
