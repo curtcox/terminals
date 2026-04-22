@@ -3598,7 +3598,10 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 	}
 	deviceID := strings.TrimSpace(va.DeviceID)
 	if deviceID == "" {
-		return nil, ErrMissingCommandDeviceID
+		return nil, ErrInvalidClientMessage
+	}
+	if !h.deviceAllowsVoiceAudio(deviceID) {
+		return nil, nil
 	}
 
 	h.mu.Lock()
@@ -3711,6 +3714,21 @@ func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequ
 		},
 	})
 	return out, nil
+}
+
+func (h *StreamHandler) deviceAllowsVoiceAudio(deviceID string) bool {
+	if h == nil || h.control == nil || h.control.devices == nil {
+		return true
+	}
+	current, ok := h.control.devices.Get(strings.TrimSpace(deviceID))
+	if !ok {
+		return true
+	}
+	if current.Generation == 0 {
+		return true
+	}
+	return truthyCapability(current.Capabilities["microphone.present"]) ||
+		truthyCapability(current.Capabilities["microphone.endpoint_count"])
 }
 
 func (h *StreamHandler) recordVoiceAudioChunk(recorder recording.Manager, deviceID string, chunk []byte) {

@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"encoding/binary"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +36,12 @@ type audioChunkRecordingStub struct {
 	audio   []byte
 }
 
+type counterFramePublisherStub struct {
+	mu       sync.Mutex
+	deviceID []string
+	counters []uint64
+}
+
 func (s *audioChunkRecordingStub) Start(context.Context, recording.Stream) error { return nil }
 
 func (s *audioChunkRecordingStub) Stop(context.Context, string) error { return nil }
@@ -46,6 +53,35 @@ func (s *audioChunkRecordingStub) WriteDeviceAudio(deviceID string, chunk []byte
 	s.devices = append(s.devices, deviceID)
 	s.audio = append(s.audio, chunk...)
 	return nil
+}
+
+func (s *counterFramePublisherStub) Publish(deviceID string, chunk []byte) {
+	if len(chunk) < 8 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deviceID = append(s.deviceID, deviceID)
+	s.counters = append(s.counters, binary.BigEndian.Uint64(chunk[:8]))
+}
+
+func (s *counterFramePublisherStub) maxCounter() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var max uint64
+	for _, value := range s.counters {
+		if value > max {
+			max = value
+		}
+	}
+	return max
+}
+
+func makeCounterPayload(counter uint64) []byte {
+	payload := make([]byte, 12)
+	binary.BigEndian.PutUint64(payload[:8], counter)
+	copy(payload[8:], []byte("test"))
+	return payload
 }
 
 func TestOverlayInputPolicyAllowsMainStreamByMode(t *testing.T) {
@@ -461,6 +497,76 @@ func TestHandleMessageVoiceAudioWritesChunksToRecordingManager(t *testing.T) {
 	}
 	if got := recorder.audio; len(got) != 3 || got[0] != 0x10 || got[1] != 0x20 || got[2] != 0x30 {
 		t.Fatalf("audio bytes = %v, want [16 32 48]", got)
+	}
+}
+
+func TestHandleMessageVoiceAudioDropsPostPrivacyCutoverFrames(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+	publisher := &counterFramePublisherStub{}
+	handler.SetDeviceAudioPublisher(publisher)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"microphone.present": "true",
+				"camera.present":     "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		VoiceAudio: &VoiceAudioRequest{
+			DeviceID:   "device-1",
+			Audio:      makeCounterPayload(1),
+			SampleRate: 16000,
+			IsFinal:    false,
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(voice_audio pre-cutover) error = %v", err)
+	}
+
+	cutoverCounter := publisher.maxCounter()
+	if cutoverCounter != 1 {
+		t.Fatalf("cutover counter = %d, want 1", cutoverCounter)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:     "device-1",
+			Generation:   2,
+			Reason:       "privacy.toggle",
+			Capabilities: map[string]string{},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	for _, counter := range []uint64{2, 3, 4} {
+		if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+			VoiceAudio: &VoiceAudioRequest{
+				DeviceID:   "device-1",
+				Audio:      makeCounterPayload(counter),
+				SampleRate: 16000,
+				IsFinal:    false,
+			},
+		}); err != nil {
+			t.Fatalf("HandleMessage(voice_audio post-cutover counter=%d) error = %v", counter, err)
+		}
+	}
+
+	if got := publisher.maxCounter(); got > cutoverCounter {
+		t.Fatalf("max delivered counter after cutover = %d, want <= %d", got, cutoverCounter)
 	}
 }
 

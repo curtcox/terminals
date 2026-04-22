@@ -1,1 +1,1 @@
-Add an integration test for privacy-mode cutover that injects mic and camera frames with monotonic counters, records cutover on privacy.toggle, and asserts zero post-cutover frames reach any server activation.
+Extend capability-loss integration coverage to include both audio and video routes, asserting `privacy.toggle` invalidates active mic/camera claims and emits `stop_stream` for each affected route.
