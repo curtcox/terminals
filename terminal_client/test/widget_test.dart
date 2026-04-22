@@ -753,6 +753,71 @@ void main() {
     expect(voiceAudio.isFinal, isTrue);
   });
 
+  testWidgets(
+    'wake-word utterance does not send VoiceAudio after privacy.toggle withdraws microphone capability',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final harness = _FakeClientHarness();
+      final detector = _FakeWakeWordDetectorController();
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          wakeWordDetectorFactory: () => detector,
+          capabilityProbeFactory: () => _StaticCapabilityProbe(
+            capv1.DeviceCapabilities()
+              ..microphone = (capv1.AudioInputCapability()
+                ..channels = 1
+                ..endpoints.add(capv1.AudioEndpoint()..endpointId = 'mic-main')),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..setUi = (uiv1.SetUI()
+            ..root = (uiv1.Node()
+              ..id = 'terminal_root'
+              ..stack = (uiv1.StackWidget())
+              ..children.add(
+                uiv1.Node()
+                  ..id = 'act:main/privacy_toggle'
+                  ..button = (uiv1.ButtonWidget()
+                    ..label = 'Privacy'
+                    ..action = 'privacy.toggle'),
+              ))),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Privacy'));
+      await tester.pumpAndSettle();
+
+      detector.simulateUtterance(
+        audio: <int>[9, 8, 7, 6],
+        sampleRate: 16000,
+        isFinal: true,
+      );
+      await tester.pumpAndSettle();
+
+      final voiceAudioRequests = harness.lastClient.requests
+          .where((request) => request.hasVoiceAudio())
+          .toList(growable: false);
+      expect(voiceAudioRequests, isEmpty);
+    },
+  );
+
   testWidgets('connection attempt immediately falls back to next carrier', (
     WidgetTester tester,
   ) async {
