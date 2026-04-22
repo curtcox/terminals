@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// Identity represents a user or system principal in the capability service.
 type Identity struct {
 	ID          string    `json:"id"`
 	DisplayName string    `json:"display_name,omitempty"`
@@ -16,6 +17,7 @@ type Identity struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// InteractiveSession represents a collaborative session between participants.
 type InteractiveSession struct {
 	ID           string               `json:"id"`
 	Kind         string               `json:"kind"`
@@ -24,11 +26,13 @@ type InteractiveSession struct {
 	CreatedAt    time.Time            `json:"created_at"`
 }
 
+// SessionParticipant records a single identity's membership in a session.
 type SessionParticipant struct {
 	IdentityID string    `json:"identity_id"`
 	JoinedAt   time.Time `json:"joined_at"`
 }
 
+// Message represents a posted message within a room.
 type Message struct {
 	ID        string    `json:"id"`
 	Room      string    `json:"room"`
@@ -36,6 +40,7 @@ type Message struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// BoardItem represents a pinned item on a named board.
 type BoardItem struct {
 	ID        string    `json:"id"`
 	Board     string    `json:"board"`
@@ -43,6 +48,7 @@ type BoardItem struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Artifact represents a stored artifact such as a document or media object.
 type Artifact struct {
 	ID        string    `json:"id"`
 	Kind      string    `json:"kind"`
@@ -50,6 +56,7 @@ type Artifact struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Annotation represents a user annotation attached to a canvas.
 type Annotation struct {
 	ID        string    `json:"id"`
 	Canvas    string    `json:"canvas"`
@@ -57,12 +64,14 @@ type Annotation struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// SearchResult represents a single item returned by a search query.
 type SearchResult struct {
 	ID   string `json:"id"`
 	Kind string `json:"kind"`
 	Text string `json:"text"`
 }
 
+// MemoryEntry represents a stored memory item scoped to a named context.
 type MemoryEntry struct {
 	ID        string    `json:"id"`
 	Scope     string    `json:"scope"`
@@ -70,12 +79,14 @@ type MemoryEntry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Acknowledgement records that an identity has acknowledged a subject reference.
 type Acknowledgement struct {
 	IdentityID     string    `json:"identity_id"`
 	SubjectRef     string    `json:"subject_ref"`
 	AcknowledgedAt time.Time `json:"acknowledged_at"`
 }
 
+// RecentItem represents a recent activity entry in the capability service.
 type RecentItem struct {
 	ID        string    `json:"id"`
 	Kind      string    `json:"kind"`
@@ -83,6 +94,7 @@ type RecentItem struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// StoreRecord represents a key/value entry in a named namespace store.
 type StoreRecord struct {
 	Namespace string    `json:"namespace"`
 	Key       string    `json:"key"`
@@ -90,6 +102,7 @@ type StoreRecord struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// BusEvent represents a named event emitted on the internal event bus.
 type BusEvent struct {
 	ID        string    `json:"id"`
 	Kind      string    `json:"kind"`
@@ -98,6 +111,7 @@ type BusEvent struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Service provides typed in-memory storage for capability closure tools.
 type Service struct {
 	mu sync.RWMutex
 
@@ -117,6 +131,7 @@ type Service struct {
 	acks        map[string]Acknowledgement
 }
 
+// NewService creates a new Service with default seed data.
 func NewService() *Service {
 	now := time.Now
 	s := &Service{
@@ -136,6 +151,7 @@ func NewService() *Service {
 	return s
 }
 
+// ListIdentities returns all registered identities sorted by ID.
 func (s *Service) ListIdentities() []Identity {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -144,6 +160,7 @@ func (s *Service) ListIdentities() []Identity {
 	return out
 }
 
+// ResolveAudience returns identities matching the given audience specifier.
 func (s *Service) ResolveAudience(audience string) []Identity {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -183,6 +200,7 @@ func (s *Service) ResolveAudience(audience string) []Identity {
 	return out
 }
 
+// CreateSession creates a new interactive session of the given kind and target.
 func (s *Service) CreateSession(kind, target string) InteractiveSession {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -199,12 +217,14 @@ func (s *Service) CreateSession(kind, target string) InteractiveSession {
 	return session
 }
 
+// ListSessions returns all active interactive sessions.
 func (s *Service) ListSessions() []InteractiveSession {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return cloneSessions(s.sessions)
 }
 
+// GetSession returns the session with the given ID, or false if not found.
 func (s *Service) GetSession(sessionID string) (InteractiveSession, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -218,6 +238,7 @@ func (s *Service) GetSession(sessionID string) (InteractiveSession, bool) {
 	return InteractiveSession{}, false
 }
 
+// ListSessionParticipants returns participants for the given session ID.
 func (s *Service) ListSessionParticipants(sessionID string) ([]SessionParticipant, bool) {
 	session, ok := s.GetSession(sessionID)
 	if !ok {
@@ -227,6 +248,7 @@ func (s *Service) ListSessionParticipants(sessionID string) ([]SessionParticipan
 	return participants, true
 }
 
+// JoinSession adds a participant to the session, returning the updated session.
 func (s *Service) JoinSession(sessionID, participant string) (InteractiveSession, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -255,6 +277,7 @@ func (s *Service) JoinSession(sessionID, participant string) (InteractiveSession
 	return InteractiveSession{}, false
 }
 
+// LeaveSession removes a participant from the session, returning the updated session.
 func (s *Service) LeaveSession(sessionID, participant string) (InteractiveSession, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -281,6 +304,7 @@ func (s *Service) LeaveSession(sessionID, participant string) (InteractiveSessio
 	return InteractiveSession{}, false
 }
 
+// PostMessage posts a message to the given room.
 func (s *Service) PostMessage(room, text string) Message {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -297,6 +321,7 @@ func (s *Service) PostMessage(room, text string) Message {
 	return msg
 }
 
+// ListMessages returns messages in the given room, or all messages if room is empty.
 func (s *Service) ListMessages(room string) []Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -310,6 +335,7 @@ func (s *Service) ListMessages(room string) []Message {
 	return out
 }
 
+// AcknowledgeMessage records an acknowledgement from an identity for a message.
 func (s *Service) AcknowledgeMessage(identityID, messageID string) (Acknowledgement, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -341,6 +367,7 @@ func (s *Service) AcknowledgeMessage(identityID, messageID string) (Acknowledgem
 	return ack, true
 }
 
+// ListUnreadMessages returns messages that have not been acknowledged by the given identity.
 func (s *Service) ListUnreadMessages(identityID, room string) []Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -362,6 +389,7 @@ func (s *Service) ListUnreadMessages(identityID, room string) []Message {
 	return out
 }
 
+// PinBoard pins a text item to the named board.
 func (s *Service) PinBoard(board, text string) BoardItem {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -376,6 +404,7 @@ func (s *Service) PinBoard(board, text string) BoardItem {
 	return item
 }
 
+// ListBoard returns all items pinned to the given board.
 func (s *Service) ListBoard(board string) []BoardItem {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -389,6 +418,7 @@ func (s *Service) ListBoard(board string) []BoardItem {
 	return out
 }
 
+// CreateArtifact creates a new artifact of the given kind and title.
 func (s *Service) CreateArtifact(kind, title string) Artifact {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -403,6 +433,7 @@ func (s *Service) CreateArtifact(kind, title string) Artifact {
 	return item
 }
 
+// PatchArtifact updates the title of the artifact with the given ID.
 func (s *Service) PatchArtifact(artifactID, title string) (Artifact, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -421,12 +452,14 @@ func (s *Service) PatchArtifact(artifactID, title string) (Artifact, bool) {
 	return Artifact{}, false
 }
 
+// ListArtifacts returns all stored artifacts.
 func (s *Service) ListArtifacts() []Artifact {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return append([]Artifact(nil), s.artifacts...)
 }
 
+// AnnotateCanvas appends an annotation to the named canvas.
 func (s *Service) AnnotateCanvas(canvas, text string) Annotation {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -441,6 +474,7 @@ func (s *Service) AnnotateCanvas(canvas, text string) Annotation {
 	return item
 }
 
+// ListCanvas returns annotations on the given canvas.
 func (s *Service) ListCanvas(canvas string) []Annotation {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -454,6 +488,7 @@ func (s *Service) ListCanvas(canvas string) []Annotation {
 	return out
 }
 
+// Search returns items whose text matches the query across messages, board, artifacts and memories.
 func (s *Service) Search(query string) []SearchResult {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -485,6 +520,7 @@ func (s *Service) Search(query string) []SearchResult {
 	return out
 }
 
+// Remember stores a memory entry in the given scope.
 func (s *Service) Remember(scope, text string) MemoryEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -499,6 +535,7 @@ func (s *Service) Remember(scope, text string) MemoryEntry {
 	return item
 }
 
+// Recall returns memory entries whose text or scope matches the query.
 func (s *Service) Recall(query string) []MemoryEntry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -512,12 +549,14 @@ func (s *Service) Recall(query string) []MemoryEntry {
 	return out
 }
 
+// ListRecent returns the most recent activity entries in insertion order.
 func (s *Service) ListRecent() []RecentItem {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return append([]RecentItem(nil), s.recent...)
 }
 
+// StorePut sets a key/value record in the given namespace.
 func (s *Service) StorePut(namespace, key, value string) StoreRecord {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -533,6 +572,7 @@ func (s *Service) StorePut(namespace, key, value string) StoreRecord {
 	return record
 }
 
+// StoreGet retrieves a record by namespace and key, returning false if not found.
 func (s *Service) StoreGet(namespace, key string) (StoreRecord, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -541,6 +581,7 @@ func (s *Service) StoreGet(namespace, key string) (StoreRecord, bool) {
 	return record, ok
 }
 
+// StoreList returns all records in the given namespace sorted by key.
 func (s *Service) StoreList(namespace string) []StoreRecord {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -555,6 +596,7 @@ func (s *Service) StoreList(namespace string) []StoreRecord {
 	return out
 }
 
+// BusEmit emits a named event with an optional payload on the event bus.
 func (s *Service) BusEmit(kind, name, payload string) BusEvent {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -570,6 +612,7 @@ func (s *Service) BusEmit(kind, name, payload string) BusEvent {
 	return event
 }
 
+// BusTail returns all events emitted on the event bus.
 func (s *Service) BusTail() []BusEvent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

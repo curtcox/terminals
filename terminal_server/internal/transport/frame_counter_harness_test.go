@@ -7,7 +7,7 @@ import (
 )
 
 func TestDecodeHarnessFrameCounterPayload(t *testing.T) {
-	raw := make([]byte, 8)
+	raw := make([]byte, 8, 11)
 	binary.BigEndian.PutUint64(raw, 42)
 	raw = append(raw, []byte("pcm")...)
 
@@ -38,7 +38,7 @@ func TestDecodeHarnessFrameCounterPayloadRejectsShortFrame(t *testing.T) {
 
 func TestHarnessFrameCounterRecorderRecordsCounterAndStripsPrefix(t *testing.T) {
 	recorder := newHarnessFrameCounterRecorder()
-	frame := make([]byte, 8)
+	frame := make([]byte, 8, 19)
 	binary.BigEndian.PutUint64(frame, 7)
 	frame = append(frame, []byte("audio-frame")...)
 

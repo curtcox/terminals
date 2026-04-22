@@ -456,36 +456,6 @@ func (s *Server) closeSession(ctx context.Context, sessionID string) {
 	s.adapter.CloseSession(sessionID)
 }
 
-func (s *Server) issueFallbackProbe(sessionID string) string {
-	sessionID = strings.TrimSpace(sessionID)
-	if sessionID == "" {
-		return ""
-	}
-	token := fmt.Sprintf("probe_%d", s.nextID.Add(1))
-	s.mu.Lock()
-	s.probes[sessionID] = token
-	s.mu.Unlock()
-	return token
-}
-
-func (s *Server) confirmFallbackProbe(sessionID, suppliedToken string) bool {
-	sessionID = strings.TrimSpace(sessionID)
-	suppliedToken = strings.TrimSpace(suppliedToken)
-	if sessionID == "" || suppliedToken == "" {
-		return false
-	}
-	s.mu.Lock()
-	expected := strings.TrimSpace(s.probes[sessionID])
-	if expected == "" || expected != suppliedToken {
-		s.mu.Unlock()
-		return false
-	}
-	delete(s.probes, sessionID)
-	s.mu.Unlock()
-	s.adapter.SetSessionCapability(sessionID, MutatingViaFallback)
-	return true
-}
-
 func (s *Server) addInflight(sessionID, requestID string, cancel context.CancelFunc) {
 	if cancel == nil {
 		return

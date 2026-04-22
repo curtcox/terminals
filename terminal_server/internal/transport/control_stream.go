@@ -2933,7 +2933,7 @@ func policyAllowsMainStream(policy overlayInputPolicyConfig, stream overlayInput
 		if allowed, ok := policy.Overrides[stream]; ok {
 			return allowed
 		}
-		return !(stream == overlayStreamPointer || stream == overlayStreamTouch)
+		return stream != overlayStreamPointer && stream != overlayStreamTouch
 	default:
 		return true
 	}

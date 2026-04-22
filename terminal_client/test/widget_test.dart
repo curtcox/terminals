@@ -980,7 +980,6 @@ void main() {
       ConnectResponse()
         ..playAudio = (iov1.PlayAudio()
           ..requestId = 'wake-audio-1'
-          ..streamId = 'wake-stream'
           ..pcmData = <int>[1, 2, 3, 4]),
     );
     harness.lastClient.emitResponse(

@@ -1,3 +1,4 @@
+// Package mcpadapter bridges the MCP tool-call protocol to the REPL capability layer.
 package mcpadapter
 
 import (
@@ -15,18 +16,22 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 )
 
+// Tool name constants for special REPL meta-tools.
 const (
 	ToolReplComplete = "repl_complete"
 	ToolReplDescribe = "repl_describe"
 )
 
+// Sentinel errors returned by the adapter.
 var (
 	ErrUnknownTool    = errors.New("unknown tool")
 	ErrUnknownSession = errors.New("unknown mcp session")
 )
 
+// MutatingCapability describes how a session authorizes mutating tool calls.
 type MutatingCapability string
 
+// MutatingCapability values.
 const (
 	MutatingViaElicitation MutatingCapability = "mutating_via_elicitation"
 	MutatingViaFallback    MutatingCapability = "mutating_via_fallback"

@@ -246,6 +246,8 @@ func normalizeOrigin(origin SessionOrigin) SessionOrigin {
 	switch SessionOrigin(strings.ToLower(strings.TrimSpace(string(origin)))) {
 	case SessionOriginMCP:
 		return SessionOriginMCP
+	case SessionOriginHuman:
+		return SessionOriginHuman
 	default:
 		return SessionOriginHuman
 	}

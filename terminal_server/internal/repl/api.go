@@ -10,6 +10,7 @@ import (
 // CommandClassification describes the mutation level of a REPL command.
 type CommandClassification string
 
+// CommandClassification values.
 const (
 	CommandClassificationReadOnly    CommandClassification = "read_only"
 	CommandClassificationOperational CommandClassification = "operational"
@@ -19,6 +20,7 @@ const (
 // DocsRenderMode controls how docs commands are rendered.
 type DocsRenderMode string
 
+// DocsRenderMode values.
 const (
 	DocsRenderModeTerminal DocsRenderMode = "terminal"
 	DocsRenderModeMarkdown DocsRenderMode = "markdown"
