@@ -95,6 +95,7 @@ client-coverage:
 
 proto-lint:
 	cd api && buf lint
+	cd terminal_server && go test ./internal/transport -run 'TestProtoRoundTrip' -count=1
 
 proto-breaking:
 	cd api && buf breaking --against '../.git#branch=main,subdir=api'

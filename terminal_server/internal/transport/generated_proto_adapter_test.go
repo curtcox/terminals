@@ -8,6 +8,7 @@ import (
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
@@ -146,6 +147,77 @@ func TestGeneratedProtoAdapterToInternalCapabilitySnapshotAndDelta(t *testing.T)
 	}
 	if deltaMsg.CapabilityDelta.Reason != "display_changed" {
 		t.Fatalf("delta reason = %q, want display_changed", deltaMsg.CapabilityDelta.Reason)
+	}
+}
+
+func TestProtoRoundTripCapabilityDeltaPrivacyWithdrawalOmitsMicAndCameraFields(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	original := &controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_CapabilityDelta{
+			CapabilityDelta: &controlv1.CapabilityDelta{
+				DeviceId:   "device-privacy",
+				Generation: 7,
+				Reason:     "privacy.toggle",
+				Capabilities: &capabilitiesv1.DeviceCapabilities{
+					DeviceId: "device-privacy",
+					Screen: &capabilitiesv1.ScreenCapability{
+						Width:  1920,
+						Height: 1080,
+					},
+				},
+			},
+		},
+	}
+
+	encoded, err := proto.Marshal(original)
+	if err != nil {
+		t.Fatalf("proto.Marshal(capability_delta privacy) error = %v", err)
+	}
+
+	var decoded controlv1.ConnectRequest
+	if err := proto.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("proto.Unmarshal(capability_delta privacy) error = %v", err)
+	}
+
+	delta := decoded.GetCapabilityDelta()
+	if delta == nil {
+		t.Fatalf("decoded capability delta is nil")
+	}
+	caps := delta.GetCapabilities()
+	if caps == nil {
+		t.Fatalf("decoded capabilities are nil")
+	}
+	fields := caps.ProtoReflect().Descriptor().Fields()
+	microphoneField := fields.ByName("microphone")
+	if microphoneField == nil {
+		t.Fatalf("microphone field descriptor not found")
+	}
+	if caps.ProtoReflect().Has(microphoneField) {
+		t.Fatalf("microphone field should be absent for privacy withdrawal encoding")
+	}
+	cameraField := fields.ByName("camera")
+	if cameraField == nil {
+		t.Fatalf("camera field descriptor not found")
+	}
+	if caps.ProtoReflect().Has(cameraField) {
+		t.Fatalf("camera field should be absent for privacy withdrawal encoding")
+	}
+
+	internalMsg, err := adapter.ToInternal(&decoded)
+	if err != nil {
+		t.Fatalf("ToInternal(decoded capability_delta privacy) error = %v", err)
+	}
+	if internalMsg.CapabilityDelta == nil {
+		t.Fatalf("expected internal capability delta message")
+	}
+	if internalMsg.CapabilityDelta.Reason != "privacy.toggle" {
+		t.Fatalf("delta reason = %q, want privacy.toggle", internalMsg.CapabilityDelta.Reason)
+	}
+	if _, ok := internalMsg.CapabilityDelta.Capabilities["microphone.present"]; ok {
+		t.Fatalf("microphone.present should be omitted when capability field is absent")
+	}
+	if _, ok := internalMsg.CapabilityDelta.Capabilities["camera.present"]; ok {
+		t.Fatalf("camera.present should be omitted when capability field is absent")
 	}
 }
 
