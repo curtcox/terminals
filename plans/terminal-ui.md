@@ -135,12 +135,49 @@ responds by starting an overlay-layer activation that holds
 ### Server-enforced reachability invariant
 
 Because the affordance is part of a scenario wrapper and not client
-chrome, we can enforce at the server what the client cannot: **every
-main-layer UI descriptor emitted for a terminal with a screen must
-include, somewhere in its tree, a live corner affordance, or an
-explicit wrapper-level opt-out flag that has been reviewed**. A CI
-check walks every scenario's rendered descriptor in a fixture run and
-fails if the invariant is violated.
+chrome, we can enforce at the server what the client cannot. The
+invariant is defined on the **typed wrapper contract**, not on
+arbitrary descriptor trees — tree-walking "any tree containing a
+button" is brittle, as Codex noted. Concretely:
+
+- `withCornerAffordance` emits a node with a **reserved `id` prefix**
+  `__affordance.corner__` and a `UIAction` handler for action
+  `corner.open`.
+- The wrapper enforces, in code, minimum hit-target size (for
+  example, >= 44×44 logical px, exact value documented alongside the
+  wrapper), top-of-stack Z-order relative to the scenario's root
+  content, and non-occluded geometry under the current
+  `ScreenCapability.safe_area`.
+- A CI gate validates the **output of the wrapper specifically** for
+  every main-layer scenario in the registry: the emitted tree
+  contains exactly one node with the reserved id prefix, its props
+  satisfy the minimums, and its action handler is wired to
+  `corner.open`.
+- Anything outside the wrapper — third-party descriptor content,
+  hand-rolled scenarios — is not audited by the invariant. Main-layer
+  scenarios are required to pass through the wrapper; skipping it is
+  itself a CI failure (see opt-out governance below).
+
+**Opt-out governance.** Some scenarios (kiosk demos, safety-critical
+foreground lock) legitimately need to run without the affordance.
+"Reviewed opt-out" is not a prose escape hatch; it is a concrete
+mechanism:
+
+- A checked-in allowlist at
+  `terminal_server/internal/scenario/affordance_optouts.yaml` with
+  entries keyed by `scenario_id`, each carrying `reason`,
+  `approver`, `expires_at`, and optionally a `replacement_affordance`
+  pointer (if the scenario substitutes its own audited equivalent).
+- The scenario registry refuses to load a scenario that skips
+  `withCornerAffordance` unless it appears in the allowlist with a
+  non-expired entry.
+- A CI test fails the build if the allowlist contains an expired
+  entry, an entry whose referenced scenario no longer exists, or an
+  entry whose `replacement_affordance` (if any) does not itself pass
+  the typed-wrapper check.
+- PR review process for additions to the allowlist is documented in
+  [ci.md](ci.md); this plan requires the file and the CI check, not
+  a specific review workflow.
 
 This replaces the client-side escape hatch that was contemplated and
 deferred.
@@ -160,6 +197,34 @@ background plus a `Stack`/`Row` of `Button` widgets:
 Every interaction is a `UIAction` dispatched via the existing input
 channel. No new control-plane messages.
 
+### Action routing and component-id scoping
+
+`io.v1.UIAction{component_id, action, value}` carries no layer or
+activation context. When the main layer and the overlay layer are
+both active, a bare `component_id` is ambiguous — two trees could
+legally contain the same logical name. Rule:
+
+- **Scenario authors write logical component IDs**
+  (e.g. `submit`, `privacy_toggle`) in their descriptor trees.
+- **The descriptor generator rewrites** every `id` field on every
+  `ui.v1.Node` it emits to a **server-assigned, globally unique ID**
+  scoped by owning activation (convention:
+  `<activation_id>:<logical_id>`). The client only ever sees the
+  rewritten form.
+- **The server maintains** an action-ownership map from rewritten
+  `component_id` → owning activation, populated at `SetUI` /
+  `UpdateUI` time and torn down at activation exit.
+- **Incoming `UIAction`s** are routed to the owning activation by
+  lookup. Unknown or stale component IDs are dropped with an
+  observable server-side counter, not delivered.
+- **A server-side validator** rejects a `SetUI` whose tree contains a
+  duplicate `id` or an unrewritten logical id leaking through. This
+  is a scenario-engine bug, not a protocol bug, and should fail
+  loudly in tests.
+
+No wire change is required: the scoping lives in the bytes of the
+`id` field, which already exists on every `Node`.
+
 ### Input routing while the overlay is up
 
 The claim manager and router, not the client, decide what the main
@@ -177,6 +242,18 @@ All three are the existing router behavior of routing inputs to one
 claim or another, or pausing the relevant edges in the media plan.
 Nothing about it is UI-specific. The default mix (audio continues,
 pointer routes to overlay) is the server policy, tested as such.
+
+**Where the policy lives.** The policy is a **server-internal
+attribute of the overlay activation**, not a wire field. Concretely:
+the activation record in `internal/scenario` (or the claim manager's
+activation metadata — exact package chosen at implementation time)
+gains an `overlay_input_policy` field with value `LIVE` / `PAUSED` /
+`MIXED` plus a per-stream override map. The router consults this
+attribute when resolving each incoming event's destination while an
+overlay claim is active on the same display. Scenarios set the
+attribute at activation-start; there is no `ConnectRequest` /
+`ConnectResponse` carrier for it, and it is not part of
+[io-abstraction.md](io-abstraction.md)'s public `Claim` struct.
 
 ## Idle Content Rendering
 
@@ -197,9 +274,15 @@ truth for its own hardware access.
 - On entering privacy mode, the client:
   1. Stops local capture on mic and camera *before* emitting the
      delta.
-  2. Emits a `CapabilityDelta` with `generation = N+1` in which the
-     `microphone` and `camera` fields are cleared (no endpoints,
-     supported = false).
+  2. Emits a `CapabilityDelta` with `generation = N+1` whose embedded
+     `DeviceCapabilities` omits the mic and camera **capability
+     messages entirely**. This plan pins that as the canonical
+     withdrawal encoding: the `microphone` field and the `camera`
+     field are unset on the `DeviceCapabilities` message. Neither
+     `AudioInputCapability` nor `CameraCapability` has a `supported`
+     boolean in [capabilities.proto](../api/terminals/capabilities/v1/capabilities.proto),
+     so the pre-rewrite phrasing is invalid; the canonical form is
+     "field absent," and a single round-trip test pins it.
   3. Disables local wake-word detection.
 - The server's claim manager observes the delta and, per
   [io-abstraction.md](io-abstraction.md), **invalidates** any claim on
@@ -221,14 +304,30 @@ The race is between "client decides to enter privacy mode" and
 `generation` on `CapabilitySnapshot`/`CapabilityDelta`. The rule:
 
 - The client must **not** emit any mic or camera frame after the local
-  cutover timestamp that precedes the delta.
+  cutover — defined as the instant the client's capture stack returns
+  its final frame on the path to the transport.
 - The server must drop any mic/camera frame whose producing
   activation's claim has been invalidated by a capability change.
 - Test fixture asserts that from the moment the delta is sent, zero
   mic/camera frames reach any server-side activation.
 
+**Test-observable sequencing signal.** `VoiceAudio` and camera frame
+messages in the current contracts do not carry per-frame timestamps,
+so the cutover test relies on harness-side tagging rather than
+in-protocol timestamps:
+
+- The Flutter test harness wraps the client's capture producers to
+  stamp each produced frame with a **monotonic harness counter** and
+  records the counter value at the moment `stopCapture()` returns.
+- The server-side test harness records the counter value on every
+  received frame.
+- The assertion is: no received frame carries a counter value
+  strictly greater than the recorded cutover value. This avoids any
+  dependence on wall-clock timestamps that the wire format does not
+  provide.
+
 This generalizes the existing capability-invalidation path; nothing
-new is invented.
+new is invented on the wire.
 
 ## Wake Words
 
@@ -257,6 +356,12 @@ will emit voice events. Dedupe is a server-side policy on the voice
 pipeline, not a client concern. This plan requires that a test exist
 asserting at most one intent is dispatched per utterance within a
 configurable window; it does not prescribe the winner policy.
+
+**This is new infrastructure.** [phase-5-voice.md](phase-5-voice.md)
+documents STT, LLM, TTS, and the intent bus — it does **not**
+document a dedupe stage. Phase E below owns adding that stage to the
+voice pipeline, in addition to the client-side work. The plan should
+not read as though dedupe already exists.
 
 ## Identity and Actors
 
@@ -338,6 +443,15 @@ Tests run under `make all-check` from Phase A onward — CI wiring is
 not deferred. Tests are written alongside or before the code, never
 after.
 
+**CI-gating clause, applied to every phase below.** Each phase's new
+tests land in the same commit series as the code and are included
+in the relevant `make` target at that phase: Go tests in
+`make server-test`, Flutter tests in `make client-test`, proto
+round-trip tests in `make proto-lint`, use-case gates in
+`make usecase-validate`. `make all-check` invokes all of the above.
+No phase is "done" until its additions are reachable from
+`make all-check` on that phase's PR.
+
 Test layers in use:
 
 - **Protobuf contract tests** (`make proto-lint` plus Go round-trip
@@ -383,8 +497,18 @@ Tests (`make server-test`, wired into `make all-check` from day one):
   documented wrapper-level opt-out is present". Failure is a build
   failure.
 - Widget: given a wrapped descriptor, the Flutter renderer shows the
-  affordance at the configured corner and emits
-  `UIAction{component_id: "corner", action: "open"}` on activation.
+  affordance at the configured corner and emits a `UIAction` on
+  activation. The emitted `component_id` matches the
+  server-assigned scoped id (prefix `__affordance.corner__`) that
+  the wrapper placed on the node; the test does not hardcode a bare
+  string.
+- Unit (opt-out governance): the scenario registry refuses to load a
+  main-layer scenario that skips `withCornerAffordance` unless an
+  entry exists in `affordance_optouts.yaml` with an unexpired
+  `expires_at`.
+- Unit (opt-out governance): an expired allowlist entry, a reference
+  to a missing scenario, or a `replacement_affordance` that fails
+  the typed-wrapper check, each cause the build to fail.
 
 ## Phase B — Menu overlay activation
 
@@ -406,6 +530,19 @@ Tests:
   entries when registered; nothing special-cased.
 - Integration: second `corner.open` while menu is up is idempotent
   (no duplicate overlay activation).
+- Integration: an explicit `close` action on the menu (e.g. the
+  menu's close button) terminates the overlay activation and
+  releases its `display.<id>.overlay` claim.
+- Unit (action routing): the descriptor generator rewrites logical
+  `id`s on emitted `ui.v1.Node` trees to scoped ids
+  (`<activation_id>:<logical>`); a `SetUI` that contains a duplicate
+  id or leaks an unrewritten logical id is rejected by the
+  server-side validator.
+- Unit (action routing): the action-ownership map is populated at
+  `SetUI` / `UpdateUI` time and torn down at activation exit; an
+  incoming `UIAction` with an unknown scoped `component_id` is
+  dropped and increments a server-side counter rather than being
+  delivered.
 
 ## Phase C — Overlay input-routing policies
 
@@ -435,16 +572,20 @@ capability set.
 
 Tests:
 
-- Widget: `privacy.toggle` UIAction triggers a `CapabilityDelta` with
-  `microphone` and `camera` cleared and a monotonically-incremented
-  `generation`.
+- Widget: `privacy.toggle` UIAction triggers a `CapabilityDelta`
+  whose embedded `DeviceCapabilities` has the `microphone` and
+  `camera` fields **absent** (not present with empty sub-messages),
+  and a monotonically-incremented `generation`. One proto round-trip
+  test pins the exact canonical encoding.
 - Widget: local capture stops **before** the delta is emitted; a
   fixture stub for the capture APIs asserts the stop call precedes
   the delta send.
 - Integration (race cutover — **blocker** fix): inject mic frames at
-  a fixed rate into the client stub; trigger privacy mode; assert
-  **zero** frames with a capture timestamp after the local cutover
-  reach any server-side activation. Repeat for camera.
+  a fixed rate into the client stub; trigger privacy mode; using the
+  harness-side monotonic frame counter (see **Cutover semantics**
+  above), assert **zero** frames with a counter value strictly
+  greater than the recorded cutover value reach any server-side
+  activation. Repeat for camera.
 - Integration: any active claim on the terminal's mic/camera is
   invalidated server-side on the delta.
 - Integration: exiting privacy mode re-emits capabilities with a
@@ -461,25 +602,43 @@ Tests:
 Client's on-device detector is always live while mic capability is
 present. Detected wake words feed the existing voice pipeline.
 
+**This phase introduces two pieces of new infrastructure** that were
+not acknowledged as new in the previous revision:
+
+1. **A multi-client voice integration fixture.** Existing tests exercise
+   one client at a time; Phase E's dedupe test needs two clients
+   attached to a single server instance with coordinated wake-word
+   injection. The fixture is a prerequisite for the dedupe test in
+   this phase and must land first.
+2. **A voice-pipeline dedupe stage.** Per the note in "Multi-terminal
+   deduplication" above, [phase-5-voice.md](phase-5-voice.md) does
+   not document dedupe. Phase E adds a dedupe stage upstream of
+   intent dispatch, configurable by a window length and a
+   pluggable winner policy (confidence, first-timestamp, closest
+   terminal via the placement engine).
+
 Tests:
 
 - Widget: detector is enabled when mic is in capability set; disabled
   on privacy mode (no mic capability). Fixture harness replaces the
   detector with a stub.
-- Widget (completes a coverage gap from the spec): with mic
-  capability present and privacy mode off, a simulated utterance
-  causes the voice pipeline to begin streaming `VoiceAudio` frames.
-- Integration (**server-side dedup** — addresses Codex #6.3):
-  two terminals each emit a wake-word-triggered voice stream for
-  the same utterance within a configurable window; server dispatches
-  **at most one** intent. The winner policy is a fixture parameter,
-  not hardcoded by the test.
+- Widget: with mic capability present and privacy mode off, a
+  simulated utterance causes the voice pipeline to begin streaming
+  `VoiceAudio` frames.
+- Go unit: the new dedupe stage, given two wake-word events within
+  the configured window, emits one downstream intent per the
+  configured winner policy. Each winner policy has its own unit
+  test; the default policy is pinned.
+- Integration (dedupe end-to-end): using the multi-client fixture,
+  two terminals each emit a wake-word-triggered voice stream for the
+  same utterance within the window; server dispatches **at most
+  one** intent. The winner policy is a fixture parameter, not
+  hardcoded.
 - Integration: server response to a detected wake word may be (a)
   silent service, (b) activation launch, (c) an audible/visible
   server-composed descriptor update. One test per disposition, with
   the client assertions performed by the Flutter integration
-  harness — **not** by the Go server test (correcting the original
-  plan's test-layer mistake).
+  harness — **not** by the Go server test.
 
 ## Phase F — Viewport and orientation via capability delta
 
@@ -522,6 +681,37 @@ Tests:
 - Unit: a mid-flight `UIAction` for `corner.open` whose response
   arrived post-disconnect is idempotent on resume (no ghost overlay
   activation).
+
+## Phase G2 — Idle rendering and identity invariants
+
+Covers spec-level claims that the first revision of the plan asserted
+in prose without a corresponding test.
+
+Tests:
+
+- Widget (cold start): on first connect, before any `SetUI` has been
+  received, the client renders the server-defined placeholder
+  descriptor that ships with the scenario runtime. No ad-hoc client
+  widget is rendered in its place. Asserted by rendering-tree
+  inspection against a chrome-namespace vs descriptor-namespace
+  split.
+- Widget (no idle cache across sessions): disconnect the client from
+  a session whose last `SetUI` was an idle descriptor; reconnect as
+  a new session; assert the prior idle tree is not re-rendered
+  before a fresh server push. The test inspects the renderer's
+  active descriptor between the disconnect and the server's first
+  post-reconnect `SetUI`.
+- Widget (no identity surface): inspect the rendered tree across a
+  representative set of descriptors for any login, user-picker, or
+  actor-display element that originates from the **client-chrome
+  namespace**. Any such element is a test failure. Server-composed
+  descriptor elements that display identity are not subject to this
+  assertion — the test distinguishes by namespace.
+- Integration (no client-side identity gating): a `UIAction` that the
+  server decides is restricted for the current resolved actor is
+  blocked server-side (policy returns an error / no-op / redirect);
+  the client never gates on identity and always forwards the
+  action. Fixture asserts both sides of this behavior.
 
 ## Phase H — End-to-end use cases
 
