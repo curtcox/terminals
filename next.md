@@ -1,1 +1,1 @@
-Pick the next unimplemented `plans/terminal-ui.md` acceptance test and start with a failing test.
+Implement Phase C overlay input-routing policy tests (LIVE/PAUSED/MIXED), starting with default MIXED integration red test.

@@ -1776,6 +1776,126 @@ func TestHandleMessageInputMenuCloseActionReleasesOverlayClaim(t *testing.T) {
 	}
 }
 
+type stubIdentityService struct {
+	actorsByDevice map[string]Actor
+}
+
+func (s stubIdentityService) ResolveActor(deviceID string) Actor {
+	if actor, ok := s.actorsByDevice[deviceID]; ok {
+		return actor
+	}
+	return Actor{Kind: "device", ID: strings.TrimSpace(deviceID)}
+}
+
+type fixtureMenuPolicy struct{}
+
+func (fixtureMenuPolicy) VisibleApps(actor Actor, apps []string) []string {
+	if strings.EqualFold(strings.TrimSpace(actor.Kind), "anonymous") {
+		out := make([]string, 0, len(apps))
+		for _, app := range apps {
+			if app == "photo_frame" {
+				out = append(out, app)
+			}
+		}
+		return out
+	}
+	return append([]string(nil), apps...)
+}
+
+func TestHandleMessageInputMenuOverlayCompositionVariesByResolvedActor(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	router := io.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.SetIdentityService(stubIdentityService{
+		actorsByDevice: map[string]Actor{
+			"device-anon":   {Kind: "anonymous", ID: "kiosk"},
+			"device-person": {Kind: "person", ID: "alice"},
+		},
+	})
+	handler.SetMenuAppPolicy(fixtureMenuPolicy{})
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-anon", DeviceName: "Kiosk"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-person", DeviceName: "Kitchen Tablet"},
+	})
+
+	anonOpenOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-anon",
+			ComponentID: "act:device-anon/__affordance.corner__",
+			Action:      "open",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input corner open anonymous) error = %v", err)
+	}
+	personOpenOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-person",
+			ComponentID: "act:device-person/__affordance.corner__",
+			Action:      "open",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input corner open person) error = %v", err)
+	}
+
+	if len(anonOpenOut) != 1 || anonOpenOut[0].UpdateUI == nil {
+		t.Fatalf("expected one UpdateUI for anonymous menu open, got %+v", anonOpenOut)
+	}
+	if len(personOpenOut) != 1 || personOpenOut[0].UpdateUI == nil {
+		t.Fatalf("expected one UpdateUI for person menu open, got %+v", personOpenOut)
+	}
+
+	anonApps := menuAppNamesFromDescriptor(&anonOpenOut[0].UpdateUI.Node)
+	personApps := menuAppNamesFromDescriptor(&personOpenOut[0].UpdateUI.Node)
+
+	if len(anonApps) == 0 {
+		t.Fatalf("expected anonymous actor to see at least one app")
+	}
+	if _, ok := anonApps["terminal"]; ok {
+		t.Fatalf("anonymous menu should hide terminal app, got %+v", anonApps)
+	}
+	if _, ok := personApps["terminal"]; !ok {
+		t.Fatalf("person menu should include terminal app, got %+v", personApps)
+	}
+	if len(personApps) <= len(anonApps) {
+		t.Fatalf("expected actor-variant menu app counts, anonymous=%d person=%d", len(anonApps), len(personApps))
+	}
+}
+
+func menuAppNamesFromDescriptor(node *ui.Descriptor) map[string]struct{} {
+	out := map[string]struct{}{}
+	if node == nil {
+		return out
+	}
+	if id := node.Props["id"]; strings.Contains(id, "/menu.app.") {
+		parts := strings.SplitN(id, "/menu.app.", 2)
+		if len(parts) == 2 {
+			out[parts[1]] = struct{}{}
+		}
+	}
+	for i := range node.Children {
+		for name := range menuAppNamesFromDescriptor(&node.Children[i]) {
+			out[name] = struct{}{}
+		}
+	}
+	return out
+}
+
 func TestHandleInputActionMapTurnoverDropsPriorMainActivationScopedIDs(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

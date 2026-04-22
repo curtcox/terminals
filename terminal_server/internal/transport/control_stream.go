@@ -380,6 +380,28 @@ type BugReportIntake interface {
 	File(context.Context, *diagnosticsv1.BugReport) (*diagnosticsv1.BugReportAck, error)
 }
 
+// Actor is a resolved identity principal used by menu composition policy.
+type Actor struct {
+	Kind string
+	ID   string
+}
+
+// IdentityService resolves the actor for a given device id.
+type IdentityService interface {
+	ResolveActor(deviceID string) Actor
+}
+
+// MenuAppPolicy filters or rewrites menu app visibility by actor.
+type MenuAppPolicy interface {
+	VisibleApps(actor Actor, apps []string) []string
+}
+
+type allowAllMenuAppPolicy struct{}
+
+func (allowAllMenuAppPolicy) VisibleApps(_ Actor, apps []string) []string {
+	return append([]string(nil), apps...)
+}
+
 // StreamHandler processes control stream messages.
 type StreamHandler struct {
 	control     *ControlService
@@ -416,6 +438,9 @@ type StreamHandler struct {
 	webrtc      WebRTCSignalEngine
 	bugReports  BugReportIntake
 	uiOwners    *uiActionOwnershipTracker
+
+	identityService IdentityService
+	menuAppPolicy   MenuAppPolicy
 }
 
 type mediaStreamState struct {
@@ -493,6 +518,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		voiceAudioBuffers:     map[string][]byte{},
 		recording:             recording.NoopManager{},
 		uiOwners:              newUIActionOwnershipTracker(),
+		menuAppPolicy:         allowAllMenuAppPolicy{},
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -536,6 +562,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		voiceAudioBuffers:     map[string][]byte{},
 		recording:             recording.NoopManager{},
 		uiOwners:              newUIActionOwnershipTracker(),
+		menuAppPolicy:         allowAllMenuAppPolicy{},
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -566,6 +593,24 @@ func (h *StreamHandler) SetBugReportIntake(intake BugReportIntake) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.bugReports = intake
+}
+
+// SetIdentityService wires actor resolution used by menu composition.
+func (h *StreamHandler) SetIdentityService(identity IdentityService) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.identityService = identity
+}
+
+// SetMenuAppPolicy configures actor-aware menu app filtering.
+func (h *StreamHandler) SetMenuAppPolicy(policy MenuAppPolicy) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if policy == nil {
+		h.menuAppPolicy = allowAllMenuAppPolicy{}
+		return
+	}
+	h.menuAppPolicy = policy
 }
 
 // SetPhotoFrameSettings overrides photo-frame slide URLs and rotation
@@ -2718,7 +2763,7 @@ func (h *StreamHandler) releaseMenuOverlayClaim(ctx context.Context, activationI
 func (h *StreamHandler) menuOverlayDescriptor(deviceID string) ui.Descriptor {
 	activationID := menuOverlayActivationID(deviceID)
 	children := make([]ui.Descriptor, 0, 4)
-	for _, appName := range h.menuOverlayApps() {
+	for _, appName := range h.menuOverlayApps(deviceID) {
 		children = append(children, ui.New("button", map[string]string{
 			"id":     menuScopedComponentID(activationID, "menu.app."+appName),
 			"label":  appName,
@@ -2750,7 +2795,7 @@ func (h *StreamHandler) menuOverlayDescriptor(deviceID string) ui.Descriptor {
 	}, children...))
 }
 
-func (h *StreamHandler) menuOverlayApps() []string {
+func (h *StreamHandler) menuOverlayApps(deviceID string) []string {
 	if h.runtime == nil || h.runtime.Engine == nil {
 		return nil
 	}
@@ -2764,7 +2809,21 @@ func (h *StreamHandler) menuOverlayApps() []string {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	return names
+
+	actor := Actor{Kind: "device", ID: strings.TrimSpace(deviceID)}
+	if h.identityService != nil {
+		resolved := h.identityService.ResolveActor(deviceID)
+		if kind := strings.TrimSpace(resolved.Kind); kind != "" {
+			actor.Kind = kind
+		}
+		if id := strings.TrimSpace(resolved.ID); id != "" {
+			actor.ID = id
+		}
+	}
+	if h.menuAppPolicy == nil {
+		return names
+	}
+	return h.menuAppPolicy.VisibleApps(actor, names)
 }
 
 func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, action string) ([]ServerMessage, bool, error) {
