@@ -76,6 +76,68 @@ type pipelineWakeWord struct {
 	failWith  error
 }
 
+type multiClientVoiceFixture struct {
+	handler *StreamHandler
+	stt     *pipelineSTT
+	llm     *pipelineLLM
+}
+
+func newMultiClientVoiceFixture(t *testing.T, policy wakeWordWinnerPolicy) *multiClientVoiceFixture {
+	t.Helper()
+
+	stt := &pipelineSTT{transcribed: "hey terminal what is the weather"}
+	llm := &pipelineLLM{response: "It is sunny in Test City"}
+	wakeWord := &pipelineWakeWord{detection: scenario.WakeWordDetection{
+		Detected: true,
+		Command:  "assistant what is the weather",
+	}}
+
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        iorouter.NewRouter(),
+		LLM:       llm,
+		STT:       stt,
+		WakeWord:  wakeWord,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.wakeWordDedupe = newWakeWordDedupeStage(defaultWakeWordDedupeWindow, policy)
+
+	return &multiClientVoiceFixture{
+		handler: handler,
+		stt:     stt,
+		llm:     llm,
+	}
+}
+
+func (f *multiClientVoiceFixture) registerDevice(t *testing.T, deviceID, deviceName string) {
+	t.Helper()
+	if _, err := f.handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: deviceID, DeviceName: deviceName},
+	}); err != nil {
+		t.Fatalf("register(%s) error = %v", deviceID, err)
+	}
+}
+
+func (f *multiClientVoiceFixture) sendFinalVoiceAudio(t *testing.T, deviceID string, audio []byte) []ServerMessage {
+	t.Helper()
+	out, err := f.handler.HandleMessage(context.Background(), ClientMessage{
+		VoiceAudio: &VoiceAudioRequest{DeviceID: deviceID, Audio: audio, SampleRate: 16000, IsFinal: true},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(final voice_audio device=%s) error = %v", deviceID, err)
+	}
+	return out
+}
+
 func (w *pipelineWakeWord) Detect(_ context.Context, spoken string) (scenario.WakeWordDetection, error) {
 	if w.failWith != nil {
 		return scenario.WakeWordDetection{}, w.failWith
@@ -357,6 +419,42 @@ func TestControlStreamVoiceAudioWakeWordNotDetectedReturnsNoOutput(t *testing.T)
 	}
 	if len(broadcaster.Events()) != 0 {
 		t.Fatalf("expected no broadcast events when wake word not detected")
+	}
+}
+
+func TestControlStreamVoiceAudioWakeWordDedupeAcrossClientsDispatchesAtMostOneIntent(t *testing.T) {
+	t.Parallel()
+
+	policies := []wakeWordWinnerPolicy{
+		wakeWordWinnerPolicyFirstHeard,
+		wakeWordWinnerPolicyHighestConfidence,
+		wakeWordWinnerPolicyClosestTerminal,
+	}
+
+	for _, policy := range policies {
+		policy := policy
+		t.Run(string(policy), func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newMultiClientVoiceFixture(t, policy)
+			fixture.registerDevice(t, "device-1", "Kitchen")
+			fixture.registerDevice(t, "device-2", "Hall")
+
+			firstOut := fixture.sendFinalVoiceAudio(t, "device-1", []byte("audio-a"))
+			secondOut := fixture.sendFinalVoiceAudio(t, "device-2", []byte("audio-b"))
+
+			scenarioStarts := 0
+			for _, out := range [][]ServerMessage{firstOut, secondOut} {
+				for _, msg := range out {
+					if msg.ScenarioStart != "" {
+						scenarioStarts++
+					}
+				}
+			}
+			if scenarioStarts > 1 {
+				t.Fatalf("scenario start count = %d, want <= 1 for policy %q", scenarioStarts, policy)
+			}
+		})
 	}
 }
 
