@@ -1649,6 +1649,142 @@ func TestHandleMessageInputRoutesStopActiveAction(t *testing.T) {
 	}
 }
 
+func TestHandleMessageInputCornerOpenTogglesMenuOverlayAndClaim(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	router := io.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+
+	openOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "act:device-1/__affordance.corner__",
+			Action:      "open",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input corner open) error = %v", err)
+	}
+	if len(openOut) != 1 || openOut[0].UpdateUI == nil {
+		t.Fatalf("expected one UpdateUI response for menu open, got %+v", openOut)
+	}
+	if openOut[0].UpdateUI.ComponentID != ui.GlobalOverlayComponentID {
+		t.Fatalf("UpdateUI.ComponentID = %q, want %q", openOut[0].UpdateUI.ComponentID, ui.GlobalOverlayComponentID)
+	}
+	if openOut[0].UpdateUI.Node.Type != "overlay" {
+		t.Fatalf("UpdateUI node type = %q, want overlay", openOut[0].UpdateUI.Node.Type)
+	}
+	if findNodeByID(&openOut[0].UpdateUI.Node, "act:menu-overlay:device-1/menu.privacy_toggle") == nil {
+		t.Fatalf("expected privacy toggle button in menu overlay descriptor")
+	}
+	if findNodeByID(&openOut[0].UpdateUI.Node, "act:menu-overlay:device-1/menu.bug_report") == nil {
+		t.Fatalf("expected bug report button in menu overlay descriptor")
+	}
+
+	claims := router.Claims().Snapshot("device-1")
+	if !hasClaim(claims, "menu-overlay:device-1", "screen.overlay") {
+		t.Fatalf("expected screen.overlay claim for menu overlay activation, got %+v", claims)
+	}
+
+	closeOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "act:device-1/__affordance.corner__",
+			Action:      "corner.open",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input second corner open) error = %v", err)
+	}
+	if len(closeOut) != 1 || closeOut[0].UpdateUI == nil {
+		t.Fatalf("expected one UpdateUI response for menu close, got %+v", closeOut)
+	}
+	if closeOut[0].UpdateUI.Node.Type != "overlay" {
+		t.Fatalf("close UpdateUI node type = %q, want overlay", closeOut[0].UpdateUI.Node.Type)
+	}
+	if len(closeOut[0].UpdateUI.Node.Children) != 0 {
+		t.Fatalf("expected menu overlay clear patch on close, got children=%d", len(closeOut[0].UpdateUI.Node.Children))
+	}
+
+	claims = router.Claims().Snapshot("device-1")
+	if hasClaim(claims, "menu-overlay:device-1", "screen.overlay") {
+		t.Fatalf("expected menu overlay claim released on close, got %+v", claims)
+	}
+}
+
+func TestHandleMessageInputMenuCloseActionReleasesOverlayClaim(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	router := io.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "act:device-1/__affordance.corner__",
+			Action:      "open",
+		},
+	})
+
+	closeOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: "act:menu-overlay:device-1/menu.close",
+			Action:      "close",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(input menu close) error = %v", err)
+	}
+	if len(closeOut) != 1 || closeOut[0].UpdateUI == nil {
+		t.Fatalf("expected one UpdateUI response for menu close action, got %+v", closeOut)
+	}
+	if len(closeOut[0].UpdateUI.Node.Children) != 0 {
+		t.Fatalf("expected menu overlay clear patch, got children=%d", len(closeOut[0].UpdateUI.Node.Children))
+	}
+
+	claims := router.Claims().Snapshot("device-1")
+	if hasClaim(claims, "menu-overlay:device-1", "screen.overlay") {
+		t.Fatalf("expected menu overlay claim released by close action, got %+v", claims)
+	}
+}
+
+func hasClaim(claims []io.Claim, activationID, resource string) bool {
+	for _, claim := range claims {
+		if claim.ActivationID == activationID && claim.Resource == resource {
+			return true
+		}
+	}
+	return false
+}
+
 func TestHandleMessageInputRoutesMultiWindowEndActionAndRestoresPriorTerminal(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "device-2", DeviceName: "Hall"})

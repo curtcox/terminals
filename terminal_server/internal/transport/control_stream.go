@@ -399,6 +399,7 @@ type StreamHandler struct {
 	terminalUIInterval   time.Duration
 	terminalReplAdminURL string
 	lastSetUIByDevice    map[string]ui.Descriptor
+	menuOverlayByDevice  map[string]menuOverlayState
 	multiWindowResume    map[string]multiWindowResumeState
 	photoFrameSlides     []string
 	photoFrameIndexByDev map[string]int
@@ -430,6 +431,10 @@ type multiWindowResumeState struct {
 	HasPriorUI    bool
 }
 
+type menuOverlayState struct {
+	ActivationID string
+}
+
 type sensorSnapshot struct {
 	UnixMS int64
 	Values map[string]float64
@@ -445,6 +450,7 @@ const (
 	bugReportActionPrefix       = "bug_report"
 	defaultCornerPlacement      = "bottom-right"
 	cornerAffordanceLogicalID   = "__affordance.corner__"
+	menuOverlayActivationPrefix = "menu-overlay:"
 )
 
 // CommandEvent is a bounded audit record of command handling.
@@ -473,6 +479,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalUIInterval:   defaultTerminalUIInterval,
 		terminalReplAdminURL: defaultTerminalReplAdminURL,
 		lastSetUIByDevice:    map[string]ui.Descriptor{},
+		menuOverlayByDevice:  map[string]menuOverlayState{},
 		multiWindowResume:    map[string]multiWindowResumeState{},
 		photoFrameSlides:     defaultPhotoFrameSlides(),
 		photoFrameIndexByDev: map[string]int{},
@@ -513,6 +520,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalUIInterval:   defaultTerminalUIInterval,
 		terminalReplAdminURL: defaultTerminalReplAdminURL,
 		lastSetUIByDevice:    map[string]ui.Descriptor{},
+		menuOverlayByDevice:  map[string]menuOverlayState{},
 		multiWindowResume:    map[string]multiWindowResumeState{},
 		photoFrameSlides:     defaultPhotoFrameSlides(),
 		photoFrameIndexByDev: map[string]int{},
@@ -2422,6 +2430,9 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	if responses, handled := h.handleChatInput(deviceID, componentID, action, in.Value); handled {
 		return responses, nil
 	}
+	if responses, handled, err := h.handleMenuOverlayInput(ctx, deviceID, componentID, action); handled {
+		return responses, err
+	}
 
 	switch action {
 	case "change":
@@ -2544,6 +2555,192 @@ func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDev
 			Notification: "Bug report filed: " + ack.GetReportId(),
 		},
 	}, nil
+}
+
+func (h *StreamHandler) handleMenuOverlayInput(ctx context.Context, deviceID, componentID, action string) ([]ServerMessage, bool, error) {
+	componentID = strings.TrimSpace(componentID)
+	action = strings.ToLower(strings.TrimSpace(action))
+	if action == "" {
+		return nil, false, nil
+	}
+
+	overlayOpen := h.isMenuOverlayOpen(deviceID)
+	if isCornerOpenInput(componentID, action) {
+		if overlayOpen {
+			return h.closeMenuOverlay(ctx, deviceID)
+		}
+		return h.openMenuOverlay(ctx, deviceID)
+	}
+	if isMenuCloseInput(componentID, action) {
+		if !overlayOpen {
+			return nil, true, nil
+		}
+		return h.closeMenuOverlay(ctx, deviceID)
+	}
+	return nil, false, nil
+}
+
+func isCornerOpenInput(componentID, action string) bool {
+	if action == "corner.open" {
+		return true
+	}
+	return action == "open" && strings.HasSuffix(strings.TrimSpace(componentID), "/"+cornerAffordanceLogicalID)
+}
+
+func isMenuCloseInput(componentID, action string) bool {
+	return action == "close" && strings.HasSuffix(strings.TrimSpace(componentID), "/menu.close")
+}
+
+func (h *StreamHandler) isMenuOverlayOpen(deviceID string) bool {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return false
+	}
+	h.mu.Lock()
+	_, ok := h.menuOverlayByDevice[deviceID]
+	h.mu.Unlock()
+	return ok
+}
+
+func (h *StreamHandler) openMenuOverlay(ctx context.Context, deviceID string) ([]ServerMessage, bool, error) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil, true, nil
+	}
+	activationID := menuOverlayActivationID(deviceID)
+	if err := h.requestMenuOverlayClaim(ctx, deviceID, activationID); err != nil {
+		return nil, true, err
+	}
+	h.mu.Lock()
+	h.menuOverlayByDevice[deviceID] = menuOverlayState{ActivationID: activationID}
+	h.mu.Unlock()
+	return []ServerMessage{{
+		UpdateUI: &UIUpdate{
+			ComponentID: ui.GlobalOverlayComponentID,
+			Node:        h.menuOverlayDescriptor(deviceID),
+		},
+	}}, true, nil
+}
+
+func (h *StreamHandler) closeMenuOverlay(ctx context.Context, deviceID string) ([]ServerMessage, bool, error) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil, true, nil
+	}
+	h.mu.Lock()
+	state, ok := h.menuOverlayByDevice[deviceID]
+	if ok {
+		delete(h.menuOverlayByDevice, deviceID)
+	}
+	h.mu.Unlock()
+	if ok {
+		if err := h.releaseMenuOverlayClaim(ctx, state.ActivationID); err != nil {
+			return nil, true, err
+		}
+	}
+	return []ServerMessage{{
+		UpdateUI: &UIUpdate{
+			ComponentID: ui.GlobalOverlayComponentID,
+			Node:        ui.GlobalOverlaySlot(),
+		},
+	}}, true, nil
+}
+
+func menuOverlayActivationID(deviceID string) string {
+	return menuOverlayActivationPrefix + strings.TrimSpace(deviceID)
+}
+
+func menuScopedComponentID(activationID, logicalID string) string {
+	return "act:" + strings.TrimSpace(activationID) + "/" + strings.TrimSpace(logicalID)
+}
+
+func (h *StreamHandler) requestMenuOverlayClaim(ctx context.Context, deviceID, activationID string) error {
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+		return nil
+	}
+	routeIO, ok := h.runtime.Env.IO.(interface{ Claims() *iorouter.ClaimManager })
+	if !ok {
+		return nil
+	}
+	claims := routeIO.Claims()
+	if claims == nil {
+		return nil
+	}
+	_, err := claims.Request(ctx, []iorouter.Claim{{
+		ActivationID: activationID,
+		DeviceID:     strings.TrimSpace(deviceID),
+		Resource:     "screen.overlay",
+		Mode:         iorouter.ClaimShared,
+		Priority:     int(scenario.PriorityNormal),
+	}})
+	return err
+}
+
+func (h *StreamHandler) releaseMenuOverlayClaim(ctx context.Context, activationID string) error {
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+		return nil
+	}
+	routeIO, ok := h.runtime.Env.IO.(interface{ Claims() *iorouter.ClaimManager })
+	if !ok {
+		return nil
+	}
+	claims := routeIO.Claims()
+	if claims == nil {
+		return nil
+	}
+	return claims.Release(ctx, strings.TrimSpace(activationID))
+}
+
+func (h *StreamHandler) menuOverlayDescriptor(deviceID string) ui.Descriptor {
+	activationID := menuOverlayActivationID(deviceID)
+	children := make([]ui.Descriptor, 0, 4)
+	for _, appName := range h.menuOverlayApps() {
+		children = append(children, ui.New("button", map[string]string{
+			"id":     menuScopedComponentID(activationID, "menu.app."+appName),
+			"label":  appName,
+			"action": "start:" + appName,
+		}))
+	}
+	children = append(children,
+		ui.New("button", map[string]string{
+			"id":     menuScopedComponentID(activationID, "menu.privacy_toggle"),
+			"label":  "Privacy",
+			"action": "privacy.toggle",
+		}),
+		ui.New("button", map[string]string{
+			"id":     menuScopedComponentID(activationID, "menu.bug_report"),
+			"label":  "Report Bug",
+			"action": bugReportActionPrefix + ":" + strings.TrimSpace(deviceID),
+		}),
+		ui.New("button", map[string]string{
+			"id":     menuScopedComponentID(activationID, "menu.close"),
+			"label":  "Close",
+			"action": "close",
+		}),
+	)
+
+	return ui.New("overlay", map[string]string{
+		"id": ui.GlobalOverlayComponentID,
+	}, ui.New("stack", map[string]string{
+		"id": menuScopedComponentID(activationID, "menu.root"),
+	}, children...))
+}
+
+func (h *StreamHandler) menuOverlayApps() []string {
+	if h.runtime == nil || h.runtime.Engine == nil {
+		return nil
+	}
+	items := h.runtime.Engine.RegistrySnapshot()
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		name := strings.TrimSpace(item.Name)
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, action string) ([]ServerMessage, bool, error) {
