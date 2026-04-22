@@ -40,14 +40,31 @@ typedef UnixMsProvider = int Function();
 typedef BugReportScreenshotCapture = Future<List<int>> Function();
 typedef WakeWordDetectorFactory = WakeWordDetectorController Function();
 
+class WakeWordUtterance {
+  const WakeWordUtterance({
+    required this.audio,
+    required this.sampleRate,
+    required this.isFinal,
+  });
+
+  final List<int> audio;
+  final int sampleRate;
+  final bool isFinal;
+}
+
 abstract class WakeWordDetectorController {
   Future<void> setEnabled(bool enabled);
+  void setOnUtterance(void Function(WakeWordUtterance utterance)? onUtterance);
   Future<void> dispose();
 }
 
 class NoopWakeWordDetectorController implements WakeWordDetectorController {
   @override
   Future<void> setEnabled(bool enabled) async {}
+
+  @override
+  void setOnUtterance(void Function(WakeWordUtterance utterance)? onUtterance) {
+  }
 
   @override
   Future<void> dispose() async {}
@@ -1388,6 +1405,31 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     unawaited(_wakeWordDetector.setEnabled(enabled));
   }
 
+  bool _canEmitVoiceAudio() {
+    if (_privacyModeEnabled || !_isConnectionRegistered) {
+      return false;
+    }
+    final capabilities = _lastRegisteredCapabilities;
+    return capabilities != null && capabilities.hasMicrophone();
+  }
+
+  void _handleWakeWordUtterance(WakeWordUtterance utterance) {
+    if (!_canEmitVoiceAudio()) {
+      return;
+    }
+    unawaited(
+      _sendWhenReady(
+        operation: OutboundOperation.voiceAudio,
+        request: ConnectRequest()
+          ..voiceAudio = (VoiceAudio()
+            ..deviceId = _deviceId
+            ..audio = utterance.audio
+            ..sampleRate = utterance.sampleRate
+            ..isFinal = utterance.isFinal),
+      ),
+    );
+  }
+
   bool _isStaleCapabilityGenerationError(ControlError error) {
     if (error.code != ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION) {
       return false;
@@ -1744,6 +1786,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     );
     _audioPlayback = widget.audioPlaybackFactory();
     _wakeWordDetector = widget.wakeWordDetectorFactory();
+    _wakeWordDetector.setOnUtterance(_handleWakeWordUtterance);
     _artifactExporter = DurableArtifactExporter();
     _readinessGateway = ConnectionReadinessGateway(
       currentPhase: () => _connectionPhase,
@@ -3651,6 +3694,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _outgoing.close();
     unawaited(_mediaEngine.dispose());
     unawaited(_audioPlayback.dispose());
+    _wakeWordDetector.setOnUtterance(null);
     unawaited(_wakeWordDetector.dispose());
     final existingClient = _client;
     if (existingClient != null) {

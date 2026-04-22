@@ -703,6 +703,56 @@ void main() {
     expect(detector.enabledStates, <bool>[true, false, true]);
   });
 
+  testWidgets('wake-word utterance sends VoiceAudio when microphone is enabled', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    final detector = _FakeWakeWordDetectorController();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+        wakeWordDetectorFactory: () => detector,
+        capabilityProbeFactory: () => _StaticCapabilityProbe(
+          capv1.DeviceCapabilities()
+            ..microphone = (capv1.AudioInputCapability()
+              ..channels = 1
+              ..endpoints.add(capv1.AudioEndpoint()..endpointId = 'mic-main')),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..registerAck = (RegisterAck()
+          ..serverId = 'test-server'
+          ..message = 'registered'),
+    );
+    await tester.pumpAndSettle();
+
+    detector.simulateUtterance(
+      audio: <int>[1, 2, 3, 4],
+      sampleRate: 16000,
+      isFinal: true,
+    );
+    await tester.pumpAndSettle();
+
+    final voiceAudioRequests = harness.lastClient.requests
+        .where((request) => request.hasVoiceAudio())
+        .toList(growable: false);
+    expect(voiceAudioRequests, hasLength(1));
+    final voiceAudio = voiceAudioRequests.single.voiceAudio;
+    expect(voiceAudio.deviceId, isNotEmpty);
+    expect(voiceAudio.audio, <int>[1, 2, 3, 4]);
+    expect(voiceAudio.sampleRate, 16000);
+    expect(voiceAudio.isFinal, isTrue);
+  });
+
   testWidgets('connection attempt immediately falls back to next carrier', (
     WidgetTester tester,
   ) async {
@@ -2803,10 +2853,30 @@ class _StaticCapabilityProbe implements CapabilityProbe {
 
 class _FakeWakeWordDetectorController implements WakeWordDetectorController {
   final List<bool> enabledStates = <bool>[];
+  void Function(WakeWordUtterance utterance)? _onUtterance;
 
   @override
   Future<void> setEnabled(bool enabled) async {
     enabledStates.add(enabled);
+  }
+
+  @override
+  void setOnUtterance(void Function(WakeWordUtterance utterance)? onUtterance) {
+    _onUtterance = onUtterance;
+  }
+
+  void simulateUtterance({
+    required List<int> audio,
+    required int sampleRate,
+    required bool isFinal,
+  }) {
+    _onUtterance?.call(
+      WakeWordUtterance(
+        audio: audio,
+        sampleRate: sampleRate,
+        isFinal: isFinal,
+      ),
+    );
   }
 
   @override

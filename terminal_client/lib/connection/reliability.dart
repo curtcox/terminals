@@ -235,6 +235,7 @@ enum OutboundOperation {
   keyEvent,
   streamReady,
   webrtcSignal,
+  voiceAudio,
   artifactAvailable,
 }
 
@@ -339,6 +340,11 @@ const Map<OutboundOperation, OutboundRoutingRule> kOutboundRoutingRules =
   ),
   OutboundOperation.webrtcSignal: OutboundRoutingRule(
     mode: SendMode.fireAndForget,
+    safeToReplay: false,
+    requiresAck: false,
+  ),
+  OutboundOperation.voiceAudio: OutboundRoutingRule(
+    mode: SendMode.queueUntilReady,
     safeToReplay: false,
     requiresAck: false,
   ),
