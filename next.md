@@ -1,1 +1,1 @@
-Add a widget test that asserts there is no persistent client-chrome privacy/capture indicator rendered while privacy mode toggles on/off, then implement only the minimum client change if it fails.
+Add an integration test for privacy-mode cutover that injects mic and camera frames with monotonic counters, records cutover on privacy.toggle, and asserts zero post-cutover frames reach any server activation.

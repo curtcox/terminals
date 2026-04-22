@@ -18,6 +18,21 @@ import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/main.dart';
 import 'package:terminal_client/media/webrtc_engine.dart';
 
+Finder _findClientChromePrivacyOrCaptureIndicators() {
+  return find.byWidgetPredicate(
+    (widget) {
+      final key = widget.key;
+      if (key is! ValueKey<String>) {
+        return false;
+      }
+      final value = key.value;
+      return value.contains('client.chrome.privacy') ||
+          value.contains('client.chrome.capture');
+    },
+    description: 'client-chrome privacy/capture indicator',
+  );
+}
+
 void main() {
   test('diagnoseTransportError identifies grpc unavailable socket issue', () {
     final diagnosis = diagnoseTransportError(
@@ -552,6 +567,80 @@ void main() {
       expect(restoredDelta.generation, greaterThan(firstPrivacyDelta.generation));
       expect(restoredDelta.capabilities.hasMicrophone(), isTrue);
       expect(restoredDelta.capabilities.hasCamera(), isTrue);
+    },
+  );
+
+  testWidgets(
+    'privacy.toggle does not render persistent client-chrome privacy/capture indicator',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final harness = _FakeClientHarness();
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          capabilityProbeFactory: () => _StaticCapabilityProbe(
+            capv1.DeviceCapabilities()
+              ..microphone = (capv1.AudioInputCapability()
+                ..channels = 1
+                ..endpoints.add(capv1.AudioEndpoint()..endpointId = 'mic-main'))
+              ..camera = (capv1.CameraCapability()
+                ..endpoints.add(
+                  capv1.CameraEndpoint()..endpointId = 'camera-main',
+                )),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..setUi = (uiv1.SetUI()
+            ..root = (uiv1.Node()
+              ..id = 'terminal_root'
+              ..stack = (uiv1.StackWidget())
+              ..children.addAll([
+                uiv1.Node()
+                  ..id = 'act:main/privacy_toggle'
+                  ..button = (uiv1.ButtonWidget()
+                    ..label = 'Privacy'
+                    ..action = 'privacy.toggle'),
+                uiv1.Node()
+                  ..id = 'server.descriptor.privacy_overlay'
+                  ..overlay = (uiv1.OverlayWidget())
+                  ..children.add(
+                    uiv1.Node()
+                      ..id = 'server.descriptor.privacy_text'
+                      ..text = (uiv1.TextWidget()..value = 'Server indicator'),
+                  ),
+              ]))),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const ValueKey<String>('ui-overlay-server.descriptor.privacy_overlay'),
+        ),
+        findsOneWidget,
+      );
+      expect(_findClientChromePrivacyOrCaptureIndicators(), findsNothing);
+
+      await tester.tap(find.text('Privacy'));
+      await tester.pumpAndSettle();
+      expect(_findClientChromePrivacyOrCaptureIndicators(), findsNothing);
+
+      await tester.tap(find.text('Privacy'));
+      await tester.pumpAndSettle();
+      expect(_findClientChromePrivacyOrCaptureIndicators(), findsNothing);
     },
   );
 
