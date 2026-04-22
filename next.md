@@ -1,1 +1,1 @@
-Implement Phase C overlay input-routing policy tests (LIVE/PAUSED/MIXED), starting with default MIXED integration red test.
+Implement Phase D first deliverable: add test harness frame-counter plumbing for privacy cutover assertions.

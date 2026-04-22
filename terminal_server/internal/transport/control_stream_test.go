@@ -48,6 +48,32 @@ func (s *audioChunkRecordingStub) WriteDeviceAudio(deviceID string, chunk []byte
 	return nil
 }
 
+func TestOverlayInputPolicyAllowsMainStreamByMode(t *testing.T) {
+	live := overlayInputPolicyConfig{Mode: overlayInputPolicyLive}
+	if !policyAllowsMainStream(live, overlayStreamPointer) {
+		t.Fatalf("LIVE policy should keep pointer stream live")
+	}
+	if !policyAllowsMainStream(live, overlayStreamAudio) {
+		t.Fatalf("LIVE policy should keep audio stream live")
+	}
+
+	paused := overlayInputPolicyConfig{Mode: overlayInputPolicyPaused}
+	if policyAllowsMainStream(paused, overlayStreamPointer) {
+		t.Fatalf("PAUSED policy should block pointer stream by default")
+	}
+	if policyAllowsMainStream(paused, overlayStreamAudio) {
+		t.Fatalf("PAUSED policy should block audio stream by default")
+	}
+
+	mixed := defaultOverlayInputPolicy()
+	if policyAllowsMainStream(mixed, overlayStreamPointer) {
+		t.Fatalf("MIXED policy should block pointer stream by default")
+	}
+	if !policyAllowsMainStream(mixed, overlayStreamAudio) {
+		t.Fatalf("MIXED policy should keep audio stream live by default")
+	}
+}
+
 func TestHandleMessageRegisterSendsAckAndUI(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

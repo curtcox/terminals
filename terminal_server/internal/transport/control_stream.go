@@ -439,8 +439,9 @@ type StreamHandler struct {
 	bugReports  BugReportIntake
 	uiOwners    *uiActionOwnershipTracker
 
-	identityService IdentityService
-	menuAppPolicy   MenuAppPolicy
+	identityService   IdentityService
+	menuAppPolicy     MenuAppPolicy
+	menuOverlayPolicy overlayInputPolicyConfig
 }
 
 type mediaStreamState struct {
@@ -460,11 +461,36 @@ type multiWindowResumeState struct {
 
 type menuOverlayState struct {
 	ActivationID string
+	Policy       overlayInputPolicyConfig
+	Suspended    []iorouter.Route
 }
 
 type sensorSnapshot struct {
 	UnixMS int64
 	Values map[string]float64
+}
+
+type overlayInputPolicy string
+
+const (
+	overlayInputPolicyLive   overlayInputPolicy = "LIVE"
+	overlayInputPolicyPaused overlayInputPolicy = "PAUSED"
+	overlayInputPolicyMixed  overlayInputPolicy = "MIXED"
+)
+
+type overlayInputStream string
+
+const (
+	overlayStreamPointer  overlayInputStream = "pointer"
+	overlayStreamTouch    overlayInputStream = "touch"
+	overlayStreamKeyboard overlayInputStream = "keyboard"
+	overlayStreamAudio    overlayInputStream = "audio"
+	overlayStreamCamera   overlayInputStream = "camera"
+)
+
+type overlayInputPolicyConfig struct {
+	Mode      overlayInputPolicy
+	Overrides map[overlayInputStream]bool // true keeps main activation live for stream.
 }
 
 const (
@@ -519,6 +545,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		recording:             recording.NoopManager{},
 		uiOwners:              newUIActionOwnershipTracker(),
 		menuAppPolicy:         allowAllMenuAppPolicy{},
+		menuOverlayPolicy:     defaultOverlayInputPolicy(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -563,6 +590,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		recording:             recording.NoopManager{},
 		uiOwners:              newUIActionOwnershipTracker(),
 		menuAppPolicy:         allowAllMenuAppPolicy{},
+		menuOverlayPolicy:     defaultOverlayInputPolicy(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -611,6 +639,24 @@ func (h *StreamHandler) SetMenuAppPolicy(policy MenuAppPolicy) {
 		return
 	}
 	h.menuAppPolicy = policy
+}
+
+// SetMenuOverlayInputPolicyForTesting overrides menu-overlay routing policy in tests.
+func (h *StreamHandler) SetMenuOverlayInputPolicyForTesting(mode string, overrides map[string]bool) {
+	config := overlayInputPolicyConfig{
+		Mode:      normalizeOverlayInputPolicy(mode),
+		Overrides: map[overlayInputStream]bool{},
+	}
+	for key, value := range overrides {
+		stream := normalizeOverlayInputStream(key)
+		if stream == "" {
+			continue
+		}
+		config.Overrides[stream] = value
+	}
+	h.mu.Lock()
+	h.menuOverlayPolicy = mergeOverlayPolicy(defaultOverlayInputPolicy(), config)
+	h.mu.Unlock()
 }
 
 // SetPhotoFrameSettings overrides photo-frame slide URLs and rotation
@@ -814,6 +860,9 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		return h.handleWebRTCSignal(ctx, msg.WebRTCSignal, msg.SessionDeviceID), nil
 	case msg.VoiceAudio != nil:
 		h.metrics.voiceAudioReceived.Add(1)
+		if h.shouldDropMainStreamWhileOverlayOpen(strings.TrimSpace(msg.VoiceAudio.DeviceID), overlayStreamAudio) {
+			return nil, nil
+		}
 		out, err := h.handleVoiceAudio(ctx, msg.VoiceAudio)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
@@ -2492,6 +2541,9 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	if responses, handled, err := h.handleMenuOverlayInput(ctx, deviceID, componentID, action); handled {
 		return responses, err
 	}
+	if h.shouldDropMainInputWhileOverlayOpen(deviceID, in) {
+		return nil, nil
+	}
 
 	switch action {
 	case "change":
@@ -2670,17 +2722,234 @@ func (h *StreamHandler) isMenuOverlayOpen(deviceID string) bool {
 	return ok
 }
 
+func defaultOverlayInputPolicy() overlayInputPolicyConfig {
+	return overlayInputPolicyConfig{
+		Mode: overlayInputPolicyMixed,
+		Overrides: map[overlayInputStream]bool{
+			overlayStreamAudio: true,
+		},
+	}
+}
+
+func normalizeOverlayInputPolicy(mode string) overlayInputPolicy {
+	switch strings.ToUpper(strings.TrimSpace(mode)) {
+	case string(overlayInputPolicyLive):
+		return overlayInputPolicyLive
+	case string(overlayInputPolicyPaused):
+		return overlayInputPolicyPaused
+	default:
+		return overlayInputPolicyMixed
+	}
+}
+
+func normalizeOverlayInputStream(raw string) overlayInputStream {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case string(overlayStreamPointer):
+		return overlayStreamPointer
+	case string(overlayStreamTouch):
+		return overlayStreamTouch
+	case string(overlayStreamKeyboard):
+		return overlayStreamKeyboard
+	case string(overlayStreamAudio):
+		return overlayStreamAudio
+	case string(overlayStreamCamera):
+		return overlayStreamCamera
+	default:
+		return ""
+	}
+}
+
+func mergeOverlayPolicy(base, override overlayInputPolicyConfig) overlayInputPolicyConfig {
+	out := overlayInputPolicyConfig{
+		Mode:      base.Mode,
+		Overrides: map[overlayInputStream]bool{},
+	}
+	for key, value := range base.Overrides {
+		out.Overrides[key] = value
+	}
+	if override.Mode != "" {
+		out.Mode = override.Mode
+	}
+	for key, value := range override.Overrides {
+		out.Overrides[key] = value
+	}
+	return out
+}
+
+func (h *StreamHandler) overlayPolicyForOpen() overlayInputPolicyConfig {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return mergeOverlayPolicy(defaultOverlayInputPolicy(), h.menuOverlayPolicy)
+}
+
+func (h *StreamHandler) overlayPolicyForDevice(deviceID string) (overlayInputPolicyConfig, bool) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return overlayInputPolicyConfig{}, false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	state, ok := h.menuOverlayByDevice[deviceID]
+	if !ok {
+		return overlayInputPolicyConfig{}, false
+	}
+	return mergeOverlayPolicy(defaultOverlayInputPolicy(), state.Policy), true
+}
+
+func (h *StreamHandler) shouldDropMainStreamWhileOverlayOpen(deviceID string, stream overlayInputStream) bool {
+	policy, ok := h.overlayPolicyForDevice(deviceID)
+	if !ok {
+		return false
+	}
+	return !policyAllowsMainStream(policy, stream)
+}
+
+func policyAllowsMainStream(policy overlayInputPolicyConfig, stream overlayInputStream) bool {
+	switch policy.Mode {
+	case overlayInputPolicyLive:
+		return true
+	case overlayInputPolicyPaused:
+		if allowed, ok := policy.Overrides[stream]; ok {
+			return allowed
+		}
+		return false
+	case overlayInputPolicyMixed:
+		if allowed, ok := policy.Overrides[stream]; ok {
+			return allowed
+		}
+		return !(stream == overlayStreamPointer || stream == overlayStreamTouch)
+	default:
+		return true
+	}
+}
+
+func inferOverlayInputStream(in *InputRequest) overlayInputStream {
+	if in == nil {
+		return overlayStreamPointer
+	}
+	if strings.TrimSpace(in.KeyText) != "" {
+		return overlayStreamKeyboard
+	}
+	componentID := strings.TrimSpace(in.ComponentID)
+	action := strings.ToLower(strings.TrimSpace(in.Action))
+	if componentID == "terminal_input" || action == "change" || action == "submit" {
+		return overlayStreamKeyboard
+	}
+	return overlayStreamPointer
+}
+
+func (h *StreamHandler) inputTargetsOverlay(deviceID, componentID string) bool {
+	deviceID = strings.TrimSpace(deviceID)
+	componentID = strings.TrimSpace(componentID)
+	if deviceID == "" || componentID == "" {
+		return false
+	}
+	overlayActivationID := menuOverlayActivationID(deviceID)
+	if _, activationID, _, ok := parseScopedComponentID(componentID); ok {
+		return activationID == overlayActivationID
+	}
+	return false
+}
+
+func (h *StreamHandler) shouldDropMainInputWhileOverlayOpen(deviceID string, in *InputRequest) bool {
+	if in == nil {
+		return false
+	}
+	policy, ok := h.overlayPolicyForDevice(deviceID)
+	if !ok {
+		return false
+	}
+	if h.inputTargetsOverlay(deviceID, in.ComponentID) {
+		return false
+	}
+	return !policyAllowsMainStream(policy, inferOverlayInputStream(in))
+}
+
+func shouldSuspendRouteForOverlay(route iorouter.Route) bool {
+	switch strings.TrimSpace(route.StreamKind) {
+	case "audio", "video", "audio_mix", "pa_audio", "announcement_audio":
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *StreamHandler) pauseRoutesForOverlayPolicy(
+	ctx context.Context,
+	deviceID string,
+	policy overlayInputPolicyConfig,
+) ([]iorouter.Route, error) {
+	_ = ctx
+	if policy.Mode != overlayInputPolicyPaused {
+		return nil, nil
+	}
+	if policyAllowsMainStream(policy, overlayStreamAudio) && policyAllowsMainStream(policy, overlayStreamCamera) {
+		return nil, nil
+	}
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+		return nil, nil
+	}
+	routeIO, ok := h.runtime.Env.IO.(interface {
+		RoutesForDevice(deviceID string) []iorouter.Route
+		Disconnect(sourceID, targetID, streamKind string) error
+	})
+	if !ok {
+		return nil, nil
+	}
+	routes := routeIO.RoutesForDevice(deviceID)
+	suspended := make([]iorouter.Route, 0, len(routes))
+	for _, route := range routes {
+		if !shouldSuspendRouteForOverlay(route) {
+			continue
+		}
+		if err := routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind); err != nil {
+			return nil, err
+		}
+		suspended = append(suspended, route)
+	}
+	return suspended, nil
+}
+
+func (h *StreamHandler) resumeRoutesForOverlayPolicy(ctx context.Context, suspended []iorouter.Route) error {
+	_ = ctx
+	if len(suspended) == 0 || h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.IO == nil {
+		return nil
+	}
+	routeIO, ok := h.runtime.Env.IO.(interface {
+		Connect(sourceID, targetID, streamKind string) error
+	})
+	if !ok {
+		return nil
+	}
+	for _, route := range suspended {
+		if err := routeIO.Connect(route.SourceID, route.TargetID, route.StreamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+			return err
+		}
+	}
+	return nil
+}
+
 func (h *StreamHandler) openMenuOverlay(ctx context.Context, deviceID string) ([]ServerMessage, bool, error) {
 	deviceID = strings.TrimSpace(deviceID)
 	if deviceID == "" {
 		return nil, true, nil
 	}
 	activationID := menuOverlayActivationID(deviceID)
+	policy := h.overlayPolicyForOpen()
 	if err := h.requestMenuOverlayClaim(ctx, deviceID, activationID); err != nil {
 		return nil, true, err
 	}
+	suspended, err := h.pauseRoutesForOverlayPolicy(ctx, deviceID, policy)
+	if err != nil {
+		_ = h.releaseMenuOverlayClaim(ctx, activationID)
+		return nil, true, err
+	}
 	h.mu.Lock()
-	h.menuOverlayByDevice[deviceID] = menuOverlayState{ActivationID: activationID}
+	h.menuOverlayByDevice[deviceID] = menuOverlayState{
+		ActivationID: activationID,
+		Policy:       policy,
+		Suspended:    suspended,
+	}
 	h.mu.Unlock()
 	return []ServerMessage{{
 		UpdateUI: &UIUpdate{
@@ -2702,6 +2971,9 @@ func (h *StreamHandler) closeMenuOverlay(ctx context.Context, deviceID string) (
 	}
 	h.mu.Unlock()
 	if ok {
+		if err := h.resumeRoutesForOverlayPolicy(ctx, state.Suspended); err != nil {
+			return nil, true, err
+		}
 		if err := h.releaseMenuOverlayClaim(ctx, state.ActivationID); err != nil {
 			return nil, true, err
 		}

@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1802,6 +1803,25 @@ func (fixtureMenuPolicy) VisibleApps(actor Actor, apps []string) []string {
 	return append([]string(nil), apps...)
 }
 
+type countingAudioPublisher struct {
+	mu     sync.Mutex
+	count  int
+	device string
+}
+
+func (p *countingAudioPublisher) Publish(deviceID string, _ []byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.count++
+	p.device = deviceID
+}
+
+func (p *countingAudioPublisher) Snapshot() (int, string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.count, p.device
+}
+
 func TestHandleMessageInputMenuOverlayCompositionVariesByResolvedActor(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
@@ -1874,6 +1894,180 @@ func TestHandleMessageInputMenuOverlayCompositionVariesByResolvedActor(t *testin
 	}
 	if len(personApps) <= len(anonApps) {
 		t.Fatalf("expected actor-variant menu app counts, anonymous=%d person=%d", len(anonApps), len(personApps))
+	}
+}
+
+func TestHandleMessageInputMenuOverlayDefaultMixedPolicyBlocksMainPointerButKeepsAudioLive(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	pub := &countingAudioPublisher{}
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.SetDeviceAudioPublisher(pub)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	}); err != nil {
+		t.Fatalf("register error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{RequestID: "cmd-terminal", DeviceID: "device-1", Kind: "manual", Intent: "terminal"},
+	}); err != nil {
+		t.Fatalf("terminal start error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:device-1/__affordance.corner__", Action: "open"},
+	}); err != nil {
+		t.Fatalf("menu open error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		VoiceAudio: &VoiceAudioRequest{DeviceID: "device-1", Audio: []byte("live-audio"), SampleRate: 16000, IsFinal: false},
+	}); err != nil {
+		t.Fatalf("voice audio error = %v", err)
+	}
+	if count, deviceID := pub.Snapshot(); count != 1 || deviceID != "device-1" {
+		t.Fatalf("audio publish snapshot = (%d,%q), want (1,device-1)", count, deviceID)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "stop_gesture", Action: "stop_active"},
+	})
+	if err != nil {
+		t.Fatalf("stop_active input error = %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("expected no routed main-layer response while overlay is open under MIXED policy, got %+v", out)
+	}
+	if active, ok := runtime.Engine.Active("device-1"); !ok || active != "terminal" {
+		t.Fatalf("active scenario after stop_active = (%q, %v), want terminal,true", active, ok)
+	}
+
+	out, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:menu-overlay:device-1/menu.close", Action: "close"},
+	})
+	if err != nil {
+		t.Fatalf("menu close error = %v", err)
+	}
+	if len(out) == 0 || out[0].UpdateUI == nil {
+		t.Fatalf("expected overlay clear patch on close, got %+v", out)
+	}
+
+	out, err = handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "stop_gesture", Action: "stop_active"},
+	})
+	if err != nil {
+		t.Fatalf("stop_active post-close error = %v", err)
+	}
+	if len(out) == 0 || out[0].ScenarioStop != "terminal" {
+		t.Fatalf("expected stop_active routed after menu close, got %+v", out)
+	}
+}
+
+func TestHandleMessageInputMenuOverlayLivePolicyKeepsMainPointerActive(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.SetMenuOverlayInputPolicyForTesting("LIVE", nil)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{RequestID: "cmd-terminal", DeviceID: "device-1", Kind: "manual", Intent: "terminal"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:device-1/__affordance.corner__", Action: "open"},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "stop_gesture", Action: "stop_active"},
+	})
+	if err != nil {
+		t.Fatalf("stop_active input error = %v", err)
+	}
+	if len(out) == 0 || out[0].ScenarioStop != "terminal" {
+		t.Fatalf("expected stop_active routed with LIVE policy while overlay open, got %+v", out)
+	}
+}
+
+func TestHandleMessageInputMenuOverlayPausedPolicyTearsDownAndRestoresRoutes(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	router := io.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.SetMenuOverlayInputPolicyForTesting("PAUSED", map[string]bool{
+		"audio": false,
+	})
+
+	if err := router.Connect("device-1", "device-2", "audio"); err != nil {
+		t.Fatalf("connect audio route error = %v", err)
+	}
+	if got := len(router.RoutesForDevice("device-1")); got != 1 {
+		t.Fatalf("routes before menu open = %d, want 1", got)
+	}
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{RequestID: "cmd-terminal", DeviceID: "device-1", Kind: "manual", Intent: "terminal"},
+	})
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:device-1/__affordance.corner__", Action: "open"},
+	}); err != nil {
+		t.Fatalf("menu open error = %v", err)
+	}
+	if got := len(router.RoutesForDevice("device-1")); got != 0 {
+		t.Fatalf("routes after menu open with PAUSED policy = %d, want 0", got)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "stop_gesture", Action: "stop_active"},
+	})
+	if err != nil {
+		t.Fatalf("stop_active while paused error = %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("expected main pointer action blocked while PAUSED overlay open, got %+v", out)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:menu-overlay:device-1/menu.close", Action: "close"},
+	}); err != nil {
+		t.Fatalf("menu close error = %v", err)
+	}
+	if got := len(router.RoutesForDevice("device-1")); got != 1 {
+		t.Fatalf("routes after menu close with PAUSED policy = %d, want 1", got)
 	}
 }
 
