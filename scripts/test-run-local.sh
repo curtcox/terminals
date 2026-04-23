@@ -22,7 +22,7 @@ fail() {
 assert_contains() {
   local file="$1"
   local needle="$2"
-  if ! grep -Fq "${needle}" "${file}"; then
+  if ! grep -Fq -- "${needle}" "${file}"; then
     fail "expected '${needle}' in ${file}"
   fi
 }
@@ -30,7 +30,7 @@ assert_contains() {
 assert_not_contains() {
   local file="$1"
   local needle="$2"
-  if grep -Fq "${needle}" "${file}"; then
+  if grep -Fq -- "${needle}" "${file}"; then
     fail "did not expect '${needle}' in ${file}"
   fi
 }
@@ -48,7 +48,7 @@ reset_sandbox() {
   fi
 
   SANDBOX_DIR="$(mktemp -d "${ROOT_DIR}/.tmp/run-local-test.XXXXXX")"
-  mkdir -p "${SANDBOX_DIR}/scripts" "${SANDBOX_DIR}/terminal_server" "${SANDBOX_DIR}/terminal_client" "${SANDBOX_DIR}/.bin" "${SANDBOX_DIR}/.tmp"
+  mkdir -p "${SANDBOX_DIR}/scripts" "${SANDBOX_DIR}/terminal_server" "${SANDBOX_DIR}/terminal_client" "${SANDBOX_DIR}/terminal_client/macos" "${SANDBOX_DIR}/.bin" "${SANDBOX_DIR}/.tmp"
   cp "${SOURCE_SCRIPT}" "${SANDBOX_DIR}/scripts/run-local.sh"
   chmod +x "${SANDBOX_DIR}/scripts/run-local.sh"
 
@@ -101,10 +101,45 @@ if [[ "$1" == "create" && "$2" == "." ]]; then
   exit 0
 fi
 
+if [[ "$1" == "build" && "$2" == "macos" ]]; then
+  mkdir -p build/macos/Build/Products/Debug/terminal_client.app/Contents/MacOS
+  cat > build/macos/Build/Products/Debug/terminal_client.app/Contents/Info.plist <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key>
+  <string>terminal_client</string>
+</dict>
+</plist>
+PLIST
+  cat > build/macos/Build/Products/Debug/terminal_client.app/Contents/MacOS/terminal_client <<'APP'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "fake macOS app launched"
+trap 'exit 0' TERM INT
+while true; do
+  sleep 1
+done
+APP
+  chmod +x build/macos/Build/Products/Debug/terminal_client.app/Contents/MacOS/terminal_client
+  exit 0
+fi
+
 if [[ "$1" == "run" && "$2" == "-d" ]]; then
   echo "Launching lib/main.dart on $3 in debug mode..."
   if [[ "$3" == "web-server" ]]; then
-    echo "lib/main.dart is being served at http://localhost:58080"
+    web_host="localhost"
+    web_port="58080"
+    for arg in "$@"; do
+      if [[ "${arg}" == --web-hostname=* ]]; then
+        web_host="${arg#--web-hostname=}"
+      fi
+      if [[ "${arg}" == --web-port=* ]]; then
+        web_port="${arg#--web-port=}"
+      fi
+    done
+    echo "lib/main.dart is being served at http://${web_host}:${web_port}"
   fi
   trap 'exit 0' TERM INT
   while true; do
@@ -116,6 +151,22 @@ echo "unexpected flutter invocation: $*" >&2
 exit 2
 EOF
   chmod +x "${SANDBOX_DIR}/.bin/flutter"
+
+  cat >"${SANDBOX_DIR}/.bin/pod" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "pod $*" >> "${RUN_LOCAL_TEST_COMMAND_LOG:?RUN_LOCAL_TEST_COMMAND_LOG not set}"
+exit 0
+EOF
+  chmod +x "${SANDBOX_DIR}/.bin/pod"
+
+  cat >"${SANDBOX_DIR}/.bin/xcodebuild" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "xcodebuild $*" >> "${RUN_LOCAL_TEST_COMMAND_LOG:?RUN_LOCAL_TEST_COMMAND_LOG not set}"
+exit 0
+EOF
+  chmod +x "${SANDBOX_DIR}/.bin/xcodebuild"
 
   cat >"${SANDBOX_DIR}/.bin/nc" <<'EOF'
 #!/usr/bin/env bash
@@ -252,15 +303,23 @@ test_bootstrap_web_and_auto_port_selection() {
     fail "expected web bootstrap to create terminal_client/web/index.html"
   fi
 
-  assert_contains "${output_file}" "Using ports: grpc=50051 control_ws=50055 admin=50054 photo=50052"
+  assert_contains "${output_file}" "Using ports: grpc=50051 control_ws=50055 admin=50054 photo=50052 control_tcp=50056 control_http=50057"
+  assert_contains "${output_file}" "Using build metadata: sha="
   assert_contains "${output_file}" "Test mode: startup checks passed."
-  assert_contains "${output_file}" "Browser client URL: http://localhost:58080"
+  assert_contains "${output_file}" "Browser client URL: http://0.0.0.0:60739"
   assert_contains "${SANDBOX_DIR}/commands.log" "go mod download"
   assert_contains "${SANDBOX_DIR}/commands.log" "flutter pub get"
   assert_contains "${SANDBOX_DIR}/commands.log" "flutter config --enable-web"
   assert_contains "${SANDBOX_DIR}/commands.log" "flutter create . --platforms=web"
   assert_contains "${SANDBOX_DIR}/commands.log" "go run ./cmd/server"
   assert_contains "${SANDBOX_DIR}/commands.log" "flutter run -d web-server"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_GRPC_PORT=50051"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_CONTROL_WS_PORT=50055"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_CONTROL_TCP_PORT=50056"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_CONTROL_HTTP_PORT=50057"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_BUILD_SHA="
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_BUILD_DATE="
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_AUTO_CONNECT_ON_STARTUP=true"
 
   echo "PASS: web bootstrap and auto-port selection work"
 }
@@ -291,6 +350,48 @@ test_duplicate_explicit_ports_fail_early() {
   echo "PASS: duplicate explicit ports fail early with a clear message"
 }
 
+test_macos_build_and_launch_uses_runtime_defines() {
+  reset_sandbox
+  : >"${SANDBOX_DIR}/commands.log"
+  local output_file="${SANDBOX_DIR}/test-output.log"
+
+  set +e
+  (
+    cd "${SANDBOX_DIR}"
+    RUN_LOCAL_TEST_MODE=true \
+    RUN_LOCAL_CLIENT_STARTUP_DELAY_SECONDS=0.1 \
+    RUN_LOCAL_TEST_COMMAND_LOG="${SANDBOX_DIR}/commands.log" \
+    TERMINALS_GRPC_PORT=51051 \
+    TERMINALS_CONTROL_WS_PORT=51054 \
+    TERMINALS_CONTROL_TCP_PORT=51055 \
+    TERMINALS_CONTROL_HTTP_PORT=51056 \
+    TERMINALS_ADMIN_HTTP_PORT=51053 \
+    TERMINALS_PHOTO_FRAME_HTTP_PORT=51052 \
+    ./scripts/run-local.sh --client macos
+  ) >"${output_file}" 2>&1
+  local status=$?
+  set -e
+
+  if [[ "${status}" -ne 0 ]]; then
+    fail "expected run-local macOS success in test mode"
+  fi
+
+  assert_contains "${output_file}" "Using ports: grpc=51051 control_ws=51054 admin=51053 photo=51052 control_tcp=51055 control_http=51056"
+  assert_contains "${output_file}" "Test mode: startup checks passed."
+  assert_contains "${SANDBOX_DIR}/commands.log" "pod install"
+  assert_contains "${SANDBOX_DIR}/commands.log" "flutter build macos --debug --config-only --no-pub"
+  assert_contains "${SANDBOX_DIR}/commands.log" "flutter build macos --debug --no-pub"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_GRPC_PORT=51051"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_CONTROL_WS_PORT=51054"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_CONTROL_TCP_PORT=51055"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_CONTROL_HTTP_PORT=51056"
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_BUILD_SHA="
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_BUILD_DATE="
+  assert_contains "${SANDBOX_DIR}/commands.log" "--dart-define=TERMINALS_AUTO_CONNECT_ON_STARTUP=true"
+
+  echo "PASS: macOS build and launch include runtime defines"
+}
+
 test_real_smoke_run_local() {
   local output_file="${ROOT_DIR}/.tmp/run-local-real-smoke.log"
 
@@ -313,7 +414,7 @@ test_real_smoke_run_local() {
   fi
 
   assert_contains "${output_file}" "Test mode: startup checks passed."
-  assert_contains "${output_file}" "Browser client URL: http://localhost:"
+  assert_contains "${output_file}" "Browser client URL: http://"
   assert_contains "${ROOT_DIR}/.tmp/run-local-client.log" "Launching lib/main.dart on Web Server in debug mode"
   assert_not_contains "${ROOT_DIR}/.tmp/run-local-client.log" "This application is not configured to build on the web"
 
@@ -326,6 +427,7 @@ main() {
   test_explicit_busy_port_fails_early
   test_bootstrap_web_and_auto_port_selection
   test_duplicate_explicit_ports_fail_early
+  test_macos_build_and_launch_uses_runtime_defines
   if [[ "${RUN_REAL_SMOKE}" == "true" ]]; then
     test_real_smoke_run_local
   else

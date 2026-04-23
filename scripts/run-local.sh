@@ -24,6 +24,8 @@ ADMIN_PORT="${TERMINALS_ADMIN_HTTP_PORT:-}"
 PHOTO_PORT="${TERMINALS_PHOTO_FRAME_HTTP_PORT:-}"
 CLIENT_WEB_PORT="${TERMINALS_CLIENT_WEB_PORT:-}"
 CLIENT_WEB_HOST="${TERMINALS_CLIENT_WEB_HOST:-0.0.0.0}"
+BUILD_SHA="${TERMINALS_BUILD_SHA:-}"
+BUILD_DATE="${TERMINALS_BUILD_DATE:-}"
 CLIENT_DEVICE="web-server"
 SKIP_BOOTSTRAP="false"
 TEST_MODE="${RUN_LOCAL_TEST_MODE:-false}"
@@ -43,6 +45,9 @@ HAS_ERROR="false"
 RESERVED_PORTS=()
 CLIENT_RESTART_ATTEMPTS=0
 MAX_CLIENT_RESTART_ATTEMPTS="${RUN_LOCAL_CLIENT_RESTART_ATTEMPTS:-3}"
+CLIENT_CONTROL_HOST="127.0.0.1"
+CLIENT_AUTO_CONNECT_ON_STARTUP="true"
+CLIENT_DART_DEFINE_ARGS=()
 
 usage() {
   cat <<'EOF'
@@ -161,7 +166,7 @@ wait_for_log() {
 
 extract_browser_url() {
   local file="$1"
-  grep -Eo 'http://localhost:[0-9]+' "${file}" | tail -n 1
+  grep -Eo 'http://[^ ]+:[0-9]+' "${file}" | tail -n 1
 }
 
 is_port_available() {
@@ -308,6 +313,39 @@ resolve_ports() {
   fi
 }
 
+resolve_build_metadata() {
+  if [[ -z "${BUILD_SHA}" ]]; then
+    BUILD_SHA="$(git -C "${ROOT_DIR}" rev-parse --short=12 HEAD 2>/dev/null || true)"
+  fi
+  BUILD_SHA="$(echo "${BUILD_SHA}" | tr -d '[:space:]')"
+  if [[ -z "${BUILD_SHA}" ]]; then
+    BUILD_SHA="unknown"
+  fi
+
+  if [[ -z "${BUILD_DATE}" ]]; then
+    BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || true)"
+  fi
+  BUILD_DATE="$(echo "${BUILD_DATE}" | tr -d '[:space:]')"
+  if [[ -z "${BUILD_DATE}" ]]; then
+    BUILD_DATE="unknown"
+  fi
+}
+
+configure_client_dart_defines() {
+  CLIENT_DART_DEFINE_ARGS=(
+    "--dart-define=TERMINALS_CONTROL_HOST=${CLIENT_CONTROL_HOST}"
+    "--dart-define=TERMINALS_GRPC_PORT=${GRPC_PORT}"
+    "--dart-define=TERMINALS_CONTROL_WS_PORT=${CONTROL_WS_PORT}"
+    "--dart-define=TERMINALS_CONTROL_TCP_PORT=${CONTROL_TCP_PORT}"
+    "--dart-define=TERMINALS_CONTROL_HTTP_PORT=${CONTROL_HTTP_PORT}"
+    "--dart-define=TERMINALS_ADMIN_HTTP_PORT=${ADMIN_PORT}"
+    "--dart-define=TERMINALS_PHOTO_FRAME_HTTP_PORT=${PHOTO_PORT}"
+    "--dart-define=TERMINALS_BUILD_SHA=${BUILD_SHA}"
+    "--dart-define=TERMINALS_BUILD_DATE=${BUILD_DATE}"
+    "--dart-define=TERMINALS_AUTO_CONNECT_ON_STARTUP=${CLIENT_AUTO_CONNECT_ON_STARTUP}"
+  )
+}
+
 require_cmd() {
   local name="$1"
   if ! command -v "${name}" >/dev/null 2>&1; then
@@ -425,7 +463,7 @@ sanitize_macos_xcconfig() {
 ensure_macos_flutter_config() {
   (
     cd "${ROOT_DIR}/terminal_client"
-    flutter build macos --debug --config-only --no-pub
+    flutter build macos --debug --config-only --no-pub "${CLIENT_DART_DEFINE_ARGS[@]}"
   )
 }
 
@@ -453,7 +491,7 @@ build_macos_client_app() {
     trap - ERR
     set +E
     cd "${ROOT_DIR}/terminal_client"
-    flutter build macos --debug --no-pub
+    flutter build macos --debug --no-pub "${CLIENT_DART_DEFINE_ARGS[@]}"
   ) >>"${CLIENT_LOG}" 2>&1
 }
 
@@ -574,6 +612,8 @@ start_server() {
     TERMINALS_CONTROL_HTTP_PORT="${CONTROL_HTTP_PORT}" \
     TERMINALS_ADMIN_HTTP_PORT="${ADMIN_PORT}" \
     TERMINALS_PHOTO_FRAME_HTTP_PORT="${PHOTO_PORT}" \
+    TERMINALS_BUILD_SHA="${BUILD_SHA}" \
+    TERMINALS_BUILD_DATE="${BUILD_DATE}" \
     go run ./cmd/server
   ) >"${SERVER_LOG}" 2>&1 &
   SERVER_PID=$!
@@ -654,8 +694,7 @@ start_client() {
         -d web-server \
         --web-port="${CLIENT_WEB_PORT}" \
         --web-hostname="${CLIENT_WEB_HOST}" \
-        --dart-define=TERMINALS_CONTROL_WS_PORT="${CONTROL_WS_PORT}" \
-        --dart-define=TERMINALS_GRPC_PORT="${GRPC_PORT}"
+        "${CLIENT_DART_DEFINE_ARGS[@]}"
     ) 2>&1 | tee "${CLIENT_LOG}"
     local client_status=${PIPESTATUS[0]}
     set -e
@@ -675,10 +714,9 @@ start_client() {
         -d web-server \
         --web-port="${CLIENT_WEB_PORT}" \
         --web-hostname="${CLIENT_WEB_HOST}" \
-        --dart-define=TERMINALS_CONTROL_WS_PORT="${CONTROL_WS_PORT}" \
-        --dart-define=TERMINALS_GRPC_PORT="${GRPC_PORT}"
+        "${CLIENT_DART_DEFINE_ARGS[@]}"
     else
-      flutter run -d "${CLIENT_DEVICE}" --no-pub
+      flutter run -d "${CLIENT_DEVICE}" --no-pub "${CLIENT_DART_DEFINE_ARGS[@]}"
     fi
   ) >"${CLIENT_LOG}" 2>&1 &
   CLIENT_PID=$!
@@ -693,7 +731,7 @@ start_client() {
   fi
 
   if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
-    if ! wait_for_log "${CLIENT_LOG}" 'lib/main.dart is being served at http://localhost:[0-9]+' "120"; then
+    if ! wait_for_log "${CLIENT_LOG}" 'lib/main.dart is being served at http://[^ ]+:[0-9]+' "120"; then
       fail "web client did not report browser URL within timeout"
     fi
     local browser_url
@@ -762,7 +800,10 @@ main() {
   rotate_log "${CLIENT_LOG}"
   parse_args "$@"
   resolve_ports
+  resolve_build_metadata
+  configure_client_dart_defines
   echo "Using ports: grpc=${GRPC_PORT} control_ws=${CONTROL_WS_PORT} admin=${ADMIN_PORT} photo=${PHOTO_PORT} control_tcp=${CONTROL_TCP_PORT} control_http=${CONTROL_HTTP_PORT}"
+  echo "Using build metadata: sha=${BUILD_SHA} date=${BUILD_DATE}"
   if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
     echo "Using web client endpoint: http://localhost:${CLIENT_WEB_PORT}"
   fi

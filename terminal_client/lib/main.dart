@@ -138,6 +138,10 @@ const int _defaultControlWSPort = int.fromEnvironment(
 );
 const int _defaultControlPort =
     kIsWeb ? _defaultControlWSPort : _defaultGrpcPort;
+const bool _autoConnectOnStartupDefault = bool.fromEnvironment(
+  'TERMINALS_AUTO_CONNECT_ON_STARTUP',
+  defaultValue: kIsWeb,
+);
 const String _buildSha = String.fromEnvironment(
   'TERMINALS_BUILD_SHA',
   defaultValue: 'unknown',
@@ -926,7 +930,7 @@ class TerminalClientApp extends StatelessWidget {
     this.reconnectDelayBase = const Duration(seconds: 2),
     this.reconnectDelayMaxSeconds = 30,
     this.nowUnixMsProvider = _systemNowUnixMs,
-    this.autoConnectOnStartup = kIsWeb,
+    this.autoConnectOnStartup = _autoConnectOnStartupDefault,
     this.wakeWordDetectorFactory = _defaultWakeWordDetectorFactory,
     this.bugReportScreenshotCapture,
     this.screenMetricsProvider,
