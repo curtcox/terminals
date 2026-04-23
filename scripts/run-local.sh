@@ -17,6 +17,7 @@ exec 3>&2 4>&1
 
 GRPC_PORT="${TERMINALS_GRPC_PORT:-}"
 CONTROL_WS_PORT="${TERMINALS_CONTROL_WS_PORT:-}"
+CONTROL_TCP_PORT="${TERMINALS_CONTROL_TCP_PORT:-}"
 ADMIN_PORT="${TERMINALS_ADMIN_HTTP_PORT:-}"
 PHOTO_PORT="${TERMINALS_PHOTO_FRAME_HTTP_PORT:-}"
 CLIENT_WEB_PORT="${TERMINALS_CLIENT_WEB_PORT:-}"
@@ -260,6 +261,16 @@ resolve_ports() {
     reserve_port "${PHOTO_PORT}"
   fi
 
+  if [[ -n "${CONTROL_TCP_PORT}" ]]; then
+    require_available_port "${CONTROL_TCP_PORT}" "control TCP" "TERMINALS_CONTROL_TCP_PORT"
+  else
+    CONTROL_TCP_PORT="$(find_available_port 50055 200 || true)"
+    if [[ -z "${CONTROL_TCP_PORT}" ]]; then
+      fail "unable to find open port for control TCP starting at 50055"
+    fi
+    reserve_port "${CONTROL_TCP_PORT}"
+  fi
+
   if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
     if [[ -n "${CLIENT_WEB_PORT}" ]]; then
       require_available_port "${CLIENT_WEB_PORT}" "web client" "TERMINALS_CLIENT_WEB_PORT"
@@ -364,7 +375,7 @@ bootstrap() {
     require_cmd pod
     (
       cd "${ROOT_DIR}/terminal_client/macos"
-      pod install
+      env -u DART_DEFINES pod install
     )
   fi
 }
@@ -385,13 +396,27 @@ start_server() {
     cd "${ROOT_DIR}/terminal_server"
     TERMINALS_GRPC_PORT="${GRPC_PORT}" \
     TERMINALS_CONTROL_WS_PORT="${CONTROL_WS_PORT}" \
+    TERMINALS_CONTROL_TCP_PORT="${CONTROL_TCP_PORT}" \
     TERMINALS_ADMIN_HTTP_PORT="${ADMIN_PORT}" \
     TERMINALS_PHOTO_FRAME_HTTP_PORT="${PHOTO_PORT}" \
     go run ./cmd/server
   ) >"${SERVER_LOG}" 2>&1 &
   SERVER_PID=$!
 
-  if ! wait_for_log "${SERVER_LOG}" "control service ready" "45"; then
+  local deadline=$((SECONDS + 45))
+  while (( SECONDS < deadline )); do
+    if [[ -f "${SERVER_LOG}" ]] && grep -Eq "control service ready" "${SERVER_LOG}"; then
+      echo "Server ready on 127.0.0.1:${GRPC_PORT}"
+      return 0
+    fi
+    if ! kill -0 "${SERVER_PID}" >/dev/null 2>&1; then
+      wait "${SERVER_PID}" || true
+      fail "server exited before reaching ready state"
+    fi
+    sleep 1
+  done
+
+  if ! wait_for_log "${SERVER_LOG}" "control service ready" "1"; then
     fail "server did not reach ready state within timeout"
   fi
 
@@ -527,7 +552,7 @@ main() {
   rotate_log "${CLIENT_LOG}"
   parse_args "$@"
   resolve_ports
-  echo "Using ports: grpc=${GRPC_PORT} control_ws=${CONTROL_WS_PORT} admin=${ADMIN_PORT} photo=${PHOTO_PORT}"
+  echo "Using ports: grpc=${GRPC_PORT} control_ws=${CONTROL_WS_PORT} admin=${ADMIN_PORT} photo=${PHOTO_PORT} control_tcp=${CONTROL_TCP_PORT}"
   if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
     echo "Using web client endpoint: http://localhost:${CLIENT_WEB_PORT}"
   fi
