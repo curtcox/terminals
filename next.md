@@ -1,1 +1,1 @@
-Wire `ValidateMainLayerAffordanceCoverage` into scenario registration so startup fails when a configured main-layer opt-out is missing from `affordance_optouts.yaml`.
+No pending implementation steps; await user review or commit/push instructions.

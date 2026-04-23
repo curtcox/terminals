@@ -1,6 +1,12 @@
 package scenario
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
 
 func TestRegisterBuiltinsIncludesMasterplanScenarios(t *testing.T) {
 	engine := NewEngine()
@@ -40,4 +46,65 @@ func TestRegisterBuiltinsIncludesMasterplanScenarios(t *testing.T) {
 			t.Fatalf("missing builtin scenario registration: %s", name)
 		}
 	}
+}
+
+func TestValidateBuiltinAffordanceCoverageRejectsConfiguredOptOutWithoutAllowlistEntry(t *testing.T) {
+	dir := t.TempDir()
+	allowlistPath := filepath.Join(dir, "affordance_optouts.yaml")
+	if err := os.WriteFile(allowlistPath, []byte(""), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	registry := []RegistrationInfo{
+		{Name: "photo_frame", Priority: PriorityLow},
+	}
+	configuredOptOuts := map[string]struct{}{
+		"photo_frame": {},
+	}
+
+	err := validateBuiltinAffordanceCoverage(
+		registry,
+		configuredOptOuts,
+		allowlistPath,
+		time.Date(2026, 4, 22, 0, 0, 0, 0, time.UTC),
+	)
+	if err == nil {
+		t.Fatalf("expected missing allowlist entry error")
+	}
+	if !strings.Contains(err.Error(), "skip withCornerAffordance without allowlist entry") {
+		t.Fatalf("expected allowlist coverage error, got %v", err)
+	}
+}
+
+func TestRegisterBuiltinsPanicsWhenConfiguredOptOutMissingFromAllowlist(t *testing.T) {
+	dir := t.TempDir()
+	allowlistPath := filepath.Join(dir, "affordance_optouts.yaml")
+	if err := os.WriteFile(allowlistPath, []byte(""), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	originalPathFn := builtinAffordanceOptOutAllowlistPath
+	originalNowFn := builtinAffordanceCoverageNow
+	originalOptOuts := builtinMainLayerAffordanceOptOuts
+	builtinAffordanceOptOutAllowlistPath = func() string { return allowlistPath }
+	builtinAffordanceCoverageNow = func() time.Time {
+		return time.Date(2026, 4, 22, 0, 0, 0, 0, time.UTC)
+	}
+	builtinMainLayerAffordanceOptOuts = map[string]struct{}{
+		"photo_frame": {},
+	}
+	defer func() {
+		builtinAffordanceOptOutAllowlistPath = originalPathFn
+		builtinAffordanceCoverageNow = originalNowFn
+		builtinMainLayerAffordanceOptOuts = originalOptOuts
+	}()
+
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatalf("expected RegisterBuiltins to panic when opt-out is missing from allowlist")
+		}
+	}()
+
+	RegisterBuiltins(NewEngine())
 }

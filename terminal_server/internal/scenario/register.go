@@ -1,5 +1,46 @@
 package scenario
 
+import (
+	"fmt"
+	"path/filepath"
+	"runtime"
+	"time"
+)
+
+var (
+	builtinAffordanceCoverageNow = func() time.Time {
+		return time.Now().UTC()
+	}
+	builtinAffordanceOptOutAllowlistPath = defaultBuiltinAffordanceOptOutAllowlistPath
+	// builtinMainLayerAffordanceOptOuts declares main-layer scenarios that
+	// intentionally skip withCornerAffordance and therefore require allowlist entries.
+	builtinMainLayerAffordanceOptOuts = map[string]struct{}{}
+)
+
+func defaultBuiltinAffordanceOptOutAllowlistPath() string {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return "affordance_optouts.yaml"
+	}
+	return filepath.Join(filepath.Dir(file), "affordance_optouts.yaml")
+}
+
+func validateBuiltinAffordanceCoverage(
+	registry []RegistrationInfo,
+	configuredOptOuts map[string]struct{},
+	allowlistPath string,
+	now time.Time,
+) error {
+	allowlist, err := LoadAffordanceOptOutAllowlist(allowlistPath)
+	if err != nil {
+		return fmt.Errorf("load affordance opt-out allowlist %q: %w", allowlistPath, err)
+	}
+	if err := ValidateMainLayerAffordanceCoverage(registry, configuredOptOuts, allowlist, now); err != nil {
+		return fmt.Errorf("validate builtin main-layer affordance coverage: %w", err)
+	}
+	return nil
+}
+
 // RegisterBuiltins installs core scenarios into the engine.
 func RegisterBuiltins(engine *Engine) {
 	engine.Register(Registration{
@@ -90,4 +131,13 @@ func RegisterBuiltins(engine *Engine) {
 		Factory:  func() Scenario { return AlertScenario{} },
 		Priority: PriorityCritical,
 	})
+
+	if err := validateBuiltinAffordanceCoverage(
+		engine.RegistrySnapshot(),
+		builtinMainLayerAffordanceOptOuts,
+		builtinAffordanceOptOutAllowlistPath(),
+		builtinAffordanceCoverageNow(),
+	); err != nil {
+		panic(err)
+	}
 }
