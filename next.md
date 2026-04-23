@@ -1,1 +1,1 @@
-Add Phase F coverage for app/tab foreground-background capability changes (safe-area or lifecycle marker) and verify server handling while overlay is open.
+Identify the next uncovered `plans/terminal-ui.md` test gap and add a red test for it.

@@ -617,6 +617,74 @@ void main() {
     },
   );
 
+  testWidgets(
+    'app lifecycle foreground/background emits capability deltas with lifecycle operator updates',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      final baseDeltaCount = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .length;
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pumpAndSettle();
+      final backgroundDelta = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList()
+          .last
+          .capabilityDelta;
+      expect(
+        harness.lastClient.requests
+            .where((request) => request.hasCapabilityDelta())
+            .length,
+        baseDeltaCount + 1,
+      );
+      expect(backgroundDelta.reason, 'app_lifecycle_change');
+      expect(
+        backgroundDelta.capabilities.edge.operators,
+        contains('monitor.lifecycle.background'),
+      );
+      expect(
+        backgroundDelta.capabilities.edge.operators,
+        isNot(contains('monitor.lifecycle.foreground')),
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      final allDeltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList();
+      expect(allDeltas.length, baseDeltaCount + 2);
+      final foregroundDelta = allDeltas.last.capabilityDelta;
+      expect(foregroundDelta.reason, 'app_lifecycle_change');
+      expect(
+          foregroundDelta.generation, greaterThan(backgroundDelta.generation));
+      expect(
+        foregroundDelta.capabilities.edge.operators,
+        contains('monitor.lifecycle.foreground'),
+      );
+      expect(
+        foregroundDelta.capabilities.edge.operators,
+        isNot(contains('monitor.lifecycle.background')),
+      );
+    },
+  );
+
   testWidgets('sends periodic sensor telemetry while connected', (
     WidgetTester tester,
   ) async {

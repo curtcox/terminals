@@ -2070,6 +2070,138 @@ func TestCapabilityDeltaWhileMenuOverlayOpenPreservesMainAndOverlayActivations(t
 	}
 }
 
+func TestLifecycleCapabilityDeltaWhileMenuOverlayOpenPreservesMainAndOverlayActivations(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	router := io.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	}); err != nil {
+		t.Fatalf("register error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"screen.width":          "1920",
+				"screen.height":         "1080",
+				"screen.orientation":    "landscape",
+				"edge.operators":        "monitor.lifecycle.foreground",
+				"monitor.runtime_state": "foreground",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("capability snapshot error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{RequestID: "cmd-terminal", DeviceID: "device-1", Kind: "manual", Intent: "terminal"},
+	}); err != nil {
+		t.Fatalf("terminal start error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:device-1/__affordance.corner__", Action: "open"},
+	}); err != nil {
+		t.Fatalf("menu open error = %v", err)
+	}
+
+	if active, ok := runtime.Engine.Active("device-1"); !ok || active != "terminal" {
+		t.Fatalf("active scenario before lifecycle delta = (%q, %v), want terminal,true", active, ok)
+	}
+	if !hasClaim(router.Claims().Snapshot("device-1"), "menu-overlay:device-1", "screen.overlay") {
+		t.Fatalf("expected overlay claim before lifecycle delta")
+	}
+
+	backgroundOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Reason:     "app_lifecycle_change",
+			Capabilities: map[string]string{
+				"screen.width":          "1920",
+				"screen.height":         "1080",
+				"screen.orientation":    "landscape",
+				"edge.operators":        "monitor.lifecycle.background",
+				"monitor.runtime_state": "background",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("background lifecycle capability delta error = %v", err)
+	}
+	if len(backgroundOut) == 0 || backgroundOut[0].CapabilityAck == nil {
+		t.Fatalf("expected capability ack for background lifecycle delta, got %+v", backgroundOut)
+	}
+	for _, msg := range backgroundOut {
+		if msg.UpdateUI != nil && len(msg.UpdateUI.Node.Children) == 0 {
+			t.Fatalf("unexpected overlay clear patch on background lifecycle delta: %+v", msg.UpdateUI)
+		}
+	}
+	if active, ok := runtime.Engine.Active("device-1"); !ok || active != "terminal" {
+		t.Fatalf("active scenario after background lifecycle delta = (%q, %v), want terminal,true", active, ok)
+	}
+	if !hasClaim(router.Claims().Snapshot("device-1"), "menu-overlay:device-1", "screen.overlay") {
+		t.Fatalf("expected overlay claim to remain active after background lifecycle delta")
+	}
+
+	foregroundOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 3,
+			Reason:     "app_lifecycle_change",
+			Capabilities: map[string]string{
+				"screen.width":          "1920",
+				"screen.height":         "1080",
+				"screen.orientation":    "landscape",
+				"edge.operators":        "monitor.lifecycle.foreground",
+				"monitor.runtime_state": "foreground",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("foreground lifecycle capability delta error = %v", err)
+	}
+	if len(foregroundOut) == 0 || foregroundOut[0].CapabilityAck == nil {
+		t.Fatalf("expected capability ack for foreground lifecycle delta, got %+v", foregroundOut)
+	}
+	for _, msg := range foregroundOut {
+		if msg.UpdateUI != nil && len(msg.UpdateUI.Node.Children) == 0 {
+			t.Fatalf("unexpected overlay clear patch on foreground lifecycle delta: %+v", msg.UpdateUI)
+		}
+	}
+	if active, ok := runtime.Engine.Active("device-1"); !ok || active != "terminal" {
+		t.Fatalf("active scenario after foreground lifecycle delta = (%q, %v), want terminal,true", active, ok)
+	}
+	if !hasClaim(router.Claims().Snapshot("device-1"), "menu-overlay:device-1", "screen.overlay") {
+		t.Fatalf("expected overlay claim to remain active after foreground lifecycle delta")
+	}
+
+	closeOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:menu-overlay:device-1/menu.close", Action: "close"},
+	})
+	if err != nil {
+		t.Fatalf("menu close after lifecycle deltas error = %v", err)
+	}
+	if len(closeOut) == 0 || closeOut[0].UpdateUI == nil {
+		t.Fatalf("expected overlay close patch after lifecycle deltas, got %+v", closeOut)
+	}
+	if len(closeOut[0].UpdateUI.Node.Children) != 0 {
+		t.Fatalf("expected overlay close patch to clear children, got %+v", closeOut[0].UpdateUI.Node.Children)
+	}
+}
+
 func TestHandleMessageInputMenuOverlayLivePolicyKeepsMainPointerActive(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)
