@@ -1,1 +1,1 @@
-Add a red test proving scenario registry rejects main-layer scenarios that skip `withCornerAffordance` unless allowlisted.
+Wire `ValidateMainLayerAffordanceCoverage` into scenario registration so startup fails when a configured main-layer opt-out is missing from `affordance_optouts.yaml`.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -121,6 +122,55 @@ func validateReplacementAffordance(raw string) error {
 	}
 	if !logicalIDPattern.MatchString(replacement) {
 		return fmt.Errorf("must match logical id grammar [A-Za-z0-9_.-]+")
+	}
+	return nil
+}
+
+// ValidateMainLayerAffordanceCoverage enforces that any main-layer scenario
+// explicitly skipping withCornerAffordance has an active reviewed opt-out.
+func ValidateMainLayerAffordanceCoverage(
+	registry []RegistrationInfo,
+	skipsAffordance map[string]struct{},
+	allowlist []AffordanceOptOutEntry,
+	now time.Time,
+) error {
+	registryIDs := make(map[string]struct{}, len(registry))
+	for _, item := range registry {
+		name := strings.TrimSpace(item.Name)
+		if name == "" {
+			continue
+		}
+		registryIDs[name] = struct{}{}
+	}
+	if err := ValidateAffordanceOptOutAllowlist(allowlist, registryIDs, now); err != nil {
+		return err
+	}
+
+	allowlisted := make(map[string]struct{}, len(allowlist))
+	for _, entry := range allowlist {
+		name := strings.TrimSpace(entry.ScenarioID)
+		if name == "" {
+			continue
+		}
+		allowlisted[name] = struct{}{}
+	}
+
+	missing := make([]string, 0, len(skipsAffordance))
+	for name := range skipsAffordance {
+		scenarioID := strings.TrimSpace(name)
+		if scenarioID == "" {
+			continue
+		}
+		if _, ok := registryIDs[scenarioID]; !ok {
+			return fmt.Errorf("main-layer scenario %q marked as skipping withCornerAffordance but is not registered", scenarioID)
+		}
+		if _, ok := allowlisted[scenarioID]; !ok {
+			missing = append(missing, scenarioID)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("main-layer scenario(s) skip withCornerAffordance without allowlist entry: %s", strings.Join(missing, ", "))
 	}
 	return nil
 }

@@ -101,3 +101,49 @@ func TestCODEOWNERSHasAffordanceOptOutEntry(t *testing.T) {
 		t.Fatalf("expected scenario-engine maintainers CODEOWNERS owner for affordance opt-out allowlist")
 	}
 }
+
+func TestValidateMainLayerAffordanceCoverageRejectsUnallowlistedOptOut(t *testing.T) {
+	registry := []RegistrationInfo{
+		{Name: "photo_frame", Priority: PriorityLow},
+	}
+	skipsAffordance := map[string]struct{}{
+		"photo_frame": {},
+	}
+
+	err := ValidateMainLayerAffordanceCoverage(
+		registry,
+		skipsAffordance,
+		nil,
+		time.Date(2026, 4, 22, 0, 0, 0, 0, time.UTC),
+	)
+	if err == nil {
+		t.Fatalf("expected unallowlisted opt-out error")
+	}
+}
+
+func TestValidateMainLayerAffordanceCoverageAllowsAllowlistedOptOut(t *testing.T) {
+	registry := []RegistrationInfo{
+		{Name: "photo_frame", Priority: PriorityLow},
+	}
+	skipsAffordance := map[string]struct{}{
+		"photo_frame": {},
+	}
+	allowlist := []AffordanceOptOutEntry{
+		{
+			ScenarioID: "photo_frame",
+			Reason:     "temporary locked kiosk flow",
+			Approver:   "@scenario-engine-maintainers",
+			ExpiresAt:  "2027-01-01",
+		},
+	}
+
+	err := ValidateMainLayerAffordanceCoverage(
+		registry,
+		skipsAffordance,
+		allowlist,
+		time.Date(2026, 4, 22, 0, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("ValidateMainLayerAffordanceCoverage() error = %v", err)
+	}
+}
