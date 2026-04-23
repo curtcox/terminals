@@ -20,6 +20,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 )
 
+// MCP HTTP header names used for session and confirmation routing.
 const (
 	HeaderSessionID      = "Mcp-Session-Id"
 	HeaderConfirmationID = "Mcp-Confirmation-Id"

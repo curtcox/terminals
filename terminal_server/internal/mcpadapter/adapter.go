@@ -38,17 +38,20 @@ const (
 	MutatingUnavailable    MutatingCapability = "mutating_unavailable"
 )
 
+// ClientCapabilities describes optional protocol features supported by an MCP client.
 type ClientCapabilities struct {
 	SupportsElicitation bool
 	SupportsFallbackID  bool
 }
 
+// SessionInfo holds the negotiated state for an open MCP session.
 type SessionInfo struct {
 	SessionID      string
 	Capability     MutatingCapability
 	ClientIdentity string
 }
 
+// ElicitRequest carries the parameters for a human-approval elicitation call.
 type ElicitRequest struct {
 	SessionID       string
 	ToolName        string
@@ -56,10 +59,12 @@ type ElicitRequest struct {
 	Classification  repl.CommandClassification
 }
 
+// ElicitResponse carries the human approval decision from an elicitation call.
 type ElicitResponse struct {
 	Approved bool
 }
 
+// UnsafeConfirmationEvent is emitted when a mutation is confirmed suspiciously fast.
 type UnsafeConfirmationEvent struct {
 	SessionID   string
 	ClientID    string
@@ -69,6 +74,7 @@ type UnsafeConfirmationEvent struct {
 	Path        string
 }
 
+// Config holds construction-time settings for the Adapter.
 type Config struct {
 	AdminBaseURL       string
 	Now                func() time.Time
@@ -80,6 +86,7 @@ type Config struct {
 	UnsafeConfirmation func(context.Context, UnsafeConfirmationEvent)
 }
 
+// Tool describes a single callable tool exposed via the MCP adapter.
 type Tool struct {
 	Name                 string
 	CommandName          string
@@ -89,6 +96,7 @@ type Tool struct {
 	ArgumentsSchema      map[string]any
 }
 
+// CallToolRequest is the input to a single MCP tool call.
 type CallToolRequest struct {
 	SessionID          string
 	ToolName           string
@@ -96,6 +104,7 @@ type CallToolRequest struct {
 	MetaConfirmationID string
 }
 
+// CallToolResponse is the output from a single MCP tool call.
 type CallToolResponse struct {
 	Status          string
 	Output          string
@@ -108,6 +117,7 @@ type CallToolResponse struct {
 	Metadata        map[string]any
 }
 
+// Adapter bridges MCP tool-call requests to the REPL capability layer.
 type Adapter struct {
 	cfg             Config
 	toolsByName     map[string]Tool
@@ -130,6 +140,7 @@ type pendingConfirmation struct {
 	Consumed        bool
 }
 
+// New creates an Adapter with the given configuration.
 func New(cfg Config) *Adapter {
 	now := cfg.Now
 	if now == nil {
@@ -165,16 +176,19 @@ func New(cfg Config) *Adapter {
 	}
 }
 
+// RegistryVersion returns a hash that changes whenever the tool registry changes.
 func (a *Adapter) RegistryVersion() string {
 	return a.registryVersion
 }
 
+// Tools returns a snapshot of the registered tools.
 func (a *Adapter) Tools() []Tool {
 	out := make([]Tool, len(a.tools))
 	copy(out, a.tools)
 	return out
 }
 
+// OpenSession registers a new MCP session and returns its negotiated info.
 func (a *Adapter) OpenSession(sessionID, clientIdentity string, caps ClientCapabilities) SessionInfo {
 	sessionID = strings.TrimSpace(sessionID)
 	clientIdentity = strings.TrimSpace(clientIdentity)
@@ -192,12 +206,14 @@ func (a *Adapter) OpenSession(sessionID, clientIdentity string, caps ClientCapab
 	return info
 }
 
+// CloseSession removes the session with the given ID.
 func (a *Adapter) CloseSession(sessionID string) {
 	a.mu.Lock()
 	delete(a.sessions, strings.TrimSpace(sessionID))
 	a.mu.Unlock()
 }
 
+// SessionInfo returns the negotiated info for the given session ID.
 func (a *Adapter) SessionInfo(sessionID string) (SessionInfo, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -205,6 +221,7 @@ func (a *Adapter) SessionInfo(sessionID string) (SessionInfo, bool) {
 	return info, ok
 }
 
+// SetSessionCapability updates the mutating capability for the given session.
 func (a *Adapter) SetSessionCapability(sessionID string, capability MutatingCapability) bool {
 	sessionID = strings.TrimSpace(sessionID)
 	a.mu.Lock()
@@ -218,16 +235,19 @@ func (a *Adapter) SetSessionCapability(sessionID string, capability MutatingCapa
 	return true
 }
 
+// SetElicitHook installs a callback invoked when a mutating tool requires human approval.
 func (a *Adapter) SetElicitHook(hook func(context.Context, ElicitRequest) (ElicitResponse, error)) {
 	a.mu.Lock()
 	a.cfg.Elicit = hook
 	a.mu.Unlock()
 }
 
+// CallTool executes a single MCP tool call and returns the response.
 func (a *Adapter) CallTool(ctx context.Context, req CallToolRequest) (CallToolResponse, error) {
 	return a.CallToolStream(ctx, req, nil)
 }
 
+// CallToolStream executes a tool call and delivers output chunks via onChunk as they are produced.
 func (a *Adapter) CallToolStream(ctx context.Context, req CallToolRequest, onChunk func(string) error) (CallToolResponse, error) {
 	tool, ok := a.toolsByName[strings.TrimSpace(req.ToolName)]
 	if !ok {
@@ -619,6 +639,7 @@ func newConfirmationToken(sessionID, toolName, canonicalArgs string, now time.Ti
 	return hex.EncodeToString(sum[:16])
 }
 
+// ReplSessionCreateRequest builds a replsession.CreateSessionRequest from the given MCP session info.
 func ReplSessionCreateRequest(deviceID, ownerActivationID string, info SessionInfo) replsession.CreateSessionRequest {
 	return replsession.CreateSessionRequest{
 		DeviceID:          strings.TrimSpace(deviceID),

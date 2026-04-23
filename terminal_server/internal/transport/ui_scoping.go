@@ -206,21 +206,21 @@ func (t *uiActionOwnershipTracker) Resolve(deviceID, componentID string) (string
 	}
 	deviceID = strings.TrimSpace(deviceID)
 	componentID = strings.TrimSpace(componentID)
-	if _, activationID, _, ok := parseScopedComponentID(componentID); !ok {
+	_, activationID, _, ok := parseScopedComponentID(componentID)
+	if !ok {
 		return "", "unscoped", false
-	} else {
-		t.mu.Lock()
-		defer t.mu.Unlock()
-		if owner, exists := t.componentOwner[ownershipKey(deviceID, componentID)]; exists {
-			return owner, "", true
-		}
-		if activations, exists := t.knownActivations[deviceID]; exists {
-			if _, known := activations[activationID]; known {
-				return "", "stale_node", false
-			}
-		}
-		return "", "unknown_activation", false
 	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if owner, exists := t.componentOwner[ownershipKey(deviceID, componentID)]; exists {
+		return owner, "", true
+	}
+	if activations, exists := t.knownActivations[deviceID]; exists {
+		if _, known := activations[activationID]; known {
+			return "", "stale_node", false
+		}
+	}
+	return "", "unknown_activation", false
 }
 
 func (t *uiActionOwnershipTracker) HasKnownActivation(deviceID string) bool {

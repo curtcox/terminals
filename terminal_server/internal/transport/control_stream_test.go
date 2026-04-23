@@ -68,13 +68,13 @@ func (s *counterFramePublisherStub) Publish(deviceID string, chunk []byte) {
 func (s *counterFramePublisherStub) maxCounter() uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var max uint64
+	var maxVal uint64
 	for _, value := range s.counters {
-		if value > max {
-			max = value
+		if value > maxVal {
+			maxVal = value
 		}
 	}
-	return max
+	return maxVal
 }
 
 func makeCounterPayload(counter uint64) []byte {
