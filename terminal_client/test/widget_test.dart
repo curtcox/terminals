@@ -351,6 +351,46 @@ void main() {
     expect(requests.where((r) => r.hasCapabilitySnapshot()).length, 1);
   });
 
+  testWidgets(
+    'connect emits CapabilitySnapshot with ScreenCapability geometry metadata',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+        ),
+      );
+      final mediaQuery = tester.widget<MediaQuery>(
+        find.byType(MediaQuery).first,
+      );
+      final expectedWidth = mediaQuery.data.size.width.round();
+      final expectedHeight = mediaQuery.data.size.height.round();
+      final expectedOrientation = expectedWidth >= expectedHeight
+          ? 'landscape'
+          : 'portrait';
+      final expectedDensity = mediaQuery.data.devicePixelRatio;
+
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+
+      final snapshot = harness.lastClient.requests
+          .firstWhere((request) => request.hasCapabilitySnapshot())
+          .capabilitySnapshot;
+      final screen = snapshot.capabilities.screen;
+      expect(snapshot.capabilities.hasScreen(), isTrue);
+      expect(screen.width, expectedWidth);
+      expect(screen.height, expectedHeight);
+      expect(screen.orientation, expectedOrientation);
+      expect(screen.density, expectedDensity);
+      expect(screen.hasSafeArea(), isTrue);
+      expect(screen.safeArea.left, 0);
+      expect(screen.safeArea.top, 0);
+      expect(screen.safeArea.right, 0);
+      expect(screen.safeArea.bottom, 0);
+    },
+  );
+
   testWidgets('sends periodic sensor telemetry while connected', (
     WidgetTester tester,
   ) async {

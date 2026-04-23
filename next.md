@@ -1,1 +1,1 @@
-Add Flutter widget coverage that on connect emits CapabilitySnapshot with ScreenCapability width, height, orientation, density, and safe_area.
+Identify the next unimplemented `plans/terminal-ui.md` test gap after connect-time CapabilitySnapshot coverage.
