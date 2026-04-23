@@ -366,9 +366,8 @@ void main() {
       );
       final expectedWidth = mediaQuery.data.size.width.round();
       final expectedHeight = mediaQuery.data.size.height.round();
-      final expectedOrientation = expectedWidth >= expectedHeight
-          ? 'landscape'
-          : 'portrait';
+      final expectedOrientation =
+          expectedWidth >= expectedHeight ? 'landscape' : 'portrait';
       final expectedDensity = mediaQuery.data.devicePixelRatio;
 
       await tester.tap(find.text('Connect Stream'));
@@ -388,6 +387,233 @@ void main() {
       expect(screen.safeArea.top, 0);
       expect(screen.safeArea.right, 0);
       expect(screen.safeArea.bottom, 0);
+    },
+  );
+
+  testWidgets(
+    'deterministic metrics seam emits CapabilityDelta on rotation with fresh generation',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      final metrics = _TestScreenMetricsController(
+        ScreenMetrics(
+          logicalSize: Size(1280, 720),
+          devicePixelRatio: 2.0,
+        ),
+      );
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          screenMetricsProvider: metrics.read,
+          screenMetricsChangeListenable: metrics.changes,
+          displayGeometryDebounceInterval: const Duration(milliseconds: 80),
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      final snapshot = harness.lastClient.requests
+          .firstWhere((request) => request.hasCapabilitySnapshot())
+          .capabilitySnapshot;
+      expect(snapshot.capabilities.screen.orientation, 'landscape');
+
+      final deltaCountBefore = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .length;
+      metrics.update(
+        ScreenMetrics(
+          logicalSize: Size(720, 1280),
+          devicePixelRatio: 2.0,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+
+      final deltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList();
+      expect(deltas.length, deltaCountBefore + 1);
+      final delta = deltas.last.capabilityDelta;
+      expect(delta.reason, 'display_geometry_change');
+      expect(delta.generation, greaterThan(snapshot.generation));
+      expect(delta.capabilities.screen.orientation, 'portrait');
+      expect(delta.capabilities.screen.width, 720);
+      expect(delta.capabilities.screen.height, 1280);
+    },
+  );
+
+  testWidgets(
+    'deterministic metrics seam emits CapabilityDelta on resize',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      final metrics = _TestScreenMetricsController(
+        ScreenMetrics(
+          logicalSize: Size(1024, 768),
+          devicePixelRatio: 1.5,
+        ),
+      );
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          screenMetricsProvider: metrics.read,
+          screenMetricsChangeListenable: metrics.changes,
+          displayGeometryDebounceInterval: const Duration(milliseconds: 80),
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      final deltaCountBefore = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .length;
+      metrics.update(
+        ScreenMetrics(
+          logicalSize: Size(900, 700),
+          devicePixelRatio: 1.5,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+
+      final deltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList();
+      expect(deltas.length, deltaCountBefore + 1);
+      final delta = deltas.last.capabilityDelta;
+      expect(delta.capabilities.screen.width, 900);
+      expect(delta.capabilities.screen.height, 700);
+    },
+  );
+
+  testWidgets(
+    'deterministic metrics seam emits CapabilityDelta on browser zoom dimension change',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      final metrics = _TestScreenMetricsController(
+        ScreenMetrics(
+          logicalSize: Size(1440, 900),
+          devicePixelRatio: 1.0,
+        ),
+      );
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          screenMetricsProvider: metrics.read,
+          screenMetricsChangeListenable: metrics.changes,
+          displayGeometryDebounceInterval: const Duration(milliseconds: 80),
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      final deltaCountBefore = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .length;
+      metrics.update(
+        ScreenMetrics(
+          logicalSize: Size(1152, 720),
+          devicePixelRatio: 1.25,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+
+      final deltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList();
+      expect(deltas.length, deltaCountBefore + 1);
+      final delta = deltas.last.capabilityDelta;
+      expect(delta.capabilities.screen.width, 1152);
+      expect(delta.capabilities.screen.height, 720);
+      expect(delta.capabilities.screen.density, 1.25);
+    },
+  );
+
+  testWidgets(
+    'rapid deterministic resize changes are coalesced to one CapabilityDelta per debounce interval',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      final metrics = _TestScreenMetricsController(
+        ScreenMetrics(
+          logicalSize: Size(1280, 720),
+          devicePixelRatio: 2.0,
+        ),
+      );
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          screenMetricsProvider: metrics.read,
+          screenMetricsChangeListenable: metrics.changes,
+          displayGeometryDebounceInterval: kDisplayGeometryDebounceInterval,
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      final deltaCountBefore = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .length;
+      metrics.update(
+        ScreenMetrics(
+          logicalSize: Size(1200, 700),
+          devicePixelRatio: 2.0,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 30));
+      metrics.update(
+        ScreenMetrics(
+          logicalSize: Size(1000, 680),
+          devicePixelRatio: 2.0,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 30));
+      metrics.update(
+        ScreenMetrics(
+          logicalSize: Size(900, 650),
+          devicePixelRatio: 2.0,
+        ),
+      );
+      await tester.pump();
+
+      await tester.pump(kDisplayGeometryDebounceInterval);
+      final deltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList();
+      expect(deltas.length, deltaCountBefore + 1);
+      final delta = deltas.last.capabilityDelta;
+      expect(delta.capabilities.screen.width, 900);
+      expect(delta.capabilities.screen.height, 650);
     },
   );
 
@@ -3138,6 +3364,20 @@ class _StaticCapabilityProbe implements CapabilityProbe {
   @override
   Future<capv1.DeviceCapabilities> probe(CapabilityProbeContext context) async {
     return capabilities.deepCopy();
+  }
+}
+
+class _TestScreenMetricsController {
+  _TestScreenMetricsController(this._metrics);
+
+  ScreenMetrics _metrics;
+  final ValueNotifier<int> changes = ValueNotifier<int>(0);
+
+  ScreenMetrics read() => _metrics;
+
+  void update(ScreenMetrics metrics) {
+    _metrics = metrics;
+    changes.value = changes.value + 1;
   }
 }
 

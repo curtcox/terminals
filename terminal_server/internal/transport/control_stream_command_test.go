@@ -1973,6 +1973,103 @@ func TestHandleMessageInputMenuOverlayDefaultMixedPolicyBlocksMainPointerButKeep
 	}
 }
 
+func TestCapabilityDeltaWhileMenuOverlayOpenPreservesMainAndOverlayActivations(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	router := io.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	}); err != nil {
+		t.Fatalf("register error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"screen.width":       "1920",
+				"screen.height":      "1080",
+				"screen.orientation": "landscape",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("capability snapshot error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{RequestID: "cmd-terminal", DeviceID: "device-1", Kind: "manual", Intent: "terminal"},
+	}); err != nil {
+		t.Fatalf("terminal start error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:device-1/__affordance.corner__", Action: "open"},
+	}); err != nil {
+		t.Fatalf("menu open error = %v", err)
+	}
+
+	if active, ok := runtime.Engine.Active("device-1"); !ok || active != "terminal" {
+		t.Fatalf("active scenario before orientation delta = (%q, %v), want terminal,true", active, ok)
+	}
+	if !hasClaim(router.Claims().Snapshot("device-1"), "menu-overlay:device-1", "screen.overlay") {
+		t.Fatalf("expected overlay claim before orientation delta")
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Reason:     "display_geometry_change",
+			Capabilities: map[string]string{
+				"screen.width":       "1080",
+				"screen.height":      "1920",
+				"screen.orientation": "portrait",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("capability delta error = %v", err)
+	}
+	if len(out) == 0 || out[0].CapabilityAck == nil {
+		t.Fatalf("expected capability ack response, got %+v", out)
+	}
+	for _, msg := range out {
+		if msg.UpdateUI != nil && len(msg.UpdateUI.Node.Children) == 0 {
+			t.Fatalf("unexpected overlay clear patch on orientation delta: %+v", msg.UpdateUI)
+		}
+	}
+
+	if active, ok := runtime.Engine.Active("device-1"); !ok || active != "terminal" {
+		t.Fatalf("active scenario after orientation delta = (%q, %v), want terminal,true", active, ok)
+	}
+	if !hasClaim(router.Claims().Snapshot("device-1"), "menu-overlay:device-1", "screen.overlay") {
+		t.Fatalf("expected overlay claim to remain active after orientation delta")
+	}
+
+	closeOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{DeviceID: "device-1", ComponentID: "act:menu-overlay:device-1/menu.close", Action: "close"},
+	})
+	if err != nil {
+		t.Fatalf("menu close after orientation delta error = %v", err)
+	}
+	if len(closeOut) == 0 || closeOut[0].UpdateUI == nil {
+		t.Fatalf("expected overlay close patch after orientation delta, got %+v", closeOut)
+	}
+	if len(closeOut[0].UpdateUI.Node.Children) != 0 {
+		t.Fatalf("expected overlay close patch to clear children, got %+v", closeOut[0].UpdateUI.Node.Children)
+	}
+}
+
 func TestHandleMessageInputMenuOverlayLivePolicyKeepsMainPointerActive(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

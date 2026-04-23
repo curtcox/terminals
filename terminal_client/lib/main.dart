@@ -39,6 +39,22 @@ typedef AudioPlaybackFactory = AudioPlayback Function();
 typedef UnixMsProvider = int Function();
 typedef BugReportScreenshotCapture = Future<List<int>> Function();
 typedef WakeWordDetectorFactory = WakeWordDetectorController Function();
+typedef ScreenMetricsProvider = ScreenMetrics Function();
+
+class ScreenMetrics {
+  ScreenMetrics({
+    required this.logicalSize,
+    required this.devicePixelRatio,
+    String? orientation,
+  }) : orientation = orientation ??
+            (logicalSize.width >= logicalSize.height
+                ? 'landscape'
+                : 'portrait');
+
+  final Size logicalSize;
+  final double devicePixelRatio;
+  final String orientation;
+}
 
 class WakeWordUtterance {
   const WakeWordUtterance({
@@ -139,7 +155,7 @@ const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
 const Duration _capabilityMonitorInterval = Duration(seconds: 2);
-const Duration _displayGeometryDebounceInterval = Duration(milliseconds: 120);
+const Duration kDisplayGeometryDebounceInterval = Duration(milliseconds: 120);
 const RetryPolicy _bugReportAckRetryPolicy = RetryPolicy(
   interval: Duration(seconds: 1),
   maxDuration: Duration(seconds: 20),
@@ -913,6 +929,9 @@ class TerminalClientApp extends StatelessWidget {
     this.autoConnectOnStartup = kIsWeb,
     this.wakeWordDetectorFactory = _defaultWakeWordDetectorFactory,
     this.bugReportScreenshotCapture,
+    this.screenMetricsProvider,
+    this.screenMetricsChangeListenable,
+    this.displayGeometryDebounceInterval = kDisplayGeometryDebounceInterval,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -927,6 +946,9 @@ class TerminalClientApp extends StatelessWidget {
   final bool autoConnectOnStartup;
   final WakeWordDetectorFactory wakeWordDetectorFactory;
   final BugReportScreenshotCapture? bugReportScreenshotCapture;
+  final ScreenMetricsProvider? screenMetricsProvider;
+  final Listenable? screenMetricsChangeListenable;
+  final Duration displayGeometryDebounceInterval;
 
   @override
   Widget build(BuildContext context) {
@@ -945,6 +967,9 @@ class TerminalClientApp extends StatelessWidget {
         autoConnectOnStartup: autoConnectOnStartup,
         wakeWordDetectorFactory: wakeWordDetectorFactory,
         bugReportScreenshotCapture: bugReportScreenshotCapture,
+        screenMetricsProvider: screenMetricsProvider,
+        screenMetricsChangeListenable: screenMetricsChangeListenable,
+        displayGeometryDebounceInterval: displayGeometryDebounceInterval,
       ),
     );
   }
@@ -964,6 +989,9 @@ class _ControlStreamScaffold extends StatefulWidget {
     required this.autoConnectOnStartup,
     required this.wakeWordDetectorFactory,
     required this.bugReportScreenshotCapture,
+    required this.screenMetricsProvider,
+    required this.screenMetricsChangeListenable,
+    required this.displayGeometryDebounceInterval,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -978,6 +1006,9 @@ class _ControlStreamScaffold extends StatefulWidget {
   final bool autoConnectOnStartup;
   final WakeWordDetectorFactory wakeWordDetectorFactory;
   final BugReportScreenshotCapture? bugReportScreenshotCapture;
+  final ScreenMetricsProvider? screenMetricsProvider;
+  final Listenable? screenMetricsChangeListenable;
+  final Duration displayGeometryDebounceInterval;
 
   @override
   State<_ControlStreamScaffold> createState() => _ControlStreamScaffoldState();
@@ -1115,9 +1146,33 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   int _nowUnixMs() => widget.nowUnixMsProvider();
 
+  ScreenMetrics? _injectedScreenMetrics() {
+    final provider = widget.screenMetricsProvider;
+    if (provider == null) {
+      return null;
+    }
+    final metrics = provider();
+    final size = metrics.logicalSize;
+    if (size.width <= 0 || size.height <= 0) {
+      return null;
+    }
+    final dpr = metrics.devicePixelRatio <= 0 ? 1.0 : metrics.devicePixelRatio;
+    return ScreenMetrics(
+      logicalSize: size,
+      devicePixelRatio: dpr,
+      orientation: metrics.orientation.trim().isEmpty
+          ? _normalizedOrientationFromSize(size)
+          : metrics.orientation.trim(),
+    );
+  }
+
   Size _currentLogicalSize() {
     if (_lastKnownLogicalSize.width > 0 && _lastKnownLogicalSize.height > 0) {
       return _lastKnownLogicalSize;
+    }
+    final injected = _injectedScreenMetrics();
+    if (injected != null) {
+      return injected.logicalSize;
     }
     final views = WidgetsBinding.instance.platformDispatcher.views;
     if (views.isEmpty) {
@@ -1135,6 +1190,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (_lastKnownDevicePixelRatio > 0) {
       return _lastKnownDevicePixelRatio;
     }
+    final injected = _injectedScreenMetrics();
+    if (injected != null) {
+      return injected.devicePixelRatio;
+    }
     final views = WidgetsBinding.instance.platformDispatcher.views;
     if (views.isEmpty) {
       return 1.0;
@@ -1146,7 +1205,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   bool get _hasActiveControlSession =>
       _shouldStayConnected && _incoming != null && _client != null;
 
-  void _refreshDisplayMetricsFromViews() {
+  void _refreshDisplayMetrics() {
+    final injected = _injectedScreenMetrics();
+    if (injected != null) {
+      _lastKnownLogicalSize = injected.logicalSize;
+      _lastKnownDevicePixelRatio = injected.devicePixelRatio;
+      _lastKnownOrientation = injected.orientation;
+      return;
+    }
     final views = WidgetsBinding.instance.platformDispatcher.views;
     if (views.isEmpty) {
       return;
@@ -1178,7 +1244,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return;
     }
     _displayGeometryDebounceTimer?.cancel();
-    _displayGeometryDebounceTimer = Timer(_displayGeometryDebounceInterval, () {
+    _displayGeometryDebounceTimer =
+        Timer(widget.displayGeometryDebounceInterval, () {
       _sendLifecycleCapabilityUpdate(reason: 'display_geometry_change');
     });
   }
@@ -1844,6 +1911,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         isUtc: true,
       ),
     );
+    widget.screenMetricsChangeListenable
+        ?.addListener(_handleInjectedScreenMetricsChanged);
     _recordClientLog('info', 'client started');
     if (_e2eEmitEvents) {
       debugPrint('E2E_EVENT: client_started');
@@ -1858,6 +1927,18 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         }
         unawaited(_startStream(userInitiated: true));
       });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ControlStreamScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.screenMetricsChangeListenable !=
+        widget.screenMetricsChangeListenable) {
+      oldWidget.screenMetricsChangeListenable
+          ?.removeListener(_handleInjectedScreenMetricsChanged);
+      widget.screenMetricsChangeListenable
+          ?.addListener(_handleInjectedScreenMetricsChanged);
     }
   }
 
@@ -3713,7 +3794,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   @override
   void didChangeMetrics() {
-    _refreshDisplayMetricsFromViews();
+    _refreshDisplayMetrics();
+    _scheduleDisplayGeometryCapabilityUpdate();
+  }
+
+  void _handleInjectedScreenMetricsChanged() {
+    _refreshDisplayMetrics();
     _scheduleDisplayGeometryCapabilityUpdate();
   }
 
@@ -3753,15 +3839,24 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _playbackArtifactIdController.dispose();
     _playbackTargetDeviceIdController.dispose();
     _restoreFlutterErrorHook();
+    widget.screenMetricsChangeListenable
+        ?.removeListener(_handleInjectedScreenMetricsChanged);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    _lastKnownLogicalSize = mediaQuery.size;
-    _lastKnownDevicePixelRatio = mediaQuery.devicePixelRatio;
-    _lastKnownOrientation = mediaQuery.orientation.name;
+    final injectedMetrics = _injectedScreenMetrics();
+    if (injectedMetrics != null) {
+      _lastKnownLogicalSize = injectedMetrics.logicalSize;
+      _lastKnownDevicePixelRatio = injectedMetrics.devicePixelRatio;
+      _lastKnownOrientation = injectedMetrics.orientation;
+    } else {
+      final mediaQuery = MediaQuery.of(context);
+      _lastKnownLogicalSize = mediaQuery.size;
+      _lastKnownDevicePixelRatio = mediaQuery.devicePixelRatio;
+      _lastKnownOrientation = mediaQuery.orientation.name;
+    }
     final displaySignature = _displaySignature(
       logicalSize: _lastKnownLogicalSize,
       devicePixelRatio: _lastKnownDevicePixelRatio,

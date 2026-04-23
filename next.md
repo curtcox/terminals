@@ -1,1 +1,1 @@
-Add a deterministic test seam for screen-metrics changes, then land Phase F rotate/resize capability-delta tests from plans/terminal-ui.md.
+Add Phase F coverage for app/tab foreground-background capability changes (safe-area or lifecycle marker) and verify server handling while overlay is open.
