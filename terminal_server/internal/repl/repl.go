@@ -181,10 +181,6 @@ type state struct {
 	docsRoot string
 }
 
-func newState(out io.Writer, adminBaseURL, sessionID string) *state {
-	return newStateWithDocsMode(out, adminBaseURL, sessionID, DocsRenderModeTerminal)
-}
-
 func newStateWithDocsMode(out io.Writer, adminBaseURL, sessionID string, docsMode DocsRenderMode) *state {
 	adminBaseURL = strings.TrimSpace(adminBaseURL)
 	if adminBaseURL == "" {

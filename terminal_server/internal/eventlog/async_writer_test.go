@@ -38,7 +38,7 @@ func TestAsyncWriterWriteFailureIsThrottledAndResetsAfterRecovery(t *testing.T) 
 	failSink.fail.Store(true)
 
 	w := NewAsyncWriter(&failSink, 8)
-	w.stderr = &stderr
+	w.SetStderr(&stderr)
 	w.SetWriteFailureCallback(func(WriteFailure) {
 		callback.Add(1)
 	})
@@ -49,7 +49,10 @@ func TestAsyncWriterWriteFailureIsThrottledAndResetsAfterRecovery(t *testing.T) 
 	if _, err := w.Write([]byte("second\n")); err != nil {
 		t.Fatalf("Write(second) error = %v", err)
 	}
-	time.Sleep(20 * time.Millisecond)
+	// Flush waits for inFlight==0, which is decremented after reportWriteError
+	// finishes writing to stderr — so reading stderr.String() after Flush is
+	// race-free.
+	_ = w.Flush()
 
 	got := stderr.String()
 	if strings.Count(got, "eventlog sink write failed: sink failed") != 1 {
@@ -63,13 +66,13 @@ func TestAsyncWriterWriteFailureIsThrottledAndResetsAfterRecovery(t *testing.T) 
 	if _, err := w.Write([]byte("healthy\n")); err != nil {
 		t.Fatalf("Write(healthy) error = %v", err)
 	}
-	time.Sleep(20 * time.Millisecond)
+	_ = w.Flush()
 
 	failSink.fail.Store(true)
 	if _, err := w.Write([]byte("failed-again\n")); err != nil {
 		t.Fatalf("Write(failed-again) error = %v", err)
 	}
-	time.Sleep(20 * time.Millisecond)
+	_ = w.Flush()
 
 	got = stderr.String()
 	if strings.Count(got, "eventlog sink write failed: sink failed") != 2 {

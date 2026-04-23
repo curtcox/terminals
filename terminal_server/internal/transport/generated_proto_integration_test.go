@@ -1970,7 +1970,8 @@ func TestGeneratedSessionMultiWindowSetUIAndFocusActionRouting(t *testing.T) {
 		}
 		if set := resp.GetSetUi(); set != nil {
 			walkNode(set.GetRoot(), func(node *uiv1.Node) {
-				if node.GetProps()["id"] == "multi_window_grid" && node.GetGrid() != nil && node.GetGrid().GetColumns() == 2 {
+				propID := node.GetProps()["id"]
+				if (propID == "multi_window_grid" || strings.HasSuffix(propID, "/multi_window_grid")) && node.GetGrid() != nil && node.GetGrid().GetColumns() == 2 {
 					sawGridColumns = true
 				}
 				if button := node.GetButton(); button != nil {

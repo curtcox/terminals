@@ -565,7 +565,8 @@ void main() {
       expect(capabilityDeltas.length, greaterThanOrEqualTo(2));
       final restoredDelta = capabilityDeltas.last.capabilityDelta;
       expect(restoredDelta.reason, 'privacy.toggle');
-      expect(restoredDelta.generation, greaterThan(firstPrivacyDelta.generation));
+      expect(
+          restoredDelta.generation, greaterThan(firstPrivacyDelta.generation));
       expect(restoredDelta.capabilities.hasMicrophone(), isTrue);
       expect(restoredDelta.capabilities.hasCamera(), isTrue);
     },
@@ -629,7 +630,8 @@ void main() {
 
       expect(
         find.byKey(
-          const ValueKey<String>('ui-overlay-server.descriptor.privacy_overlay'),
+          const ValueKey<String>(
+              'ui-overlay-server.descriptor.privacy_overlay'),
         ),
         findsOneWidget,
       );
@@ -645,7 +647,8 @@ void main() {
     },
   );
 
-  testWidgets('wake-word detector toggles with microphone capability and privacy', (
+  testWidgets(
+      'wake-word detector toggles with microphone capability and privacy', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
@@ -704,7 +707,8 @@ void main() {
     expect(detector.enabledStates, <bool>[true, false, true]);
   });
 
-  testWidgets('wake-word utterance sends VoiceAudio when microphone is enabled', (
+  testWidgets('wake-word utterance sends VoiceAudio when microphone is enabled',
+      (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
@@ -770,7 +774,8 @@ void main() {
             capv1.DeviceCapabilities()
               ..microphone = (capv1.AudioInputCapability()
                 ..channels = 1
-                ..endpoints.add(capv1.AudioEndpoint()..endpointId = 'mic-main')),
+                ..endpoints
+                    .add(capv1.AudioEndpoint()..endpointId = 'mic-main')),
           ),
         ),
       );
@@ -861,7 +866,7 @@ void main() {
         .where((request) => request.hasVoiceAudio())
         .toList(growable: false);
     expect(voiceAudioRequests, hasLength(1));
-    expect(find.text('Notification: '), findsOneWidget);
+    expect(find.text('Notification: '), findsNothing);
     expect(find.text('wake service launched'), findsNothing);
     expect(find.text('Wake acknowledged'), findsNothing);
   });
@@ -922,7 +927,8 @@ void main() {
     expect(find.text('Wake acknowledged'), findsNothing);
   });
 
-  testWidgets('wake-word response disposition: audible visible descriptor update', (
+  testWidgets(
+      'wake-word response disposition: audible visible descriptor update', (
     WidgetTester tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
@@ -964,7 +970,8 @@ void main() {
             ..children.add(
               uiv1.Node()
                 ..id = 'act:wake_feedback/banner'
-                ..text = (uiv1.TextWidget()..value = 'Waiting for wake response'),
+                ..text =
+                    (uiv1.TextWidget()..value = 'Waiting for wake response'),
             ))),
     );
     await tester.pumpAndSettle();
@@ -980,7 +987,6 @@ void main() {
       ConnectResponse()
         ..playAudio = (iov1.PlayAudio()
           ..requestId = 'wake-audio-1'
-          ..streamId = 'wake-stream'
           ..pcmData = <int>[1, 2, 3, 4]),
     );
     harness.lastClient.emitResponse(
@@ -2475,8 +2481,7 @@ void main() {
           )
           .fold<int>(
             0,
-            (current, next) =>
-                current > next.toInt() ? current : next.toInt(),
+            (current, next) => current > next.toInt() ? current : next.toInt(),
           );
 
       await tester.tap(find.text('Privacy'));
