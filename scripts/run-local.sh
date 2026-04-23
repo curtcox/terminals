@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="${ROOT_DIR}/.tmp"
 SERVER_LOG="${TMP_DIR}/run-local-server.log"
 CLIENT_LOG="${TMP_DIR}/run-local-client.log"
+CLIENT_DIAG_LOG="${TMP_DIR}/run-local-client-diagnostics.log"
 LOG_ARCHIVES="${RUN_LOCAL_LOG_ARCHIVES:-3}"
 # Hard cap on any single log file written by this script. Per-process RLIMIT_FSIZE
 # (`ulimit -f`) protects against runaway logging that previously filled the disk.
@@ -30,6 +31,9 @@ CLIENT_STARTUP_DELAY_SECONDS="${RUN_LOCAL_CLIENT_STARTUP_DELAY_SECONDS:-5}"
 OPEN_BROWSER="${RUN_LOCAL_OPEN_BROWSER:-true}"
 
 export PATH="${ROOT_DIR}/.bin:${ROOT_DIR}/.sdk/flutter/bin:${PATH}"
+export FLUTTER_SUPPRESS_ANALYTICS="${FLUTTER_SUPPRESS_ANALYTICS:-true}"
+export DART_SUPPRESS_ANALYTICS="${DART_SUPPRESS_ANALYTICS:-true}"
+export COCOAPODS_DISABLE_STATS="${COCOAPODS_DISABLE_STATS:-true}"
 
 SERVER_PID=""
 CLIENT_PID=""
@@ -38,7 +42,7 @@ CLIENT_FOREGROUND="false"
 HAS_ERROR="false"
 RESERVED_PORTS=()
 CLIENT_RESTART_ATTEMPTS=0
-MAX_CLIENT_RESTART_ATTEMPTS="${RUN_LOCAL_CLIENT_RESTART_ATTEMPTS:-1}"
+MAX_CLIENT_RESTART_ATTEMPTS="${RUN_LOCAL_CLIENT_RESTART_ATTEMPTS:-3}"
 
 usage() {
   cat <<'EOF'
@@ -59,6 +63,12 @@ report_log_path() {
     echo "--- ${label}: ${file} ---" >&3
   else
     echo "--- ${label} missing: ${file} ---" >&3
+  fi
+}
+
+append_diagnostic_path() {
+  if [[ -f "${CLIENT_DIAG_LOG}" ]]; then
+    echo "--- client diagnostics: ${CLIENT_DIAG_LOG} ---" >&3
   fi
 }
 
@@ -88,6 +98,7 @@ fail() {
   echo "ERROR: ${message}" >&3
   report_log_path "${SERVER_LOG}" "server log"
   report_log_path "${CLIENT_LOG}" "client log"
+  append_diagnostic_path
   exit 1
 }
 
@@ -117,6 +128,7 @@ on_err() {
   echo "ERROR: command failed at line ${line_no}: ${BASH_COMMAND}" >&3
   report_log_path "${SERVER_LOG}" "server log"
   report_log_path "${CLIENT_LOG}" "client log"
+  append_diagnostic_path
   exit "${exit_code}"
 }
 
@@ -386,20 +398,152 @@ bootstrap() {
   if [[ "${CLIENT_DEVICE}" == "macos" ]]; then
     require_cmd xcodebuild
     require_cmd pod
-    local generated_xcconfig="${ROOT_DIR}/terminal_client/macos/Flutter/ephemeral/Flutter-Generated.xcconfig"
-    if [[ -f "${generated_xcconfig}" ]]; then
-      # Flutter's CocoaPods parser splits on every "="; DART_DEFINES values contain
-      # base64 padding ("=="), which triggers noisy "Invalid key/value pair" output.
-      # Keep the generated file intact otherwise and remove only this non-essential key.
-      local sanitized_xcconfig="${generated_xcconfig}.run-local-sanitized"
-      grep -Ev '^DART_DEFINES=' "${generated_xcconfig}" > "${sanitized_xcconfig}"
-      mv -f "${sanitized_xcconfig}" "${generated_xcconfig}"
+    repair_macos_pods
+  fi
+}
+
+sanitize_macos_xcconfig() {
+  local generated_xcconfig="${ROOT_DIR}/terminal_client/macos/Flutter/ephemeral/Flutter-Generated.xcconfig"
+  if [[ -f "${generated_xcconfig}" ]]; then
+    # Flutter's CocoaPods parser splits on every "="; DART_DEFINES values contain
+    # base64 padding ("=="), which triggers noisy "Invalid key/value pair" output.
+    # Keep the generated file intact otherwise and remove only this non-essential key.
+    local sanitized_xcconfig="${generated_xcconfig}.run-local-sanitized"
+    grep -Ev '^DART_DEFINES=' "${generated_xcconfig}" > "${sanitized_xcconfig}"
+    mv -f "${sanitized_xcconfig}" "${generated_xcconfig}"
+  fi
+}
+
+repair_macos_pods() {
+  sanitize_macos_xcconfig
+  (
+    cd "${ROOT_DIR}/terminal_client/macos"
+    env -u DART_DEFINES pod install
+  )
+}
+
+recover_macos_client_build() {
+  echo "Attempting macOS build recovery (flutter clean + pub get + pod install)..."
+  (
+    cd "${ROOT_DIR}/terminal_client"
+    flutter clean
+    flutter pub get
+  )
+  repair_macos_pods
+}
+
+build_macos_client_app() {
+  local derived_data="${ROOT_DIR}/terminal_client/macos/.derivedData"
+  (
+    trap - ERR
+    set +E
+    ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
+    cd "${ROOT_DIR}/terminal_client/macos"
+    xcodebuild \
+      -workspace Runner.xcworkspace \
+      -scheme Runner \
+      -configuration Debug \
+      -destination 'platform=macOS' \
+      -derivedDataPath "${derived_data}" \
+      build
+  ) >>"${CLIENT_LOG}" 2>&1
+}
+
+start_client_macos() {
+  local derived_data="${ROOT_DIR}/terminal_client/macos/.derivedData"
+  local products_dir="${derived_data}/Build/Products/Debug"
+  local app_path=""
+  local app_executable=""
+
+  echo "Building macOS client with xcodebuild..."
+  if ! build_macos_client_app; then
+    return 1
+  fi
+
+  app_path="$(find "${products_dir}" -maxdepth 1 -type d -name '*.app' | head -n 1)"
+  if [[ -z "${app_path}" ]]; then
+    echo "Unable to locate built macOS .app under ${products_dir}" >>"${CLIENT_LOG}"
+    return 1
+  fi
+
+  app_executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "${app_path}/Contents/Info.plist" 2>/dev/null || true)"
+  if [[ -z "${app_executable}" ]]; then
+    app_executable="$(basename "${app_path}" .app)"
+  fi
+
+  echo "Launching macOS app: ${app_path}" >>"${CLIENT_LOG}"
+  (
+    trap - ERR
+    set +E
+    ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
+    cd "${ROOT_DIR}/terminal_client"
+    exec "${app_path}/Contents/MacOS/${app_executable}"
+  ) >>"${CLIENT_LOG}" 2>&1 &
+  CLIENT_PID=$!
+
+  sleep "${CLIENT_STARTUP_DELAY_SECONDS}"
+  if ! kill -0 "${CLIENT_PID}" >/dev/null 2>&1; then
+    wait "${CLIENT_PID}" || true
+    return 1
+  fi
+
+  return 0
+}
+
+collect_macos_client_diagnostics() {
+  local reason="${1:-unknown}"
+  rotate_log "${CLIENT_DIAG_LOG}"
+  : >"${CLIENT_DIAG_LOG}"
+  {
+    echo "=== run-local macOS diagnostics ==="
+    echo "timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    echo "reason: ${reason}"
+    echo "root: ${ROOT_DIR}"
+    echo
+    echo "--- client log (tail 120) ---"
+    if [[ -f "${CLIENT_LOG}" ]]; then
+      tail -n 120 "${CLIENT_LOG}" || true
+    else
+      echo "(missing)"
     fi
+    echo
+    echo "--- xcodebuild -version ---"
+    xcodebuild -version || true
+    echo
+    echo "--- flutter --version ---"
+    (
+      cd "${ROOT_DIR}/terminal_client"
+      flutter --version
+    ) || true
+    echo
+    echo "--- flutter doctor -v (tail 120) ---"
+    (
+      cd "${ROOT_DIR}/terminal_client"
+      flutter doctor -v
+    ) 2>&1 | tail -n 120 || true
+    echo
+    echo "--- xcodebuild showBuildSettings (tail 200) ---"
     (
       cd "${ROOT_DIR}/terminal_client/macos"
-      env -u DART_DEFINES pod install
-    )
-  fi
+      xcodebuild \
+        -workspace Runner.xcworkspace \
+        -scheme Runner \
+        -configuration Debug \
+        -destination 'platform=macOS' \
+        -showBuildSettings
+    ) 2>&1 | tail -n 200 || true
+    echo
+    echo "--- xcodebuild build (tail 260) ---"
+    (
+      cd "${ROOT_DIR}/terminal_client/macos"
+      xcodebuild \
+        -workspace Runner.xcworkspace \
+        -scheme Runner \
+        -configuration Debug \
+        -destination 'platform=macOS' \
+        build
+    ) 2>&1 | tail -n 260 || true
+  } >"${CLIENT_DIAG_LOG}" 2>&1
 }
 
 start_server() {
@@ -450,6 +594,14 @@ start_client() {
   rotate_log "${CLIENT_LOG}"
   : >"${CLIENT_LOG}"
   echo "Starting local client (${CLIENT_DEVICE})..."
+
+  if [[ "${CLIENT_DEVICE}" == "macos" ]]; then
+    if ! start_client_macos; then
+      collect_macos_client_diagnostics "macos client failed to build/launch"
+      fail "client exited immediately after launch"
+    fi
+    return 0
+  fi
 
   if [[ "${CLIENT_DEVICE}" == "web-server" && "${TEST_MODE}" != "true" ]]; then
     CLIENT_FOREGROUND="true"
@@ -508,7 +660,7 @@ start_client() {
         --dart-define=TERMINALS_CONTROL_WS_PORT="${CONTROL_WS_PORT}" \
         --dart-define=TERMINALS_GRPC_PORT="${GRPC_PORT}"
     else
-      flutter run -d "${CLIENT_DEVICE}"
+      flutter run -d "${CLIENT_DEVICE}" --no-pub
     fi
   ) >"${CLIENT_LOG}" 2>&1 &
   CLIENT_PID=$!
@@ -516,6 +668,9 @@ start_client() {
   sleep "${CLIENT_STARTUP_DELAY_SECONDS}"
   if ! kill -0 "${CLIENT_PID}" >/dev/null 2>&1; then
     wait "${CLIENT_PID}" || true
+    if [[ "${CLIENT_DEVICE}" == "macos" ]]; then
+      collect_macos_client_diagnostics "client exited immediately after launch"
+    fi
     fail "client exited immediately after launch"
   fi
 
@@ -565,9 +720,13 @@ monitor_processes() {
         && grep -Eq "Xcode build system has crashed|unexpected service error" "${CLIENT_LOG}"; then
         CLIENT_RESTART_ATTEMPTS=$((CLIENT_RESTART_ATTEMPTS + 1))
         echo "Client exited due to transient Xcode build failure; retrying (${CLIENT_RESTART_ATTEMPTS}/${MAX_CLIENT_RESTART_ATTEMPTS})..."
+        recover_macos_client_build
         sleep 2
         start_client
         continue
+      fi
+      if [[ "${CLIENT_DEVICE}" == "macos" ]]; then
+        collect_macos_client_diagnostics "client exited unexpectedly after retries"
       fi
       fail "client exited unexpectedly"
     fi
