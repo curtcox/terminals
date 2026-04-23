@@ -379,10 +379,12 @@ bootstrap() {
     cd "${ROOT_DIR}/terminal_server"
     go mod download
   )
-  (
-    cd "${ROOT_DIR}/terminal_client"
-    flutter pub get
-  )
+  if [[ "${CLIENT_DEVICE}" != "macos" ]]; then
+    (
+      cd "${ROOT_DIR}/terminal_client"
+      flutter pub get
+    )
+  fi
 
   if [[ "${CLIENT_DEVICE}" == "web-server" ]]; then
     (
@@ -398,6 +400,12 @@ bootstrap() {
   if [[ "${CLIENT_DEVICE}" == "macos" ]]; then
     require_cmd xcodebuild
     require_cmd pod
+    rm -rf "${ROOT_DIR}/terminal_client/.dart_tool"
+    (
+      cd "${ROOT_DIR}/terminal_client"
+      flutter pub get
+    )
+    ensure_macos_flutter_config
     repair_macos_pods
   fi
 }
@@ -414,6 +422,13 @@ sanitize_macos_xcconfig() {
   fi
 }
 
+ensure_macos_flutter_config() {
+  (
+    cd "${ROOT_DIR}/terminal_client"
+    flutter build macos --debug --config-only --no-pub
+  )
+}
+
 repair_macos_pods() {
   sanitize_macos_xcconfig
   (
@@ -423,46 +438,40 @@ repair_macos_pods() {
 }
 
 recover_macos_client_build() {
-  echo "Attempting macOS build recovery (flutter clean + pub get + pod install)..."
+  echo "Attempting macOS build recovery (reset .dart_tool + pub get + config + pod install)..."
+  rm -rf "${ROOT_DIR}/terminal_client/.dart_tool"
   (
     cd "${ROOT_DIR}/terminal_client"
-    flutter clean
     flutter pub get
   )
+  ensure_macos_flutter_config
   repair_macos_pods
 }
 
 build_macos_client_app() {
-  local derived_data="${ROOT_DIR}/terminal_client/macos/.derivedData"
   (
     trap - ERR
     set +E
-    ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
-    cd "${ROOT_DIR}/terminal_client/macos"
-    xcodebuild \
-      -workspace Runner.xcworkspace \
-      -scheme Runner \
-      -configuration Debug \
-      -destination 'platform=macOS' \
-      -derivedDataPath "${derived_data}" \
-      build
+    cd "${ROOT_DIR}/terminal_client"
+    flutter build macos --debug --no-pub
   ) >>"${CLIENT_LOG}" 2>&1
 }
 
 start_client_macos() {
-  local derived_data="${ROOT_DIR}/terminal_client/macos/.derivedData"
-  local products_dir="${derived_data}/Build/Products/Debug"
   local app_path=""
   local app_executable=""
 
-  echo "Building macOS client with xcodebuild..."
+  echo "Building macOS client..."
   if ! build_macos_client_app; then
     return 1
   fi
 
-  app_path="$(find "${products_dir}" -maxdepth 1 -type d -name '*.app' | head -n 1)"
+  app_path="$(find "${ROOT_DIR}/terminal_client/build/macos/Build/Products/Debug" -maxdepth 1 -type d -name '*.app' 2>/dev/null | head -n 1 || true)"
   if [[ -z "${app_path}" ]]; then
-    echo "Unable to locate built macOS .app under ${products_dir}" >>"${CLIENT_LOG}"
+    app_path="$(ls -td "${HOME}/Library/Developer/Xcode/DerivedData"/Runner-*/Build/Products/Debug/*.app 2>/dev/null | head -n 1 || true)"
+  fi
+  if [[ -z "${app_path}" ]]; then
+    echo "Unable to locate built macOS .app in Xcode DerivedData." >>"${CLIENT_LOG}"
     return 1
   fi
 
@@ -475,7 +484,6 @@ start_client_macos() {
   (
     trap - ERR
     set +E
-    ulimit -f "${LOG_MAX_KB}" 2>/dev/null || true
     cd "${ROOT_DIR}/terminal_client"
     exec "${app_path}/Contents/MacOS/${app_executable}"
   ) >>"${CLIENT_LOG}" 2>&1 &
@@ -596,11 +604,21 @@ start_client() {
   echo "Starting local client (${CLIENT_DEVICE})..."
 
   if [[ "${CLIENT_DEVICE}" == "macos" ]]; then
-    if ! start_client_macos; then
+    local launch_attempt=0
+    while true; do
+      if start_client_macos; then
+        return 0
+      fi
+      if [[ "${launch_attempt}" -lt "${MAX_CLIENT_RESTART_ATTEMPTS}" ]]; then
+        launch_attempt=$((launch_attempt + 1))
+        echo "macOS client failed to build/launch; retrying (${launch_attempt}/${MAX_CLIENT_RESTART_ATTEMPTS})..."
+        recover_macos_client_build
+        sleep 2
+        continue
+      fi
       collect_macos_client_diagnostics "macos client failed to build/launch"
       fail "client exited immediately after launch"
-    fi
-    return 0
+    done
   fi
 
   if [[ "${CLIENT_DEVICE}" == "web-server" && "${TEST_MODE}" != "true" ]]; then
