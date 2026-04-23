@@ -63,8 +63,8 @@ class NoopWakeWordDetectorController implements WakeWordDetectorController {
   Future<void> setEnabled(bool enabled) async {}
 
   @override
-  void setOnUtterance(void Function(WakeWordUtterance utterance)? onUtterance) {
-  }
+  void setOnUtterance(
+      void Function(WakeWordUtterance utterance)? onUtterance) {}
 
   @override
   Future<void> dispose() async {}
