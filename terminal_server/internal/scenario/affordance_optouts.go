@@ -3,6 +3,7 @@ package scenario
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -15,6 +16,8 @@ type AffordanceOptOutEntry struct {
 	ExpiresAt             string
 	ReplacementAffordance string
 }
+
+var logicalIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.\-]+$`)
 
 // LoadAffordanceOptOutAllowlist loads the checked-in affordance opt-out file.
 func LoadAffordanceOptOutAllowlist(path string) ([]AffordanceOptOutEntry, error) {
@@ -91,6 +94,9 @@ func ValidateAffordanceOptOutAllowlist(entries []AffordanceOptOutEntry, scenario
 		if _, ok := scenarioIDs[strings.TrimSpace(entry.ScenarioID)]; !ok {
 			return fmt.Errorf("affordance opt-out references unknown scenario_id %q", entry.ScenarioID)
 		}
+		if err := validateReplacementAffordance(entry.ReplacementAffordance); err != nil {
+			return fmt.Errorf("invalid replacement_affordance for scenario_id %q: %w", entry.ScenarioID, err)
+		}
 		expiresAt, err := time.Parse("2006-01-02", strings.TrimSpace(entry.ExpiresAt))
 		if err != nil {
 			return fmt.Errorf("invalid expires_at for scenario_id %q: %w", entry.ScenarioID, err)
@@ -98,6 +104,23 @@ func ValidateAffordanceOptOutAllowlist(entries []AffordanceOptOutEntry, scenario
 		if !expiresAt.After(now.UTC()) {
 			return fmt.Errorf("expired affordance opt-out for scenario_id %q at %s", entry.ScenarioID, entry.ExpiresAt)
 		}
+	}
+	return nil
+}
+
+func validateReplacementAffordance(raw string) error {
+	replacement := strings.TrimSpace(raw)
+	if replacement == "" {
+		return nil
+	}
+	if !strings.HasPrefix(replacement, "__affordance.") {
+		return fmt.Errorf("must use reserved __affordance.* namespace")
+	}
+	if replacement == "__affordance." {
+		return fmt.Errorf("must include affordance id suffix")
+	}
+	if !logicalIDPattern.MatchString(replacement) {
+		return fmt.Errorf("must match logical id grammar [A-Za-z0-9_.-]+")
 	}
 	return nil
 }

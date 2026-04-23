@@ -1,1 +1,1 @@
-Identify the next uncovered `plans/terminal-ui.md` test gap and add a red test for it.
+Add a red test proving scenario registry rejects main-layer scenarios that skip `withCornerAffordance` unless allowlisted.

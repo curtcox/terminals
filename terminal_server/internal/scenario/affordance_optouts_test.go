@@ -71,12 +71,33 @@ func TestLoadAffordanceOptOutAllowlistRejectsMissingRequiredField(t *testing.T) 
 	}
 }
 
+func TestValidateAffordanceOptOutAllowlistRejectsInvalidReplacementAffordance(t *testing.T) {
+	entries := []AffordanceOptOutEntry{
+		{
+			ScenarioID:            "kiosk_demo",
+			Reason:                "locked demo flow",
+			Approver:              "@reviewer",
+			ExpiresAt:             "2027-01-01",
+			ReplacementAffordance: "menu_button",
+		},
+	}
+
+	err := ValidateAffordanceOptOutAllowlist(
+		entries,
+		map[string]struct{}{"kiosk_demo": {}},
+		time.Date(2026, 4, 22, 0, 0, 0, 0, time.UTC),
+	)
+	if err == nil {
+		t.Fatalf("expected invalid replacement_affordance error")
+	}
+}
+
 func TestCODEOWNERSHasAffordanceOptOutEntry(t *testing.T) {
-	ok, err := CodeownersHasPathOwner("../../../.github/CODEOWNERS", "terminal_server/internal/scenario/affordance_optouts.yaml", "@curtcox")
+	ok, err := CodeownersHasPathOwner("../../../.github/CODEOWNERS", "terminal_server/internal/scenario/affordance_optouts.yaml", "@scenario-engine-maintainers")
 	if err != nil {
 		t.Fatalf("CodeownersHasPathOwner() error = %v", err)
 	}
 	if !ok {
-		t.Fatalf("expected CODEOWNERS entry for affordance opt-out allowlist")
+		t.Fatalf("expected scenario-engine maintainers CODEOWNERS owner for affordance opt-out allowlist")
 	}
 }
