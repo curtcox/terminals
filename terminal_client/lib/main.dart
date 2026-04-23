@@ -4696,7 +4696,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (node == null) {
       return false;
     }
-    return _nodeId(node).trim() == 'terminal_root';
+    final id = _nodeId(node).trim();
+    if (id == 'terminal_root') {
+      return true;
+    }
+    return id.endsWith('/terminal_root');
   }
 
   Widget _renderNode(uiv1.Node node) {

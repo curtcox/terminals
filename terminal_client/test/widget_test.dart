@@ -3372,6 +3372,39 @@ void main() {
     expect(find.text('Server Host'), findsNothing);
     expect(find.text('Connect Stream'), findsNothing);
   });
+
+  testWidgets('scoped terminal root renders fullscreen app view',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'act:test-activation/terminal_root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'act:test-activation/terminal_output'
+                ..text = (uiv1.TextWidget()..value = 'repl>'),
+            ))),
+    );
+    await tester.pump();
+
+    expect(find.text('repl>'), findsOneWidget);
+    expect(find.text('Server Host'), findsNothing);
+    expect(find.text('Connect Stream'), findsNothing);
+  });
 }
 
 class _FakeClientHarness {
