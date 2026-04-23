@@ -12,7 +12,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
 	skills-validate \
-	all-lint all-test all-check run-server run-client-web \
+	all-lint all-test all-check stop-server run-server run-client-web \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate
 
 server-build:
@@ -111,6 +111,9 @@ all-lint: server-lint client-lint proto-lint
 all-test: server-test client-test
 
 all-check: all-lint all-test proto-breaking client-build-all
+
+stop-server:
+	./scripts/stop-server.sh
 
 run-server:
 	cd terminal_server && \
