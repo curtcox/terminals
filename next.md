@@ -1,1 +1,1 @@
-Identify the next unimplemented `plans/terminal-ui.md` test gap after connect-time CapabilitySnapshot coverage.
+Add a deterministic test seam for screen-metrics changes, then land Phase F rotate/resize capability-delta tests from plans/terminal-ui.md.

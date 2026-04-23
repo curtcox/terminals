@@ -139,6 +139,7 @@ const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
 const Duration _capabilityMonitorInterval = Duration(seconds: 2);
+const Duration _displayGeometryDebounceInterval = Duration(milliseconds: 120);
 const RetryPolicy _bugReportAckRetryPolicy = RetryPolicy(
   interval: Duration(seconds: 1),
   maxDuration: Duration(seconds: 20),
@@ -1035,6 +1036,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   Timer? _heartbeatTimer;
   Timer? _sensorTimer;
   Timer? _capabilityMonitorTimer;
+  Timer? _displayGeometryDebounceTimer;
   Timer? _reconnectTimer;
   bool _shouldStayConnected = false;
   bool _isConnecting = false;
@@ -1104,6 +1106,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   TextDirection _lastKnownTextDirection = TextDirection.ltr;
   bool _capabilityPollInFlight = false;
   String _lastCapabilitySignature = '';
+  String _lastObservedDisplaySignature = '';
   bool _privacyModeEnabled = false;
   bool _wakeWordDetectorEnabled = false;
   late final ConnectionReadinessGateway _readinessGateway;
@@ -1142,6 +1145,43 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   bool get _hasActiveControlSession =>
       _shouldStayConnected && _incoming != null && _client != null;
+
+  void _refreshDisplayMetricsFromViews() {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) {
+      return;
+    }
+    final view = views.first;
+    final dpr = view.devicePixelRatio <= 0 ? 1.0 : view.devicePixelRatio;
+    final logicalSize = Size(
+      view.physicalSize.width / dpr,
+      view.physicalSize.height / dpr,
+    );
+    if (logicalSize.width <= 0 || logicalSize.height <= 0) {
+      return;
+    }
+    _lastKnownLogicalSize = logicalSize;
+    _lastKnownDevicePixelRatio = dpr;
+    _lastKnownOrientation = _normalizedOrientationFromSize(logicalSize);
+  }
+
+  String _displaySignature({
+    required Size logicalSize,
+    required double devicePixelRatio,
+    required String orientation,
+  }) {
+    return '${logicalSize.width.round()}x${logicalSize.height.round()}@${devicePixelRatio.toStringAsFixed(3)}:$orientation';
+  }
+
+  void _scheduleDisplayGeometryCapabilityUpdate() {
+    if (!_hasActiveControlSession) {
+      return;
+    }
+    _displayGeometryDebounceTimer?.cancel();
+    _displayGeometryDebounceTimer = Timer(_displayGeometryDebounceInterval, () {
+      _sendLifecycleCapabilityUpdate(reason: 'display_geometry_change');
+    });
+  }
 
   ConnectionPhase get _connectionPhase => deriveConnectionPhase(
         shouldStayConnected: _shouldStayConnected,
@@ -3673,7 +3713,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   @override
   void didChangeMetrics() {
-    _sendLifecycleCapabilityUpdate(reason: 'display_geometry_change');
+    _refreshDisplayMetricsFromViews();
+    _scheduleDisplayGeometryCapabilityUpdate();
   }
 
   @override
@@ -3682,6 +3723,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _cancelRegisterAckRetry();
     WidgetsBinding.instance.removeObserver(this);
     _cancelReconnectTimer();
+    _displayGeometryDebounceTimer?.cancel();
+    _displayGeometryDebounceTimer = null;
     _bugReportAckTimer?.cancel();
     _bugReportAckTimer = null;
     _stopHeartbeatLoop();
@@ -3719,6 +3762,15 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _lastKnownLogicalSize = mediaQuery.size;
     _lastKnownDevicePixelRatio = mediaQuery.devicePixelRatio;
     _lastKnownOrientation = mediaQuery.orientation.name;
+    final displaySignature = _displaySignature(
+      logicalSize: _lastKnownLogicalSize,
+      devicePixelRatio: _lastKnownDevicePixelRatio,
+      orientation: _lastKnownOrientation,
+    );
+    if (displaySignature != _lastObservedDisplaySignature) {
+      _lastObservedDisplaySignature = displaySignature;
+      _scheduleDisplayGeometryCapabilityUpdate();
+    }
     final directionality = Directionality.maybeOf(context);
     if (directionality != null) {
       _lastKnownTextDirection = directionality;
