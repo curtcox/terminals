@@ -1,1 +1,1 @@
-No pending implementation steps; await user review or commit/push instructions.
+No failing terminal-ui plan tests remain; await review or next requested change.
