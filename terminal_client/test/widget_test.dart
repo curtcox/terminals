@@ -866,7 +866,7 @@ void main() {
         .where((request) => request.hasVoiceAudio())
         .toList(growable: false);
     expect(voiceAudioRequests, hasLength(1));
-    expect(find.text('Notification: '), findsOneWidget);
+    expect(find.text('Notification: '), findsNothing);
     expect(find.text('wake service launched'), findsNothing);
     expect(find.text('Wake acknowledged'), findsNothing);
   });

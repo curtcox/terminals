@@ -59,6 +59,14 @@ func (w *AsyncWriter) SetWriteFailureCallback(callback func(WriteFailure)) {
 	w.onWriteFailure = callback
 }
 
+// SetStderr replaces the writer used for error diagnostics. It is safe to
+// call concurrently with writes.
+func (w *AsyncWriter) SetStderr(writer io.Writer) {
+	w.errMu.Lock()
+	defer w.errMu.Unlock()
+	w.stderr = writer
+}
+
 func (w *AsyncWriter) Write(p []byte) (int, error) {
 	if w.closed.Load() {
 		return 0, os.ErrClosed
