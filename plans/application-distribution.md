@@ -209,6 +209,15 @@ Roles (extensible, but these three are defined here):
 - `publisher` — the server that packaged the file. Optional, used
   when a server re-hosts something it did not author.
 
+Vouchers travel with the package. Every time a server (or a human
+reviewer on a server) is willing to stand behind a package, they
+append a `[[signature]]` with `role = "voucher"` to `package.sig`
+and re-publish. Because signatures are over the content-addressed
+`package_id`, appending a voucher never changes the package
+itself — the same `.tap` accumulates more signatures as it moves.
+Multiple sequential vouchers are expected, and each voucher's
+`created` timestamp records the review order.
+
 Keys bind to identities through the existing identity scheme in
 [identity-and-audience.md](identity-and-audience.md). A signature
 with an unknown key is never *invalid* per se; it is simply
@@ -450,8 +459,15 @@ tractable. The analyzer checks:
 ### 5.5 Gate 5 — AI-assisted review
 
 The server runs a code review pass using its configured
-`ai.review` provider (Claude, Codex, or another). The prompt is
-structured, not free-form, and asks for:
+`ai.review` providers. **Two independent providers are run by
+default** (e.g., Claude and Codex, or Claude and a local model),
+backed by the rule "when in doubt, double check." Using providers
+from different families reduces shared blind spots; a deployment
+may narrow this to one provider only by explicit policy, and
+should widen to more than two when a package touches a
+high-risk capability surface (see §5.7).
+
+The prompt is structured, not free-form, and asks for:
 
 - a plain-English summary of what the app does,
 - a list of side effects the app can cause, grouped by host
@@ -464,10 +480,12 @@ structured, not free-form, and asks for:
 - a verdict: `pass` / `warn` / `block` with reasons.
 
 The AI verdict is treated as one input, not the final answer. A
-`block` from the AI reviewer escalates to a human; a `pass`
-never *bypasses* human review required by policy. The exact
-review prompt and the reviewer's response are persisted verbatim
-with the install, so decisions are auditable after the fact.
+`block` from any reviewer escalates to a human; a `pass` never
+*bypasses* human review required by policy. When two providers
+disagree, the stricter verdict wins and the disagreement is
+itself recorded as evidence on the install. The exact review
+prompt and every reviewer's response are persisted verbatim with
+the install, so decisions are auditable after the fact.
 
 ### 5.6 Gate 6 — Conflict and redundancy
 
@@ -652,21 +670,40 @@ A compressed trace using the example in
 
 ---
 
-## Open Questions
+## Follow-On Plans
 
-- **Voucher discovery.** Vouchers are signatures on a package
-  hash; how do they travel? Same source as the package, a
-  separate endpoint, or bus messages? Left to the discovery layer.
-- **AI-review provider independence.** Should Gate 5 *always* run
-  a second reviewer with a different provider (Claude and Codex
-  both, or Claude and a local model) to reduce single-model
-  blind spots? Worth piloting.
-- **Quarantine tier.** Should TAR support a reduced-permission
-  runtime tier for provisional installs, separate from `--dev`?
-  This plan describes it in §5.3 as a policy option but does not
-  specify its implementation; that belongs in a follow-on
-  amendment to [application-runtime.md](application-runtime.md).
-- **Artifact ownership on uninstall.** Artifacts are first-class
-  and may be referenced by other apps or users. The default
-  `--keep-data` preserves them; a future plan should specify
-  reference counting so `--purge` is safe.
+Two questions raised while drafting this plan are load-bearing
+enough to warrant their own documents:
+
+- **Quarantine sandbox specification.** §5.3 treats a
+  reduced-permission runtime tier as a policy option, and §5.7
+  references it as a risk-mitigation lever, but the mechanics
+  belong elsewhere. A separate plan (`plans/quarantine-sandbox.md`,
+  amending [application-runtime.md](application-runtime.md))
+  should fix the tier's permission subset, its lifecycle (time
+  limits, promotion criteria), and how activations see the
+  difference.
+- **Data retention policy.** Artifacts are first-class and often
+  cross-referenced by other apps, users, and sessions. `--keep-data`
+  / `--archive-data` / `--purge` are coarse operator controls, but
+  the deeper question is how long data should live after an app's
+  removal, under which legal/operational regimes, and with what
+  notice to owners. A separate plan (`plans/data-retention.md`)
+  should cover retention classes, owner notification, legal holds,
+  and safe deletion — reference counting alone is insufficient.
+
+## Resolved Design Choices
+
+The following were open during drafting and are now fixed here
+so they are not re-opened:
+
+- **Voucher travel.** Vouchers are appended to the package's own
+  `package.sig` as additional `[[signature]]` blocks and travel
+  with the package. Multiple sequential vouchers are expected.
+  Since signatures are over `package_id`, adding a voucher never
+  changes the package bytes.
+- **AI-review provider independence.** Gate 5 runs two independent
+  `ai.review` providers by default ("when in doubt, double
+  check"); policy may narrow to one or widen further, and
+  disagreements are recorded as evidence with the stricter
+  verdict winning.
