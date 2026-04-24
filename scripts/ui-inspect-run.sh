@@ -220,6 +220,9 @@ write_state() {
     printf 'WEB_STARTED_AT=%s\n'    "${WEB_STARTED_AT}"
     printf 'MACOS_STARTED_AT=%s\n'  "${MACOS_STARTED_AT}"
   } >"${STATE_FILE}"
+  if ! chmod 600 "${STATE_FILE}" 2>/dev/null; then
+    warn "unable to chmod 600 state file: ${STATE_FILE}"
+  fi
 }
 
 # Strict KV parser. Replaces the previous `source "${STATE_FILE}"` which
