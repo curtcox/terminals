@@ -213,14 +213,72 @@ Rules:
   expects to read. For `compatibility = "incompatible"` steps,
   both `prior_record_schema` and the new `record_schema` are
   required.
-- `seed` is an ndjson file of records conforming to
+- `seed` is an ndjson file of **fixture records** conforming to
   `prior_record_schema`; `expected` is the ndjson file of
-  records the dry-run must produce. Both are part of the
-  package and travel in the `.tap` under `tests/`.
+  fixture records the dry-run must produce. Both are part of
+  the package and travel in the `.tap` under `tests/`.
 - A package that declares `migrate/*.tal` without
   corresponding `[[migrate.fixture]]` entries fails at Gate 1.
 - The fixtures are capped at 4096 records per step (operator
   policy can raise) so Gate 4 runs bounded.
+
+#### 2.1.2 Fixture record envelope
+
+Every line of `seed` and `expected` is a **fixture record**:
+one JSON object with exactly two fields, no others.
+
+```json
+{ "key": "<string, ≤ 256 bytes, UTF-8 NFC>",
+  "value": { ... } }
+```
+
+Rules:
+
+- `key` is an opaque string from the app's store namespace. It
+  is not interpreted by the executor beyond equality and
+  ordering. Keys MUST be unique within a fixture file;
+  duplicate `key` is a Gate 1 rejection (the fixture itself is
+  ill-formed, independent of the migration).
+- `value` is a JSON object. It is validated against the
+  declared `record_schema` (for `expected`) or
+  `prior_record_schema` (for `seed`). A value that fails
+  schema validation is a Gate 1 rejection.
+- Fixture files MUST be sorted ascending by `key` under strict
+  byte-lexicographic ordering of the UTF-8 NFC key bytes. A
+  mis-sorted line is a Gate 1 rejection. Sorting is load-
+  bearing so that two independent tools generate byte-
+  identical fixtures for the same semantic set.
+- Lines are separated by a single `\n` (LF). Trailing `\n` on
+  the last line is required. No `\r\n`. No blank lines. No
+  comments. Any deviation is a Gate 1 rejection.
+- Each line, parsed as JSON, MUST equal the same JSON value
+  when re-serialized under RFC 8785 canonical JSON. Gate 4
+  rejects the fixture otherwise — this ensures the fixture
+  author did not rely on whitespace or member-order quirks.
+
+#### 2.1.3 Fixture comparison semantics
+
+Gate 4 compares the migrated fixture output against
+`expected` as follows:
+
+1. The executor writes migrated output to an in-memory
+   ndjson stream using the same envelope.
+2. Both `expected` and `output` are parsed into in-memory
+   maps from `key → value`. The parse rejects duplicates
+   (which §2.1.2 already excludes from well-formed fixtures).
+3. Key sets MUST match exactly. A key present in one and not
+   the other is a test failure; the fixture report names the
+   missing key(s) and the containing file.
+4. For each key, `expected[key]` and `output[key]` are
+   compared under RFC 8785 canonical JSON — each is
+   re-serialized and the two byte strings are compared for
+   equality. This is the authoritative equality; no deep
+   structural equality or library-specific comparison is
+   used.
+5. Gate 4 passes the step only when all key sets match and
+   every value passes canonical-JSON equality. Any mismatch
+   aborts Gate 4 with the first differing key and a byte-
+   level diff of the two canonical JSON forms.
 
 ### 2.2 Compatibility declaration
 
@@ -470,8 +528,26 @@ in this upgrade:
    `multi_version`, and best-effort for `none` (compatible
    migrations do not change record semantics so rewind of new
    writes is safe).
-3. Re-register the old package; for `drain`, resume drained
-   activations at the old version.
+3. Re-point `apps/<app_id>/current` at the prior
+   `versions/<package_id>` via the install-transaction pointer
+   flip ([application-distribution.md](application-distribution.md)
+   §6.a.1). This is the visibility barrier for the rewind. The
+   old package directory is already immutable and present; the
+   flip is a `rename(2)` of a fresh `current.new` symlink.
+4. Drained activations are **not** resumed. The runtime
+   invariant from §3.1.1 holds through abort-to-baseline:
+   every activation drained at `drain_required` is terminated
+   and its termination recorded in
+   `drain/intents.ndjson`. After the pointer flip, the
+   scenario engine resolves `current` to the prior
+   `package_id` and creates new activations at the old
+   version from the next `ActivationRequest` onward. Clients
+   observe the app as "was drained, now accepting new
+   activations at the prior version."
+5. Append a `verdict-log/1` entry with
+   `decision = "rolled-back"` and a `verdict/1` bundle with
+   `final_action = "rolled-back"`. `prev_hash` and
+   `verdict_bundle_sha256` chain as usual.
 
 If any artifact inverse fails during rewind (the artifact was
 deleted by its owner between patch and rewind, or its current
@@ -483,7 +559,11 @@ patched), the upgrade enters `reconcile_pending`, not `aborted`.
 When rewind cannot fully reverse its artifact patches, the
 upgrade transitions to `reconcile_pending`:
 
-- The old package is re-registered so the app runs.
+- `apps/<app_id>/current` is re-pointed at the prior
+  `versions/<package_id>` via the same pointer flip as
+  §3.7.2, so the app runs on the old version. Drained
+  activations are not resumed; new requests start at the old
+  version.
 - A reconciliation record is written to
   `apps/<app_id>/migrate/<run_id>/reconcile.json` listing every
   artifact whose inverse failed, with: artifact id, journaled
@@ -564,25 +644,33 @@ to an additional vetting gate during Gate 4 (see
 [application-distribution.md](application-distribution.md)
 vetting pipeline). The dry-run harness:
 
-1. Spawns an isolated executor instance against a synthetic
-   store seeded from the `[[migrate.fixture]].seed` file of §2.1.1.
-   Each seeded record must validate against the declared
-   `prior_record_schema`; a seed that fails validation is a
-   Gate 4 `block`.
-2. Runs every declared migration step end-to-end against its
-   seed.
-3. Compares the post-migration state against the declared
-   `expected` ndjson. Any divergence is a Gate 4 `block`.
-4. For each step, re-runs it with an induced crash injected at
+1. Validates every fixture file end-to-end against the
+   envelope rules in §2.1.2 (record shape, key uniqueness,
+   sort order, line separators, canonical-JSON round-trip).
+   Any violation is a Gate 4 `block` before any step runs.
+2. Spawns an isolated executor instance against a synthetic
+   store seeded from the `[[migrate.fixture]].seed` file. Each
+   seeded record's `value` must validate against the declared
+   `prior_record_schema`; a seed that fails schema validation
+   is a Gate 4 `block`.
+3. Runs every declared migration step end-to-end against its
+   seed, producing an in-memory output stream in the fixture
+   envelope.
+4. Compares `output` against `expected` per §2.1.3 (key-set
+   equality plus RFC 8785 canonical-JSON value equality).
+   Any divergence is a Gate 4 `block` with the byte-level
+   diff attached to the gate evidence.
+5. For each step, re-runs it with an induced crash injected at
    every journal boundary (after `store.put`, before checkpoint;
    after checkpoint, before next op). Verifies the replayed
    state equals the non-crashed terminal state (which must in
-   turn equal `expected`).
-5. For `drain` steps, verifies the package declares
+   turn pass §2.1.3 equality against `expected`).
+6. For `drain` steps, verifies the package declares
    `compatibility = "incompatible"`.
-6. For `multi_version` steps, runs the author-supplied read
-   adapter against migrated records and verifies adapter output
-   validates against the declared `prior_record_schema`.
+7. For `multi_version` steps, runs the author-supplied read
+   adapter against migrated records and verifies adapter
+   output validates against the declared
+   `prior_record_schema`.
 
 Any dry-run failure is a Gate 4 block. A package that fails the
 dry-run cannot be installed through the normal pipeline;

@@ -101,7 +101,7 @@ the following constraints:
 | Window log                      | 23 (8 MiB)                                       |
 | Block size                      | encoder default at level 19; not constrained     |
 | Content Size flag               | **set**; decompressed size stored in frame header |
-| Content checksum flag           | **unset** (integrity comes from `package_id` over the frame, not from zstd) |
+| Content checksum flag           | **unset** (integrity comes from `package_id` over the canonical tar, not from zstd) |
 | Dictionary ID flag              | **unset**                                        |
 | Single Segment flag             | encoder default                                  |
 | Number of frames                | exactly 1; skippable frames are rejected         |
@@ -241,7 +241,7 @@ Schema:
 | Key | Field                | Type   | Notes                                         |
 |-----|----------------------|--------|-----------------------------------------------|
 | 0   | `schema_version`     | uint   | Matches outer `schema`. v1 value: `1`.        |
-| 1   | `package_id`         | bstr   | Raw 32-byte sha256 of the `.tap`.             |
+| 1   | `package_id`         | bstr   | Raw 32-byte sha256 of the **canonical tar** (§1.1). |
 | 2   | `role`               | tstr   | `"author"`, `"voucher"`, `"publisher"`.       |
 | 3   | `key_id`             | tstr   | `"ed25519:…"` in v1.                          |
 | 4   | `created_unix`       | uint   | Signer-asserted. Advisory; §3.5 binds authoritative time to server-observed receipt per [signing-and-trust.md](signing-and-trust.md). |

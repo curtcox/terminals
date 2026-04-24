@@ -1067,25 +1067,50 @@ from the verdict log:
                   | "upgraded"
                   | "rolled-back"
                   | "uninstalled"
-                  | "disabled"
                   | "aborted-pre-commit"
                   | "aborted-post-commit"
                   | "reconcile-pending"
+                  | "revet-pass"
+                  | "revet-warn"
+                  | "revet-block"
   }
 }
 ```
+
+**Correspondence with the verdict log.** Every value of
+`final_action` here is also a `decision` in the
+`verdict-log/1` enum defined normatively in
+[signing-and-trust.md](signing-and-trust.md) §6.4. The verdict
+log additionally carries two *log-only* decisions that
+produce **no** bundle: `enabled` and `disabled`. Those
+transitions never reach §5.8 because they do not re-run gates
+and carry no installer-signed evidence beyond the log entry
+itself. `verdict-log/1` entries for `enabled` / `disabled` set
+`verdict_bundle_sha256 = null` and `package_id = null`, and
+this section's enum therefore omits them.
+
+`final_action` values `revet-pass`, `revet-warn`, and
+`revet-block` produce bundles because a re-vet re-runs Gates
+3/6/7 (per §7) and must record the resulting evidence, warn
+acknowledgments, and epoch-at-vet in signed form. They do
+not change `current`.
 
 Field nullability:
 
 - `package_id`, `name`, `version` are null for decisions that
   do not name a specific package (standalone re-vet of an
-  install already present, policy-only re-vet, etc.).
+  install already present, policy-only re-vet). `app_id` is
+  always present.
 - `installed_at` is null for any `final_action` that did not
-  reach commit. `decided_at` is always present.
+  flip `current` in this transaction (`aborted-*`, `revet-*`,
+  `reconcile-pending`). `decided_at` is always present.
 - `epochs_at_commit` is null when `final_action` is
-  `aborted-pre-commit`.
+  `aborted-pre-commit` or any `revet-*` (no pointer flip
+  occurred).
 - `prev_verdict_digest` is null for the first-ever verdict for
   this `app_id`.
+- `gates` is populated for every bundle, including `revet-*`;
+  an empty `gates` array is a format rejection.
 
 Each bundle is signed by the installer key (per
 [signing-and-trust.md](signing-and-trust.md) §6) and indexed
@@ -1144,36 +1169,93 @@ phases = fetch → vet → lock_acquired → drain (if needed)
        → drain_old → unload_old → archive → released
 ```
 
+**Package directories are immutable, content-addressed, and
+versioned.** Every successful `prepare_new` writes a fresh
+directory at `apps/<app_id>/versions/<package_id>/` and never
+mutates an existing one. Rollback re-points at a directory that
+already exists; uninstall archives but does not in-place delete.
+The scenario engine never reads `apps/<app_id>/<anything other
+than the pointer target>` directly.
+
+**The `current` pointer is the single visibility barrier.**
+`apps/<app_id>/current` is a symlink (or, on filesystems
+without reliable symlink rename, a small pointer file of form
+`current -> <package_id>\n`) whose atomic swap via `rename(2)`
+*is* the commit. The scenario engine resolves definitions only
+through `current`; nothing it reads is mutable in place.
+
 **`prepare_new` is invisible to the scenario engine.** It
-writes the new package directory to `apps/<app_id>/` under a
-staged subpath, primes caches, and validates that TAR can
-load the definitions, but new `ActivationRequest`s are not
-routed to it. A crash during `prepare_new` is resolved by
-discarding the staged subpath on recovery.
+unpacks the canonical tar into a temporary sibling directory
+`apps/<app_id>/versions/.staging-<tx_id>/`, primes caches, and
+validates that TAR can load the definitions. The staged
+directory is fsynced, then atomically renamed into
+`apps/<app_id>/versions/<package_id>/` on the same filesystem;
+the parent directory is fsynced. If `versions/<package_id>/`
+already exists (idempotent re-prepare, e.g. reinstalling the
+same bytes), the staging directory is discarded and the
+existing one is reused. A crash during `prepare_new` leaves at
+most a `.staging-<tx_id>` directory behind; recovery removes
+any `.staging-*` whose `tx_id` is not the winning transaction.
 
-**`commit` is the single fsynced visibility barrier.** It is
-an atomic sequence executed under the per-app lock:
+**`commit` is the single fsynced pointer flip.** Steps are
+ordered so that every durable side effect either precedes the
+pointer flip (and is recoverable before visibility) or is
+recoverable deterministically after it:
 
-1. Re-check trust, registry, and capability epochs (§6.a.2).
-   Abort the transaction if any epoch check fails.
-2. Rename the staged subpath into the live package path with
-   a single directory-rename operation followed by fsync of
-   the parent directory.
-3. Append the `install-tx/1` `commit` entry to the
-   transaction journal, fsync.
-4. Write the verdict bundle file (§5.8) and append the
-   `verdict-log/1` entry to `trust/verdicts.ndjson`, fsync.
-5. Signal the scenario engine to begin routing new
-   `ActivationRequest`s to the new definitions.
+1. **Epoch re-check** (in-memory). Re-load trust, registry, and
+   capability epochs (§6.a.2) and re-run any gate whose epoch
+   moved. A `block` result aborts the transaction; this step
+   has no durable side effect.
+2. **Journal commit entry.** Append the `install-tx/1` phase
+   `commit` to the transaction journal; fsync the file and its
+   directory. `evidence` carries the resolved `package_id`, the
+   prior `package_id|null`, `epochs_at_commit`, and the
+   deterministic hash of the yet-to-be-written verdict bundle
+   (§5.8) so recovery can reconstruct it.
+3. **Verdict bundle file.** Write
+   `<server_data>/trust/verdicts/<app_id>/<seq>.json` with
+   `final_action` resolved and installer-sig applied; fsync the
+   file and its directory. Filename uses the
+   `verdict-log/1.seq` reserved in step 4.
+4. **Verdict-log entry.** Append the `verdict-log/1` entry to
+   `<server_data>/trust/verdicts.ndjson`; fsync. `this_hash`
+   chains to the prior log entry and references
+   `verdict_bundle_sha256` from step 3.
+5. **Atomic pointer flip.** Write
+   `apps/<app_id>/current.new` as a symlink (or pointer file)
+   targeting `versions/<package_id>`; fsync its parent
+   directory; `rename("current.new", "current")`; fsync the
+   parent directory again. This rename is the visibility
+   barrier — before it, the scenario engine sees `v_old`;
+   after it, `v_new`.
+6. **Engine signal and journal release.** Signal the scenario
+   engine to re-resolve `current` and begin routing new
+   `ActivationRequest`s to the new definitions. Append the
+   `released` phase to the transaction journal.
 
-Steps 1–4 are reversible by journal rollback on crash because
-the scenario engine has not yet switched. Step 5 is the point
-of no return; if the server crashes between step 4 and step 5,
-recovery reads the commit entry, replays step 5, and the
-decision is visible. A recovery that finds a `commit` entry
-without a preceding `verdict-log/1` append repairs by writing
-the verdict-log entry from the staged bundle (idempotent;
-`this_hash` is deterministic) before running step 5.
+**Crash recovery matrix.** On startup, for every `app_id` with
+an open transaction journal whose terminal phase is not
+`released`, `aborted-pre-commit`, or `aborted-post-commit`:
+
+| Last durable phase found                                       | Repair action                                                                                                                                                                                         | Outcome                   |
+|----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
+| Before step 2 (`prepare_new` present, no `commit` entry)       | Discard any `.staging-*` for this `tx_id`. Append `aborted-pre-commit`. Leave `current` unchanged.                                                                                                    | Tx aborted; old version live. |
+| Step 2 durable; step 3 missing or partial                      | Delete any partial `<seq>.json`. Re-derive the bundle deterministically from the journal `evidence` (installer-sig is re-generated deterministically over the canonical bundle bytes). Continue at step 3. | Tx completes; new version live. |
+| Step 3 durable; step 4 missing                                 | Append the `verdict-log/1` entry; `this_hash` is deterministic given the durable bundle and `prev_hash` from the tail of `verdicts.ndjson`. Continue at step 5.                                       | Tx completes; new version live. |
+| Step 4 durable; step 5 missing (no `current.new`, no rename)   | Create `current.new` and perform the rename. Continue at step 6.                                                                                                                                      | Tx completes; new version live. |
+| Step 4 durable; `current.new` present but not renamed          | Complete the rename (idempotent: `current.new` is only written by this tx, its target is the same `package_id`). Continue at step 6.                                                                  | Tx completes; new version live. |
+| Step 5 durable; step 6 missing                                 | Signal the scenario engine; append `released`.                                                                                                                                                        | Tx completes; new version live. |
+| Journal or verdict-log corruption detected (hash mismatch, unknown phase) | Declare the transaction `aborted-post-commit` if the durable `current` already points at the new `package_id`, else `aborted-pre-commit`. Raise a `critical_mutating` incident; leave the live pointer untouched. | Manual audit required.    |
+
+**Rollback and uninstall use the same pointer-flip barrier.**
+Rollback re-points `current` at an existing
+`versions/<prior_package_id>` directory through the same
+6-step ritual — step 5 is the only durable mutation to live
+state. Uninstall flips `current` to a null pointer
+(`apps/<app_id>/current` removed via `rename` from a freshly
+created `current.none` sentinel) and then archives the
+versions tree per the data policy (§6.3). Retained versions
+stay in `versions/` until archive; they are never mutated.
 
 #### 6.a.2 Epoch revalidation at commit
 
@@ -1267,6 +1349,19 @@ and triggers the server-wide recovery path described in
 Transitions are journaled; every arrow is either a reversible
 pre-commit action or an install-transaction commit.
 
+**State-name spelling convention.** Internal lifecycle states
+are spelled in `snake_case` (`reconcile_pending`, `installed`,
+`disabled`, `upgrading`). Wire-format values that appear in
+`verdict-log/1.decision`, `verdict/1.final_action`, and
+`disabled_reason` are spelled in `kebab-case`
+(`reconcile-pending`, `revet-block`, `aborted-pre-commit`,
+`author-revoked`). The mapping is a pure character swap of
+`_` for `-`; `reconcile_pending` ↔ `reconcile-pending` is the
+only pair where both spellings appear in the plan set, and
+they denote the same state. Operator-facing prose favors the
+`snake_case` form; machine-consumed schemas favor the
+`kebab-case` form.
+
 #### 6.a.5 Install-transaction journal (`install-tx/1`)
 
 Each transaction appends one line per phase transition to
@@ -1306,9 +1401,19 @@ Rules:
 - `this_hash = sha256(canonical_json({schema, tx_id, app_id,
   seq, at, actor, phase, evidence, prev_hash}))`. The first
   entry uses `prev_hash = "sha256:" + hex(0^32)`.
-- `evidence` is phase-specific (staged package path for
-  `prepare_new`, directory-rename source/target for `commit`,
-  migration run id for `migrate`, etc.).
+- `evidence` is phase-specific. For `prepare_new` it carries
+  the staging directory, target `package_id`, and tar-size
+  byte count. For `commit` it carries the resolved
+  `package_id`, the prior `package_id|null` that `current`
+  pointed at, `epochs_at_commit`, and
+  `verdict_bundle_sha256` — the sha256 of the canonical
+  bundle bytes as they will be written to
+  `<server_data>/trust/verdicts/<app_id>/<seq>.json`, computed
+  before the file is written so recovery can re-derive the
+  bundle deterministically. For `migrate` it carries the
+  migration run id and journal-line count. For `drain` it
+  carries the drain-intent count and terminated-activation
+  count.
 - `install-tx/1` entries are NOT installer-signed; integrity is
   provided by the hash chain plus the co-signed `verdict-log/1`
   entry that references the same `tx_id`. Damage to a
@@ -1410,26 +1515,57 @@ agreeing that the app will not run until trust is promoted.
 ### 6.5 Drain semantics
 
 `term apps drain <app>` and any migration-required drain (§6.1)
-share the following semantics:
+share the following semantics. The drain always terminates
+activations; no activation crosses a version boundary (see
+[app-migrations.md](app-migrations.md) §3.1.1).
 
 1. Scenario engine stops accepting new activations for the
    `app_id`.
-2. For each existing activation:
-   - If the activation's definition exports `suspend(reason)`,
-     send a suspend request and wait for acknowledgment.
-     Record the acknowledgment in `drain/intents.ndjson`.
-   - Otherwise, wait for the activation to reach its next
-     yield boundary and terminate it there. Record the
-     termination.
-3. Drain is complete when every existing activation has
-   recorded an acknowledgment or termination, or `drain_timeout`
-   elapses.
+2. For each existing activation, drain is a two-step
+   `suspend → terminate` sequence:
+   - **Snapshot.** If the activation's definition exports
+     `suspend(reason)`, send a suspend request and wait for
+     its acknowledgment. The `suspend` handler runs under a
+     bounded deadline (`policy.drain.suspend_deadline_ms`,
+     default 2000) and is expected to flush pending writes,
+     commit any open store transactions, and return an
+     idempotent safe-snapshot marker. The acknowledgment is
+     recorded as a `drain-intent/1` entry with `action =
+     "acknowledged"` and `state = "pending"`. Acknowledgment
+     alone is **not** drain completion — it is a safe-point
+     signal that makes the next step safe to apply.
+   - **Terminate.** After acknowledgment (or immediately, if
+     the activation has no `suspend` handler), the activation
+     is terminated at its next yield boundary per the runtime's
+     cooperative shutdown protocol. Termination is recorded
+     as a `drain-intent/1` entry with `action = "terminate"`
+     and `state = "complete"`. This is the drain-completion
+     record.
+   - If an activation's `suspend` handler does not ack within
+     its deadline, the activation is terminated without a
+     snapshot — `drain-intent/1` records `action =
+     "terminate"` with `state = "complete"` and `reason =
+     "suspend_deadline_exceeded"`. A non-acking activation
+     does not block drain; it is recorded as having been
+     terminated without a clean snapshot.
+3. Drain is complete when every existing activation has a
+   `drain-intent/1` entry with `action = "terminate"` and
+   `state ∈ {"complete", "failed"}`, or `drain_timeout`
+   elapses. Pending `action = "acknowledged"` entries are
+   **not** completion; they are intermediate safe-points.
 4. Drain is idempotent: re-invocation for the same `tx_id`
    scans the journal and continues from the last recorded
-   state. A server crash mid-drain resumes on restart.
+   state. A server crash mid-drain resumes on restart; any
+   activation that was `acknowledged` but not yet
+   `terminate`d is terminated on resume.
 5. On `drain_timeout`, the install transaction aborts with a
    specific error; the executor does not run against a non-
-   drained app.
+   drained app. Partial drain state (some activations
+   terminated, others not) is left in the journal so the
+   operator can inspect which activations failed to drain.
+6. Drained activations never resume on the old or new version.
+   The scenario engine routes only **new** `ActivationRequest`s
+   after the visibility barrier (§6.a.1) has flipped `current`.
 
 ---
 
@@ -1646,23 +1782,38 @@ Using [docs/tal-example-kitchen-timer.md](../docs/tal-example-kitchen-timer.md):
 
 5. **Install on Server B.**
    - `term apps install kitchen_timer-0.1.0.tap --allow-warn`
-     enters the install transaction: lock acquired, trust and
-     registry epochs recorded, definition registered, no
-     stores provisioned (none declared), verdict bundle
-     signed by the installer key and appended to
-     `verdicts/log.ndjson`. The app is live.
+     enters the install transaction: per-app lock acquired,
+     trust/registry/capability epochs recorded in
+     `epochs_at_vet`. `prepare_new` unpacks the canonical tar
+     into a staging directory, then atomically renames it to
+     `apps/<app_id>/versions/<package_id>/` (immutable). At
+     `commit`, the journal commit entry is fsynced, the
+     verdict bundle file is written under
+     `<server_data>/trust/verdicts/<app_id>/<seq>.json`, the
+     `verdict-log/1` entry is appended to
+     `<server_data>/trust/verdicts.ndjson` (installer-signed,
+     hash-chained), and finally `apps/<app_id>/current` is
+     atomically flipped via `rename(2)` to point at
+     `versions/<package_id>/`. The scenario engine re-reads
+     `current` and the app is live. No stores provisioned
+     (none declared).
 
 6. **Upgrade to 0.2.0 (snoozing).**
    - Server A ships 0.2.0. Server B re-discovers, re-fetches,
      re-vets. Because `app_id` matches, this is an upgrade. No
      migration declared; no durable-data work. The install
-     transaction re-checks trust and registry epochs at
-     commit; both unchanged → proceeds.
-   - Activations running on 0.1.0 continue; new activations
-     use 0.2.0. `term apps ls` shows `kitchen_timer 0.2.0
-     (also 0.1.0 draining: 2 activations)`.
+     transaction re-checks trust, registry, and capability
+     epochs at commit; all unchanged → proceeds. A fresh
+     immutable `versions/<package_id_v2>/` is written, then
+     `current` is re-pointed.
+   - Activations running on 0.1.0 continue under the old
+     definitions (still loaded from the 0.1.0 version
+     directory); new activations resolve `current` to 0.2.0.
+     `term apps ls` shows `kitchen_timer 0.2.0 (also 0.1.0
+     draining: 2 activations)`.
    - Ten minutes later the last 0.1.0 activation expires; 0.1.0
-     definitions unload; archive retains the 0.1.0 package.
+     definitions unload. The 0.1.0 version directory stays on
+     disk (immutable, re-usable by rollback) until archive.
 
 7. **Author key rotation on Server A.**
    - Server A's operator rotates the author key per
