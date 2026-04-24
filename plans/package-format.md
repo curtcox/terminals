@@ -9,76 +9,111 @@ packages move between servers) and
 
 ## Problem
 
-[application-runtime.md](application-runtime.md) specifies a package
-as a *directory on disk*. Distribution needs a *file* that can move
-between servers and be reasoned about cryptographically. The file
-format has to make two things unambiguous:
+[application-runtime.md](application-runtime.md) specifies a
+package as a *directory on disk*. Distribution needs a *file* that
+can move between servers and be reasoned about cryptographically.
+The file format has to make three things unambiguous:
 
 1. **What bytes are "the package."** Every server and every
    reviewer must compute the same `package_id` from the same
-   source tree.
-2. **What each signature actually asserts.** A signature that
-   commits only to "the package bytes" is too weak: it cannot
-   distinguish an author claim from a voucher claim, cannot bind
-   a voucher to the review conditions that were true when it was
-   issued, and cannot prevent reuse of an old signature against a
-   new package.
+   source tree, regardless of which encoder they used.
+2. **What each signature actually asserts.** A signature over a
+   hash alone is too weak: it cannot distinguish author from
+   voucher, cannot bind a voucher to its review conditions, and
+   cannot prevent reuse of an old signature against a new
+   package.
+3. **Where trust begins.** Before any trust store is consulted,
+   the package must be proven well-formed and self-consistent
+   through a pre-trust verifier — including decompression,
+   canonical tar validation, and manifest extraction.
 
-Both were flagged as blockers during review of the distribution
-plan; this document fixes them before any trust machinery is
-layered on top.
+Both the statement semantics and the pre-trust ordering were
+flagged as blockers in review; this document fixes them.
 
 ## Design Principles
 
-1. **Canonicalization is content, not convention.** A package is
-   a byte sequence produced by a fully specified tar canonicalizer.
-   Two authors who build from the same source tree produce the
-   same bytes.
-2. **Every signature signs a statement, not a hash.** The statement
-   names its own role, scope, key, timestamps, and the package
-   it refers to. A hash alone is ambiguous.
-3. **Statements are schema-versioned.** Future roles and fields
-   extend the schema without breaking old verifiers.
-4. **Static validation before trust.** A package that fails
-   canonicalization or statement-schema validation is rejected
-   before any key is even looked up.
+1. **Canonicalization of the trust boundary.** A package is a
+   byte sequence produced by a fully specified pipeline. The
+   `package_id` commits to that sequence and nothing else.
+2. **One pre-trust pipeline.** `verify_package()` is the single
+   function every gate consults before trust. Manifest contents
+   are not read until the archive has been canonicalized.
+3. **Every signature signs a statement, not a hash.** The
+   statement names its own role, scope, key, timestamps, nonce,
+   and the package it refers to.
+4. **Schema-versioned statements.** Future roles and fields
+   extend the schema with an explicit bump. v1 verifiers reject
+   unknown authority-bearing fields rather than ignoring them.
+5. **Ed25519 only in v1.** Algorithm agility is deferred behind a
+   schema bump.
 
 ## Non-Goals
 
-- No compression scheme selection — this document fixes one.
-- No transport format — `.tap` / `.tap.sig` travel over whatever
+- No transport format. `.tap` / `.tap.sig` travel over whatever
   `PackageSource` carries them (see distribution plan).
 - No trust policy — that lives in
   [signing-and-trust.md](signing-and-trust.md). This document
-  only specifies what can be verified *about* a signature, not
+  specifies what can be verified *about* a statement, not
   whether to accept it.
 
 ---
 
 ## 1. Package File (`.tap`)
 
-### 1.1 Outer shape
+### 1.1 Two-layer canonicalization
 
-A package is a POSIX ustar archive, compressed with zstd at a
-fixed level, with filename `<name>-<version>.tap`.
+A package is specified as two independently canonical forms:
 
 ```
-<name>-<version>.tap = zstd(level=19, deterministic)( canonical_tar )
+canonical_tar         = deterministic POSIX ustar (§1.3)
+tap_bytes             = canonical_zstd_frame(canonical_tar)    (§1.2)
+package_id            = "sha256:" + hex(sha256(tap_bytes))
 ```
 
-zstd level 19 is fixed so a rebuild is byte-identical. The zstd
-frame has no dictionary and no checksum flag (checksumming is
-done at the tar + signature layer instead, so it is not
-duplicated inside the compressor).
+The file on disk is `<name>-<version>.tap` and its contents are
+`tap_bytes`. The `package_id` commits to the compressed outer
+bytes. Both layers are canonical, because a verifier MUST be
+able to decompress, revalidate, and reject any `.tap` whose
+outer bytes do not match its inner canonical tar.
 
-### 1.2 Canonical tar
+### 1.2 Canonical zstd frame
 
-The tar stream MUST satisfy every rule below. A non-conforming
-tar is rejected at Gate 1 before any signature is examined.
+v1 `.tap` files MUST use exactly one canonical zstd frame with
+the following constraints:
+
+| Property                        | Value                                            |
+|---------------------------------|--------------------------------------------------|
+| Frame format                    | zstd single frame (RFC 8878), magic `0x28B52FFD` |
+| Compression level               | 19                                               |
+| Window log                      | 23 (8 MiB)                                       |
+| Block size                      | encoder default at level 19; not constrained     |
+| Content Size flag               | **set**; decompressed size stored in frame header |
+| Content checksum flag           | **unset** (integrity comes from `package_id` over the frame, not from zstd) |
+| Dictionary ID flag              | **unset**                                        |
+| Single Segment flag             | encoder default                                  |
+| Number of frames                | exactly 1; skippable frames are rejected         |
+| Trailing bytes                  | forbidden; bytes after the frame terminator are a format error |
+
+Pinned encoder reference: `zstd` command-line tool version ≥
+1.5.x built from upstream, invoked as `zstd -19 --no-check
+--format=zstd --single-thread`. A Go implementation (used by the
+server) MUST be tested to produce byte-identical output for the
+golden vectors in §4.
+
+If two encoder implementations ever diverge on a source tree
+that conforms to §1.3, the zstd pin is tightened in a `.tap/2`
+schema bump. v1 treats encoder divergence as a bug in the
+non-matching encoder.
+
+### 1.3 Canonical tar
+
+The decompressed tar stream MUST satisfy every rule below. A
+non-conforming tar is rejected by `verify_package()` before any
+signature is examined.
 
 **Member ordering.** Entries appear in lexicographic order of
 their full path under the package root. No duplicate paths. No
-empty directories as standalone entries (implicit from files).
+empty-directory entries.
 
 **Paths.**
 
@@ -88,28 +123,21 @@ empty directories as standalone entries (implicit from files).
 - No symlinks. No hardlinks. No device, FIFO, or socket entries.
 - No component longer than 255 bytes. Total path ≤ 4096 bytes.
 - Case-sensitive; two entries differing only in case are
-  rejected (protects extractors on case-insensitive filesystems).
+  rejected.
 
 **Types.** Only `regtype` (regular file) is allowed. Directories
 are implicit.
 
-**Modes.** File mode is exactly `0644`. The executable bit is
-never carried in the archive; TAL modules do not need it, and
-kernel blobs are loaded by path, not executed directly.
+**Modes.** File mode is exactly `0644`.
 
-**Owner / group.** `uid = gid = 0`, `uname = gname = ""` (empty
-strings, not `"root"`).
+**Owner / group.** `uid = gid = 0`, `uname = gname = ""`.
 
 **Times.** `mtime = 0`, `atime = 0`, `ctime = 0`.
 
 **Sizes.** `size` matches the actual byte length of the payload.
 
 **Headers.** No PAX extended headers. No GNU long-name or
-long-link headers. If a path exceeds the 100/155 ustar split, the
-build fails rather than emitting a `L`/`K` extension header.
-(Paths this long are rejected under the path rules above; this
-is a belt-and-braces rule so no extension-header parsing is ever
-required by a reader.)
+long-link headers.
 
 **Padding.** Standard 512-byte block padding. Two zero blocks at
 end of archive. No trailing bytes after the end marker.
@@ -119,13 +147,12 @@ end of archive. No trailing bytes after the end marker.
 **Checksum.** Computed per POSIX ustar. Mismatches reject the
 archive.
 
-### 1.3 Required contents
+### 1.4 Required contents
 
 Every `.tap` MUST contain:
 
-- `<name>/manifest.toml` — the package manifest defined in
-  [application-runtime.md](application-runtime.md).
-- `<name>/main.tal` — the top-level TAL module.
+- `<name>/manifest.toml` (exactly one).
+- `<name>/main.tal` (exactly one).
 
 Every `.tap` MAY contain any subset of:
 
@@ -138,34 +165,7 @@ Every `.tap` MAY contain any subset of:
   [app-migrations.md](app-migrations.md))
 
 No other top-level directories are permitted. Unknown top-level
-entries cause Gate 1 rejection — this is the lever future
-extensions pull rather than silently tolerating junk.
-
-### 1.4 Package identity
-
-```
-package_id = "sha256:" + hex(sha256(<tap bytes>))
-```
-
-The hash covers the **compressed** outer file. This is the only
-identifier that crosses server boundaries. `name` and `version`
-inside the manifest are metadata, not identity.
-
-### 1.5 Builder contract
-
-`term app pack <name>` produces `<name>-<version>.tap`. The
-builder:
-
-1. Validates the source tree against §1.3.
-2. Emits the canonical tar per §1.2.
-3. Compresses per §1.1.
-4. Records the produced `package_id` in an adjacent
-   `<name>-<version>.tap.buildinfo` (unsigned, for reproducibility
-   audits; not part of the package and not consumed at install).
-
-A second invocation on the same clean source tree produces a
-byte-identical `.tap`. CI for this repo should check that
-property on every app package change.
+entries cause rejection in §3.
 
 ---
 
@@ -173,74 +173,92 @@ property on every app package change.
 
 ### 2.1 Outer shape
 
-A TOML file named `<name>-<version>.tap.sig`. Unlike the package
-itself, the signature bundle is **append-only**: additional
-signatures accumulate over the package's lifetime as vouchers
-arrive.
+A TOML file named `<name>-<version>.tap.sig`. Append-only:
+additional statements accumulate over the package's lifetime as
+vouchers arrive.
 
 ```toml
-schema = "tap-sig/1"
+schema     = "tap-sig/1"
 package_id = "sha256:…"
 
 [[statement]]
-role         = "author"
-key_id       = "ed25519:…"
-created      = "2026-04-24T12:34:56Z"
+role             = "author"
+key_id           = "ed25519:…"
+created_unix     = 1714000000
 manifest_name    = "kitchen_timer"
 manifest_version = "0.1.0"
-scope        = { }
-sig          = "base64:…"
+nonce            = "base64url:…"          # 16 random bytes, required
+scope            = { }
+sig              = "base64:…"
 
 [[statement]]
-role         = "voucher"
-key_id       = "ed25519:…"
-created      = "2026-04-25T09:00:00Z"
+role             = "voucher"
+key_id           = "ed25519:…"
+created_unix     = 1714100000
 manifest_name    = "kitchen_timer"
 manifest_version = "0.1.0"
-scope        = { tier = "quarantine", reviewed = ["manifest", "tal", "tests"], tested_under = "sim-only" }
-sig          = "base64:…"
+nonce            = "base64url:…"
+scope            = { tier = "quarantine", reviewed = ["manifest", "tal", "tests"], tested_under = "sim-only" }
+sig              = "base64:…"
 ```
+
+Every TOML `[[statement]]` MUST carry every field the signed
+statement carries, including `nonce`. Missing `nonce` is a
+format rejection; a verifier cannot reconstruct the signed
+bytes without it.
+
+**Parser quotas** (v1 minimum; operator policy may raise):
+
+- File size ≤ 1 MiB.
+- Statement count ≤ 64.
+- Any string field length ≤ 8 KiB.
+- TOML parse depth ≤ 16.
+
+Exceeding any quota is a format rejection.
 
 ### 2.2 Canonical signed statement
 
 Each `[[statement]]` commits to a **canonical signed statement**
-— a byte string that is stable across encoders. The signature is
-over that byte string, never over `package_id` alone.
+— a byte string that is stable across encoders. The signature
+is over that byte string, never over `package_id` alone.
 
 The statement is a CBOR map with fixed, sorted integer keys.
-Integers (not strings) keep the encoding compact and stable.
-The schema:
+Schema:
 
 | Key | Field                | Type   | Notes                                         |
 |-----|----------------------|--------|-----------------------------------------------|
-| 0   | `schema_version`     | int    | Matches outer `schema`. Current value: `1`.   |
+| 0   | `schema_version`     | uint   | Matches outer `schema`. v1 value: `1`.        |
 | 1   | `package_id`         | bstr   | Raw 32-byte sha256 of the `.tap`.             |
 | 2   | `role`               | tstr   | `"author"`, `"voucher"`, `"publisher"`.       |
-| 3   | `key_id`             | tstr   | Key identifier per signing-and-trust.md.      |
-| 4   | `created_unix`       | int    | UTC seconds.                                  |
+| 3   | `key_id`             | tstr   | `"ed25519:…"` in v1.                          |
+| 4   | `created_unix`       | uint   | Signer-asserted. Advisory; §3.5 binds authoritative time to server-observed receipt per [signing-and-trust.md](signing-and-trust.md). |
 | 5   | `manifest_name`      | tstr   | From the package's manifest.                  |
 | 6   | `manifest_version`   | tstr   | From the package's manifest.                  |
 | 7   | `scope`              | map    | Role-specific; see §2.3.                      |
-| 8   | `nonce`              | bstr   | 16 random bytes. Prevents signature reuse.    |
+| 8   | `nonce`              | bstr   | 16 random bytes. Required.                    |
 
 Rules:
 
-- CBOR is encoded deterministically per RFC 8949 §4.2.
-- `package_id` is the raw hash bytes, not the `sha256:…` string,
-  so the statement cannot be made to "float" between formats.
+- CBOR is encoded deterministically per RFC 8949 §4.2. The
+  verifier re-encodes the statement from parsed TOML and checks
+  byte equality against the signature's message, so any
+  encoder-level ambiguity fails closed.
+- `package_id` is the raw 32 bytes of the sha256, not the
+  `"sha256:…"` string. Length is fixed at 32; any other length
+  is a format rejection.
 - `manifest_name` and `manifest_version` are redundant with the
   package contents but signed explicitly so that a verifier can
-  reject a bundle whose statements name a different manifest than
-  the `.tap` actually contains.
-- `nonce` prevents an attacker from replaying an identical
-  statement CBOR twice to inflate voucher counts.
+  reject a bundle whose statements name a different manifest
+  than the `.tap` actually contains.
+- `nonce` is per-statement. Two statements with equal
+  `(key_id, package_id, nonce)` are a format rejection.
 
 ### 2.3 Role-specific scope
 
-Every statement has a `scope` map. Unknown keys MUST be ignored
-by older verifiers; unknown *values* in a known key MUST be
-treated as unrecognized (policy may then choose to warn or
-block).
+Every statement has a `scope` map. v1 verifiers **reject** any
+unknown key in an authority-bearing scope — unknown keys cannot
+silently carry new authority. This reverses the earlier draft's
+"unknown keys are ignored" rule.
 
 **`role = "author"`**
 
@@ -249,36 +267,35 @@ scope = { }   # reserved; authors assert authorship, not conditions.
 ```
 
 Authors do not narrow their claim. An author either signed the
-package or did not.
+package or did not. A non-empty `scope` on an author statement
+is a format rejection in v1.
 
 **`role = "voucher"`**
 
 ```
 scope = {
     tier         : "full" | "quarantine" | "custom"
-    reviewed     : ["manifest", "tal", "tests", "kernels", "models", "assets"]
+    reviewed     : [ list of values in {"manifest","tal","tests","kernels","models","assets"} ]
     tested_under : "sim-only" | "hardware" | "production"
-    notes        : <tstr, optional, bounded to 2 KiB>
-    expires_unix : <int, optional>
+    notes        : <tstr, optional, ≤ 2 KiB>
+    expires_unix : <uint, optional>
 }
 ```
 
 The voucher commits to the exact conditions under which review
 occurred. A vouch under `tier = "quarantine"` cannot be
-laundered into a full-tier install: the signed statement itself
-carries the scope. This closes the voucher-laundering path
-called out in review.
+laundered into a full-tier install.
 
-`expires_unix`, when present, is advisory — a verifier MAY refuse
-old vouches per policy. A vouch without `expires_unix` is open-
-ended; trust-store policy is where expiry floors are applied (see
-[signing-and-trust.md](signing-and-trust.md)).
+`expires_unix`, when present, is advisory — trust policy decides
+if an expired vouch still counts. A vouch without
+`expires_unix` is bounded by the voucher's ceiling in
+[signing-and-trust.md](signing-and-trust.md) §2.
 
 **`role = "publisher"`**
 
 ```
 scope = {
-    via : "<hostname or peer id>"
+    via : "<hostname or peer id, ≤ 256 bytes>"
 }
 ```
 
@@ -286,111 +303,208 @@ Publisher signatures record re-hosting events. No gate currently
 acts on them; they exist so a server can audit how a package
 reached it.
 
-### 2.4 Append semantics
+### 2.4 Append semantics (no ordering authority)
+
+Statements are appended to `.tap.sig` as vouchers arrive.
+**Statement order is not authority-bearing.** A previous draft
+claimed statement-reordering would fail verification; that was
+wrong — only the per-statement signature is bound. Trust policy
+(§9 crosswalk in [signing-and-trust.md](signing-and-trust.md))
+consumes the unordered set and may weight statements by
+server-observed receipt time recorded in the trust log.
 
 Appending a voucher:
 
 1. Recompute `sha256(<tap>)` and confirm it equals the bundle's
    `package_id`. A bundle whose outer `package_id` no longer
    matches its `.tap` is rejected outright.
-2. Validate every existing statement's canonical encoding and
-   signature. A malformed older statement makes the whole bundle
-   invalid — a verifier never accepts a bundle piecemeal.
-3. Append a new `[[statement]]` block. Do not reorder or remove
-   existing blocks.
+2. Validate every existing statement per §3.
+3. Append a new `[[statement]]` block. Reordering is harmless
+   to signature verification but is not a supported editing
+   operation; toolchains SHOULD preserve insertion order to
+   match server-observed log ordering.
 
-A `.tap.sig` file that has been tampered with — statements
-reordered, role changed, scope edited — fails §2.2 verification
-because the CBOR statement bytes no longer match the signature.
-Role and scope cannot be modified in transit without breaking the
-signature, which is the property the distribution review flagged
-as missing.
-
-### 2.5 Minimum acceptance
+### 2.5 Minimum acceptance (field-level; trust is out of scope)
 
 For a `.tap` + `.tap.sig` pair to reach any policy gate at all,
-all of the following MUST hold:
+`verify_package()` must succeed (§3). In addition:
 
-- The `.tap` satisfies §1.
-- The bundle satisfies §2.1 / §2.4.
-- `schema` is a version this server understands.
-- Every statement's CBOR parses, its signature verifies against
-  the named key, and its `manifest_name` / `manifest_version`
-  match the `.tap`'s `manifest.toml`.
-- At least one statement has `role = "author"`. (Unsigned
-  packages are not accepted by this format; a server that wants
-  to accept unsigned code must do so explicitly outside the
-  `.tap` path.)
+- At least one statement has `role = "author"`. Unsigned
+  packages are not accepted.
+- All statement (`key_id`, `package_id`, `nonce`) triples are
+  distinct.
+- No statement is rejected under §2.3 scope rules.
 
 Trust decisions — which keys, which roles, which scopes — are
 deferred to [signing-and-trust.md](signing-and-trust.md).
 
 ---
 
-## 3. Verification Pseudocode
+## 3. `verify_package()` — The Pre-Trust Pipeline
+
+`verify_package(tap_bytes, sig_bytes) → (package_id,
+manifest, statements)` is the single entry point for
+Gate 0 of the distribution pipeline. Every later gate runs
+*only* after it succeeds.
 
 ```python
 def verify_package(tap_bytes, sig_bytes):
-    assert_canonical_tar(tap_bytes)             # §1.2
-    pkg_id = sha256(tap_bytes)                  # §1.4
-    bundle = parse_toml(sig_bytes)              # §2.1
+    # ---- Layer 1: outer frame ---------------------------------
+    assert_canonical_zstd_frame(tap_bytes)          # §1.2
+    canonical_tar = zstd_decompress(tap_bytes)      # stream length ≤ window_log bound
+    # ---- Layer 2: canonical tar -------------------------------
+    members = parse_tar(canonical_tar)
+    assert_canonical_tar(members)                   # §1.3 (paths, types, modes, times…)
+    assert_required_contents(members)               # §1.4
+    # ---- Layer 3: manifest extraction -------------------------
+    manifest_bytes = members["<name>/manifest.toml"]
+    manifest       = parse_toml(manifest_bytes)
+    # ---- Layer 4: package identity ----------------------------
+    pkg_id = sha256(tap_bytes)                      # §1.1
+    # ---- Layer 5: signature bundle ----------------------------
+    bundle = parse_toml(sig_bytes)                  # quotas from §2.1
     assert bundle["schema"] == "tap-sig/1"
     assert bundle["package_id"] == "sha256:" + hex(pkg_id)
-    manifest = read_manifest(tap_bytes)         # §1.3
-    author_seen = False
+    seen_triples = set()
+    author_seen  = False
+    statements   = []
     for stmt in bundle["statement"]:
-        cbor = canonical_cbor(stmt, pkg_id)     # §2.2
+        assert_required_fields(stmt)                # incl. nonce
+        cbor = canonical_cbor(stmt, pkg_id)         # §2.2
         verify_signature(stmt["key_id"], cbor, stmt["sig"])
         assert stmt["manifest_name"]    == manifest["name"]
         assert stmt["manifest_version"] == manifest["version"]
+        assert_scope_shape(stmt["role"], stmt["scope"])   # §2.3
+        triple = (stmt["key_id"], pkg_id, stmt["nonce"])
+        assert triple not in seen_triples
+        seen_triples.add(triple)
         if stmt["role"] == "author":
             author_seen = True
-    assert author_seen                          # §2.5
-    return pkg_id, bundle["statement"]
+        statements.append(stmt)
+    assert author_seen                              # §2.5
+    return pkg_id, manifest, statements
 ```
 
-Every gate in the distribution plan runs *after* this function
-succeeds. A failure here is a pre-trust rejection with no key
-lookup and no policy decision.
+Properties this pipeline guarantees:
+
+- **Zstd frame well-formedness is proven before decompression
+  runs on the result.** Decompression is bounded by the window
+  log and the frame's content-size field; bombs are rejected.
+- **Manifest contents are never read until canonicalization
+  passes.** A tar with two `manifest.toml` entries is rejected
+  at §1.3 before the parser picks one.
+- **Statements are validated against the manifest bytes
+  extracted from the same canonical archive the
+  `package_id` was computed over.** A bundle that names a
+  different manifest version is rejected.
+- **Duplicate-statement replay is rejected** by the
+  `(key_id, package_id, nonce)` uniqueness check. A voucher
+  quorum cannot be inflated by replaying the same signed
+  statement twice.
+
+Anything failing §3 is a *pre-trust rejection* with no key
+lookup and no policy decision. The `.tap` is staged for audit,
+not installed.
 
 ---
 
 ## 4. Test Vectors
 
 The repo MUST ship golden vectors exercising every rejection
-path, under `terminal_server/apps/tap/testdata/`:
+path, under `terminal_server/apps/tap/testdata/`. The full
+vector set covers:
+
+**Happy path.**
 
 - `good_v1.tap` / `good_v1.tap.sig` — canonical, signed by a
-  test author key, round-trips.
+  test author key; round-trips; `package_id` is stable across
+  rebuilds.
+
+**Zstd-layer rejections (§1.2).**
+
+- `zstd_checksum_flag.tap` — content-checksum flag set.
+- `zstd_dict_flag.tap` — dictionary flag set.
+- `zstd_multiframe.tap` — two frames concatenated.
+- `zstd_trailing_bytes.tap` — bytes after frame terminator.
+- `zstd_window_too_large.tap` — window log > 23.
+- `zstd_missing_content_size.tap` — content-size flag unset.
+
+**Tar-layer rejections (§1.3 / §1.4).**
+
 - `dup_path.tap` — two entries with identical paths.
-- `symlink.tap` — symlink entry; must reject.
+- `dup_manifest.tap` — two `manifest.toml` entries.
+- `symlink.tap` — symlink entry.
+- `hardlink.tap` — hardlink entry.
 - `case_collision.tap` — `main.tal` and `Main.tal`.
+- `path_traversal.tap` — entry named `kitchen_timer/../other`.
+- `absolute_path.tap` — entry named `/kitchen_timer/main.tal`.
 - `pax_header.tap` — PAX extended header present.
 - `mtime_nonzero.tap` — non-zero mtime.
-- `rolled_voucher.tap.sig` — author signature has been rewritten
-  as voucher; statement CBOR signature must fail.
+- `mode_nonstandard.tap` — file mode != 0644.
+- `unknown_top_level.tap` — entry under `kitchen_timer/secrets/`.
+- `missing_main_tal.tap` — no `main.tal`.
+- `missing_manifest.tap` — no `manifest.toml`.
+
+**Bundle-layer rejections (§2).**
+
+- `malformed_toml.tap.sig` — TOML parse error.
+- `schema_mismatch.tap.sig` — wrong `schema`.
+- `package_id_mismatch.tap.sig` — bundle `package_id` does not
+  match the `.tap`.
+- `no_author.tap.sig` — only voucher statements.
+- `missing_nonce.tap.sig` — `nonce` field omitted.
+- `duplicate_nonce.tap.sig` — two statements with the same
+  `(key_id, package_id, nonce)`.
+- `rolled_voucher.tap.sig` — statement text rewritten (role
+  author→voucher) without re-signing; CBOR verification fails.
 - `scope_edited.tap.sig` — voucher with `scope.tier` changed
-  post-sign; must fail.
+  post-sign; CBOR verification fails.
+- `unknown_scope_key.tap.sig` — voucher with `scope.new_field =
+  "yes"` on v1 verifier; must reject.
+- `wrong_manifest_name.tap.sig` — statement names a manifest
+  other than the one in the archive.
 - `replayed_sig.tap.sig` — signature bundle from a different
   package with matching key; must fail because `package_id` in
   the signed statement mismatches.
-- `wrong_manifest_name.tap.sig` — statement names a manifest
-  other than the one in the archive.
+- `invalid_signature.tap.sig` — statement with a corrupted
+  signature byte.
+- `oversized_bundle.tap.sig` — file > 1 MiB.
+- `too_many_statements.tap.sig` — statement count > 64.
 
-These vectors exist to make the canonicalizer and verifier
-falsifiable. A change to this document that does not come with a
-test-vector diff is incomplete.
+A change to this document that does not come with a
+test-vector diff is incomplete. The vectors exist to make
+`verify_package()` falsifiable.
+
+---
+
+## 5. Schema Compatibility
+
+`tap-sig/1` is the v1 statement schema. A server MUST:
+
+- Accept only `tap-sig/1` statements in v1.
+- Reject a bundle whose outer `schema` is unknown.
+- Persist the outer `schema` field alongside the installed app
+  so that upgrade transforms can be written when `tap-sig/2`
+  ships.
+
+Schema bumps are reserved for changes that alter *signed
+authority surface* — adding a signed field, adding a new role,
+or changing canonicalization. Non-authority changes (parser
+limits, error codes) do not bump the schema.
 
 ---
 
 ## Open Questions
 
-- **Ed25519 only, or an alg agreement field?** This spec assumes
-  Ed25519 by the `key_id = "ed25519:…"` prefix and no separate
-  algorithm field in the statement. If we want BLS or PQC
-  signatures later, add an `alg` key to the statement schema
-  (key 9) and bump `schema_version`.
-- **Maximum package size.** Not fixed here. Distribution has to
-  enforce a size cap at fetch time; the choice is deployment-
-  specific and belongs in the distribution plan or operator
-  policy, not the format spec.
+- **Encoder parity testing.** §1.2 pins a reference zstd CLI
+  invocation; the Go server needs a CI check that the same
+  source tree produces byte-identical `.tap` under both
+  encoders. The test is straightforward but needs a home.
+- **Maximum package size.** Not fixed here beyond the 1 MiB
+  bundle cap. Distribution has to enforce a size cap at fetch
+  time; the choice is deployment-specific and belongs in the
+  distribution plan or operator policy, not the format spec.
+- **Algorithm agility.** Ed25519-only in v1. A future
+  `tap-sig/2` will add an `alg` key (CBOR key 9) and widen the
+  `key_id` prefix set. Until then, non-`ed25519:` prefixes are
+  rejected at Gate 0.
