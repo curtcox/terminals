@@ -17,6 +17,7 @@ SCRIPT="${ROOT_DIR}/scripts/ui-inspect-run.sh"
 
 SANDBOX=""
 FAILS=0
+PS_MAP_FILE=""
 
 cleanup() {
   if [[ -n "${SANDBOX}" && -d "${SANDBOX}" ]]; then
@@ -47,6 +48,57 @@ expect() {
 mk_sandbox() {
   SANDBOX="$(mktemp -d -t ui-inspect-test.XXXXXX)"
   mkdir -p "${SANDBOX}/pids"
+  install_fake_ps
+}
+
+install_fake_ps() {
+  mkdir -p "${SANDBOX}/bin"
+  PS_MAP_FILE="${SANDBOX}/ps-map"
+  : >"${PS_MAP_FILE}"
+  cat >"${SANDBOX}/bin/ps" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+map_file="${UI_INSPECT_TEST_PS_MAP:-}"
+[[ -n "${map_file}" && -f "${map_file}" ]] || exit 1
+
+get_field() {
+  local pid="$1"
+  local field="$2"
+  awk -F'|' -v p="${pid}" -v f="${field}" '$1==p { print $f; exit 0 }' "${map_file}"
+}
+
+if [[ "$#" -ge 4 && "$1" == "-o" && "$2" == "args=" && "$3" == "-p" ]]; then
+  out="$(get_field "$4" 2)"
+  [[ -n "${out}" ]] && { printf '%s\n' "${out}"; exit 0; }
+  exit 1
+fi
+
+if [[ "$#" -ge 4 && "$1" == "-o" && "$2" == "lstart=" && "$3" == "-p" ]]; then
+  out="$(get_field "$4" 3)"
+  [[ -n "${out}" ]] && { printf '%s\n' "${out}"; exit 0; }
+  exit 1
+fi
+
+if [[ "$#" -ge 4 && "$1" == "-o" && "$2" == "command=" && "$3" == "-p" ]]; then
+  out="$(get_field "$4" 2)"
+  [[ -n "${out}" ]] && { printf '%s\n' "${out}"; exit 0; }
+  exit 1
+fi
+
+exit 1
+EOF
+  chmod +x "${SANDBOX}/bin/ps"
+}
+
+ps_map_add() {
+  local pid="$1"
+  local args="$2"
+  local lstart="$3"
+  printf '%s|%s|%s\n' "${pid}" "${args}" "${lstart}" >>"${PS_MAP_FILE}"
+}
+
+ps_lstart_now() {
+  date '+%a %b %e %T %Y'
 }
 
 # Spawn a background process we control and set VICTIM_PID. We don't use
@@ -162,6 +214,7 @@ test_pid_reuse_safety() {
 
   spawn_victim web
   local victim_pid="${VICTIM_PID}"
+  ps_map_add "${victim_pid}" "ui-inspect-test-victim-web 600" "$(ps_lstart_now)"
 
   # Recorded pattern that does NOT match the victim's command.
   local pattern="run-local.sh --platform web-server"
@@ -172,11 +225,13 @@ test_pid_reuse_safety() {
 
   # verify_identity must reject (return 1).
   local rc=0
-  verify_identity "${victim_pid}" "${pattern}" "$(iso_to_epoch "${recorded_iso}")" || rc=$?
+  PATH="${SANDBOX}/bin:${PATH}" UI_INSPECT_TEST_PS_MAP="${PS_MAP_FILE}" \
+    verify_identity "${victim_pid}" "${pattern}" "$(iso_to_epoch "${recorded_iso}")" || rc=$?
   expect "verify_identity rejects reused pid" test "${rc}" -ne 0
 
   # kill_tree_verified must NOT signal the victim.
-  kill_tree_verified "${victim_pid}" "${pattern}" "${recorded_iso}" "web" >/dev/null 2>&1 || true
+  PATH="${SANDBOX}/bin:${PATH}" UI_INSPECT_TEST_PS_MAP="${PS_MAP_FILE}" \
+    kill_tree_verified "${victim_pid}" "${pattern}" "${recorded_iso}" "web" >/dev/null 2>&1 || true
   expect "victim survives kill_tree_verified" kill -0 "${victim_pid}"
 
   kill_pid "${victim_pid}"
@@ -191,6 +246,7 @@ test_identity_match_positive() {
 
   spawn_victim macos
   local pid="${VICTIM_PID}"
+  ps_map_add "${pid}" "ui-inspect-test-victim-macos 600" "$(ps_lstart_now)"
 
   # Pattern chosen to be a substring of the victim's argv (see spawn_victim).
   local pattern="ui-inspect-test-victim-macos"
@@ -198,7 +254,8 @@ test_identity_match_positive() {
   recorded_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   local rc=0
-  verify_identity "${pid}" "${pattern}" "$(iso_to_epoch "${recorded_iso}")" || rc=$?
+  PATH="${SANDBOX}/bin:${PATH}" UI_INSPECT_TEST_PS_MAP="${PS_MAP_FILE}" \
+    verify_identity "${pid}" "${pattern}" "$(iso_to_epoch "${recorded_iso}")" || rc=$?
   expect "verify_identity accepts matching pid" test "${rc}" -eq 0
 
   kill_pid "${pid}"
@@ -241,7 +298,8 @@ WRAPPER
   mkdir -p "${tmp_state}"
 
   # Start.
-  if ! "${SANDBOX}/run.sh" "${ROOT_DIR}" "${tmp_state}" start >"${SANDBOX}/start.out" 2>&1; then
+  if ! PATH="${SANDBOX}/bin:${PATH}" UI_INSPECT_TEST_PS_MAP="${PS_MAP_FILE}" \
+    "${SANDBOX}/run.sh" "${ROOT_DIR}" "${tmp_state}" start >"${SANDBOX}/start.out" 2>&1; then
     fail "cmd_start exited non-zero"
     sed 's/^/    | /' "${SANDBOX}/start.out" >&2
     return
@@ -258,13 +316,16 @@ WRAPPER
   expect "WEB_STARTED_AT recorded"                  test -n "${WEB_STARTED_AT}"
 
   local w_pid="${WEB_PID}" m_pid="${MACOS_PID}"
+  ps_map_add "${w_pid}" "ui-inspect-test-web 600" "$(ps_lstart_now)"
+  ps_map_add "${m_pid}" "ui-inspect-test-macos 600" "$(ps_lstart_now)"
 
   # Both fake processes should be alive.
   expect "fake web pid alive"   kill -0 "${w_pid}"
   expect "fake macos pid alive" kill -0 "${m_pid}"
 
   # Stop.
-  if ! "${SANDBOX}/run.sh" "${ROOT_DIR}" "${tmp_state}" stop >"${SANDBOX}/stop.out" 2>&1; then
+  if ! PATH="${SANDBOX}/bin:${PATH}" UI_INSPECT_TEST_PS_MAP="${PS_MAP_FILE}" \
+    "${SANDBOX}/run.sh" "${ROOT_DIR}" "${tmp_state}" stop >"${SANDBOX}/stop.out" 2>&1; then
     fail "cmd_stop exited non-zero"
     sed 's/^/    | /' "${SANDBOX}/stop.out" >&2
   else
