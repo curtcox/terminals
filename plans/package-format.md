@@ -62,19 +62,32 @@ flagged as blockers in review; this document fixes them.
 
 ### 1.1 Two-layer canonicalization
 
-A package is specified as two independently canonical forms:
+A package is specified as two independently canonical forms.
+The inner canonical tar is authority-bearing; the outer zstd
+frame is transport compression.
 
 ```
 canonical_tar         = deterministic POSIX ustar (§1.3)
 tap_bytes             = canonical_zstd_frame(canonical_tar)    (§1.2)
-package_id            = "sha256:" + hex(sha256(tap_bytes))
+package_id            = "sha256:" + hex(sha256(canonical_tar))
 ```
 
 The file on disk is `<name>-<version>.tap` and its contents are
-`tap_bytes`. The `package_id` commits to the compressed outer
-bytes. Both layers are canonical, because a verifier MUST be
-able to decompress, revalidate, and reject any `.tap` whose
-outer bytes do not match its inner canonical tar.
+`tap_bytes`. `package_id` commits to the **canonical tar bytes**,
+not to the compressed frame. This choice means:
+
+- Signatures remain valid across any encoder that produces the
+  same canonical tar even if the zstd frame bytes differ
+  (different compression library versions, level tuning,
+  block-size decisions).
+- `verify_package()` (§3) decompresses first, validates the
+  canonical tar, then hashes it. An attacker cannot forge a
+  `package_id` by feeding a different `.tap`: canonical-tar
+  validation fails first.
+- Frame-level properties (§1.2) are still enforced — a `.tap`
+  that is not a canonical zstd frame is a Gate 0 rejection —
+  but frame encoding no longer needs bit-for-bit parity across
+  implementations.
 
 ### 1.2 Canonical zstd frame
 
@@ -240,12 +253,16 @@ Schema:
 Rules:
 
 - CBOR is encoded deterministically per RFC 8949 §4.2. The
-  verifier re-encodes the statement from parsed TOML and checks
-  byte equality against the signature's message, so any
-  encoder-level ambiguity fails closed.
-- `package_id` is the raw 32 bytes of the sha256, not the
-  `"sha256:…"` string. Length is fixed at 32; any other length
-  is a format rejection.
+  verifier deterministically re-encodes the CBOR map from the
+  parsed TOML statement and verifies the Ed25519 signature over
+  those re-encoded bytes. The signer and verifier therefore
+  agree on a single canonical byte string for the signed
+  statement; any encoder-level ambiguity fails closed because
+  the signature check fails.
+- `package_id` (CBOR key 1) is the raw 32-byte sha256 of the
+  **canonical tar** (§1.1), not of the outer zstd frame and not
+  the `"sha256:…"` string. Length is fixed at 32; any other
+  length is a format rejection.
 - `manifest_name` and `manifest_version` are redundant with the
   package contents but signed explicitly so that a verifier can
   reject a bundle whose statements name a different manifest
@@ -360,7 +377,7 @@ def verify_package(tap_bytes, sig_bytes):
     manifest_bytes = members["<name>/manifest.toml"]
     manifest       = parse_toml(manifest_bytes)
     # ---- Layer 4: package identity ----------------------------
-    pkg_id = sha256(tap_bytes)                      # §1.1
+    pkg_id = sha256(canonical_tar)                  # §1.1 — authority hash is over tar, not frame
     # ---- Layer 5: signature bundle ----------------------------
     bundle = parse_toml(sig_bytes)                  # quotas from §2.1
     assert bundle["schema"] == "tap-sig/1"
@@ -419,6 +436,13 @@ vector set covers:
 - `good_v1.tap` / `good_v1.tap.sig` — canonical, signed by a
   test author key; round-trips; `package_id` is stable across
   rebuilds.
+- `reencoded_frame.tap` — re-compressed with a different zstd
+  implementation over the same canonical tar as `good_v1.tap`.
+  Its bytes differ from `good_v1.tap` but its `package_id`
+  (sha256 over the canonical tar, §1.1) MUST match and
+  `good_v1.tap.sig` MUST verify against it without
+  modification. This vector falsifies any implementation that
+  accidentally hashes the outer frame.
 
 **Zstd-layer rejections (§1.2).**
 

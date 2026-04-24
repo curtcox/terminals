@@ -73,6 +73,12 @@ permissions = [
 ]
 
 exports = ["kitchen_timer"]
+
+# Closed finite domains for every req.* field used by match().
+# See application-distribution.md §5.4.1.
+[match.domain]
+"req.kind"   = ["intent"]
+"req.action" = ["timer.set", "timer.start"]
 ```
 
 Notes:
@@ -117,12 +123,11 @@ def name():
 
 
 def match(req):
-    # TAL `match` is pure: no ops, no state. Return True iff this app
-    # should own the request. The scenario engine dispatches at most
-    # one matched app.
-    if req.kind != "intent":
-        return False
-    return req.action in ("timer.set", "timer.start")
+    # TAL `match` is pure Boolean DNF over the closed atom set
+    # declared in manifest.toml's [match.domain] (see
+    # application-distribution.md §5.4.1). No negation, no helpers,
+    # no state — Gate 4 rejects anything else.
+    return req.kind == "intent" && req.action in ["timer.set", "timer.start"]
 
 
 def new_activation(req):

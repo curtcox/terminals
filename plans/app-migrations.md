@@ -175,6 +175,53 @@ executor enforces them; a migration that exceeds
 `max_runtime_seconds` is rolled back to its last checkpoint and
 the upgrade aborts.
 
+If a migration's declared `max_runtime_seconds` exceeds the
+server's configured default (`policy.migrate.max_runtime_seconds`,
+default 120), the install transaction must present a
+**preflight estimate** to the operator before running: current
+store sizes, declared worst-case write volume, and estimated
+runtime at the declared rate. The operator acknowledges the
+estimate (ordinary `mutating`) or aborts the upgrade. A
+migration whose live store size exceeds the budget implied by
+`max_runtime_seconds` produces a `block`-level preflight error
+that requires policy override, not just acknowledgment.
+
+### 2.1.1 Manifest store schemas and migration fixtures
+
+Packages that ship a non-empty `migrate/` directory MUST also
+declare, for each store they read or write during migration,
+both a **record schema** and a **migration fixture**. Gate 4
+(§6) cannot run the dry-run harness otherwise.
+
+```toml
+[[storage.store_schema]]
+store          = "history"
+version        = "2"                    # matches manifest.version
+record_schema  = "schemas/history_v2.json"  # JSON Schema draft 2020-12
+
+[[migrate.fixture]]
+step              = "0001_v1_to_v2"
+prior_version     = "1"
+prior_record_schema = "schemas/history_v1.json"
+seed              = "tests/migrate_fixtures/history_v1_seed.ndjson"
+expected          = "tests/migrate_fixtures/history_v2_expected.ndjson"
+```
+
+Rules:
+
+- `prior_record_schema` describes the record shape the migration
+  expects to read. For `compatibility = "incompatible"` steps,
+  both `prior_record_schema` and the new `record_schema` are
+  required.
+- `seed` is an ndjson file of records conforming to
+  `prior_record_schema`; `expected` is the ndjson file of
+  records the dry-run must produce. Both are part of the
+  package and travel in the `.tap` under `tests/`.
+- A package that declares `migrate/*.tal` without
+  corresponding `[[migrate.fixture]]` entries fails at Gate 1.
+- The fixtures are capped at 4096 records per step (operator
+  policy can raise) so Gate 4 runs bounded.
+
 ### 2.2 Compatibility declaration
 
 Every declared step names one of:
@@ -228,14 +275,31 @@ engine. The exact ordering depends on `drain_policy`:
      `apps/<app_id>/drain/intents.ndjson`, fsynced before the
      executor starts, so a server crash mid-drain resumes the
      drain rather than starting the migration on live data.
+     Each line conforms to schema `drain-intent/1`:
+     `{ "schema": "drain-intent/1", "tx_id", "app_id",
+        "activation_id", "from_version", "action":
+        "suspend"|"terminate"|"acknowledged"|"expired", "state":
+        "pending"|"complete"|"failed", "at": <unix ms>,
+        "reason": <tstr|null> }`.
+     Entries append in order; a later entry for the same
+     `activation_id` supersedes earlier ones. v1 readers reject
+     unknown `schema` strings.
 3. When all activations have drained (or `drain_timeout`
    elapses — default 90s, per-app override in manifest), the
    executor runs.
 4. On migration success, the scenario engine registers the new
-   package and resumes drained activations at the new version,
-   calling `migrate(from_version, state)` per §1.1 for each.
+   package. Drained activations are **terminated**, not
+   resumed: their snapshots are retained per §3.3 for
+   post-mortem but they do not continue as live activations.
+   New `ActivationRequest`s that arrive after commit start
+   fresh activations at the new version. This preserves the
+   invariant from
+   [application-runtime.md](application-runtime.md) that no
+   operation migrates a running activation across a version
+   boundary.
 5. On migration failure, the old package is re-registered and
-   drained activations resume at the old version.
+   drained activations are terminated the same way; new
+   activation requests resume at the old version.
 
 `drain_timeout` expiry is a migration abort (§3.7), not a
 forced kill: the executor does not run against a non-drained
@@ -501,31 +565,35 @@ to an additional vetting gate during Gate 4 (see
 vetting pipeline). The dry-run harness:
 
 1. Spawns an isolated executor instance against a synthetic
-   store seeded with representative records derived from the
-   package's declared store schemas.
-2. Runs every declared migration step end-to-end.
-3. For each step, re-runs it with an induced crash injected at
+   store seeded from the `[[migrate.fixture]].seed` file of §2.1.1.
+   Each seeded record must validate against the declared
+   `prior_record_schema`; a seed that fails validation is a
+   Gate 4 `block`.
+2. Runs every declared migration step end-to-end against its
+   seed.
+3. Compares the post-migration state against the declared
+   `expected` ndjson. Any divergence is a Gate 4 `block`.
+4. For each step, re-runs it with an induced crash injected at
    every journal boundary (after `store.put`, before checkpoint;
    after checkpoint, before next op). Verifies the replayed
-   state equals the non-crashed terminal state.
-4. For `drain` steps, verifies the package declares
-   `compatibility = "incompatible"` AND provides no
-   `multi_version` adapters (inconsistent combinations are a
-   hard fail).
-5. For `multi_version` steps, runs the author-supplied read
+   state equals the non-crashed terminal state (which must in
+   turn equal `expected`).
+5. For `drain` steps, verifies the package declares
+   `compatibility = "incompatible"`.
+6. For `multi_version` steps, runs the author-supplied read
    adapter against migrated records and verifies adapter output
-   parses as the v(from) record shape declared in the prior
-   version's manifest.
+   validates against the declared `prior_record_schema`.
 
 Any dry-run failure is a Gate 4 block. A package that fails the
 dry-run cannot be installed through the normal pipeline;
 quarantine is not an escape hatch because quarantine disables
 migrations (§4).
 
-The synthetic store generator is bounded: it is not a substitute
-for production testing. It exists to catch the cheap bugs —
-non-idempotent migrations, inverses that don't inverse, missing
-drain declarations — before they reach the executor.
+The synthetic store generator is bounded — at most 4096 records
+per fixture per §2.1.1. It is not a substitute for production
+testing. It exists to catch the cheap bugs — non-idempotent
+migrations, inverses that don't inverse, missing drain
+declarations — before they reach the executor.
 
 ---
 

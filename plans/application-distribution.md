@@ -307,20 +307,20 @@ Rules:
 Every persisted envelope this plan references carries a
 `schema` string:
 
-- `verdict/1` — verdict bundle schema in §5.8.
-- `tap-sig/1` — signature bundle schema, per
-  [package-format.md](package-format.md).
-- `policy/1` — trust/installer policy file, per
-  [signing-and-trust.md](signing-and-trust.md) §8.
-- `rotation-stmt/1` — rotation statement pair, per
-  [signing-and-trust.md](signing-and-trust.md) §4.
-- `drain-intent/1` — drain journal entries (§6.1).
-- `install-tx/1` — install transaction journal (§6.a).
+| Schema            | Owned by                                   | Purpose                                         |
+|-------------------|--------------------------------------------|-------------------------------------------------|
+| `tap-sig/1`       | [package-format.md](package-format.md) §2  | Signature bundle outer TOML.                    |
+| `rotation-stmt/1` | [signing-and-trust.md](signing-and-trust.md) §4.1 | Pair-signed rotation statements (CBOR).  |
+| `policy/1`        | [signing-and-trust.md](signing-and-trust.md) §8   | Trust / vetting policy file.              |
+| `verdict-log/1`   | [signing-and-trust.md](signing-and-trust.md) §6.4 | Verdict-log ndjson entries.               |
+| `verdict/1`       | this plan §5.8                             | Per-install verdict bundle JSON file.          |
+| `install-tx/1`    | this plan §6.a.5                           | Install transaction journal entries.            |
+| `drain-intent/1`  | [app-migrations.md](app-migrations.md) §3.1.1 | Drain journal entries (§6.5).              |
 
-v1 readers reject unknown schema strings at parse time; v1
-writers only emit these strings. Upgrades to a `/2` schema
-require a co-ordinated plan change and a migration, not a
-silent bump.
+v1 readers reject unknown schema strings at parse time, and
+reject unknown fields within a known schema. v1 writers only
+emit these strings. Upgrades to a `/2` schema require a
+co-ordinated plan change and a migration, not a silent bump.
 
 ---
 
@@ -405,7 +405,9 @@ owned by the distribution subsystem rather than by any app:
   [signing-and-trust.md](signing-and-trust.md) but physically
   co-located under `<server_data>/trust/`.
 
-Paths:
+Paths. All occurrences of `<app_id>` are the full
+`"app:sha256:<hex>"` textual form specified in
+[signing-and-trust.md](signing-and-trust.md) §1.4.
 
 ```
 <server_data>/
@@ -413,26 +415,26 @@ Paths:
 │   ├── <app_id>/                     # live package directory
 │   ├── <app_id>.tap                  # installed source
 │   ├── <app_id>/stores/              # §3.2
-│   ├── <app_id>/drain/intents.ndjson # §6.1
+│   ├── <app_id>/drain/intents.ndjson # §6.5 (schema drain-intent/1)
 │   ├── <app_id>/migrate/<run_id>/    # see app-migrations.md §3.3
-│   └── <app_id>/install-tx/<tx_id>/  # §6.a journal
+│   └── <app_id>/install-tx/<tx_id>/  # §6.a.5 (schema install-tx/1)
 ├── staging/
 ├── archive/
 │   └── <app_id>-<version>-<timestamp>/
-├── verdicts/
-│   ├── <app_id>-<version>-<installed_at>.json
-│   └── log.ndjson                    # hash-chained, installer-signed
-├── name_index/                       # name → app_id alias map
-└── trust/                            # see signing-and-trust.md
+└── trust/                            # verdict log, verdict bundles,
+                                      # trust store, policy — see
+                                      # signing-and-trust.md §3.2, §6.4
 ```
 
-`name_index/` is an operator-visible alias table that maps
-manifest names to `app_id`s. It is advisory: the install
-pipeline always resolves to `app_id` before touching anything
-under `apps/`.
+Verdict bundles and the verdict log live under `trust/`, not
+`verdicts/`, to keep all installer-signed artifacts under one
+tree. `name_index/` (an advisory manifest-name → app_id alias
+table) lives under `trust/name_index/`.
 
-The schema for `verdicts/*.json` is defined in §5.8; the
-schema for the verdict log chain is in §6.a.
+The verdict bundle file schema is defined in §5.8. The
+verdict log entry schema and path are normative in
+[signing-and-trust.md](signing-and-trust.md) §6.4; this plan
+does not restate them.
 
 ---
 
@@ -582,9 +584,9 @@ command takes a handle from a source and runs the pipeline
 in §5:
 
 ```text
-term apps offer <source> [--query=…]          # list candidates
-term apps fetch <source> <handle>             # download to staging
-term apps vet   <staged>                      # run gates, produce report
+term apps offer <source> [--query=…]                 # list candidates
+term apps fetch <source> <handle> [--unpinned]       # --unpinned is †; bypasses §4.3 pins
+term apps vet   <staged>                             # run gates, produce report
 term apps install <staged> [--voucher=…] [--allow-warn]
 ```
 
@@ -745,21 +747,20 @@ tractable. Checks:
 #### 5.4.1 Declarative match grammar
 
 A `match` function must be a pure Boolean expression in
-disjunctive normal form (DNF) over a bounded set of atoms. The
-canonical form is:
+disjunctive normal form (DNF) over a bounded set of **positive**
+atoms. The canonical form is:
 
 ```
 match    := or_expr
 or_expr  := and_expr ( "||" and_expr )*
 and_expr := atom     ( "&&" atom     )*
-atom     := req_field op literal
+atom     := req_field "==" literal
           | req_field "in" literal_set
-          | "!" atom
 
 req_field     := "req.kind" | "req.action" | "req.zone"
               | "req.device_role" | "req.source_app_id"
-              | "req.schema_version"
-op            := "==" | "!="
+              | "req.schema_version" | "req.object"
+              | "req.event_kind"
 literal       := string_literal | bool_literal | int_literal
 literal_set   := "[" literal ( "," literal )* "]"
 ```
@@ -769,16 +770,44 @@ Rules:
 - Only the `req.*` fields listed above are allowed. `req.body`,
   `req.args`, arbitrary dict access, function calls, and any
   reference to module state are rejected.
-- Literals must be compile-time constants. A constant
-  referenced by name must be declared in the manifest's
-  `[match.constants]` section and resolves to its declared
-  literal value.
+- Literals must be compile-time constants drawn from the
+  **closed finite domain** the manifest declares for each
+  matchable field:
+
+  ```toml
+  [match.domain]
+  "req.kind"         = ["intent", "event"]
+  "req.action"       = ["timer.set", "timer.start", "timer.cancel"]
+  "req.object"       = ["kitchen_timer"]
+  "req.event_kind"   = ["voice", "ui"]
+  "req.zone"         = ["kitchen"]
+  "req.device_role"  = ["speaker", "mic", "display"]
+  "req.schema_version" = [1]
+  ```
+
+  A `match` literal not in its field's declared domain is a
+  Gate 4 `block`. A `req.*` field referenced without a
+  declared domain is a Gate 4 `block`. `req.source_app_id` is
+  exempt from the closed-domain rule (its universe is every
+  installable `app_id`); literals there must match the
+  `app:sha256:<hex>` textual form.
+- No negation. `!=`, `!`, `not`, and implicit De Morgan rewrites
+  are rejected. Negation over open domains is unsound for Gate
+  6's finite-atom analysis, and for the closed finite domains
+  declared above it is redundant (enumerate the complement as a
+  positive `in` set instead).
 - No helper-function calls: not `_normalize(...)`, not
   `req.kind.lower()`, not anything. The analyzer evaluates the
   AST as-is.
-- `and`/`or`/`not` are the only Boolean connectives. Short-
-  circuit semantics are irrelevant because every atom is
-  side-effect free.
+- `&&`/`||` are the only Boolean connectives. Short-circuit
+  semantics are irrelevant because every atom is side-effect
+  free.
+- Imperative rewrite: a `match` body written as a sequence of
+  `if <atom> { return false }` guards followed by `return
+  <expr>` is normalized to pure-expression DNF only if every
+  `<atom>` is grammar-valid and `<expr>` is grammar-valid. Any
+  other imperative shape (early `return true`, mutable state,
+  nested blocks) is rejected.
 - Canonical form: the analyzer normalizes `match` expressions
   to a canonical DNF representation (sort clauses
   lexicographically, dedupe atoms) for Gate 6 comparison.
@@ -928,20 +957,15 @@ Reviewer output handling:
 
 Gate 4's declarative `match` grammar (§5.4.1) makes this gate
 sound. Every installed app's `match` reduces to a set of
-**canonical atoms** over the finite predicate universe:
-
-```
-atom-universe = { req.kind == <manifest-declared string constant>,
-                  req.action == <manifest-declared string constant>,
-                  req.zone == <manifest-declared string constant>,
-                  req.device_role == <manifest-declared string constant>,
-                  req.source_app_id == <app_id literal>,
-                  req.schema_version == <int constant> }
-```
+**canonical positive atoms** drawn from the field-specific
+closed domains declared in each manifest's `[match.domain]`
+table, plus the open `req.source_app_id` universe. Atoms are
+of the form `req.<field> == <domain-declared literal>`; there
+are no negative atoms.
 
 Every `match` is a subset of this universe in DNF. Two
 matches' intersection is decidable by Boolean algebra on a
-finite set. Gate 6 computes:
+finite, positive set. Gate 6 computes:
 
 - **Export conflicts.** Two apps cannot claim the same export
   name. Same `app_id` replaces (upgrade path); different
@@ -989,29 +1013,42 @@ After all gates run, the install decision is:
   auto-accepted (with the policy name and version).
 - **Any `block`** → install aborted; verdict set retained.
 
-**Verdict bundle schema** (`verdicts/*.json`):
+**Verdict bundle schema** (`verdict/1`). The file is written
+to the path specified by
+[signing-and-trust.md](signing-and-trust.md) §6.4 and indexed
+from the verdict log:
 
 ```json
 {
   "schema": "verdict/1",
-  "package_id": "sha256:…",
-  "app_id": "app:…",
-  "name": "kitchen_timer",
-  "version": "0.1.0",
-  "installed_at": 1714000000,
+  "tx_id": "tx:…",
+  "package_id": "sha256:…"|null,
+  "app_id": "app:sha256:…",
+  "name": "kitchen_timer"|null,
+  "version": "0.1.0"|null,
+  "decided_at": 1714000000,
+  "installed_at": 1714000010|null,
   "installer_key_id": "ed25519:…",
   "installer_sig": "base64:…",
-  "prev_verdict_digest": "sha256:…|null",
+  "prev_verdict_digest": "sha256:…"|null,
   "policy_version": "policy/1#17",
   "reviewer_pinning": {
     "providers": [
-      { "id": "claude/1", "model": "…", "context_scope": "public" },
-      { "id": "codex/1",  "model": "…", "context_scope": "public" }
+      { "id": "claude-v1", "model": "…", "context_scope": "public", "substitute_id": "local-llm-v1" },
+      { "id": "codex-v1",  "model": "…", "context_scope": "public", "substitute_id": "local-llm-v1" }
     ],
     "prompt_template_sha256": "…"
   },
-  "trust_epoch": 42,
-  "registry_epoch": 117,
+  "epochs_at_vet": {
+    "trust_epoch":      42,
+    "registry_epoch":   117,
+    "capability_epoch": 9
+  },
+  "epochs_at_commit": {
+    "trust_epoch":      42,
+    "registry_epoch":   118,
+    "capability_epoch": 9
+  }|null,
   "gates": [
     {
       "gate": "canonical-format",
@@ -1026,18 +1063,37 @@ After all gates run, the install decision is:
       { "gate": "risk", "by": "operator:curt", "at": 1714000100 }
     ],
     "policies_applied": ["default@policy/1#17"],
-    "final_action": "installed"|"disabled"|"aborted"
+    "final_action": "installed"
+                  | "upgraded"
+                  | "rolled-back"
+                  | "uninstalled"
+                  | "disabled"
+                  | "aborted-pre-commit"
+                  | "aborted-post-commit"
+                  | "reconcile-pending"
   }
 }
 ```
 
+Field nullability:
+
+- `package_id`, `name`, `version` are null for decisions that
+  do not name a specific package (standalone re-vet of an
+  install already present, policy-only re-vet, etc.).
+- `installed_at` is null for any `final_action` that did not
+  reach commit. `decided_at` is always present.
+- `epochs_at_commit` is null when `final_action` is
+  `aborted-pre-commit`.
+- `prev_verdict_digest` is null for the first-ever verdict for
+  this `app_id`.
+
 Each bundle is signed by the installer key (per
-[signing-and-trust.md](signing-and-trust.md) §6) and appended
-to `verdicts/log.ndjson`, whose entries form a hash chain
-verified by `term apps keys verify`. `prev_verdict_digest`
-links each bundle to the immediately prior verdict for the
-same `app_id`, so verdict history is tamper-evident even if
-the file layout changes.
+[signing-and-trust.md](signing-and-trust.md) §6) and indexed
+by one `verdict-log/1` entry whose schema is normative there.
+`prev_verdict_digest` chains verdict bundles for the same
+`app_id`; the verdict log separately chains every entry
+server-wide so both per-app and global order are tamper-
+evident. `term apps keys verify` walks both chains.
 
 ### 5.9 Policy schema (v1 minimum)
 
@@ -1064,9 +1120,10 @@ bearing.
 Every install, upgrade, migration, revocation response, and
 rollback runs inside an **install transaction** with a
 monotonic `tx_id` scoped to the affected `app_id`. The
-transaction journal (`install-tx/1`) lives at
+transaction journal lives at
 `apps/<app_id>/install-tx/<tx_id>/` and records every state
-transition with fsync barriers between steps.
+transition with fsync barriers between steps. Its entry schema
+is `install-tx/1` (§6.a.5).
 
 #### 6.a.1 Per-app lock
 
@@ -1083,62 +1140,100 @@ any durable side effect). Phases:
 
 ```
 phases = fetch → vet → lock_acquired → drain (if needed)
-       → migrate (if needed) → register_new → commit
+       → migrate (if needed) → prepare_new → commit
        → drain_old → unload_old → archive → released
 ```
 
-`commit` is the single point at which the new definitions
-become visible to the scenario engine. Everything before
-`commit` is reversible by rollback of the journal. Everything
-after is reversible only by a new install transaction.
+**`prepare_new` is invisible to the scenario engine.** It
+writes the new package directory to `apps/<app_id>/` under a
+staged subpath, primes caches, and validates that TAR can
+load the definitions, but new `ActivationRequest`s are not
+routed to it. A crash during `prepare_new` is resolved by
+discarding the staged subpath on recovery.
+
+**`commit` is the single fsynced visibility barrier.** It is
+an atomic sequence executed under the per-app lock:
+
+1. Re-check trust, registry, and capability epochs (§6.a.2).
+   Abort the transaction if any epoch check fails.
+2. Rename the staged subpath into the live package path with
+   a single directory-rename operation followed by fsync of
+   the parent directory.
+3. Append the `install-tx/1` `commit` entry to the
+   transaction journal, fsync.
+4. Write the verdict bundle file (§5.8) and append the
+   `verdict-log/1` entry to `trust/verdicts.ndjson`, fsync.
+5. Signal the scenario engine to begin routing new
+   `ActivationRequest`s to the new definitions.
+
+Steps 1–4 are reversible by journal rollback on crash because
+the scenario engine has not yet switched. Step 5 is the point
+of no return; if the server crashes between step 4 and step 5,
+recovery reads the commit entry, replays step 5, and the
+decision is visible. A recovery that finds a `commit` entry
+without a preceding `verdict-log/1` append repairs by writing
+the verdict-log entry from the staged bundle (idempotent;
+`this_hash` is deterministic) before running step 5.
 
 #### 6.a.2 Epoch revalidation at commit
 
-Two epochs move independently:
+Three epochs move independently:
 
 - **Trust epoch** — incremented on every mutation of the
   trust store, policy, or installer key. Owned by
   [signing-and-trust.md](signing-and-trust.md).
 - **Registry epoch** — incremented on every install, upgrade,
   rollback, or uninstall that reached `commit`.
+- **Capability epoch** — incremented on every change to the
+  installed device, zone, or role topology the server
+  exposes to apps (see
+  [capability-lifecycle.md](capability-lifecycle.md)). A new
+  speaker appearing in a zone, a camera permission being
+  granted or revoked, a role binding moving — all bump the
+  capability epoch.
 
-The vet pass records the trust and registry epochs it saw.
-At `commit`, the install transaction reloads both. If either
-has advanced, the transaction:
+The vet pass records all three epochs in
+`verdict.epochs_at_vet`. At `commit`, the install transaction
+reloads them:
 
-1. Aborts if the change invalidates a gate it passed
-   (Gate 3's trust chain, Gate 6's conflict set).
-2. Re-runs only the affected gates, otherwise.
-3. Proceeds to `commit` if the re-run still produces the same
-   decision.
+1. If the **trust epoch** advanced, re-run Gate 3 against the
+   current trust store. A re-run producing `block` aborts the
+   transaction; a re-run producing `warn` that was not
+   pre-acknowledged aborts pending operator input.
+2. If the **registry epoch** advanced, re-run Gate 6 against
+   the current installed-app set. Same escalation rules.
+3. If the **capability epoch** advanced **and** Gate 7's
+   evidence names any affected zone or device role, re-run
+   Gate 7. A Gate 7 re-run producing `warn` on a commit path
+   that did not ack it aborts and re-enters the
+   warn-acknowledgment flow.
 
-This prevents a TOCTOU where vet passes against an old trust
-state but commits after an operator has revoked the voucher it
-depended on.
+Re-run outputs replace the prior gate records and
+`epochs_at_commit` is recorded in the verdict bundle. If no
+epoch moved, `epochs_at_commit == epochs_at_vet` and no
+gate is re-run.
 
-#### 6.a.3 Verdict log hash chain
+This prevents TOCTOU where vet passes against an old trust
+state, installed-app set, or device topology but commits after
+the underlying assumption has changed.
 
-Every transaction that reaches `commit` or `abort` appends a
-record to `verdicts/log.ndjson`:
+#### 6.a.3 Verdict log binding
 
-```json
-{
-  "schema": "verdict/1",
-  "tx_id": "tx:…",
-  "app_id": "app:…",
-  "decision": "installed"|"upgraded"|"rolled_back"|"uninstalled"
-            |"disabled"|"aborted"|"reconcile_pending",
-  "prev_log_digest": "sha256:…",
-  "this_log_digest": "sha256:…",
-  "installer_sig": "base64:…"
-}
-```
+Every transaction that reaches `commit` or the
+`aborted-pre-commit` / `aborted-post-commit` sinks appends
+one `verdict-log/1` entry to `trust/verdicts.ndjson` (schema
+defined normatively in
+[signing-and-trust.md](signing-and-trust.md) §6.4). Standalone
+re-vets that do not name a new package also append entries
+(`revet-pass`, `revet-warn`, `revet-block`). A `disabled` or
+`enabled` transition appends a log entry with `package_id =
+null` and `verdict_bundle_sha256 = null`.
 
-`term apps keys verify` walks both the trust log
-([signing-and-trust.md](signing-and-trust.md) §4.4) and the
-verdict log chains. A broken chain is a `critical_mutating`
-incident (triggers §6.4 behavior server-wide) and requires
-operator recovery.
+`term apps keys verify` walks the trust log
+([signing-and-trust.md](signing-and-trust.md) §3.3) and the
+verdict log. A broken chain is a `critical_mutating` incident
+and triggers the server-wide recovery path described in
+[signing-and-trust.md](signing-and-trust.md) §6.2 / §6.4.
 
 #### 6.a.4 State machine
 
@@ -1171,6 +1266,58 @@ operator recovery.
 
 Transitions are journaled; every arrow is either a reversible
 pre-commit action or an install-transaction commit.
+
+#### 6.a.5 Install-transaction journal (`install-tx/1`)
+
+Each transaction appends one line per phase transition to
+`apps/<app_id>/install-tx/<tx_id>/journal.ndjson`:
+
+```json
+{
+  "schema": "install-tx/1",
+  "tx_id": "tx:…",
+  "app_id": "app:sha256:…",
+  "seq": 0,
+  "at": 1714000000123,
+  "actor": "operator:curt|installer:self",
+  "phase": "fetch"
+         | "vet"
+         | "lock_acquired"
+         | "drain"
+         | "migrate"
+         | "prepare_new"
+         | "commit"
+         | "drain_old"
+         | "unload_old"
+         | "archive"
+         | "released"
+         | "aborted-pre-commit"
+         | "aborted-post-commit",
+  "evidence": { ... },
+  "prev_hash": "sha256:…",
+  "this_hash": "sha256:…"
+}
+```
+
+Rules:
+
+- `seq` is monotonic within a transaction; `tx_id` is globally
+  unique per `app_id`.
+- `this_hash = sha256(canonical_json({schema, tx_id, app_id,
+  seq, at, actor, phase, evidence, prev_hash}))`. The first
+  entry uses `prev_hash = "sha256:" + hex(0^32)`.
+- `evidence` is phase-specific (staged package path for
+  `prepare_new`, directory-rename source/target for `commit`,
+  migration run id for `migrate`, etc.).
+- `install-tx/1` entries are NOT installer-signed; integrity is
+  provided by the hash chain plus the co-signed `verdict-log/1`
+  entry that references the same `tx_id`. Damage to a
+  transaction journal invalidates the transaction but not the
+  verdict log.
+- Unknown `phase` or unknown top-level field: the journal is
+  treated as corrupt and the transaction is declared
+  `aborted-post-commit` on recovery if a `commit` entry
+  preceded the corruption, else `aborted-pre-commit`.
 
 ### 6.1 Upgrade
 
@@ -1301,19 +1448,24 @@ joins the pre-rotation verdict chain cleanly.
 | Policy version bump                                       | All installs.                          |
 | Reviewer provider set / prompt template change (a policy-version change per §5.5) | Installs over a configurable risk threshold; policy-controlled. |
 
-Re-vet outcomes:
+Re-vet outcomes depend on the triggering cause:
 
-- **New `pass`** — no action; verdict bundle updated and
-  chained.
-- **New `warn`** — install marked needs-ack; the operator sees
-  it in `term apps ls` with a `warn` flag.
-- **New `block`** — install moves to `disabled` (§6.4);
-  running activations are allowed to finish, new activations
-  refused.
+| Cause                                 | New verdict | Consequence                                                                                                                             |
+|---------------------------------------|-------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| Any                                   | `pass`      | Verdict bundle updated and chained; `disabled_reason` cleared if any; app continues to run.                                            |
+| Any                                   | `warn`      | Install marked `needs-ack`; operator sees `warn` flag in `term apps ls`; running activations continue.                                  |
+| Author-key revocation                 | `block`     | App moves to `disabled` with `disabled_reason = "author-revoked"`; running activations are suspended at their next safe point (per [signing-and-trust.md](signing-and-trust.md) §5.2); re-enable is `critical_mutating`. |
+| Voucher-key revocation                | `block`     | App moves to `disabled` with `disabled_reason = "voucher-revet-block"`; running activations are suspended at their next safe point; re-enable is `critical_mutating` and requires a new qualifying voucher (or trusted author). |
+| Installed-app-set change (Gate 6)     | `block`     | App moves to `disabled` with `disabled_reason = "conflict"`; running activations are allowed to finish; re-enable is ordinary `mutating` after the conflict is resolved via `term apps conflicts resolve`. |
+| Capability-topology change (Gate 7)   | `block`     | App moves to `disabled` with `disabled_reason = "risk-revet-block"`; running activations are allowed to finish; re-enable is `critical_mutating`. |
+| Policy-version bump                   | `block`     | Same as the most-specific triggering sub-cause above; if the bump touched multiple, the strictest `disabled_reason` wins.               |
 
 Re-vet work is scheduled, not synchronous with the triggering
-event, so a trust-store edit never blocks. An explicit `term
-apps revet <app|--all>` forces immediate re-vet.
+event, so a trust-store edit never blocks — except for the
+synchronous `no-new-activations` flag set immediately on
+author- or voucher-key revocation (per
+[signing-and-trust.md](signing-and-trust.md) §5.2 / §5.3). An
+explicit `term apps revet <app|--all>` forces immediate re-vet.
 
 ---
 
@@ -1335,14 +1487,17 @@ term app reload <name>
 term app logs <name>
 term app trace <name>
 term app pack <name>
-term app sign <name> --role=author|voucher [voucher-scope flags]
+term app sign <name> --role=author                                                       [†]
+term app sign <name> --role=voucher [voucher-scope flags]                                [†]
+term app sign <name> --role=publisher [--via=<hostname>]
 
-# Voucher-scope flags (see signing-and-trust.md §3):
-#   --tier=<full|quarantine|custom>   required for --role=voucher
-#   --reviewed=<static|dynamic|full>  required for --role=voucher
-#   --tested-under=<hardware|production|simulator>  repeatable
-#   --expires=<RFC3339>               required for --role=voucher
-#   --notes=<string>                  optional, ≤ 256 bytes
+# Voucher-scope flags (mirror the signed scope fields in
+# package-format.md §2.3 exactly):
+#   --tier=<full|quarantine|custom>                             required
+#   --reviewed=<manifest|tal|tests|kernels|models|assets>        required, repeatable
+#   --tested-under=<sim-only|hardware|production>               required
+#   --expires=<RFC3339>                                         optional; defaults to voucher ceiling (§2)
+#   --notes=<string>                                            optional, ≤ 2 KiB
 
 # sources
 term apps source add    <kind> <config>           [†]
@@ -1351,54 +1506,66 @@ term apps source remove <name>                    [†]
 
 # discover + fetch
 term apps offer <source> [--query=…]
-term apps fetch <source> <handle> [--unpinned]    [--unpinned is †]
+term apps fetch <source> <handle> [--unpinned]                        [--unpinned is †]
 term apps staging ls
 term apps staging purge [--older-than=…]
 
 # vet + install
 term apps vet <staged>
 term apps describe <staged|installed>
-term apps install <staged> [--voucher=…] [--allow-warn] [--allow-untrusted-install]  [--allow-untrusted-install is †]
+term apps install <staged> [--voucher=…] [--allow-warn] [--allow-untrusted-install]   [--allow-untrusted-install is †]
 term apps ls [--state=…]
 term apps revet <app|--all>
 
 # lifecycle
 term apps upgrade   <app> <staged>
 term apps drain     <app> [--to-version=…]
-term apps rollback  <app>                         [†]
-term apps uninstall <app> [--keep-data|--archive-data|--purge]
+term apps rollback  <app>                                             [†]
+term apps uninstall <app> --keep-data
+term apps uninstall <app> --archive-data
+term apps uninstall <app> --purge                                     [†]
 
 # disable (quarantine is an alias for disable in v1; §6.4)
 term apps disable     <app>
-term apps enable      <app>
-term apps quarantine  <app>                       # alias for disable in v1
+term apps enable      <app>                                           [† when disabled_reason ∈
+                                                                       {author-revoked,
+                                                                        voucher-revet-block,
+                                                                        risk-revet-block,
+                                                                        reconcile-pending};
+                                                                       ordinary mutating otherwise]
+term apps quarantine  <app>                                           # alias for disable in v1
 
 # migrations
 term apps migrate status    <app>
 term apps migrate retry     <app>
-term apps migrate abort     <app> [--to=checkpoint|baseline]   [--to=baseline is †]
-term apps migrate reconcile <app> --artifact=<id> --resolution=<accept_current|force_rewind|manual>  [†]
+term apps migrate abort     <app> [--to=checkpoint|baseline]          [--to=baseline is †]
+term apps migrate reconcile <app> --artifact=<id> --resolution=<accept_current|force_rewind|manual>   [†]
 term apps migrate logs      <app> [--step=N]
 
 # conflict and policy reconciliation
 term apps conflicts ls
-term apps conflicts resolve <app> --winner=<app>  [†]
+term apps conflicts resolve <app> --winner=<app>                      [†]
 
-# trust (details in signing-and-trust.md)
+# trust (details in signing-and-trust.md §7)
 term apps keys ls [--role=…] [--state=…]
 term apps keys show <key_id>
-term apps keys add  <key_id> --role=… [--note=…]  [†]
-term apps keys confirm <key_id>
-term apps keys revoke  <key_id> --reason=… [--on-installed=…]  [†]
-term apps keys archive <key_id>
-term apps keys rotate  --accept <rotation_statement>  [†]
-term apps keys rotate  --emit   --old=<key> --new=<key> --names=…  [†]
+term apps keys add  <key_id> --role=… [--note=…]                      [†]
+term apps keys confirm <key_id> --role=author                         [†]
+term apps keys confirm <key_id> --role=voucher|publisher
+term apps keys revoke  <key_id> --reason=… [--on-installed=…]         [†]
+term apps keys archive <key_id>                                       [† when current state is "active";
+                                                                       ordinary mutating when state is
+                                                                       "revoked" | "rotated" | "candidate"]
+term apps keys rotate  --accept <rotation_statement>                  [†]
+term apps keys rotate  --emit   --old=<key> --new=<key> --names=…     [†]
+term apps keys rotate  --rollback <trust_log_seq>                     [†]
+term apps keys rotate-installer --new=<key>                           [†]
 term apps keys log     [--since=…]
-term apps keys verify                                      # walks trust log + verdict log chains
+term apps keys verify                                                 # walks trust log + verdict log chains
 
 # policy
 term apps policy show
-term apps policy set  <path> <value>              [†]
+term apps policy set  <path> <value>                                  [†]
 term apps policy diff <file>
 ```
 

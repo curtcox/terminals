@@ -123,8 +123,15 @@ A new concept required to make storage and verdict paths stable
 across author-key rotation.
 
 ```
-app_id = sha256(first_author_key_id || "\0" || manifest_name)
+app_id_bytes = sha256(first_author_key_id || "\0" || manifest_name)
+app_id       = "app:sha256:" + hex(app_id_bytes)
 ```
+
+The textual form `"app:sha256:<hex>"` is the **only** encoding of
+`app_id` used in persisted files, JSON fields, paths, CLI
+arguments, and cross-plan references. Bare `"sha256:…"` is
+reserved for `package_id` and similar; unprefixed hex is a
+format rejection.
 
 - The **first** time a package with a given `manifest_name` is
   installed, the server computes `app_id` from the installing
@@ -202,8 +209,10 @@ A versioned TOML file plus an append-only log:
 ### 3.2 Location
 
 - Primary file: `<server_data>/trust/store.toml`.
-- Log: `<server_data>/trust/log.ndjson`.
-- Verdict log: `<server_data>/trust/verdicts.ndjson` (§6.4).
+- Trust-mutation log: `<server_data>/trust/log.ndjson`.
+- Verdict log: `<server_data>/trust/verdicts.ndjson` (normative
+  schema in §6.4).
+- Verdict bundles: `<server_data>/trust/verdicts/<app_id>/<seq>.json`.
 - Mutations go through `term apps keys …` / `term apps
   policy …` commands; direct edits are detected by log-chaining
   and flagged.
@@ -253,7 +262,7 @@ First, the outgoing author publishes:
 
 ```
 OldKeyRotationStatement (CBOR, deterministic):
-  schema_version : 1
+  schema         : "rotation-stmt/1"
   old_key        : "ed25519:…"
   new_key        : "ed25519:…"
   proposed_at    : <unix seconds, advisory only>
@@ -266,12 +275,15 @@ The new-key holder must countersign before the server accepts:
 
 ```
 NewKeyRotationStatement (CBOR, deterministic):
-  schema_version : 1
+  schema              : "rotation-stmt/1"
   old_key_stmt_digest : sha256(CBOR of OldKeyRotationStatement)
-  new_key        : "ed25519:…"
-  accept_at      : <unix seconds, advisory only>
-  sig_new        : signature by new_key over the above
+  new_key             : "ed25519:…"
+  accept_at           : <unix seconds, advisory only>
+  sig_new             : signature by new_key over the above
 ```
+
+Both statements carry the `schema` string verbatim; v1 verifiers
+reject unknown schemas and reject statements missing `schema`.
 
 A stolen old key alone cannot forge authority transfer: it must
 also sign over a new key whose holder has not agreed to the
@@ -479,28 +491,77 @@ knowing every prior entry. Off-site log replication (operator
 policy, out of scope for v1) is the mitigation against
 silent rewrites.
 
-### 6.4 Verdict log
+### 6.4 Verdict log (normative)
 
-Every verdict bundle write appends to `verdicts.ndjson`:
+This section is the single normative definition of the verdict
+log. Distribution and migration plans reference it; they do not
+restate the fields.
+
+**Path.** `<server_data>/trust/verdicts.ndjson`. The verdict
+bundle file itself lives under
+`<server_data>/trust/verdicts/<app_id>/<seq>.json`; the ndjson
+record is the tamper-evident index. Retroactive edits to a
+stored bundle change its sha256, breaking the chain.
+
+**Entry schema (`verdict-log/1`).** One JSON object per line:
 
 ```json
 {
+  "schema": "verdict-log/1",
   "seq": 112,
   "at": 1714000500,
-  "app_id": "sha256:…",
-  "package_id": "sha256:…",
-  "decision": "installed"|"quarantined"|"aborted"|"revet-warn"|"revet-block",
-  "verdict_bundle_sha256": "…",
+  "actor": "operator:curt|installer:self",
+  "tx_id": "tx:…",
+  "app_id": "app:sha256:…",
+  "package_id": "sha256:…"|null,
+  "decision": "installed"
+            | "upgraded"
+            | "rolled-back"
+            | "uninstalled"
+            | "disabled"
+            | "enabled"
+            | "reconcile-pending"
+            | "revet-pass"
+            | "revet-warn"
+            | "revet-block"
+            | "aborted-pre-commit"
+            | "aborted-post-commit",
+  "verdict_bundle_sha256": "…"|null,
   "prev_hash": "sha256:…",
   "this_hash": "sha256:…",
   "installer_sig": "base64:…"
 }
 ```
 
-The verdict bundle file itself lives under
-`<server_data>/verdicts/<app_id>/<seq>.json`; the ndjson
-record is the tamper-evident index. Retroactive edits to a
-stored bundle change its sha256, breaking the chain.
+Rules:
+
+- `this_hash = sha256(canonical_json({schema, seq, at, actor,
+  tx_id, app_id, package_id, decision, verdict_bundle_sha256,
+  prev_hash}))`. Canonical JSON is RFC 8785.
+- `package_id` is null for decisions that do not name a specific
+  package (e.g. `disabled`, `enabled`, standalone `revet-*`).
+- `verdict_bundle_sha256` is null for decisions that did not
+  produce a verdict bundle (e.g. `enabled` from the disabled
+  state). Otherwise it is the sha256 of the bundle file.
+- `aborted-pre-commit` records an install transaction that
+  rejected before visibility; `aborted-post-commit` records
+  rollback after commit. Both still append a chain entry.
+- `tx_id` is the install-transaction id (`application-
+  distribution.md` §6.a.1). Decisions outside a transaction
+  (policy-only mutations, log repair) use `"tx:none"`.
+- Every entry is signed by the current installer key; on
+  installer-key rotation the first post-rotation entry names the
+  new key in the `installer_sig` header fields (out-of-band
+  metadata, not repeated here).
+- Unknown `schema` strings are rejected at read. Unknown fields
+  in a known schema are rejected at read. `v2` readers will
+  specify upgrade transforms.
+
+**Verdict bundle file schema (`verdict/1`).** The file under
+`trust/verdicts/<app_id>/<seq>.json` is the full gate evidence
+referenced by `verdict_bundle_sha256`. Its schema is defined in
+[application-distribution.md](application-distribution.md) §5.8;
+this plan owns the chain, distribution owns the gate payload.
 
 ---
 
@@ -517,18 +578,28 @@ approval):
 
 - `term apps keys revoke`
 - `term apps keys rotate --accept`
+- `term apps keys rotate --emit`
 - `term apps keys rotate --rollback`
 - `term apps keys rotate-installer`
+- `term apps keys confirm --role=author`
+- `term apps keys archive <active-author-or-voucher-key>`
+  (archiving a key in state `revoked` / `rotated` / `candidate`
+  is ordinary `mutating`; archiving an `active` key that could
+  authorize future installs is `critical_mutating`)
 - `term apps policy set` (for any field referenced in this
   document)
+- `term apps enable <app>` when the app's current
+  `disabled_reason` is `author-revoked`, `voucher-revet-block`,
+  `risk-revet-block`, or `reconcile-pending`. A `disabled` state
+  set by operator command or dev-TTL expiry is ordinary
+  `mutating` to re-enable.
 
 Ordinary `mutating` (proposable by agents with standard
 approval):
 
 - `term apps keys add`
-- `term apps keys confirm` (for voucher or publisher roles
-  only; `author` confirmation is `critical_mutating`)
-- `term apps keys archive`
+- `term apps keys confirm --role=voucher|publisher`
+- `term apps keys archive <non-active-key>`
 
 Read-only:
 
@@ -569,9 +640,26 @@ kind        = "quarantine_admit"          # signed by any known key; install goe
 enabled     = false                       # off until quarantine-sandbox ships
 
 [gate5]                                   # AI reviewers
-providers = ["claude-v1", "codex-v1"]     # pinned per vet run
 min_active_providers = 2
-cooldown_treatment  = "require_revet"     # see distribution plan §5.5
+cooldown_treatment   = "require_revet"    # see distribution plan §5.5
+# Active provider set is enumerated below; a change to this set
+# (add, remove, model bump, context_scope change, substitute_id)
+# increments the policy version.
+[[gate5.provider]]
+id            = "claude-v1"
+model         = "claude-opus-4-7"
+context_scope = "public"                  # "public" | "private" — gates SERVER_CONTEXT_PRIVATE
+substitute_id = "local-llm-v1"            # used if this provider enters cooldown
+[[gate5.provider]]
+id            = "codex-v1"
+model         = "gpt-5-codex-2026-03"
+context_scope = "public"
+substitute_id = "local-llm-v1"
+[[gate5.provider]]
+id            = "local-llm-v1"
+model         = "…"
+context_scope = "private"
+substitute_id = ""                        # terminal fallback; empty substitute_id allowed
 
 [gate7]                                   # risk thresholds
 block_above_score = 80
