@@ -13,7 +13,8 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	proto-lint proto-breaking proto-generate \
 	skills-validate \
 	all-lint all-test all-check stop-server run-server run-client-web \
-	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate
+	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
+	ui-inspect-test
 
 server-build:
 	cd terminal_server && go build ./...
@@ -147,3 +148,6 @@ mac-e2e-test:
 
 usecase-validate:
 	./scripts/usecase-validate.sh "$(USECASE)"
+
+ui-inspect-test:
+	./scripts/test-ui-inspect-run.sh

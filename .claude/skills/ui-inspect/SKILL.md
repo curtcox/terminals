@@ -105,7 +105,7 @@ Zoom in on anything small using `mcp__computer-use__zoom region=[x0,y0,x1,y1]` �
 ./scripts/ui-inspect-run.sh stop
 ```
 
-This reads the recorded PIDs from `.tmp/ui-inspect/state`, kills each process tree (descendants first, then parent, then `SIGKILL` after 10s), and finishes by running `./scripts/stop-server.sh` as a fallback port sweep. If the state file is missing/stale it falls straight through to `stop-server.sh`.
+This reads the recorded PIDs from `.tmp/ui-inspect/state` and, before sending any signal, verifies each PID is still the process we recorded by comparing `ps -o args=` against the recorded command pattern and the process start time against the recorded `STARTED_AT`. A PID that has been reused by an unrelated process, or whose identity can't be verified (e.g. `ps` restricted by the sandbox), is **skipped with a warning** rather than killed. Verified PIDs are torn down descendants-first, then parent, then `SIGKILL` after 10s. Finally `./scripts/stop-server.sh` runs as a port-sweep fallback. If the state file is missing or malformed it falls straight through to `stop-server.sh`.
 
 ## Tool-API compatibility
 
@@ -117,35 +117,39 @@ Tools: `request_access`, `screenshot`, `switch_display`, `zoom`, `left_click`, `
 
 Use the steps above verbatim.
 
-### Reduced toolkit (`get_app_state`, `click`, …) — no `request_access` / `screenshot` / `switch_display` / `zoom`
+### Reduced toolkit (no `request_access` / `screenshot` / `switch_display` / `zoom`)
 
-If the environment only exposes `get_app_state` and `click`-style tools (no `request_access`, `screenshot`, `switch_display`, `zoom`), substitute as follows. Always check what's actually in the deferred-tool list — don't assume. `ToolSearch { query: "computer-use", max_results: 30 }` reveals which variant is available.
+Not all environments expose the full computer-use MCP. Before falling back, always list what's actually available with `ToolSearch { query: "computer-use", max_results: 30 }` — don't guess at tool names. Under some agent harnesses you'll see a different server (`mcp__Macos__*`: `Snapshot`, `Scrape`, `Click`, `App`, `Type`, …); treat that as a distinct shape, not a renamed `computer-use`.
 
-| Task | Full API | Reduced API fallback |
+Substitution table — use the tool names that are actually present in your deferred-tool list:
+
+| Task | Full `computer-use` API | Substitutes |
 | --- | --- | --- |
-| Grant access | `request_access(apps=[...])` | Skip — the reduced toolkit typically doesn't gate on access; proceed to the capture step. |
-| See rendered UI | `screenshot()` | `get_app_state()` returns a structured snapshot of the focused window. For pixel-accurate checks, use the Chrome-in-Chrome MCP (`mcp__Claude_in_Chrome__*`) for the web client, and fall back to asking the user to attach a screenshot for the macOS window if neither tool can capture it. |
-| Pick a monitor | `switch_display(display=name)` | `get_app_state()` reports which display the focused window is on; re-focus with `click(target=<window>)` or `open_application(...)`. If the app is on the wrong display and you can't move it programmatically, ask the user to drag it to the primary display once. |
-| Zoom into a region | `zoom(region=[x0,y0,x1,y1])` | Open the web client in Chrome-in-Chrome and use `read_page` / `get_page_text` / element-level inspection — text styling is exposed in the DOM without needing a magnified raster. |
-| Click an element | `left_click(x, y)` | `click(target=...)` — pass the accessibility label / id from `get_app_state` instead of pixel coordinates. |
+| Grant access | `mcp__computer-use__request_access(apps=[...], reason=...)` | If no `request_access` tool is present, proceed without it — the reduced harness does not gate on per-app access. |
+| See rendered UI | `mcp__computer-use__screenshot()` | (a) `mcp__Claude_in_Chrome__read_page` + `get_page_text` for the web client; (b) `mcp__Macos__Snapshot` / `Scrape` for the macOS window if the Macos server is present; (c) otherwise ask the user to attach a screenshot. |
+| Pick a monitor | `mcp__computer-use__switch_display(display=<name>)` | No direct equivalent in the reduced shapes. Ask the user to move the app to the primary display once, then proceed. |
+| Zoom into a region | `mcp__computer-use__zoom(region=[x0,y0,x1,y1])` | For the web client: inspect the DOM directly with `mcp__Claude_in_Chrome__read_page` / `get_page_text` / `find` — text styling lives in the DOM and doesn't need a raster zoom. For the macOS window: there is no DOM; flag any sub-pixel detail as "unverified without zoom" rather than asserting. |
+| Click an element | `mcp__computer-use__left_click(x=…, y=…)` | `mcp__Claude_in_Chrome__find` → then click via the Chrome MCP's click tool (web); `mcp__Macos__Click(target=…)` or `mcp__Macos__Snapshot` + coordinate click (native). The Macos server addresses elements by accessibility label — verify the label with `Snapshot` first instead of guessing. |
 
-Pseudocode for the reduced-API capture step:
+Concrete reduced-toolkit capture flow (web client via Chrome MCP, macOS via the Macos server when available):
 
 ```
-state = get_app_state()              # Chrome foreground, window on display D
-# no request_access needed
-# no screenshot() — inspect via get_app_state() or Chrome MCP
-chrome_state = get_app_state()       # for browser tab URL / title checks
-# for the macOS client, focus it and snapshot its state:
-open_application(name="terminal_client")
-mac_state = get_app_state()
+# Web client — DOM-aware inspection, no screenshot needed.
+mcp__Claude_in_Chrome__navigate(url="<WEB_URL-from-ui-inspect-run-start>")
+mcp__Claude_in_Chrome__read_page()        # returns structured DOM + visible text
+mcp__Claude_in_Chrome__get_page_text()    # full text for tab title / labels / debug counters
+
+# macOS client — only if the Macos MCP is in your deferred-tool list.
+mcp__Macos__App(action="focus", name="terminal_client")
+mcp__Macos__Snapshot()                    # accessibility tree of the focused window
+mcp__Macos__Scrape()                      # visible text of the focused window
 ```
 
-Write punch-list items from the structured state (window title, element labels, visible text, geometry) rather than from pixel screenshots. Flag anything you cannot verify because the API is unavailable — don't silently skip it.
+If neither the Macos MCP nor computer-use is available, you cannot inspect the native window — report that explicitly and ask the user for a screenshot rather than silently reporting only the web findings. Always list in the punch-list which items were checked via DOM vs. raster vs. user-supplied, so the user can see the coverage gaps.
 
-### Chrome MCP alternative
+### Chrome MCP alternative (preferred for web)
 
-If `mcp__Claude_in_Chrome__*` is connected, prefer it for the web client regardless of which computer-use flavor is available. It's DOM-aware, text is extractable directly, and clicks target elements by id/selector. The macOS client still needs computer-use (or the user) for capture.
+If `mcp__Claude_in_Chrome__*` is connected, prefer it for the web client regardless of which computer-use flavor is available. It's DOM-aware, text is extractable directly, and clicks target elements by id/selector. The macOS client still needs computer-use or the Macos MCP (or the user) for capture.
 
 ## Environment and access notes
 
