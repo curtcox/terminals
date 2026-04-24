@@ -3671,7 +3671,7 @@ func TestHandleMessageSystemRunDueTimers(t *testing.T) {
 		t.Fatalf("processed = %q, want 1", out[0].Data["processed"])
 	}
 	events := broadcaster.Events()
-	if len(events) != 1 || events[0].Message != "Timer complete" {
+	if len(events) != 1 || events[0].Message != "Timer done!" {
 		t.Fatalf("unexpected broadcast events: %+v", events)
 	}
 }

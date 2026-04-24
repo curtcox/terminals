@@ -1,6 +1,7 @@
 package scenario
 
 import (
+	"bytes"
 	"context"
 	"strconv"
 	"sync"
@@ -22,6 +23,15 @@ type testAIBackend struct {
 type testLLM struct {
 	text    string
 	queries [][]LLMMessage
+}
+
+type testTTS struct {
+	calls []string
+}
+
+func (t *testTTS) Synthesize(_ context.Context, text string, _ TTSOptions) (AudioPlayback, error) {
+	t.calls = append(t.calls, text)
+	return bytes.NewReader(nil), nil
 }
 
 type eventForwardingScenario struct {
@@ -1845,14 +1855,18 @@ func TestRuntimeProcessDueTimers(t *testing.T) {
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
 	scheduler := storage.NewMemoryScheduler()
 	broadcaster := ui.NewMemoryBroadcaster()
+	tts := &testTTS{}
 	runtime := NewRuntime(NewEngine(), &Environment{
 		Devices:   devices,
 		Scheduler: scheduler,
 		Broadcast: broadcaster,
+		TTS:       tts,
 	})
+	busEvents, cancel := runtime.Bus.Subscribe(1)
+	defer cancel()
 
 	now := time.Date(2026, 4, 12, 9, 0, 0, 0, time.UTC)
-	_ = scheduler.Schedule(context.Background(), "timer:d1:100", now.UnixMilli()-1000)
+	_ = scheduler.Schedule(context.Background(), timerScheduleKey("d1", now.UnixMilli()-1000, 600, "pasta"), now.UnixMilli()-1000)
 	_ = scheduler.Schedule(context.Background(), "timer:d1:200", now.UnixMilli()+60_000)
 
 	processed, err := runtime.ProcessDueTimers(context.Background(), now)
@@ -1866,8 +1880,22 @@ func TestRuntimeProcessDueTimers(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("len(events) = %d, want 1", len(events))
 	}
-	if events[0].Message != "Timer complete" {
-		t.Fatalf("message = %q, want Timer complete", events[0].Message)
+	if events[0].Message != "Timer done!" {
+		t.Fatalf("message = %q, want Timer done!", events[0].Message)
+	}
+	if len(tts.calls) != 1 || tts.calls[0] != "Your pasta is ready." {
+		t.Fatalf("TTS calls = %+v, want Your pasta is ready.", tts.calls)
+	}
+	select {
+	case event := <-busEvents:
+		if event.EventV2 == nil || event.EventV2.Kind != "timer.expired" || event.EventV2.Subject != "pasta" {
+			t.Fatalf("bus event = %+v, want timer.expired pasta", event)
+		}
+		if event.EventV2.Attributes["duration_seconds"] != "600" {
+			t.Fatalf("duration_seconds = %q, want 600", event.EventV2.Attributes["duration_seconds"])
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("expected timer.expired bus event")
 	}
 	if len(scheduler.Due(now.UnixMilli())) != 0 {
 		t.Fatalf("expected due timers to be removed")

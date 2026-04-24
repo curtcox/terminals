@@ -1,0 +1,137 @@
+# kitchen_timer/main.tal
+#
+# This TAL source mirrors docs/tal-example-kitchen-timer.md. The current Go
+# runtime loads and registers the package manifest; executable timer behavior
+# is provided by the server-side TimerReminderScenario until TAL hooks are
+# interpreted end-to-end.
+
+load("placement", nearest = "nearest")
+load("scheduler", after = "after", every = "every", cancel = "cancel")
+load("ui", view = "view", patch = "patch", clear = "clear",
+     column = "column", heading = "heading", text = "text")
+load("ai", tts = "tts")
+load("bus", emit = "emit")
+load("log", info = "info")
+
+def name():
+    return "kitchen_timer"
+
+def match(req):
+    return req.kind == "intent" and req.action in ["timer.set", "timer.start"]
+
+def new_activation(req):
+    target = nearest(
+        to = req.source_device,
+        role = "display",
+        zone = "kitchen",
+        fallback = req.source_device,
+    )
+    duration = int(req.slots.get("duration_seconds", 0))
+    label = req.slots.get("label", "timer")
+    if duration <= 0:
+        return None
+    return {
+        "id": req.activation_id,
+        "state": {
+            "label": label,
+            "target": target,
+            "total": duration,
+            "remaining": duration,
+            "status": "running",
+        },
+    }
+
+def start(env, state):
+    info("timer.start", label = state["label"], seconds = state["total"])
+    return {
+        "state": state,
+        "ops": [
+            ui.view(state["target"], root = "timer", body = _countdown(state)),
+            scheduler.every(id = "tick", seconds = 1, event = "tick"),
+            scheduler.after(id = "expiry", seconds = state["remaining"], event = "expired"),
+        ],
+    }
+
+def handle(env, state, trigger):
+    if trigger.kind == "event" and trigger.name == "tick":
+        return _on_tick(state)
+    if trigger.kind == "event" and trigger.name == "expired":
+        return _on_expired(state)
+    if trigger.kind == "intent" and trigger.action == "timer.cancel":
+        return _on_cancel(state)
+    return {}
+
+def suspend(env, state):
+    state["remaining"] = max(state["remaining"] - env.seconds_since_start, 0)
+    state["status"] = "suspended"
+    return {"state": state}
+
+def resume(env, state):
+    state["status"] = "running"
+    return start(env, state)
+
+def stop(env, state):
+    return {
+        "ops": [
+            scheduler.cancel(id = "tick"),
+            scheduler.cancel(id = "expiry"),
+            ui.clear(state["target"], root = "timer"),
+        ],
+    }
+
+def _on_tick(state):
+    state["remaining"] = max(state["remaining"] - 1, 0)
+    return {
+        "state": state,
+        "ops": [
+            ui.patch(
+                state["target"],
+                component = "remaining",
+                node = ui.text(body = _mmss(state["remaining"])),
+            ),
+        ],
+    }
+
+def _on_expired(state):
+    state["status"] = "done"
+    state["remaining"] = 0
+    return {
+        "state": state,
+        "done": True,
+        "ops": [
+            ui.patch(
+                state["target"],
+                component = "banner",
+                node = ui.text(body = "Timer done!", style = "alert"),
+            ),
+            ai.tts(state["target"], "Your %s is ready." % state["label"]),
+            scheduler.cancel(id = "tick"),
+        ],
+        "emit": [
+            bus.emit(kind = "timer.expired", subject = state["label"], duration = state["total"]),
+        ],
+    }
+
+def _on_cancel(state):
+    state["status"] = "cancelled"
+    return {
+        "state": state,
+        "done": True,
+        "ops": [
+            scheduler.cancel(id = "tick"),
+            scheduler.cancel(id = "expiry"),
+            ui.clear(state["target"], root = "timer"),
+        ],
+    }
+
+def _countdown(state):
+    return ui.column(
+        ui.heading(body = state["label"]),
+        ui.text(id = "remaining", body = _mmss(state["remaining"])),
+        ui.text(id = "banner", body = ""),
+    )
+
+def _mmss(seconds):
+    m = seconds // 60
+    s = seconds % 60
+    return "%02d:%02d" % (m, s)

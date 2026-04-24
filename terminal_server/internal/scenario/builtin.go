@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -111,14 +112,23 @@ func (s *TimerReminderScenario) Start(ctx context.Context, env *Environment) err
 		return nil
 	}
 
-	fireUnixMS := time.Now().Add(10 * time.Minute).UnixMilli()
+	durationSeconds := timerDurationSeconds(s.trigger.Arguments)
+	fireUnixMS := time.Now().Add(time.Duration(durationSeconds) * time.Second).UnixMilli()
 	if raw := s.trigger.Arguments["fire_unix_ms"]; raw != "" {
 		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil {
 			fireUnixMS = parsed
 		}
 	}
+	if durationSeconds <= 0 && fireUnixMS > 0 {
+		delta := time.Until(time.UnixMilli(fireUnixMS))
+		durationSeconds = int(delta.Round(time.Second).Seconds())
+		if durationSeconds < 0 {
+			durationSeconds = 0
+		}
+	}
 
-	timerKey := "timer:" + s.trigger.SourceID + ":" + strconv.FormatInt(fireUnixMS, 10)
+	label := timerLabel(s.trigger.Arguments)
+	timerKey := timerScheduleKey(s.trigger.SourceID, fireUnixMS, durationSeconds, label)
 	if env.Scheduler != nil {
 		if err := env.Scheduler.Schedule(ctx, timerKey, fireUnixMS); err != nil {
 			return err
@@ -129,13 +139,103 @@ func (s *TimerReminderScenario) Start(ctx context.Context, env *Environment) err
 		if s.trigger.SourceID != "" {
 			deviceIDs = []string{s.trigger.SourceID}
 		}
-		return env.Broadcast.Notify(ctx, deviceIDs, "Timer set")
+		return env.Broadcast.Notify(ctx, deviceIDs, timerSetMessage(label, durationSeconds))
 	}
 	return nil
 }
 
 // Stop ends the scenario and currently has no side effects.
 func (s *TimerReminderScenario) Stop() error { return nil }
+
+func timerDurationSeconds(args map[string]string) int {
+	if seconds, ok := parsePositiveInt(args["duration_seconds"]); ok {
+		return seconds
+	}
+	if minutes, ok := parsePositiveInt(args["minutes"]); ok {
+		return minutes * 60
+	}
+	return 10 * 60
+}
+
+func parsePositiveInt(raw string) (int, bool) {
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n <= 0 {
+		return 0, false
+	}
+	return n, true
+}
+
+func timerLabel(args map[string]string) string {
+	label := strings.TrimSpace(args["label"])
+	if label == "" {
+		label = "timer"
+	}
+	return label
+}
+
+func timerScheduleKey(sourceID string, fireUnixMS int64, durationSeconds int, label string) string {
+	parts := []string{
+		"timer",
+		strings.TrimSpace(sourceID),
+		strconv.FormatInt(fireUnixMS, 10),
+	}
+	if durationSeconds > 0 || strings.TrimSpace(label) != "" {
+		parts = append(parts, strconv.Itoa(durationSeconds), url.PathEscape(strings.TrimSpace(label)))
+	}
+	return strings.Join(parts, ":")
+}
+
+type timerScheduleMetadata struct {
+	DeviceID        string
+	FireUnixMS      int64
+	DurationSeconds int
+	Label           string
+}
+
+func parseTimerScheduleKey(key string) timerScheduleMetadata {
+	parts := strings.Split(key, ":")
+	meta := timerScheduleMetadata{Label: "timer"}
+	if len(parts) >= 2 {
+		meta.DeviceID = strings.TrimSpace(parts[1])
+	}
+	if len(parts) >= 3 {
+		meta.FireUnixMS, _ = strconv.ParseInt(strings.TrimSpace(parts[2]), 10, 64)
+	}
+	if len(parts) >= 4 {
+		meta.DurationSeconds, _ = strconv.Atoi(strings.TrimSpace(parts[3]))
+	}
+	if len(parts) >= 5 {
+		if unescaped, err := url.PathUnescape(strings.TrimSpace(parts[4])); err == nil && strings.TrimSpace(unescaped) != "" {
+			meta.Label = strings.TrimSpace(unescaped)
+		}
+	}
+	return meta
+}
+
+func timerSetMessage(label string, durationSeconds int) string {
+	if strings.TrimSpace(label) == "" || label == "timer" {
+		return "Timer set"
+	}
+	if durationSeconds <= 0 {
+		return "Timer set: " + label
+	}
+	return "Timer set: " + label + " " + mmss(durationSeconds)
+}
+
+func timerExpiredSpeech(label string) string {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		label = "timer"
+	}
+	return "Your " + label + " is ready."
+}
+
+func mmss(seconds int) string {
+	if seconds < 0 {
+		seconds = 0
+	}
+	return fmt.Sprintf("%02d:%02d", seconds/60, seconds%60)
+}
 
 // TerminalScenario activates interactive terminal mode on the requesting device.
 type TerminalScenario struct {

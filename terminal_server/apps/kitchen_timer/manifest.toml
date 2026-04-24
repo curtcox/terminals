@@ -1,0 +1,7 @@
+name = "kitchen_timer"
+version = "0.1.0"
+language = "tal/1"
+requires_kernel_api = "kernel/1"
+description = "Voice-activated countdown timer with spoken and visual alerts."
+permissions = ["placement.read", "ui.set", "ui.patch", "scheduler", "ai.tts", "bus.emit"]
+exports = ["kitchen_timer"]

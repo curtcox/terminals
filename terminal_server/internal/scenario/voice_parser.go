@@ -213,7 +213,29 @@ func parseTimerMinutes(args map[string]string, normalized string, now time.Time)
 		return
 	}
 	args["minutes"] = strconv.Itoa(minutes)
+	args["duration_seconds"] = strconv.Itoa(minutes * 60)
 	args["fire_unix_ms"] = strconv.FormatInt(now.Add(time.Duration(minutes)*time.Minute).UnixMilli(), 10)
+	labelParts := []string{}
+	if len(parts) > 2 {
+		labelParts = parts[2:]
+	}
+	if label := parseTimerLabel(labelParts); label != "" {
+		args["label"] = label
+	}
+}
+
+func parseTimerLabel(parts []string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	switch parts[0] {
+	case "called", "named":
+		return strings.TrimSpace(strings.Join(parts[1:], " "))
+	case "for":
+		return strings.TrimSpace(strings.Join(parts[1:], " "))
+	default:
+		return strings.TrimSpace(strings.Join(parts, " "))
+	}
 }
 
 func parseBluetoothConnectTarget(normalized string) (string, bool) {

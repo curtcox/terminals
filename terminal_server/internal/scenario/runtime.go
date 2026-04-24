@@ -481,19 +481,38 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 	processed := 0
 	for _, key := range due {
 		if strings.HasPrefix(key, "timer:") {
-			targetDevice := ""
-			parts := strings.Split(key, ":")
-			if len(parts) >= 2 {
-				targetDevice = parts[1]
-			}
+			meta := parseTimerScheduleKey(key)
 			if r.Env.Broadcast != nil {
 				deviceIDs := []string{}
-				if targetDevice != "" {
-					deviceIDs = []string{targetDevice}
+				if meta.DeviceID != "" {
+					deviceIDs = []string{meta.DeviceID}
 				}
-				if err := r.Env.Broadcast.Notify(ctx, deviceIDs, "Timer complete"); err != nil {
+				if err := r.Env.Broadcast.Notify(ctx, deviceIDs, "Timer done!"); err != nil {
 					return processed, err
 				}
+			}
+			if r.Env.TTS != nil {
+				if _, err := r.Env.TTS.Synthesize(ctx, timerExpiredSpeech(meta.Label), TTSOptions{
+					Voice:  "default",
+					Format: "pcm16",
+				}); err != nil {
+					return processed, err
+				}
+			}
+			if r.Env.TriggerBus != nil {
+				r.Env.TriggerBus.Publish(Trigger{
+					Kind:     TriggerSchedule,
+					SourceID: meta.DeviceID,
+					EventV2: &EventRecord{
+						Kind:    "timer.expired",
+						Subject: meta.Label,
+						Attributes: map[string]string{
+							"duration_seconds": strconv.Itoa(meta.DurationSeconds),
+						},
+						Source:     SourceSchedule,
+						OccurredAt: now.UTC(),
+					},
+				})
 			}
 		}
 		if err := r.Env.Scheduler.Remove(ctx, key); err != nil {

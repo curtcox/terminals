@@ -1,0 +1,6 @@
+test("manifest declares kitchen timer"):
+    assert manifest.name == "kitchen_timer"
+    assert manifest.version == "0.1.0"
+    assert main.contains("def _on_expired")
+    assert main.contains("timer.expired")
+    assert main.contains("Your %s is ready.")
