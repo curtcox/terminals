@@ -10,6 +10,25 @@ The runtime adds one layer above the existing Go server modules:
 - **TAL (Terminals Application Language)**: deterministic application language for scenario logic.
 - **Optional operator kernels**: portable compute units that TAR may place on a capable client or on the server. See [edge-execution.md](edge-execution.md).
 
+## Runtime Status Vocabulary
+
+Runtime docs use these labels so implemented behavior is distinguishable from
+the planned TAL/TAR contract:
+
+- `Implemented`: runs in the current codebase and is covered by executable validation.
+- `Partially implemented`: some supporting path exists, but the full runtime contract is not executable yet.
+- `Planned`: documented target behavior that still needs runtime implementation.
+
+| Surface | Status | Current validation |
+|---|---|---|
+| Package loading | Implemented | `term app check <name>` loads app directories through `internal/appruntime`. |
+| Manifest validation | Implemented | package load rejects invalid manifest shape and unsupported language declarations. |
+| Exported definitions | Partially implemented | manifests declare exports and packages register exported app definitions, but TAL `match` bodies are not interpreted. |
+| TAL parsing/interpretation | Planned | TAL files are present as contract examples; lifecycle hooks are not executed by an interpreter. |
+| Lifecycle state snapshots | Planned | `Result.State` is the target contract; durable snapshots are not committed for interpreted TAL activations yet. |
+| Host operation commit | Planned | all-or-nothing operation validation and commit is the target model; Go scenarios still perform most side effects directly. |
+| Simulation harness | Partially implemented | `term app test` smoke-tests packages and test declarations; full synthetic-time lifecycle simulation is planned. |
+
 ## Language Choice
 TAL is a **Starlark-like**, deterministic, embeddable language hosted inside the Go server. It is intentionally small:
 - No threads.

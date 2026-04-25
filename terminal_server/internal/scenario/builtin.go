@@ -108,8 +108,18 @@ func (s *TimerReminderScenario) Match(trigger Trigger) bool {
 
 // Start schedules the timer and confirms to the origin device.
 func (s *TimerReminderScenario) Start(ctx context.Context, env *Environment) error {
+	result, err := s.StartResult(ctx, env)
+	if err != nil {
+		return err
+	}
+	return ExecuteOperations(ctx, env, result.Ops, time.Now().UTC())
+}
+
+// StartResult returns scheduler and notification operations for a timer.
+func (s *TimerReminderScenario) StartResult(ctx context.Context, env *Environment) (ScenarioResult, error) {
+	_ = ctx
 	if env == nil {
-		return nil
+		return ScenarioResult{}, nil
 	}
 
 	durationSeconds := timerDurationSeconds(s.trigger.Arguments)
@@ -129,19 +139,29 @@ func (s *TimerReminderScenario) Start(ctx context.Context, env *Environment) err
 
 	label := timerLabel(s.trigger.Arguments)
 	timerKey := timerScheduleKey(s.trigger.SourceID, fireUnixMS, durationSeconds, label)
-	if env.Scheduler != nil {
-		if err := env.Scheduler.Schedule(ctx, timerKey, fireUnixMS); err != nil {
-			return err
-		}
+	ops := []Operation{
+		{
+			Kind:   OperationSchedulerAfter,
+			Target: timerKey,
+			Args: map[string]string{
+				"unix_ms":          strconv.FormatInt(fireUnixMS, 10),
+				"kind":             "timer",
+				"device_id":        s.trigger.SourceID,
+				"subject":          label,
+				"duration_seconds": strconv.Itoa(durationSeconds),
+			},
+		},
 	}
 	if env.Broadcast != nil {
-		deviceIDs := []string{}
-		if s.trigger.SourceID != "" {
-			deviceIDs = []string{s.trigger.SourceID}
-		}
-		return env.Broadcast.Notify(ctx, deviceIDs, timerSetMessage(label, durationSeconds))
+		ops = append(ops, Operation{
+			Kind:   OperationBroadcastNotify,
+			Target: s.trigger.SourceID,
+			Args: map[string]string{
+				"message": timerSetMessage(label, durationSeconds),
+			},
+		})
 	}
-	return nil
+	return ScenarioResult{Ops: ops}, nil
 }
 
 // Stop ends the scenario and currently has no side effects.

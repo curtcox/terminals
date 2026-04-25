@@ -3995,6 +3995,14 @@ func TestHandleMessageSystemPendingTimers(t *testing.T) {
 		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
 	})
 	_ = scheduler.Schedule(context.Background(), "timer:device-1:100", control.now().Add(5*time.Minute).UnixMilli())
+	_ = scheduler.ScheduleRecord(context.Background(), storage.ScheduleRecord{
+		Key:      "structured-timer-1",
+		Kind:     "timer",
+		Subject:  "pasta",
+		DeviceID: "device-1",
+		UnixMS:   control.now().Add(6 * time.Minute).UnixMilli(),
+		Payload:  map[string]string{"duration_seconds": "360"},
+	})
 
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		Command: &CommandRequest{
@@ -4006,8 +4014,11 @@ func TestHandleMessageSystemPendingTimers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pending_timers error = %v", err)
 	}
-	if out[0].Data["timer:device-1:100"] != "scheduled" {
+	if out[0].Data["timer:device-1:100"] != "kind=timer" {
 		t.Fatalf("pending timer missing from response: %+v", out[0].Data)
+	}
+	if out[0].Data["structured-timer-1"] != "kind=timer|device=device-1|subject=pasta|duration_seconds=360" {
+		t.Fatalf("structured pending timer missing metadata: %+v", out[0].Data)
 	}
 }
 

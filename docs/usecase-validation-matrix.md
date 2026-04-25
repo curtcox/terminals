@@ -12,20 +12,29 @@ make usecase-validate USECASE=all
 
 ## Automated IDs
 
-| ID | Scenario | Validation Command | Primary Evidence |
-|---|---|---|---|
-| C1 | Intercom (2-way / route-stop / fan-out) | `make usecase-validate USECASE=C1` | `internal/transport` generated+wire integration tests |
-| C3 | PA mode | `make usecase-validate USECASE=C3` | PA relay, voice start, voice stop alias tests |
-| C5 | Internal video call | `make usecase-validate USECASE=C5` | `TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow` |
-| D1 | Photo frame idle rotation | `make usecase-validate USECASE=D1` | photo-frame config + heartbeat rotation tests |
-| M1 | "Tell me when X stops" audio monitor | `make usecase-validate USECASE=M1` | silence classifier integration test |
-| M3 | Red alert broadcast | `make usecase-validate USECASE=M3` | generated+wire red alert integration tests |
-| M4 | Stand down / stop red alert | `make usecase-validate USECASE=M4` | generated+wire voice stop/stand-down tests |
-| S1 | Show all cameras | `make usecase-validate USECASE=S1` | generated+wire voice show-all-cameras tests |
-| S2 | Focus one camera audio | `make usecase-validate USECASE=S2` | generated+wire focus-action routing tests |
-| S3 | Mixed multi-camera audio overview | `make usecase-validate USECASE=S3` | generated+wire multi-window audio mix tests |
-| P1 | Terminal session UI transitions | `make usecase-validate USECASE=P1` | generated+wire terminal transition tests |
-| T1 | Timer firing | `make usecase-validate USECASE=T1` | due-timer loop + transport timer tests |
+Coverage depth labels:
+
+- `Smoke`: proves a narrow server loop or command path.
+- `Transport`: proves generated/wire control-plane behavior.
+- `Scenario`: proves scenario matching and server-side side effects.
+- `Contract`: proves app/package/runtime contract surfaces.
+- `Simulation`: proves lifecycle behavior against synthetic time/events.
+- `Full`: covers trigger, placement, UI, scheduling, side effects, and expiry/cancel/resume behavior.
+
+| ID | Scenario | Validation Command | Primary Evidence | Coverage Depth |
+|---|---|---|---|---|
+| C1 | Intercom (2-way / route-stop / fan-out) | `make usecase-validate USECASE=C1` | `internal/transport` generated+wire integration tests | Transport |
+| C3 | PA mode | `make usecase-validate USECASE=C3` | PA relay, voice start, voice stop alias tests | Transport |
+| C5 | Internal video call | `make usecase-validate USECASE=C5` | `TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow` | Transport |
+| D1 | Photo frame idle rotation | `make usecase-validate USECASE=D1` | photo-frame config + heartbeat rotation tests | Scenario |
+| M1 | "Tell me when X stops" audio monitor | `make usecase-validate USECASE=M1` | silence classifier integration test | Scenario |
+| M3 | Red alert broadcast | `make usecase-validate USECASE=M3` | generated+wire red alert integration tests | Transport |
+| M4 | Stand down / stop red alert | `make usecase-validate USECASE=M4` | generated+wire voice stop/stand-down tests | Transport |
+| S1 | Show all cameras | `make usecase-validate USECASE=S1` | generated+wire voice show-all-cameras tests | Transport |
+| S2 | Focus one camera audio | `make usecase-validate USECASE=S2` | generated+wire focus-action routing tests | Transport |
+| S3 | Mixed multi-camera audio overview | `make usecase-validate USECASE=S3` | generated+wire multi-window audio mix tests | Transport |
+| P1 | Terminal session UI transitions | `make usecase-validate USECASE=P1` | generated+wire terminal transition tests | Transport |
+| T1 | Timer firing | `make usecase-validate USECASE=T1` | due-timer loop; transport `run_due_timers`; kitchen timer package smoke test; future TAL simulation coverage | Smoke |
 
 ## Planned / Not Yet Automated
 

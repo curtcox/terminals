@@ -62,3 +62,73 @@ func TestMemorySchedulerDueAndRemove(t *testing.T) {
 		t.Fatalf("Due(200) after remove = %+v", due)
 	}
 }
+
+func TestMemorySchedulerScheduleRecordRoundTrip(t *testing.T) {
+	s := NewMemoryScheduler()
+	record := ScheduleRecord{
+		Key:       "timer:device-1:123",
+		Kind:      "timer",
+		Subject:   "pasta",
+		DeviceID:  "device-1",
+		UnixMS:    123,
+		Payload:   map[string]string{"duration_seconds": "600"},
+		CreatedMS: 10,
+	}
+
+	if err := s.ScheduleRecord(context.Background(), record); err != nil {
+		t.Fatalf("ScheduleRecord() error = %v", err)
+	}
+
+	due := s.DueRecords(123)
+	if len(due) != 1 {
+		t.Fatalf("len(DueRecords()) = %d, want 1", len(due))
+	}
+	got := due[0]
+	if got.Key != record.Key || got.Kind != "timer" || got.Subject != "pasta" || got.DeviceID != "device-1" || got.UnixMS != 123 || got.CreatedMS != 10 {
+		t.Fatalf("DueRecords()[0] = %+v", got)
+	}
+	if got.Payload["duration_seconds"] != "600" {
+		t.Fatalf("payload = %+v, want duration_seconds=600", got.Payload)
+	}
+
+	got.Payload["duration_seconds"] = "changed"
+	again := s.DueRecords(123)
+	if again[0].Payload["duration_seconds"] != "600" {
+		t.Fatalf("DueRecords() exposed mutable payload: %+v", again[0].Payload)
+	}
+}
+
+func TestMemorySchedulerScheduleCompatibilityWritesRecord(t *testing.T) {
+	s := NewMemoryScheduler()
+	if err := s.Schedule(context.Background(), "timer:device-1:123", 123); err != nil {
+		t.Fatalf("Schedule() error = %v", err)
+	}
+
+	due := s.DueRecords(123)
+	if len(due) != 1 {
+		t.Fatalf("len(DueRecords()) = %d, want 1", len(due))
+	}
+	if due[0].Key != "timer:device-1:123" || due[0].Kind != "timer" || due[0].UnixMS != 123 {
+		t.Fatalf("DueRecords()[0] = %+v", due[0])
+	}
+}
+
+func TestMemorySchedulerDueRecordsOrderAndRemove(t *testing.T) {
+	s := NewMemoryScheduler()
+	_ = s.ScheduleRecord(context.Background(), ScheduleRecord{Key: "timer-b", Kind: "timer", UnixMS: 100})
+	_ = s.ScheduleRecord(context.Background(), ScheduleRecord{Key: "timer-a", Kind: "timer", UnixMS: 100})
+	_ = s.ScheduleRecord(context.Background(), ScheduleRecord{Key: "timer-c", Kind: "timer", UnixMS: 200})
+
+	due := s.DueRecords(100)
+	if len(due) != 2 || due[0].Key != "timer-a" || due[1].Key != "timer-b" {
+		t.Fatalf("DueRecords(100) = %+v", due)
+	}
+
+	if err := s.Remove(context.Background(), "timer-a"); err != nil {
+		t.Fatalf("Remove() error = %v", err)
+	}
+	due = s.DueRecords(100)
+	if len(due) != 1 || due[0].Key != "timer-b" {
+		t.Fatalf("DueRecords(100) after remove = %+v", due)
+	}
+}

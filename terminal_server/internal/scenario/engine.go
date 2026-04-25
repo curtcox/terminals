@@ -206,6 +206,21 @@ func (e *Engine) ActivateMatched(ctx context.Context, env *Environment, match Ma
 		}
 	}
 
+	if resultScenario, ok := match.Activation.(ResultScenario); ok {
+		result, err := resultScenario.StartResult(ctx, env)
+		if err != nil {
+			return err
+		}
+		if err := ExecuteOperations(ctx, env, result.Ops, match.Request.RequestedAt); err != nil {
+			return err
+		}
+		for _, trigger := range result.Emit {
+			if env != nil && env.TriggerBus != nil {
+				env.TriggerBus.Publish(trigger)
+			}
+		}
+		return nil
+	}
 	return match.Activation.Start(ctx, env)
 }
 

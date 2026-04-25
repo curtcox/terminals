@@ -15,6 +15,20 @@ named there.
 
 ---
 
+## Implementation Status
+
+| Path | Status | What runs today |
+|---|---|---|
+| Current executable path | Implemented | The Go-side `TimerReminderScenario` handles T1 timer requests, schedules due timers, and emits the reminder side effects. |
+| Package-load path | Partially implemented | `terminal_server/apps/kitchen_timer` is loadable by `term app check kitchen_timer` and smoke-tested by `term app test kitchen_timer`. |
+| TAL interpretation path | Planned | Lifecycle hooks returning host operations are the planned contract in [plans/application-runtime.md](../plans/application-runtime.md), but they are not interpreted end-to-end yet. |
+
+`term app test kitchen_timer` is a package smoke test for the manifest and
+declared TAL test files. It is not yet a lifecycle simulation for countdown
+ticks, expiry, TTS, UI patches, or bus emissions.
+
+---
+
 ## Why this use case
 
 T1 is small enough to fit on one page and still touches every part of

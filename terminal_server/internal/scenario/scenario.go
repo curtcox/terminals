@@ -6,6 +6,7 @@ import (
 	"time"
 
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
+	"github.com/curtcox/terminals/terminal_server/internal/storage"
 )
 
 // TriggerKind identifies how a scenario was requested.
@@ -332,6 +333,12 @@ type Scheduler interface {
 	Schedule(ctx context.Context, key string, unixMS int64) error
 	Due(unixMS int64) []string
 	Remove(ctx context.Context, key string) error
+}
+
+// StructuredScheduler optionally supports typed scheduler records.
+type StructuredScheduler interface {
+	ScheduleRecord(ctx context.Context, record storage.ScheduleRecord) error
+	DueRecords(unixMS int64) []storage.ScheduleRecord
 }
 
 // Broadcaster sends one-to-many notifications or commands.

@@ -4,20 +4,57 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PATH="${ROOT_DIR}/.bin:${ROOT_DIR}/.sdk/flutter/bin:${PATH}"
 
+INFO="${INFO:-}"
+if [[ "${1:-}" == "--info" ]]; then
+  INFO="1"
+  shift
+fi
+
 USECASE="${1:-${USECASE:-}}"
 USECASE="$(echo "${USECASE}" | tr -d '[:space:]')"
 
 if [[ -z "${USECASE}" ]]; then
-  echo "usage: make usecase-validate USECASE=<ID|all>"
+  echo "usage: make usecase-validate USECASE=<ID|all> [INFO=1]"
+  echo "   or: scripts/usecase-validate.sh --info <ID|all>"
   echo "example: make usecase-validate USECASE=C1"
   exit 2
 fi
+
+metadata() {
+  local id="$1"
+  case "${id}" in
+    C1) echo "C1|Transport|internal/transport generated+wire integration tests" ;;
+    C3) echo "C3|Transport|PA relay, voice start, voice stop alias tests" ;;
+    C5) echo "C5|Transport|TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow" ;;
+    D1) echo "D1|Scenario|photo-frame config + heartbeat rotation tests" ;;
+    M1) echo "M1|Scenario|silence classifier integration test" ;;
+    M3) echo "M3|Transport|generated+wire red alert integration tests" ;;
+    M4) echo "M4|Transport|generated+wire voice stop/stand-down tests" ;;
+    S1) echo "S1|Transport|generated+wire voice show-all-cameras tests" ;;
+    S2) echo "S2|Transport|generated+wire focus-action routing tests" ;;
+    S3) echo "S3|Transport|generated+wire multi-window audio mix tests" ;;
+    P1) echo "P1|Transport|generated+wire terminal transition tests" ;;
+    T1) echo "T1|Smoke|due-timer loop; transport run_due_timers; kitchen timer package smoke test; future TAL simulation coverage" ;;
+    *)
+      echo "unsupported use case id: ${id}" >&2
+      exit 2
+      ;;
+  esac
+}
+
+all_ids=(C1 C3 C5 D1 M1 M3 M4 S1 S2 S3 P1 T1)
 
 run_go_test() {
   local pkg="$1"
   local regex="$2"
   echo "==> go test ${pkg} -run ${regex}"
   (cd "${ROOT_DIR}/terminal_server" && go test "${pkg}" -run "${regex}" -count=1)
+}
+
+run_app_test() {
+  local name="$1"
+  echo "==> go run ./cmd/term app test ${name}"
+  (cd "${ROOT_DIR}/terminal_server" && go run ./cmd/term app test "${name}")
 }
 
 run_usecase() {
@@ -60,6 +97,7 @@ run_usecase() {
     T1)
       run_go_test ./cmd/server 'TestRunDueTimerLoopProcessesTimers$'
       run_go_test ./internal/transport 'TestHandleMessageSystemRunDueTimers$'
+      run_app_test kitchen_timer
       ;;
     *)
       echo "unsupported use case id: ${id}"
@@ -69,9 +107,19 @@ run_usecase() {
   esac
 }
 
+if [[ "${INFO}" == "1" ]]; then
+  if [[ "${USECASE}" == "all" ]]; then
+    for id in "${all_ids[@]}"; do
+      metadata "${id}"
+    done
+    exit 0
+  fi
+  metadata "${USECASE}"
+  exit 0
+fi
+
 if [[ "${USECASE}" == "all" ]]; then
-  ids=(C1 C3 C5 D1 M1 M3 M4 S1 S2 S3 P1 T1)
-  for id in "${ids[@]}"; do
+  for id in "${all_ids[@]}"; do
     printf "\n### Validating %s\n" "${id}"
     run_usecase "${id}"
   done

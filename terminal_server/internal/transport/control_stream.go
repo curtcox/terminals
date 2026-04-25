@@ -20,6 +20,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
+	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
@@ -4214,8 +4215,16 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 	case SystemIntentPendingTimers:
 		data := map[string]string{}
 		if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Scheduler != nil {
-			for _, key := range h.runtime.Env.Scheduler.Due(math.MaxInt64) {
-				data[key] = "scheduled"
+			if structured, ok := h.runtime.Env.Scheduler.(interface {
+				DueRecords(int64) []storage.ScheduleRecord
+			}); ok {
+				for _, record := range structured.DueRecords(math.MaxInt64) {
+					data[record.Key] = pendingTimerRecordValue(record)
+				}
+			} else {
+				for _, key := range h.runtime.Env.Scheduler.Due(math.MaxInt64) {
+					data[key] = "scheduled"
+				}
 			}
 		}
 		return ServerMessage{
@@ -4337,6 +4346,29 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		}
 		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", cmd.Intent)
 	}
+}
+
+func pendingTimerRecordValue(record storage.ScheduleRecord) string {
+	if record.Kind == "" && record.Subject == "" && record.DeviceID == "" && len(record.Payload) == 0 {
+		return "scheduled"
+	}
+	parts := []string{}
+	if record.Kind != "" {
+		parts = append(parts, "kind="+record.Kind)
+	}
+	if record.DeviceID != "" {
+		parts = append(parts, "device="+record.DeviceID)
+	}
+	if record.Subject != "" {
+		parts = append(parts, "subject="+record.Subject)
+	}
+	if duration := strings.TrimSpace(record.Payload["duration_seconds"]); duration != "" {
+		parts = append(parts, "duration_seconds="+duration)
+	}
+	if len(parts) == 0 {
+		return "scheduled"
+	}
+	return strings.Join(parts, "|")
 }
 
 func (h *StreamHandler) listPlaybackArtifacts() []recording.Artifact {

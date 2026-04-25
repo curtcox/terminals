@@ -1482,6 +1482,13 @@ func TestRuntimeHandleVoiceTimer(t *testing.T) {
 	if len(scheduled) != 1 {
 		t.Fatalf("len(scheduled) = %d, want 1", len(scheduled))
 	}
+	records := scheduler.DueRecords(time.Date(2026, 4, 11, 21, 36, 0, 0, time.UTC).UnixMilli())
+	if len(records) != 1 {
+		t.Fatalf("len(DueRecords()) = %d, want 1", len(records))
+	}
+	if records[0].Kind != "timer" || records[0].DeviceID != "d1" || records[0].Subject != "timer" || records[0].Payload["duration_seconds"] != "300" {
+		t.Fatalf("timer record = %+v, want structured timer metadata", records[0])
+	}
 	events := broadcaster.Events()
 	if len(events) != 1 || events[0].Message != "Timer set" {
 		t.Fatalf("unexpected broadcast events: %+v", events)
@@ -1905,6 +1912,58 @@ func TestRuntimeProcessDueTimers(t *testing.T) {
 	laterDue := scheduler.Due(now.Add(2 * time.Minute).UnixMilli())
 	if len(laterDue) != 1 || laterDue[0] != "timer:d1:200" {
 		t.Fatalf("later due = %+v, want timer:d1:200", laterDue)
+	}
+}
+
+func TestRuntimeProcessDueTimersUsesStructuredRecordMetadata(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})
+	scheduler := storage.NewMemoryScheduler()
+	broadcaster := ui.NewMemoryBroadcaster()
+	tts := &testTTS{}
+	runtime := NewRuntime(NewEngine(), &Environment{
+		Devices:   devices,
+		Scheduler: scheduler,
+		Broadcast: broadcaster,
+		TTS:       tts,
+	})
+	busEvents, cancel := runtime.Bus.Subscribe(1)
+	defer cancel()
+
+	now := time.Date(2026, 4, 12, 9, 0, 0, 0, time.UTC)
+	_ = scheduler.ScheduleRecord(context.Background(), storage.ScheduleRecord{
+		Key:      "timer-record-1",
+		Kind:     "timer",
+		Subject:  "pasta",
+		DeviceID: "d1",
+		UnixMS:   now.UnixMilli() - 1000,
+		Payload:  map[string]string{"duration_seconds": "600"},
+	})
+
+	processed, err := runtime.ProcessDueTimers(context.Background(), now)
+	if err != nil {
+		t.Fatalf("ProcessDueTimers() error = %v", err)
+	}
+	if processed != 1 {
+		t.Fatalf("processed = %d, want 1", processed)
+	}
+	if len(tts.calls) != 1 || tts.calls[0] != "Your pasta is ready." {
+		t.Fatalf("TTS calls = %+v, want Your pasta is ready.", tts.calls)
+	}
+	select {
+	case event := <-busEvents:
+		if event.EventV2 == nil || event.EventV2.Subject != "pasta" {
+			t.Fatalf("bus event = %+v, want pasta subject", event)
+		}
+		if event.EventV2.Attributes["duration_seconds"] != "600" {
+			t.Fatalf("duration_seconds = %q, want 600", event.EventV2.Attributes["duration_seconds"])
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("expected timer.expired bus event")
+	}
+	events := broadcaster.Events()
+	if len(events) != 1 || len(events[0].DeviceIDs) != 1 || events[0].DeviceIDs[0] != "d1" {
+		t.Fatalf("broadcast events = %+v, want d1 timer done", events)
 	}
 }
 

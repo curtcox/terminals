@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
+	"github.com/curtcox/terminals/terminal_server/internal/storage"
 )
 
 // ErrNoMatchingScenario indicates no scenario handled the trigger.
@@ -477,11 +478,25 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 		return 0, nil
 	}
 
-	due := r.Env.Scheduler.Due(now.UnixMilli())
+	dueRecords := []storage.ScheduleRecord{}
+	if structured, ok := r.Env.Scheduler.(interface {
+		DueRecords(int64) []storage.ScheduleRecord
+	}); ok {
+		dueRecords = structured.DueRecords(now.UnixMilli())
+	} else {
+		for _, key := range r.Env.Scheduler.Due(now.UnixMilli()) {
+			dueRecords = append(dueRecords, storage.ScheduleRecord{
+				Key:    key,
+				Kind:   scheduleKindFromKey(key),
+				UnixMS: now.UnixMilli(),
+			})
+		}
+	}
+
 	processed := 0
-	for _, key := range due {
-		if strings.HasPrefix(key, "timer:") {
-			meta := parseTimerScheduleKey(key)
+	for _, record := range dueRecords {
+		if record.Kind == "timer" || strings.HasPrefix(record.Key, "timer:") {
+			meta := timerMetadataFromScheduleRecord(record)
 			if r.Env.Broadcast != nil {
 				deviceIDs := []string{}
 				if meta.DeviceID != "" {
@@ -515,12 +530,50 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 				})
 			}
 		}
-		if err := r.Env.Scheduler.Remove(ctx, key); err != nil {
+		if err := r.Env.Scheduler.Remove(ctx, record.Key); err != nil {
 			return processed, err
 		}
 		processed++
 	}
 	return processed, nil
+}
+
+func scheduleKindFromKey(key string) string {
+	if prefix, _, ok := strings.Cut(key, ":"); ok {
+		return prefix
+	}
+	return ""
+}
+
+func timerMetadataFromScheduleRecord(record storage.ScheduleRecord) timerScheduleMetadata {
+	if record.Kind != "timer" && strings.HasPrefix(record.Key, "timer:") {
+		return parseTimerScheduleKey(record.Key)
+	}
+	legacy := timerScheduleMetadata{}
+	if strings.HasPrefix(record.Key, "timer:") {
+		legacy = parseTimerScheduleKey(record.Key)
+	}
+	meta := timerScheduleMetadata{
+		DeviceID:   strings.TrimSpace(record.DeviceID),
+		FireUnixMS: record.UnixMS,
+		Label:      strings.TrimSpace(record.Subject),
+	}
+	if meta.Label == "" {
+		meta.Label = "timer"
+	}
+	if raw := strings.TrimSpace(record.Payload["duration_seconds"]); raw != "" {
+		meta.DurationSeconds, _ = strconv.Atoi(raw)
+	}
+	if legacy.DeviceID != "" {
+		meta.DeviceID = legacy.DeviceID
+	}
+	if meta.DurationSeconds == 0 {
+		meta.DurationSeconds = legacy.DurationSeconds
+	}
+	if meta.Label == "timer" && legacy.Label != "" {
+		meta.Label = legacy.Label
+	}
+	return meta
 }
 
 func targetDevices(ctx context.Context, env *Environment, trigger Trigger) []string {
