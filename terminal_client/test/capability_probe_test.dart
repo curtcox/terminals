@@ -98,8 +98,13 @@ void main() {
     expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
     expect(capabilities.microphone.channels, 0);
     expect(capabilities.microphone.endpoints.first.channels, 0);
+    expect(
+        capabilities.microphone.endpoints.first.hasConnectionType(), isFalse);
     expect(capabilities.speakers.channels, 0);
     expect(capabilities.speakers.endpoints.first.channels, 0);
+    expect(capabilities.speakers.endpoints.first.hasConnectionType(), isFalse);
+    expect(capabilities.camera.endpoints.first.hasConnectionType(), isFalse);
+    expect(capabilities.camera.endpoints.first.hasFacing(), isFalse);
     expect(capabilities.microphone.endpoints, isNotEmpty);
     expect(capabilities.camera.endpoints, isNotEmpty);
     expect(capabilities.speakers.endpoints, isNotEmpty);

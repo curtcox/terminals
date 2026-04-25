@@ -145,7 +145,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
             kind == 'audioinput' ? 'Microphone' : 'Speaker',
             fallbackIndex,
           )
-          ..connectionType = _connectionTypeForEndpoint(device.label)
           ..available = true,
       );
     }
@@ -173,8 +172,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
             'Camera',
             fallbackIndex,
           )
-          ..connectionType = _connectionTypeForEndpoint(device.label)
-          ..facing = _cameraFacingForLabel(device.label)
           ..available = true,
       );
     }
@@ -249,32 +246,4 @@ String _endpointLabelOrDefault(String label, String prefix, int index) {
     return trimmed;
   }
   return '$prefix $index';
-}
-
-String _connectionTypeForEndpoint(String label) {
-  final normalized = label.toLowerCase();
-  if (normalized.contains('bluetooth') || normalized.contains('bt')) {
-    return 'bluetooth';
-  }
-  if (normalized.contains('usb')) {
-    return 'usb';
-  }
-  if (normalized.contains('hdmi')) {
-    return 'hdmi';
-  }
-  if (normalized.contains('external')) {
-    return 'external';
-  }
-  return 'built_in';
-}
-
-String _cameraFacingForLabel(String label) {
-  final normalized = label.toLowerCase();
-  if (normalized.contains('back') || normalized.contains('rear')) {
-    return 'back';
-  }
-  if (normalized.contains('front')) {
-    return 'front';
-  }
-  return 'unknown';
 }
