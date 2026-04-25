@@ -27,6 +27,9 @@ void main() {
     expect(capabilities.hasSpeakers(), isFalse);
     expect(capabilities.hasHaptics(), isFalse);
     expect(capabilities.hasEdge(), isTrue);
+    expect(capabilities.hasTouch(), isFalse);
+    expect(capabilities.screen.hasTouch(), isFalse);
+    expect(capabilities.displays.first.screen.hasTouch(), isFalse);
     expect(capabilities.edge.hasRetention(), isFalse);
     expect(capabilities.screen.hasFullscreenSupported(), isFalse);
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);
@@ -83,9 +86,9 @@ void main() {
     expect(capabilities.hasCamera(), isTrue);
     expect(capabilities.hasSpeakers(), isTrue);
     expect(capabilities.hasHaptics(), isTrue);
-    expect(capabilities.hasTouch(), isTrue);
-    expect(capabilities.touch.supported, isTrue);
-    expect(capabilities.touch.hasMaxPoints(), isFalse);
+    expect(capabilities.hasTouch(), isFalse);
+    expect(capabilities.screen.hasTouch(), isFalse);
+    expect(capabilities.displays.first.screen.hasTouch(), isFalse);
     expect(capabilities.edge.hasRetention(), isFalse);
     expect(capabilities.screen.hasFullscreenSupported(), isFalse);
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);

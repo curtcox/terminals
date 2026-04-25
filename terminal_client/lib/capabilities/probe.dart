@@ -88,7 +88,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
         ..width = context.screenWidth
         ..height = context.screenHeight
         ..density = context.screenDensity
-        ..touch = context.touchInputLikely
         ..orientation = context.screenWidth >= context.screenHeight
             ? 'landscape'
             : 'portrait')
@@ -101,7 +100,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
             ..width = context.screenWidth
             ..height = context.screenHeight
             ..density = context.screenDensity
-            ..touch = context.touchInputLikely
             ..orientation = context.screenWidth >= context.screenHeight
                 ? 'landscape'
                 : 'portrait'),
@@ -113,9 +111,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     capabilities.pointer = (capv1.PointerCapability()
       ..type = context.touchInputLikely ? 'touch' : 'mouse'
       ..hover = !context.touchInputLikely);
-    if (context.touchInputLikely) {
-      capabilities.touch = (capv1.TouchCapability()..supported = true);
-    }
     if (hasAudioOutput) {
       final outputEndpoints =
           _audioEndpointsForKind(mediaDevices, 'audiooutput');

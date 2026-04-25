@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Removed heuristic touch declarations from capability probing so `touch.supported` and `screen.touch` are no longer advertised from platform guesses alone, and added regression assertions that touch fields stay omitted unless explicit probe evidence is available.
 - 2026-04-25: Expanded Stage 4 placement strict-filter regression coverage to camera, microphone, and speakers by asserting `RequiredCaps` excludes devices when those capability fields are missing or explicitly `false`, preserving capability-truthful targeting across media routes.
 - 2026-04-25: Removed synthetic default audio channel counts from client capability probing (`microphone.channels`, `speakers.channels`, and endpoint channel fields) so channel capacity is no longer advertised without verified measurement, and added probe regression assertions that those values remain unset/default unless explicitly probed.
 - 2026-04-25: Removed synthetic probe-only defaults for `screen.safe_area` zero insets and `touch.max_points=1` so capability probes now omit those fields unless runtime metadata can provide real values, and added probe regression assertions while preserving runtime snapshot safe-area coverage through display metadata wiring.
