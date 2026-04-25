@@ -685,13 +685,26 @@ void main() {
     },
   );
 
-  testWidgets('sends periodic sensor telemetry while connected', (
+  testWidgets('sends periodic sensor telemetry for declared signals only', (
     WidgetTester tester,
   ) async {
     final harness = _FakeClientHarness();
+    final capabilities = capv1.DeviceCapabilities()
+      ..screen = (capv1.ScreenCapability()
+        ..width = 1200
+        ..height = 800
+        ..density = 2.0
+        ..touch = false
+        ..orientation = 'landscape')
+      ..connectivity =
+          (capv1.ConnectivityCapability()..wifiSignalStrength = true)
+      ..battery = (capv1.BatteryCapability()
+        ..level = 0.75
+        ..charging = true);
     await tester.pumpWidget(
       TerminalClientApp(
         clientFactory: harness.createClient,
+        capabilityProbeFactory: () => _StaticCapabilityProbe(capabilities),
         mediaEngineFactory: harness.createMediaEngine,
         heartbeatInterval: const Duration(seconds: 60),
         sensorTelemetryInterval: const Duration(milliseconds: 40),
@@ -712,12 +725,52 @@ void main() {
     expect(
       sensorRequests.every((request) =>
           request.sensor.values.containsKey('connectivity.reconnect_attempt') &&
-          request.sensor.values.containsKey('time.utc_hour')),
+          request.sensor.values.containsKey('battery.level') &&
+          request.sensor.values.containsKey('battery.charging') &&
+          !request.sensor.values.containsKey('time.utc_hour') &&
+          !request.sensor.values.containsKey('time.utc_weekday') &&
+          !request.sensor.values.containsKey('time.utc_minute')),
       isTrue,
     );
     expect(find.textContaining('Sensor sends: '), findsOneWidget);
     expect(find.textContaining('Last sensor unix_ms: '), findsOneWidget);
     expect(find.textContaining('Stream-ready acks: 0'), findsOneWidget);
+  });
+
+  testWidgets('skips sensor telemetry without declared signal capabilities', (
+    WidgetTester tester,
+  ) async {
+    final harness = _FakeClientHarness();
+    final capabilities = capv1.DeviceCapabilities()
+      ..screen = (capv1.ScreenCapability()
+        ..width = 1200
+        ..height = 800
+        ..density = 2.0
+        ..touch = false
+        ..orientation = 'landscape');
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        capabilityProbeFactory: () => _StaticCapabilityProbe(capabilities),
+        mediaEngineFactory: harness.createMediaEngine,
+        heartbeatInterval: const Duration(seconds: 60),
+        sensorTelemetryInterval: const Duration(milliseconds: 40),
+      ),
+    );
+
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 140));
+
+    final sensorRequests = harness.lastClient.requests
+        .where((request) => request.hasSensor())
+        .toList();
+    expect(sensorRequests, isEmpty);
+    expect(find.textContaining('Sensor sends: 0'), findsOneWidget);
   });
 
   testWidgets('pauses heartbeat loop while app is backgrounded', (

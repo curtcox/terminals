@@ -16,6 +16,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 ## Incremental Progress
 
 - 2026-04-25: Added server placement regression coverage to lock Stage 4 behavior that missing or explicitly disabled capability fields are treated as unsupported when evaluating `RequiredCaps` filters.
+- 2026-04-25: Removed synthetic default connectivity declaration from client capability probing, and gated outbound sensor telemetry to emit only declared capability-backed signals (connectivity/battery), with widget coverage proving time-derived synthetic keys are no longer sent.
 
 ## Guiding Decisions
 

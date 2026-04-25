@@ -149,8 +149,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
       capabilities.camera = (capv1.CameraCapability()
         ..endpoints.addAll(_cameraEndpoints(mediaDevices)));
     }
-    capabilities.connectivity = capv1.ConnectivityCapability()
-      ..wifiSignalStrength = true;
     if (supportsHaptics) {
       capabilities.haptics = (capv1.HapticCapability()
         ..supported = true

@@ -2414,14 +2414,24 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return deduped;
   }
 
-  ConnectRequest _buildSensorTelemetryRequest() {
+  ConnectRequest? _buildSensorTelemetryRequest() {
+    final capabilities = _lastRegisteredCapabilities;
+    if (capabilities == null) {
+      return null;
+    }
     final now = DateTime.now().toUtc();
-    final values = <String, double>{
-      'connectivity.reconnect_attempt': _reconnectAttempt.toDouble(),
-      'time.utc_hour': now.hour.toDouble(),
-      'time.utc_weekday': now.weekday.toDouble(),
-      'time.utc_minute': now.minute.toDouble(),
-    };
+    final values = <String, double>{};
+    if (capabilities.hasConnectivity() &&
+        capabilities.connectivity.wifiSignalStrength) {
+      values['connectivity.reconnect_attempt'] = _reconnectAttempt.toDouble();
+    }
+    if (capabilities.hasBattery()) {
+      values['battery.level'] = capabilities.battery.level.toDouble();
+      values['battery.charging'] = capabilities.battery.charging ? 1.0 : 0.0;
+    }
+    if (values.isEmpty) {
+      return null;
+    }
     return ConnectRequest()
       ..sensor = (iov1.SensorData()
         ..deviceId = _deviceId
@@ -2434,6 +2444,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return;
     }
     final request = _buildSensorTelemetryRequest();
+    if (request == null) {
+      return;
+    }
     _lastSensorSnapshot
       ..clear()
       ..addAll(request.sensor.values);
