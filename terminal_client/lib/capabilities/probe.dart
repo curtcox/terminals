@@ -70,8 +70,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     final hasMicrophone = mediaKinds.contains('audioinput');
     final hasAudioOutput = mediaKinds.contains('audiooutput');
     final hasCamera = mediaKinds.contains('videoinput');
-    final hasKeyboard = _isLikelyKeyboardPlatform(context.targetPlatform);
-    final supportsHaptics = _supportsHaptics(context.targetPlatform);
     final monitoringTier = _monitoringSupportTierForPlatform(
       context.targetPlatform,
     );
@@ -103,9 +101,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
                 : 'portrait'),
       );
 
-    if (hasKeyboard) {
-      capabilities.keyboard = (capv1.KeyboardCapability()..physical = true);
-    }
     if (hasAudioOutput) {
       final outputEndpoints =
           _audioEndpointsForKind(mediaDevices, 'audiooutput');
@@ -120,12 +115,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     if (hasCamera) {
       capabilities.camera = (capv1.CameraCapability()
         ..endpoints.addAll(_cameraEndpoints(mediaDevices)));
-    }
-    if (supportsHaptics) {
-      capabilities.haptics = (capv1.HapticCapability()
-        ..supported = true
-        ..vibration = true
-        ..hapticsEngine = true);
     }
     capabilities.edge = (capv1.EdgeCapability()
       ..runtimes.addAll(<String>['dart'])
@@ -288,30 +277,4 @@ String _cameraFacingForLabel(String label) {
     return 'front';
   }
   return 'unknown';
-}
-
-bool _isLikelyKeyboardPlatform(TargetPlatform platform) {
-  switch (platform) {
-    case TargetPlatform.macOS:
-    case TargetPlatform.windows:
-    case TargetPlatform.linux:
-      return true;
-    case TargetPlatform.android:
-    case TargetPlatform.iOS:
-    case TargetPlatform.fuchsia:
-      return false;
-  }
-}
-
-bool _supportsHaptics(TargetPlatform platform) {
-  switch (platform) {
-    case TargetPlatform.android:
-    case TargetPlatform.iOS:
-      return true;
-    case TargetPlatform.macOS:
-    case TargetPlatform.windows:
-    case TargetPlatform.linux:
-    case TargetPlatform.fuchsia:
-      return false;
-  }
 }

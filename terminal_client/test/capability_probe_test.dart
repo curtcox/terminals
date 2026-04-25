@@ -25,6 +25,7 @@ void main() {
     expect(capabilities.hasCamera(), isFalse);
     expect(capabilities.hasSpeakers(), isFalse);
     expect(capabilities.hasHaptics(), isFalse);
+    expect(capabilities.hasKeyboard(), isFalse);
     expect(capabilities.hasEdge(), isTrue);
     expect(capabilities.hasPointer(), isFalse);
     expect(capabilities.hasTouch(), isFalse);
@@ -84,7 +85,8 @@ void main() {
     expect(capabilities.hasMicrophone(), isTrue);
     expect(capabilities.hasCamera(), isTrue);
     expect(capabilities.hasSpeakers(), isTrue);
-    expect(capabilities.hasHaptics(), isTrue);
+    expect(capabilities.hasHaptics(), isFalse);
+    expect(capabilities.hasKeyboard(), isFalse);
     expect(capabilities.hasPointer(), isFalse);
     expect(capabilities.hasTouch(), isFalse);
     expect(capabilities.screen.hasTouch(), isFalse);

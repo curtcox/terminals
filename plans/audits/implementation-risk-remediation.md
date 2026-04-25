@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Removed platform-heuristic keyboard (`keyboard.physical`) and haptics (`haptics.supported`/`vibration`/`haptics_engine`) declarations from client capability probing so those fields are omitted unless explicitly probed, and updated capability-probe regression assertions to lock both capabilities absent by default.
 - 2026-04-25: Removed synthetic pointer capability declarations derived from platform touch heuristics so `pointer.type`/`pointer.hover` are no longer advertised without explicit probe evidence, and added probe regression assertions that pointer remains omitted unless explicitly probed.
 - 2026-04-25: Removed heuristic touch declarations from capability probing so `touch.supported` and `screen.touch` are no longer advertised from platform guesses alone, and added regression assertions that touch fields stay omitted unless explicit probe evidence is available.
 - 2026-04-25: Expanded Stage 4 placement strict-filter regression coverage to camera, microphone, and speakers by asserting `RequiredCaps` excludes devices when those capability fields are missing or explicitly `false`, preserving capability-truthful targeting across media routes.
