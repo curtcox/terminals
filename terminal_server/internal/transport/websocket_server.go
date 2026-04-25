@@ -178,7 +178,7 @@ func (s *WebSocketServer) handshake(cfg *websocket.Config, req *http.Request) er
 		if trimmed == "" {
 			continue
 		}
-		if trimmed == "*" || strings.EqualFold(trimmed, origin) {
+		if strings.EqualFold(trimmed, origin) {
 			return nil
 		}
 	}

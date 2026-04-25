@@ -309,6 +309,20 @@ func TestLoadInvalidControlHTTPPort(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsWildcardControlWSAllowedOrigin(t *testing.T) {
+	t.Setenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS", "*")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for wildcard control websocket origin")
+	}
+}
+
+func TestLoadRejectsInvalidControlWSAllowedOrigin(t *testing.T) {
+	t.Setenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS", "not-an-origin")
+	if _, err := Load(); err == nil {
+		t.Fatalf("Load() expected error for malformed control websocket origin")
+	}
+}
+
 func TestLoadIntervals(t *testing.T) {
 	t.Setenv("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS", "45")
 	t.Setenv("TERMINALS_LIVENESS_RECONCILE_INTERVAL_SECONDS", "7")

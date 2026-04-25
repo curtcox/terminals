@@ -27,6 +27,9 @@ source .env
 |----------|---------|-------------|
 | `TERMINALS_GRPC_HOST` | `0.0.0.0` | gRPC listen address |
 | `TERMINALS_GRPC_PORT` | `50051` | gRPC listen port |
+| `TERMINALS_CONTROL_WS_HOST` | `0.0.0.0` | WebSocket control listener address |
+| `TERMINALS_CONTROL_WS_PORT` | `50054` | WebSocket control listener port |
+| `TERMINALS_CONTROL_WS_ALLOWED_ORIGINS` | *(empty)* | Comma-separated explicit origins allowed for cross-origin browser websocket upgrades. Wildcard `*` is rejected; same-origin and loopback-origin development flows are allowed without this setting. |
 | `TERMINALS_ADMIN_HTTP_HOST` | `0.0.0.0` | Admin dashboard listen address |
 | `TERMINALS_ADMIN_HTTP_PORT` | `50053` | Admin dashboard listen port |
 | `TERMINALS_MDNS_SERVICE` | `_terminals._tcp.local.` | mDNS service type for discovery |

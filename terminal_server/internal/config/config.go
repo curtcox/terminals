@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -171,6 +172,9 @@ func Load() (Config, error) {
 		cfg.ControlHTTPPort = v
 	}
 	if origins := parseCSVStrings(os.Getenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS")); len(origins) > 0 {
+		if err := validateControlWSAllowedOrigins(origins); err != nil {
+			return Config{}, err
+		}
 		cfg.ControlWSAllowedOrigins = origins
 	}
 	if v, ok, err := parseOptionalInt("TERMINALS_PHOTO_FRAME_HTTP_PORT"); err != nil {
@@ -327,6 +331,23 @@ func parseOptionalBool(env string) (bool, error) {
 		return false, fmt.Errorf("parse %s: %w", env, err)
 	}
 	return v, nil
+}
+
+func validateControlWSAllowedOrigins(origins []string) error {
+	for _, origin := range origins {
+		trimmed := strings.TrimSpace(origin)
+		if trimmed == "" {
+			continue
+		}
+		if trimmed == "*" {
+			return fmt.Errorf("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS does not support wildcard '*' entries")
+		}
+		parsed, err := url.Parse(trimmed)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return fmt.Errorf("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS contains invalid origin %q", trimmed)
+		}
+	}
+	return nil
 }
 
 func parseCSVStrings(raw string) []string {

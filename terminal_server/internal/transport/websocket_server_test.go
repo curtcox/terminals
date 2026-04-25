@@ -92,6 +92,32 @@ func TestWebSocketServerRejectsDisallowedOrigin(t *testing.T) {
 	}
 }
 
+func TestWebSocketServerDoesNotTreatWildcardAsAllowAll(t *testing.T) {
+	manager := device.NewManager()
+	control := NewControlService("srv-1", manager)
+	grpcServer := NewServer(mustAvailableTCPAddress(t))
+	grpcServer.ConfigureControl(control, GeneratedProtoAdapter{})
+	wsServer := NewWebSocketServer(mustAvailableTCPAddress(t), grpcServer, []string{"*"})
+
+	if err := wsServer.Start(context.Background()); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = wsServer.Stop(ctx)
+	})
+
+	endpoint := url.URL{Scheme: "ws", Host: wsServer.Address(), Path: wsServer.Path()}
+	config, err := websocket.NewConfig(endpoint.String(), "http://evil.example")
+	if err != nil {
+		t.Fatalf("websocket.NewConfig() error = %v", err)
+	}
+	if _, err := websocket.DialConfig(config); err == nil {
+		t.Fatalf("DialConfig() error = nil, want origin rejection")
+	}
+}
+
 func TestSameOriginHostAllowsDifferentPorts(t *testing.T) {
 	if !sameOriginHost("http://192.168.0.138:60739", "192.168.0.138:50054") {
 		t.Fatalf("sameOriginHost should allow same host with different ports")
