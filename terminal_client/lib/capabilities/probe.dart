@@ -157,12 +157,7 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     }
     capabilities.edge = (capv1.EdgeCapability()
       ..runtimes.addAll(<String>['dart'])
-      ..operators.addAll(monitoringTier.operators)
-      ..retention = (capv1.EdgeRetentionCapability()
-        ..audioSec = 120
-        ..videoSec = 120
-        ..sensorSec = 600
-        ..radioSec = 0));
+      ..operators.addAll(monitoringTier.operators));
 
     return capabilities;
   }

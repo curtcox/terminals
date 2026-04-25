@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Removed synthetic default edge-retention capability declaration from the client capability probe so retention windows are no longer advertised without verified platform-backed evidence, and added probe unit assertions that edge retention remains omitted while real runtime/operators metadata is still emitted.
 - 2026-04-25: Hardened Stage 2 websocket origin policy to enforce explicit allow-list entries only (rejecting wildcard `*`), added config and transport regression coverage, and documented dev-time same-origin/loopback behavior for `TERMINALS_CONTROL_WS_ALLOWED_ORIGINS`.
 - 2026-04-25: Added deterministic video-surface stream state (`Waiting for media` / `Attached`) backed by the media engine attach signal so start/stop transitions are directly observable in widget tests.
 - 2026-04-25: Split explicit user-alert delivery from in-app status text handling so `ConnectResponse.notification` now routes through a dedicated alert callback while `command_result.notification` remains status-only; added deterministic widget coverage for both paths.
