@@ -5058,6 +5058,35 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                     streamListenable: _mediaEngine.remoteStream(streamID),
                   ),
                 ),
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: _mediaEngine.streamAttached(streamID),
+                    builder: (context, attached, _) {
+                      return Container(
+                        key: ValueKey<String>(
+                          'ui-video-surface-state-$componentId',
+                        ),
+                        margin: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          attached ? 'Attached' : 'Waiting for media',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
                 if (streamID.isNotEmpty)
                   Align(
                     alignment: Alignment.bottomRight,

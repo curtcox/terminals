@@ -2786,9 +2786,81 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('track-a'), findsOneWidget);
+    expect(find.text('Waiting for media'), findsOneWidget);
     expect(find.text('Fullscreen body'), findsOneWidget);
     expect(find.text('Awake body'), findsOneWidget);
     expect(find.text('Brightness body'), findsOneWidget);
+  });
+
+  testWidgets('video surface stream state toggles on start and stop stream',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'camera_a'
+                ..videoSurface =
+                    (uiv1.VideoSurfaceWidget()..trackId = 'stream-a'),
+            ))),
+    );
+    await tester.pump();
+
+    final stateFinder = find.byKey(
+      const ValueKey<String>('ui-video-surface-state-camera_a'),
+    );
+    expect(stateFinder, findsOneWidget);
+    expect(find.descendant(of: stateFinder, matching: find.text('Attached')),
+        findsNothing);
+    expect(
+      find.descendant(
+        of: stateFinder,
+        matching: find.text('Waiting for media'),
+      ),
+      findsOneWidget,
+    );
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..startStream = (iov1.StartStream()
+          ..streamId = 'stream-a'
+          ..kind = 'video'
+          ..sourceDeviceId = 'device-1'
+          ..targetDeviceId = 'device-2'),
+    );
+    await tester.pump();
+
+    expect(find.descendant(of: stateFinder, matching: find.text('Attached')),
+        findsOneWidget);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..stopStream = (iov1.StopStream()..streamId = 'stream-a'),
+    );
+    await tester.pump();
+
+    expect(find.descendant(of: stateFinder, matching: find.text('Attached')),
+        findsNothing);
+    expect(
+      find.descendant(
+        of: stateFinder,
+        matching: find.text('Waiting for media'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -3746,6 +3818,8 @@ class _FakeMediaEngine implements ClientMediaEngine {
   final List<String> stopStreamCalls = <String>[];
   final Map<String, ValueNotifier<MediaStream?>> _remoteStreamsByID =
       <String, ValueNotifier<MediaStream?>>{};
+  final Map<String, ValueNotifier<bool>> _streamAttachedByID =
+      <String, ValueNotifier<bool>>{};
   final Map<String, ValueNotifier<double>> _audioLevelsByID =
       <String, ValueNotifier<double>>{};
 
@@ -3759,6 +3833,12 @@ class _FakeMediaEngine implements ClientMediaEngine {
       start.streamId,
       () => ValueNotifier<MediaStream?>(null),
     );
+    _streamAttachedByID
+        .putIfAbsent(
+          start.streamId,
+          () => ValueNotifier<bool>(false),
+        )
+        .value = true;
     _audioLevelsByID.putIfAbsent(
       start.streamId,
       () => ValueNotifier<double>(0.5),
@@ -3791,6 +3871,12 @@ class _FakeMediaEngine implements ClientMediaEngine {
           () => ValueNotifier<MediaStream?>(null),
         )
         .value = null;
+    _streamAttachedByID
+        .putIfAbsent(
+          streamID,
+          () => ValueNotifier<bool>(false),
+        )
+        .value = false;
     _audioLevelsByID
         .putIfAbsent(
           streamID,
@@ -3826,6 +3912,14 @@ class _FakeMediaEngine implements ClientMediaEngine {
     return _remoteStreamsByID.putIfAbsent(
       streamID,
       () => ValueNotifier<MediaStream?>(null),
+    );
+  }
+
+  @override
+  ValueListenable<bool> streamAttached(String streamID) {
+    return _streamAttachedByID.putIfAbsent(
+      streamID,
+      () => ValueNotifier<bool>(false),
     );
   }
 

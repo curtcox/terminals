@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Added deterministic video-surface stream state (`Waiting for media` / `Attached`) backed by the media engine attach signal so start/stop transitions are directly observable in widget tests.
 - 2026-04-25: Split explicit user-alert delivery from in-app status text handling so `ConnectResponse.notification` now routes through a dedicated alert callback while `command_result.notification` remains status-only; added deterministic widget coverage for both paths.
 - 2026-04-25: Hardened Stage 5 playback handling with deterministic unit coverage for `PlayAudio` source routing (`url`, `pcm_data`, `tts_text`), including WAV wrapping for raw PCM and trimmed TTS dispatch behavior.
 - 2026-04-25: Added deterministic runtime permission-denied handling coverage for local media starts by injecting media permission probes in the client and asserting denied starts set a stable status/notification without emitting local offers.
