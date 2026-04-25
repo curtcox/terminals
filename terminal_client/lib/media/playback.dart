@@ -9,6 +9,11 @@ abstract class AudioPlayback {
   Future<void> dispose();
 }
 
+typedef SpeechOutput = void Function(String text);
+typedef StopPlayback = Future<void> Function();
+typedef PlaySource = Future<void> Function(Source source);
+typedef DisposePlayback = Future<void> Function();
+
 class NoopAudioPlayback implements AudioPlayback {
   @override
   Future<void> play(iov1.PlayAudio playAudio) async {}
@@ -18,9 +23,43 @@ class NoopAudioPlayback implements AudioPlayback {
 }
 
 class AudioPlayerPlayback implements AudioPlayback {
-  AudioPlayerPlayback() : _player = AudioPlayer();
+  AudioPlayerPlayback({
+    SpeechOutput? speechOutput,
+    StopPlayback? stopPlayback,
+    PlaySource? playSource,
+    DisposePlayback? disposePlayback,
+  })  : _speechOutput = speechOutput ?? speech.speakText,
+        _stopPlayback = stopPlayback,
+        _playSource = playSource,
+        _disposePlayback = disposePlayback;
 
-  final AudioPlayer _player;
+  AudioPlayer? _player;
+  final SpeechOutput _speechOutput;
+  final StopPlayback? _stopPlayback;
+  final PlaySource? _playSource;
+  final DisposePlayback? _disposePlayback;
+
+  AudioPlayer _resolvedPlayer() {
+    return _player ??= AudioPlayer();
+  }
+
+  Future<void> _stop() async {
+    final stopPlayback = _stopPlayback;
+    if (stopPlayback != null) {
+      await stopPlayback();
+      return;
+    }
+    await _resolvedPlayer().stop();
+  }
+
+  Future<void> _play(Source source) async {
+    final playSource = _playSource;
+    if (playSource != null) {
+      await playSource(source);
+      return;
+    }
+    await _resolvedPlayer().play(source);
+  }
 
   @override
   Future<void> play(iov1.PlayAudio playAudio) async {
@@ -28,8 +67,8 @@ class AudioPlayerPlayback implements AudioPlayback {
       case iov1.PlayAudio_Source.url:
         final url = playAudio.url.trim();
         if (url.isNotEmpty) {
-          await _player.stop();
-          await _player.play(UrlSource(url));
+          await _stop();
+          await _play(UrlSource(url));
         }
         return;
       case iov1.PlayAudio_Source.pcmData:
@@ -44,13 +83,13 @@ class AudioPlayerPlayback implements AudioPlayback {
                 sampleRate: _sampleRateFromFormat(format),
                 channels: _channelsFromFormat(format),
               );
-        await _player.stop();
-        await _player.play(BytesSource(payload));
+        await _stop();
+        await _play(BytesSource(payload));
         return;
       case iov1.PlayAudio_Source.ttsText:
         final text = playAudio.ttsText.trim();
         if (text.isNotEmpty) {
-          speech.speakText(text);
+          _speechOutput(text);
         }
         return;
       case iov1.PlayAudio_Source.notSet:
@@ -60,7 +99,15 @@ class AudioPlayerPlayback implements AudioPlayback {
 
   @override
   Future<void> dispose() async {
-    await _player.dispose();
+    final disposePlayback = _disposePlayback;
+    if (disposePlayback != null) {
+      await disposePlayback();
+      return;
+    }
+    final player = _player;
+    if (player != null) {
+      await player.dispose();
+    }
   }
 }
 
