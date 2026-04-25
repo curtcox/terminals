@@ -428,6 +428,8 @@ void main() {
       expect(screen.height, expectedHeight);
       expect(screen.orientation, expectedOrientation);
       expect(screen.density, expectedDensity);
+      expect(screen.hasFullscreenSupported(), isFalse);
+      expect(screen.hasMultiWindowSupported(), isFalse);
       expect(screen.hasSafeArea(), isTrue);
       expect(screen.safeArea.left, expectedSafeArea.left.round());
       expect(screen.safeArea.top, expectedSafeArea.top.round());

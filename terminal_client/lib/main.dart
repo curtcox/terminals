@@ -1395,8 +1395,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ..height = size.height.round()
       ..density = dpr
       ..orientation = orientation
-      ..fullscreenSupported = true
-      ..multiWindowSupported = true
       ..safeArea = (screen.hasSafeArea() ? screen.safeArea : capv1.Insets())
       ..safeArea.left = safeAreaInsets.left.round()
       ..safeArea.top = safeAreaInsets.top.round()

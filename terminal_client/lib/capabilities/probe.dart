@@ -92,8 +92,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
         ..orientation = context.screenWidth >= context.screenHeight
             ? 'landscape'
             : 'portrait'
-        ..fullscreenSupported = true
-        ..multiWindowSupported = true
         ..safeArea = (capv1.Insets()
           ..left = 0
           ..top = 0
@@ -112,8 +110,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
             ..orientation = context.screenWidth >= context.screenHeight
                 ? 'landscape'
                 : 'portrait'
-            ..fullscreenSupported = true
-            ..multiWindowSupported = true
             ..safeArea = (capv1.Insets()
               ..left = 0
               ..top = 0
