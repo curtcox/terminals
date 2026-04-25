@@ -158,6 +158,59 @@ func TestFindRequiredCapsFalseValuesAreUnsupported(t *testing.T) {
 	}
 }
 
+func TestFindRequiredCapsMissingAndFalseValuesAreUnsupportedAcrossMediaCaps(t *testing.T) {
+	testCases := []struct {
+		name           string
+		requiredCap    string
+		availableField string
+	}{
+		{
+			name:           "camera",
+			requiredCap:    "camera",
+			availableField: "camera.front",
+		},
+		{
+			name:           "microphone",
+			requiredCap:    "microphone",
+			availableField: "microphone.endpoint.main",
+		},
+		{
+			name:           "speakers",
+			requiredCap:    "speakers",
+			availableField: "speakers.endpoint.main",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			devices := device.NewManager()
+			_, _ = devices.Register(device.Manifest{
+				DeviceID:     tc.name + "-available",
+				Capabilities: device.CapabilitySet{tc.availableField: "true"},
+			})
+			_, _ = devices.Register(device.Manifest{
+				DeviceID:     tc.name + "-absent",
+				Capabilities: device.CapabilitySet{"screen.width": "1024"},
+			})
+			_, _ = devices.Register(device.Manifest{
+				DeviceID:     tc.name + "-false",
+				Capabilities: device.CapabilitySet{tc.requiredCap: "false"},
+			})
+
+			engine := NewManagerBackedEngine(devices)
+			got, err := engine.Find(context.Background(), scenario.PlacementQuery{
+				RequiredCaps: []string{tc.requiredCap},
+			})
+			if err != nil {
+				t.Fatalf("Find(%s) error = %v", tc.requiredCap, err)
+			}
+			if len(got) != 1 || got[0].DeviceID != tc.name+"-available" {
+				t.Fatalf("Find(%s) = %+v, want [%s-available]", tc.requiredCap, got, tc.name)
+			}
+		})
+	}
+}
+
 func TestFindBackgroundRoleSkipsForegroundOnlyDevices(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{
