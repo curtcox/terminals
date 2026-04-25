@@ -37,15 +37,7 @@ void main() {
     expect(capabilities.screen.hasSafeArea(), isFalse);
     expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
     expect(capabilities.edge.runtimes, contains('dart'));
-    expect(capabilities.edge.operators, contains('monitor.foreground_only'));
-    expect(
-      capabilities.edge.operators,
-      contains('monitor.tier.foreground_only'),
-    );
-    expect(
-      capabilities.edge.operators,
-      contains('monitor.lifecycle.foreground'),
-    );
+    expect(capabilities.edge.operators, isEmpty);
   });
 
   test('probe includes media capabilities when devices are detected', () async {

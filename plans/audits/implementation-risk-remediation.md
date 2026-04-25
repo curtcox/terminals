@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Removed platform-heuristic monitoring operator declarations (`monitor.foreground_only`, `monitor.tier.foreground_only`, and default lifecycle operator) from client capability probing so `edge.operators` remains omitted/empty unless explicitly sourced elsewhere, and updated probe regression assertions to lock the default omission.
 - 2026-04-25: Removed label-derived endpoint heuristics from client capability probing so `audio_endpoint.connection_type`, `camera_endpoint.connection_type`, and `camera_endpoint.facing` are omitted unless explicitly probed, and added regression assertions to keep those fields absent by default.
 - 2026-04-25: Removed platform-heuristic keyboard (`keyboard.physical`) and haptics (`haptics.supported`/`vibration`/`haptics_engine`) declarations from client capability probing so those fields are omitted unless explicitly probed, and updated capability-probe regression assertions to lock both capabilities absent by default.
 - 2026-04-25: Removed synthetic pointer capability declarations derived from platform touch heuristics so `pointer.type`/`pointer.hover` are no longer advertised without explicit probe evidence, and added probe regression assertions that pointer remains omitted unless explicitly probed.
