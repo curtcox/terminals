@@ -98,6 +98,66 @@ func TestFindRequiredCaps(t *testing.T) {
 	}
 }
 
+func TestFindRequiredCapsMissingFieldIsUnsupported(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{
+		DeviceID:     "camera-available",
+		Capabilities: device.CapabilitySet{"camera.front": "true"},
+	})
+	_, _ = devices.Register(device.Manifest{
+		DeviceID:     "camera-absent",
+		Capabilities: device.CapabilitySet{"screen.width": "1024"},
+	})
+
+	engine := NewManagerBackedEngine(devices)
+	got, err := engine.Find(context.Background(), scenario.PlacementQuery{
+		RequiredCaps: []string{"camera"},
+	})
+	if err != nil {
+		t.Fatalf("Find(camera) error = %v", err)
+	}
+	if len(got) != 1 || got[0].DeviceID != "camera-available" {
+		t.Fatalf("Find(camera) = %+v, want [camera-available]", got)
+	}
+}
+
+func TestFindRequiredCapsFalseValuesAreUnsupported(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{
+		DeviceID:     "camera-true",
+		Capabilities: device.CapabilitySet{"camera.front": "true"},
+	})
+	_, _ = devices.Register(device.Manifest{
+		DeviceID: "camera-false",
+		Capabilities: device.CapabilitySet{
+			"camera": "false",
+		},
+	})
+	_, _ = devices.Register(device.Manifest{
+		DeviceID: "camera-zero",
+		Capabilities: device.CapabilitySet{
+			"camera": "0",
+		},
+	})
+	_, _ = devices.Register(device.Manifest{
+		DeviceID: "camera-off",
+		Capabilities: device.CapabilitySet{
+			"camera": "off",
+		},
+	})
+
+	engine := NewManagerBackedEngine(devices)
+	got, err := engine.Find(context.Background(), scenario.PlacementQuery{
+		RequiredCaps: []string{"camera"},
+	})
+	if err != nil {
+		t.Fatalf("Find(camera) error = %v", err)
+	}
+	if len(got) != 1 || got[0].DeviceID != "camera-true" {
+		t.Fatalf("Find(camera) = %+v, want [camera-true]", got)
+	}
+}
+
 func TestFindBackgroundRoleSkipsForegroundOnlyDevices(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{

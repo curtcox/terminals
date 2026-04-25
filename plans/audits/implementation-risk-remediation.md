@@ -2,7 +2,7 @@
 title: "Implementation Risk Remediation Plan"
 kind: plan
 status: building
-owner: unowned
+owner: cascade
 validation: none
 last-reviewed: 2026-04-25
 ---
@@ -12,6 +12,10 @@ last-reviewed: 2026-04-25
 Addresses the findings in [implementation-risk-audit.md](implementation-risk-audit.md). Executed strictly serially — each stage must meet its acceptance criteria before the next begins. Adds a dual-transport server (gRPC for native, WebSocket for web) so the browser client stops depending on raw gRPC sockets.
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
+
+## Incremental Progress
+
+- 2026-04-25: Added server placement regression coverage to lock Stage 4 behavior that missing or explicitly disabled capability fields are treated as unsupported when evaluating `RequiredCaps` filters.
 
 ## Guiding Decisions
 
