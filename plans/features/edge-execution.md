@@ -1,5 +1,14 @@
+---
+title: "Edge Execution and Operator Runtime"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Edge Execution and Operator Runtime
-See [masterplan.md](../masterplan.md) for overall system context. The server still owns behavior. This plan adds a **generic operator runtime** to capable clients so expensive perception work can run at the edge when appropriate.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. The server still owns behavior. This plan adds a **generic operator runtime** to capable clients so expensive perception work can run at the edge when appropriate.
 
 ## Design Principle
 Scenario logic stays on the server. Clients do **not** gain scenario-specific behavior. Instead, a client may advertise that it can host generic operators chosen by the server.

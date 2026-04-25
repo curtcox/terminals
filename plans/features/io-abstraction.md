@@ -1,6 +1,15 @@
+---
+title: "IO Abstraction Layer"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # IO Abstraction Layer
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 Every IO capability maps to a uniform interface on both client and server.
 

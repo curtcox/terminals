@@ -1,6 +1,15 @@
+---
+title: "Capability Lifecycle and Dynamic Terminal Capabilities"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Capability Lifecycle and Dynamic Terminal Capabilities
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 The system already assumes thin clients report capabilities and the server owns all behavior. This plan makes that contract explicit and dynamic: every terminal declares a typed capability manifest on initial connection, and publishes capability-change events whenever its usable IO surface changes.
 

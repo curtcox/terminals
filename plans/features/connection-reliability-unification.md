@@ -1,3 +1,12 @@
+---
+title: "Connection Reliability Unification Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Connection Reliability Unification Plan
 
 ## Goal

@@ -1,6 +1,15 @@
+---
+title: "Package Format"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Package Format
 
-See [masterplan.md](masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 Extends [application-runtime.md](application-runtime.md) (on-disk
 package layout). Referenced by
 [application-distribution.md](application-distribution.md) (how

@@ -1,15 +1,24 @@
+---
+title: "REPL Capability Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # REPL Capability Plan
 
-See [masterplan.md](../masterplan.md) for overall system context.
-Extends [repl-and-shell.md](repl-and-shell.md) (base REPL) and
-[application-runtime.md](application-runtime.md) (TAR/TAL runtime).
+See [masterplan.md](../../../masterplan.md) for overall system context.
+Extends [repl-and-shell.md](../repl-and-shell.md) (base REPL) and
+[application-runtime.md](../application-runtime.md) (TAR/TAL runtime).
 Supersedes the earlier `repl-authoring-capabilities.md` and
 `Capability-plans.md` by merging their content into a single plan.
 
 This document is the umbrella plan for closing the REPL and
 runtime's capability surface against
-[usecases.md](../usecases.md) and
-[plato_inspired_usecases.md](plato_inspired_usecases.md).
+[usecases.md](../../../usecases.md) and
+[plato_inspired_usecases.md](../plato-inspired-usecases.md).
 Detailed designs live in the per-family plans listed under
 **Component Plans** below; this document owns the overall shape,
 layering, acceptance rules, and authoring substrate.
@@ -174,7 +183,7 @@ A `descriptor-expr` is a small literal form over the closed UI
 primitive set — no new primitives, only a typed way to compose them
 from text. `ui transition` is the authoring form of the existing
 `TransitionUI` primitive from
-[server-driven-ui.md](server-driven-ui.md). Authored views are
+[server-driven-ui.md](../server-driven-ui.md). Authored views are
 first-class records: `ui push` either publishes inline or binds to
 a named view-id, and `ui views ls/show/rm` lets operators inventory
 and remove REPL-authored views (satisfies the G10 listability
@@ -300,7 +309,7 @@ semantics. CI invokes the REPL this way for use-case validation.
 All of these sit under the existing REPL command-registry pipeline
 (classification, approval, streaming dispatch) and are equally
 available to MCP origins per
-[agent-delegation.md](agent-delegation.md).
+[agent-delegation.md](../agent-delegation.md).
 
 ### Substrate Worked Example — Red-Alert Broadcast Without Go Changes
 
@@ -335,12 +344,12 @@ sim).
 
 | Family | Component plan | TAL module | Service | REPL groups |
 |---|---|---|---|---|
-| Identity, groups, audiences, ack state | [identity-and-audience.md](identity-and-audience.md) | `identity` | `IdentityService` | `identity` |
-| Generalized interactive sessions | [collab-sessions.md](collab-sessions.md) | `session` | `InteractiveSessionService` | `session` |
-| Rooms, DMs, boards, bulletins, threads | [messaging-and-boards.md](messaging-and-boards.md) | `message` | `MessagingService` | `message`, `board` |
-| Durable shared artifacts, canvases, annotations | [shared-artifacts.md](shared-artifacts.md) | `artifact` | `ArtifactService` | `artifact`, `canvas` |
-| Unified search, timeline, household memory | [search-and-memory.md](search-and-memory.md) | `search`, `memory` | `SearchService`, `MemoryService` | `search`, `memory` |
-| Bug reporting and diagnostics | [bug-reporting.md](bug-reporting.md) | `bug` | `BugReportService` | `bug` |
+| Identity, groups, audiences, ack state | [identity-and-audience.md](../identity-and-audience.md) | `identity` | `IdentityService` | `identity` |
+| Generalized interactive sessions | [collab-sessions.md](../collab-sessions.md) | `session` | `InteractiveSessionService` | `session` |
+| Rooms, DMs, boards, bulletins, threads | [messaging-and-boards.md](../messaging-and-boards.md) | `message` | `MessagingService` | `message`, `board` |
+| Durable shared artifacts, canvases, annotations | [shared-artifacts.md](../shared-artifacts.md) | `artifact` | `ArtifactService` | `artifact`, `canvas` |
+| Unified search, timeline, household memory | [search-and-memory.md](../search-and-memory.md) | `search`, `memory` | `SearchService`, `MemoryService` | `search`, `memory` |
+| Bug reporting and diagnostics | [bug-reporting.md](../bug-reporting.md) | `bug` | `BugReportService` | `bug` |
 
 #### Acknowledgement ownership
 
@@ -355,10 +364,10 @@ flows — are thin helpers that delegate to
 `IdentityService.GetAcknowledgements` and expose convenience
 filters on top. Ack semantics (modes `seen`/`read`/`heard`/
 `dismissed`/`confirmed`, audience resolution, durability) are
-defined once in [identity-and-audience.md](identity-and-audience.md).
+defined once in [identity-and-audience.md](../identity-and-audience.md).
 Actor references are a discriminated union over
 `person`/`device`/`agent`/`anonymous` kinds (full definition in
-[identity-and-audience.md](identity-and-audience.md)); this plan
+[identity-and-audience.md](../identity-and-audience.md)); this plan
 relies on that union so that kiosk taps, automated-agent acks, and
 off-device SIP/webhook acks all land through the same typed path.
 This resolves the boundary blur between identity and messaging.
@@ -367,16 +376,16 @@ This resolves the boundary blur between identity and messaging.
 
 `timeline`, `related`, and `recent` are subcommands of `search`
 (e.g., `search timeline --since 24h`), not top-level REPL groups.
-If [search-and-memory.md](search-and-memory.md) examples imply a
+If [search-and-memory.md](../search-and-memory.md) examples imply a
 top-level `timeline` group, read them as `search timeline` for the
 purposes of this umbrella.
 
 Revised base documents that Layer 2 touches directly:
 
-- [application-runtime.md](application-runtime.md) — adds the
+- [application-runtime.md](../application-runtime.md) — adds the
   `identity`, `session`, `message`, `artifact`, `search`, `memory`
   TAL host modules and their permission model.
-- [repl-and-shell.md](repl-and-shell.md) — adds the corresponding
+- [repl-and-shell.md](../repl-and-shell.md) — adds the corresponding
   REPL groups alongside the existing
   `devices`/`activations`/`claims`/`ui`/`flow`/`observe`/`presence`/
   `world`/`scheduler`/`app`/`logs`/`telephony`/`ai`/`docs` set.
@@ -395,7 +404,7 @@ Revised base documents that Layer 2 touches directly:
 | Shared canvas / symbols | artifact, session, ui | artifact, canvas, session | Layer 2 (new) |
 | Multiplayer games | session, identity, artifact or store | session, identity, artifact | Layer 2 (new) |
 | Household knowledge / memory | search, memory, message, artifact | search, memory, board, artifact | Layer 2 (new) |
-| Bug reporting and diagnostics (B1–B5) | bug, identity, observe | bug, identity, observe | Layer 2 (new, via [bug-reporting.md](bug-reporting.md)) |
+| Bug reporting and diagnostics (B1–B5) | bug, identity, observe | bug, identity, observe | Layer 2 (new, via [bug-reporting.md](../bug-reporting.md)) |
 
 #### Out-of-scope use cases
 
@@ -406,15 +415,15 @@ authoritative home is elsewhere in the masterplan:
 
 - **I1, I2, I3, I11** — device discovery, connection lifecycle,
   capability handshake, reconnect/restore. Covered by
-  [discovery.md](discovery.md), [protocol.md](protocol.md), and
-  [transport-multiplexing.md](transport-multiplexing.md), not by
+  [discovery.md](../discovery.md), [protocol.md](../protocol.md), and
+  [transport-multiplexing.md](../transport-multiplexing.md), not by
   typed scenario capabilities.
 - **I8** — CI / `make all-check` build-quality gate. Covered by
-  [ci.md](ci.md); the REPL `scripts` + `sim` surfaces are
+  [ci.md](../ci.md); the REPL `scripts` + `sim` surfaces are
   *consumed* by CI but do not replace the repo-wide quality gate.
 - **I9** — developer tooling and documentation conventions.
-  Covered by [../CLAUDE.md](../CLAUDE.md) (project-wide agent and
-  contributor rules) and [agent-config.md](agent-config.md)
+  Covered by [../CLAUDE.md](../../../CLAUDE.md) (project-wide agent and
+  contributor rules) and [agent-config.md](../agent-config.md)
   (agent-facing configuration conventions). No typed runtime
   service maps to it.
 
@@ -446,27 +455,27 @@ the typed service.
 
 ## Interactions With Existing Plans
 
-- **[scenario-engine.md](scenario-engine.md)** — `scenarios define`
+- **[scenario-engine.md](../scenario-engine.md)** — `scenarios define`
   is an additional factory path into the existing engine.
   Runtime-defined scenarios use the same
   `ScenarioDefinition`/`ScenarioActivation` interfaces; they are
   not a parallel lifecycle. `Start/Stop/Suspend/Resume` still go
   through the engine's supervisor.
-- **[application-runtime.md](application-runtime.md)** — TAR/TAL
+- **[application-runtime.md](../application-runtime.md)** — TAR/TAL
   remains the authoring path for durable applications. Inline
   `scenarios define` is the cheap prototyping path; graduation to
   a TAR package is a copy-out, not a rewrite, because both targets
   use the same typed service surface.
-- **[server-driven-ui.md](server-driven-ui.md)** — `ui push/patch/
+- **[server-driven-ui.md](../server-driven-ui.md)** — `ui push/patch/
   broadcast` adds no new primitives. The closed UI contract is
   unchanged; what changes is who can compose primitives (now: the
   REPL, not only hand-written Go).
-- **[repl-and-shell.md](repl-and-shell.md)** — this document adds
+- **[repl-and-shell.md](../repl-and-shell.md)** — this document adds
   command groups alongside the existing set. Classification
   metadata, approval pipeline, streaming dispatch, and AI tool-use
   mediation all apply to the new groups exactly as to the existing
   ones.
-- **[agent-delegation.md](agent-delegation.md)** — every new
+- **[agent-delegation.md](../agent-delegation.md)** — every new
   command is usable from MCP origins with the same approval model.
 
 ## Acceptance Criteria
@@ -475,8 +484,8 @@ the typed service.
   input, log, fan-out, retention — using only REPL commands,
   without Go recompilation, and without new UI primitives.
 - Every **application/scenario** use case in
-  [usecases.md](../usecases.md) and
-  [plato_inspired_usecases.md](plato_inspired_usecases.md) maps
+  [usecases.md](../../../usecases.md) and
+  [plato_inspired_usecases.md](../plato-inspired-usecases.md) maps
   cleanly to REPL-visible typed capabilities. Infrastructure,
   protocol, and developer-tooling use cases (see
   §"Out-of-scope use cases" above) are explicitly excluded from
@@ -555,33 +564,33 @@ agent-driven test surface (AA6).
 ### Phase 6 — Identity and audience
 
 `IdentityService`, TAL `identity` module, REPL `identity` group.
-See [identity-and-audience.md](identity-and-audience.md).
+See [identity-and-audience.md](../identity-and-audience.md).
 
 ### Phase 7 — Generalized sessions
 
 `InteractiveSessionService`, TAL `session` module, REPL `session`
-group. See [collab-sessions.md](collab-sessions.md).
+group. See [collab-sessions.md](../collab-sessions.md).
 
 ### Phase 8 — Messaging and boards
 
 `MessagingService`, TAL `message` module, REPL `message` and `board`
 groups. Canonical chat recipe ships here. See
-[messaging-and-boards.md](messaging-and-boards.md).
+[messaging-and-boards.md](../messaging-and-boards.md).
 
 ### Phase 9 — Shared artifacts and canvases
 
 `ArtifactService`, TAL `artifact` module, REPL `artifact` and
-`canvas` groups. See [shared-artifacts.md](shared-artifacts.md).
+`canvas` groups. See [shared-artifacts.md](../shared-artifacts.md).
 
 ### Phase 10 — Search and memory
 
 `SearchService` and (optional) `MemoryService`, TAL `search`/`memory`
 modules, REPL `search`/`memory` groups. See
-[search-and-memory.md](search-and-memory.md).
+[search-and-memory.md](../search-and-memory.md).
 
 ### Phase 11 — Bug reporting
 
-Promote [bug-reporting.md](bug-reporting.md) to the five-form rule.
+Promote [bug-reporting.md](../bug-reporting.md) to the five-form rule.
 **Depends on all five rollout phases of `bug-reporting.md`** —
 core pipeline, client context capture, on-device entry points,
 third-party reporting, and autodetection/dead-device fallback —
@@ -615,28 +624,28 @@ seeded simulation fixture.
 
 ## Related Plans
 
-- [repl-and-shell.md](repl-and-shell.md) — base REPL: sessions,
+- [repl-and-shell.md](../repl-and-shell.md) — base REPL: sessions,
   classification, approval pipeline, AI assistance.
-- [application-runtime.md](application-runtime.md) — TAR/TAL
+- [application-runtime.md](../application-runtime.md) — TAR/TAL
   durable authoring; uses the same typed services this plan
   extends.
-- [scenario-engine.md](scenario-engine.md) — supervisor for both
+- [scenario-engine.md](../scenario-engine.md) — supervisor for both
   Go-defined and REPL-defined scenarios.
-- [server-driven-ui.md](server-driven-ui.md) — closed UI primitive
+- [server-driven-ui.md](../server-driven-ui.md) — closed UI primitive
   contract; unchanged.
-- [agent-delegation.md](agent-delegation.md) — MCP exposure of the
+- [agent-delegation.md](../agent-delegation.md) — MCP exposure of the
   REPL command surface.
-- [identity-and-audience.md](identity-and-audience.md),
-  [collab-sessions.md](collab-sessions.md),
-  [messaging-and-boards.md](messaging-and-boards.md),
-  [shared-artifacts.md](shared-artifacts.md),
-  [search-and-memory.md](search-and-memory.md),
-  [bug-reporting.md](bug-reporting.md) — Layer 2 domain
+- [identity-and-audience.md](../identity-and-audience.md),
+  [collab-sessions.md](../collab-sessions.md),
+  [messaging-and-boards.md](../messaging-and-boards.md),
+  [shared-artifacts.md](../shared-artifacts.md),
+  [search-and-memory.md](../search-and-memory.md),
+  [bug-reporting.md](../bug-reporting.md) — Layer 2 domain
   plans.
-- [discovery.md](discovery.md), [protocol.md](protocol.md),
-  [transport-multiplexing.md](transport-multiplexing.md),
-  [ci.md](ci.md) — homes for the infrastructure/tooling use cases
+- [discovery.md](../discovery.md), [protocol.md](../protocol.md),
+  [transport-multiplexing.md](../transport-multiplexing.md),
+  [ci.md](../ci.md) — homes for the infrastructure/tooling use cases
   explicitly excluded from the REPL-closure clause.
-- [usecases.md](../usecases.md) and
-  [plato_inspired_usecases.md](plato_inspired_usecases.md) — the
+- [usecases.md](../../../usecases.md) and
+  [plato_inspired_usecases.md](../plato-inspired-usecases.md) — the
   user stories this plan moves out of Go and into the REPL.

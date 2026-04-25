@@ -1,3 +1,12 @@
+---
+title: "PLATO-Inspired Use Cases for Terminals"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # PLATO-Inspired Use Cases for Terminals
 
 These use cases are inspired by notable PLATO applications and interaction patterns, but adapted to the architecture and intent of **Terminals**: a server-orchestrated home system with generic client terminals. They are written in the same story format as `usecases.md`.

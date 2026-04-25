@@ -328,7 +328,7 @@ class BugReportAck extends $pb.GeneratedMessage {
 
 /// ClientContext is the reporter-side snapshot collected at report time.
 /// Every collection is size-capped and redacted before transmission per the
-/// rules documented in plans/bug-reporting.md.
+/// rules documented in plans/features/bug-reporting.md.
 class ClientContext extends $pb.GeneratedMessage {
   factory ClientContext({
     ClientIdentity? identity,

@@ -1,6 +1,15 @@
+---
+title: "Use Case Flows"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Use Case Flows
 
-See [masterplan.md](../masterplan.md) for overall system context. See [../usecases.md](../usecases.md) for user-story-style use cases.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. See [../usecases.md](../../usecases.md) for user-story-style use cases.
 
 Each use case maps to a scenario definition. A single trigger produces an `Intent` or `Event` on the bus; the engine constructs a `ScenarioActivation`; the activation resolves targets via the [placement engine](placement.md), requests [resource claims](io-abstraction.md#resource-claims), applies a [`MediaPlan`](io-abstraction.md#media-topology-plans-not-connects), and sends UI. The client code is identical in every case — only the server scenario differs.
 
@@ -165,4 +174,4 @@ Mic D ─┘
 - [scenario-engine.md](scenario-engine.md) — Scenario definitions, activations, and lifecycle.
 - [io-abstraction.md](io-abstraction.md) — Router primitives used by each flow.
 - [server-driven-ui.md](server-driven-ui.md) — UI primitives used by each flow.
-- [../usecases.md](../usecases.md) — User-story form of each scenario.
+- [../usecases.md](../../usecases.md) — User-story form of each scenario.

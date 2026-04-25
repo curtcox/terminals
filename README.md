@@ -71,7 +71,7 @@ Add behavior on the server, not the client. The client remains a generic termina
 
 ## Agent Delegation (Claude Code / Codex)
 
-The server exposes the REPL command registry to Claude Code and Codex over MCP so an LLM agent can drive the system with exactly the access a REPL user has — no more, no less. See [`plans/agent-delegation.md`](plans/agent-delegation.md) for the design, and the setup guides to enable it:
+The server exposes the REPL command registry to Claude Code and Codex over MCP so an LLM agent can drive the system with exactly the access a REPL user has — no more, no less. See [`plans/agent-delegation.md`](plans/features/agent-delegation.md) for the design, and the setup guides to enable it:
 
 - [`docs/repl/agents/mcp-setup.md`](docs/repl/agents/mcp-setup.md) — endpoints, transports, auth
 - [`docs/repl/agents/claude-code-setup.md`](docs/repl/agents/claude-code-setup.md)
@@ -106,4 +106,4 @@ Metadata contract:
 - If `TERMINALS_PHOTO_FRAME_PUBLIC_BASE_URL` is set, that exact value (trailing slash trimmed) is published in metadata.
 - Otherwise the server publishes `http://<mdns_name>.local:<photo_frame_http_port>/photo-frame`.
 
-Example env config is in [`terminal_server/configs/server.env.example`](/Users/curtcox/me/terminals/terminal_server/configs/server.env.example).
+Example env config is in [`terminal_server/configs/server.env.example`](terminal_server/configs/server.env.example).

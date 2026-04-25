@@ -1,10 +1,19 @@
+---
+title: "Placement and World Model"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Placement and World Model
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 Scenarios reason about devices in the language of the use cases: "the kitchen", "the nearest screen", "the child's room", "all cameras", "the lobby display". The Placement Engine translates those semantic queries into concrete `DeviceRef` sets using the device registry plus zone/role metadata.
 
-Without this layer, device-selection logic ends up duplicated in every scenario — one scenario knows how to find "the kitchen screen", another re-implements it for "all cameras". Centralizing it keeps scenarios declarative and close to the user-story language in [usecases.md](../usecases.md), and makes adding a new room or role a configuration change rather than a code change.
+Without this layer, device-selection logic ends up duplicated in every scenario — one scenario knows how to find "the kitchen screen", another re-implements it for "all cameras". Centralizing it keeps scenarios declarative and close to the user-story language in [usecases.md](../../usecases.md), and makes adding a new room or role a configuration change rather than a code change.
 
 ## Device Metadata
 

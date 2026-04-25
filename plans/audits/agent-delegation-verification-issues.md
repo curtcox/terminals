@@ -1,8 +1,17 @@
+---
+title: "Agent Delegation Verification Issues"
+kind: audit
+status: open
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Agent Delegation Verification Issues
 
 Date verified: 2026-04-20
 Verifier: Claude Code session
-Source plan: [plans/agent-delegation.md](agent-delegation.md)
+Source plan: [plans/agent-delegation.md](../features/agent-delegation.md)
 
 ## Resolved Issues
 

@@ -71,7 +71,7 @@ message BugReportAck {
 
 // ClientContext is the reporter-side snapshot collected at report time.
 // Every collection is size-capped and redacted before transmission per the
-// rules documented in plans/bug-reporting.md.
+// rules documented in plans/features/bug-reporting.md.
 message ClientContext {
   ClientIdentity identity = 1;
   terminals.capabilities.v1.DeviceCapabilities capabilities = 2;

@@ -1,3 +1,12 @@
+---
+title: "Identity and Audience Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Identity and Audience Plan
 
 See `application-runtime.md`, `repl-and-shell.md`, and `repl-capability-closure.md` for the surrounding runtime and REPL context.
@@ -81,7 +90,7 @@ kinds:
 
 This keeps `IdentityService` as the single canonical ack owner
 (per the layering in
-[repl-capability-plan.md](repl-capability-plan.md)) while
+[repl-capability-plan.md](repl-capability/plan.md)) while
 admitting device-level, agent, and anonymous acks without
 inventing a parallel ack substrate on `MessagingService`,
 `ArtifactService`, or the monitoring flows.

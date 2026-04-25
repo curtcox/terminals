@@ -122,7 +122,7 @@ GOCACHE=/tmp/terminals-go-build go test ./...
 ```
 
 The long-term remediation plan is tracked in
-[`plans/server-test-sandbox-network.md`](../plans/server-test-sandbox-network.md).
+[`plans/server-test-sandbox-network.md`](../plans/features/server-test-sandbox-network.md).
 
 ## Scheduler
 

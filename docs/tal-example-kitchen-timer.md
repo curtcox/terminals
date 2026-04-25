@@ -8,7 +8,7 @@ off a worked example. The app implements **T1** from [usecases.md](../usecases.m
 > ready without watching the clock.
 
 TAL and the Terminals Application Runtime (TAR) are specified in
-[plans/application-runtime.md](../plans/application-runtime.md). TAL is
+[plans/application-runtime.md](../plans/features/application-runtime.md). TAL is
 not yet implemented; this example is written against that spec so the
 contract stays concrete. Every host call below corresponds to a module
 named there.
@@ -21,7 +21,7 @@ named there.
 |---|---|---|
 | Current executable path | Implemented | The Go-side `TimerReminderScenario` handles T1 timer requests, places a countdown UI, schedules expiry and 1 Hz ticks, patches remaining time and the done banner, supports cancellation, speaks the alert, emits `timer.expired`, and removes due records. |
 | Package-load path | Partially implemented | `terminal_server/apps/kitchen_timer` is loadable by `term app check kitchen_timer` and smoke-tested by `term app test kitchen_timer`. |
-| TAL interpretation path | Planned | Lifecycle hooks returning host operations are the planned contract in [plans/application-runtime.md](../plans/application-runtime.md), but they are not interpreted end-to-end yet. |
+| TAL interpretation path | Planned | Lifecycle hooks returning host operations are the planned contract in [plans/application-runtime.md](../plans/features/application-runtime.md), but they are not interpreted end-to-end yet. |
 
 `term app test kitchen_timer` is a package smoke test for the manifest and
 declared TAL test files. It is not yet a lifecycle simulation for countdown
@@ -392,7 +392,7 @@ Result {
 ```
 
 Rules TAL relies on (from
-[application-runtime.md](../plans/application-runtime.md) §TAL
+[application-runtime.md](../plans/features/application-runtime.md) §TAL
 Execution Model):
 
 - **Serial mailbox.** `handle` never runs concurrently for the same
@@ -433,13 +433,13 @@ land, they extend the same pattern.
 
 ## Related
 
-- [plans/application-runtime.md](../plans/application-runtime.md) —
+- [plans/application-runtime.md](../plans/features/application-runtime.md) —
   full TAL/TAR specification.
-- [plans/scenario-engine.md](../plans/scenario-engine.md) — the
+- [plans/scenario-engine.md](../plans/features/scenario-engine.md) — the
   supervisor that calls `start` / `handle` / `stop` / `suspend` /
   `resume`.
 - [usecases.md](../usecases.md) — T1 and adjacent timer/reminder
   stories.
-- [plans/repl-capability-plan.md](../plans/repl-capability-plan.md) —
+- [plans/repl-capability-plan.md](../plans/features/repl-capability/plan.md) —
   how the same capabilities are reachable from the REPL, so this app
   is operable without a TAR package during prototyping.

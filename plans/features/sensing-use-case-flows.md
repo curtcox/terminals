@@ -1,5 +1,14 @@
+---
+title: "Sensing and Edge Observation Use Case Flows"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Sensing and Edge Observation Use Case Flows
-See [masterplan.md](../masterplan.md) for overall system context. See [../usecases.md](../usecases.md) for user-story-style use cases. These flows extend [use-case-flows.md](use-case-flows.md) with sensing-heavy scenarios that should prefer edge execution when the client supports it.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. See [../usecases.md](../../usecases.md) for user-story-style use cases. These flows extend [use-case-flows.md](use-case-flows.md) with sensing-heavy scenarios that should prefer edge execution when the client supports it.
 
 A single trigger still produces a typed request on the server. The server resolves targets, requests claims, applies a `FlowPlan`, and renders UI. The difference is that expensive operators may be placed on the client and only emit compact observations back to the server.
 
@@ -116,4 +125,4 @@ A single trigger still produces a typed request on the server. The server resolv
 - [edge-execution.md](edge-execution.md) — Edge operator placement and runtime constraints.
 - [world-model-calibration.md](world-model-calibration.md) — Spatial model and terminal verification.
 - [application-runtime.md](application-runtime.md) — TAL applications that request these flows.
-- [phase-6b-edge-sensing.md](phase-6b-edge-sensing.md) — Suggested implementation phase.
+- [phase-6b-edge-sensing.md](../phases/phase-6b-edge-sensing.md) — Suggested implementation phase.

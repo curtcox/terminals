@@ -1,5 +1,14 @@
+---
+title: "Observation Plane and Flow Plans"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Observation Plane and Flow Plans
-See [masterplan.md](../masterplan.md) for overall system context. This plan generalizes the existing media-routing model so audio, video, sensors, and radio observations all use one vocabulary.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. This plan generalizes the existing media-routing model so audio, video, sensors, and radio observations all use one vocabulary.
 
 ## From MediaPlan to FlowPlan
 The current [IO abstraction](io-abstraction.md) defines a `MediaPlan` for stream graphs. Keep that shape, but broaden it into a **FlowPlan** so observations, artifacts, and retrospective buffers are first-class.

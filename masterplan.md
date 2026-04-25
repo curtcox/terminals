@@ -2,7 +2,7 @@
 
 A client/server system where devices on the same network serve as terminals for a single unified system. The server orchestrates all behavior; clients are generic IO surfaces that never need updating as new capabilities are added.
 
-This file is an **index**. Detailed designs and phase plans live in the [`plans/`](plans/) directory so they can be read and executed in relative isolation.
+This file is an **index**. Detailed designs and phase plans live in the [`plans/`](plans) directory so they can be read and executed in relative isolation.
 
 ## Vision
 
@@ -56,43 +56,43 @@ None of this requires updating the client app. The Flutter client is a generic t
 
 ### System design
 
-- [plans/architecture-client.md](plans/architecture-client.md) — Flutter client: capability declaration, module layout, platform support.
-- [plans/architecture-server.md](plans/architecture-server.md) — Go server: module layout and responsibilities.
-- [plans/protocol.md](plans/protocol.md) — gRPC control plane, WebRTC media plane, data channels.
-- [plans/discovery.md](plans/discovery.md) — mDNS, manual connect, connection lifecycle, trust model.
-- [plans/io-abstraction.md](plans/io-abstraction.md) — IO categories, resources and claims, media-plan topology graph compiled by the router.
-- [plans/placement.md](plans/placement.md) — Zones, roles, and the placement engine that turns semantic targets into concrete devices.
-- [plans/server-driven-ui.md](plans/server-driven-ui.md) — Fixed primitive component set, descriptor format, update/patch/animate.
-- [plans/scenario-engine.md](plans/scenario-engine.md) — Scenario definitions vs activations, intent/event triggers, claim-driven preemption, scenario recipes.
-- [plans/use-case-flows.md](plans/use-case-flows.md) — End-to-end flows for each planned scenario.
-- [plans/application-runtime.md](plans/application-runtime.md) — Runtime model for app/session lifecycles and server orchestration.
-- [plans/edge-execution.md](plans/edge-execution.md) — Edge execution model and on-device/off-device execution boundaries.
-- [plans/observation-plane.md](plans/observation-plane.md) — Telemetry, sensing signals, and observation pipeline.
-- [plans/world-model-calibration.md](plans/world-model-calibration.md) — World-model calibration strategy and feedback loops.
-- [plans/sensing-use-case-flows.md](plans/sensing-use-case-flows.md) — End-to-end sensing-centric use-case flows.
-- [plans/bug-reporting.md](plans/bug-reporting.md) — Modality-agnostic, cross-device bug reporting with full client/subject context capture.
-- [plans/repl-and-shell.md](plans/repl-and-shell.md) — Server-side REPL: session model, typed command registry, in-REPL LLM assistance.
-- [plans/agent-delegation.md](plans/agent-delegation.md) — Expose the REPL command surface to Claude Code / Codex desktop apps via MCP so users can delegate the same work without a server restart.
+- [plans/architecture-client.md](plans/features/architecture-client.md) — Flutter client: capability declaration, module layout, platform support.
+- [plans/architecture-server.md](plans/features/architecture-server.md) — Go server: module layout and responsibilities.
+- [plans/protocol.md](plans/features/protocol.md) — gRPC control plane, WebRTC media plane, data channels.
+- [plans/discovery.md](plans/features/discovery.md) — mDNS, manual connect, connection lifecycle, trust model.
+- [plans/io-abstraction.md](plans/features/io-abstraction.md) — IO categories, resources and claims, media-plan topology graph compiled by the router.
+- [plans/placement.md](plans/features/placement.md) — Zones, roles, and the placement engine that turns semantic targets into concrete devices.
+- [plans/server-driven-ui.md](plans/features/server-driven-ui.md) — Fixed primitive component set, descriptor format, update/patch/animate.
+- [plans/scenario-engine.md](plans/features/scenario-engine.md) — Scenario definitions vs activations, intent/event triggers, claim-driven preemption, scenario recipes.
+- [plans/use-case-flows.md](plans/features/use-case-flows.md) — End-to-end flows for each planned scenario.
+- [plans/application-runtime.md](plans/features/application-runtime.md) — Runtime model for app/session lifecycles and server orchestration.
+- [plans/edge-execution.md](plans/features/edge-execution.md) — Edge execution model and on-device/off-device execution boundaries.
+- [plans/observation-plane.md](plans/features/observation-plane.md) — Telemetry, sensing signals, and observation pipeline.
+- [plans/world-model-calibration.md](plans/features/world-model-calibration.md) — World-model calibration strategy and feedback loops.
+- [plans/sensing-use-case-flows.md](plans/features/sensing-use-case-flows.md) — End-to-end sensing-centric use-case flows.
+- [plans/bug-reporting.md](plans/features/bug-reporting.md) — Modality-agnostic, cross-device bug reporting with full client/subject context capture.
+- [plans/repl-and-shell.md](plans/features/repl-and-shell.md) — Server-side REPL: session model, typed command registry, in-REPL LLM assistance.
+- [plans/agent-delegation.md](plans/features/agent-delegation.md) — Expose the REPL command surface to Claude Code / Codex desktop apps via MCP so users can delegate the same work without a server restart.
 
 ### Tooling
 
-- [plans/technology.md](plans/technology.md) — Server, client, and pluggable AI backend technology choices.
-- [plans/agent-config.md](plans/agent-config.md) — CLAUDE.md / AGENTS.md layout and contents for every subproject.
-- [plans/ci.md](plans/ci.md) — Go, Flutter, and proto quality gates; `Makefile`; CI workflows.
+- [plans/technology.md](plans/features/technology.md) — Server, client, and pluggable AI backend technology choices.
+- [plans/agent-config.md](plans/features/agent-config.md) — CLAUDE.md / AGENTS.md layout and contents for every subproject.
+- [plans/ci.md](plans/features/ci.md) — Go, Flutter, and proto quality gates; `Makefile`; CI workflows.
 
 ### Development phases
 
 Each phase is a standalone checklist with explicit prerequisites. Execute in order.
 
-- [plans/phase-0-setup.md](plans/phase-0-setup.md) — Repo setup, tooling, and CI.
-- [plans/phase-1-foundation.md](plans/phase-1-foundation.md) — Proto, skeletons, server-driven UI hello-world.
-- [plans/phase-2-terminal.md](plans/phase-2-terminal.md) — Text terminal (PTY + keyboard forwarding).
-- [plans/phase-3-media.md](plans/phase-3-media.md) — WebRTC media plane and IO router.
-- [plans/phase-4-comms.md](plans/phase-4-comms.md) — Intercom, PA, multi-window, calls, SIP bridge.
-- [plans/phase-5-voice.md](plans/phase-5-voice.md) — AI backends and voice assistant pipeline.
-- [plans/phase-6-monitoring.md](plans/phase-6-monitoring.md) — Sound classification, timers, schedule monitoring, red alert.
-- [plans/phase-6b-edge-sensing.md](plans/phase-6b-edge-sensing.md) — Edge sensing expansion phase.
-- [plans/phase-7-polish.md](plans/phase-7-polish.md) — Photo frame, preemption hardening, admin UI, misc IO.
+- [plans/phase-0-setup.md](plans/phases/phase-0-setup.md) — Repo setup, tooling, and CI.
+- [plans/phase-1-foundation.md](plans/phases/phase-1-foundation.md) — Proto, skeletons, server-driven UI hello-world.
+- [plans/phase-2-terminal.md](plans/phases/phase-2-terminal.md) — Text terminal (PTY + keyboard forwarding).
+- [plans/phase-3-media.md](plans/phases/phase-3-media.md) — WebRTC media plane and IO router.
+- [plans/phase-4-comms.md](plans/phases/phase-4-comms.md) — Intercom, PA, multi-window, calls, SIP bridge.
+- [plans/phase-5-voice.md](plans/phases/phase-5-voice.md) — AI backends and voice assistant pipeline.
+- [plans/phase-6-monitoring.md](plans/phases/phase-6-monitoring.md) — Sound classification, timers, schedule monitoring, red alert.
+- [plans/phase-6b-edge-sensing.md](plans/phases/phase-6b-edge-sensing.md) — Edge sensing expansion phase.
+- [plans/phase-7-polish.md](plans/phases/phase-7-polish.md) — Photo frame, preemption hardening, admin UI, misc IO.
 
 ### Adjacent docs
 
@@ -109,14 +109,14 @@ Each phase is a standalone checklist with explicit prerequisites. Execute in ord
 
 4. **Pluggable AI backends**. The system doesn't couple to any specific AI provider. Interfaces allow swapping between local and cloud implementations based on the user's preference and hardware capability.
 
-5. **Activations are the unit of execution**. A scenario definition is a singleton; a scenario *activation* is a live instance with its own ID, claims, targets, and resume snapshot. Multiple timers, terminal sessions, or calls coexist cleanly. See [plans/scenario-engine.md](plans/scenario-engine.md).
+5. **Activations are the unit of execution**. A scenario definition is a singleton; a scenario *activation* is a live instance with its own ID, claims, targets, and resume snapshot. Multiple timers, terminal sessions, or calls coexist cleanly. See [plans/scenario-engine.md](plans/features/scenario-engine.md).
 
-6. **Resource-level preemption via claims**. Activations claim specific resources (main screen, overlay, speaker, mic, camera, PTY) rather than whole devices. Higher-priority claims suspend lower ones; releases resume the suspended activation with exactly the claims it had. PA can take speakers without hiding the photo frame; a voice reply can overlay without replacing the terminal. See [plans/io-abstraction.md](plans/io-abstraction.md#resource-claims).
+6. **Resource-level preemption via claims**. Activations claim specific resources (main screen, overlay, speaker, mic, camera, PTY) rather than whole devices. Higher-priority claims suspend lower ones; releases resume the suspended activation with exactly the claims it had. PA can take speakers without hiding the photo frame; a voice reply can overlay without replacing the terminal. See [plans/io-abstraction.md](plans/features/io-abstraction.md#resource-claims).
 
-7. **Semantic placement**. A placement engine turns "kitchen", "nearest screen", "all cameras" into concrete device sets. Scenarios never target raw device IDs; zones and roles are server-assigned metadata. See [plans/placement.md](plans/placement.md).
+7. **Semantic placement**. A placement engine turns "kitchen", "nearest screen", "all cameras" into concrete device sets. Scenarios never target raw device IDs; zones and roles are server-assigned metadata. See [plans/placement.md](plans/features/placement.md).
 
-8. **Typed intents and events**. Voice, UI actions, schedules, webhooks, classifier events, and automation agents all produce the same `Intent`/`Event` records on one bus. One matcher handles every trigger source. See [plans/scenario-engine.md](plans/scenario-engine.md#triggers-intents-and-events).
+8. **Typed intents and events**. Voice, UI actions, schedules, webhooks, classifier events, and automation agents all produce the same `Intent`/`Event` records on one bus. One matcher handles every trigger source. See [plans/scenario-engine.md](plans/features/scenario-engine.md#triggers-intents-and-events).
 
-9. **Declarative media topology**. Scenarios hand the IO router a `MediaPlan` — a small graph of sources, sinks, mixers, forks, analyzers, recorders — and the router compiles it to concrete transport messages. No stream-kind magic strings. See [plans/io-abstraction.md](plans/io-abstraction.md#media-topology-plans-not-connects).
+9. **Declarative media topology**. Scenarios hand the IO router a `MediaPlan` — a small graph of sources, sinks, mixers, forks, analyzers, recorders — and the router compiles it to concrete transport messages. No stream-kind magic strings. See [plans/io-abstraction.md](plans/features/io-abstraction.md#media-topology-plans-not-connects).
 
 10. **Trusted LAN, no auth**. For a home network, mDNS discovery + direct connection with no authentication keeps things simple. If this assumption changes, TLS mutual auth can be added at the transport layer without protocol changes.

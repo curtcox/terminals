@@ -1,5 +1,14 @@
+---
+title: "World Model and Calibration"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # World Model and Calibration
-See [masterplan.md](../masterplan.md) for overall system context. The existing [placement plan](placement.md) already gives devices zones and roles. This document extends that world model so the system can localize sounds, people, objects, radios, and terminals.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. The existing [placement plan](placement.md) already gives devices zones and roles. This document extends that world model so the system can localize sounds, people, objects, radios, and terminals.
 
 ## Design Principle
 Semantic placement still matters most. Users speak in room and role language. The spatial model exists to support:

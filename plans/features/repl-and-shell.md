@@ -1,6 +1,15 @@
+---
+title: "REPL Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # REPL Plan
 
-See [masterplan.md](../masterplan.md) for overall system context. See [usecases.md](../usecases.md) for the user stories this plan needs to satisfy. See [application-runtime.md](application-runtime.md) for the runtime model this plan extends.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. See [usecases.md](../../usecases.md) for the user stories this plan needs to satisfy. See [application-runtime.md](application-runtime.md) for the runtime model this plan extends.
 
 ## Design Principle
 
@@ -187,7 +196,7 @@ The `ai` command group lets the user ask questions, generate code, and have the 
 
 ### Pluggable providers
 
-AI providers sit behind the existing server-side AI interface (per [masterplan.md](../masterplan.md) core rule 3). Two providers ship initially:
+AI providers sit behind the existing server-side AI interface (per [masterplan.md](../archive/masterplan-duplicate.md) core rule 3). Two providers ship initially:
 
 - **OpenRouter** — hosted models via the OpenRouter API.
 - **Ollama** — locally hosted models via a configured Ollama base URL.
@@ -760,9 +769,9 @@ Invariants:
 
 ## Related Plans
 
-- [masterplan.md](../masterplan.md) — overall architecture and client/server rules
-- [usecases.md](../usecases.md) — user stories, especially P1–P4
-- [phase-2-terminal.md](phase-2-terminal.md) — PTY-backed text terminal foundation
+- [masterplan.md](../archive/masterplan-duplicate.md) — overall architecture and client/server rules
+- [usecases.md](../../usecases.md) — user stories, especially P1–P4
+- [phase-2-terminal.md](../phases/phase-2-terminal.md) — PTY-backed text terminal foundation
 - [scenario-engine.md](scenario-engine.md) — activation model, lifecycle, claims, suspend/resume
 - [application-runtime.md](application-runtime.md) — TAR/TAL runtime, `pty` host module, terminal-first development loop
 - [agent-delegation.md](agent-delegation.md) — exposing the REPL command surface to Claude Code / Codex desktop apps via MCP

@@ -1,5 +1,14 @@
+---
+title: "Phase X — Multi-Transport Connection Fallback"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Phase X — Multi-Transport Connection Fallback
-See [masterplan.md](../masterplan.md) for overall system context. Extend the control plane so a client can connect over gRPC, WebSocket, TCP, or HTTP and automatically use any carrier the server exposes and the network permits.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. Extend the control plane so a client can connect over gRPC, WebSocket, TCP, or HTTP and automatically use any carrier the server exposes and the network permits.
 
 This phase explicitly ignores migration and backward-compatibility concerns. There are no existing users.
 
@@ -8,7 +17,7 @@ This phase explicitly ignores migration and backward-compatibility concerns. The
 - [phase-3-media.md](phase-3-media.md) complete — WebRTC signaling already rides on the control plane and must be preserved across carriers.
 
 ## Deliverables
-- [ ] **Carrier-neutral session layer**: Introduce a shared session abstraction above concrete transports. All higher layers consume ordered inbound/outbound envelopes rather than gRPC-specific stream types. See [transport-multiplexing.md](transport-multiplexing.md).
+- [ ] **Carrier-neutral session layer**: Introduce a shared session abstraction above concrete transports. All higher layers consume ordered inbound/outbound envelopes rather than gRPC-specific stream types. See [transport-multiplexing.md](../features/transport-multiplexing.md).
 - [ ] **Explicit transport envelope**: Add a protobuf `WireEnvelope` and transport handshake messages for non-gRPC carriers, including version negotiation, session identity, sequencing, and heartbeat payloads.
 - [ ] **Server multi-listener support**: Add control-plane listeners for gRPC, WebSocket, TCP, and HTTP fallback under `internal/transport/`, with identical session semantics once connected.
 - [ ] **Client carrier implementations**: Add `grpc`, `websocket`, `tcp`, and `http` carrier adapters in the Flutter client, each implementing one common connection interface.
@@ -24,8 +33,8 @@ This phase explicitly ignores migration and backward-compatibility concerns. The
 Take one client device and prove the following sequence without changing scenario code: connect over gRPC on an open network, connect over WebSocket when gRPC is blocked, connect over TCP when HTTP upgrade is blocked, connect over HTTP when only request/response works, and produce a visible local diagnostic report when all four are unavailable.
 
 ## Related Plans
-- [transport-multiplexing.md](transport-multiplexing.md) — Design for the carrier-neutral control plane.
-- [protocol.md](protocol.md) — Existing wire contract to revise around envelopes and carrier-neutral signaling.
-- [discovery.md](discovery.md) — Discovery and manual connect rules to extend.
-- [architecture-client.md](architecture-client.md) — Client module changes for carrier selection and reporting.
-- [architecture-server.md](architecture-server.md) — Server module changes for multi-listener transport.
+- [transport-multiplexing.md](../features/transport-multiplexing.md) — Design for the carrier-neutral control plane.
+- [protocol.md](../features/protocol.md) — Existing wire contract to revise around envelopes and carrier-neutral signaling.
+- [discovery.md](../features/discovery.md) — Discovery and manual connect rules to extend.
+- [architecture-client.md](../features/architecture-client.md) — Client module changes for carrier selection and reporting.
+- [architecture-server.md](../features/architecture-server.md) — Server module changes for multi-listener transport.

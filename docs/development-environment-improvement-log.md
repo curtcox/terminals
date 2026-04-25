@@ -13,7 +13,7 @@ repo changes that resolved it.
 ## 2026-04-25 Completed Improvements
 
 The development-environment improvement plan has been completed and drained
-from `plans/development-environment-improvement.md`. The durable behavior is
+from `plans/archive/development-environment-improvement.md`. The durable behavior is
 documented in the guides below.
 
 ### TAL Runtime Status Documentation
@@ -25,7 +25,7 @@ documented in the guides below.
 - `terminal_server/apps/kitchen_timer/README.md` documents the package as a
   TAL/TAR contract example and records that `go run ./cmd/term app test
   kitchen_timer` is a package smoke test, not a synthetic lifecycle simulation.
-- `plans/application-runtime.md` defines the `Implemented`, `Partially
+- `plans/features/application-runtime.md` defines the `Implemented`, `Partially
   implemented`, and `Planned` status vocabulary and includes a runtime status
   table for package loading, manifest validation, exported definitions, TAL
   interpretation, lifecycle snapshots, host operation commit, and simulation.

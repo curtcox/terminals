@@ -1,6 +1,15 @@
+---
+title: "Agent Delegation Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Agent Delegation Plan
 
-See [masterplan.md](../masterplan.md) for overall system context. See [usecases.md](../usecases.md) for the user stories this plan needs to satisfy. See [repl-and-shell.md](repl-and-shell.md) for the REPL command surface this plan exposes.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. See [usecases.md](../../usecases.md) for the user stories this plan needs to satisfy. See [repl-and-shell.md](repl-and-shell.md) for the REPL command surface this plan exposes.
 
 ## Design Principle
 
@@ -280,7 +289,7 @@ Adapter behavior:
 
 ## Use-Case Coverage
 
-This plan is a second path to cover the same use cases P1–P4 from [usecases.md](../usecases.md):
+This plan is a second path to cover the same use cases P1–P4 from [usecases.md](../../usecases.md):
 
 - **P1** — the MCP session is a REPL session; it is an "interactive REPL session" in every structural sense except that the keystrokes come from an LLM instead of a keyboard.
 - **P2** — multiple MCP sessions coexist just like multiple REPL sessions.
@@ -375,8 +384,8 @@ Resolved during the first two Claude↔Codex review cycles:
 
 ## Related Plans
 
-- [masterplan.md](../masterplan.md) — overall architecture and client/server rules, especially the "all changes live on the server" invariant this plan preserves.
-- [usecases.md](../usecases.md) — user stories, especially P1–P4 and I9–I10.
+- [masterplan.md](../archive/masterplan-duplicate.md) — overall architecture and client/server rules, especially the "all changes live on the server" invariant this plan preserves.
+- [usecases.md](../../usecases.md) — user stories, especially P1–P4 and I9–I10.
 - [repl-and-shell.md](repl-and-shell.md) — the REPL command surface this plan exposes through MCP; the authoritative definition of every capability reachable through agent delegation, and the source of the approval contract the adapter enforces.
 - [application-runtime.md](application-runtime.md) — TAR hot reload, the mechanism that makes TAL app changes visible without a server restart.
 - [scenario-engine.md](scenario-engine.md) — activation, claims, and lifecycle semantics the REPL (and therefore the MCP adapter) drives.

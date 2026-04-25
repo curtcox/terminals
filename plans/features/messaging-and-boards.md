@@ -1,3 +1,12 @@
+---
+title: "Messaging and Boards Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Messaging and Boards Plan
 
 See `repl-capability-plan.md` for the overall closure rationale

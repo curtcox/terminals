@@ -1,5 +1,14 @@
+---
+title: "Application Runtime"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Application Runtime
-See [masterplan.md](../masterplan.md) for overall system context. See [scenario-engine.md](scenario-engine.md) for the existing activation model this runtime extends.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. See [scenario-engine.md](scenario-engine.md) for the existing activation model this runtime extends.
 
 ## Design Principle
 Applications are **server-side control-plane programs**. The client remains a generic terminal. New application behavior still ships without scenario-specific client updates.
@@ -213,4 +222,4 @@ TAL requests observations or actions. The kernel decides where operator kernels 
 - [edge-execution.md](edge-execution.md) — Generic client-side operator hosting.
 - [observation-plane.md](observation-plane.md) — `FlowPlan`, observations, artifacts, and buffers.
 - [world-model-calibration.md](world-model-calibration.md) — Spatial model, entity location, and verification.
-- [phase-6b-edge-sensing.md](phase-6b-edge-sensing.md) — Suggested implementation phase for this runtime extension.
+- [phase-6b-edge-sensing.md](../phases/phase-6b-edge-sensing.md) — Suggested implementation phase for this runtime extension.

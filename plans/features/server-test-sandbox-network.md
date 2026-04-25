@@ -1,3 +1,12 @@
+---
+title: "Server Test Sandbox Network Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Server Test Sandbox Network Plan
 
 ## Context

@@ -1,3 +1,12 @@
+---
+title: "Shared Artifacts Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Shared Artifacts Plan
 
 See `repl-capability-closure.md` for the umbrella capability-closure rationale.

@@ -1,6 +1,6 @@
 # MCP Setup
 
-The Terminals MCP adapter exposes the REPL command registry as MCP tools. See [agent-delegation.md](../../../plans/agent-delegation.md) for the design; this page tells you how to turn it on.
+The Terminals MCP adapter exposes the REPL command registry as MCP tools. See [agent-delegation.md](../../../plans/features/agent-delegation.md) for the design; this page tells you how to turn it on.
 
 The adapter is in-process in the Go server. Start the server (`make run-server`) and the adapter is running. Nothing else to install.
 
@@ -14,7 +14,7 @@ The adapter is in-process in the Go server. Start the server (`make run-server`)
   - The subprocess attaches stdio to the already-running server's MCP endpoint. It does not start a second server.
   - Use this when Claude Code / Codex runs on the same machine as the server.
 
-Discovery: the HTTP endpoint is advertised via mDNS alongside the REPL endpoint (see [discovery.md](../../../plans/discovery.md)).
+Discovery: the HTTP endpoint is advertised via mDNS alongside the REPL endpoint (see [discovery.md](../../../plans/features/discovery.md)).
 
 ## Transport choice
 

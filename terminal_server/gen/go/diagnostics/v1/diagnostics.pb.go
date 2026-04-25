@@ -380,7 +380,7 @@ func (x *BugReportAck) GetMessage() string {
 
 // ClientContext is the reporter-side snapshot collected at report time.
 // Every collection is size-capped and redacted before transmission per the
-// rules documented in plans/bug-reporting.md.
+// rules documented in plans/features/bug-reporting.md.
 type ClientContext struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Identity      *ClientIdentity        `protobuf:"bytes,1,opt,name=identity,proto3" json:"identity,omitempty"`

@@ -7,8 +7,8 @@ description: Drive the Terminals server via its MCP adapter when the `terminals`
 
 The `terminals` MCP server is a thin adapter over the REPL command registry. Every tool is a REPL command. Your access equals a REPL user's access — no hidden powers, no shortcuts.
 
-Design doc: [../../../plans/agent-delegation.md](../../../plans/agent-delegation.md).
-User-facing setup: [../../../docs/repl/agents/](../../../docs/repl/agents/).
+Design doc: [../../../plans/agent-delegation.md](../../../plans/features/agent-delegation.md).
+User-facing setup: [../../../docs/repl/agents/](../../../docs/repl/agents).
 
 ## First moves on a fresh session
 

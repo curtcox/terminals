@@ -1,6 +1,15 @@
+---
+title: "Signing and Trust"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Signing and Trust
 
-See [masterplan.md](masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 Depends on [package-format.md](package-format.md) (canonical
 signed statements) and is referenced by
 [application-distribution.md](application-distribution.md)

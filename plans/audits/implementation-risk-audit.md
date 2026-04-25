@@ -1,10 +1,19 @@
+---
+title: "Implementation Risk Audit (Cross-Client)"
+kind: audit
+status: open
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Implementation Risk Audit (Cross-Client)
 
 ## Scope and Inputs
 
 This audit was produced by inferring missing placeholders from the repository state:
 
-- Plan docs: [`masterplan.md`](../masterplan.md), `plans/phase-*.md`, and supporting docs in `plans/` + `docs/`.
+- Plan docs: [`masterplan.md`](../archive/masterplan-duplicate.md), `plans/phase-*.md`, and supporting docs in `plans/` + `docs/`.
 - Target clients/platforms: Android, iOS, Web/Browser, macOS, Linux, Windows (from `plans/architecture-client.md`).
 - Relevant code/config: `terminal_client/`, `terminal_server/`, `api/`, scripts, and CI workflow files.
 
@@ -235,26 +244,26 @@ Legend per cell:
 
 ## Evidence Index
 
-- E2: [`scripts/run-local.sh`](../scripts/run-local.sh#L31), [`scripts/run-local.sh`](../scripts/run-local.sh#L237)
-- E3: [`Makefile`](../Makefile#L26), [`Makefile`](../Makefile#L56)
-- E4: [`terminal_client/lib/connection/control_client.dart`](../terminal_client/lib/connection/control_client.dart#L23)
-- E5: [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L401), [`terminal_client/test/widget_test.dart`](../terminal_client/test/widget_test.dart#L16)
-- E6: [`terminal_server/internal/transport/grpc_server.go`](../terminal_server/internal/transport/grpc_server.go#L41), [`terminal_server/internal/transport/grpc_server_test.go`](../terminal_server/internal/transport/grpc_server_test.go#L12)
-- E7: [`terminal_client/lib/discovery/mdns_scanner.dart`](../terminal_client/lib/discovery/mdns_scanner.dart#L25)
-- E8: [`docs/client-ios.md`](../docs/client-ios.md#L112), [`docs/client-linux.md`](../docs/client-linux.md#L81), [`docs/client-windows.md`](../docs/client-windows.md#L79)
-- E9: [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L509), [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L654)
-- E10: [`terminal_client/lib/media/webrtc_engine.dart`](../terminal_client/lib/media/webrtc_engine.dart#L74)
-- E11: [`terminal_client/lib/connection/control_client.dart`](../terminal_client/lib/connection/control_client.dart#L83), [`api/terminals/capabilities/v1/capabilities.proto`](../api/terminals/capabilities/v1/capabilities.proto#L16)
-- E12: [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L2277), [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L2720)
-- E13: [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L872)
-- E14: [`terminal_client/macos/Runner/DebugProfile.entitlements`](../terminal_client/macos/Runner/DebugProfile.entitlements#L5), [`terminal_client/macos/Runner/Release.entitlements`](../terminal_client/macos/Runner/Release.entitlements#L5), [`terminal_client/macos/Runner/Info.plist`](../terminal_client/macos/Runner/Info.plist#L4), [`docs/client-macos.md`](../docs/client-macos.md#L70)
-- E15: [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L746), [`terminal_client/lib/util/speech.dart`](../terminal_client/lib/util/speech.dart#L1)
-- E16: [`terminal_client/lib/util/speech_stub.dart`](../terminal_client/lib/util/speech_stub.dart#L1), [`terminal_client/lib/util/speech_web.dart`](../terminal_client/lib/util/speech_web.dart#L3)
-- E17: [`plans/phase-5-voice.md`](./phase-5-voice.md#L15), [`plans/phase-6b-edge-sensing.md`](./phase-6b-edge-sensing.md#L11), [`plans/phase-7-polish.md`](./phase-7-polish.md#L16)
-- E18: [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L842), [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L862)
-- E19: [`terminal_client/lib/edge/host.dart`](../terminal_client/lib/edge/host.dart#L5), [`terminal_client/lib/edge/bundle_store.dart`](../terminal_client/lib/edge/bundle_store.dart#L3), [`terminal_client/lib/edge/artifact_export.dart`](../terminal_client/lib/edge/artifact_export.dart#L4)
-- E20: [`terminal_client/pubspec.yaml`](../terminal_client/pubspec.yaml#L9)
-- E21: [`plans/protocol.md`](./protocol.md#L63), [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L2455), [`terminal_client/lib/main.dart`](../terminal_client/lib/main.dart#L881)
+- E2: [`scripts/run-local.sh`](../../scripts/run-local.sh#L31), [`scripts/run-local.sh`](../../scripts/run-local.sh#L237)
+- E3: [`Makefile`](../../Makefile#L26), [`Makefile`](../../Makefile#L56)
+- E4: [`terminal_client/lib/connection/control_client.dart`](../../terminal_client/lib/connection/control_client.dart#L23)
+- E5: [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L401), [`terminal_client/test/widget_test.dart`](../../terminal_client/test/widget_test.dart#L16)
+- E6: [`terminal_server/internal/transport/grpc_server.go`](../../terminal_server/internal/transport/grpc_server.go#L41), [`terminal_server/internal/transport/grpc_server_test.go`](../../terminal_server/internal/transport/grpc_server_test.go#L12)
+- E7: [`terminal_client/lib/discovery/mdns_scanner.dart`](../../terminal_client/lib/discovery/mdns_scanner.dart#L25)
+- E8: [`docs/client-ios.md`](../../docs/client-ios.md#L112), [`docs/client-linux.md`](../../docs/client-linux.md#L81), [`docs/client-windows.md`](../../docs/client-windows.md#L79)
+- E9: [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L509), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L654)
+- E10: [`terminal_client/lib/media/webrtc_engine.dart`](../../terminal_client/lib/media/webrtc_engine.dart#L74)
+- E11: [`terminal_client/lib/connection/control_client.dart`](../../terminal_client/lib/connection/control_client.dart#L83), [`api/terminals/capabilities/v1/capabilities.proto`](../../api/terminals/capabilities/v1/capabilities.proto#L16)
+- E12: [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L2277), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L2720)
+- E13: [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L872)
+- E14: [`terminal_client/macos/Runner/DebugProfile.entitlements`](../../terminal_client/macos/Runner/DebugProfile.entitlements#L5), [`terminal_client/macos/Runner/Release.entitlements`](../../terminal_client/macos/Runner/Release.entitlements#L5), [`terminal_client/macos/Runner/Info.plist`](../../terminal_client/macos/Runner/Info.plist#L4), [`docs/client-macos.md`](../../docs/client-macos.md#L70)
+- E15: [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L746), [`terminal_client/lib/util/speech.dart`](../../terminal_client/lib/util/speech.dart#L1)
+- E16: [`terminal_client/lib/util/speech_stub.dart`](../../terminal_client/lib/util/speech_stub.dart#L1), [`terminal_client/lib/util/speech_web.dart`](../../terminal_client/lib/util/speech_web.dart#L3)
+- E17: [`plans/phase-5-voice.md`](../phases/phase-5-voice.md#L15), [`plans/phase-6b-edge-sensing.md`](../phases/phase-6b-edge-sensing.md#L11), [`plans/phase-7-polish.md`](../phases/phase-7-polish.md#L16)
+- E18: [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L842), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L862)
+- E19: [`terminal_client/lib/edge/host.dart`](../../terminal_client/lib/edge/host.dart#L5), [`terminal_client/lib/edge/bundle_store.dart`](../../terminal_client/lib/edge/bundle_store.dart#L3), [`terminal_client/lib/edge/artifact_export.dart`](../../terminal_client/lib/edge/artifact_export.dart#L4)
+- E20: [`terminal_client/pubspec.yaml`](../../terminal_client/pubspec.yaml#L9)
+- E21: [`plans/protocol.md`](../features/protocol.md#L63), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L2455), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L881)
 
 ---
 

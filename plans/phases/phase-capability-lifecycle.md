@@ -1,6 +1,15 @@
+---
+title: "Phase X — Dynamic Capability Lifecycle"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Phase X — Dynamic Capability Lifecycle
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 Make terminal capabilities explicit, typed, and dynamic across the client/server boundary.
 
@@ -13,7 +22,7 @@ This phase deliberately ignores migration and backward-compatibility concerns. T
 
 ## Deliverables
 
-- [x] **Explicit capability lifecycle protocol**: Replace one-shot capability registration with `Hello`, `CapabilitySnapshot`, `CapabilityDelta`, and `CapabilityAck`. See [capability-lifecycle.md](capability-lifecycle.md) and [protocol.md](protocol.md).
+- [x] **Explicit capability lifecycle protocol**: Replace one-shot capability registration with `Hello`, `CapabilitySnapshot`, `CapabilityDelta`, and `CapabilityAck`. See [capability-lifecycle.md](../features/capability-lifecycle.md) and [protocol.md](../features/protocol.md).
 - [x] **Typed capability schema**: Define strongly typed capability messages for display, keyboard, pointer, touch, speaker, microphone, camera, sensors, haptics, and battery. Avoid opaque JSON blobs.
 - [x] **Generation-based synchronization**: Add monotonically increasing capability generations so the server can reject stale deltas and clients can re-baseline with a fresh snapshot.
 - [x] **Dynamic display support**: Model display size, density, orientation, safe areas, fullscreen support, and multi-window support as explicit display capability fields. Treat runtime display changes as capability updates, not ad-hoc UI events.

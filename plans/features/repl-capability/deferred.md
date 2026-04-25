@@ -1,6 +1,15 @@
+---
+title: "REPL Capability Plan — Deferred Work"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # REPL Capability Plan — Deferred Work
 
-See [repl-capability-plan.md](repl-capability-plan.md) for the
+See [repl-capability-plan.md](plan.md) for the
 umbrella this document defers from. This file catalogs concerns
 surfaced during the plan's review cycles (three Codex passes) that
 were *intentionally not* folded into the plan, so that future work
@@ -15,7 +24,7 @@ not ordered by priority — pick order is a separate exercise.
 
 **Surfaced:** review 1, §2 generality and §3 changes-to-consider.
 
-**Location in plan:** [repl-capability-plan.md](repl-capability-plan.md)
+**Location in plan:** [repl-capability-plan.md](plan.md)
 `handlers` command group (`handlers on <selector> <action>
 --run <command>`), `HandlerService` substrate entry.
 
@@ -69,7 +78,7 @@ re-resolution on membership/device-presence changes.
 **Surfaced:** review 1, §2 generality and §3 nice-to-have.
 
 **Location in plan:** L2 families table, phase 10,
-[search-and-memory.md](search-and-memory.md) (optional
+[search-and-memory.md](../search-and-memory.md) (optional
 `MemoryService`).
 
 **Concern.** The umbrella and component plan both admit
@@ -92,9 +101,9 @@ amendment to `search-and-memory.md`.
 
 **Surfaced:** review 1, §2 generality and §3 nice-to-have.
 
-**Location in plan:** [collab-sessions.md](collab-sessions.md)
+**Location in plan:** [collab-sessions.md](../collab-sessions.md)
 session kinds (`chat_room`, `artifact_view`, …),
-[shared-artifacts.md](shared-artifacts.md) artifact kinds
+[shared-artifacts.md](../shared-artifacts.md) artifact kinds
 (`lesson`, `quiz`, `sign`, `checklist`).
 
 **Concern.** Enumerated kinds read as example-driven and will
@@ -182,7 +191,7 @@ should be written against that consumer.
 
 **Surfaced:** review 1, §2 generality.
 
-**Location in plan:** [search-and-memory.md](search-and-memory.md)
+**Location in plan:** [search-and-memory.md](../search-and-memory.md)
 `Query`/`Timeline`/`Related`/`Recent`/`Suggest`.
 
 **Concern.** The search plan enumerates methods but does not
@@ -203,7 +212,7 @@ implementation.
 
 **Surfaced:** review 1, §2 generality.
 
-**Location in plan:** [collab-sessions.md](collab-sessions.md).
+**Location in plan:** [collab-sessions.md](../collab-sessions.md).
 
 **Concern.** Kinds look hardcoded (example-driven), and policy
 constraints (time gating, room gating, role gating — "kids
@@ -260,21 +269,21 @@ listed so that this document does not accidentally re-open them:
 - authored-view inventory commands (`ui views ls/show/rm`):
   applied (lifecycle details deferred as D10).
 - `timeline` taxonomy mismatch: applied (reconciled in umbrella,
-  propagated into [search-and-memory.md](search-and-memory.md)).
+  propagated into [search-and-memory.md](../search-and-memory.md)).
 - ack-ownership boundary blur: applied (`IdentityService` owns
   ack; messaging delegates; actor-kind union allows non-person
   actors).
 - `BugReportService.Attach` / `bug tail`: applied as proposed
-  extensions to [bug-reporting.md](bug-reporting.md) in Phase 11.
+  extensions to [bug-reporting.md](../bug-reporting.md) in Phase 11.
 
 ## Related
 
-- [repl-capability-plan.md](repl-capability-plan.md) — the
+- [repl-capability-plan.md](plan.md) — the
   umbrella this document defers from.
-- [identity-and-audience.md](identity-and-audience.md),
-  [collab-sessions.md](collab-sessions.md),
-  [messaging-and-boards.md](messaging-and-boards.md),
-  [shared-artifacts.md](shared-artifacts.md),
-  [search-and-memory.md](search-and-memory.md),
-  [bug-reporting.md](bug-reporting.md) — Layer 2 component plans
+- [identity-and-audience.md](../identity-and-audience.md),
+  [collab-sessions.md](../collab-sessions.md),
+  [messaging-and-boards.md](../messaging-and-boards.md),
+  [shared-artifacts.md](../shared-artifacts.md),
+  [search-and-memory.md](../search-and-memory.md),
+  [bug-reporting.md](../bug-reporting.md) — Layer 2 component plans
   that several deferred items touch.

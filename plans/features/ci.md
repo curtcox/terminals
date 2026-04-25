@@ -1,6 +1,15 @@
+---
+title: "Code Quality and CI"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Code Quality and CI
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 Every PR is validated by GitHub Actions. Agents should be able to run the same checks locally before pushing.
 
@@ -95,5 +104,5 @@ make run-client-web    # Start the Flutter web client locally
 ## Related Plans
 
 - [agent-config.md](agent-config.md) — How agents discover these commands.
-- [phase-0-setup.md](phase-0-setup.md) — Phase that lands CI.
+- [phase-0-setup.md](../phases/phase-0-setup.md) — Phase that lands CI.
 - [technology.md](technology.md) — Underlying tool choices.

@@ -1,5 +1,14 @@
+---
+title: "Multi-Transport Control Plane"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Multi-Transport Control Plane
-See [masterplan.md](../masterplan.md) for overall system context. Extend the control protocol so clients and server can communicate over **gRPC, WebSocket, raw TCP sockets, or HTTP** without changing scenario semantics or client behavior. The client still acts as a generic terminal. Only the transport carrying typed protocol messages changes.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. Extend the control protocol so clients and server can communicate over **gRPC, WebSocket, raw TCP sockets, or HTTP** without changing scenario semantics or client behavior. The client still acts as a generic terminal. Only the transport carrying typed protocol messages changes.
 
 ## Design Principle
 Treat transport as a **carrier**, not a behavior boundary. The protobuf message model remains the source of truth; all four connection types carry the same logical `ClientMessage` / `ServerMessage` exchange.
@@ -347,5 +356,5 @@ No alternative media plane is introduced here. Only the control plane becomes mu
 - [discovery.md](discovery.md) — Discovery records and manual-connect UX to extend with carrier metadata.
 - [architecture-client.md](architecture-client.md) — Client transport-selection and diagnostics modules.
 - [architecture-server.md](architecture-server.md) — Server transport listener/module layout.
-- [phase-1-foundation.md](phase-1-foundation.md) — Foundational control-plane work that this supersedes conceptually.
-- [phase-3-media.md](phase-3-media.md) — WebRTC signaling remains above the multi-carrier control layer.
+- [phase-1-foundation.md](../phases/phase-1-foundation.md) — Foundational control-plane work that this supersedes conceptually.
+- [phase-3-media.md](../phases/phase-3-media.md) — WebRTC signaling remains above the multi-carrier control layer.

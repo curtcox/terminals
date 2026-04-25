@@ -1,6 +1,15 @@
+---
+title: "Discovery and Connection"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Discovery and Connection
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 ## Automatic Discovery (mDNS)
 

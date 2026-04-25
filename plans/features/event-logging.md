@@ -1,6 +1,15 @@
+---
+title: "Server Event Logging"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Server Event Logging
 
-See [masterplan.md](../masterplan.md) for overall system context. This plan introduces a structured, filesystem-resident event log that captures everything the server does while running, so future feature work can be grounded in real traces rather than guesswork.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. This plan introduces a structured, filesystem-resident event log that captures everything the server does while running, so future feature work can be grounded in real traces rather than guesswork.
 
 ## Goals
 
@@ -345,4 +354,4 @@ Each step is independently mergeable and keeps the server runnable.
 - [architecture-server.md](architecture-server.md) — Server component layout the `component` field mirrors.
 - [protocol.md](protocol.md) — Transport layer whose interceptors anchor trace ids.
 - [application-runtime.md](application-runtime.md) — App runtime emits `appruntime.*` events.
-- [phase-6-monitoring.md](phase-6-monitoring.md) — Later phase that will build on this foundation for external observability.
+- [phase-6-monitoring.md](../phases/phase-6-monitoring.md) — Later phase that will build on this foundation for external observability.

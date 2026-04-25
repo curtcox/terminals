@@ -1,6 +1,15 @@
+---
+title: "Bug Reporting and Diagnostics"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Bug Reporting and Diagnostics
 
-See [masterplan.md](../masterplan.md) for overall system context. This plan defines how any user, on any device, at any time, can file a bug report against the system — including bugs in devices whose own input mechanisms are broken. The mechanism is **modality-agnostic** (no single input device required) and **cross-device** (a bug can be filed about device A from device B).
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. This plan defines how any user, on any device, at any time, can file a bug report against the system — including bugs in devices whose own input mechanisms are broken. The mechanism is **modality-agnostic** (no single input device required) and **cross-device** (a bug can be filed about device A from device B).
 
 ## Goals
 
@@ -18,7 +27,7 @@ See [masterplan.md](../masterplan.md) for overall system context. This plan defi
 
 ## Architectural Fit
 
-Follows the project's core rules (see [CLAUDE.md](../CLAUDE.md)):
+Follows the project's core rules (see [CLAUDE.md](../../CLAUDE.md)):
 
 1. **No scenario-specific client code.** Every on-device entry point is built from the existing `ui/v1` primitives and the existing `InputEvent` / `SensorData` / voice streams. The client adds only a generic "collect my context" capability, not bug-flow logic.
 2. **All wire contracts in protobuf.** New package `api/terminals/diagnostics/v1/diagnostics.proto`.
@@ -198,7 +207,7 @@ Each phase is independently mergeable and independently useful.
 
 ## Incident Addendum (2026-04-16)
 
-See [bug-reporting-incident-2026-04-16.md](./bug-reporting-incident-2026-04-16.md) for the full report from local testing and iterative fixes.
+See [bug-reporting-incident-2026-04-16.md](../incidents/2026-04-16-bug-reporting.md) for the full report from local testing and iterative fixes.
 
 Summary of observed failure:
 

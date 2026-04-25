@@ -12,7 +12,7 @@ When the user files a bug from the Flutter client, the server assigns a short me
 
 The token is the user's handle for the bug — they'll say "work the 'photo' bug" or "what happened with the word sky?". This skill turns that word into a concrete diagnosis.
 
-See [plans/bug-reporting-incident-2026-04-16.md](../../../plans/bug-reporting-incident-2026-04-16.md) for the reporting pipeline background.
+See [plans/bug-reporting-incident-2026-04-16.md](../../../plans/incidents/2026-04-16-bug-reporting.md) for the reporting pipeline background.
 
 ## Procedure
 
@@ -104,5 +104,5 @@ This is the shape every invocation of this skill should produce: word → report
 ## Out of scope
 
 - Filing new bug reports (that's the client UI).
-- Modifying the bug-reporting pipeline itself — see [plans/bug-reporting-incident-2026-04-16.md](../../../plans/bug-reporting-incident-2026-04-16.md) and its follow-ups.
+- Modifying the bug-reporting pipeline itself — see [plans/bug-reporting-incident-2026-04-16.md](../../../plans/incidents/2026-04-16-bug-reporting.md) and its follow-ups.
 - Inventing token words the user didn't supply.

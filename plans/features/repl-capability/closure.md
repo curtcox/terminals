@@ -1,3 +1,12 @@
+---
+title: "REPL Capability Closure Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # REPL Capability Closure Plan
 
 See `../masterplan.md` for overall system context, `../usecases.md` for the original use cases, `plato_inspired_usecases.md` for the PLATO-inspired use cases, `application-runtime.md` for the TAL/TAR runtime, and `repl-and-shell.md` for the REPL plan this document extends.

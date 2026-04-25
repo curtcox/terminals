@@ -1,4 +1,15 @@
-# Terminals — Master Plan
+---
+title: "Terminals — Master Plan"
+kind: plan
+status: superseded
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
+# Terminals — Master Plan (superseded duplicate)
+
+> **Superseded.** The canonical master plan is [`/masterplan.md`](../../masterplan.md). This file is a stale fork preserved here for history; its internal links were broken before the reorg and have not been updated.
 
 A client/server system where devices on the same network serve as terminals for a single unified system. The server orchestrates all behavior; clients are generic IO surfaces that never need updating as new capabilities are added.
 

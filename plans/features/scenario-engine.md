@@ -1,6 +1,15 @@
+---
+title: "Scenario Engine"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Scenario Engine
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 Scenarios are server-side modules that implement specific behaviors. They are the only place where "what the system does" is defined.
 

@@ -1,6 +1,15 @@
+---
+title: "Agent Configuration"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Agent Configuration
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 Development is primarily driven by Claude Code and Codex. The repo must contain configuration files that give these agents the context they need to work effectively.
 
@@ -70,4 +79,4 @@ Each subproject (`terminal_server/`, `terminal_client/`, `api/`) gets its own `C
 ## Related Plans
 
 - [ci.md](ci.md) — CI pipelines referenced here.
-- [phase-0-setup.md](phase-0-setup.md) — Phase that lands these files.
+- [phase-0-setup.md](../phases/phase-0-setup.md) — Phase that lands these files.

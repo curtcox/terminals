@@ -1,8 +1,17 @@
+---
+title: "Implementation Risk Remediation Plan"
+kind: plan
+status: building
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Implementation Risk Remediation Plan
 
 Addresses the findings in [implementation-risk-audit.md](implementation-risk-audit.md). Executed strictly serially — each stage must meet its acceptance criteria before the next begins. Adds a dual-transport server (gRPC for native, WebSocket for web) so the browser client stops depending on raw gRPC sockets.
 
-See [masterplan.md](../masterplan.md) for system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Guiding Decisions
 

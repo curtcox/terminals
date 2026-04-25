@@ -10,7 +10,7 @@ Adds behavior and/or automated validation for an ID from [usecases.md](../../../
 ## Scope check before starting
 
 - **Planned IDs** (`C*`, `V*`, `T*`, `M*`, `D*`, `S*`, `P*`, `I*`) come from [masterplan.md](../../../masterplan.md) — implement freely within the architecture.
-- **Adjacent IDs** (`AH*`, `AO*`, `AB*`, `AA*`) are not in the master plan. Confirm scope with the user before expanding the architecture; they may need a design note in [plans/](../../../plans/) first.
+- **Adjacent IDs** (`AH*`, `AO*`, `AB*`, `AA*`) are not in the master plan. Confirm scope with the user before expanding the architecture; they may need a design note in [plans/](../../../plans) first.
 - If the user is only asking to _promote_ an existing behavior into the validation gate (e.g. the feature already works, you're adding a test), skip to step 5.
 
 ## Core rules (non-negotiable)
@@ -28,11 +28,11 @@ If your design requires violating any of these, stop and discuss with the user b
 
 ### 1. Ground the work
 Re-read the target row in [usecases.md](../../../usecases.md) and the relevant plan file(s):
-- [plans/use-case-flows.md](../../../plans/use-case-flows.md) — end-to-end flow for each planned scenario; start here.
-- [plans/scenario-engine.md](../../../plans/scenario-engine.md) — scenario definitions, activations, triggers, preemption.
-- [plans/application-runtime.md](../../../plans/application-runtime.md) — session lifecycle and orchestration.
-- [plans/protocol.md](../../../plans/protocol.md) — gRPC + WebRTC + data channel shapes.
-- [plans/server-driven-ui.md](../../../plans/server-driven-ui.md) — UI primitive set.
+- [plans/use-case-flows.md](../../../plans/features/use-case-flows.md) — end-to-end flow for each planned scenario; start here.
+- [plans/scenario-engine.md](../../../plans/features/scenario-engine.md) — scenario definitions, activations, triggers, preemption.
+- [plans/application-runtime.md](../../../plans/features/application-runtime.md) — session lifecycle and orchestration.
+- [plans/protocol.md](../../../plans/features/protocol.md) — gRPC + WebRTC + data channel shapes.
+- [plans/server-driven-ui.md](../../../plans/features/server-driven-ui.md) — UI primitive set.
 
 ### 2. Write the failing test first (red)
 Integration tests live in one of:

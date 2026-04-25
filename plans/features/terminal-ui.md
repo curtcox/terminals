@@ -1,6 +1,15 @@
+---
+title: "Terminal UI"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Terminal UI
 
-See [masterplan.md](../masterplan.md) for overall system context. This
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. This
 plan specifies the user-facing surface of a terminal with a screen —
 tablets and browsers running the Flutter client — by composing existing
 primitives, not by inventing new wire contracts.
@@ -19,11 +28,11 @@ Load-bearing precedents this plan leans on:
   the same pattern.
 - [identity-and-audience.md](identity-and-audience.md) — actor forms
   `person` / `device` / `agent` / `anonymous`, possibly uncertain.
-- [capabilities.proto](../api/terminals/capabilities/v1/capabilities.proto)
+- [capabilities.proto](../../api/terminals/capabilities/v1/capabilities.proto)
   + `CapabilityDelta` — the existing channel for viewport, orientation,
   and per-resource availability changes.
 
-The client (see [CLAUDE.md](../CLAUDE.md) core rule 1) remains generic:
+The client (see [CLAUDE.md](../../CLAUDE.md) core rule 1) remains generic:
 it renders descriptors, captures inputs, plays outputs, reports
 events, detects wake words, and reports capability changes. Nothing
 else.
@@ -319,7 +328,7 @@ truth for its own hardware access.
      withdrawal encoding: the `microphone` field and the `camera`
      field are unset on the `DeviceCapabilities` message. Neither
      `AudioInputCapability` nor `CameraCapability` has a `supported`
-     boolean in [capabilities.proto](../api/terminals/capabilities/v1/capabilities.proto),
+     boolean in [capabilities.proto](../../api/terminals/capabilities/v1/capabilities.proto),
      so the pre-rewrite phrasing is invalid; the canonical form is
      "field absent," and a single round-trip test pins it.
   3. Disables local wake-word detection.
@@ -407,7 +416,7 @@ pipeline, not a client concern. This plan requires that a test exist
 asserting at most one intent is dispatched per utterance within a
 configurable window; it does not prescribe the winner policy.
 
-**This is new infrastructure.** [phase-5-voice.md](phase-5-voice.md)
+**This is new infrastructure.** [phase-5-voice.md](../phases/phase-5-voice.md)
 documents STT, LLM, TTS, and the intent bus — it does **not**
 document a dedupe stage. Phase E below owns adding that stage to the
 voice pipeline, in addition to the client-side work. The plan should
@@ -520,7 +529,7 @@ Test layers in use:
   driving end-to-end descriptor round-trips.
 - **Use-case validation gate** (`usecase-validate` skill /
   `make usecase-validate`): end-to-end scenarios registered in
-  [usecases.md](../usecases.md).
+  [usecases.md](../../usecases.md).
 
 ## Phase A — Scenario wrapper: `withCornerAffordance`
 
@@ -730,7 +739,7 @@ not acknowledged as new in the previous revision:
    injection. The fixture is a prerequisite for the dedupe test in
    this phase and must land first.
 2. **A voice-pipeline dedupe stage.** Per the note in "Multi-terminal
-   deduplication" above, [phase-5-voice.md](phase-5-voice.md) does
+   deduplication" above, [phase-5-voice.md](../phases/phase-5-voice.md) does
    not document dedupe. Phase E adds a dedupe stage upstream of
    intent dispatch, configurable by a window length and a
    pluggable winner policy (confidence, first-timestamp, closest
@@ -838,7 +847,7 @@ phase's PR (`make client-test` + `make server-test`):
 
 ## Phase I — End-to-end use cases
 
-Register in [usecases.md](../usecases.md) and wire into
+Register in [usecases.md](../../usecases.md) and wire into
 `make usecase-validate` per the `usecase-implement` skill.
 Tests added in this phase are wired into `make all-check` via
 `make usecase-validate`. Candidate IDs (exact IDs at registration

@@ -1,3 +1,12 @@
+---
+title: "Bug Report Incident: Bug Reporting Reliability (2026-04-16)"
+kind: incident
+status: mitigated
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Bug Report Incident: Bug Reporting Reliability (2026-04-16)
 
 ## Incident Status

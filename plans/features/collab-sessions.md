@@ -1,3 +1,12 @@
+---
+title: "Collaborative Sessions Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Collaborative Sessions Plan
 
 See `application-runtime.md`, `repl-and-shell.md`, and `repl-capability-closure.md` for the broader runtime and REPL context.

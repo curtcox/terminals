@@ -1,6 +1,15 @@
+---
+title: "Server-Driven UI"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Server-Driven UI
 
-See [masterplan.md](../masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 The server sends UI descriptors that the client renders. This is the mechanism by which the client displays anything beyond the connection screen.
 

@@ -1,3 +1,12 @@
+---
+title: "Search and Memory Plan"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Search and Memory Plan
 
 See `repl-capability-closure.md` for the capability-closure rule this plan satisfies.

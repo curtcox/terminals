@@ -1,9 +1,18 @@
+---
+title: "Application Distribution"
+kind: plan
+status: planned
+owner: unowned
+validation: none
+last-reviewed: 2026-04-25
+---
+
 # Application Distribution
 
-See [masterplan.md](masterplan.md) for overall system context.
+See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 Extends [application-runtime.md](application-runtime.md) (TAR/TAL
 package format and lifecycle) and
-[repl-capability-plan.md](repl-capability-plan.md) (authoring
+[repl-capability-plan.md](repl-capability/plan.md) (authoring
 substrate). Depends on [package-format.md](package-format.md)
 (canonical `.tap`, signed statements, `verify_package`
 pipeline), [signing-and-trust.md](signing-and-trust.md) (keys,
@@ -16,7 +25,7 @@ rotation, policy schema), and [app-migrations.md](app-migrations.md)
 [identity-and-audience.md](identity-and-audience.md).
 
 Worked example used throughout:
-[docs/tal-example-kitchen-timer.md](../docs/tal-example-kitchen-timer.md).
+[docs/tal-example-kitchen-timer.md](../../docs/tal-example-kitchen-timer.md).
 
 ## Problem
 
@@ -1725,7 +1734,7 @@ defined command:
 
 ## 9. Worked Example (Kitchen Timer, End-to-End)
 
-Using [docs/tal-example-kitchen-timer.md](../docs/tal-example-kitchen-timer.md):
+Using [docs/tal-example-kitchen-timer.md](../../docs/tal-example-kitchen-timer.md):
 
 1. **Author on Server A.**
    - Operator: "build me a kitchen timer" via Claude over MCP.
