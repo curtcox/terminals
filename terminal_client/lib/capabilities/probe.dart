@@ -28,7 +28,6 @@ class CapabilityProbeContext {
     required this.screenWidth,
     required this.screenHeight,
     required this.screenDensity,
-    required this.touchInputLikely,
     required this.targetPlatform,
   });
 
@@ -39,7 +38,6 @@ class CapabilityProbeContext {
   final int screenWidth;
   final int screenHeight;
   final double screenDensity;
-  final bool touchInputLikely;
   final TargetPlatform targetPlatform;
 }
 
@@ -108,9 +106,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     if (hasKeyboard) {
       capabilities.keyboard = (capv1.KeyboardCapability()..physical = true);
     }
-    capabilities.pointer = (capv1.PointerCapability()
-      ..type = context.touchInputLikely ? 'touch' : 'mouse'
-      ..hover = !context.touchInputLikely);
     if (hasAudioOutput) {
       final outputEndpoints =
           _audioEndpointsForKind(mediaDevices, 'audiooutput');

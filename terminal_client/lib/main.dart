@@ -1449,14 +1449,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     _capabilityPollInFlight = true;
     try {
-      final touchInputLikely = switch (defaultTargetPlatform) {
-        TargetPlatform.android => true,
-        TargetPlatform.iOS => true,
-        TargetPlatform.fuchsia => true,
-        TargetPlatform.macOS => false,
-        TargetPlatform.linux => false,
-        TargetPlatform.windows => false,
-      };
       final probedCapabilities = await _capabilityProbe.probe(
         CapabilityProbeContext(
           deviceId: _deviceId,
@@ -1466,7 +1458,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           screenWidth: _currentLogicalSize().width.round(),
           screenHeight: _currentLogicalSize().height.round(),
           screenDensity: _currentDevicePixelRatio(),
-          touchInputLikely: touchInputLikely,
           targetPlatform: defaultTargetPlatform,
         ),
       );
@@ -2320,14 +2311,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       );
 
       _syncMonitoringLoops();
-      final touchInputLikely = switch (defaultTargetPlatform) {
-        TargetPlatform.android => true,
-        TargetPlatform.iOS => true,
-        TargetPlatform.fuchsia => true,
-        TargetPlatform.macOS => false,
-        TargetPlatform.linux => false,
-        TargetPlatform.windows => false,
-      };
       final probedCapabilities = await _capabilityProbe.probe(
         CapabilityProbeContext(
           deviceId: _deviceId,
@@ -2337,7 +2320,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           screenWidth: size.width.round(),
           screenHeight: size.height.round(),
           screenDensity: _currentDevicePixelRatio(),
-          touchInputLikely: touchInputLikely,
           targetPlatform: defaultTargetPlatform,
         ),
       );

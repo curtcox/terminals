@@ -17,7 +17,6 @@ void main() {
         screenWidth: 1920,
         screenHeight: 1080,
         screenDensity: 2.0,
-        touchInputLikely: false,
         targetPlatform: TargetPlatform.macOS,
       ),
     );
@@ -27,6 +26,7 @@ void main() {
     expect(capabilities.hasSpeakers(), isFalse);
     expect(capabilities.hasHaptics(), isFalse);
     expect(capabilities.hasEdge(), isTrue);
+    expect(capabilities.hasPointer(), isFalse);
     expect(capabilities.hasTouch(), isFalse);
     expect(capabilities.screen.hasTouch(), isFalse);
     expect(capabilities.displays.first.screen.hasTouch(), isFalse);
@@ -77,7 +77,6 @@ void main() {
         screenWidth: 1080,
         screenHeight: 1920,
         screenDensity: 2.5,
-        touchInputLikely: true,
         targetPlatform: TargetPlatform.android,
       ),
     );
@@ -86,6 +85,7 @@ void main() {
     expect(capabilities.hasCamera(), isTrue);
     expect(capabilities.hasSpeakers(), isTrue);
     expect(capabilities.hasHaptics(), isTrue);
+    expect(capabilities.hasPointer(), isFalse);
     expect(capabilities.hasTouch(), isFalse);
     expect(capabilities.screen.hasTouch(), isFalse);
     expect(capabilities.displays.first.screen.hasTouch(), isFalse);
@@ -127,7 +127,6 @@ void main() {
         screenWidth: 1920,
         screenHeight: 1080,
         screenDensity: 2.0,
-        touchInputLikely: false,
         targetPlatform: TargetPlatform.macOS,
       ),
     );
