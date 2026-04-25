@@ -39,6 +39,11 @@ Current policy in this repo:
 - Web, macOS, Linux, Windows: `foreground_only`
 - Android, iOS: currently `foreground_only` until dedicated background schedulers are implemented and validated
 
+## Alert Delivery Routing
+
+- `ConnectResponse.notification` is treated as explicit user alert delivery and routed through the client alert-delivery callback (default behavior currently speaks the alert text).
+- `ConnectResponse.command_result.notification` remains an in-app status update and does not trigger external alert delivery.
+
 ## Milestone
 
 "Tell me when the dishwasher stops" works end to end.

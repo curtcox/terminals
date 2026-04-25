@@ -234,6 +234,51 @@ void main() {
     expect(harness.createdClients, isNotEmpty);
   });
 
+  testWidgets(
+    'notification envelope triggers alert delivery callback only for explicit notifications',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      final deliveredAlerts = <String>[];
+
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          alertDelivery: ({
+            required String title,
+            required String body,
+            required String level,
+          }) {
+            deliveredAlerts.add('$title|$body|$level');
+          },
+        ),
+      );
+
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..notification = (uiv1.Notification()
+            ..title = 'Timer'
+            ..body = 'Dishwasher finished'
+            ..level = 'info'),
+      );
+      await tester.pump();
+
+      expect(deliveredAlerts, <String>['Timer|Dishwasher finished|info']);
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..commandResult =
+              (CommandResult()..notification = 'in-app status only'),
+      );
+      await tester.pump();
+
+      expect(deliveredAlerts, <String>['Timer|Dishwasher finished|info']);
+    },
+  );
+
   testWidgets('app shows build metadata footer', (WidgetTester tester) async {
     await tester.pumpWidget(const TerminalClientApp());
     expect(find.textContaining('Build:'), findsWidgets);

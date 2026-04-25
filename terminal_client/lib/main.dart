@@ -36,6 +36,11 @@ typedef ClientMediaEngineFactory = ClientMediaEngine Function({
   required OutboundSignalCallback onSignal,
 });
 typedef AudioPlaybackFactory = AudioPlayback Function();
+typedef AlertDelivery = void Function({
+  required String title,
+  required String body,
+  required String level,
+});
 typedef UnixMsProvider = int Function();
 typedef BugReportScreenshotCapture = Future<List<int>> Function();
 typedef WakeWordDetectorFactory = WakeWordDetectorController Function();
@@ -110,6 +115,18 @@ AudioPlayback _defaultAudioPlaybackFactory() {
     return NoopAudioPlayback();
   }
   return AudioPlayerPlayback();
+}
+
+void _defaultAlertDelivery({
+  required String title,
+  required String body,
+  required String level,
+}) {
+  final spoken = body.trim().isNotEmpty ? body.trim() : title.trim();
+  if (spoken.isEmpty) {
+    return;
+  }
+  speech.speakText(spoken);
 }
 
 WakeWordDetectorController _defaultWakeWordDetectorFactory() {
@@ -947,6 +964,7 @@ class TerminalClientApp extends StatelessWidget {
     this.capabilityProbeFactory = _defaultCapabilityProbeFactory,
     this.mediaEngineFactory = defaultClientMediaEngineFactory,
     this.audioPlaybackFactory = _defaultAudioPlaybackFactory,
+    this.alertDelivery = _defaultAlertDelivery,
     this.heartbeatInterval = const Duration(seconds: 10),
     this.sensorTelemetryInterval = const Duration(seconds: 15),
     this.reconnectDelayBase = const Duration(seconds: 2),
@@ -965,6 +983,7 @@ class TerminalClientApp extends StatelessWidget {
   final CapabilityProbeFactory capabilityProbeFactory;
   final ClientMediaEngineFactory mediaEngineFactory;
   final AudioPlaybackFactory audioPlaybackFactory;
+  final AlertDelivery alertDelivery;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
@@ -987,6 +1006,7 @@ class TerminalClientApp extends StatelessWidget {
         capabilityProbeFactory: capabilityProbeFactory,
         mediaEngineFactory: mediaEngineFactory,
         audioPlaybackFactory: audioPlaybackFactory,
+        alertDelivery: alertDelivery,
         heartbeatInterval: heartbeatInterval,
         sensorTelemetryInterval: sensorTelemetryInterval,
         reconnectDelayBase: reconnectDelayBase,
@@ -1010,6 +1030,7 @@ class _ControlStreamScaffold extends StatefulWidget {
     required this.capabilityProbeFactory,
     required this.mediaEngineFactory,
     required this.audioPlaybackFactory,
+    required this.alertDelivery,
     required this.heartbeatInterval,
     required this.sensorTelemetryInterval,
     required this.reconnectDelayBase,
@@ -1028,6 +1049,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   final CapabilityProbeFactory capabilityProbeFactory;
   final ClientMediaEngineFactory mediaEngineFactory;
   final AudioPlaybackFactory audioPlaybackFactory;
+  final AlertDelivery alertDelivery;
   final Duration heartbeatInterval;
   final Duration sensorTelemetryInterval;
   final Duration reconnectDelayBase;
@@ -2189,6 +2211,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
             }
             if (response.hasNotification()) {
               _lastNotification = response.notification.body;
+              widget.alertDelivery(
+                title: response.notification.title,
+                body: response.notification.body,
+                level: response.notification.level,
+              );
             }
             if (response.hasCommandResult() &&
                 response.commandResult.notification.isNotEmpty) {
