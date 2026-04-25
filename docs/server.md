@@ -102,6 +102,39 @@ make server-test          # run all tests
 make server-coverage      # run tests with coverage report
 ```
 
+## Scheduler
+
+The in-memory scheduler stores structured records in
+`terminal_server/internal/storage.ScheduleRecord`. A record includes the stable
+key, kind, subject, device ID, trigger time, optional string payload, and
+creation timestamp.
+
+Legacy key-only callers remain supported through `Schedule(ctx, key, unixMS)`
+and `Due(unixMS)`. Those calls are stored internally as records, and known key
+prefixes such as `timer:` infer the schedule kind. New server code should prefer
+`ScheduleRecord` and `DueRecords` when it needs typed metadata such as a timer
+label or duration.
+
+Timer due processing prefers structured records and falls back to parsing
+legacy timer keys, so old scheduled entries still fire and are removed.
+
+## Scenario Operations
+
+Scenarios may opt in to the result-returning path by implementing
+`ResultScenario`. Instead of directly performing every side effect in `Start`,
+they return a `ScenarioResult` containing typed operations and emitted
+triggers. The engine validates all operations before committing any side
+effects, then executes the operations in order.
+
+Currently executable operation kinds are `scheduler.after`,
+`scheduler.cancel`, `broadcast.notify`, `ai.tts`, and `bus.emit`. The shared
+model also defines UI and flow operation names for the TAL/TAR contract, but
+those are rejected until the corresponding executors exist.
+
+`TimerReminderScenario` is the first built-in scenario on this path. It returns
+a scheduler operation plus a confirmation notification, while legacy scenarios
+continue to use their existing `Start` methods.
+
 ## Lint
 
 ```bash
