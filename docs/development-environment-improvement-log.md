@@ -85,3 +85,19 @@ documented in the guides below.
 - `ResultFromAppRuntime` adapts `appruntime.Result` values into
   `scenario.ScenarioResult`, giving TAL activations and Go scenarios a shared
   operation model once TAL interpretation is active.
+
+## 2026-04-25 Kitchen Timer Completion Pass
+
+- Go tests may try to write under the user-level Go build cache, which is
+  outside the workspace sandbox. Running focused tests with
+  `GOCACHE=/tmp/terminals-go-build` avoids the permission failure; a make-level
+  default would make this smoother for app-development loops.
+- Scenario-authored UI now has an in-memory host and transport polling bridge,
+  but the response-only stream shape means updates are delivered on command or
+  heartbeat turns rather than pushed independently from the housekeeping loop.
+- The current scheduler models 1 Hz timer ticks as structured one-shot records.
+  That keeps the implementation small, but a first-class recurring scheduler
+  operation would better match the TAL `scheduler.every` contract.
+- Timer cancellation currently finds all pending timer/tick records for a
+  source device by scanning scheduler records. An indexed scheduler query by
+  kind/device would make cancellation and future multi-timer management cleaner.

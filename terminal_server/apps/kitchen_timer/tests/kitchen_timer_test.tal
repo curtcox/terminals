@@ -4,3 +4,4 @@ test("manifest declares kitchen timer"):
     assert main.contains("def _on_expired")
     assert main.contains("timer.expired")
     assert main.contains("Your %s is ready.")
+    assert main.contains("ui.clear")

@@ -116,7 +116,10 @@ func inferScheduleKind(key string) string {
 		return ""
 	}
 	switch prefix {
-	case "timer", "schedule_monitor":
+	case "timer", "timer_tick", "schedule_monitor":
+		if prefix == "timer_tick" {
+			return "timer.tick"
+		}
 		return prefix
 	default:
 		return ""

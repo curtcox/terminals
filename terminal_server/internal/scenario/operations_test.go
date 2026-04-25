@@ -86,3 +86,26 @@ func TestExecuteOperationsTTSAndBusEmit(t *testing.T) {
 		t.Fatalf("expected bus event")
 	}
 }
+
+func TestExecuteOperationsUISetPatchAndClear(t *testing.T) {
+	uiHost := ui.NewMemoryHost()
+	root := ui.New("stack", map[string]string{"id": "timer"})
+	patch := ui.New("text", map[string]string{"id": "remaining", "value": "00:59"})
+	env := &Environment{UI: uiHost}
+
+	err := ExecuteOperations(context.Background(), env, []Operation{
+		{Kind: OperationUISet, Target: "kitchen-screen", Node: &root},
+		{Kind: OperationUIPatch, Target: "kitchen-screen", Args: map[string]string{"component_id": "remaining"}, Node: &patch},
+		{Kind: OperationUIClear, Target: "kitchen-screen", Args: map[string]string{"root": "timer"}},
+	}, time.Date(2026, 4, 12, 9, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("ExecuteOperations() error = %v", err)
+	}
+	events := uiHost.Events()
+	if len(events) != 3 {
+		t.Fatalf("len(events) = %d, want 3", len(events))
+	}
+	if events[0].Kind != "set" || events[1].ComponentID != "remaining" || events[2].Root != "timer" {
+		t.Fatalf("unexpected UI events: %+v", events)
+	}
+}

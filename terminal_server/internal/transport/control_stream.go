@@ -422,6 +422,7 @@ type StreamHandler struct {
 	terminalUIInterval    time.Duration
 	terminalReplAdminURL  string
 	lastSetUIByDevice     map[string]ui.Descriptor
+	lastUIHostEventByDev  map[string]int
 	mainUIActivationByDev map[string]string
 	menuOverlayByDevice   map[string]menuOverlayState
 	multiWindowResume     map[string]multiWindowResumeState
@@ -535,6 +536,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		terminalUIInterval:      defaultTerminalUIInterval,
 		terminalReplAdminURL:    defaultTerminalReplAdminURL,
 		lastSetUIByDevice:       map[string]ui.Descriptor{},
+		lastUIHostEventByDev:    map[string]int{},
 		mainUIActivationByDev:   map[string]string{},
 		menuOverlayByDevice:     map[string]menuOverlayState{},
 		multiWindowResume:       map[string]multiWindowResumeState{},
@@ -582,6 +584,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		terminalUIInterval:      defaultTerminalUIInterval,
 		terminalReplAdminURL:    defaultTerminalReplAdminURL,
 		lastSetUIByDevice:       map[string]ui.Descriptor{},
+		lastUIHostEventByDev:    map[string]int{},
 		mainUIActivationByDev:   map[string]string{},
 		menuOverlayByDevice:     map[string]menuOverlayState{},
 		multiWindowResume:       map[string]multiWindowResumeState{},
@@ -789,7 +792,12 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		if photoRotate := h.photoFrameHeartbeatUpdate(msg.Heartbeat.DeviceID); photoRotate != nil {
 			out = append(out, *photoRotate)
 		}
+		uiMessages := h.uiHostMessagesForDevice(msg.Heartbeat.DeviceID)
+		if len(uiMessages) > 0 {
+			out = append(out, uiMessages...)
+		}
 		if len(out) > 0 {
+			h.rememberSetUI(msg.Heartbeat.DeviceID, out)
 			return out, nil
 		}
 		return nil, nil
@@ -909,6 +917,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		}
 		beforeRoutes := h.routeSnapshotForDevice(msg.Command.DeviceID)
 		beforeBroadcastEvents := h.broadcastEventCount()
+		beforeUIEvents := h.uiHostEventCount()
 		commandResult, err := h.handleCommand(ctx, msg.Command)
 		if err != nil {
 			h.metrics.commandErrors.Add(1)
@@ -968,6 +977,10 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		broadcastNotifications := h.broadcastNotificationsForCommand(msg.Command, commandResult, beforeBroadcastEvents)
 		if len(broadcastNotifications) > 0 {
 			postResponses = append(postResponses, broadcastNotifications...)
+		}
+		uiMessages := h.uiHostMessagesSince(beforeUIEvents, msg.Command.DeviceID, true)
+		if len(uiMessages) > 0 {
+			postResponses = append(postResponses, uiMessages...)
 		}
 		h.rememberSetUI(msg.Command.DeviceID, postResponses)
 		return postResponses, nil
@@ -1411,6 +1424,91 @@ func (h *StreamHandler) broadcastEventCount() int {
 		return 0
 	}
 	return len(eventReader.Events())
+}
+
+func (h *StreamHandler) uiHostEventCount() int {
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.UI == nil {
+		return 0
+	}
+	eventReader, ok := h.runtime.Env.UI.(interface {
+		Events() []ui.HostEvent
+	})
+	if !ok {
+		return 0
+	}
+	return len(eventReader.Events())
+}
+
+func (h *StreamHandler) uiHostMessagesForDevice(deviceID string) []ServerMessage {
+	count := h.uiHostEventCount()
+	h.mu.Lock()
+	beforeCount := h.lastUIHostEventByDev[strings.TrimSpace(deviceID)]
+	h.lastUIHostEventByDev[strings.TrimSpace(deviceID)] = count
+	h.mu.Unlock()
+	return h.uiHostMessagesSince(beforeCount, deviceID, true)
+}
+
+func (h *StreamHandler) uiHostMessagesSince(beforeCount int, sessionDeviceID string, includeSession bool) []ServerMessage {
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.UI == nil {
+		return nil
+	}
+	eventReader, ok := h.runtime.Env.UI.(interface {
+		Events() []ui.HostEvent
+	})
+	if !ok {
+		return nil
+	}
+	events := eventReader.Events()
+	if beforeCount < 0 {
+		beforeCount = 0
+	}
+	if beforeCount > len(events) {
+		beforeCount = len(events)
+	}
+	sessionDeviceID = strings.TrimSpace(sessionDeviceID)
+	out := make([]ServerMessage, 0, len(events)-beforeCount)
+	delivered := map[string]struct{}{}
+	for _, event := range events[beforeCount:] {
+		targetDeviceID := strings.TrimSpace(event.DeviceID)
+		if targetDeviceID == "" {
+			continue
+		}
+		if targetDeviceID == sessionDeviceID && !includeSession {
+			continue
+		}
+		msg := ServerMessage{}
+		switch event.Kind {
+		case "set":
+			node := event.Node
+			msg.SetUI = &node
+		case "patch":
+			msg.UpdateUI = &UIUpdate{
+				ComponentID: strings.TrimSpace(event.ComponentID),
+				Node:        event.Node,
+			}
+		case "clear":
+			node := ui.HelloWorld(targetDeviceID)
+			msg.SetUI = &node
+		default:
+			continue
+		}
+		if targetDeviceID != sessionDeviceID {
+			msg.RelayToDeviceID = targetDeviceID
+		}
+		out = append(out, msg)
+		delivered[targetDeviceID] = struct{}{}
+		delivered[sessionDeviceID] = struct{}{}
+	}
+	if len(delivered) > 0 {
+		h.mu.Lock()
+		for deliveredDeviceID := range delivered {
+			if deliveredDeviceID != "" {
+				h.lastUIHostEventByDev[deliveredDeviceID] = len(events)
+			}
+		}
+		h.mu.Unlock()
+	}
+	return out
 }
 
 func (h *StreamHandler) broadcastNotificationsForCommand(
@@ -3231,6 +3329,7 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 	}
 	beforeRoutes := h.routeSnapshotForDevice(deviceID)
 	beforeBroadcastEvents := h.broadcastEventCount()
+	beforeUIEvents := h.uiHostEventCount()
 
 	intent := ""
 	commandAction := CommandActionStart
@@ -3326,6 +3425,10 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		if len(broadcastNotifications) > 0 {
 			responses = append(responses, broadcastNotifications...)
 		}
+		uiMessages := h.uiHostMessagesSince(beforeUIEvents, deviceID, true)
+		if len(uiMessages) > 0 {
+			responses = append(responses, uiMessages...)
+		}
 		return responses, true, nil
 	}
 	name, err := h.runtime.HandleTrigger(ctx, trigger)
@@ -3363,6 +3466,10 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 	broadcastNotifications := h.broadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
 	if len(broadcastNotifications) > 0 {
 		responses = append(responses, broadcastNotifications...)
+	}
+	uiMessages := h.uiHostMessagesSince(beforeUIEvents, deviceID, true)
+	if len(uiMessages) > 0 {
+		responses = append(responses, uiMessages...)
 	}
 	return responses, true, nil
 }

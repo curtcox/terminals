@@ -26,7 +26,7 @@ the planned TAL/TAR contract:
 | Exported definitions | Partially implemented | manifests declare exports and packages register exported app definitions, but TAL `match` bodies are not interpreted. |
 | TAL parsing/interpretation | Planned | TAL files are present as contract examples; lifecycle hooks are not executed by an interpreter. |
 | Lifecycle state snapshots | Planned | `Result.State` is the target contract; durable snapshots are not committed for interpreted TAL activations yet. |
-| Host operation commit | Partially implemented | Go `ResultScenario` activations can return operations committed by `internal/scenario.ExecuteOperations`; TAL results can be adapted to the same model, but interpreted TAL lifecycle hooks are not wired end-to-end yet. |
+| Host operation commit | Partially implemented | Go `ResultScenario` activations can return UI, scheduler, TTS, broadcast, and bus operations committed by `internal/scenario.ExecuteOperations`; TAL results can be adapted to the same model, but interpreted TAL lifecycle hooks are not wired end-to-end yet. |
 | Simulation harness | Partially implemented | `term app test` smoke-tests packages and test declarations; full synthetic-time lifecycle simulation is planned. |
 
 ## Language Choice

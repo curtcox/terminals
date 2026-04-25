@@ -116,6 +116,7 @@ func main() {
 	store := storage.NewMemoryStore()
 	scheduler := storage.NewMemoryScheduler()
 	broadcaster := ui.NewMemoryBroadcaster()
+	uiHost := ui.NewMemoryHost()
 	observationStore := observation.NewStore(4096)
 	worldModel := world.NewModel()
 	appRuntime := appruntime.NewRuntime()
@@ -145,6 +146,7 @@ func main() {
 		Storage:     store,
 		Scheduler:   scheduler,
 		Broadcast:   broadcaster,
+		UI:          uiHost,
 		DeviceAudio: scenarioDeviceAudio{hub: audioHub},
 		Placement:   placement.NewManagerBackedEngine(deviceManager),
 		Observe:     observationStore,

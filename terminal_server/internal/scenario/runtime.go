@@ -495,8 +495,47 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 
 	processed := 0
 	for _, record := range dueRecords {
-		if record.Kind == "timer" || strings.HasPrefix(record.Key, "timer:") {
+		if record.Kind == "timer.tick" || strings.HasPrefix(record.Key, "timer_tick:") {
 			meta := timerMetadataFromScheduleRecord(record)
+			if meta.FireUnixMS > now.UnixMilli() && meta.TargetDeviceID != "" && r.Env.UI != nil {
+				remaining := int((meta.FireUnixMS - now.UnixMilli() + 999) / 1000)
+				if remaining < 0 {
+					remaining = 0
+				}
+				node := timerRemainingPatch(remaining)
+				if err := r.Env.UI.Patch(ctx, meta.TargetDeviceID, "remaining", node); err != nil {
+					return processed, err
+				}
+				nextUnixMS := now.Add(time.Second).UnixMilli()
+				if nextUnixMS < meta.FireUnixMS {
+					if structured, ok := r.Env.Scheduler.(interface {
+						ScheduleRecord(context.Context, storage.ScheduleRecord) error
+					}); ok {
+						if err := structured.ScheduleRecord(ctx, storage.ScheduleRecord{
+							Key:      timerTickScheduleKey(meta.DeviceID, meta.FireUnixMS, meta.DurationSeconds, meta.Label, nextUnixMS),
+							Kind:     "timer.tick",
+							Subject:  meta.Label,
+							DeviceID: meta.DeviceID,
+							UnixMS:   nextUnixMS,
+							Payload: map[string]string{
+								"duration_seconds": strconv.Itoa(meta.DurationSeconds),
+								"expiry_unix_ms":   strconv.FormatInt(meta.FireUnixMS, 10),
+								"target_device_id": meta.TargetDeviceID,
+							},
+						}); err != nil {
+							return processed, err
+						}
+					}
+				}
+			}
+		} else if record.Kind == "timer" || strings.HasPrefix(record.Key, "timer:") {
+			meta := timerMetadataFromScheduleRecord(record)
+			if meta.TargetDeviceID != "" && r.Env.UI != nil {
+				node := timerDoneBannerPatch()
+				if err := r.Env.UI.Patch(ctx, meta.TargetDeviceID, "banner", node); err != nil {
+					return processed, err
+				}
+			}
 			if r.Env.Broadcast != nil {
 				deviceIDs := []string{}
 				if meta.DeviceID != "" {
@@ -540,12 +579,46 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 
 func scheduleKindFromKey(key string) string {
 	if prefix, _, ok := strings.Cut(key, ":"); ok {
+		if prefix == "timer_tick" {
+			return "timer.tick"
+		}
 		return prefix
 	}
 	return ""
 }
 
 func timerMetadataFromScheduleRecord(record storage.ScheduleRecord) timerScheduleMetadata {
+	if record.Kind == "timer.tick" || strings.HasPrefix(record.Key, "timer_tick:") {
+		legacy := timerScheduleMetadata{}
+		if strings.HasPrefix(record.Key, "timer_tick:") {
+			legacy = parseTimerTickScheduleKey(record.Key)
+		}
+		meta := timerScheduleMetadata{
+			DeviceID:       strings.TrimSpace(record.DeviceID),
+			TargetDeviceID: strings.TrimSpace(record.Payload["target_device_id"]),
+			FireUnixMS:     legacy.FireUnixMS,
+			Label:          strings.TrimSpace(record.Subject),
+		}
+		if meta.Label == "" {
+			meta.Label = "timer"
+		}
+		if raw := strings.TrimSpace(record.Payload["expiry_unix_ms"]); raw != "" {
+			meta.FireUnixMS, _ = strconv.ParseInt(raw, 10, 64)
+		}
+		if raw := strings.TrimSpace(record.Payload["duration_seconds"]); raw != "" {
+			meta.DurationSeconds, _ = strconv.Atoi(raw)
+		}
+		if meta.DeviceID == "" {
+			meta.DeviceID = legacy.DeviceID
+		}
+		if meta.DurationSeconds == 0 {
+			meta.DurationSeconds = legacy.DurationSeconds
+		}
+		if meta.Label == "timer" && legacy.Label != "" {
+			meta.Label = legacy.Label
+		}
+		return meta
+	}
 	if record.Kind != "timer" && strings.HasPrefix(record.Key, "timer:") {
 		return parseTimerScheduleKey(record.Key)
 	}
@@ -554,9 +627,10 @@ func timerMetadataFromScheduleRecord(record storage.ScheduleRecord) timerSchedul
 		legacy = parseTimerScheduleKey(record.Key)
 	}
 	meta := timerScheduleMetadata{
-		DeviceID:   strings.TrimSpace(record.DeviceID),
-		FireUnixMS: record.UnixMS,
-		Label:      strings.TrimSpace(record.Subject),
+		DeviceID:       strings.TrimSpace(record.DeviceID),
+		TargetDeviceID: strings.TrimSpace(record.Payload["target_device_id"]),
+		FireUnixMS:     record.UnixMS,
+		Label:          strings.TrimSpace(record.Subject),
 	}
 	if meta.Label == "" {
 		meta.Label = "timer"

@@ -91,6 +91,8 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 		}
 	case normalized == "schedule monitor":
 		trigger.Intent = "schedule monitor"
+	case normalized == "cancel timer" || normalized == "cancel the timer" || normalized == "stop timer" || normalized == "stop the timer":
+		trigger.Intent = "cancel timer"
 	case normalized == "voice assistant" || strings.HasPrefix(normalized, "assistant "):
 		trigger.Intent = "voice assistant"
 		if strings.HasPrefix(normalized, "assistant ") {

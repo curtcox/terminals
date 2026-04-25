@@ -40,6 +40,7 @@ var allowedPermissions = map[string]struct{}{
 	"claims.request": {},
 	"ui.set":         {},
 	"ui.patch":       {},
+	"ui.clear":       {},
 	"ui.transition":  {},
 	"flow.apply":     {},
 	"flow.patch":     {},

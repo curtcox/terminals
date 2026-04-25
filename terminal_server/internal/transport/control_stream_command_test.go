@@ -91,6 +91,48 @@ func TestHandleMessageCommandVoice(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCommandVoiceTimerRelaysCountdownUI(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	uiHost := ui.NewMemoryHost()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		Scheduler: storage.NewMemoryScheduler(),
+		UI:        uiHost,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Tablet",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-timer",
+			DeviceID:  "device-1",
+			Kind:      "voice",
+			Text:      "set a timer for 1 minutes pasta",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(timer command) error = %v", err)
+	}
+	var foundSetUI bool
+	for _, msg := range out {
+		if msg.SetUI != nil && findNodePropValue(msg.SetUI, "remaining", "value") == "01:00" {
+			foundSetUI = true
+		}
+	}
+	if !foundSetUI {
+		t.Fatalf("expected countdown SetUI in responses: %+v", out)
+	}
+}
+
 func TestHandleMessageIntercomStartStopUpdatesRecordingManager(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

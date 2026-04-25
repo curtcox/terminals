@@ -7,6 +7,7 @@ import (
 
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
+	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
 // TriggerKind identifies how a scenario was requested.
@@ -346,6 +347,13 @@ type Broadcaster interface {
 	Notify(ctx context.Context, deviceIDs []string, message string) error
 }
 
+// UIHost applies server-driven UI descriptors to terminals.
+type UIHost interface {
+	Set(ctx context.Context, deviceID string, root ui.Descriptor) error
+	Patch(ctx context.Context, deviceID, componentID string, node ui.Descriptor) error
+	Clear(ctx context.Context, deviceID, root string) error
+}
+
 // Environment is the dependency bag scenarios receive at runtime.
 type Environment struct {
 	Devices     DeviceManager
@@ -361,6 +369,7 @@ type Environment struct {
 	Storage     StorageManager
 	Scheduler   Scheduler
 	Broadcast   Broadcaster
+	UI          UIHost
 	DeviceAudio DeviceAudioSubscriber
 	Passthrough PassthroughBridge
 	Placement   PlacementEngine

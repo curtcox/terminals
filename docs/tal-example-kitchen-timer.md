@@ -19,7 +19,7 @@ named there.
 
 | Path | Status | What runs today |
 |---|---|---|
-| Current executable path | Implemented | The Go-side `TimerReminderScenario` handles T1 timer requests, schedules due timers, and emits the reminder side effects. |
+| Current executable path | Implemented | The Go-side `TimerReminderScenario` handles T1 timer requests, places a countdown UI, schedules expiry and 1 Hz ticks, patches remaining time and the done banner, supports cancellation, speaks the alert, emits `timer.expired`, and removes due records. |
 | Package-load path | Partially implemented | `terminal_server/apps/kitchen_timer` is loadable by `term app check kitchen_timer` and smoke-tested by `term app test kitchen_timer`. |
 | TAL interpretation path | Planned | Lifecycle hooks returning host operations are the planned contract in [plans/application-runtime.md](../plans/application-runtime.md), but they are not interpreted end-to-end yet. |
 
@@ -81,6 +81,7 @@ permissions = [
     "placement.read",   # resolve the nearest display to the cook
     "ui.set",           # render the initial countdown view
     "ui.patch",         # tick the remaining-time field and banner
+    "ui.clear",         # clear the timer view when cancelled/stopped
     "scheduler",        # one-shot expiry + 1 Hz tick
     "ai.tts",           # speak "Your pasta is ready."
     "bus.emit",         # emit a `timer.expired` event for other apps

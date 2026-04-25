@@ -10,12 +10,14 @@ import (
 
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
+	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
 // Operation kind constants identify host capabilities the executor can commit.
 const (
 	OperationUISet           = "ui.set"
 	OperationUIPatch         = "ui.patch"
+	OperationUIClear         = "ui.clear"
 	OperationUITransition    = "ui.transition"
 	OperationSchedulerAfter  = "scheduler.after"
 	OperationSchedulerCancel = "scheduler.cancel"
@@ -31,6 +33,7 @@ type Operation struct {
 	Kind   string
 	Target string
 	Args   map[string]string
+	Node   *ui.Descriptor
 }
 
 // ScenarioResult is the all-or-nothing result model shared by Go scenarios and TAL apps.
@@ -125,7 +128,37 @@ func ValidateOperations(env *Environment, ops []Operation) error {
 			if strings.TrimSpace(op.Target) == "" {
 				return fmt.Errorf("op %d %s requires event kind target", i, op.Kind)
 			}
-		case OperationUISet, OperationUIPatch, OperationUITransition, OperationFlowApply, OperationFlowStop:
+		case OperationUISet:
+			if env == nil || env.UI == nil {
+				return fmt.Errorf("op %d %s requires ui host", i, op.Kind)
+			}
+			if strings.TrimSpace(op.Target) == "" {
+				return fmt.Errorf("op %d %s requires target device", i, op.Kind)
+			}
+			if op.Node == nil {
+				return fmt.Errorf("op %d %s requires node", i, op.Kind)
+			}
+		case OperationUIPatch:
+			if env == nil || env.UI == nil {
+				return fmt.Errorf("op %d %s requires ui host", i, op.Kind)
+			}
+			if strings.TrimSpace(op.Target) == "" {
+				return fmt.Errorf("op %d %s requires target device", i, op.Kind)
+			}
+			if strings.TrimSpace(op.Args["component_id"]) == "" {
+				return fmt.Errorf("op %d %s requires component_id", i, op.Kind)
+			}
+			if op.Node == nil {
+				return fmt.Errorf("op %d %s requires node", i, op.Kind)
+			}
+		case OperationUIClear:
+			if env == nil || env.UI == nil {
+				return fmt.Errorf("op %d %s requires ui host", i, op.Kind)
+			}
+			if strings.TrimSpace(op.Target) == "" {
+				return fmt.Errorf("op %d %s requires target device", i, op.Kind)
+			}
+		case OperationUITransition, OperationFlowApply, OperationFlowStop:
 			return fmt.Errorf("op %d %s is not executable yet", i, op.Kind)
 		default:
 			return fmt.Errorf("op %d has unsupported kind %q", i, op.Kind)
@@ -136,6 +169,12 @@ func ValidateOperations(env *Environment, ops []Operation) error {
 
 func executeOperation(ctx context.Context, env *Environment, op Operation, now time.Time) error {
 	switch op.Kind {
+	case OperationUISet:
+		return env.UI.Set(ctx, strings.TrimSpace(op.Target), *op.Node)
+	case OperationUIPatch:
+		return env.UI.Patch(ctx, strings.TrimSpace(op.Target), strings.TrimSpace(op.Args["component_id"]), *op.Node)
+	case OperationUIClear:
+		return env.UI.Clear(ctx, strings.TrimSpace(op.Target), strings.TrimSpace(op.Args["root"]))
 	case OperationSchedulerAfter:
 		unixMS, _ := strconv.ParseInt(strings.TrimSpace(op.Args["unix_ms"]), 10, 64)
 		if structured, ok := env.Scheduler.(interface {
@@ -147,7 +186,7 @@ func executeOperation(ctx context.Context, env *Environment, op Operation, now t
 				Subject:  strings.TrimSpace(op.Args["subject"]),
 				DeviceID: strings.TrimSpace(op.Args["device_id"]),
 				UnixMS:   unixMS,
-				Payload:  operationPayload(op.Args, "duration_seconds"),
+				Payload:  operationPayload(op.Args, "duration_seconds", "target_device_id", "expiry_unix_ms"),
 			})
 		}
 		return env.Scheduler.Schedule(ctx, strings.TrimSpace(op.Target), unixMS)

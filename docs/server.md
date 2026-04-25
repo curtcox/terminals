@@ -126,13 +126,15 @@ they return a `ScenarioResult` containing typed operations and emitted
 triggers. The engine validates all operations before committing any side
 effects, then executes the operations in order.
 
-Currently executable operation kinds are `scheduler.after`,
-`scheduler.cancel`, `broadcast.notify`, `ai.tts`, and `bus.emit`. The shared
-model also defines UI and flow operation names for the TAL/TAR contract, but
-those are rejected until the corresponding executors exist.
+Currently executable operation kinds are `ui.set`, `ui.patch`, `ui.clear`,
+`scheduler.after`, `scheduler.cancel`, `broadcast.notify`, `ai.tts`, and
+`bus.emit`. The shared model also defines transition and flow operation names
+for the TAL/TAR contract, but those are rejected until the corresponding
+executors exist.
 
 `TimerReminderScenario` is the first built-in scenario on this path. It returns
-a scheduler operation plus a confirmation notification, while legacy scenarios
+UI, scheduler, and confirmation operations; due-timer processing applies tick
+and expiry side effects from structured scheduler records. Legacy scenarios
 continue to use their existing `Start` methods.
 
 ## Lint
