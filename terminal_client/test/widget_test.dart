@@ -369,6 +369,7 @@ void main() {
       final expectedOrientation =
           expectedWidth >= expectedHeight ? 'landscape' : 'portrait';
       final expectedDensity = mediaQuery.data.devicePixelRatio;
+      final expectedSafeArea = mediaQuery.data.viewPadding;
 
       await tester.tap(find.text('Connect Stream'));
       await tester.pump();
@@ -383,10 +384,10 @@ void main() {
       expect(screen.orientation, expectedOrientation);
       expect(screen.density, expectedDensity);
       expect(screen.hasSafeArea(), isTrue);
-      expect(screen.safeArea.left, 0);
-      expect(screen.safeArea.top, 0);
-      expect(screen.safeArea.right, 0);
-      expect(screen.safeArea.bottom, 0);
+      expect(screen.safeArea.left, expectedSafeArea.left.round());
+      expect(screen.safeArea.top, expectedSafeArea.top.round());
+      expect(screen.safeArea.right, expectedSafeArea.right.round());
+      expect(screen.safeArea.bottom, expectedSafeArea.bottom.round());
     },
   );
 
@@ -549,6 +550,62 @@ void main() {
       expect(delta.capabilities.screen.width, 1152);
       expect(delta.capabilities.screen.height, 720);
       expect(delta.capabilities.screen.density, 1.25);
+    },
+  );
+
+  testWidgets(
+    'deterministic metrics seam emits CapabilityDelta on safe-area change',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      final metrics = _TestScreenMetricsController(
+        ScreenMetrics(
+          logicalSize: Size(1024, 768),
+          devicePixelRatio: 2.0,
+          safeAreaInsets: EdgeInsets.zero,
+        ),
+      );
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          screenMetricsProvider: metrics.read,
+          screenMetricsChangeListenable: metrics.changes,
+          displayGeometryDebounceInterval: const Duration(milliseconds: 80),
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      final deltaCountBefore = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .length;
+      metrics.update(
+        ScreenMetrics(
+          logicalSize: Size(1024, 768),
+          devicePixelRatio: 2.0,
+          safeAreaInsets: const EdgeInsets.only(top: 24, bottom: 16),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+
+      final deltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .toList();
+      expect(deltas.length, deltaCountBefore + 1);
+      final delta = deltas.last.capabilityDelta;
+      expect(delta.reason, 'display_geometry_change');
+      expect(delta.capabilities.screen.safeArea.top, 24);
+      expect(delta.capabilities.screen.safeArea.bottom, 16);
+      expect(delta.capabilities.screen.safeArea.left, 0);
+      expect(delta.capabilities.screen.safeArea.right, 0);
     },
   );
 

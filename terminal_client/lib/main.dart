@@ -45,6 +45,7 @@ class ScreenMetrics {
   ScreenMetrics({
     required this.logicalSize,
     required this.devicePixelRatio,
+    this.safeAreaInsets = EdgeInsets.zero,
     String? orientation,
   }) : orientation = orientation ??
             (logicalSize.width >= logicalSize.height
@@ -53,6 +54,7 @@ class ScreenMetrics {
 
   final Size logicalSize;
   final double devicePixelRatio;
+  final EdgeInsets safeAreaInsets;
   final String orientation;
 }
 
@@ -1137,6 +1139,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   bool _appIsForeground = true;
   Size _lastKnownLogicalSize = Size.zero;
   double _lastKnownDevicePixelRatio = 1.0;
+  EdgeInsets _lastKnownSafeAreaInsets = EdgeInsets.zero;
   String _lastKnownOrientation = 'unknown';
   TextDirection _lastKnownTextDirection = TextDirection.ltr;
   bool _capabilityPollInFlight = false;
@@ -1164,10 +1167,30 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return ScreenMetrics(
       logicalSize: size,
       devicePixelRatio: dpr,
+      safeAreaInsets: metrics.safeAreaInsets,
       orientation: metrics.orientation.trim().isEmpty
           ? _normalizedOrientationFromSize(size)
           : metrics.orientation.trim(),
     );
+  }
+
+  EdgeInsets _safeAreaInsetsFromView(ui.FlutterView view, double dpr) {
+    final ratio = dpr <= 0 ? 1.0 : dpr;
+    final padding = view.padding;
+    return EdgeInsets.fromLTRB(
+      padding.left / ratio,
+      padding.top / ratio,
+      padding.right / ratio,
+      padding.bottom / ratio,
+    );
+  }
+
+  EdgeInsets _currentSafeAreaInsets() {
+    final injected = _injectedScreenMetrics();
+    if (injected != null) {
+      return injected.safeAreaInsets;
+    }
+    return _lastKnownSafeAreaInsets;
   }
 
   Size _currentLogicalSize() {
@@ -1214,6 +1237,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (injected != null) {
       _lastKnownLogicalSize = injected.logicalSize;
       _lastKnownDevicePixelRatio = injected.devicePixelRatio;
+      _lastKnownSafeAreaInsets = injected.safeAreaInsets;
       _lastKnownOrientation = injected.orientation;
       return;
     }
@@ -1232,15 +1256,17 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     _lastKnownLogicalSize = logicalSize;
     _lastKnownDevicePixelRatio = dpr;
+    _lastKnownSafeAreaInsets = _safeAreaInsetsFromView(view, dpr);
     _lastKnownOrientation = _normalizedOrientationFromSize(logicalSize);
   }
 
   String _displaySignature({
     required Size logicalSize,
     required double devicePixelRatio,
+    required EdgeInsets safeAreaInsets,
     required String orientation,
   }) {
-    return '${logicalSize.width.round()}x${logicalSize.height.round()}@${devicePixelRatio.toStringAsFixed(3)}:$orientation';
+    return '${logicalSize.width.round()}x${logicalSize.height.round()}@${devicePixelRatio.toStringAsFixed(3)}:${safeAreaInsets.left.toStringAsFixed(2)},${safeAreaInsets.top.toStringAsFixed(2)},${safeAreaInsets.right.toStringAsFixed(2)},${safeAreaInsets.bottom.toStringAsFixed(2)}:$orientation';
   }
 
   void _scheduleDisplayGeometryCapabilityUpdate() {
@@ -1312,6 +1338,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   ) {
     final size = _currentLogicalSize();
     final dpr = _currentDevicePixelRatio();
+    final safeAreaInsets = _currentSafeAreaInsets();
     final orientation = _normalizedOrientationFromSize(size);
     final screen = capabilities.hasScreen()
         ? capabilities.screen
@@ -1324,10 +1351,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ..fullscreenSupported = true
       ..multiWindowSupported = true
       ..safeArea = (screen.hasSafeArea() ? screen.safeArea : capv1.Insets())
-      ..safeArea.left = 0
-      ..safeArea.top = 0
-      ..safeArea.right = 0
-      ..safeArea.bottom = 0;
+      ..safeArea.left = safeAreaInsets.left.round()
+      ..safeArea.top = safeAreaInsets.top.round()
+      ..safeArea.right = safeAreaInsets.right.round()
+      ..safeArea.bottom = safeAreaInsets.bottom.round();
 
     if (capabilities.displays.isEmpty) {
       capabilities.displays.add(capv1.DisplayCapability()..displayId = 'main');
@@ -3867,16 +3894,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (injectedMetrics != null) {
       _lastKnownLogicalSize = injectedMetrics.logicalSize;
       _lastKnownDevicePixelRatio = injectedMetrics.devicePixelRatio;
+      _lastKnownSafeAreaInsets = injectedMetrics.safeAreaInsets;
       _lastKnownOrientation = injectedMetrics.orientation;
     } else {
       final mediaQuery = MediaQuery.of(context);
       _lastKnownLogicalSize = mediaQuery.size;
       _lastKnownDevicePixelRatio = mediaQuery.devicePixelRatio;
+      _lastKnownSafeAreaInsets = mediaQuery.viewPadding;
       _lastKnownOrientation = mediaQuery.orientation.name;
     }
     final displaySignature = _displaySignature(
       logicalSize: _lastKnownLogicalSize,
       devicePixelRatio: _lastKnownDevicePixelRatio,
+      safeAreaInsets: _lastKnownSafeAreaInsets,
       orientation: _lastKnownOrientation,
     );
     if (displaySignature != _lastObservedDisplaySignature) {
