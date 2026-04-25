@@ -1,8 +1,8 @@
 ---
 title: "Implementation Risk Audit (Cross-Client)"
 kind: audit
-status: open
-owner: unowned
+status: partially-resolved
+owner: cascade
 validation: none
 last-reviewed: 2026-04-25
 ---
@@ -16,6 +16,20 @@ This audit was produced by inferring missing placeholders from the repository st
 - Plan docs: [`masterplan.md`](../archive/masterplan-duplicate.md), `plans/phase-*.md`, and supporting docs in `plans/` + `docs/`.
 - Target clients/platforms: Android, iOS, Web/Browser, macOS, Linux, Windows (from `plans/architecture-client.md`).
 - Relevant code/config: `terminal_client/`, `terminal_server/`, `api/`, scripts, and CI workflow files.
+
+## Rebaseline (2026-04-25)
+
+This audit has been re-validated against current repository state and is now **partially resolved**.
+
+Addressed high-severity findings:
+
+- **P0-1 (6-platform workflow mismatch)**: platform scaffolding and build lanes now exist in repo and CI (`terminal_client/android`, `terminal_client/ios`, `terminal_client/linux`, `terminal_client/windows`, `Makefile` `client-build-*`, and `.github/workflows/client-ci.yml` build matrix).
+- **P0-2 (web raw gRPC control path)**: browser-compatible transports are implemented and selected in client factory (`terminal_client/lib/connection/control_client_factory.dart`, `terminal_client/lib/connection/control_client_ws.dart`) with server websocket endpoint (`terminal_server/internal/transport/websocket_server.go`, tests in `terminal_server/internal/transport/websocket_server_test.go`).
+- **P0-3 (missing real gRPC listener wiring)**: transport now binds real sockets with `grpc.NewServer` + generated service registration and serve/stop lifecycle (`terminal_server/internal/transport/grpc_server.go`, `terminal_server/internal/transport/grpc_service.go`, startup wiring in `terminal_server/cmd/server/main.go`).
+
+Still open in remediation plan:
+
+- **P0-4/P0-5/P0-6** and **P1-1/P1-2/P2-1** remain active and are tracked in `plans/audits/implementation-risk-remediation.md` (Stages 4-9).
 
 ---
 

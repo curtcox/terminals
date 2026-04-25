@@ -1,8 +1,8 @@
 ---
 title: "Agent Delegation Verification Issues"
 kind: audit
-status: open
-owner: unowned
+status: resolved
+owner: cascade
 validation: none
 last-reviewed: 2026-04-25
 ---
