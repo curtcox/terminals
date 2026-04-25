@@ -102,6 +102,28 @@ make server-test          # run all tests
 make server-coverage      # run tests with coverage report
 ```
 
+Some server tests intentionally exercise real local networking. In restricted
+agent sandboxes, those tests can fail before server code runs because the
+sandbox blocks listener creation or host-interface inspection. Typical errors
+include:
+
+- `listen tcp 127.0.0.1:0: bind: operation not permitted`
+- `httptest: failed to listen on a port: listen tcp6 [::1]:0: bind: operation
+  not permitted`
+- mDNS setup errors when host IP addresses cannot be determined
+
+When that happens, rerun the affected server tests in an environment that
+allows loopback listeners and network-interface reads. Keep the Go build cache
+inside the workspace or `/tmp` if the default user cache is also restricted:
+
+```bash
+cd terminal_server
+GOCACHE=/tmp/terminals-go-build go test ./...
+```
+
+The long-term remediation plan is tracked in
+[`plans/server-test-sandbox-network.md`](../plans/server-test-sandbox-network.md).
+
 ## Scheduler
 
 The in-memory scheduler stores structured records in

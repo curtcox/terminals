@@ -92,6 +92,22 @@ documented in the guides below.
   outside the workspace sandbox. Running focused tests with
   `GOCACHE=/tmp/terminals-go-build` avoids the permission failure; a make-level
   default would make this smoother for app-development loops.
+- Server tests that create local listeners can fail inside the Codex workspace
+  sandbox even when the code is healthy. The observed failures are:
+  - `listen tcp 127.0.0.1:0: bind: operation not permitted` from tests that use
+    `net.Listen` for admin and WebSocket round trips.
+  - `httptest: failed to listen on a port: listen tcp6 [::1]:0: bind: operation
+    not permitted` from tests that use `httptest.NewServer`.
+  - mDNS setup failures such as `could not determine host IP addresses for
+    <host>.local.` when discovery tests cannot inspect host network interfaces.
+- The practical workaround today is to run the affected server package tests
+  outside the sandbox while keeping deterministic cache paths, for example
+  `GOCACHE=/tmp/terminals-go-build go test ./...` from `terminal_server`, or
+  the full repository gate with the same `GOCACHE` plus local Flutter cache
+  environment.
+- This is a test-harness/environment mismatch, not a client/server architecture
+  issue: the same `make all-check` run passed outside the sandbox after the
+  listener/network restrictions were lifted.
 - Scenario-authored UI now has an in-memory host and transport polling bridge,
   but the response-only stream shape means updates are delivered on command or
   heartbeat turns rather than pushed independently from the housekeeping loop.
