@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Removed synthetic probe-only defaults for `screen.safe_area` zero insets and `touch.max_points=1` so capability probes now omit those fields unless runtime metadata can provide real values, and added probe regression assertions while preserving runtime snapshot safe-area coverage through display metadata wiring.
 - 2026-04-25: Removed synthetic default edge-retention capability declaration from the client capability probe so retention windows are no longer advertised without verified platform-backed evidence, and added probe unit assertions that edge retention remains omitted while real runtime/operators metadata is still emitted.
 - 2026-04-25: Hardened Stage 2 websocket origin policy to enforce explicit allow-list entries only (rejecting wildcard `*`), added config and transport regression coverage, and documented dev-time same-origin/loopback behavior for `TERMINALS_CONTROL_WS_ALLOWED_ORIGINS`.
 - 2026-04-25: Added deterministic video-surface stream state (`Waiting for media` / `Attached`) backed by the media engine attach signal so start/stop transitions are directly observable in widget tests.

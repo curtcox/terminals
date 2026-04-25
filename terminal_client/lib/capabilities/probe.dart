@@ -91,12 +91,7 @@ class DefaultCapabilityProbe implements CapabilityProbe {
         ..touch = context.touchInputLikely
         ..orientation = context.screenWidth >= context.screenHeight
             ? 'landscape'
-            : 'portrait'
-        ..safeArea = (capv1.Insets()
-          ..left = 0
-          ..top = 0
-          ..right = 0
-          ..bottom = 0))
+            : 'portrait')
       ..displays.add(
         capv1.DisplayCapability()
           ..displayId = 'main'
@@ -109,12 +104,7 @@ class DefaultCapabilityProbe implements CapabilityProbe {
             ..touch = context.touchInputLikely
             ..orientation = context.screenWidth >= context.screenHeight
                 ? 'landscape'
-                : 'portrait'
-            ..safeArea = (capv1.Insets()
-              ..left = 0
-              ..top = 0
-              ..right = 0
-              ..bottom = 0)),
+                : 'portrait'),
       );
 
     if (hasKeyboard) {
@@ -124,9 +114,7 @@ class DefaultCapabilityProbe implements CapabilityProbe {
       ..type = context.touchInputLikely ? 'touch' : 'mouse'
       ..hover = !context.touchInputLikely);
     if (context.touchInputLikely) {
-      capabilities.touch = (capv1.TouchCapability()
-        ..supported = true
-        ..maxPoints = 1);
+      capabilities.touch = (capv1.TouchCapability()..supported = true);
     }
     if (hasAudioOutput) {
       final outputEndpoints =

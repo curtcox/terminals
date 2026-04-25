@@ -30,6 +30,8 @@ void main() {
     expect(capabilities.edge.hasRetention(), isFalse);
     expect(capabilities.screen.hasFullscreenSupported(), isFalse);
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);
+    expect(capabilities.screen.hasSafeArea(), isFalse);
+    expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
     expect(capabilities.edge.runtimes, contains('dart'));
     expect(capabilities.edge.operators, contains('monitor.foreground_only'));
     expect(
@@ -81,9 +83,14 @@ void main() {
     expect(capabilities.hasCamera(), isTrue);
     expect(capabilities.hasSpeakers(), isTrue);
     expect(capabilities.hasHaptics(), isTrue);
+    expect(capabilities.hasTouch(), isTrue);
+    expect(capabilities.touch.supported, isTrue);
+    expect(capabilities.touch.hasMaxPoints(), isFalse);
     expect(capabilities.edge.hasRetention(), isFalse);
     expect(capabilities.screen.hasFullscreenSupported(), isFalse);
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);
+    expect(capabilities.screen.hasSafeArea(), isFalse);
+    expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
     expect(capabilities.microphone.channels, 1);
     expect(capabilities.microphone.endpoints, isNotEmpty);
     expect(capabilities.camera.endpoints, isNotEmpty);
