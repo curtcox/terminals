@@ -91,7 +91,10 @@ void main() {
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);
     expect(capabilities.screen.hasSafeArea(), isFalse);
     expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
-    expect(capabilities.microphone.channels, 1);
+    expect(capabilities.microphone.channels, 0);
+    expect(capabilities.microphone.endpoints.first.channels, 0);
+    expect(capabilities.speakers.channels, 0);
+    expect(capabilities.speakers.endpoints.first.channels, 0);
     expect(capabilities.microphone.endpoints, isNotEmpty);
     expect(capabilities.camera.endpoints, isNotEmpty);
     expect(capabilities.speakers.endpoints, isNotEmpty);

@@ -119,15 +119,13 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     if (hasAudioOutput) {
       final outputEndpoints =
           _audioEndpointsForKind(mediaDevices, 'audiooutput');
-      capabilities.speakers = (capv1.AudioOutputCapability()
-        ..channels = 2
-        ..endpoints.addAll(outputEndpoints));
+      capabilities.speakers =
+          (capv1.AudioOutputCapability()..endpoints.addAll(outputEndpoints));
     }
     if (hasMicrophone) {
       final inputEndpoints = _audioEndpointsForKind(mediaDevices, 'audioinput');
-      capabilities.microphone = (capv1.AudioInputCapability()
-        ..channels = 1
-        ..endpoints.addAll(inputEndpoints));
+      capabilities.microphone =
+          (capv1.AudioInputCapability()..endpoints.addAll(inputEndpoints));
     }
     if (hasCamera) {
       capabilities.camera = (capv1.CameraCapability()
@@ -169,7 +167,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
             fallbackIndex,
           )
           ..connectionType = _connectionTypeForEndpoint(device.label)
-          ..channels = kind == 'audioinput' ? 1 : 2
           ..available = true,
       );
     }
