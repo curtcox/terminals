@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Added deterministic runtime permission-denied handling coverage for local media starts by injecting media permission probes in the client and asserting denied starts set a stable status/notification without emitting local offers.
 - 2026-04-25: Replaced synthetic zero-valued screen safe-area capability metadata with real view/injected metrics in capability snapshots and deltas, and added deterministic widget coverage proving safe-area changes trigger `display_geometry_change` capability updates.
 - 2026-04-25: Added server placement regression coverage to lock Stage 4 behavior that missing or explicitly disabled capability fields are treated as unsupported when evaluating `RequiredCaps` filters.
 - 2026-04-25: Removed synthetic default connectivity declaration from client capability probing, and gated outbound sensor telemetry to emit only declared capability-backed signals (connectivity/battery), with widget coverage proving time-derived synthetic keys are no longer sent.

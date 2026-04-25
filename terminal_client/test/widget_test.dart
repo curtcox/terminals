@@ -2856,6 +2856,57 @@ void main() {
   );
 
   testWidgets(
+    'surfaces deterministic status when media permission probe fails',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final harness = _FakeClientHarness();
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          mediaPermissionProbe: ({required audio, required video}) async {
+            throw StateError('permission denied');
+          },
+        ),
+      );
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+
+      final localDeviceID = harness.lastClient.requests
+          .firstWhere((request) => request.hasHello())
+          .hello
+          .deviceId;
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..startStream = (iov1.StartStream()
+            ..streamId = 'stream-permission-denied'
+            ..kind = 'audio'
+            ..sourceDeviceId = localDeviceID
+            ..targetDeviceId = 'device-2'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Control Stream: Media permission required'),
+          findsOneWidget);
+      expect(
+        find.textContaining(
+            'Unable to start media stream stream-permission-denied: Bad state: permission denied'),
+        findsOneWidget,
+      );
+
+      final localOfferRequests = harness.lastClient.requests
+          .where((request) =>
+              request.hasWebrtcSignal() &&
+              request.webrtcSignal.streamId == 'stream-permission-denied' &&
+              request.webrtcSignal.signalType == 'offer')
+          .toList();
+      expect(localOfferRequests, isEmpty);
+    },
+  );
+
+  testWidgets(
     'privacy.toggle stops local capture before sending capability delta',
     (WidgetTester tester) async {
       await tester.binding.setSurfaceSize(const Size(1200, 1400));

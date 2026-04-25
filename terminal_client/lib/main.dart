@@ -40,6 +40,10 @@ typedef UnixMsProvider = int Function();
 typedef BugReportScreenshotCapture = Future<List<int>> Function();
 typedef WakeWordDetectorFactory = WakeWordDetectorController Function();
 typedef ScreenMetricsProvider = ScreenMetrics Function();
+typedef MediaPermissionProbe = Future<void> Function({
+  required bool audio,
+  required bool video,
+});
 
 class ScreenMetrics {
   ScreenMetrics({
@@ -110,6 +114,22 @@ AudioPlayback _defaultAudioPlaybackFactory() {
 
 WakeWordDetectorController _defaultWakeWordDetectorFactory() {
   return NoopWakeWordDetectorController();
+}
+
+Future<void> _defaultMediaPermissionProbe({
+  required bool audio,
+  required bool video,
+}) async {
+  final stream = await navigator.mediaDevices.getUserMedia(
+    <String, dynamic>{
+      'audio': audio,
+      'video': video,
+    },
+  );
+  for (final track in stream.getTracks()) {
+    track.stop();
+  }
+  await stream.dispose();
 }
 
 const bool _e2eEmitEvents = bool.fromEnvironment(
@@ -938,6 +958,7 @@ class TerminalClientApp extends StatelessWidget {
     this.screenMetricsProvider,
     this.screenMetricsChangeListenable,
     this.displayGeometryDebounceInterval = kDisplayGeometryDebounceInterval,
+    this.mediaPermissionProbe = _defaultMediaPermissionProbe,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -955,6 +976,7 @@ class TerminalClientApp extends StatelessWidget {
   final ScreenMetricsProvider? screenMetricsProvider;
   final Listenable? screenMetricsChangeListenable;
   final Duration displayGeometryDebounceInterval;
+  final MediaPermissionProbe mediaPermissionProbe;
 
   @override
   Widget build(BuildContext context) {
@@ -976,6 +998,7 @@ class TerminalClientApp extends StatelessWidget {
         screenMetricsProvider: screenMetricsProvider,
         screenMetricsChangeListenable: screenMetricsChangeListenable,
         displayGeometryDebounceInterval: displayGeometryDebounceInterval,
+        mediaPermissionProbe: mediaPermissionProbe,
       ),
     );
   }
@@ -998,6 +1021,7 @@ class _ControlStreamScaffold extends StatefulWidget {
     required this.screenMetricsProvider,
     required this.screenMetricsChangeListenable,
     required this.displayGeometryDebounceInterval,
+    required this.mediaPermissionProbe,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -1015,6 +1039,7 @@ class _ControlStreamScaffold extends StatefulWidget {
   final ScreenMetricsProvider? screenMetricsProvider;
   final Listenable? screenMetricsChangeListenable;
   final Duration displayGeometryDebounceInterval;
+  final MediaPermissionProbe mediaPermissionProbe;
 
   @override
   State<_ControlStreamScaffold> createState() => _ControlStreamScaffoldState();
@@ -4444,16 +4469,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (!wantsAudio && !wantsVideo) {
       return;
     }
-    final stream = await navigator.mediaDevices.getUserMedia(
-      <String, dynamic>{
-        'audio': wantsAudio,
-        'video': wantsVideo,
-      },
+    await widget.mediaPermissionProbe(
+      audio: wantsAudio,
+      video: wantsVideo,
     );
-    for (final track in stream.getTracks()) {
-      track.stop();
-    }
-    await stream.dispose();
   }
 
   Future<void> _executePlayAudio(iov1.PlayAudio playAudio) async {

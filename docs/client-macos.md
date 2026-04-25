@@ -67,12 +67,18 @@ Ensure the following are present:
 <true/>
 ```
 
-If you need microphone access for audio features:
+For live media scenarios, include both microphone and camera entitlements:
 
 ```xml
 <key>com.apple.security.device.audio-input</key>
 <true/>
+<key>com.apple.security.device.camera</key>
+<true/>
 ```
+
+When the OS denies media permissions at runtime, the client surfaces a
+deterministic control-stream status (`Media permission required`) and records a
+failure notification for the rejected stream start.
 
 ## Test
 
