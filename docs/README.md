@@ -19,6 +19,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | [Client — Windows](client-windows.md) | Flutter Windows desktop client |
 | [Event Taxonomy](event-taxonomy.md) | Server event names emitted to JSONL logs |
 | [Use Case Validation Matrix](usecase-validation-matrix.md) | Mapping from use-case IDs to automated validation commands |
+| [Sensing and Edge Observation Use Case Flows](sensing-use-case-flows.md) | Durable sensing-heavy edge-observation flow reference |
 | [Development Environment Improvement Log](development-environment-improvement-log.md) | Completed improvements plus local sandbox listener/network test restrictions |
 
 ## Quick start

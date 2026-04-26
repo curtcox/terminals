@@ -17,7 +17,7 @@ The completed work from this phase is now documented in:
 - [edge-execution.md](../features/edge-execution.md)
 - [observation-plane.md](../features/observation-plane.md)
 - [world-model-calibration.md](../features/world-model-calibration.md)
-- [sensing-use-case-flows.md](../features/sensing-use-case-flows.md)
+- [../../docs/sensing-use-case-flows.md](../../docs/sensing-use-case-flows.md)
 - [docs/implementation-risk-remediation.md](../../docs/implementation-risk-remediation.md)
 - [docs/server.md](../../docs/server.md)
 
