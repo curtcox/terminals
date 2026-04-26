@@ -102,6 +102,11 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/session/create", h.handleInteractiveSessionCreate)
 	mux.HandleFunc("/admin/api/session/join", h.handleInteractiveSessionJoin)
 	mux.HandleFunc("/admin/api/session/leave", h.handleInteractiveSessionLeave)
+	mux.HandleFunc("/admin/api/session/attach", h.handleInteractiveSessionAttachDevice)
+	mux.HandleFunc("/admin/api/session/detach", h.handleInteractiveSessionDetachDevice)
+	mux.HandleFunc("/admin/api/session/control/request", h.handleInteractiveSessionRequestControl)
+	mux.HandleFunc("/admin/api/session/control/grant", h.handleInteractiveSessionGrantControl)
+	mux.HandleFunc("/admin/api/session/control/revoke", h.handleInteractiveSessionRevokeControl)
 	mux.HandleFunc("/admin/api/message", h.handleMessages)
 	mux.HandleFunc("/admin/api/message/unread", h.handleMessageUnread)
 	mux.HandleFunc("/admin/api/message/post", h.handleMessagePost)
@@ -315,6 +320,91 @@ func (h *Handler) handleInteractiveSessionLeave(w http.ResponseWriter, req *http
 		return
 	}
 	session, ok := h.capability.LeaveSession(req.Form.Get("session_id"), req.Form.Get("participant"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
+}
+
+func (h *Handler) handleInteractiveSessionAttachDevice(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	session, ok := h.capability.AttachDevice(req.Form.Get("session_id"), req.Form.Get("device_ref"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
+}
+
+func (h *Handler) handleInteractiveSessionDetachDevice(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	session, ok := h.capability.DetachDevice(req.Form.Get("session_id"), req.Form.Get("device_ref"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
+}
+
+func (h *Handler) handleInteractiveSessionRequestControl(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	session, ok := h.capability.RequestControl(req.Form.Get("session_id"), req.Form.Get("participant"), req.Form.Get("control_type"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
+}
+
+func (h *Handler) handleInteractiveSessionGrantControl(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	session, ok := h.capability.GrantControl(req.Form.Get("session_id"), req.Form.Get("participant"), req.Form.Get("granted_by"), req.Form.Get("control_type"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "session": session})
+}
+
+func (h *Handler) handleInteractiveSessionRevokeControl(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	session, ok := h.capability.RevokeControl(req.Form.Get("session_id"), req.Form.Get("participant"), req.Form.Get("revoked_by"))
 	if !ok {
 		h.writeJSONError(w, http.StatusNotFound, "session not found")
 		return

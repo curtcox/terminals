@@ -260,6 +260,11 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"session members",
 		"session join",
 		"session leave",
+		"session attach",
+		"session detach",
+		"session control request",
+		"session control grant",
+		"session control revoke",
 		"message post",
 		"message unread",
 		"message ack",
@@ -346,6 +351,57 @@ func TestSessionJoinLeaveCommandsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "OK  session=sess-1 participant=alice action=leave") {
 		t.Fatalf("missing session leave output: %q", text)
+	}
+}
+
+func TestSessionAttachDetachAndControlCommandsUseAdminAPIs(t *testing.T) {
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/attach":
+			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1","attached_devices":["device:kitchen-display"]}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/detach":
+			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1","attached_devices":[]}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/control/request":
+			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1","control_requests":[{"participant_id":"alice","control_type":"keyboard"}]}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/control/grant":
+			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1","control_grants":[{"participant_id":"alice","granted_by":"moderator","control_type":"keyboard"}]}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/control/revoke":
+			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1","control_grants":[]}}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader(strings.Join([]string{
+		"session attach sess-1 device:kitchen-display",
+		"session detach sess-1 device:kitchen-display",
+		"session control request sess-1 alice keyboard",
+		"session control grant sess-1 alice moderator keyboard",
+		"session control revoke sess-1 alice moderator",
+		"exit",
+	}, "\n") + "\n")
+	var out bytes.Buffer
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "OK  session=sess-1 device=device:kitchen-display action=attach") {
+		t.Fatalf("missing session attach output: %q", text)
+	}
+	if !strings.Contains(text, "OK  session=sess-1 device=device:kitchen-display action=detach") {
+		t.Fatalf("missing session detach output: %q", text)
+	}
+	if !strings.Contains(text, "OK  session=sess-1 participant=alice action=control.request type=keyboard") {
+		t.Fatalf("missing session control request output: %q", text)
+	}
+	if !strings.Contains(text, "OK  session=sess-1 participant=alice action=control.grant by=moderator type=keyboard") {
+		t.Fatalf("missing session control grant output: %q", text)
+	}
+	if !strings.Contains(text, "OK  session=sess-1 participant=alice action=control.revoke by=moderator") {
+		t.Fatalf("missing session control revoke output: %q", text)
 	}
 }
 

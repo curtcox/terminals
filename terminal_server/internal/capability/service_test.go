@@ -45,6 +45,69 @@ func TestSessionJoinAndLeave(t *testing.T) {
 	}
 }
 
+func TestSessionAttachDetachAndControlLifecycle(t *testing.T) {
+	svc := NewService()
+	session := svc.CreateSession("shared_view", "kitchen")
+
+	attached, ok := svc.AttachDevice(session.ID, "device:kiosk-1")
+	if !ok {
+		t.Fatalf("AttachDevice(%q,device:kiosk-1) reported missing session", session.ID)
+	}
+	if len(attached.AttachedDevices) != 1 || attached.AttachedDevices[0] != "device:kiosk-1" {
+		t.Fatalf("AttachDevice attached devices = %+v, want [device:kiosk-1]", attached.AttachedDevices)
+	}
+
+	detached, ok := svc.DetachDevice(session.ID, "device:kiosk-1")
+	if !ok {
+		t.Fatalf("DetachDevice(%q,device:kiosk-1) reported missing session", session.ID)
+	}
+	if len(detached.AttachedDevices) != 0 {
+		t.Fatalf("DetachDevice should remove attached device, got %+v", detached.AttachedDevices)
+	}
+
+	requested, ok := svc.RequestControl(session.ID, "alice", "keyboard")
+	if !ok {
+		t.Fatalf("RequestControl(%q,alice) reported missing session", session.ID)
+	}
+	if len(requested.ControlRequests) != 1 {
+		t.Fatalf("RequestControl requests = %+v, want one request", requested.ControlRequests)
+	}
+	if requested.ControlRequests[0].ParticipantID != "alice" || requested.ControlRequests[0].ControlType != "keyboard" {
+		t.Fatalf("RequestControl request[0] = %+v, want participant=alice control_type=keyboard", requested.ControlRequests[0])
+	}
+
+	granted, ok := svc.GrantControl(session.ID, "alice", "moderator", "keyboard")
+	if !ok {
+		t.Fatalf("GrantControl(%q,alice) reported missing session", session.ID)
+	}
+	if len(granted.ControlRequests) != 0 {
+		t.Fatalf("GrantControl should clear request, got %+v", granted.ControlRequests)
+	}
+	if len(granted.ControlGrants) != 1 {
+		t.Fatalf("GrantControl grants = %+v, want one grant", granted.ControlGrants)
+	}
+	if granted.ControlGrants[0].ParticipantID != "alice" || granted.ControlGrants[0].GrantedBy != "moderator" {
+		t.Fatalf("GrantControl grant[0] = %+v, want participant=alice granted_by=moderator", granted.ControlGrants[0])
+	}
+
+	revoked, ok := svc.RevokeControl(session.ID, "alice", "moderator")
+	if !ok {
+		t.Fatalf("RevokeControl(%q,alice) reported missing session", session.ID)
+	}
+	if len(revoked.ControlGrants) != 0 {
+		t.Fatalf("RevokeControl should clear grants, got %+v", revoked.ControlGrants)
+	}
+
+	audit := revoked.Audit
+	if len(audit) < 6 {
+		t.Fatalf("audit events = %+v, want at least create/attach/detach/request/grant/revoke", audit)
+	}
+	last := audit[len(audit)-1]
+	if last.Action != "session.control.revoke" || last.Actor != "moderator" || last.Target != "alice" {
+		t.Fatalf("last audit event = %+v, want control revoke by moderator for alice", last)
+	}
+}
+
 func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 	svc := NewService()
 

@@ -1,10 +1,10 @@
 ---
 title: "Collaborative Sessions Plan"
 kind: plan
-status: planned
-owner: unowned
+status: shipped-untested
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Collaborative Sessions Plan

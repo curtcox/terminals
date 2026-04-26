@@ -394,6 +394,11 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		allowNotFound bool
 	}{
 		{path: "/admin/api/session/create", form: url.Values{"kind": {"help"}, "target": {"room"}}},
+		{path: "/admin/api/session/attach", form: url.Values{"session_id": {"missing"}, "device_ref": {"device:screen-1"}}, allowNotFound: true},
+		{path: "/admin/api/session/detach", form: url.Values{"session_id": {"missing"}, "device_ref": {"device:screen-1"}}, allowNotFound: true},
+		{path: "/admin/api/session/control/request", form: url.Values{"session_id": {"missing"}, "participant": {"alice"}, "control_type": {"keyboard"}}, allowNotFound: true},
+		{path: "/admin/api/session/control/grant", form: url.Values{"session_id": {"missing"}, "participant": {"alice"}, "granted_by": {"moderator"}, "control_type": {"keyboard"}}, allowNotFound: true},
+		{path: "/admin/api/session/control/revoke", form: url.Values{"session_id": {"missing"}, "participant": {"alice"}, "revoked_by": {"moderator"}}, allowNotFound: true},
 		{path: "/admin/api/message/post", form: url.Values{"room": {"room-1"}, "text": {"hello"}}},
 		{path: "/admin/api/board/pin", form: url.Values{"board": {"family"}, "text": {"note"}}},
 		{path: "/admin/api/artifact/create", form: url.Values{"kind": {"lesson"}, "title": {"math"}}},
@@ -448,6 +453,38 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		h.ServeHTTP(w, req)
 		if w.Code != http.StatusOK {
 			t.Fatalf("POST %s status = %d, want 200 body=%s", path, w.Code, w.Body.String())
+		}
+	}
+
+	attachReq := httptest.NewRequest(http.MethodPost, "/admin/api/session/attach", strings.NewReader(url.Values{
+		"session_id": {sessionID},
+		"device_ref": {"device:kitchen-display"},
+	}.Encode()))
+	attachReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	attachW := httptest.NewRecorder()
+	h.ServeHTTP(attachW, attachReq)
+	if attachW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/session/attach status = %d, want 200 body=%s", attachW.Code, attachW.Body.String())
+	}
+	if !strings.Contains(attachW.Body.String(), "device:kitchen-display") {
+		t.Fatalf("attach response missing device ref: %s", attachW.Body.String())
+	}
+
+	for _, path := range []struct {
+		url  string
+		form url.Values
+	}{
+		{url: "/admin/api/session/control/request", form: url.Values{"session_id": {sessionID}, "participant": {"alice"}, "control_type": {"keyboard"}}},
+		{url: "/admin/api/session/control/grant", form: url.Values{"session_id": {sessionID}, "participant": {"alice"}, "granted_by": {"moderator"}, "control_type": {"keyboard"}}},
+		{url: "/admin/api/session/control/revoke", form: url.Values{"session_id": {sessionID}, "participant": {"alice"}, "revoked_by": {"moderator"}}},
+		{url: "/admin/api/session/detach", form: url.Values{"session_id": {sessionID}, "device_ref": {"device:kitchen-display"}}},
+	} {
+		req := httptest.NewRequest(http.MethodPost, path.url, strings.NewReader(path.form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("POST %s status = %d, want 200 body=%s", path.url, w.Code, w.Body.String())
 		}
 	}
 

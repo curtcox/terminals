@@ -8,3 +8,8 @@ Typed operations for generalized collaborative sessions:
 - `ListSessionMembers`
 - `JoinSession`
 - `LeaveSession`
+- `AttachDevice`
+- `DetachDevice`
+- `RequestControl`
+- `GrantControl`
+- `RevokeControl`

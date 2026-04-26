@@ -70,6 +70,11 @@ func replCommandSpecs() []commandSpec {
 		{Name: "session members", Usage: "session members <session> [--json]", Summary: "List interactive session participants", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session join", Usage: "session join <session> <participant> [--json]", Summary: "Join a participant to an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session leave", Usage: "session leave <session> <participant> [--json]", Summary: "Remove a participant from an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session attach", Usage: "session attach <session> <device-ref> [--json]", Summary: "Attach a device to an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session detach", Usage: "session detach <session> <device-ref> [--json]", Summary: "Detach a device from an interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session control request", Usage: "session control request <session> <participant> [control-type] [--json]", Summary: "Request control for one participant", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session control grant", Usage: "session control grant <session> <participant> [granted-by] [control-type] [--json]", Summary: "Grant control to one participant", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "session control revoke", Usage: "session control revoke <session> <participant> [revoked-by] [--json]", Summary: "Revoke control from one participant", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "message ls", Usage: "message ls [room] [--json]", Summary: "List messages", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message unread", Usage: "message unread <identity> [room] [--json]", Summary: "List unread messages for an identity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message post", Usage: "message post <room> <text> [--json]", Summary: "Post a room/direct message", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
@@ -596,6 +601,118 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			_, err = fmt.Fprintf(s.out, "OK  session=%s participant=%s action=leave\n", sessionID, plain[1])
 			return err
+		case "attach":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: session attach <session> <device-ref>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/session/attach", url.Values{
+				"session_id": {plain[0]},
+				"device_ref": {plain[1]},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  session=%s device=%s action=attach\n", plain[0], plain[1])
+			return err
+		case "detach":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: session detach <session> <device-ref>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/session/detach", url.Values{
+				"session_id": {plain[0]},
+				"device_ref": {plain[1]},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  session=%s device=%s action=detach\n", plain[0], plain[1])
+			return err
+		case "control":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: session control <request|grant|revoke>")
+			}
+			action := strings.ToLower(plain[0])
+			switch action {
+			case "request":
+				if len(plain) < 3 {
+					return errors.New("usage: session control request <session> <participant> [control-type]")
+				}
+				controlType := ""
+				if len(plain) > 3 {
+					controlType = plain[3]
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/session/control/request", url.Values{
+					"session_id":   {plain[1]},
+					"participant":  {plain[2]},
+					"control_type": {controlType},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  session=%s participant=%s action=control.request type=%s\n", plain[1], plain[2], defaultIfBlank(controlType, "interactive"))
+				return err
+			case "grant":
+				if len(plain) < 3 {
+					return errors.New("usage: session control grant <session> <participant> [granted-by] [control-type]")
+				}
+				grantedBy := ""
+				if len(plain) > 3 {
+					grantedBy = plain[3]
+				}
+				controlType := ""
+				if len(plain) > 4 {
+					controlType = plain[4]
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/session/control/grant", url.Values{
+					"session_id":   {plain[1]},
+					"participant":  {plain[2]},
+					"granted_by":   {grantedBy},
+					"control_type": {controlType},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  session=%s participant=%s action=control.grant by=%s type=%s\n", plain[1], plain[2], defaultIfBlank(grantedBy, "system"), defaultIfBlank(controlType, "interactive"))
+				return err
+			case "revoke":
+				if len(plain) < 3 {
+					return errors.New("usage: session control revoke <session> <participant> [revoked-by]")
+				}
+				revokedBy := ""
+				if len(plain) > 3 {
+					revokedBy = plain[3]
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/session/control/revoke", url.Values{
+					"session_id":  {plain[1]},
+					"participant": {plain[2]},
+					"revoked_by":  {revokedBy},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  session=%s participant=%s action=control.revoke by=%s\n", plain[1], plain[2], defaultIfBlank(revokedBy, "system"))
+				return err
+			default:
+				return fmt.Errorf("unknown command: session control %s", action)
+			}
 		default:
 			return fmt.Errorf("unknown command: session %s", sub)
 		}
@@ -1772,6 +1889,13 @@ func nonFlagArgs(args []string) []string {
 		out = append(out, trimmed)
 	}
 	return out
+}
+
+func defaultIfBlank(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func decodeEscapes(in string) string {

@@ -19,17 +19,46 @@ type Identity struct {
 
 // InteractiveSession represents a collaborative session between participants.
 type InteractiveSession struct {
-	ID           string               `json:"id"`
-	Kind         string               `json:"kind"`
-	Target       string               `json:"target"`
-	Participants []SessionParticipant `json:"participants,omitempty"`
-	CreatedAt    time.Time            `json:"created_at"`
+	ID              string                  `json:"id"`
+	Kind            string                  `json:"kind"`
+	Target          string                  `json:"target"`
+	Participants    []SessionParticipant    `json:"participants,omitempty"`
+	AttachedDevices []string                `json:"attached_devices,omitempty"`
+	ControlRequests []SessionControlRequest `json:"control_requests,omitempty"`
+	ControlGrants   []SessionControlGrant   `json:"control_grants,omitempty"`
+	Audit           []SessionAuditEvent     `json:"audit,omitempty"`
+	CreatedAt       time.Time               `json:"created_at"`
+	UpdatedAt       time.Time               `json:"updated_at"`
 }
 
 // SessionParticipant records a single identity's membership in a session.
 type SessionParticipant struct {
 	IdentityID string    `json:"identity_id"`
 	JoinedAt   time.Time `json:"joined_at"`
+}
+
+// SessionControlRequest records a request from one participant to take control.
+type SessionControlRequest struct {
+	ParticipantID string    `json:"participant_id"`
+	ControlType   string    `json:"control_type"`
+	RequestedAt   time.Time `json:"requested_at"`
+}
+
+// SessionControlGrant records an approved control grant for one participant.
+type SessionControlGrant struct {
+	ParticipantID string    `json:"participant_id"`
+	GrantedBy     string    `json:"granted_by"`
+	ControlType   string    `json:"control_type"`
+	GrantedAt     time.Time `json:"granted_at"`
+}
+
+// SessionAuditEvent records one control/share lifecycle event.
+type SessionAuditEvent struct {
+	Action    string    `json:"action"`
+	Actor     string    `json:"actor,omitempty"`
+	Target    string    `json:"target,omitempty"`
+	Meta      string    `json:"meta,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Message represents a posted message within a room.
@@ -239,12 +268,15 @@ func (s *Service) CreateSession(kind, target string) InteractiveSession {
 	defer s.mu.Unlock()
 	kind = defaultIfBlank(kind, "generic")
 	target = defaultIfBlank(target, "default")
+	now := s.now()
 	session := InteractiveSession{
 		ID:        s.nextIDLocked("sess"),
 		Kind:      kind,
 		Target:    target,
-		CreatedAt: s.now(),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
+	session.Audit = append(session.Audit, SessionAuditEvent{Action: "session.create", Meta: session.Kind + ":" + session.Target, CreatedAt: now})
 	s.sessions = append(s.sessions, session)
 	s.appendRecentLocked("session", session.ID+" "+session.Kind+" "+session.Target)
 	return session
@@ -304,6 +336,14 @@ func (s *Service) JoinSession(sessionID, participant string) (InteractiveSession
 			IdentityID: participant,
 			JoinedAt:   s.now(),
 		})
+		now := s.now()
+		s.sessions[i].UpdatedAt = now
+		s.sessions[i].Audit = append(s.sessions[i].Audit, SessionAuditEvent{
+			Action:    "session.join",
+			Actor:     participant,
+			Target:    s.sessions[i].ID,
+			CreatedAt: now,
+		})
 		s.appendRecentLocked("session", s.sessions[i].ID+" join "+participant)
 		return cloneSession(s.sessions[i]), true
 	}
@@ -330,8 +370,218 @@ func (s *Service) LeaveSession(sessionID, participant string) (InteractiveSessio
 				next = append(next, existing)
 			}
 			s.sessions[i].Participants = next
+			now := s.now()
+			s.sessions[i].UpdatedAt = now
+			s.sessions[i].Audit = append(s.sessions[i].Audit, SessionAuditEvent{
+				Action:    "session.leave",
+				Actor:     participant,
+				Target:    s.sessions[i].ID,
+				CreatedAt: now,
+			})
 			s.appendRecentLocked("session", s.sessions[i].ID+" leave "+participant)
 		}
+		return cloneSession(s.sessions[i]), true
+	}
+	return InteractiveSession{}, false
+}
+
+// AttachDevice attaches a device reference to an existing session.
+func (s *Service) AttachDevice(sessionID, deviceRef string) (InteractiveSession, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sessionID = strings.TrimSpace(sessionID)
+	deviceRef = strings.TrimSpace(deviceRef)
+	for i := range s.sessions {
+		if s.sessions[i].ID != sessionID {
+			continue
+		}
+		if deviceRef == "" {
+			return cloneSession(s.sessions[i]), true
+		}
+		for _, existing := range s.sessions[i].AttachedDevices {
+			if strings.EqualFold(existing, deviceRef) {
+				return cloneSession(s.sessions[i]), true
+			}
+		}
+		now := s.now()
+		s.sessions[i].AttachedDevices = append(s.sessions[i].AttachedDevices, deviceRef)
+		s.sessions[i].UpdatedAt = now
+		s.sessions[i].Audit = append(s.sessions[i].Audit, SessionAuditEvent{
+			Action:    "session.attach_device",
+			Target:    deviceRef,
+			CreatedAt: now,
+		})
+		s.appendRecentLocked("session", s.sessions[i].ID+" attach "+deviceRef)
+		return cloneSession(s.sessions[i]), true
+	}
+	return InteractiveSession{}, false
+}
+
+// DetachDevice detaches a device reference from an existing session.
+func (s *Service) DetachDevice(sessionID, deviceRef string) (InteractiveSession, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sessionID = strings.TrimSpace(sessionID)
+	deviceRef = strings.TrimSpace(deviceRef)
+	for i := range s.sessions {
+		if s.sessions[i].ID != sessionID {
+			continue
+		}
+		if deviceRef == "" {
+			return cloneSession(s.sessions[i]), true
+		}
+		next := s.sessions[i].AttachedDevices[:0]
+		for _, existing := range s.sessions[i].AttachedDevices {
+			if strings.EqualFold(existing, deviceRef) {
+				continue
+			}
+			next = append(next, existing)
+		}
+		now := s.now()
+		s.sessions[i].AttachedDevices = next
+		s.sessions[i].UpdatedAt = now
+		s.sessions[i].Audit = append(s.sessions[i].Audit, SessionAuditEvent{
+			Action:    "session.detach_device",
+			Target:    deviceRef,
+			CreatedAt: now,
+		})
+		s.appendRecentLocked("session", s.sessions[i].ID+" detach "+deviceRef)
+		return cloneSession(s.sessions[i]), true
+	}
+	return InteractiveSession{}, false
+}
+
+// RequestControl records a participant's request for control in a session.
+func (s *Service) RequestControl(sessionID, participant, controlType string) (InteractiveSession, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sessionID = strings.TrimSpace(sessionID)
+	participant = strings.TrimSpace(participant)
+	controlType = normalizeControlType(controlType)
+	for i := range s.sessions {
+		if s.sessions[i].ID != sessionID {
+			continue
+		}
+		if participant == "" {
+			return cloneSession(s.sessions[i]), true
+		}
+		for _, existing := range s.sessions[i].ControlRequests {
+			if strings.EqualFold(existing.ParticipantID, participant) {
+				return cloneSession(s.sessions[i]), true
+			}
+		}
+		now := s.now()
+		s.sessions[i].ControlRequests = append(s.sessions[i].ControlRequests, SessionControlRequest{
+			ParticipantID: participant,
+			ControlType:   controlType,
+			RequestedAt:   now,
+		})
+		s.sessions[i].UpdatedAt = now
+		s.sessions[i].Audit = append(s.sessions[i].Audit, SessionAuditEvent{
+			Action:    "session.control.request",
+			Actor:     participant,
+			Target:    s.sessions[i].ID,
+			Meta:      controlType,
+			CreatedAt: now,
+		})
+		s.appendRecentLocked("session", s.sessions[i].ID+" control.request "+participant)
+		return cloneSession(s.sessions[i]), true
+	}
+	return InteractiveSession{}, false
+}
+
+// GrantControl approves control for one participant and records an audit entry.
+func (s *Service) GrantControl(sessionID, participant, grantedBy, controlType string) (InteractiveSession, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sessionID = strings.TrimSpace(sessionID)
+	participant = strings.TrimSpace(participant)
+	grantedBy = defaultIfBlank(grantedBy, "system")
+	controlType = normalizeControlType(controlType)
+	for i := range s.sessions {
+		if s.sessions[i].ID != sessionID {
+			continue
+		}
+		if participant == "" {
+			return cloneSession(s.sessions[i]), true
+		}
+		now := s.now()
+		nextReq := s.sessions[i].ControlRequests[:0]
+		for _, req := range s.sessions[i].ControlRequests {
+			if strings.EqualFold(req.ParticipantID, participant) {
+				continue
+			}
+			nextReq = append(nextReq, req)
+		}
+		s.sessions[i].ControlRequests = nextReq
+		grantUpdated := false
+		for j := range s.sessions[i].ControlGrants {
+			if strings.EqualFold(s.sessions[i].ControlGrants[j].ParticipantID, participant) {
+				s.sessions[i].ControlGrants[j].GrantedBy = grantedBy
+				s.sessions[i].ControlGrants[j].ControlType = controlType
+				s.sessions[i].ControlGrants[j].GrantedAt = now
+				grantUpdated = true
+				break
+			}
+		}
+		if !grantUpdated {
+			s.sessions[i].ControlGrants = append(s.sessions[i].ControlGrants, SessionControlGrant{
+				ParticipantID: participant,
+				GrantedBy:     grantedBy,
+				ControlType:   controlType,
+				GrantedAt:     now,
+			})
+		}
+		s.sessions[i].UpdatedAt = now
+		s.sessions[i].Audit = append(s.sessions[i].Audit, SessionAuditEvent{
+			Action:    "session.control.grant",
+			Actor:     grantedBy,
+			Target:    participant,
+			Meta:      controlType,
+			CreatedAt: now,
+		})
+		s.appendRecentLocked("session", s.sessions[i].ID+" control.grant "+participant)
+		return cloneSession(s.sessions[i]), true
+	}
+	return InteractiveSession{}, false
+}
+
+// RevokeControl removes control grants for one participant and records an audit entry.
+func (s *Service) RevokeControl(sessionID, participant, revokedBy string) (InteractiveSession, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sessionID = strings.TrimSpace(sessionID)
+	participant = strings.TrimSpace(participant)
+	revokedBy = defaultIfBlank(revokedBy, "system")
+	for i := range s.sessions {
+		if s.sessions[i].ID != sessionID {
+			continue
+		}
+		if participant == "" {
+			return cloneSession(s.sessions[i]), true
+		}
+		next := s.sessions[i].ControlGrants[:0]
+		for _, grant := range s.sessions[i].ControlGrants {
+			if strings.EqualFold(grant.ParticipantID, participant) {
+				continue
+			}
+			next = append(next, grant)
+		}
+		now := s.now()
+		s.sessions[i].ControlGrants = next
+		s.sessions[i].UpdatedAt = now
+		s.sessions[i].Audit = append(s.sessions[i].Audit, SessionAuditEvent{
+			Action:    "session.control.revoke",
+			Actor:     revokedBy,
+			Target:    participant,
+			CreatedAt: now,
+		})
+		s.appendRecentLocked("session", s.sessions[i].ID+" control.revoke "+participant)
 		return cloneSession(s.sessions[i]), true
 	}
 	return InteractiveSession{}, false
@@ -958,7 +1208,19 @@ func cloneSessions(input []InteractiveSession) []InteractiveSession {
 
 func cloneSession(item InteractiveSession) InteractiveSession {
 	item.Participants = append([]SessionParticipant(nil), item.Participants...)
+	item.AttachedDevices = append([]string(nil), item.AttachedDevices...)
+	item.ControlRequests = append([]SessionControlRequest(nil), item.ControlRequests...)
+	item.ControlGrants = append([]SessionControlGrant(nil), item.ControlGrants...)
+	item.Audit = append([]SessionAuditEvent(nil), item.Audit...)
 	return item
+}
+
+func normalizeControlType(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		return "interactive"
+	}
+	return value
 }
 
 func ackKey(identityID, subjectRef string) string {
