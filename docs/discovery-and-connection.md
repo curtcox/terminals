@@ -35,9 +35,15 @@ is server-driven.
 1. Client discovers server via mDNS or receives a manual host/port.
 2. Client opens a control transport carrier (runtime-dependent).
 3. Client sends bootstrap messages (`hello`, `register`, capability snapshot,
-   heartbeat).
-4. Server returns `register_ack` and initial UI (`set_ui`).
+  heartbeat).
+4. Server returns `hello_ack`, `capability_ack`, `register_ack`, and initial UI
+  (`set_ui`).
 5. Client and server continue heartbeat and command/event exchange.
+
+When capability updates remove previously-available resources (for example,
+microphone/camera loss, route changes, display detach), `capability_ack`
+includes per-resource invalidation records so clients and diagnostics can
+reason about what changed.
 
 On disconnect, the client remains on the connection screen and retries while
 the session is expected to stay online.

@@ -236,6 +236,7 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					DeviceId:           msg.CapabilityAck.DeviceID,
 					AcceptedGeneration: msg.CapabilityAck.AcceptedGeneration,
 					SnapshotApplied:    msg.CapabilityAck.SnapshotApplied,
+					Invalidations:      capabilityInvalidationsToProto(msg.CapabilityAck.Invalidations),
 				},
 			},
 		}
@@ -407,6 +408,20 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 	default:
 		return &controlv1.ConnectResponse{}
 	}
+}
+
+func capabilityInvalidationsToProto(in []CapabilityInvalidation) []*controlv1.ResourceInvalidation {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*controlv1.ResourceInvalidation, 0, len(in))
+	for _, invalidation := range in {
+		out = append(out, &controlv1.ResourceInvalidation{
+			Resource: invalidation.Resource,
+			Reason:   invalidation.Reason,
+		})
+	}
+	return out
 }
 
 func internalActionFromProto(action controlv1.CommandAction) string {

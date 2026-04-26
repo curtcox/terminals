@@ -719,6 +719,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
 		after, _ := h.control.devices.Get(msg.CapabilitySnap.DeviceID)
+		ack.Invalidations = capabilityInvalidations(before.Capabilities, after.Capabilities)
 		out := []ServerMessage{{CapabilityAck: &ack}}
 		registerAck := &RegisterResponse{
 			ServerID: h.control.serverID,
@@ -746,6 +747,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
 		after, _ := h.control.devices.Get(msg.CapabilityDelta.DeviceID)
+		ack.Invalidations = capabilityInvalidations(before.Capabilities, after.Capabilities)
 		out := []ServerMessage{{CapabilityAck: &ack}}
 		effects := h.handleCapabilityChangeEffects(ctx, msg.CapabilityDelta.DeviceID, before.Capabilities, after.Capabilities)
 		if len(effects) > 0 {
@@ -1178,6 +1180,26 @@ func gainedCapabilityResources(beforeCaps, afterCaps map[string]string) map[stri
 		gained[resource] = struct{}{}
 	}
 	return gained
+}
+
+func capabilityInvalidations(beforeCaps, afterCaps map[string]string) []CapabilityInvalidation {
+	lost := lostCapabilityResources(beforeCaps, afterCaps)
+	if len(lost) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(lost))
+	for resource := range lost {
+		names = append(names, resource)
+	}
+	sort.Strings(names)
+	out := make([]CapabilityInvalidation, 0, len(names))
+	for _, resource := range names {
+		out = append(out, CapabilityInvalidation{
+			Resource: resource,
+			Reason:   "capability_lost",
+		})
+	}
+	return out
 }
 
 func capabilityResources(caps map[string]string) map[string]struct{} {

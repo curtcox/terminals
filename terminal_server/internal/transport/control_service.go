@@ -43,11 +43,18 @@ type HelloResponse struct {
 	HeartbeatIntervalMS int64
 }
 
+// CapabilityInvalidation describes one resource invalidated by a capability change.
+type CapabilityInvalidation struct {
+	Resource string
+	Reason   string
+}
+
 // CapabilityLifecycleAck reports accepted capability generation.
 type CapabilityLifecycleAck struct {
 	DeviceID           string
 	AcceptedGeneration uint64
 	SnapshotApplied    bool
+	Invalidations      []CapabilityInvalidation
 }
 
 // ControlService encapsulates control-plane operations.

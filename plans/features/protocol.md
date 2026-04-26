@@ -1,10 +1,10 @@
 ---
 title: "Protocol Design"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Protocol Design
@@ -255,14 +255,23 @@ Keyboard / pointer / touch input still belongs on the typed gRPC control stream 
 
 ## Proto Files
 
-Proto files live in `api/proto/` and are split by concern:
+Proto files live in `api/terminals/` and are split by concern:
 
-- `control.proto` — device ↔ server control messages and handshake
-- `capabilities.proto` — capability snapshots, deltas, and endpoint records
-- `io.proto` — IO stream control and resource invalidation records
-- `ui.proto` — server-driven UI descriptors
+- `control/v1/control.proto` — device ↔ server control messages and handshake
+- `capabilities/v1/capabilities.proto` — capability snapshots/deltas and endpoint records
+- `io/v1/io.proto` — IO stream control and runtime stream records
+- `ui/v1/ui.proto` — server-driven UI descriptors
 
 Codegen is driven by Buf (`buf.yaml`, `buf.gen.yaml`). Go and Dart bindings are generated into the server and client trees respectively; CI verifies generated code is committed and up to date.
+
+## Progress (2026-04-26)
+
+- Added explicit capability invalidation payloads to control-plane acknowledgements in `CapabilityAck.invalidations` (`api/terminals/control/v1/control.proto`).
+- Wired server transport capability ack generation to include deterministic lost-resource invalidations (resource + reason) when snapshots/deltas remove claimable resources.
+- Added/updated transport regression coverage for ack invalidation content and proto adapter mapping.
+- Updated durable connection docs to describe `capability_ack` invalidation behavior.
+
+Remaining protocol-plan work includes endpoint-model cleanup, deprecation removal (`RegisterDevice` / `CapabilityUpdate`), and final reconciliation with capability-lifecycle design targets.
 
 ## Related Plans
 

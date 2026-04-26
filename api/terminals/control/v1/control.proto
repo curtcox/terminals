@@ -151,6 +151,12 @@ message CapabilityAck {
   string device_id = 1;
   uint64 accepted_generation = 2;
   bool snapshot_applied = 3;
+  repeated ResourceInvalidation invalidations = 4;
+}
+
+message ResourceInvalidation {
+  string resource = 1;
+  string reason = 2;
 }
 
 message RegisterDevice {

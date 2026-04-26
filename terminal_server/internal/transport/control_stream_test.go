@@ -353,6 +353,25 @@ func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
 	if len(router.Claims().Snapshot("device-1")) != 0 {
 		t.Fatalf("expected claims to be released for lost resources")
 	}
+	if len(out) == 0 || out[0].CapabilityAck == nil {
+		t.Fatalf("expected capability ack as first response")
+	}
+	invalidations := out[0].CapabilityAck.Invalidations
+	if len(invalidations) != 4 {
+		t.Fatalf("capability ack invalidations len = %d, want 4", len(invalidations))
+	}
+	invalidatedResources := map[string]struct{}{}
+	for _, invalidation := range invalidations {
+		if invalidation.Reason != "capability_lost" {
+			t.Fatalf("invalidation reason = %q, want capability_lost", invalidation.Reason)
+		}
+		invalidatedResources[invalidation.Resource] = struct{}{}
+	}
+	for _, resource := range []string{"mic.capture", "mic.analyze", "camera.capture", "camera.analyze"} {
+		if _, ok := invalidatedResources[resource]; !ok {
+			t.Fatalf("missing invalidation for %q", resource)
+		}
+	}
 	stopStreamIDs := map[string]struct{}{}
 	for _, msg := range out {
 		if msg.StopStream != nil {
