@@ -26,9 +26,7 @@ void main() {
     expect(capabilities.hasSpeakers(), isFalse);
     expect(capabilities.hasHaptics(), isFalse);
     expect(capabilities.hasKeyboard(), isFalse);
-    expect(capabilities.hasEdge(), isTrue);
-    expect(
-        capabilities.edge.operators, <String>['monitor.tier.foreground_only']);
+    expect(capabilities.hasEdge(), isFalse);
     expect(capabilities.hasPointer(), isFalse);
     expect(capabilities.hasTouch(), isFalse);
     expect(capabilities.screen.hasTouch(), isFalse);
@@ -85,10 +83,7 @@ void main() {
     expect(capabilities.hasTouch(), isFalse);
     expect(capabilities.screen.hasTouch(), isFalse);
     expect(capabilities.displays.first.screen.hasTouch(), isFalse);
-    expect(capabilities.hasEdge(), isTrue);
-    expect(
-        capabilities.edge.operators, <String>['monitor.tier.foreground_only']);
-    expect(capabilities.edge.hasRetention(), isFalse);
+    expect(capabilities.hasEdge(), isFalse);
     expect(capabilities.screen.hasFullscreenSupported(), isFalse);
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);
     expect(capabilities.screen.hasSafeArea(), isFalse);
@@ -293,8 +288,6 @@ void main() {
     expect(capabilities.hasMicrophone(), isFalse);
     expect(capabilities.hasCamera(), isFalse);
     expect(capabilities.hasSpeakers(), isFalse);
-    expect(capabilities.hasEdge(), isTrue);
-    expect(
-        capabilities.edge.operators, <String>['monitor.tier.foreground_only']);
+    expect(capabilities.hasEdge(), isFalse);
   });
 }

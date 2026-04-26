@@ -167,6 +167,9 @@ continue to use their existing `Start` methods.
 Device capability declarations include monitoring tier operators under
 `edge.operators`.
 
+Clients declare these operators only when they have explicit platform-backed
+evidence. Unknown tiers are omitted rather than inferred from platform type.
+
 - `monitor.tier.foreground_only`: the client can run monitor workloads only
   while active in the foreground.
 - `monitor.tier.background_capable`: the client can sustain monitor workloads
