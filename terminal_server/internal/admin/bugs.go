@@ -90,29 +90,53 @@ func (h *Handler) handleBugDetailPage(w http.ResponseWriter, req *http.Request) 
 	}
 }
 
-func (h *Handler) handleBugConfirmAPI(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
+func (h *Handler) handleBugReportAPI(w http.ResponseWriter, req *http.Request) {
 	if h.bugReports == nil {
 		h.writeJSONError(w, http.StatusNotFound, "bug reports unavailable")
 		return
 	}
 	pathValue := strings.TrimSpace(strings.TrimPrefix(req.URL.Path, "/admin/api/bugs/"))
-	if !strings.HasSuffix(pathValue, "/confirm") {
-		h.writeJSONError(w, http.StatusNotFound, "not found")
+	if pathValue == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "report id is required")
 		return
 	}
-	reportID := strings.TrimSpace(strings.TrimSuffix(pathValue, "/confirm"))
-	reportID = strings.TrimSuffix(reportID, "/")
+	if strings.HasSuffix(pathValue, "/confirm") {
+		if req.Method != http.MethodPost {
+			h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		reportID := strings.TrimSpace(strings.TrimSuffix(pathValue, "/confirm"))
+		reportID = strings.TrimSuffix(reportID, "/")
+		if reportID == "" {
+			h.writeJSONError(w, http.StatusBadRequest, "report id is required")
+			return
+		}
+		rec, ok, err := h.bugReports.Confirm(req.Context(), reportID, "admin")
+		if err != nil {
+			h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("confirm bug report: %v", err))
+			return
+		}
+		if !ok {
+			h.writeJSONError(w, http.StatusNotFound, "bug report not found")
+			return
+		}
+		h.writeJSON(w, http.StatusOK, map[string]any{"report": rec})
+		return
+	}
+
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	reportID := strings.TrimSuffix(pathValue, "/")
+	reportID = strings.TrimSpace(reportID)
 	if reportID == "" {
 		h.writeJSONError(w, http.StatusBadRequest, "report id is required")
 		return
 	}
-	rec, ok, err := h.bugReports.Confirm(req.Context(), reportID, "admin")
+	rec, ok, err := h.bugReports.Get(reportID)
 	if err != nil {
-		h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("confirm bug report: %v", err))
+		h.writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("read bug report: %v", err))
 		return
 	}
 	if !ok {

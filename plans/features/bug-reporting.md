@@ -1,10 +1,10 @@
 ---
 title: "Bug Reporting and Diagnostics"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Bug Reporting and Diagnostics
@@ -225,3 +225,16 @@ Summary of mitigations implemented in code:
 - Correlation token enrichment: token word/code are embedded in tags/source hints and propagated to server event attributes.
 - Optional input UX: description/tags remain optional; reference token is presented as text + audio + QR.
 - Expanded automatic source hints: connection, UI, stream counts, and queue/pending counters are captured at submit time.
+
+## Progress Update (2026-04-26)
+
+Completed in this pass:
+
+- Added `GET /admin/api/bugs/<report_id>` JSON detail endpoint for machine-friendly bug record retrieval.
+- Added admin tests covering:
+  - JSON detail retrieval (`/admin/api/bugs/<id>`)
+  - Public intake prefill route (`GET /bug?device=<id>`)
+  - JSON intake payload (`POST /bug/intake` with protobuf JSON)
+- Drained current durable behavior into docs at [docs/bug-reporting.md](../../docs/bug-reporting.md) and linked it from [docs/README.md](../../docs/README.md).
+
+Remaining work in this plan still includes deeper multi-modal intake channels and broader rollout phases described above.

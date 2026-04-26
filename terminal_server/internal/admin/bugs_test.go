@@ -49,6 +49,28 @@ func TestBugIntakeAndListAndDetail(t *testing.T) {
 	if confirmed, ok := payload["bugs"][0]["confirmed"].(bool); !ok || confirmed {
 		t.Fatalf("confirmed = %v, want false", payload["bugs"][0]["confirmed"])
 	}
+	reportID := strings.TrimPrefix(location, "/admin/bugs/")
+	if strings.TrimSpace(reportID) == "" {
+		t.Fatalf("failed to parse report id from location=%q", location)
+	}
+
+	detailAPIReq := httptest.NewRequest(http.MethodGet, "/admin/api/bugs/"+reportID, nil)
+	detailAPIW := httptest.NewRecorder()
+	h.ServeHTTP(detailAPIW, detailAPIReq)
+	if detailAPIW.Code != http.StatusOK {
+		t.Fatalf("GET /admin/api/bugs/%s status = %d, want 200 body=%s", reportID, detailAPIW.Code, detailAPIW.Body.String())
+	}
+	apiPayload := map[string]map[string]any{}
+	if err := json.Unmarshal(detailAPIW.Body.Bytes(), &apiPayload); err != nil {
+		t.Fatalf("decode bug detail api payload: %v", err)
+	}
+	summary, ok := apiPayload["report"]["summary"].(map[string]any)
+	if !ok {
+		t.Fatalf("detail api missing summary object: %+v", apiPayload)
+	}
+	if gotID := summary["report_id"]; gotID != reportID {
+		t.Fatalf("detail api report_id=%v, want %q", gotID, reportID)
+	}
 
 	detailReq := httptest.NewRequest(http.MethodGet, location, nil)
 	detailW := httptest.NewRecorder()
@@ -97,4 +119,60 @@ func TestBugListFilterByTag(t *testing.T) {
 	if len(payload["bugs"]) != 1 {
 		t.Fatalf("filtered bugs len = %d, want 1", len(payload["bugs"]))
 	}
+}
+
+func TestBugNewPagePrefillsSubjectFromPublicRoute(t *testing.T) {
+	logDir := t.TempDir()
+	h := testHandler(t, config.Config{MDNSName: "HomeServer", LogDir: logDir})
+
+	req := httptest.NewRequest(http.MethodGet, "/bug?device=subject-42", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /bug status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "File a Bug Report") {
+		t.Fatalf("public bug page should render heading")
+	}
+	if !strings.Contains(body, "name=\"subject_device_id\" value=\"subject-42\"") {
+		t.Fatalf("public bug page should prefill subject device id: body=%s", body)
+	}
+}
+
+func TestBugIntakeJSON(t *testing.T) {
+	logDir := t.TempDir()
+	h := testHandler(t, config.Config{MDNSName: "HomeServer", LogDir: logDir})
+
+	req := httptest.NewRequest(http.MethodPost, "/bug/intake", strings.NewReader(`{
+		"reporterDeviceId":"reporter-json",
+		"subjectDeviceId":"subject-json",
+		"source":"BUG_REPORT_SOURCE_WEBHOOK",
+		"description":"json intake path",
+		"tags":["lost_connection"]
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("POST /bug/intake (json) status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+	payload := map[string]map[string]any{}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode intake json response: %v", err)
+	}
+	ack, ok := payload["ack"]
+	if !ok {
+		t.Fatalf("response missing ack payload: %+v", payload)
+	}
+	if strings.TrimSpace(asString(ack["report_id"])) == "" {
+		t.Fatalf("ack.report_id should be populated: %+v", ack)
+	}
+}
+
+func asString(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
 }

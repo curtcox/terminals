@@ -158,7 +158,7 @@ func NewHandler(
 	mux.HandleFunc("/admin/bugs/", h.handleBugDetailPage)
 	mux.HandleFunc("/admin/bugs/new", h.handleBugNewPage)
 	mux.HandleFunc("/admin/api/bugs", h.handleBugsListAPI)
-	mux.HandleFunc("/admin/api/bugs/", h.handleBugConfirmAPI)
+	mux.HandleFunc("/admin/api/bugs/", h.handleBugReportAPI)
 	mux.HandleFunc("/bug", h.handleBugNewPage)
 	mux.HandleFunc("/bug/intake", h.handleBugIntake)
 	mux.HandleFunc("/admin/api/chat/messages", h.handleChatMessages)

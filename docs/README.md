@@ -22,6 +22,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | [Use Case Flows](use-case-flows.md) | Durable baseline scenario flow reference |
 | [Sensing and Edge Observation Use Case Flows](sensing-use-case-flows.md) | Durable sensing-heavy edge-observation flow reference |
 | [Development Environment Improvement Log](development-environment-improvement-log.md) | Completed improvements plus local sandbox listener/network test restrictions |
+| [Bug Reporting and Diagnostics](bug-reporting.md) | Bug-intake contracts, endpoints, persistence paths, and validation references |
 
 ## Quick start
 
