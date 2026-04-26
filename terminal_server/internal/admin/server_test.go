@@ -22,6 +22,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/terminal"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
+	"github.com/curtcox/terminals/terminal_server/internal/world"
 )
 
 func TestDashboardRenders(t *testing.T) {
@@ -164,6 +165,67 @@ func TestActivationsEndpointIncludesInspectionData(t *testing.T) {
 	}
 }
 
+func TestWorldCalibrationEndpointReturnsGeometry(t *testing.T) {
+	h := testHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/admin/api/world/calibration?device_id=d1", nil)
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode calibration payload: %v", err)
+	}
+	devices, ok := payload["devices"].([]any)
+	if !ok {
+		t.Fatalf("devices = %T, want []any", payload["devices"])
+	}
+	if len(devices) != 1 {
+		t.Fatalf("len(devices) = %d, want 1", len(devices))
+	}
+}
+
+func TestWorldVerifyEndpointUpdatesVerificationState(t *testing.T) {
+	h := testHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/admin/api/world/verify", strings.NewReader(url.Values{
+		"device_id": {"d1"},
+		"method":    {"marker"},
+	}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode verify payload: %v", err)
+	}
+	device, ok := payload["device"].(map[string]any)
+	if !ok {
+		t.Fatalf("device = %T, want object", payload["device"])
+	}
+	geometry, ok := device["geometry"].(map[string]any)
+	if !ok {
+		t.Fatalf("geometry = %T, want object", device["geometry"])
+	}
+	if geometry["VerificationState"] != "marker" {
+		t.Fatalf("VerificationState = %v, want marker", geometry["VerificationState"])
+	}
+	history, ok := device["history"].([]any)
+	if !ok {
+		t.Fatalf("history = %T, want []any", device["history"])
+	}
+	if len(history) != 1 {
+		t.Fatalf("len(history) = %d, want 1", len(history))
+	}
+}
+
 func TestStartAndStopScenarioEndpoints(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "kitchen-1", DeviceName: "Kitchen"})
@@ -176,7 +238,7 @@ func TestStartAndStopScenarioEndpoints(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil)
 
 	startReq := httptest.NewRequest(http.MethodPost, "/admin/api/scenarios/start", strings.NewReader(url.Values{
 		"scenario":   {"terminal"},
@@ -219,7 +281,7 @@ func TestUpdateDevicePlacementEndpoint(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/api/devices/placement", strings.NewReader(url.Values{
 		"device_id": {"kitchen-1"},
@@ -259,6 +321,8 @@ func testHandler(t *testing.T, cfgOverride ...config.Config) http.Handler {
 		IO:        io.NewRouter(),
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
+	worldModel := world.NewModel()
+	worldModel.UpsertGeometry(context.Background(), world.DeviceGeometry{DeviceID: "d1", Zone: "kitchen"})
 
 	cfg := config.Config{
 		GRPCHost:      "0.0.0.0",
@@ -279,7 +343,7 @@ func testHandler(t *testing.T, cfgOverride ...config.Config) http.Handler {
 			cfg.LogDir = override.LogDir
 		}
 	}
-	return NewHandler(control, runtime, nil, nil, nil, nil, devices, cfg)
+	return NewHandler(control, runtime, nil, nil, nil, nil, devices, cfg, worldModel)
 }
 
 func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
@@ -299,7 +363,7 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, nil, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"}, nil)
 
 	listReq := httptest.NewRequest(http.MethodGet, "/admin/api/apps", nil)
 	listW := httptest.NewRecorder()
@@ -768,7 +832,7 @@ func TestReplSessionGetAndDeleteEndpoints(t *testing.T) {
 		})
 	}()
 
-	h := NewHandler(control, runtime, replSvc, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, replSvc, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil)
 
 	getReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/sessions/"+created.Session.ID, nil)
 	getW := httptest.NewRecorder()
@@ -824,7 +888,7 @@ func TestReplAIEndpoints(t *testing.T) {
 		},
 	})
 
-	h := NewHandler(control, runtime, replSvc, aiSvc, nil, nil, devices, config.Config{MDNSName: "HomeServer"})
+	h := NewHandler(control, runtime, replSvc, aiSvc, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil)
 
 	providersReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/ai/providers", nil)
 	providersW := httptest.NewRecorder()

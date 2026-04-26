@@ -241,6 +241,7 @@ func main() {
 		func() { registerAppScenarioDefinitions(scenarioEngine, appRuntime) },
 		deviceManager,
 		cfg,
+		worldModel,
 	)
 	adminMux := http.NewServeMux()
 	adminMux.Handle("/mcp", mcpServer)

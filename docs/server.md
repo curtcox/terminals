@@ -298,11 +298,21 @@ The in-memory world model (`terminal_server/internal/world`) provides:
 - calibration and verification state for fixed devices,
 - entity lookup helpers (`LocateEntity`, `WhoIsHome`, `VerifyDevice`), and
 - filtered recent-observation queries (`RecentObservations`) over the same
-  observation stream used by sensing scenarios.
+  observation stream used by sensing scenarios,
+- optional localization geometry metadata per fixed terminal (`MicArray`,
+  `CameraIntrinsics`, `CameraExtrinsics`, `RadioBias`), and
+- bounded per-device verification history via `CalibrationHistory`.
 
 The media planner observation sink feeds both the scenario observation store
 and the world model so localization and presence queries can share a
 consistent recent history source.
+
+Admin APIs expose this calibration state for operator workflows:
+
+- `GET /admin/api/world/calibration` returns geometry and recent verification
+  history (optional `device_id` and `history_limit` query params).
+- `POST /admin/api/world/verify` records one verification method for a device
+  (`device_id`, `method`, optional `history_limit`) and returns updated state.
 
 ## Server-Driven UI Contract
 

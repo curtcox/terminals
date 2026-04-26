@@ -4,6 +4,7 @@ package world
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -34,10 +35,39 @@ type DeviceGeometry struct {
 	DeviceID          string
 	Zone              string
 	Pose              iorouter.Pose
+	MicArray          *MicArrayGeometry
+	CameraIntrinsics  *CameraIntrinsics
+	CameraExtrinsics  *iorouter.Pose
+	RadioBias         map[string]float64
 	ClockSyncErrorMS  float64
 	VerificationState VerificationState
 	CalibrationTag    string
 	UpdatedAt         time.Time
+}
+
+// MicArrayGeometry describes an optional fixed microphone array layout.
+type MicArrayGeometry struct {
+	ElementPoses []iorouter.Pose
+	SpacingM     float64
+	Orientation  string
+}
+
+// CameraIntrinsics captures lens/model parameters for localization.
+type CameraIntrinsics struct {
+	FocalLengthX float64
+	FocalLengthY float64
+	PrincipalX   float64
+	PrincipalY   float64
+	Distortion   []float64
+}
+
+// CalibrationEvent records one verification update for a fixed device.
+type CalibrationEvent struct {
+	DeviceID          string
+	Method            string
+	VerificationState VerificationState
+	CalibrationTag    string
+	OccurredAt        time.Time
 }
 
 // EntityKind describes tracked entities.
@@ -79,6 +109,7 @@ var ErrNotFound = errors.New("world model record not found")
 type Model struct {
 	mu              sync.RWMutex
 	geometries      map[string]DeviceGeometry
+	calibration     map[string][]CalibrationEvent
 	entities        map[string]EntityRecord
 	observations    []iorouter.Observation
 	maxObservations int
@@ -88,6 +119,7 @@ type Model struct {
 func NewModel() *Model {
 	return &Model{
 		geometries:      make(map[string]DeviceGeometry),
+		calibration:     make(map[string][]CalibrationEvent),
 		entities:        make(map[string]EntityRecord),
 		maxObservations: 2048,
 	}
@@ -104,9 +136,12 @@ func (m *Model) UpsertGeometry(_ context.Context, geometry DeviceGeometry) {
 	if geometry.VerificationState == "" {
 		geometry.VerificationState = VerificationUnknown
 	}
+	if geometry.RadioBias == nil {
+		geometry.RadioBias = map[string]float64{}
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.geometries[geometry.DeviceID] = geometry
+	m.geometries[geometry.DeviceID] = cloneDeviceGeometry(geometry)
 }
 
 // Geometry returns one geometry record if available.
@@ -117,7 +152,27 @@ func (m *Model) Geometry(_ context.Context, deviceID string) (DeviceGeometry, bo
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	geometry, ok := m.geometries[strings.TrimSpace(deviceID)]
+	if ok {
+		geometry = cloneDeviceGeometry(geometry)
+	}
 	return geometry, ok
+}
+
+// ListGeometries returns all known device geometry records sorted by device ID.
+func (m *Model) ListGeometries(_ context.Context) []DeviceGeometry {
+	if m == nil {
+		return nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]DeviceGeometry, 0, len(m.geometries))
+	for _, geometry := range m.geometries {
+		out = append(out, cloneDeviceGeometry(geometry))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].DeviceID < out[j].DeviceID
+	})
+	return out
 }
 
 // UpsertEntity stores or updates an entity record.
@@ -253,8 +308,40 @@ func (m *Model) VerifyDevice(ctx context.Context, deviceID string, method string
 	geometry.CalibrationTag = strings.TrimSpace(method)
 	geometry.UpdatedAt = time.Now().UTC()
 	m.geometries[deviceID] = geometry
+	m.calibration[deviceID] = append(m.calibration[deviceID], CalibrationEvent{
+		DeviceID:          deviceID,
+		Method:            strings.TrimSpace(method),
+		VerificationState: state,
+		CalibrationTag:    geometry.CalibrationTag,
+		OccurredAt:        geometry.UpdatedAt,
+	})
 	_ = ctx
 	return nil
+}
+
+// CalibrationHistory returns recent verification events for one device.
+func (m *Model) CalibrationHistory(_ context.Context, deviceID string, limit int) ([]CalibrationEvent, error) {
+	if m == nil {
+		return nil, ErrNotFound
+	}
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return nil, ErrNotFound
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	events, ok := m.calibration[deviceID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	start := 0
+	if limit > 0 && len(events) > limit {
+		start = len(events) - limit
+	}
+	out := append([]CalibrationEvent(nil), events[start:]...)
+	return out, nil
 }
 
 func verificationStateFromMethod(method string) VerificationState {
@@ -272,4 +359,18 @@ func verificationStateFromMethod(method string) VerificationState {
 	default:
 		return VerificationUnknown
 	}
+}
+
+func cloneDeviceGeometry(in DeviceGeometry) DeviceGeometry {
+	out := in
+	if len(in.RadioBias) == 0 {
+		out.RadioBias = map[string]float64{}
+		return out
+	}
+	bias := make(map[string]float64, len(in.RadioBias))
+	for key, value := range in.RadioBias {
+		bias[key] = value
+	}
+	out.RadioBias = bias
+	return out
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
+	"github.com/curtcox/terminals/terminal_server/internal/world"
 )
 
 type replSessionService interface {
@@ -40,6 +41,12 @@ type replAIService interface {
 	SetSelection(ctx context.Context, req replai.SetSelectionRequest) (*replai.SetSelectionResponse, error)
 }
 
+type worldAdminModel interface {
+	ListGeometries(ctx context.Context) []world.DeviceGeometry
+	CalibrationHistory(ctx context.Context, deviceID string, limit int) ([]world.CalibrationEvent, error)
+	VerifyDevice(ctx context.Context, deviceID string, method string) error
+}
+
 // Handler serves a lightweight admin dashboard and JSON control APIs.
 type Handler struct {
 	control     *transport.ControlService
@@ -51,6 +58,7 @@ type Handler struct {
 	devices     *device.Manager
 	bugReports  *bugreport.Service
 	capability  *capability.Service
+	world       worldAdminModel
 	cfg         config.Config
 	now         func() time.Time
 }
@@ -65,6 +73,7 @@ func NewHandler(
 	syncAppDefs func(),
 	devices *device.Manager,
 	cfg config.Config,
+	worldModel worldAdminModel,
 ) http.Handler {
 	h := &Handler{
 		control:     control,
@@ -76,6 +85,7 @@ func NewHandler(
 		devices:     devices,
 		bugReports:  bugreport.NewService(cfg.LogDir, devices, runtime),
 		capability:  capability.NewService(),
+		world:       worldModel,
 		cfg:         cfg,
 		now:         time.Now,
 	}
@@ -142,6 +152,8 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/memory/remember", h.handleMemoryRemember)
 	mux.HandleFunc("/admin/api/placement", h.handlePlacement)
 	mux.HandleFunc("/admin/api/recent", h.handleRecent)
+	mux.HandleFunc("/admin/api/world/calibration", h.handleWorldCalibration)
+	mux.HandleFunc("/admin/api/world/verify", h.handleWorldVerify)
 	mux.HandleFunc("/admin/api/store/get", h.handleStoreGet)
 	mux.HandleFunc("/admin/api/store/ls", h.handleStoreList)
 	mux.HandleFunc("/admin/api/store/put", h.handleStorePut)
