@@ -1031,7 +1031,7 @@ func (h *StreamHandler) handleCapabilityChangeEffects(
 
 	lostResources := lostCapabilityResources(beforeCaps, afterCaps)
 	gainedResources := gainedCapabilityResources(beforeCaps, afterCaps)
-	emitCapabilityEvents(ctx, h.runtime, deviceID, beforeCaps, afterCaps, lostResources)
+	emitCapabilityEvents(ctx, h.runtime, deviceID, beforeCaps, afterCaps, lostResources, gainedResources)
 	if len(lostResources) == 0 && len(gainedResources) == 0 {
 		return nil
 	}
@@ -1422,14 +1422,24 @@ func emitCapabilityEvents(
 	beforeCaps map[string]string,
 	afterCaps map[string]string,
 	lostResources map[string]struct{},
+	gainedResources map[string]struct{},
 ) {
 	if runtime == nil || runtime.Env == nil || runtime.Env.Broadcast == nil {
 		return
 	}
 	targets := []string{deviceID}
 	_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.capability.updated")
+	if len(gainedResources) > 0 {
+		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.capability.added")
+	}
+	if len(lostResources) > 0 {
+		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.capability.removed")
+	}
 	if beforeCaps["screen.width"] != afterCaps["screen.width"] || beforeCaps["screen.height"] != afterCaps["screen.height"] {
 		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.display.resized")
+	}
+	if audioRouteCapabilitiesChanged(beforeCaps, afterCaps) {
+		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.audio_route.changed")
 	}
 	if len(lostResources) == 0 {
 		return
@@ -1442,6 +1452,50 @@ func emitCapabilityEvents(
 	sort.Strings(names)
 	for _, resource := range names {
 		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.resource.lost:"+resource)
+	}
+}
+
+func audioRouteCapabilitiesChanged(beforeCaps, afterCaps map[string]string) bool {
+	before := audioRouteCapabilityState(beforeCaps)
+	after := audioRouteCapabilityState(afterCaps)
+	if len(before) != len(after) {
+		return true
+	}
+	for key, value := range before {
+		if after[key] != value {
+			return true
+		}
+	}
+	return false
+}
+
+func audioRouteCapabilityState(caps map[string]string) map[string]string {
+	out := map[string]string{}
+	for key, value := range caps {
+		if !isAudioRouteCapabilityKey(key) {
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+func isAudioRouteCapabilityKey(key string) bool {
+	switch {
+	case key == "microphone.present":
+		return true
+	case key == "microphone.endpoint_count":
+		return true
+	case strings.HasPrefix(key, "microphone.endpoint."):
+		return true
+	case key == "speakers.present":
+		return true
+	case key == "speakers.endpoint_count":
+		return true
+	case strings.HasPrefix(key, "speakers.endpoint."):
+		return true
+	default:
+		return false
 	}
 }
 

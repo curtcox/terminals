@@ -497,14 +497,83 @@ func TestHandleMessageCapabilityDeltaEmitsTypedCapabilityEvents(t *testing.T) {
 	if !containsMessage(messages, "terminal.capability.updated") {
 		t.Fatalf("expected terminal.capability.updated in events: %+v", messages)
 	}
+	if !containsMessage(messages, "terminal.capability.removed") {
+		t.Fatalf("expected terminal.capability.removed in events: %+v", messages)
+	}
 	if !containsMessage(messages, "terminal.display.resized") {
 		t.Fatalf("expected terminal.display.resized in events: %+v", messages)
+	}
+	if !containsMessage(messages, "terminal.audio_route.changed") {
+		t.Fatalf("expected terminal.audio_route.changed in events: %+v", messages)
 	}
 	if !containsMessage(messages, "terminal.resource.lost") {
 		t.Fatalf("expected terminal.resource.lost in events: %+v", messages)
 	}
 	if !containsMessage(messages, "terminal.resource.lost:mic.capture") {
 		t.Fatalf("expected terminal.resource.lost:mic.capture in events: %+v", messages)
+	}
+}
+
+func TestHandleMessageCapabilityDeltaEmitsCapabilityAddedEventOnEndpointGain(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:     "device-1",
+			Generation:   1,
+			Capabilities: map[string]string{},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Reason:     "headset_connected",
+			Capabilities: map[string]string{
+				"speakers.present":        "true",
+				"speakers.endpoint_count": "1",
+				"speakers.endpoint.0.id":  "headset",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	events := broadcaster.Events()
+	messages := make([]string, 0, len(events))
+	for _, event := range events {
+		messages = append(messages, event.Message)
+	}
+	if !containsMessage(messages, "terminal.capability.added") {
+		t.Fatalf("expected terminal.capability.added in events: %+v", messages)
+	}
+	if !containsMessage(messages, "terminal.audio_route.changed") {
+		t.Fatalf("expected terminal.audio_route.changed in events: %+v", messages)
+	}
+	if containsMessage(messages, "terminal.capability.removed") {
+		t.Fatalf("did not expect terminal.capability.removed in events: %+v", messages)
 	}
 }
 

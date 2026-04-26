@@ -1,10 +1,10 @@
 ---
 title: "Capability Lifecycle and Dynamic Terminal Capabilities"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: cascade
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Capability Lifecycle and Dynamic Terminal Capabilities
@@ -470,6 +470,10 @@ Rules:
 - resource compiler emits correct claimable resources
 - active claims are revoked on resource loss
 - router patches or tears down media plans after capability changes
+
+## Incremental Progress
+
+- 2026-04-26 (Stage 1 capability events): Server capability delta handling now emits explicit lifecycle events for capability gain/loss and audio route change (`terminal.capability.added`, `terminal.capability.removed`, `terminal.audio_route.changed`) in addition to existing update/loss events. Added transport regression coverage in `terminal_server/internal/transport/control_stream_test.go` for both endpoint gain and endpoint loss/resized paths.
 
 ## Related Plans
 
