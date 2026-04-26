@@ -7,6 +7,10 @@ import 'package:terminal_client/edge/artifact_export.dart';
 import 'package:terminal_client/edge/artifact_export_backend_io.dart';
 import 'package:terminal_client/edge/bundle_store.dart';
 import 'package:terminal_client/edge/bundle_store_backend_io.dart';
+import 'package:terminal_client/edge/host.dart';
+import 'package:terminal_client/edge/host_state_backend_io.dart';
+import 'package:terminal_client/edge/retention.dart';
+import 'package:terminal_client/edge/scheduler.dart';
 
 void main() {
   group('edge IO storage durability', () {
@@ -73,6 +77,106 @@ void main() {
       final loaded = await secondExporter.exportByID(artifactID);
 
       expect(loaded, payload);
+    });
+
+    test('edge host reloads active flow state across restart', () async {
+      final bundleID = 'pkg/audio.classify/v1';
+      final bundlePayload = Uint8List.fromList(<int>[7, 7, 7]);
+
+      final firstStore = await BundleStore.create(
+        backend: createIOBundleStoreBackend(rootDir: tempRoot),
+      );
+      final firstHost = await EdgeHost.create(
+        bundleStore: firstStore,
+        scheduler: EdgeScheduler(maxCPURealtime: 2, maxMemoryMB: 256),
+        retention: RetentionBufferManager(
+          audioSec: 10,
+          videoSec: 10,
+          sensorSec: 10,
+          radioSec: 10,
+        ),
+        stateBackend: createIOEdgeHostStateBackend(rootDir: tempRoot),
+      );
+
+      await firstHost.installBundle(bundleID, bundlePayload);
+      await firstHost.startFlow('flow-a', bundleId: bundleID);
+
+      final secondStore = await BundleStore.create(
+        backend: createIOBundleStoreBackend(rootDir: tempRoot),
+      );
+      final secondHost = await EdgeHost.create(
+        bundleStore: secondStore,
+        scheduler: EdgeScheduler(maxCPURealtime: 2, maxMemoryMB: 256),
+        retention: RetentionBufferManager(
+          audioSec: 10,
+          videoSec: 10,
+          sensorSec: 10,
+          radioSec: 10,
+        ),
+        stateBackend: createIOEdgeHostStateBackend(rootDir: tempRoot),
+      );
+
+      expect(secondHost.activeFlows, contains('flow-a'));
+      expect(secondHost.bundleForFlow('flow-a'), bundleID);
+    });
+
+    test('edge host ignores corrupt state and prunes flows for removed bundles',
+        () async {
+      final bundleID = 'pkg/audio.localize/v1';
+
+      final store = await BundleStore.create(
+        backend: createIOBundleStoreBackend(rootDir: tempRoot),
+      );
+      final host = await EdgeHost.create(
+        bundleStore: store,
+        scheduler: EdgeScheduler(maxCPURealtime: 2, maxMemoryMB: 256),
+        retention: RetentionBufferManager(
+          audioSec: 10,
+          videoSec: 10,
+          sensorSec: 10,
+          radioSec: 10,
+        ),
+        stateBackend: createIOEdgeHostStateBackend(rootDir: tempRoot),
+      );
+
+      await host.installBundle(bundleID, <int>[1, 2, 3]);
+      await host.startFlow('flow-b', bundleId: bundleID);
+      await host.removeBundle(bundleID);
+
+      final reloadedStore = await BundleStore.create(
+        backend: createIOBundleStoreBackend(rootDir: tempRoot),
+      );
+      final reloadedHost = await EdgeHost.create(
+        bundleStore: reloadedStore,
+        scheduler: EdgeScheduler(maxCPURealtime: 2, maxMemoryMB: 256),
+        retention: RetentionBufferManager(
+          audioSec: 10,
+          videoSec: 10,
+          sensorSec: 10,
+          radioSec: 10,
+        ),
+        stateBackend: createIOEdgeHostStateBackend(rootDir: tempRoot),
+      );
+      expect(reloadedHost.activeFlows, isNot(contains('flow-b')));
+
+      final stateFile = File('${tempRoot.path}/host_state.json');
+      stateFile.writeAsStringSync('{corrupt-json', flush: true);
+
+      final fromCorruptStore = await BundleStore.create(
+        backend: createIOBundleStoreBackend(rootDir: tempRoot),
+      );
+      final fromCorruptHost = await EdgeHost.create(
+        bundleStore: fromCorruptStore,
+        scheduler: EdgeScheduler(maxCPURealtime: 2, maxMemoryMB: 256),
+        retention: RetentionBufferManager(
+          audioSec: 10,
+          videoSec: 10,
+          sensorSec: 10,
+          radioSec: 10,
+        ),
+        stateBackend: createIOEdgeHostStateBackend(rootDir: tempRoot),
+      );
+      expect(fromCorruptHost.activeFlows, isEmpty);
     });
   });
 }
