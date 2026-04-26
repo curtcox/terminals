@@ -2475,10 +2475,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     final now = DateTime.now().toUtc();
     final values = <String, double>{};
-    if (capabilities.hasConnectivity() &&
-        capabilities.connectivity.wifiSignalStrength) {
-      values['connectivity.reconnect_attempt'] = _reconnectAttempt.toDouble();
-    }
     if (capabilities.hasBattery()) {
       values['battery.level'] = capabilities.battery.level.toDouble();
       values['battery.charging'] = capabilities.battery.charging ? 1.0 : 0.0;
