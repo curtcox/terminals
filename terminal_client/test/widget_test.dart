@@ -2844,7 +2844,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('track-a'), findsOneWidget);
-    expect(find.text('Waiting for media'), findsOneWidget);
+    expect(find.text('Waiting for media'), findsNWidgets(2));
     expect(find.text('Fullscreen body'), findsOneWidget);
     expect(find.text('Awake body'), findsOneWidget);
     expect(find.text('Brightness body'), findsOneWidget);
@@ -2919,6 +2919,91 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('audio visualizer stream state toggles on start and stop stream',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'mic_mix'
+                ..audioVisualizer =
+                    (uiv1.AudioVisualizerWidget()..streamId = 'stream-audio'),
+            ))),
+    );
+    await tester.pump();
+
+    final stateFinder = find.byKey(
+      const ValueKey<String>('ui-audio-visualizer-state-mic_mix'),
+    );
+    expect(stateFinder, findsOneWidget);
+    expect(find.descendant(of: stateFinder, matching: find.text('Attached')),
+        findsNothing);
+    expect(
+      find.descendant(
+        of: stateFinder,
+        matching: find.text('Waiting for media'),
+      ),
+      findsOneWidget,
+    );
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..startStream = (iov1.StartStream()
+          ..streamId = 'stream-audio'
+          ..kind = 'audio'
+          ..sourceDeviceId = 'device-1'
+          ..targetDeviceId = 'device-2'),
+    );
+    await tester.pump();
+
+    expect(find.descendant(of: stateFinder, matching: find.text('Attached')),
+        findsOneWidget);
+    final attachedProgressIndicator = tester.widget<LinearProgressIndicator>(
+      find.descendant(
+        of: find.byKey(const ValueKey<String>('ui-audio-visualizer-mic_mix')),
+        matching: find.byType(LinearProgressIndicator),
+      ),
+    );
+    expect(attachedProgressIndicator.value, isNotNull);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..stopStream = (iov1.StopStream()..streamId = 'stream-audio'),
+    );
+    await tester.pump();
+
+    expect(find.descendant(of: stateFinder, matching: find.text('Attached')),
+        findsNothing);
+    expect(
+      find.descendant(
+        of: stateFinder,
+        matching: find.text('Waiting for media'),
+      ),
+      findsOneWidget,
+    );
+    final waitingProgressIndicator = tester.widget<LinearProgressIndicator>(
+      find.descendant(
+        of: find.byKey(const ValueKey<String>('ui-audio-visualizer-mic_mix')),
+        matching: find.byType(LinearProgressIndicator),
+      ),
+    );
+    expect(waitingProgressIndicator.value, isNull);
   });
 
   testWidgets(

@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Replaced remaining audio-visualizer placeholder semantics with deterministic stream-attached state (`Waiting for media`/`Attached`) wired to media-engine attach signals, including explicit progress-bar determinate/indeterminate behavior and widget regression coverage for start/stop transitions.
 - 2026-04-25: Hardened server-side protobuf capability flattening truthfulness by omitting default-false/default-zero capability map fields (`screen.touch`, `screen.fullscreen_supported`, `screen.multi_window_supported`, `display.*.primary`, media endpoint `*.available`, endpoint `*.channels`, and `haptics.*`) unless explicitly truthy/non-zero in the source payload, with transport adapter regression coverage locking omission behavior for sparse probes.
 - 2026-04-25: Removed synthetic bug-report hardware battery defaults from client diagnostics context so `hardware.battery_level` and `hardware.battery_charging` are omitted unless real sensor telemetry has populated snapshot values; added widget regression coverage locking both fields absent (and sensor snapshot empty) when no telemetry has been observed.
 - 2026-04-25: Removed synthetic lifecycle edge-operator declarations from capability registration/snapshots/deltas by dropping client-side `monitor.lifecycle.{foreground,background}` injection, and updated lifecycle widget regression coverage to lock those operators absent unless explicitly sourced.

@@ -5063,22 +5063,50 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
             border: Border.all(color: Colors.blueGrey.shade200),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Audio level'),
-              if (streamID.isNotEmpty)
-                Text(streamID, style: const TextStyle(fontSize: 12)),
-              const SizedBox(height: 8),
-              ValueListenableBuilder<double>(
-                valueListenable: _mediaEngine.audioLevel(streamID),
-                builder: (context, level, _) {
-                  return LinearProgressIndicator(
-                    value: level > 0 ? level.clamp(0.0, 1.0) : null,
-                  );
-                },
-              ),
-            ],
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _mediaEngine.streamAttached(streamID),
+            builder: (context, attached, _) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('Audio level'),
+                      const Spacer(),
+                      Container(
+                        key: ValueKey<String>(
+                          'ui-audio-visualizer-state-$componentId',
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          attached ? 'Attached' : 'Waiting for media',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (streamID.isNotEmpty)
+                    Text(streamID, style: const TextStyle(fontSize: 12)),
+                  const SizedBox(height: 8),
+                  ValueListenableBuilder<double>(
+                    valueListenable: _mediaEngine.audioLevel(streamID),
+                    builder: (context, level, _) {
+                      return LinearProgressIndicator(
+                        value:
+                            attached ? level.clamp(0.0, 1.0).toDouble() : null,
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
           ),
         );
       case uiv1.Node_Widget.canvas:
