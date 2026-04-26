@@ -723,6 +723,77 @@ func TestHandleMessageCapabilityDeltaStopsAudioRouteOnEndpointLoss(t *testing.T)
 	}
 }
 
+func TestHandleMessageCapabilitySnapshotStopsOnlyAffectedRoutesOnRebaselineLoss(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"microphone.present": "true",
+				"camera.present":     "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(initial capability snapshot) error = %v", err)
+	}
+
+	if err := router.Connect("device-1", "device-2", "audio"); err != nil {
+		t.Fatalf("Connect(audio) error = %v", err)
+	}
+	if err := router.Connect("device-1", "device-2", "video"); err != nil {
+		t.Fatalf("Connect(video) error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Capabilities: map[string]string{
+				"camera.present": "true",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(rebaseline capability snapshot) error = %v", err)
+	}
+
+	stopStreamIDs := map[string]struct{}{}
+	for _, msg := range out {
+		if msg.StopStream != nil {
+			stopStreamIDs[msg.StopStream.StreamID] = struct{}{}
+		}
+	}
+	if len(stopStreamIDs) != 1 {
+		t.Fatalf("stop_stream count = %d, want 1 (ids=%v)", len(stopStreamIDs), stopStreamIDs)
+	}
+	if _, ok := stopStreamIDs["route:device-1|device-2|audio"]; !ok {
+		t.Fatalf("missing stop_stream for audio route (ids=%v)", stopStreamIDs)
+	}
+	if _, ok := stopStreamIDs["route:device-1|device-2|video"]; ok {
+		t.Fatalf("unexpected stop_stream for video route (ids=%v)", stopStreamIDs)
+	}
+}
+
 func TestHandleMessageCapabilityDeltaRestoresOnlyMatchingSuspendedClaimsOnPartialRegain(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
