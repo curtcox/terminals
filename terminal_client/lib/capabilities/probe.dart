@@ -6,6 +6,8 @@ import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.da
 typedef MediaDeviceInventoryProvider = Future<List<MediaDeviceDescriptor>>
     Function();
 const Duration _mediaProbeTimeout = Duration(milliseconds: 750);
+const String _foregroundOnlyMonitorTierOperator =
+    'monitor.tier.foreground_only';
 
 class MediaDeviceDescriptor {
   const MediaDeviceDescriptor({
@@ -83,6 +85,12 @@ class DefaultCapabilityProbe implements CapabilityProbe {
                 ? 'landscape'
                 : 'portrait'),
       );
+
+    final monitorTierOperators = _monitorTierOperators(context.targetPlatform);
+    if (monitorTierOperators.isNotEmpty) {
+      capabilities.edge =
+          (capv1.EdgeCapability()..operators.addAll(monitorTierOperators));
+    }
 
     if (outputEndpoints.isNotEmpty) {
       capabilities.speakers =
@@ -173,6 +181,18 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     } catch (_) {
       return <MediaDeviceDescriptor>[];
     }
+  }
+}
+
+List<String> _monitorTierOperators(TargetPlatform targetPlatform) {
+  switch (targetPlatform) {
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+    case TargetPlatform.macOS:
+    case TargetPlatform.windows:
+    case TargetPlatform.linux:
+    case TargetPlatform.fuchsia:
+      return const <String>[_foregroundOnlyMonitorTierOperator];
   }
 }
 

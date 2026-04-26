@@ -24,7 +24,8 @@ void main() {
         File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
 
     expect(manifest, contains('android.permission.INTERNET'));
-    expect(manifest, contains('android.permission.CHANGE_WIFI_MULTICAST_STATE'));
+    expect(
+        manifest, contains('android.permission.CHANGE_WIFI_MULTICAST_STATE'));
     expect(manifest, contains('android.permission.CAMERA'));
     expect(manifest, contains('android.permission.RECORD_AUDIO'));
   });

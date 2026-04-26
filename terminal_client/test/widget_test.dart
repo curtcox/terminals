@@ -726,7 +726,7 @@ void main() {
   );
 
   testWidgets(
-    'app lifecycle changes do not synthesize lifecycle edge operators',
+    'app lifecycle changes keep monitor tier and avoid lifecycle operators',
     (WidgetTester tester) async {
       final harness = _FakeClientHarness();
       await tester.pumpWidget(
@@ -760,11 +760,19 @@ void main() {
 
       expect(
         registerCapabilities.hasEdge(),
-        isFalse,
+        isTrue,
+      );
+      expect(
+        registerCapabilities.edge.operators,
+        <String>['monitor.tier.foreground_only'],
       );
       expect(
         bootstrapSnapshotCapabilities.hasEdge(),
-        isFalse,
+        isTrue,
+      );
+      expect(
+        bootstrapSnapshotCapabilities.edge.operators,
+        <String>['monitor.tier.foreground_only'],
       );
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -778,15 +786,16 @@ void main() {
           .toList();
 
       expect(
-        deltas.any((delta) => delta.capabilities.hasEdge()) &&
-            deltas.any(
+        deltas.where((delta) => delta.capabilities.hasEdge()).every(
               (delta) =>
                   delta.capabilities.edge.operators
-                      .contains('monitor.lifecycle.foreground') ||
-                  delta.capabilities.edge.operators
+                      .contains('monitor.tier.foreground_only') &&
+                  !delta.capabilities.edge.operators
+                      .contains('monitor.lifecycle.foreground') &&
+                  !delta.capabilities.edge.operators
                       .contains('monitor.lifecycle.background'),
             ),
-        isFalse,
+        isTrue,
       );
     },
   );

@@ -162,6 +162,21 @@ UI, scheduler, and confirmation operations; due-timer processing applies tick
 and expiry side effects from structured scheduler records. Legacy scenarios
 continue to use their existing `Start` methods.
 
+## Monitoring Support Tiers
+
+Device capability declarations include monitoring tier operators under
+`edge.operators`.
+
+- `monitor.tier.foreground_only`: the client can run monitor workloads only
+  while active in the foreground.
+- `monitor.tier.background_capable`: the client can sustain monitor workloads
+  when backgrounded.
+
+Placement treats `background_monitor` roles as requiring
+`monitor.background_capable=true` after capability flattening. Clients that
+declare only `monitor.tier.foreground_only` are filtered out from background
+monitor assignments.
+
 ## Lint
 
 ```bash
