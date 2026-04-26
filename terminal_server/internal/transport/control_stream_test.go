@@ -226,6 +226,57 @@ func TestHandleMessageCapabilityDeltaRejectsStaleGeneration(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCapabilitySnapshotRejectsStaleGeneration(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Capabilities: map[string]string{
+				"screen.width": "1920",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Capabilities: map[string]string{
+				"screen.width": "1280",
+			},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected stale generation error")
+	}
+	if len(out) != 1 || out[0].ErrorCode != ErrorCodeProtocolViolation {
+		t.Fatalf("error response = %+v, want protocol violation", out)
+	}
+
+	got, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected device-1 in manager")
+	}
+	if got.Generation != 2 {
+		t.Fatalf("generation = %d, want 2", got.Generation)
+	}
+	if got.Capabilities["screen.width"] != "1920" {
+		t.Fatalf("screen.width = %q, want 1920", got.Capabilities["screen.width"])
+	}
+}
+
 func TestHandleMessageCapabilitySnapshotReturnsRegisterAckOnRebaseline(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
