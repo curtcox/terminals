@@ -726,7 +726,7 @@ void main() {
   );
 
   testWidgets(
-    'app lifecycle foreground/background emits capability deltas with lifecycle operator updates',
+    'app lifecycle changes do not synthesize lifecycle edge operators',
     (WidgetTester tester) async {
       final harness = _FakeClientHarness();
       await tester.pumpWidget(
@@ -745,50 +745,48 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final baseDeltaCount = harness.lastClient.requests
-          .where((request) => request.hasCapabilityDelta())
-          .length;
+      final registerCapabilities = harness.lastClient.requests
+          .where((request) => request.hasRegister())
+          .toList()
+          .last
+          .register
+          .capabilities;
+      final bootstrapSnapshotCapabilities = harness.lastClient.requests
+          .where((request) => request.hasCapabilitySnapshot())
+          .toList()
+          .last
+          .capabilitySnapshot
+          .capabilities;
+
+      expect(
+        registerCapabilities.hasEdge(),
+        isFalse,
+      );
+      expect(
+        bootstrapSnapshotCapabilities.hasEdge(),
+        isFalse,
+      );
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pumpAndSettle();
-      final backgroundDelta = harness.lastClient.requests
-          .where((request) => request.hasCapabilityDelta())
-          .toList()
-          .last
-          .capabilityDelta;
-      expect(
-        harness.lastClient.requests
-            .where((request) => request.hasCapabilityDelta())
-            .length,
-        baseDeltaCount + 1,
-      );
-      expect(backgroundDelta.reason, 'app_lifecycle_change');
-      expect(
-        backgroundDelta.capabilities.edge.operators,
-        contains('monitor.lifecycle.background'),
-      );
-      expect(
-        backgroundDelta.capabilities.edge.operators,
-        isNot(contains('monitor.lifecycle.foreground')),
-      );
-
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
-      final allDeltas = harness.lastClient.requests
+      final deltas = harness.lastClient.requests
           .where((request) => request.hasCapabilityDelta())
+          .map((request) => request.capabilityDelta)
+          .where((delta) => delta.reason == 'app_lifecycle_change')
           .toList();
-      expect(allDeltas.length, baseDeltaCount + 2);
-      final foregroundDelta = allDeltas.last.capabilityDelta;
-      expect(foregroundDelta.reason, 'app_lifecycle_change');
+
       expect(
-          foregroundDelta.generation, greaterThan(backgroundDelta.generation));
-      expect(
-        foregroundDelta.capabilities.edge.operators,
-        contains('monitor.lifecycle.foreground'),
-      );
-      expect(
-        foregroundDelta.capabilities.edge.operators,
-        isNot(contains('monitor.lifecycle.background')),
+        deltas.any((delta) => delta.capabilities.hasEdge()) &&
+            deltas.any(
+              (delta) =>
+                  delta.capabilities.edge.operators
+                      .contains('monitor.lifecycle.foreground') ||
+                  delta.capabilities.edge.operators
+                      .contains('monitor.lifecycle.background'),
+            ),
+        isFalse,
       );
     },
   );

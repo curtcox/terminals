@@ -1409,29 +1409,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return capabilities;
   }
 
-  capv1.DeviceCapabilities _applyLifecycleOperator(
-    capv1.DeviceCapabilities capabilities,
-  ) {
-    final edge = capabilities.hasEdge()
-        ? capabilities.edge
-        : (capabilities.edge = capv1.EdgeCapability());
-    final lifecycleOperator = _appIsForeground
-        ? 'monitor.lifecycle.foreground'
-        : 'monitor.lifecycle.background';
-    final nextOperators = edge.operators
-        .where(
-          (operator) =>
-              operator != 'monitor.lifecycle.foreground' &&
-              operator != 'monitor.lifecycle.background',
-        )
-        .toList(growable: true)
-      ..add(lifecycleOperator);
-    edge.operators
-      ..clear()
-      ..addAll(_dedupeOperators(nextOperators));
-    return capabilities;
-  }
-
   Future<void> _probeAndPublishCapabilityChanges({
     required String reason,
     bool forceSnapshot = false,
@@ -1456,8 +1433,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           targetPlatform: defaultTargetPlatform,
         ),
       );
-      final nextCapabilities = _applyLifecycleOperator(
-        _applyDisplayMetadata(probedCapabilities.deepCopy()),
+      final nextCapabilities = _applyDisplayMetadata(
+        probedCapabilities.deepCopy(),
       );
       if (_privacyModeEnabled) {
         nextCapabilities
@@ -2336,8 +2313,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       );
 
       _capabilityGeneration = 1;
-      _lastRegisteredCapabilities = _applyLifecycleOperator(
-        _applyDisplayMetadata(probedCapabilities.deepCopy()),
+      _lastRegisteredCapabilities = _applyDisplayMetadata(
+        probedCapabilities.deepCopy(),
       );
       _syncWakeWordDetector(_lastRegisteredCapabilities!);
       _lastCapabilitySignature = _capabilitySignature(
@@ -2452,20 +2429,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return;
     }
     unawaited(_probeAndPublishCapabilityChanges(reason: reason));
-  }
-
-  List<String> _dedupeOperators(List<String> operators) {
-    final seen = <String>{};
-    final deduped = <String>[];
-    for (final raw in operators) {
-      final normalized = raw.trim();
-      if (normalized.isEmpty || seen.contains(normalized)) {
-        continue;
-      }
-      seen.add(normalized);
-      deduped.add(normalized);
-    }
-    return deduped;
   }
 
   ConnectRequest? _buildSensorTelemetryRequest() {
