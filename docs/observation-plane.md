@@ -9,7 +9,7 @@ server flow planning.
 The observation plane generalizes media routing into one flow model so audio,
 video, sensors, and radio sightings share one topology vocabulary.
 
-- The control plane is protobuf over gRPC/websocket.
+- The control plane is protobuf over gRPC, WebSocket, TCP, or HTTP fallback.
 - The media plane is still WebRTC when raw live streams are required.
 - Typed observations and lazy artifacts are preferred over always-on raw uplink.
 
