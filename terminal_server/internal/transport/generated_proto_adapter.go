@@ -476,12 +476,18 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		out["screen.width"] = strconv.FormatInt(int64(screen.GetWidth()), 10)
 		out["screen.height"] = strconv.FormatInt(int64(screen.GetHeight()), 10)
 		out["screen.density"] = strconv.FormatFloat(screen.GetDensity(), 'f', -1, 64)
-		out["screen.touch"] = strconv.FormatBool(screen.GetTouch())
+		if screen.GetTouch() {
+			out["screen.touch"] = "true"
+		}
 		if orientation := strings.TrimSpace(screen.GetOrientation()); orientation != "" {
 			out["screen.orientation"] = orientation
 		}
-		out["screen.fullscreen_supported"] = strconv.FormatBool(screen.GetFullscreenSupported())
-		out["screen.multi_window_supported"] = strconv.FormatBool(screen.GetMultiWindowSupported())
+		if screen.GetFullscreenSupported() {
+			out["screen.fullscreen_supported"] = "true"
+		}
+		if screen.GetMultiWindowSupported() {
+			out["screen.multi_window_supported"] = "true"
+		}
 		if safeArea := screen.GetSafeArea(); safeArea != nil {
 			out["screen.safe_area.left"] = strconv.FormatInt(int64(safeArea.GetLeft()), 10)
 			out["screen.safe_area.top"] = strconv.FormatInt(int64(safeArea.GetTop()), 10)
@@ -499,7 +505,9 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 			if name := strings.TrimSpace(display.GetDisplayName()); name != "" {
 				out[prefix+".name"] = name
 			}
-			out[prefix+".primary"] = strconv.FormatBool(display.GetPrimary())
+			if display.GetPrimary() {
+				out[prefix+".primary"] = "true"
+			}
 			if screen := display.GetScreen(); screen != nil {
 				out[prefix+".width"] = strconv.FormatInt(int64(screen.GetWidth()), 10)
 				out[prefix+".height"] = strconv.FormatInt(int64(screen.GetHeight()), 10)
@@ -543,11 +551,15 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 				if connectionType := strings.TrimSpace(endpoint.GetConnectionType()); connectionType != "" {
 					out[prefix+".connection_type"] = connectionType
 				}
-				out[prefix+".channels"] = strconv.FormatInt(int64(endpoint.GetChannels()), 10)
+				if endpoint.GetChannels() > 0 {
+					out[prefix+".channels"] = strconv.FormatInt(int64(endpoint.GetChannels()), 10)
+				}
 				if rates := joinInts(endpoint.GetSampleRates()); rates != "" {
 					out[prefix+".sample_rates"] = rates
 				}
-				out[prefix+".available"] = strconv.FormatBool(endpoint.GetAvailable())
+				if endpoint.GetAvailable() {
+					out[prefix+".available"] = "true"
+				}
 			}
 		}
 	}
@@ -572,11 +584,15 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 				if connectionType := strings.TrimSpace(endpoint.GetConnectionType()); connectionType != "" {
 					out[prefix+".connection_type"] = connectionType
 				}
-				out[prefix+".channels"] = strconv.FormatInt(int64(endpoint.GetChannels()), 10)
+				if endpoint.GetChannels() > 0 {
+					out[prefix+".channels"] = strconv.FormatInt(int64(endpoint.GetChannels()), 10)
+				}
 				if rates := joinInts(endpoint.GetSampleRates()); rates != "" {
 					out[prefix+".sample_rates"] = rates
 				}
-				out[prefix+".available"] = strconv.FormatBool(endpoint.GetAvailable())
+				if endpoint.GetAvailable() {
+					out[prefix+".available"] = "true"
+				}
 			}
 		}
 	}
@@ -620,13 +636,21 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 				if facing := strings.TrimSpace(endpoint.GetFacing()); facing != "" {
 					out[prefix+".facing"] = facing
 				}
-				out[prefix+".available"] = strconv.FormatBool(endpoint.GetAvailable())
+				if endpoint.GetAvailable() {
+					out[prefix+".available"] = "true"
+				}
 				if modes := endpoint.GetModes(); len(modes) > 0 {
 					for modeIndex, mode := range modes {
 						modePrefix := prefix + ".mode." + strconv.Itoa(modeIndex)
-						out[modePrefix+".width"] = strconv.FormatInt(int64(mode.GetWidth()), 10)
-						out[modePrefix+".height"] = strconv.FormatInt(int64(mode.GetHeight()), 10)
-						out[modePrefix+".fps"] = strconv.FormatInt(int64(mode.GetFps()), 10)
+						if mode.GetWidth() > 0 {
+							out[modePrefix+".width"] = strconv.FormatInt(int64(mode.GetWidth()), 10)
+						}
+						if mode.GetHeight() > 0 {
+							out[modePrefix+".height"] = strconv.FormatInt(int64(mode.GetHeight()), 10)
+						}
+						if mode.GetFps() > 0 {
+							out[modePrefix+".fps"] = strconv.FormatInt(int64(mode.GetFps()), 10)
+						}
 					}
 				}
 			}
@@ -652,9 +676,15 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		out["battery.charging"] = strconv.FormatBool(battery.GetCharging())
 	}
 	if haptics := caps.GetHaptics(); haptics != nil {
-		out["haptics.supported"] = strconv.FormatBool(haptics.GetSupported())
-		out["haptics.vibration"] = strconv.FormatBool(haptics.GetVibration())
-		out["haptics.engine"] = strconv.FormatBool(haptics.GetHapticsEngine())
+		if haptics.GetSupported() {
+			out["haptics.supported"] = "true"
+		}
+		if haptics.GetVibration() {
+			out["haptics.vibration"] = "true"
+		}
+		if haptics.GetHapticsEngine() {
+			out["haptics.engine"] = "true"
+		}
 	}
 	if edge := caps.GetEdge(); edge != nil {
 		out["edge.runtimes"] = strings.Join(edge.GetRuntimes(), ",")

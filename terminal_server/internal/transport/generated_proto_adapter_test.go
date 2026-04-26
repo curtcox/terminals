@@ -267,12 +267,26 @@ func TestGeneratedProtoAdapterFromInternalHelloAndCapabilityAck(t *testing.T) {
 func TestCapabilitiesToDataMapPresenceOnlyForSparseMediaProbes(t *testing.T) {
 	got := capabilitiesToDataMap(&capabilitiesv1.DeviceCapabilities{
 		DeviceId: "device-1",
-		Camera:   &capabilitiesv1.CameraCapability{},
+		Screen:   &capabilitiesv1.ScreenCapability{},
+		Displays: []*capabilitiesv1.DisplayCapability{{
+			DisplayId: "display-1",
+		}},
 		Microphone: &capabilitiesv1.AudioInputCapability{
 			Channels: 0,
+			Endpoints: []*capabilitiesv1.AudioEndpoint{{
+				EndpointId: "mic-1",
+			}},
 		},
 		Speakers: &capabilitiesv1.AudioOutputCapability{
 			Channels: 0,
+			Endpoints: []*capabilitiesv1.AudioEndpoint{{
+				EndpointId: "spk-1",
+			}},
+		},
+		Camera: &capabilitiesv1.CameraCapability{
+			Endpoints: []*capabilitiesv1.CameraEndpoint{{
+				EndpointId: "cam-1",
+			}},
 		},
 	})
 
@@ -287,6 +301,33 @@ func TestCapabilitiesToDataMapPresenceOnlyForSparseMediaProbes(t *testing.T) {
 	}
 	if _, ok := got["microphone.channels"]; ok {
 		t.Fatalf("microphone.channels should be omitted when value is zero")
+	}
+	if _, ok := got["screen.touch"]; ok {
+		t.Fatalf("screen.touch should be omitted when touch capability was not explicitly true")
+	}
+	if _, ok := got["screen.fullscreen_supported"]; ok {
+		t.Fatalf("screen.fullscreen_supported should be omitted when value is default false")
+	}
+	if _, ok := got["screen.multi_window_supported"]; ok {
+		t.Fatalf("screen.multi_window_supported should be omitted when value is default false")
+	}
+	if _, ok := got["display.0.primary"]; ok {
+		t.Fatalf("display.0.primary should be omitted when value is default false")
+	}
+	if _, ok := got["microphone.endpoint.0.channels"]; ok {
+		t.Fatalf("microphone.endpoint.0.channels should be omitted when value is zero")
+	}
+	if _, ok := got["speakers.endpoint.0.channels"]; ok {
+		t.Fatalf("speakers.endpoint.0.channels should be omitted when value is zero")
+	}
+	if _, ok := got["microphone.endpoint.0.available"]; ok {
+		t.Fatalf("microphone.endpoint.0.available should be omitted when value is default false")
+	}
+	if _, ok := got["speakers.endpoint.0.available"]; ok {
+		t.Fatalf("speakers.endpoint.0.available should be omitted when value is default false")
+	}
+	if _, ok := got["camera.endpoint.0.available"]; ok {
+		t.Fatalf("camera.endpoint.0.available should be omitted when value is default false")
 	}
 	if _, ok := got["camera.front.width"]; ok {
 		t.Fatalf("camera.front.width should be omitted when no lens dimensions were provided")
@@ -387,8 +428,8 @@ func TestCapabilitiesToDataMapIncludesEndpointInventory(t *testing.T) {
 	if got["haptics.vibration"] != "true" {
 		t.Fatalf("haptics.vibration = %q, want true", got["haptics.vibration"])
 	}
-	if got["haptics.engine"] != "false" {
-		t.Fatalf("haptics.engine = %q, want false", got["haptics.engine"])
+	if _, ok := got["haptics.engine"]; ok {
+		t.Fatalf("haptics.engine should be omitted when value is default false")
 	}
 }
 
