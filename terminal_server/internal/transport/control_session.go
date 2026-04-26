@@ -95,6 +95,13 @@ func (s *Session) Run(stream ControlStream) error {
 				connectedDeviceID = in.CapabilitySnap.DeviceID
 			}
 			capabilityReady = true
+			if connectedDeviceID != "" && connectedDeviceID != registeredRelayDeviceID {
+				if registeredRelayDeviceID != "" {
+					globalSessionRelayRegistry.Unregister(registeredRelayDeviceID)
+				}
+				globalSessionRelayRegistry.Register(connectedDeviceID, send)
+				registeredRelayDeviceID = connectedDeviceID
+			}
 		}
 		if in.Heartbeat != nil && connectedDeviceID == "" {
 			connectedDeviceID = in.Heartbeat.DeviceID

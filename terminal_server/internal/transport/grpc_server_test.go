@@ -163,17 +163,23 @@ func TestServerConnectRunsSessionWithGeneratedAdapter(t *testing.T) {
 	if err := s.Connect(stream); err != nil {
 		t.Fatalf("Connect() error = %v", err)
 	}
-	if len(stream.sent) != 2 {
-		t.Fatalf("len(sent) = %d, want 2", len(stream.sent))
+	if len(stream.sent) != 3 {
+		t.Fatalf("len(sent) = %d, want 3", len(stream.sent))
 	}
-	first, ok := stream.sent[0].(*controlv1.ConnectResponse)
-	if !ok {
-		t.Fatalf("first sent envelope type = %T, want *controlv1.ConnectResponse", stream.sent[0])
+	var registerAck *controlv1.RegisterAck
+	for _, sent := range stream.sent {
+		resp, ok := sent.(*controlv1.ConnectResponse)
+		if !ok {
+			t.Fatalf("sent envelope type = %T, want *controlv1.ConnectResponse", sent)
+		}
+		if resp.GetRegisterAck() != nil {
+			registerAck = resp.GetRegisterAck()
+		}
 	}
-	if first.GetRegisterAck() == nil || first.GetRegisterAck().GetServerId() != "srv-1" {
-		t.Fatalf("unexpected register ack payload: %+v", first.GetRegisterAck())
+	if registerAck == nil || registerAck.GetServerId() != "srv-1" {
+		t.Fatalf("register ack = %+v, want server_id srv-1", registerAck)
 	}
-	if got := first.GetRegisterAck().GetMetadata()["photo_frame_asset_base_url"]; got != "http://home.local:50052/photo-frame" {
+	if got := registerAck.GetMetadata()["photo_frame_asset_base_url"]; got != "http://home.local:50052/photo-frame" {
 		t.Fatalf("register ack metadata photo_frame_asset_base_url = %q, want configured value", got)
 	}
 
@@ -196,7 +202,7 @@ func TestServerStartInvalidAddressLeavesStopped(t *testing.T) {
 	}
 }
 
-func TestServerGeneratedGRPCRoundTripRegisterAndHeartbeat(t *testing.T) {
+func TestServerGeneratedGRPCRoundTripLegacyRegisterNormalizesToCapabilityAck(t *testing.T) {
 	addr := mustAvailableTCPAddress(t)
 	manager := device.NewManager()
 	control := NewControlService("srv-1", manager)
@@ -246,12 +252,19 @@ func TestServerGeneratedGRPCRoundTripRegisterAndHeartbeat(t *testing.T) {
 		t.Fatalf("Send(register) error = %v", err)
 	}
 
-	first, err := stream.Recv()
-	if err != nil {
-		t.Fatalf("Recv(register_ack) error = %v", err)
+	var sawRegisterAck bool
+	for i := 0; i < 3; i++ {
+		resp, recvErr := stream.Recv()
+		if recvErr != nil {
+			t.Fatalf("Recv(register bootstrap response) error = %v", recvErr)
+		}
+		if ack := resp.GetRegisterAck(); ack != nil {
+			sawRegisterAck = ack.GetServerId() == "srv-1"
+			break
+		}
 	}
-	if first.GetRegisterAck() == nil || first.GetRegisterAck().GetServerId() != "srv-1" {
-		t.Fatalf("register ack = %+v, want server_id srv-1", first.GetRegisterAck())
+	if !sawRegisterAck {
+		t.Fatalf("did not receive register_ack with server_id srv-1 after register bootstrap")
 	}
 
 	if err := stream.Send(&controlv1.ConnectRequest{

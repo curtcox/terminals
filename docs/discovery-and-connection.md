@@ -37,7 +37,9 @@ is server-driven.
 3. Client sends bootstrap messages (`hello`, capability snapshot,
   heartbeat).
 4. Server returns `hello_ack`, `capability_ack`, `register_ack`, and initial UI
-  (`set_ui`).
+  (`set_ui`). Legacy `register` payloads are still accepted for compatibility
+  and normalized through the capability-snapshot lifecycle path. In that
+  compatibility flow, `capability_ack` may arrive before `register_ack`.
 5. Client and server continue heartbeat and command/event exchange.
 
 When capability updates remove previously-available resources (for example,

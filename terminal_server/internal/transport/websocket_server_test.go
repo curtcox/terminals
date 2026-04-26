@@ -46,9 +46,9 @@ func TestWebSocketServerRoundTripRegisterAndHeartbeat(t *testing.T) {
 	}
 	mustSendProtoMessage(t, conn, register)
 
-	response := mustReceiveConnectResponse(t, conn)
-	if response.GetRegisterAck() == nil || response.GetRegisterAck().GetServerId() != "srv-1" {
-		t.Fatalf("register ack = %+v, want server_id srv-1", response.GetRegisterAck())
+	registerAck := mustReceiveRegisterAck(t, conn)
+	if registerAck.GetServerId() != "srv-1" {
+		t.Fatalf("register ack = %+v, want server_id srv-1", registerAck)
 	}
 
 	heartbeat := &controlv1.ConnectRequest{
@@ -224,9 +224,8 @@ func TestWebSocketServerAllowsLoopbackOriginWithoutExplicitAllowList(t *testing.
 	}
 	mustSendProtoMessage(t, conn, register)
 
-	registerAck := mustReceiveConnectResponse(t, conn)
-	if registerAck.GetRegisterAck() == nil {
-		t.Fatalf("first register response should include register_ack")
+	if mustReceiveRegisterAck(t, conn) == nil {
+		t.Fatalf("expected register response to include register_ack")
 	}
 
 	bugReport := &controlv1.ConnectRequest{
@@ -289,9 +288,8 @@ func TestWebSocketServerRoundTripBugReportAckWithinDeadline(t *testing.T) {
 	}
 	mustSendProtoMessage(t, conn, register)
 
-	registerAck := mustReceiveConnectResponse(t, conn)
-	if registerAck.GetRegisterAck() == nil {
-		t.Fatalf("first register response should include register_ack")
+	if mustReceiveRegisterAck(t, conn) == nil {
+		t.Fatalf("expected register response to include register_ack")
 	}
 
 	bugReport := &controlv1.ConnectRequest{
@@ -427,4 +425,16 @@ func mustReceiveBugReportAckWithin(t *testing.T, conn *websocket.Conn, timeout t
 			t.Fatalf("timed out waiting for bug_report_ack payload")
 		}
 	}
+}
+
+func mustReceiveRegisterAck(t *testing.T, conn *websocket.Conn) *controlv1.RegisterAck {
+	t.Helper()
+	for i := 0; i < 3; i++ {
+		response := mustReceiveConnectResponse(t, conn)
+		if ack := response.GetRegisterAck(); ack != nil {
+			return ack
+		}
+	}
+	t.Fatalf("register_ack not received within bootstrap response window")
+	return nil
 }

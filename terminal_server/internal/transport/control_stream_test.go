@@ -282,6 +282,53 @@ func TestHandleMessageCapabilitySnapshotReturnsRegisterAckOnRebaseline(t *testin
 	}
 }
 
+func TestHandleMessageCapabilitySnapshotBootstrapsUnknownDevice(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"device_name":  "Kitchen",
+				"device_type":  "tablet",
+				"platform":     "android",
+				"screen.width": "1920",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(capability snapshot bootstrap) error = %v", err)
+	}
+
+	hasCapabilityAck := false
+	for _, msg := range out {
+		if msg.CapabilityAck == nil {
+			continue
+		}
+		hasCapabilityAck = true
+		if msg.CapabilityAck.DeviceID != "device-1" {
+			t.Fatalf("capability ack device_id = %q, want device-1", msg.CapabilityAck.DeviceID)
+		}
+	}
+	if !hasCapabilityAck {
+		t.Fatalf("expected capability ack for snapshot bootstrap")
+	}
+
+	got, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected device record to be created")
+	}
+	if got.DeviceName != "Kitchen" {
+		t.Fatalf("device name = %q, want Kitchen", got.DeviceName)
+	}
+	if got.Generation != 1 {
+		t.Fatalf("generation = %d, want 1", got.Generation)
+	}
+}
+
 func TestHandleMessageCapabilityLossReleasesClaimsAndStopsRoutes(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

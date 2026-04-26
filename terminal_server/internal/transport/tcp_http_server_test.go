@@ -65,9 +65,19 @@ func TestTCPServerRoundTripRegisterAndHeartbeat(t *testing.T) {
 			},
 		},
 	})
-	registerAck := mustReceiveTCPEnvelope(t, conn)
-	if registerAck.GetServerMessage().GetRegisterAck().GetServerId() != "srv-1" {
-		t.Fatalf("register ack server_id = %q, want srv-1", registerAck.GetServerMessage().GetRegisterAck().GetServerId())
+	var tcpRegisterAck *controlv1.RegisterAck
+	for i := 0; i < 3; i++ {
+		env := mustReceiveTCPEnvelope(t, conn)
+		if ack := env.GetServerMessage().GetRegisterAck(); ack != nil {
+			tcpRegisterAck = ack
+			break
+		}
+	}
+	if tcpRegisterAck == nil {
+		t.Fatalf("register ack missing, want server_id srv-1")
+	}
+	if tcpRegisterAck.GetServerId() != "srv-1" {
+		t.Fatalf("register ack server_id = %q, want srv-1", tcpRegisterAck.GetServerId())
 	}
 
 	mustSendTCPEnvelope(t, conn, &controlv1.WireEnvelope{
@@ -136,9 +146,19 @@ func TestHTTPControlServerRoundTripRegisterAndHeartbeat(t *testing.T) {
 			},
 		},
 	})
-	registerAck := mustGetHTTPEnvelope(t, base, sessionID)
-	if registerAck.GetServerMessage().GetRegisterAck().GetServerId() != "srv-1" {
-		t.Fatalf("register ack server_id = %q, want srv-1", registerAck.GetServerMessage().GetRegisterAck().GetServerId())
+	var httpRegisterAck *controlv1.RegisterAck
+	for i := 0; i < 3; i++ {
+		env := mustGetHTTPEnvelope(t, base, sessionID)
+		if ack := env.GetServerMessage().GetRegisterAck(); ack != nil {
+			httpRegisterAck = ack
+			break
+		}
+	}
+	if httpRegisterAck == nil {
+		t.Fatalf("register ack missing, want server_id srv-1")
+	}
+	if httpRegisterAck.GetServerId() != "srv-1" {
+		t.Fatalf("register ack server_id = %q, want srv-1", httpRegisterAck.GetServerId())
 	}
 
 	mustPostHTTPEnvelope(t, base, sessionID, &controlv1.WireEnvelope{

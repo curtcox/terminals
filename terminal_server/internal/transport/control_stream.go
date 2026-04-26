@@ -15,6 +15,7 @@ import (
 	"time"
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
+	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
@@ -714,6 +715,20 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		h.metrics.capabilityReceived.Add(1)
 		before, _ := h.control.devices.Get(msg.CapabilitySnap.DeviceID)
 		ack, err := h.control.ApplyCapabilitySnapshot(ctx, msg.CapabilitySnap.DeviceID, msg.CapabilitySnap.Generation, msg.CapabilitySnap.Capabilities)
+		if err != nil && errors.Is(err, device.ErrDeviceNotFound) {
+			_, helloErr := h.control.Hello(ctx, HelloRequest{
+				DeviceID:      msg.CapabilitySnap.DeviceID,
+				DeviceName:    msg.CapabilitySnap.Capabilities["device_name"],
+				DeviceType:    msg.CapabilitySnap.Capabilities["device_type"],
+				Platform:      msg.CapabilitySnap.Capabilities["platform"],
+				ClientVersion: "",
+			})
+			if helloErr != nil {
+				h.metrics.protocolErrors.Add(1)
+				return []ServerMessage{{ErrorCode: errorCodeFor(helloErr), Error: helloErr.Error()}}, helloErr
+			}
+			ack, err = h.control.ApplyCapabilitySnapshot(ctx, msg.CapabilitySnap.DeviceID, msg.CapabilitySnap.Generation, msg.CapabilitySnap.Capabilities)
+		}
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err

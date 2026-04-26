@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
+func TestGeneratedProtoAdapterToInternalRegisterNormalizesToCapabilitySnapshot(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Register{
@@ -42,25 +42,25 @@ func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ToInternal() error = %v", err)
 	}
-	if msg.Register == nil {
-		t.Fatalf("expected register message")
+	if msg.CapabilitySnap == nil {
+		t.Fatalf("expected capability snapshot message")
 	}
-	if msg.Register.DeviceID != "device-1" {
-		t.Fatalf("device_id = %q, want %q", msg.Register.DeviceID, "device-1")
+	if msg.CapabilitySnap.DeviceID != "device-1" {
+		t.Fatalf("device_id = %q, want %q", msg.CapabilitySnap.DeviceID, "device-1")
 	}
-	if msg.Register.DeviceName != "Kitchen Display" {
-		t.Fatalf("device_name = %q, want %q", msg.Register.DeviceName, "Kitchen Display")
+	if msg.CapabilitySnap.Generation != 1 {
+		t.Fatalf("generation = %d, want 1", msg.CapabilitySnap.Generation)
 	}
-	if msg.Register.Capabilities["platform"] != "android" {
-		t.Fatalf("platform capability = %q, want %q", msg.Register.Capabilities["platform"], "android")
+	if msg.CapabilitySnap.Capabilities["platform"] != "android" {
+		t.Fatalf("platform capability = %q, want %q", msg.CapabilitySnap.Capabilities["platform"], "android")
 	}
-	if msg.Register.Capabilities["screen.width"] != "1920" {
-		t.Fatalf("screen.width capability = %q, want 1920", msg.Register.Capabilities["screen.width"])
+	if msg.CapabilitySnap.Capabilities["screen.width"] != "1920" {
+		t.Fatalf("screen.width capability = %q, want 1920", msg.CapabilitySnap.Capabilities["screen.width"])
 	}
-	if msg.Register.Capabilities["speakers.sample_rates"] != "44100,48000" {
+	if msg.CapabilitySnap.Capabilities["speakers.sample_rates"] != "44100,48000" {
 		t.Fatalf(
 			"speakers.sample_rates capability = %q, want 44100,48000",
-			msg.Register.Capabilities["speakers.sample_rates"],
+			msg.CapabilitySnap.Capabilities["speakers.sample_rates"],
 		)
 	}
 }

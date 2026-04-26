@@ -437,7 +437,7 @@ func TestGeneratedSessionPrivacyToggleCapabilityLossStopsAudioAndVideoRoutes(t *
 				Payload: &controlv1.ConnectRequest_CapabilitySnapshot{
 					CapabilitySnapshot: &controlv1.CapabilitySnapshot{
 						DeviceId:   "device-1",
-						Generation: 1,
+						Generation: 2,
 						Capabilities: &capabilitiesv1.DeviceCapabilities{
 							DeviceId:   "device-1",
 							Microphone: &capabilitiesv1.AudioInputCapability{},
@@ -450,7 +450,7 @@ func TestGeneratedSessionPrivacyToggleCapabilityLossStopsAudioAndVideoRoutes(t *
 				Payload: &controlv1.ConnectRequest_CapabilityDelta{
 					CapabilityDelta: &controlv1.CapabilityDelta{
 						DeviceId:   "device-1",
-						Generation: 2,
+						Generation: 3,
 						Reason:     "privacy.toggle",
 						Capabilities: &capabilitiesv1.DeviceCapabilities{
 							DeviceId: "device-1",

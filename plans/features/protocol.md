@@ -1,7 +1,7 @@
 ---
 title: "Protocol Design"
 kind: plan
-status: building
+status: shipped-untested
 owner: copilot
 validation: none
 last-reviewed: 2026-04-26
@@ -272,8 +272,12 @@ Codegen is driven by Buf (`buf.yaml`, `buf.gen.yaml`). Go and Dart bindings are 
 - Updated durable connection docs to describe `capability_ack` invalidation behavior.
 - Removed client bootstrap emission of deprecated `RegisterDevice` requests; client bootstrap now sends `hello` + `capability_snapshot` and retries snapshot delivery until acknowledgement instead of retrying register payloads.
 - Removed generated-proto ingest support for deprecated `CapabilityUpdate` client payloads; generated clients must use `capability_snapshot` / `capability_delta`.
+- Normalized legacy generated `register` payload ingest through capability-snapshot handling while preserving compatibility (`register_ack` remains emitted for bootstrap clients).
+- Added snapshot bootstrap fallback for unknown devices: capability snapshots now synthesize identity registration when needed before applying generation-ordered capability state.
+- Preserved relay registration semantics for snapshot-first sessions so cross-session route/notification fan-out behavior remains stable.
+- Updated transport carrier and websocket integration tests to accept capability lifecycle bootstrap ordering (`capability_ack` may precede `register_ack`).
 
-Remaining protocol-plan work includes server/proto deprecation cleanup for legacy `RegisterDevice` ingest paths and final reconciliation with capability-lifecycle design targets.
+Remaining protocol-plan work is focused on fully removing deprecated proto fields (`RegisterDevice`/`CapabilityUpdate`) once compatibility windows close, followed by a shipped-validated promotion pass.
 
 ## Related Plans
 

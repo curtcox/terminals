@@ -81,15 +81,12 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 			},
 		}, nil
 	case *controlv1.ConnectRequest_Register:
-		//nolint:staticcheck // Legacy register payload remains supported during protocol transition.
+		//nolint:staticcheck // Legacy payload accepted for compatibility but normalized to snapshot semantics.
 		caps := payload.Register.GetCapabilities()
-		identity := caps.GetIdentity()
 		return ClientMessage{
-			Register: &RegisterRequest{
+			CapabilitySnap: &CapabilitySnapshotRequest{
 				DeviceID:     caps.GetDeviceId(),
-				DeviceName:   identity.GetDeviceName(),
-				DeviceType:   identity.GetDeviceType(),
-				Platform:     identity.GetPlatform(),
+				Generation:   1,
 				Capabilities: capabilitiesToDataMap(caps),
 			},
 		}, nil
