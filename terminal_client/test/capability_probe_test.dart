@@ -97,10 +97,56 @@ void main() {
     expect(capabilities.speakers.endpoints.first.hasConnectionType(), isFalse);
     expect(capabilities.camera.endpoints.first.hasConnectionType(), isFalse);
     expect(capabilities.camera.endpoints.first.hasFacing(), isFalse);
+    expect(capabilities.microphone.endpoints.first.hasEndpointName(), isTrue);
+    expect(capabilities.speakers.endpoints.first.hasEndpointName(), isTrue);
+    expect(capabilities.camera.endpoints.first.hasEndpointName(), isTrue);
     expect(capabilities.microphone.endpoints, isNotEmpty);
     expect(capabilities.camera.endpoints, isNotEmpty);
     expect(capabilities.speakers.endpoints, isNotEmpty);
     expect(capabilities.displays, isNotEmpty);
+  });
+
+  test('probe omits endpoint names when device labels are unavailable',
+      () async {
+    final probe = DefaultCapabilityProbe(
+      mediaDeviceInventoryProvider: () async => const <MediaDeviceDescriptor>[
+        MediaDeviceDescriptor(
+          kind: 'audioinput',
+          deviceId: 'mic-blank-label',
+          label: '   ',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'videoinput',
+          deviceId: 'cam-blank-label',
+          label: '',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'audiooutput',
+          deviceId: 'spk-blank-label',
+          label: '\t',
+        ),
+      ],
+    );
+
+    final capabilities = await probe.probe(
+      const CapabilityProbeContext(
+        deviceId: 'device-3',
+        deviceName: 'Unlabeled Devices',
+        deviceType: 'desktop',
+        platform: 'flutter',
+        screenWidth: 1600,
+        screenHeight: 900,
+        screenDensity: 2.0,
+        targetPlatform: TargetPlatform.macOS,
+      ),
+    );
+
+    expect(capabilities.hasMicrophone(), isTrue);
+    expect(capabilities.hasCamera(), isTrue);
+    expect(capabilities.hasSpeakers(), isTrue);
+    expect(capabilities.microphone.endpoints.first.hasEndpointName(), isFalse);
+    expect(capabilities.speakers.endpoints.first.hasEndpointName(), isFalse);
+    expect(capabilities.camera.endpoints.first.hasEndpointName(), isFalse);
   });
 
   test('probe falls back when media enumeration stalls', () async {

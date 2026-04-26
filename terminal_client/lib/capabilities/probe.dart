@@ -123,15 +123,15 @@ class DefaultCapabilityProbe implements CapabilityProbe {
           ? '$kind-$fallbackIndex'
           : device.deviceId.trim();
       fallbackIndex += 1;
+      final endpointName = _trimmedOrNull(device.label);
+      final endpoint = capv1.AudioEndpoint()
+        ..endpointId = endpointId
+        ..available = true;
+      if (endpointName != null) {
+        endpoint.endpointName = endpointName;
+      }
       endpoints.add(
-        capv1.AudioEndpoint()
-          ..endpointId = endpointId
-          ..endpointName = _endpointLabelOrDefault(
-            device.label,
-            kind == 'audioinput' ? 'Microphone' : 'Speaker',
-            fallbackIndex,
-          )
-          ..available = true,
+        endpoint,
       );
     }
     return endpoints;
@@ -150,15 +150,15 @@ class DefaultCapabilityProbe implements CapabilityProbe {
           ? 'camera-$fallbackIndex'
           : device.deviceId.trim();
       fallbackIndex += 1;
+      final endpointName = _trimmedOrNull(device.label);
+      final endpoint = capv1.CameraEndpoint()
+        ..endpointId = endpointId
+        ..available = true;
+      if (endpointName != null) {
+        endpoint.endpointName = endpointName;
+      }
       endpoints.add(
-        capv1.CameraEndpoint()
-          ..endpointId = endpointId
-          ..endpointName = _endpointLabelOrDefault(
-            device.label,
-            'Camera',
-            fallbackIndex,
-          )
-          ..available = true,
+        endpoint,
       );
     }
     return endpoints;
@@ -205,10 +205,7 @@ Future<List<MediaDeviceDescriptor>>
       .toList(growable: false);
 }
 
-String _endpointLabelOrDefault(String label, String prefix, int index) {
+String? _trimmedOrNull(String label) {
   final trimmed = label.trim();
-  if (trimmed.isNotEmpty) {
-    return trimmed;
-  }
-  return '$prefix $index';
+  return trimmed.isEmpty ? null : trimmed;
 }
