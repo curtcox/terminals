@@ -205,6 +205,41 @@ Primary transport evidence lives in generated and wire integration tests under
 - `TestGeneratedSessionTerminalTransitions`
 - `TestWireSessionTerminalTransitions`
 
+## Server-Driven UI Contract
+
+Server-driven UI is implemented as a transport-level contract between server
+and client.
+
+- `SetUI` replaces the full UI tree for a target terminal.
+- `UpdateUI` patches a component subtree by ID.
+- `TransitionUI` communicates transition hints and duration for client-side
+  presentation.
+
+The canonical protobuf messages are defined in `api/terminals/ui/v1/ui.proto`
+and carried on the control stream in `ConnectResponse`.
+
+The widget contract is intentionally closed and validated. Server descriptors
+must use one of the supported primitives in `Node.widget`:
+
+- Layout: `stack`, `row`, `grid`, `scroll`, `padding`, `center`, `expand`
+- Content: `text`, `image`, `video_surface`, `audio_visualizer`, `canvas`
+- Input: `text_input`, `button`, `slider`, `toggle`, `dropdown`,
+  `gesture_area`
+- Overlay/system: `overlay`, `progress`, `fullscreen`, `keep_awake`,
+  `brightness`
+
+Validation and adaptation paths live in `terminal_server/internal/ui` and
+`terminal_server/internal/transport`, with client rendering and patch handling
+in `terminal_client/lib/main.dart`.
+
+Representative test coverage includes:
+
+- Server descriptor and transport tests under
+  `terminal_server/internal/ui/descriptor_test.go` and
+  `terminal_server/internal/transport/*_test.go`
+- Client renderer tests in `terminal_client/test/widget_test.dart`
+  (including SetUI, UpdateUI, and TransitionUI handling)
+
 ## Monitoring Support Tiers
 
 Device capability declarations include monitoring tier operators under
