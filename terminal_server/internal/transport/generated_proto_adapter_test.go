@@ -433,6 +433,68 @@ func TestCapabilitiesToDataMapIncludesEndpointInventory(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesToDataMapOmitsDefaultSensorConnectivityAndEdgeListFields(t *testing.T) {
+	got := capabilitiesToDataMap(&capabilitiesv1.DeviceCapabilities{
+		DeviceId: "device-omissions",
+		Sensors: &capabilitiesv1.SensorCapability{
+			Accelerometer: false,
+			Gyroscope:     false,
+			Compass:       false,
+			AmbientLight:  false,
+			Proximity:     false,
+			Gps:           false,
+		},
+		Connectivity: &capabilitiesv1.ConnectivityCapability{
+			BluetoothVersion:   "",
+			WifiSignalStrength: false,
+			UsbHost:            false,
+			UsbPorts:           0,
+			Nfc:                false,
+		},
+		Edge: &capabilitiesv1.EdgeCapability{},
+	})
+
+	if _, ok := got["sensors.accelerometer"]; ok {
+		t.Fatalf("sensors.accelerometer should be omitted when value is default false")
+	}
+	if _, ok := got["sensors.gyroscope"]; ok {
+		t.Fatalf("sensors.gyroscope should be omitted when value is default false")
+	}
+	if _, ok := got["sensors.compass"]; ok {
+		t.Fatalf("sensors.compass should be omitted when value is default false")
+	}
+	if _, ok := got["sensors.ambient_light"]; ok {
+		t.Fatalf("sensors.ambient_light should be omitted when value is default false")
+	}
+	if _, ok := got["sensors.proximity"]; ok {
+		t.Fatalf("sensors.proximity should be omitted when value is default false")
+	}
+	if _, ok := got["sensors.gps"]; ok {
+		t.Fatalf("sensors.gps should be omitted when value is default false")
+	}
+	if _, ok := got["connectivity.bluetooth_version"]; ok {
+		t.Fatalf("connectivity.bluetooth_version should be omitted when value is empty")
+	}
+	if _, ok := got["connectivity.wifi_signal_strength"]; ok {
+		t.Fatalf("connectivity.wifi_signal_strength should be omitted when value is default false")
+	}
+	if _, ok := got["connectivity.usb_host"]; ok {
+		t.Fatalf("connectivity.usb_host should be omitted when value is default false")
+	}
+	if _, ok := got["connectivity.usb_ports"]; ok {
+		t.Fatalf("connectivity.usb_ports should be omitted when value is zero")
+	}
+	if _, ok := got["connectivity.nfc"]; ok {
+		t.Fatalf("connectivity.nfc should be omitted when value is default false")
+	}
+	if _, ok := got["edge.runtimes"]; ok {
+		t.Fatalf("edge.runtimes should be omitted when list is empty")
+	}
+	if _, ok := got["edge.operators"]; ok {
+		t.Fatalf("edge.operators should be omitted when list is empty")
+	}
+}
+
 func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{

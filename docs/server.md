@@ -169,6 +169,9 @@ Device capability declarations include monitoring tier operators under
 
 Clients declare these operators only when they have explicit platform-backed
 evidence. Unknown tiers are omitted rather than inferred from platform type.
+Capability flattening also omits default-false/default-empty sensor,
+connectivity, and edge list fields (including `edge.runtimes` and
+`edge.operators`) unless values are explicitly true or non-empty.
 
 - `monitor.tier.foreground_only`: the client can run monitor workloads only
   while active in the foreground.

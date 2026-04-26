@@ -657,19 +657,41 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		}
 	}
 	if sensors := caps.GetSensors(); sensors != nil {
-		out["sensors.accelerometer"] = strconv.FormatBool(sensors.GetAccelerometer())
-		out["sensors.gyroscope"] = strconv.FormatBool(sensors.GetGyroscope())
-		out["sensors.compass"] = strconv.FormatBool(sensors.GetCompass())
-		out["sensors.ambient_light"] = strconv.FormatBool(sensors.GetAmbientLight())
-		out["sensors.proximity"] = strconv.FormatBool(sensors.GetProximity())
-		out["sensors.gps"] = strconv.FormatBool(sensors.GetGps())
+		if sensors.GetAccelerometer() {
+			out["sensors.accelerometer"] = "true"
+		}
+		if sensors.GetGyroscope() {
+			out["sensors.gyroscope"] = "true"
+		}
+		if sensors.GetCompass() {
+			out["sensors.compass"] = "true"
+		}
+		if sensors.GetAmbientLight() {
+			out["sensors.ambient_light"] = "true"
+		}
+		if sensors.GetProximity() {
+			out["sensors.proximity"] = "true"
+		}
+		if sensors.GetGps() {
+			out["sensors.gps"] = "true"
+		}
 	}
 	if connectivity := caps.GetConnectivity(); connectivity != nil {
-		out["connectivity.bluetooth_version"] = connectivity.GetBluetoothVersion()
-		out["connectivity.wifi_signal_strength"] = strconv.FormatBool(connectivity.GetWifiSignalStrength())
-		out["connectivity.usb_host"] = strconv.FormatBool(connectivity.GetUsbHost())
-		out["connectivity.usb_ports"] = strconv.FormatInt(int64(connectivity.GetUsbPorts()), 10)
-		out["connectivity.nfc"] = strconv.FormatBool(connectivity.GetNfc())
+		if bluetoothVersion := strings.TrimSpace(connectivity.GetBluetoothVersion()); bluetoothVersion != "" {
+			out["connectivity.bluetooth_version"] = bluetoothVersion
+		}
+		if connectivity.GetWifiSignalStrength() {
+			out["connectivity.wifi_signal_strength"] = "true"
+		}
+		if connectivity.GetUsbHost() {
+			out["connectivity.usb_host"] = "true"
+		}
+		if connectivity.GetUsbPorts() > 0 {
+			out["connectivity.usb_ports"] = strconv.FormatInt(int64(connectivity.GetUsbPorts()), 10)
+		}
+		if connectivity.GetNfc() {
+			out["connectivity.nfc"] = "true"
+		}
 	}
 	if battery := caps.GetBattery(); battery != nil {
 		out["battery.level"] = strconv.FormatFloat(float64(battery.GetLevel()), 'f', -1, 32)
@@ -687,9 +709,13 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		}
 	}
 	if edge := caps.GetEdge(); edge != nil {
-		out["edge.runtimes"] = strings.Join(edge.GetRuntimes(), ",")
+		if runtimes := edge.GetRuntimes(); len(runtimes) > 0 {
+			out["edge.runtimes"] = strings.Join(runtimes, ",")
+		}
 		operators := edge.GetOperators()
-		out["edge.operators"] = strings.Join(operators, ",")
+		if len(operators) > 0 {
+			out["edge.operators"] = strings.Join(operators, ",")
+		}
 		foregroundOnly := false
 		backgroundCapable := false
 		for _, operator := range operators {
