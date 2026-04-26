@@ -7,6 +7,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | Guide | Description |
 |-------|-------------|
 | [Server](server.md) | Go server — configuration, build, run, test |
+| [Technology Choices](technology-choices.md) | Durable server/client technology decisions and evidence |
 | [Discovery and Connection](discovery-and-connection.md) | mDNS discovery, manual connect, and carrier fallback behavior |
 | [Client — Web](client-web.md) | Flutter web client |
 | [Client — macOS](client-macos.md) | Flutter macOS desktop client |
