@@ -69,6 +69,32 @@ func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 	if patched.Title != "advanced math lesson" {
 		t.Fatalf("PatchArtifact title = %q, want %q", patched.Title, "advanced math lesson")
 	}
+	if patched.Version != 2 {
+		t.Fatalf("PatchArtifact version = %d, want 2", patched.Version)
+	}
+
+	stored, ok := svc.GetArtifact(artifact.ID)
+	if !ok {
+		t.Fatalf("GetArtifact(%q) reported missing artifact", artifact.ID)
+	}
+	if stored.Version != 2 {
+		t.Fatalf("GetArtifact version = %d, want 2", stored.Version)
+	}
+
+	history, ok := svc.ArtifactHistory(artifact.ID)
+	if !ok {
+		t.Fatalf("ArtifactHistory(%q) reported missing artifact", artifact.ID)
+	}
+	if len(history) != 2 {
+		t.Fatalf("len(ArtifactHistory(%q)) = %d, want 2", artifact.ID, len(history))
+	}
+	if history[0].Action != "create" || history[0].Version != 1 {
+		t.Fatalf("history[0] = %+v, want action=create version=1", history[0])
+	}
+	if history[1].Action != "patch" || history[1].Version != 2 {
+		t.Fatalf("history[1] = %+v, want action=patch version=2", history[1])
+	}
+
 	results := svc.Search("advanced")
 	if len(results) == 0 || results[0].ID != artifact.ID {
 		t.Fatalf("Search(advanced) should include patched artifact id %q, got %+v", artifact.ID, results)

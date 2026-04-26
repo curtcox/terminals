@@ -53,7 +53,19 @@ type Artifact struct {
 	ID        string    `json:"id"`
 	Kind      string    `json:"kind"`
 	Title     string    `json:"title"`
+	Version   int       `json:"version"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ArtifactVersion records one durable version entry for an artifact.
+type ArtifactVersion struct {
+	ArtifactID string    `json:"artifact_id"`
+	Version    int       `json:"version"`
+	Kind       string    `json:"kind"`
+	Title      string    `json:"title"`
+	Action     string    `json:"action"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // Annotation represents a user annotation attached to a canvas.
@@ -130,6 +142,7 @@ type Service struct {
 	messages    []Message
 	boardItems  []BoardItem
 	artifacts   []Artifact
+	versions    map[string][]ArtifactVersion
 	annotations []Annotation
 	memories    []MemoryEntry
 	recent      []RecentItem
@@ -142,9 +155,10 @@ type Service struct {
 func NewService() *Service {
 	now := time.Now
 	s := &Service{
-		now:   func() time.Time { return now().UTC() },
-		store: map[string]StoreRecord{},
-		acks:  map[string]Acknowledgement{},
+		now:      func() time.Time { return now().UTC() },
+		store:    map[string]StoreRecord{},
+		acks:     map[string]Acknowledgement{},
+		versions: map[string][]ArtifactVersion{},
 		identities: []Identity{
 			{
 				ID:          "system",
@@ -429,13 +443,17 @@ func (s *Service) ListBoard(board string) []BoardItem {
 func (s *Service) CreateArtifact(kind, title string) Artifact {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	now := s.now()
 	item := Artifact{
 		ID:        s.nextIDLocked("art"),
 		Kind:      defaultIfBlank(kind, "document"),
 		Title:     strings.TrimSpace(title),
-		CreatedAt: s.now(),
+		Version:   1,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 	s.artifacts = append(s.artifacts, item)
+	s.appendArtifactVersionLocked(item, "create")
 	s.appendRecentLocked("artifact", item.ID+" "+item.Title)
 	return item
 }
@@ -450,11 +468,29 @@ func (s *Service) PatchArtifact(artifactID, title string) (Artifact, bool) {
 		if s.artifacts[i].ID != artifactID {
 			continue
 		}
-		if title != "" {
-			s.artifacts[i].Title = title
+		if title == "" {
+			return s.artifacts[i], true
 		}
+		s.artifacts[i].Title = title
+		s.artifacts[i].Version++
+		s.artifacts[i].UpdatedAt = s.now()
+		s.appendArtifactVersionLocked(s.artifacts[i], "patch")
 		s.appendRecentLocked("artifact", s.artifacts[i].ID+" patch "+s.artifacts[i].Title)
 		return s.artifacts[i], true
+	}
+	return Artifact{}, false
+}
+
+// GetArtifact returns one artifact by ID.
+func (s *Service) GetArtifact(artifactID string) (Artifact, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	artifactID = strings.TrimSpace(artifactID)
+	for _, item := range s.artifacts {
+		if item.ID == artifactID {
+			return item, true
+		}
 	}
 	return Artifact{}, false
 }
@@ -464,6 +500,19 @@ func (s *Service) ListArtifacts() []Artifact {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return append([]Artifact(nil), s.artifacts...)
+}
+
+// ArtifactHistory returns version history for an artifact in creation order.
+func (s *Service) ArtifactHistory(artifactID string) ([]ArtifactVersion, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	artifactID = strings.TrimSpace(artifactID)
+	versions, ok := s.versions[artifactID]
+	if !ok {
+		return nil, false
+	}
+	return append([]ArtifactVersion(nil), versions...), true
 }
 
 // AnnotateCanvas appends an annotation to the named canvas.
@@ -818,4 +867,15 @@ func cloneSession(item InteractiveSession) InteractiveSession {
 
 func ackKey(identityID, subjectRef string) string {
 	return strings.ToLower(strings.TrimSpace(identityID)) + "|" + strings.ToLower(strings.TrimSpace(subjectRef))
+}
+
+func (s *Service) appendArtifactVersionLocked(item Artifact, action string) {
+	s.versions[item.ID] = append(s.versions[item.ID], ArtifactVersion{
+		ArtifactID: item.ID,
+		Version:    item.Version,
+		Kind:       item.Kind,
+		Title:      item.Title,
+		Action:     strings.TrimSpace(action),
+		CreatedAt:  item.UpdatedAt,
+	})
 }

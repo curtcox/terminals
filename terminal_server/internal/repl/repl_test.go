@@ -389,6 +389,10 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","item":{"id":"pin-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/create":
 			_, _ = w.Write([]byte(`{"status":"ok","artifact":{"id":"art-1"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/artifact/get":
+			_, _ = w.Write([]byte(`{"artifact":{"id":"art-1","version":2,"title":"math advanced"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/artifact/history":
+			_, _ = w.Write([]byte(`{"artifact_id":"art-1","versions":[{"version":1,"action":"create"},{"version":2,"action":"patch"}]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/patch":
 			_, _ = w.Write([]byte(`{"status":"ok","artifact":{"id":"art-1","title":"math advanced"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/canvas/annotate":
@@ -428,6 +432,8 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"message ack alice msg-1",
 		"board pin family reminder",
 		"artifact create lesson-1 math",
+		"artifact show art-1",
+		"artifact history art-1",
 		"artifact patch art-1 math advanced",
 		"canvas annotate canvas-1 note",
 		"search query hello",
@@ -465,6 +471,12 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "art-1") {
 		t.Fatalf("artifact output missing: %q", text)
+	}
+	if !strings.Contains(text, `"version": 2`) {
+		t.Fatalf("artifact show output missing version payload: %q", text)
+	}
+	if !strings.Contains(text, `"action": "patch"`) {
+		t.Fatalf("artifact history output missing patch entry: %q", text)
 	}
 	if !strings.Contains(text, "ann-1") {
 		t.Fatalf("canvas output missing: %q", text)

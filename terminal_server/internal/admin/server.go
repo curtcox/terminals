@@ -109,6 +109,8 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/board", h.handleBoard)
 	mux.HandleFunc("/admin/api/board/pin", h.handleBoardPin)
 	mux.HandleFunc("/admin/api/artifact", h.handleArtifacts)
+	mux.HandleFunc("/admin/api/artifact/get", h.handleArtifactGet)
+	mux.HandleFunc("/admin/api/artifact/history", h.handleArtifactHistory)
 	mux.HandleFunc("/admin/api/artifact/create", h.handleArtifactCreate)
 	mux.HandleFunc("/admin/api/artifact/patch", h.handleArtifactPatch)
 	mux.HandleFunc("/admin/api/canvas", h.handleCanvas)
@@ -394,6 +396,42 @@ func (h *Handler) handleArtifacts(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"artifacts": h.capability.ListArtifacts()})
+}
+
+func (h *Handler) handleArtifactGet(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	artifactID := strings.TrimSpace(req.URL.Query().Get("artifact_id"))
+	if artifactID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "artifact_id is required")
+		return
+	}
+	artifact, ok := h.capability.GetArtifact(artifactID)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "artifact not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"artifact": artifact})
+}
+
+func (h *Handler) handleArtifactHistory(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	artifactID := strings.TrimSpace(req.URL.Query().Get("artifact_id"))
+	if artifactID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "artifact_id is required")
+		return
+	}
+	history, ok := h.capability.ArtifactHistory(artifactID)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "artifact not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"artifact_id": artifactID, "versions": history})
 }
 
 func (h *Handler) handleArtifactCreate(w http.ResponseWriter, req *http.Request) {

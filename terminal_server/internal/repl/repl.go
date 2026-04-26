@@ -77,6 +77,8 @@ func replCommandSpecs() []commandSpec {
 		{Name: "board ls", Usage: "board ls [board] [--json]", Summary: "List board or bulletin entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/board"}},
 		{Name: "board pin", Usage: "board pin <board> <text> [--json]", Summary: "Pin a bulletin entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/board"}},
 		{Name: "artifact ls", Usage: "artifact ls [--json]", Summary: "List shared artifacts", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/artifact"}},
+		{Name: "artifact show", Usage: "artifact show <artifact> [--json]", Summary: "Show one shared artifact", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/artifact"}},
+		{Name: "artifact history", Usage: "artifact history <artifact> [--json]", Summary: "Show version history for one artifact", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "artifact create", Usage: "artifact create <kind> <title> [--json]", Summary: "Create a shared artifact", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "artifact patch", Usage: "artifact patch <artifact> <title> [--json]", Summary: "Patch shared artifact metadata", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "canvas ls", Usage: "canvas ls [canvas] [--json]", Summary: "List canvas annotations", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/canvas"}},
@@ -703,6 +705,26 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		switch sub {
 		case "ls":
 			body, err := s.fetchJSON(ctx, "/admin/api/artifact")
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "show":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) == 0 {
+				return errors.New("usage: artifact show <artifact>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/artifact/get", url.Values{"artifact_id": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "history":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) == 0 {
+				return errors.New("usage: artifact history <artifact>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/artifact/history", url.Values{"artifact_id": {plain[0]}})
 			if err != nil {
 				return err
 			}

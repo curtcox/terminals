@@ -533,6 +533,26 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 	if !strings.Contains(patchArtifactW.Body.String(), "math mastery") {
 		t.Fatalf("patched artifact missing updated title: %s", patchArtifactW.Body.String())
 	}
+
+	getArtifactReq := httptest.NewRequest(http.MethodGet, "/admin/api/artifact/get?artifact_id="+url.QueryEscape(artifactID), nil)
+	getArtifactW := httptest.NewRecorder()
+	h.ServeHTTP(getArtifactW, getArtifactReq)
+	if getArtifactW.Code != http.StatusOK {
+		t.Fatalf("GET /admin/api/artifact/get status = %d, want 200 body=%s", getArtifactW.Code, getArtifactW.Body.String())
+	}
+	if !strings.Contains(getArtifactW.Body.String(), `"version":2`) {
+		t.Fatalf("artifact get body missing updated version: %s", getArtifactW.Body.String())
+	}
+
+	historyReq := httptest.NewRequest(http.MethodGet, "/admin/api/artifact/history?artifact_id="+url.QueryEscape(artifactID), nil)
+	historyW := httptest.NewRecorder()
+	h.ServeHTTP(historyW, historyReq)
+	if historyW.Code != http.StatusOK {
+		t.Fatalf("GET /admin/api/artifact/history status = %d, want 200 body=%s", historyW.Code, historyW.Body.String())
+	}
+	if !strings.Contains(historyW.Body.String(), `"action":"create"`) || !strings.Contains(historyW.Body.String(), `"action":"patch"`) {
+		t.Fatalf("artifact history missing create/patch entries: %s", historyW.Body.String())
+	}
 }
 
 func TestIdentityResolveEndpointRequiresGET(t *testing.T) {
