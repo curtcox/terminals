@@ -1,9 +1,9 @@
 ---
 title: "Collaborative Sessions Plan"
 kind: plan
-status: shipped-untested
+status: shipped-validated
 owner: copilot
-validation: none
+validation: automated:PL8
 last-reviewed: 2026-04-26
 ---
 
