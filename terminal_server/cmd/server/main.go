@@ -148,7 +148,7 @@ func main() {
 		Broadcast:   broadcaster,
 		UI:          uiHost,
 		DeviceAudio: scenarioDeviceAudio{hub: audioHub},
-		Placement:   placement.NewManagerBackedEngine(deviceManager),
+		Placement:   placement.NewManagerBackedEngine(deviceManager, ioRouter.Claims()),
 		Observe:     observationStore,
 		World:       worldModelAdapter{model: worldModel},
 	}

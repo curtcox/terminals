@@ -261,6 +261,11 @@ Placement treats `background_monitor` roles as requiring
 declare only `monitor.tier.foreground_only` are filtered out from background
 monitor assignments.
 
+Placement `ExcludeBusy` filtering also consults active IO claims. A device is
+treated as busy when it currently holds one or more active claims in the
+shared claim manager, even if no explicit `liveness=busy` capability key is
+present.
+
 ## Lint
 
 ```bash

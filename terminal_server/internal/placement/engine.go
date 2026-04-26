@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
 
@@ -26,11 +27,20 @@ type Engine interface {
 // ManagerBackedEngine implements placement lookups using device.Manager.
 type ManagerBackedEngine struct {
 	devices *device.Manager
+	claims  claimSnapshotter
+}
+
+type claimSnapshotter interface {
+	Snapshot(deviceID string) []iorouter.Claim
 }
 
 // NewManagerBackedEngine creates a placement engine over the shared device registry.
-func NewManagerBackedEngine(devices *device.Manager) *ManagerBackedEngine {
-	return &ManagerBackedEngine{devices: devices}
+func NewManagerBackedEngine(devices *device.Manager, claims ...claimSnapshotter) *ManagerBackedEngine {
+	engine := &ManagerBackedEngine{devices: devices}
+	if len(claims) > 0 {
+		engine.claims = claims[0]
+	}
+	return engine
 }
 
 // Find resolves semantic scope plus capability constraints to concrete devices.
@@ -109,7 +119,7 @@ func (e *ManagerBackedEngine) filteredDevices(q scenario.PlacementQuery) []devic
 		if d.State != device.StateConnected {
 			continue
 		}
-		if q.ExcludeBusy && strings.EqualFold(d.Capabilities["liveness"], "busy") {
+		if q.ExcludeBusy && e.deviceIsBusy(d) {
 			continue
 		}
 		if !matchesScope(d, q.Scope) {
@@ -131,6 +141,16 @@ func (e *ManagerBackedEngine) filteredDevices(q scenario.PlacementQuery) []devic
 		return scoreI > scoreJ
 	})
 	return out
+}
+
+func (e *ManagerBackedEngine) deviceIsBusy(d device.Device) bool {
+	if strings.EqualFold(strings.TrimSpace(d.Capabilities["liveness"]), "busy") {
+		return true
+	}
+	if e == nil || e.claims == nil {
+		return false
+	}
+	return len(e.claims.Snapshot(d.DeviceID)) > 0
 }
 
 func preferredScore(d device.Device, preferred []string) int {

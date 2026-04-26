@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 )
 
@@ -274,5 +275,41 @@ func TestFindBackgroundRoleExplicitFalseOverridesSupportTier(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].DeviceID != "background-true" {
 		t.Fatalf("DevicesWithRole(background_monitor) = %+v, want [background-true]", got)
+	}
+}
+
+func TestFindExcludeBusyUsesActiveClaims(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{
+		DeviceID:     "busy-screen",
+		Capabilities: device.CapabilitySet{"screen.width": "1920"},
+	})
+	_, _ = devices.Register(device.Manifest{
+		DeviceID:     "idle-screen",
+		Capabilities: device.CapabilitySet{"screen.width": "1280"},
+	})
+
+	claims := iorouter.NewClaimManager()
+	_, err := claims.Request(context.Background(), []iorouter.Claim{{
+		ActivationID: "act-1",
+		DeviceID:     "busy-screen",
+		Resource:     iorouter.ResourceComputeCPUShared,
+		Mode:         iorouter.ClaimShared,
+		Priority:     1,
+	}})
+	if err != nil {
+		t.Fatalf("claims.Request() error = %v", err)
+	}
+
+	engine := NewManagerBackedEngine(devices, claims)
+	got, err := engine.Find(context.Background(), scenario.PlacementQuery{
+		RequiredCaps: []string{"screen"},
+		ExcludeBusy:  true,
+	})
+	if err != nil {
+		t.Fatalf("Find(screen, excludeBusy=true) error = %v", err)
+	}
+	if len(got) != 1 || got[0].DeviceID != "idle-screen" {
+		t.Fatalf("Find(screen, excludeBusy=true) = %+v, want [idle-screen]", got)
 	}
 }
