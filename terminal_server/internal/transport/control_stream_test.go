@@ -224,6 +224,17 @@ func TestHandleMessageCapabilityDeltaRejectsStaleGeneration(t *testing.T) {
 	if len(out) != 1 || out[0].ErrorCode != ErrorCodeProtocolViolation {
 		t.Fatalf("error response = %+v, want protocol violation", out)
 	}
+
+	got, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected device-1 in manager")
+	}
+	if got.Generation != 2 {
+		t.Fatalf("generation = %d, want 2", got.Generation)
+	}
+	if got.Capabilities["screen.width"] != "1920" {
+		t.Fatalf("screen.width = %q, want 1920", got.Capabilities["screen.width"])
+	}
 }
 
 func TestHandleMessageCapabilitySnapshotRejectsStaleGeneration(t *testing.T) {
