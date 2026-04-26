@@ -7,11 +7,11 @@ BUILD_SHA ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 
-.PHONY: server-build server-test server-test-sandbox server-test-network-probe server-lint server-coverage \
+.PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
-	skills-validate development-docs-test plans-index pick-next-work \
+	skills-validate development-docs-test server-test-network-probe-test plans-index pick-next-work \
 	all-lint all-test all-check stop-server stop-server-test run-server run-client-web \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
 	ui-inspect-test
@@ -24,6 +24,12 @@ server-test:
 
 server-test-network-probe:
 	go run ./scripts/probe_server_test_network.go
+
+server-test-network-probe-assert:
+	bash ./scripts/assert-server-test-network-probe.sh
+
+server-test-network-probe-test:
+	bash ./scripts/test-server-test-network-probe.sh
 
 server-test-sandbox:
 	./scripts/server-test-sandbox.sh

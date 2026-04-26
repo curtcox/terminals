@@ -53,25 +53,7 @@ type MDNSAdvertiser struct {
 func NewMDNSAdvertiser() *MDNSAdvertiser {
 	return &MDNSAdvertiser{
 		newZone: func(svc ServiceInfo) (*mdns.MDNSService, error) {
-			txt := []string{fmt.Sprintf("version=%s", svc.Version), fmt.Sprintf("name=%s", svc.Name)}
-			if grpc := strings.TrimSpace(svc.GRPC); grpc != "" {
-				txt = append(txt, fmt.Sprintf("grpc=%s", grpc))
-			}
-			if ws := strings.TrimSpace(svc.WebSocket); ws != "" {
-				txt = append(txt, fmt.Sprintf("ws=%s", ws))
-			}
-			if tcp := strings.TrimSpace(svc.TCP); tcp != "" {
-				txt = append(txt, fmt.Sprintf("tcp=%s", tcp))
-			}
-			if httpAddr := strings.TrimSpace(svc.HTTP); httpAddr != "" {
-				txt = append(txt, fmt.Sprintf("http=%s", httpAddr))
-			}
-			if mcpAddr := strings.TrimSpace(svc.MCP); mcpAddr != "" {
-				txt = append(txt, fmt.Sprintf("mcp=%s", mcpAddr))
-			}
-			if len(svc.Priority) > 0 {
-				txt = append(txt, fmt.Sprintf("priority=%s", strings.Join(svc.Priority, ",")))
-			}
+			txt := buildMDNSTXTRecords(svc)
 			return mdns.NewMDNSService(
 				svc.Name,
 				svc.ServiceType,
@@ -87,6 +69,29 @@ func NewMDNSAdvertiser() *MDNSAdvertiser {
 			return server.Shutdown()
 		},
 	}
+}
+
+func buildMDNSTXTRecords(svc ServiceInfo) []string {
+	txt := []string{fmt.Sprintf("version=%s", svc.Version), fmt.Sprintf("name=%s", svc.Name)}
+	if grpc := strings.TrimSpace(svc.GRPC); grpc != "" {
+		txt = append(txt, fmt.Sprintf("grpc=%s", grpc))
+	}
+	if ws := strings.TrimSpace(svc.WebSocket); ws != "" {
+		txt = append(txt, fmt.Sprintf("ws=%s", ws))
+	}
+	if tcp := strings.TrimSpace(svc.TCP); tcp != "" {
+		txt = append(txt, fmt.Sprintf("tcp=%s", tcp))
+	}
+	if httpAddr := strings.TrimSpace(svc.HTTP); httpAddr != "" {
+		txt = append(txt, fmt.Sprintf("http=%s", httpAddr))
+	}
+	if mcpAddr := strings.TrimSpace(svc.MCP); mcpAddr != "" {
+		txt = append(txt, fmt.Sprintf("mcp=%s", mcpAddr))
+	}
+	if len(svc.Priority) > 0 {
+		txt = append(txt, fmt.Sprintf("priority=%s", strings.Join(svc.Priority, ",")))
+	}
+	return txt
 }
 
 // Start begins advertisement. Repeated starts are treated as a no-op.

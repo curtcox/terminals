@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/hashicorp/mdns"
@@ -101,6 +102,57 @@ func TestMDNSAdvertiserIncludesTransportMetadata(t *testing.T) {
 	assertTXTContains(t, zone, "http=http://127.0.0.1:50056")
 	assertTXTContains(t, zone, "mcp=http://127.0.0.1:50053/mcp")
 	assertTXTContains(t, zone, "priority=grpc,websocket,tcp,http,mcp")
+}
+
+func TestBuildMDNSTXTRecords(t *testing.T) {
+	t.Parallel()
+
+	t.Run("includes only present transports", func(t *testing.T) {
+		t.Parallel()
+
+		got := buildMDNSTXTRecords(ServiceInfo{
+			Name:      "HomeServer",
+			Version:   "2",
+			GRPC:      "127.0.0.1:50051",
+			WebSocket: "ws://127.0.0.1:50054/control",
+			HTTP:      "http://127.0.0.1:50056",
+			Priority:  []string{"grpc", "websocket", "http"},
+		})
+
+		want := []string{
+			"version=2",
+			"name=HomeServer",
+			"grpc=127.0.0.1:50051",
+			"ws=ws://127.0.0.1:50054/control",
+			"http=http://127.0.0.1:50056",
+			"priority=grpc,websocket,http",
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("buildMDNSTXTRecords() = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("trims empty values", func(t *testing.T) {
+		t.Parallel()
+
+		got := buildMDNSTXTRecords(ServiceInfo{
+			Name:      "HomeServer",
+			Version:   "2",
+			GRPC:      "  ",
+			WebSocket: "",
+			TCP:       "\t",
+			HTTP:      "http://127.0.0.1:50056",
+		})
+
+		want := []string{
+			"version=2",
+			"name=HomeServer",
+			"http=http://127.0.0.1:50056",
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("buildMDNSTXTRecords() = %v, want %v", got, want)
+		}
+	})
 }
 
 func assertTXTContains(t *testing.T, zone *mdns.MDNSService, expected string) {

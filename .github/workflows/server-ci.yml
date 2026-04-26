@@ -29,6 +29,8 @@ jobs:
           version: v2.9
       - name: Build
         run: go build ./...
+      - name: Assert network probe coverage support
+        run: bash ../scripts/assert-server-test-network-probe.sh
       - name: Test
         run: go test ./...
       - name: Test (race)

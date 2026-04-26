@@ -1,17 +1,17 @@
 ---
 title: "Server Test Sandbox Network Plan"
 kind: plan
-status: shipped-untested
+status: shipped-validated
 owner: curtcox
 validation: manual
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Server Test Sandbox Network Plan
 
-## Status (2026-04-25)
+## Status (2026-04-26)
 
-Shipped (manual validation):
+Shipped and validated (manual + CI assertions):
 
 - `scripts/probe_server_test_network.go` reports
   `loopback_listener`, `ipv6_loopback_listener`, `host_interfaces`, and a
@@ -24,19 +24,17 @@ Shipped (manual validation):
   the command (`make server-test`) needed for full validation.
 - `make server-test-sandbox` and `make server-test-network-probe` targets
   expose the script and probe.
+- `make server-test-network-probe-assert` now enforces the CI contract that
+  probe output must report loopback listener and host-interface support.
+- `.github/workflows/server-ci.yml` runs the assertion before server tests, so
+  CI cannot silently degrade networked test coverage.
 - `docs/code-quality-and-ci.md` documents the new targets and that
   `make server-test-sandbox` is a development convenience, not a release
   gate.
-
-Remaining work (not shipped):
-
-- Step 5 ("Refactor Where It Improves Coverage"): pure setup/validation
-  helpers and mDNS record/interface separation are still mixed in with
-  socket code.
-- Step 6 ("CI Contract"): CI does not yet assert that the network probe
-  reports listener support, so it is theoretically possible for CI to
-  silently degrade. Lower priority because CI today calls `make server-test`
-  directly, not the sandbox target.
+- `terminal_server/internal/discovery/mdns.go` now factors TXT metadata
+  construction into `buildMDNSTXTRecords`, with unit coverage in
+  `mdns_test.go`, so record construction can be tested independently from
+  network-bound advertiser startup.
 
 ## Context
 

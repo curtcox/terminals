@@ -18,6 +18,7 @@ Use these from repository root.
 | `make server-test` | Run server tests |
 | `make server-test-sandbox` | Sandbox-friendly server tests; skips packages that need real listeners when blocked |
 | `make server-test-network-probe` | Print whether the current environment can bind loopback listeners and enumerate host interfaces |
+| `make server-test-network-probe-assert` | Fail unless the network probe reports CI-ready listener/interface coverage |
 | `make server-lint` | Run Go lint checks |
 | `make server-coverage` | Generate Go coverage profile |
 | `make client-build` | Build Flutter web client |
@@ -44,6 +45,7 @@ The repository maintains three workflows:
 Server CI runs on changes in `terminal_server/` and `api/` and includes:
 
 - `go build ./...`
+- `make server-test-network-probe-assert`
 - `golangci-lint`
 - `go test ./...`
 - `go test -race ./...`
