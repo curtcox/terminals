@@ -1,13 +1,25 @@
 ---
 title: "Phase 2 — Text Terminal"
 kind: plan
-status: planned
-owner: unowned
-validation: none
+status: superseded
+owner: copilot
+validation: automated:P1
 last-reviewed: 2026-04-25
 ---
 
 # Phase 2 — Text Terminal
+
+Status: Completed and drained on 2026-04-25.
+
+The durable behavior from this phase now lives in:
+
+- [`docs/server.md`](../../docs/server.md) (text terminal runtime behavior and operations)
+- [`docs/usecase-validation-matrix.md`](../../docs/usecase-validation-matrix.md) (automated validation mapping for `P1`)
+- [`usecases.md`](../../usecases.md) (`P1` and related terminal/productivity use cases)
+- [`plans/features/use-case-flows.md`](../features/use-case-flows.md#text-terminal) (flow-level scenario detail)
+
+There are no remaining active tasks in this phase plan. Future terminal work should
+be tracked under the feature plans and corresponding use-case automation tasks.
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 

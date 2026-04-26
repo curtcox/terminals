@@ -162,6 +162,32 @@ UI, scheduler, and confirmation operations; due-timer processing applies tick
 and expiry side effects from structured scheduler records. Legacy scenarios
 continue to use their existing `Start` methods.
 
+## Text Terminal Runtime
+
+The server provides a generic text-terminal runtime used by terminal scenarios.
+Client code remains scenario-agnostic: it renders server-provided UI descriptors
+and forwards input events.
+
+- Terminal sessions are activation-scoped and keyed by device/session identity.
+- Terminal UI is delivered as server-driven descriptors with output patches,
+  refresh actions, and enter/restore transitions.
+- Input handling normalizes keyboard text and routes submit/interactive actions
+  into the active terminal session.
+- Heartbeats can flush/coalesce terminal output updates to avoid stale UI and
+  reduce unnecessary patch traffic.
+
+Automated validation coverage for this runtime is mapped to use case `P1`:
+
+```bash
+make usecase-validate USECASE=P1
+```
+
+Primary transport evidence lives in generated and wire integration tests under
+`terminal_server/internal/transport`:
+
+- `TestGeneratedSessionTerminalTransitions`
+- `TestWireSessionTerminalTransitions`
+
 ## Monitoring Support Tiers
 
 Device capability declarations include monitoring tier operators under
