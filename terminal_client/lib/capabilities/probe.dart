@@ -99,8 +99,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
       capabilities.camera =
           (capv1.CameraCapability()..endpoints.addAll(cameraEndpoints));
     }
-    capabilities.edge =
-        (capv1.EdgeCapability()..runtimes.addAll(<String>['dart']));
 
     return capabilities;
   }

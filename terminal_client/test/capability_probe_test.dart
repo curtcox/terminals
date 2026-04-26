@@ -26,18 +26,15 @@ void main() {
     expect(capabilities.hasSpeakers(), isFalse);
     expect(capabilities.hasHaptics(), isFalse);
     expect(capabilities.hasKeyboard(), isFalse);
-    expect(capabilities.hasEdge(), isTrue);
+    expect(capabilities.hasEdge(), isFalse);
     expect(capabilities.hasPointer(), isFalse);
     expect(capabilities.hasTouch(), isFalse);
     expect(capabilities.screen.hasTouch(), isFalse);
     expect(capabilities.displays.first.screen.hasTouch(), isFalse);
-    expect(capabilities.edge.hasRetention(), isFalse);
     expect(capabilities.screen.hasFullscreenSupported(), isFalse);
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);
     expect(capabilities.screen.hasSafeArea(), isFalse);
     expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
-    expect(capabilities.edge.runtimes, contains('dart'));
-    expect(capabilities.edge.operators, isEmpty);
   });
 
   test('probe includes media capabilities when devices are detected', () async {
