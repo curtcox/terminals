@@ -748,9 +748,12 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			out = append(out, ServerMessage{SetUI: &initial})
 			h.rememberSetUI(msg.CapabilitySnap.DeviceID, out)
 		}
-		effects := h.handleCapabilityChangeEffects(ctx, msg.CapabilitySnap.DeviceID, before.Capabilities, after.Capabilities)
-		if len(effects) > 0 {
-			out = append(out, effects...)
+		isInitialSnapshotBaseline := before.Generation == 0 && len(before.Capabilities) == 0
+		if !isInitialSnapshotBaseline {
+			effects := h.handleCapabilityChangeEffects(ctx, msg.CapabilitySnap.DeviceID, before.Capabilities, after.Capabilities)
+			if len(effects) > 0 {
+				out = append(out, effects...)
+			}
 		}
 		return out, nil
 	case msg.CapabilityDelta != nil:

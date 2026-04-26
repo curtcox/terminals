@@ -999,6 +999,128 @@ func TestHandleMessageCapabilityDeltaEmitsTypedCapabilityEvents(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCapabilitySnapshotInitialBaselineDoesNotEmitCapabilityEvents(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"screen.width":       "1920",
+				"screen.height":      "1080",
+				"microphone.present": "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	events := broadcaster.Events()
+	if len(events) != 0 {
+		messages := make([]string, 0, len(events))
+		for _, event := range events {
+			messages = append(messages, event.Message)
+		}
+		t.Fatalf("expected no capability events on initial baseline snapshot: %+v", messages)
+	}
+}
+
+func TestHandleMessageCapabilitySnapshotRebaselineEmitsTypedCapabilityEvents(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"screen.width":       "1920",
+				"screen.height":      "1080",
+				"microphone.present": "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(initial capability snapshot) error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Capabilities: map[string]string{
+				"screen.width":  "1280",
+				"screen.height": "720",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(rebaseline capability snapshot) error = %v", err)
+	}
+
+	events := broadcaster.Events()
+	messages := make([]string, 0, len(events))
+	for _, event := range events {
+		messages = append(messages, event.Message)
+	}
+	if !containsMessage(messages, "terminal.capability.updated") {
+		t.Fatalf("expected terminal.capability.updated in events: %+v", messages)
+	}
+	if !containsMessage(messages, "terminal.capability.removed") {
+		t.Fatalf("expected terminal.capability.removed in events: %+v", messages)
+	}
+	if !containsMessage(messages, "terminal.display.resized") {
+		t.Fatalf("expected terminal.display.resized in events: %+v", messages)
+	}
+	if !containsMessage(messages, "terminal.audio_route.changed") {
+		t.Fatalf("expected terminal.audio_route.changed in events: %+v", messages)
+	}
+	if !containsMessage(messages, "terminal.resource.lost") {
+		t.Fatalf("expected terminal.resource.lost in events: %+v", messages)
+	}
+	if !containsMessage(messages, "terminal.resource.lost:mic.capture") {
+		t.Fatalf("expected terminal.resource.lost:mic.capture in events: %+v", messages)
+	}
+}
+
 func TestHandleMessageCapabilityDeltaEmitsDisplayResizedForDisplayCapabilityGeometry(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
