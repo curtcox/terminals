@@ -2905,13 +2905,18 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         .addAll(_recentControlErrors.map((item) => item.deepCopy()));
 
     final hardware = diagv1.HardwareState()
-      ..batteryLevel = (_lastSensorSnapshot['battery.level'] ?? 0).toDouble()
-      ..batteryCharging =
-          (_lastSensorSnapshot['battery.charging'] ?? 0).toDouble() >= 0.5
       ..screenWidthPx = size.width.round()
       ..screenHeightPx = size.height.round()
       ..devicePixelRatio = devicePixelRatio
       ..orientation = orientation;
+    final batteryLevel = _lastSensorSnapshot['battery.level'];
+    if (batteryLevel != null) {
+      hardware.batteryLevel = batteryLevel;
+    }
+    final batteryCharging = _lastSensorSnapshot['battery.charging'];
+    if (batteryCharging != null) {
+      hardware.batteryCharging = batteryCharging >= 0.5;
+    }
     hardware.sensorSnapshot.addAll(_lastSensorSnapshot);
 
     final contextProto = diagv1.ClientContext()

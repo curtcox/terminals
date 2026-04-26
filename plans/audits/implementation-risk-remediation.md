@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Removed synthetic bug-report hardware battery defaults from client diagnostics context so `hardware.battery_level` and `hardware.battery_charging` are omitted unless real sensor telemetry has populated snapshot values; added widget regression coverage locking both fields absent (and sensor snapshot empty) when no telemetry has been observed.
 - 2026-04-25: Removed synthetic lifecycle edge-operator declarations from capability registration/snapshots/deltas by dropping client-side `monitor.lifecycle.{foreground,background}` injection, and updated lifecycle widget regression coverage to lock those operators absent unless explicitly sourced.
 - 2026-04-26: Removed synthetic `connectivity.reconnect_attempt` sensor telemetry emission from the client so periodic sensor sends now include only measurable declared values (`battery.level`/`battery.charging`) rather than internal reconnect counters, and updated widget regression coverage to lock reconnect-attempt and legacy time-derived keys absent.
 - 2026-04-26: Hardened Stage 4 background-monitor placement truthfulness so an explicit `monitor.background_capable=false` now overrides `monitor.support_tier=background_capable` fallback, preventing contradictory manifests from being treated as background-capable; added placement regression coverage locking explicit-false precedence.
