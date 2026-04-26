@@ -85,7 +85,7 @@ Connected agents benefit from the [`terminals-mcp`](.claude/skills/terminals-mcp
 
 The server writes structured JSONL events to `TERMINALS_LOG_DIR` (default `logs/`) with size-based rotation (`TERMINALS_LOG_MAX_BYTES`, `TERMINALS_LOG_MAX_ARCHIVES`). Use `term logs ...` for local querying and `/admin/logs` for browser-based filtering.
 
-Event naming reference: [`docs/event-taxonomy.md`](/Users/curt/me/terminals/docs/event-taxonomy.md).
+Event naming reference: [`docs/event-taxonomy.md`](docs/event-taxonomy.md).
 
 ## Photo Frame Configuration
 

@@ -112,6 +112,11 @@ source .env
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TERMINALS_RECORDING_DIR` | `recordings` | Where audio recordings are stored on disk |
+| `TERMINALS_LOG_DIR` | `logs` | Directory for structured event logs (`terminals.jsonl` and rotated archives) |
+| `TERMINALS_LOG_LEVEL` | `info` | Minimum log level (`debug`, `info`, `warn`, `error`) |
+| `TERMINALS_LOG_MAX_BYTES` | `104857600` | Rotate the active event log file after this many bytes |
+| `TERMINALS_LOG_MAX_ARCHIVES` | `10` | Maximum number of rotated event log archives to keep |
+| `TERMINALS_LOG_STDERR` | `true` | Mirror structured event logs to stderr during development |
 
 ### SIP telephony (optional)
 
