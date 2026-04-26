@@ -1,9 +1,9 @@
 ---
 title: "Messaging and Boards Plan"
 kind: plan
-status: building
+status: shipped-validated
 owner: copilot
-validation: none
+validation: automated:PL1
 last-reviewed: 2026-04-26
 ---
 

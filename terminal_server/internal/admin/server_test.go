@@ -366,6 +366,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		"/admin/api/identity/resolve?audience=group:family",
 		"/admin/api/identity/ack?subject_ref=message:msg-1",
 		"/admin/api/session",
+		"/admin/api/message/rooms",
 		"/admin/api/message",
 		"/admin/api/message/unread?identity_id=alice",
 		"/admin/api/board",
@@ -404,6 +405,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		{path: "/admin/api/session/control/request", form: url.Values{"session_id": {"missing"}, "participant": {"alice"}, "control_type": {"keyboard"}}, allowNotFound: true},
 		{path: "/admin/api/session/control/grant", form: url.Values{"session_id": {"missing"}, "participant": {"alice"}, "granted_by": {"moderator"}, "control_type": {"keyboard"}}, allowNotFound: true},
 		{path: "/admin/api/session/control/revoke", form: url.Values{"session_id": {"missing"}, "participant": {"alice"}, "revoked_by": {"moderator"}}, allowNotFound: true},
+		{path: "/admin/api/message/room", form: url.Values{"name": {"kitchen"}}},
 		{path: "/admin/api/message/post", form: url.Values{"room": {"room-1"}, "text": {"hello"}}},
 		{path: "/admin/api/message/dm", form: url.Values{"target_ref": {"mom"}, "text": {"hello"}}},
 		{path: "/admin/api/board/post", form: url.Values{"board": {"family"}, "text": {"note"}}},
@@ -428,6 +430,16 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("POST %s status = %d, want 200 body=%s", tc.path, w.Code, w.Body.String())
 		}
+	}
+
+	roomShowReq := httptest.NewRequest(http.MethodGet, "/admin/api/message/room?room=kitchen", nil)
+	roomShowW := httptest.NewRecorder()
+	h.ServeHTTP(roomShowW, roomShowReq)
+	if roomShowW.Code != http.StatusOK {
+		t.Fatalf("GET /admin/api/message/room status = %d, want 200 body=%s", roomShowW.Code, roomShowW.Body.String())
+	}
+	if !strings.Contains(roomShowW.Body.String(), `"name":"kitchen"`) {
+		t.Fatalf("message room show missing kitchen payload: %s", roomShowW.Body.String())
 	}
 
 	createReq := httptest.NewRequest(http.MethodPost, "/admin/api/session/create", strings.NewReader(url.Values{
@@ -530,6 +542,39 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		t.Fatalf("missing message id in response: %s", postMessageW.Body.String())
 	}
 
+	getMessageReq := httptest.NewRequest(http.MethodGet, "/admin/api/message/get?message_id="+url.QueryEscape(messageID), nil)
+	getMessageW := httptest.NewRecorder()
+	h.ServeHTTP(getMessageW, getMessageReq)
+	if getMessageW.Code != http.StatusOK {
+		t.Fatalf("GET /admin/api/message/get status = %d, want 200 body=%s", getMessageW.Code, getMessageW.Body.String())
+	}
+	if !strings.Contains(getMessageW.Body.String(), messageID) {
+		t.Fatalf("message get response missing message id %q: %s", messageID, getMessageW.Body.String())
+	}
+
+	threadReq := httptest.NewRequest(http.MethodPost, "/admin/api/message/thread", strings.NewReader(url.Values{
+		"root_ref": {messageID},
+		"text":     {"thread follow-up"},
+	}.Encode()))
+	threadReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	threadW := httptest.NewRecorder()
+	h.ServeHTTP(threadW, threadReq)
+	if threadW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/message/thread status = %d, want 200 body=%s", threadW.Code, threadW.Body.String())
+	}
+	if !strings.Contains(threadW.Body.String(), `"thread_root_ref":"`+messageID+`"`) {
+		t.Fatalf("thread response missing root ref %q: %s", messageID, threadW.Body.String())
+	}
+	var threaded map[string]any
+	if err := json.Unmarshal(threadW.Body.Bytes(), &threaded); err != nil {
+		t.Fatalf("decode message thread response error = %v", err)
+	}
+	threadMessageMap, _ := threaded["message"].(map[string]any)
+	threadMessageID, _ := threadMessageMap["id"].(string)
+	if strings.TrimSpace(threadMessageID) == "" {
+		t.Fatalf("missing threaded message id in response: %s", threadW.Body.String())
+	}
+
 	directReq := httptest.NewRequest(http.MethodPost, "/admin/api/message/dm", strings.NewReader(url.Values{
 		"target_ref": {"mom"},
 		"text":       {"come downstairs"},
@@ -567,6 +612,17 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 	h.ServeHTTP(ackW, ackReq)
 	if ackW.Code != http.StatusOK {
 		t.Fatalf("POST /admin/api/message/ack status = %d, want 200 body=%s", ackW.Code, ackW.Body.String())
+	}
+
+	ackThreadReq := httptest.NewRequest(http.MethodPost, "/admin/api/message/ack", strings.NewReader(url.Values{
+		"identity_id": {"alice"},
+		"message_id":  {threadMessageID},
+	}.Encode()))
+	ackThreadReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	ackThreadW := httptest.NewRecorder()
+	h.ServeHTTP(ackThreadW, ackThreadReq)
+	if ackThreadW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/message/ack (thread) status = %d, want 200 body=%s", ackThreadW.Code, ackThreadW.Body.String())
 	}
 
 	unreadReq := httptest.NewRequest(http.MethodGet, "/admin/api/message/unread?identity_id=alice&room=room-1", nil)

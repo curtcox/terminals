@@ -35,6 +35,7 @@ Coverage depth labels:
 | S2 | Focus one camera audio | `make usecase-validate USECASE=S2` | generated+wire focus-action routing tests | Transport |
 | S3 | Mixed multi-camera audio overview | `make usecase-validate USECASE=S3` | generated+wire multi-window audio mix tests | Transport |
 | P1 | Terminal session UI transitions | `make usecase-validate USECASE=P1` | generated+wire terminal transition tests | Transport |
+| PL1 | Live room text chat | `make usecase-validate USECASE=PL1` | `internal/capability` message room/thread/unread acknowledgement lifecycle test | Contract |
 | PL8 | Shared live collaborative session | `make usecase-validate USECASE=PL8` | `internal/capability` session join/leave plus control request/grant/revoke tests | Contract |
 | PL20 | Reusable visual templates | `make usecase-validate USECASE=PL20` | artifact template save/apply plus durable patch/history capability tests | Contract |
 | T1 | Timer firing | `make usecase-validate USECASE=T1` | due-timer loop; transport `run_due_timers`; kitchen timer package smoke test; future TAL simulation coverage | Smoke |
@@ -43,6 +44,6 @@ Coverage depth labels:
 
 The following planned IDs currently do not have a dedicated `make usecase-validate USECASE=<ID>` mapping yet:
 
-`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`, `PL1`-`PL7`, `PL9`-`PL19`, `PL21`-`PL27`.
+`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`, `PL2`-`PL7`, `PL9`-`PL19`, `PL21`-`PL27`.
 
 Use `make all-check` as the baseline repository gate while dedicated use-case mappings are added.

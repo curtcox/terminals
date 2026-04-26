@@ -81,10 +81,15 @@ func replCommandSpecs() []commandSpec {
 		{Name: "session control request", Usage: "session control request <session> <participant> [control-type] [--json]", Summary: "Request control for one participant", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session control grant", Usage: "session control grant <session> <participant> [granted-by] [control-type] [--json]", Summary: "Grant control to one participant", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session control revoke", Usage: "session control revoke <session> <participant> [revoked-by] [--json]", Summary: "Revoke control from one participant", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
+		{Name: "message rooms", Usage: "message rooms [--json]", Summary: "List durable message rooms", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "message room new", Usage: "message room new <name> [--json]", Summary: "Create a durable message room", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "message room show", Usage: "message room show <room> [--json]", Summary: "Show one durable message room", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message ls", Usage: "message ls [room] [--json]", Summary: "List messages", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "message get", Usage: "message get <message> [--json]", Summary: "Show one message", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message unread", Usage: "message unread <identity> [room] [--json]", Summary: "List unread messages for an identity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message post", Usage: "message post <room> <text> [--json]", Summary: "Post a room/direct message", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message dm", Usage: "message dm <target> <text> [--json]", Summary: "Send a direct message", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "message thread", Usage: "message thread <root-message> <text> [--json]", Summary: "Reply in a message thread", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message ack", Usage: "message ack <identity> <message> [--json]", Summary: "Acknowledge a message for an identity", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "board ls", Usage: "board ls [board] [--json]", Summary: "List board or bulletin entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/board"}},
 		{Name: "board post", Usage: "board post <board> <text> [--json]", Summary: "Post a board entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/board"}},
@@ -811,6 +816,52 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		}
 	case "message":
 		switch sub {
+		case "rooms":
+			body, err := s.fetchJSON(ctx, "/admin/api/message/rooms")
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "room":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: message room <new|show>")
+			}
+			action := strings.ToLower(plain[0])
+			switch action {
+			case "new":
+				if len(plain) < 2 {
+					return errors.New("usage: message room new <name>")
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/message/room", url.Values{"name": {strings.Join(plain[1:], " ")}})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				roomID := ""
+				roomName := strings.Join(plain[1:], " ")
+				if roomMap, ok := body["room"].(map[string]any); ok {
+					roomID = toString(roomMap["id"])
+					if name := toString(roomMap["name"]); name != "" {
+						roomName = name
+					}
+				}
+				_, err = fmt.Fprintf(s.out, "OK  room=%s name=%s action=create\n", roomID, roomName)
+				return err
+			case "show":
+				if len(plain) < 2 {
+					return errors.New("usage: message room show <room>")
+				}
+				body, err := s.fetchJSONQuery(ctx, "/admin/api/message/room", url.Values{"room": {plain[1]}})
+				if err != nil {
+					return err
+				}
+				return writeJSON(s.out, body)
+			default:
+				return fmt.Errorf("unknown command: message room %s", action)
+			}
 		case "ls":
 			query := url.Values{}
 			plain := nonFlagArgs(args[1:])
@@ -818,6 +869,16 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				query.Set("room", plain[0])
 			}
 			body, err := s.fetchJSONQuery(ctx, "/admin/api/message", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "get":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: message get <message>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/message/get", url.Values{"message_id": {plain[0]}})
 			if err != nil {
 				return err
 			}
@@ -877,6 +938,27 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				messageID = toString(msgMap["id"])
 			}
 			_, err = fmt.Fprintf(s.out, "OK  message=%s target=%s action=dm\n", messageID, plain[0])
+			return err
+		case "thread":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: message thread <root-message> <text>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/message/thread", url.Values{
+				"root_ref": {plain[0]},
+				"text":     {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			messageID := ""
+			if msgMap, ok := body["message"].(map[string]any); ok {
+				messageID = toString(msgMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  message=%s root=%s action=thread\n", messageID, plain[0])
 			return err
 		case "ack":
 			plain := nonFlagArgs(args[1:])

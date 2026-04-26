@@ -271,8 +271,13 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"session control request",
 		"session control grant",
 		"session control revoke",
+		"message rooms",
+		"message room new",
+		"message room show",
 		"message post",
+		"message get",
 		"message dm",
+		"message thread",
 		"message unread",
 		"message ack",
 		"board post",
@@ -456,10 +461,20 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","ack":{"actor_ref":"device:kitchen-screen","mode":"dismissed"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/create":
 			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/message/rooms":
+			_, _ = w.Write([]byte(`{"rooms":[{"id":"room-1","name":"kitchen"}]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/room":
+			_, _ = w.Write([]byte(`{"status":"ok","room":{"id":"room-2","name":"family"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/message/room":
+			_, _ = w.Write([]byte(`{"room":{"id":"room-1","name":"kitchen"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/post":
 			_, _ = w.Write([]byte(`{"status":"ok","message":{"id":"msg-1"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/message/get":
+			_, _ = w.Write([]byte(`{"message":{"id":"msg-1","room":"room-1","text":"hello"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/dm":
 			_, _ = w.Write([]byte(`{"status":"ok","message":{"id":"msg-dm-1","target_ref":"person:mom"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/thread":
+			_, _ = w.Write([]byte(`{"status":"ok","message":{"id":"msg-2","thread_root_ref":"msg-1"}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/message/unread":
 			_, _ = w.Write([]byte(`{"identity_id":"alice","messages":[]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/ack":
@@ -519,8 +534,13 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"identity ack record message:msg-1 --actor device:kitchen-screen --mode dismissed",
 		"identity ack show message:msg-1",
 		"session create help room",
+		"message rooms",
+		"message room new family",
+		"message room show kitchen",
 		"message post room-1 hello",
+		"message get msg-1",
 		"message dm mom come downstairs",
+		"message thread msg-1 follow up",
 		"message unread alice room-1",
 		"message ack alice msg-1",
 		"board post family grocery update",
@@ -574,6 +594,15 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "msg-dm-1") {
 		t.Fatalf("direct message output missing: %q", text)
+	}
+	if !strings.Contains(text, "room=room-2") || !strings.Contains(text, "action=create") {
+		t.Fatalf("message room create output missing: %q", text)
+	}
+	if !strings.Contains(text, "\"name\": \"kitchen\"") {
+		t.Fatalf("message room show output missing kitchen payload: %q", text)
+	}
+	if !strings.Contains(text, "action=thread") {
+		t.Fatalf("message thread output missing: %q", text)
 	}
 	if !strings.Contains(text, "post-1") {
 		t.Fatalf("board post output missing: %q", text)

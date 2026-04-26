@@ -62,13 +62,24 @@ type SessionAuditEvent struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// MessageRoom represents a durable room for conversation history.
+type MessageRoom struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Audience      string    `json:"audience,omitempty"`
+	RetentionDays int       `json:"retention_days,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 // Message represents a posted message within a room.
 type Message struct {
-	ID        string    `json:"id"`
-	Room      string    `json:"room"`
-	TargetRef string    `json:"target_ref,omitempty"`
-	Text      string    `json:"text"`
-	CreatedAt time.Time `json:"created_at"`
+	ID              string    `json:"id"`
+	Room            string    `json:"room"`
+	TargetRef       string    `json:"target_ref,omitempty"`
+	Text            string    `json:"text"`
+	ThreadRootRef   string    `json:"thread_root_ref,omitempty"`
+	ThreadParentRef string    `json:"thread_parent_ref,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 // BoardItem represents a pinned item on a named board.
@@ -181,19 +192,20 @@ type Service struct {
 	now func() time.Time
 	seq uint64
 
-	identities  []Identity
-	sessions    []InteractiveSession
-	messages    []Message
-	boardItems  []BoardItem
-	artifacts   []Artifact
-	versions    map[string][]ArtifactVersion
-	templates   map[string]ArtifactTemplate
-	annotations []Annotation
-	memories    []MemoryEntry
-	recent      []RecentItem
-	store       map[string]StoreRecord
-	bus         []BusEvent
-	acks        map[string]Acknowledgement
+	identities   []Identity
+	sessions     []InteractiveSession
+	messageRooms []MessageRoom
+	messages     []Message
+	boardItems   []BoardItem
+	artifacts    []Artifact
+	versions     map[string][]ArtifactVersion
+	templates    map[string]ArtifactTemplate
+	annotations  []Annotation
+	memories     []MemoryEntry
+	recent       []RecentItem
+	store        map[string]StoreRecord
+	bus          []BusEvent
+	acks         map[string]Acknowledgement
 }
 
 // NewService creates a new Service with default seed data.
@@ -216,7 +228,37 @@ func NewService() *Service {
 			},
 		},
 	}
+	s.createMessageRoomLocked("general")
 	return s
+}
+
+// CreateMessageRoom creates one durable message room.
+func (s *Service) CreateMessageRoom(name string) MessageRoom {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.createMessageRoomLocked(name)
+}
+
+// ListMessageRooms returns all known message rooms.
+func (s *Service) ListMessageRooms() []MessageRoom {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]MessageRoom, 0, len(s.messageRooms))
+	out = append(out, s.messageRooms...)
+	return out
+}
+
+// GetMessageRoom returns one room by ID or by name.
+func (s *Service) GetMessageRoom(roomRef string) (MessageRoom, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	roomRef = strings.TrimSpace(roomRef)
+	for _, room := range s.messageRooms {
+		if strings.EqualFold(room.ID, roomRef) || strings.EqualFold(room.Name, roomRef) {
+			return room, true
+		}
+	}
+	return MessageRoom{}, false
 }
 
 // ListIdentities returns all registered identities sorted by ID.
@@ -654,16 +696,20 @@ func (s *Service) RevokeControl(sessionID, participant, revokedBy string) (Inter
 func (s *Service) PostMessage(room, text string) Message {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	room = defaultIfBlank(room, "general")
+	roomRef := strings.TrimSpace(room)
+	if roomRef == "" {
+		roomRef = "general"
+	}
+	roomRecord := s.ensureRoomLocked(roomRef)
 	text = strings.TrimSpace(text)
 	msg := Message{
 		ID:        s.nextIDLocked("msg"),
-		Room:      room,
+		Room:      roomRecord.Name,
 		Text:      text,
 		CreatedAt: s.now(),
 	}
 	s.messages = append(s.messages, msg)
-	s.appendRecentLocked("message", msg.ID+" "+msg.Text)
+	s.appendRecentLocked("message", msg.ID+" room="+msg.Room+" "+msg.Text)
 	return msg
 }
 
@@ -686,18 +732,79 @@ func (s *Service) SendDirectMessage(targetRef, text string) Message {
 	return msg
 }
 
+// ReplyMessageThread posts a reply anchored to one existing root message.
+func (s *Service) ReplyMessageThread(rootRef, text string) (Message, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rootRef = strings.TrimSpace(rootRef)
+	if rootRef == "" {
+		return Message{}, false
+	}
+	var root Message
+	found := false
+	for _, item := range s.messages {
+		if strings.EqualFold(item.ID, rootRef) {
+			root = item
+			found = true
+			break
+		}
+	}
+	if !found {
+		return Message{}, false
+	}
+	rootID := root.ID
+	if strings.TrimSpace(root.ThreadRootRef) != "" {
+		rootID = root.ThreadRootRef
+	}
+	msg := Message{
+		ID:              s.nextIDLocked("msg"),
+		Room:            root.Room,
+		TargetRef:       root.TargetRef,
+		Text:            strings.TrimSpace(text),
+		ThreadRootRef:   rootID,
+		ThreadParentRef: root.ID,
+		CreatedAt:       s.now(),
+	}
+	s.messages = append(s.messages, msg)
+	s.appendRecentLocked("message", msg.ID+" thread="+msg.ThreadRootRef+" parent="+msg.ThreadParentRef+" "+msg.Text)
+	return msg, true
+}
+
 // ListMessages returns messages in the given room, or all messages if room is empty.
 func (s *Service) ListMessages(room string) []Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	room = strings.TrimSpace(room)
+	roomRef := strings.TrimSpace(room)
+	roomName := roomRef
+	if roomRef != "" {
+		for _, existingRoom := range s.messageRooms {
+			if strings.EqualFold(existingRoom.ID, roomRef) || strings.EqualFold(existingRoom.Name, roomRef) {
+				roomName = existingRoom.Name
+				break
+			}
+		}
+	}
 	out := make([]Message, 0, len(s.messages))
 	for _, item := range s.messages {
-		if room == "" || item.Room == room {
+		if roomName == "" || item.Room == roomName {
 			out = append(out, item)
 		}
 	}
 	return out
+}
+
+// GetMessage returns one message by ID.
+func (s *Service) GetMessage(messageID string) (Message, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	messageID = strings.TrimSpace(messageID)
+	for _, item := range s.messages {
+		if strings.EqualFold(item.ID, messageID) {
+			return item, true
+		}
+	}
+	return Message{}, false
 }
 
 // AcknowledgeMessage records an acknowledgement from an identity for a message.
@@ -794,11 +901,20 @@ func (s *Service) ListUnreadMessages(identityID, room string) []Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	identityID = strings.TrimSpace(identityID)
-	room = strings.TrimSpace(room)
+	roomRef := strings.TrimSpace(room)
+	roomName := roomRef
+	if roomRef != "" {
+		for _, existingRoom := range s.messageRooms {
+			if strings.EqualFold(existingRoom.ID, roomRef) || strings.EqualFold(existingRoom.Name, roomRef) {
+				roomName = existingRoom.Name
+				break
+			}
+		}
+	}
 
 	out := make([]Message, 0, len(s.messages))
 	for _, item := range s.messages {
-		if room != "" && item.Room != room {
+		if roomName != "" && item.Room != roomName {
 			continue
 		}
 		if identityID != "" {
@@ -1303,6 +1419,38 @@ func normalizeTargetRef(targetRef string) string {
 		return targetRef
 	}
 	return "person:" + targetRef
+}
+
+func (s *Service) createMessageRoomLocked(name string) MessageRoom {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "general"
+	}
+	for _, room := range s.messageRooms {
+		if strings.EqualFold(room.Name, name) {
+			return room
+		}
+	}
+	room := MessageRoom{
+		ID:            s.nextIDLocked("msgroom"),
+		Name:          name,
+		Audience:      "household:all",
+		RetentionDays: 30,
+		CreatedAt:     s.now(),
+	}
+	s.messageRooms = append(s.messageRooms, room)
+	s.appendRecentLocked("message", room.ID+" room.create "+room.Name)
+	return room
+}
+
+func (s *Service) ensureRoomLocked(roomRef string) MessageRoom {
+	roomRef = strings.TrimSpace(roomRef)
+	for _, room := range s.messageRooms {
+		if strings.EqualFold(room.ID, roomRef) || strings.EqualFold(room.Name, roomRef) {
+			return room
+		}
+	}
+	return s.createMessageRoomLocked(roomRef)
 }
 
 func normalizedTokens(value string) []string {

@@ -35,6 +35,7 @@ metadata() {
     S2) echo "S2|Transport|generated+wire focus-action routing tests" ;;
     S3) echo "S3|Transport|generated+wire multi-window audio mix tests" ;;
     P1) echo "P1|Transport|generated+wire terminal transition tests" ;;
+    PL1) echo "PL1|Contract|capability message room/thread/unread acknowledgement lifecycle test" ;;
     PL8) echo "PL8|Contract|interactive session join/leave and control lifecycle capability tests" ;;
     PL20) echo "PL20|Contract|capability artifact template save/apply and artifact history tests" ;;
     T1) echo "T1|Smoke|due-timer loop; transport run_due_timers; kitchen timer package smoke test; future TAL simulation coverage" ;;
@@ -45,7 +46,7 @@ metadata() {
   esac
 }
 
-all_ids=(C1 C3 C5 D1 M1 M2 M3 M4 S1 S2 S3 P1 PL8 PL20 T1)
+all_ids=(C1 C3 C5 D1 M1 M2 M3 M4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
 
 run_go_test() {
   local pkg="$1"
@@ -99,6 +100,9 @@ run_usecase() {
       ;;
     P1)
       run_go_test ./internal/transport 'Test(Generated|Wire)SessionTerminalTransitions$'
+      ;;
+    PL1)
+      run_go_test ./internal/capability 'TestMessageRoomThreadUnreadAcknowledgeLifecycle$'
       ;;
     PL8)
       run_go_test ./internal/capability 'Test(SessionJoinAndLeave|SessionAttachDetachAndControlLifecycle)$'

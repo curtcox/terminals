@@ -155,7 +155,34 @@ func TestSessionAttachDetachAndControlLifecycle(t *testing.T) {
 func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 	svc := NewService()
 
+	room := svc.CreateMessageRoom("room-1")
+	if strings.TrimSpace(room.ID) == "" || room.Name != "room-1" {
+		t.Fatalf("CreateMessageRoom(room-1) = %+v, want non-empty id and name room-1", room)
+	}
+	if gotRoom, ok := svc.GetMessageRoom(room.ID); !ok || gotRoom.ID != room.ID {
+		t.Fatalf("GetMessageRoom(%s) = (%+v,%v), want id=%s,true", room.ID, gotRoom, ok, room.ID)
+	}
+	if gotRoom, ok := svc.GetMessageRoom(room.Name); !ok || gotRoom.ID != room.ID {
+		t.Fatalf("GetMessageRoom(%s) = (%+v,%v), want id=%s,true", room.Name, gotRoom, ok, room.ID)
+	}
+
 	message := svc.PostMessage("room-1", "remember the groceries")
+	messageGet, ok := svc.GetMessage(message.ID)
+	if !ok || messageGet.ID != message.ID {
+		t.Fatalf("GetMessage(%q) = (%+v,%v), want id=%s,true", message.ID, messageGet, ok, message.ID)
+	}
+
+	reply, ok := svc.ReplyMessageThread(message.ID, "adding eggs")
+	if !ok {
+		t.Fatalf("ReplyMessageThread(%q, adding eggs) returned false", message.ID)
+	}
+	if reply.ThreadRootRef != message.ID || reply.ThreadParentRef != message.ID {
+		t.Fatalf("ReplyMessageThread thread refs = root:%q parent:%q, want both %q", reply.ThreadRootRef, reply.ThreadParentRef, message.ID)
+	}
+	if reply.Room != message.Room {
+		t.Fatalf("ReplyMessageThread room = %q, want %q", reply.Room, message.Room)
+	}
+
 	direct := svc.SendDirectMessage("mom", "come downstairs")
 	if direct.TargetRef != "person:mom" {
 		t.Fatalf("SendDirectMessage target = %q, want person:mom", direct.TargetRef)
@@ -174,8 +201,8 @@ func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 	}
 
 	unread := svc.ListUnreadMessages("alice", "room-1")
-	if len(unread) != 1 || unread[0].ID != message.ID {
-		t.Fatalf("ListUnreadMessages before ack = %+v, want [%s]", unread, message.ID)
+	if len(unread) != 2 || unread[0].ID != message.ID || unread[1].ID != reply.ID {
+		t.Fatalf("ListUnreadMessages before ack = %+v, want [%s %s]", unread, message.ID, reply.ID)
 	}
 	if _, ok := svc.AcknowledgeMessage("alice", message.ID); !ok {
 		t.Fatalf("AcknowledgeMessage(%q,%q) = false, want true", "alice", message.ID)
@@ -188,8 +215,15 @@ func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 		t.Fatalf("message ack entry = %+v, want actor=person:alice mode=read", ackEntries[0])
 	}
 	unread = svc.ListUnreadMessages("alice", "room-1")
+	if len(unread) != 1 || unread[0].ID != reply.ID {
+		t.Fatalf("ListUnreadMessages after first ack = %+v, want [%s]", unread, reply.ID)
+	}
+	if _, ok := svc.AcknowledgeMessage("alice", reply.ID); !ok {
+		t.Fatalf("AcknowledgeMessage(%q,%q) for reply = false, want true", "alice", reply.ID)
+	}
+	unread = svc.ListUnreadMessages("alice", "room-1")
 	if len(unread) != 0 {
-		t.Fatalf("ListUnreadMessages after ack = %+v, want none", unread)
+		t.Fatalf("ListUnreadMessages after acking thread reply = %+v, want none", unread)
 	}
 
 	artifact := svc.CreateArtifact("lesson", "math lesson")
@@ -312,5 +346,44 @@ func TestSearchTimelineRelatedRecentAndMemoryStream(t *testing.T) {
 	}
 	if stream[0].ID != memKitchen.ID {
 		t.Fatalf("MemoryStream(kitchen)[0].ID = %q, want %q", stream[0].ID, memKitchen.ID)
+	}
+}
+
+func TestMessageRoomThreadUnreadAcknowledgeLifecycle(t *testing.T) {
+	svc := NewService()
+
+	room := svc.CreateMessageRoom("kitchen")
+	if room.Name != "kitchen" {
+		t.Fatalf("CreateMessageRoom(kitchen).Name = %q, want kitchen", room.Name)
+	}
+
+	root := svc.PostMessage("kitchen", "Dinner in 10")
+	if root.Room != "kitchen" {
+		t.Fatalf("PostMessage room = %q, want kitchen", root.Room)
+	}
+
+	reply, ok := svc.ReplyMessageThread(root.ID, "On my way")
+	if !ok {
+		t.Fatalf("ReplyMessageThread(%q) returned false", root.ID)
+	}
+	if reply.ThreadRootRef != root.ID || reply.ThreadParentRef != root.ID {
+		t.Fatalf("thread refs = root:%q parent:%q, want both %q", reply.ThreadRootRef, reply.ThreadParentRef, root.ID)
+	}
+
+	unread := svc.ListUnreadMessages("alice", "kitchen")
+	if len(unread) != 2 {
+		t.Fatalf("ListUnreadMessages(alice,kitchen) len = %d, want 2", len(unread))
+	}
+
+	if _, ok := svc.AcknowledgeMessage("alice", root.ID); !ok {
+		t.Fatalf("AcknowledgeMessage(alice,%q) returned false", root.ID)
+	}
+	if _, ok := svc.AcknowledgeMessage("alice", reply.ID); !ok {
+		t.Fatalf("AcknowledgeMessage(alice,%q) returned false", reply.ID)
+	}
+
+	unread = svc.ListUnreadMessages("alice", "kitchen")
+	if len(unread) != 0 {
+		t.Fatalf("ListUnreadMessages(alice,kitchen) after ack = %+v, want empty", unread)
 	}
 }
