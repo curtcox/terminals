@@ -1,19 +1,39 @@
 ---
 title: "Implementation Risk Remediation Plan"
 kind: plan
-status: building
+status: superseded
 owner: cascade
-validation: none
-last-reviewed: 2026-04-25
+validation: manual
+last-reviewed: 2026-04-26
 ---
 
 # Implementation Risk Remediation Plan
+
+Status: Completed and drained on 2026-04-26.
+
+The completed and durable outcomes from this remediation are documented in:
+
+- `docs/implementation-risk-remediation.md`
+- `docs/server.md`
+- `docs/client-web.md`
+- `docs/client-macos.md`
+- `docs/client-ios.md`
+- `docs/client-android.md`
+- `docs/client-linux.md`
+- `docs/client-windows.md`
+
+There are no remaining active implementation tasks in this remediation plan.
+Future capability, transport, media, monitoring, and edge-runtime changes should
+be scoped in feature/phase plans rather than reopening this completed audit
+remediation tracker.
 
 Addresses the findings in [implementation-risk-audit.md](implementation-risk-audit.md). Executed strictly serially — each stage must meet its acceptance criteria before the next begins. Adds a dual-transport server (gRPC for native, WebSocket for web) so the browser client stops depending on raw gRPC sockets.
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
+
+- 2026-04-26: Ran `make all-check` after Stage 1-9 remediation completion and drained this plan into durable docs, promoting plan status from `building` to `superseded` with manual validation.
 
 - 2026-04-25: Implemented Stage 9 web alert parity by replacing the web alert-delivery no-op with browser Notification API dispatch (permission-gated, best-effort) while preserving in-app status text + speech fallback semantics; updated web client docs to describe granted/denied permission behavior.
 - 2026-04-25: Hardened Stage 4 capability-flattening truthfulness in the server generated-proto adapter by omitting default-false sensor/connectivity fields and empty edge runtime/operator declarations (`edge.runtimes`/`edge.operators`) unless explicitly true/non-empty, with transport regression coverage locking omission behavior for sparse capability payloads.

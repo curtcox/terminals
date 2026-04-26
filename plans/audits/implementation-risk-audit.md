@@ -1,10 +1,10 @@
 ---
 title: "Implementation Risk Audit (Cross-Client)"
 kind: audit
-status: partially-resolved
+status: resolved
 owner: cascade
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Implementation Risk Audit (Cross-Client)
@@ -17,9 +17,9 @@ This audit was produced by inferring missing placeholders from the repository st
 - Target clients/platforms: Android, iOS, Web/Browser, macOS, Linux, Windows (from `plans/architecture-client.md`).
 - Relevant code/config: `terminal_client/`, `terminal_server/`, `api/`, scripts, and CI workflow files.
 
-## Rebaseline (2026-04-25)
+## Rebaseline (2026-04-26)
 
-This audit has been re-validated against current repository state and is now **partially resolved**.
+This audit has been re-validated against current repository state and is now **resolved**.
 
 Addressed high-severity findings:
 
@@ -27,9 +27,15 @@ Addressed high-severity findings:
 - **P0-2 (web raw gRPC control path)**: browser-compatible transports are implemented and selected in client factory (`terminal_client/lib/connection/control_client_factory.dart`, `terminal_client/lib/connection/control_client_ws.dart`) with server websocket endpoint (`terminal_server/internal/transport/websocket_server.go`, tests in `terminal_server/internal/transport/websocket_server_test.go`).
 - **P0-3 (missing real gRPC listener wiring)**: transport now binds real sockets with `grpc.NewServer` + generated service registration and serve/stop lifecycle (`terminal_server/internal/transport/grpc_server.go`, `terminal_server/internal/transport/grpc_service.go`, startup wiring in `terminal_server/cmd/server/main.go`).
 
-Still open in remediation plan:
+Addressed remaining remediation findings (tracked in Stage 4-9 and now closed):
 
-- **P0-4/P0-5/P0-6** and **P1-1/P1-2/P2-1** remain active and are tracked in `plans/audits/implementation-risk-remediation.md` (Stages 4-9).
+- **P0-4/P0-5/P0-6**: media output parity, capability truthfulness, and durable edge persistence/export behavior were completed with unit/widget/integration coverage and reflected in client/server docs.
+- **P1-1/P1-2/P2-1**: permissions hardening, monitoring support-tier behavior, and native/web alert delivery parity are now implemented and documented.
+
+Closure evidence:
+
+- `make all-check` passed on 2026-04-26.
+- `plans/audits/implementation-risk-remediation.md` was drained to docs and marked `superseded`.
 
 ---
 
