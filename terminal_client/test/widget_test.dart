@@ -745,12 +745,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final registerCapabilities = harness.lastClient.requests
-          .where((request) => request.hasRegister())
-          .toList()
-          .last
-          .register
-          .capabilities;
       final bootstrapSnapshotCapabilities = harness.lastClient.requests
           .where((request) => request.hasCapabilitySnapshot())
           .toList()
@@ -758,7 +752,6 @@ void main() {
           .capabilitySnapshot
           .capabilities;
 
-      expect(registerCapabilities.hasEdge(), isFalse);
       expect(bootstrapSnapshotCapabilities.hasEdge(), isFalse);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -3652,7 +3645,7 @@ void main() {
   });
 
   testWidgets(
-      'connect bootstrap sends register request so metadata and app list hydrate without reconnect',
+      'connect bootstrap sends hello and capability snapshot so metadata and app list hydrate without reconnect',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -3668,16 +3661,24 @@ void main() {
     await tester.pump();
 
     for (var i = 0; i < 80; i++) {
-      if (harness.lastClient.requests.any((request) => request.hasRegister())) {
+      if (harness.lastClient.requests.any((request) => request.hasHello()) &&
+          harness.lastClient.requests
+              .any((request) => request.hasCapabilitySnapshot())) {
         break;
       }
       await tester.pump(const Duration(milliseconds: 25));
     }
 
     expect(
-      harness.lastClient.requests.any((request) => request.hasRegister()),
+      harness.lastClient.requests.any((request) => request.hasHello()),
       isTrue,
-      reason: 'bootstrap should include register request on first connect',
+      reason: 'bootstrap should include hello request on first connect',
+    );
+    expect(
+      harness.lastClient.requests
+          .any((request) => request.hasCapabilitySnapshot()),
+      isTrue,
+      reason: 'bootstrap should include capability snapshot on first connect',
     );
 
     harness.lastClient.emitResponse(
@@ -3728,7 +3729,7 @@ void main() {
   });
 
   testWidgets(
-      'connect bootstrap retries register when transport attaches request stream late',
+      'connect bootstrap still delivers capability snapshot when transport attaches request stream late',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -3747,10 +3748,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 4200));
 
     expect(
-      harness.lastClient.requests.any((request) => request.hasRegister()),
+      harness.lastClient.requests
+          .any((request) => request.hasCapabilitySnapshot()),
       isTrue,
-      reason:
-          'client should retry bootstrap register even when request stream subscription is delayed',
+      reason: 'client should send capability snapshot during bootstrap',
     );
   });
 

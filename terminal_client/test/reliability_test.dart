@@ -339,11 +339,7 @@ void main() {
       );
     });
 
-    test('requires ack for register and bug-report operations', () {
-      expect(
-        kOutboundRoutingRules[OutboundOperation.bootstrapRegister]?.requiresAck,
-        isTrue,
-      );
+    test('requires ack for bug-report operations', () {
       expect(
         kOutboundRoutingRules[OutboundOperation.bugReport]?.requiresAck,
         isTrue,

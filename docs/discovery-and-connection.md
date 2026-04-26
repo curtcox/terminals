@@ -34,7 +34,7 @@ is server-driven.
 
 1. Client discovers server via mDNS or receives a manual host/port.
 2. Client opens a control transport carrier (runtime-dependent).
-3. Client sends bootstrap messages (`hello`, `register`, capability snapshot,
+3. Client sends bootstrap messages (`hello`, capability snapshot,
   heartbeat).
 4. Server returns `hello_ack`, `capability_ack`, `register_ack`, and initial UI
   (`set_ui`).

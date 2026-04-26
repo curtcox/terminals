@@ -2346,14 +2346,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       );
       unawaited(
         _sendWhenReady(
-          operation: OutboundOperation.bootstrapRegister,
-          request: TerminalControlGrpcClient.registerRequest(
-            capabilities: _lastRegisteredCapabilities!,
-          ),
-        ),
-      );
-      unawaited(
-        _sendWhenReady(
           operation: OutboundOperation.bootstrapCapabilitySnapshot,
           request: TerminalControlGrpcClient.capabilitySnapshotRequest(
             deviceId: _deviceId,
@@ -2562,6 +2554,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _registerAckRetryController.stop();
   }
 
+  ConnectRequest? _buildBootstrapCapabilitySnapshotRequest() {
+    final capabilities = _lastRegisteredCapabilities;
+    if (capabilities == null ||
+        _deviceId.isEmpty ||
+        _capabilityGeneration <= 0) {
+      return null;
+    }
+    return TerminalControlGrpcClient.capabilitySnapshotRequest(
+      deviceId: _deviceId,
+      generation: _capabilityGeneration,
+      capabilities: capabilities,
+    );
+  }
+
   void _scheduleRegisterAckRetry() {
     _registerAckRetryController.start(
       shouldContinue: () =>
@@ -2569,21 +2575,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           _hasActiveControlSession &&
           _lastRegisteredCapabilities != null,
       onRetry: (attempt) {
-        final capabilities = _lastRegisteredCapabilities;
-        if (capabilities == null) {
+        final request = _buildBootstrapCapabilitySnapshotRequest();
+        if (request == null) {
           return;
         }
         unawaited(
           _sendWhenReady(
-            operation: OutboundOperation.bootstrapRegister,
-            request: TerminalControlGrpcClient.registerRequest(
-              capabilities: capabilities,
-            ),
+            operation: OutboundOperation.bootstrapCapabilitySnapshot,
+            request: request,
           ),
         );
         _recordClientLog(
           'warn',
-          'register acknowledgement pending; retrying bootstrap register '
+          'register acknowledgement pending; retrying bootstrap capability snapshot '
               'attempt=$attempt',
         );
       },

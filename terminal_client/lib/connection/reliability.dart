@@ -218,7 +218,6 @@ enum SendResult {
 
 enum OutboundOperation {
   bootstrapHello,
-  bootstrapRegister,
   bootstrapCapabilitySnapshot,
   heartbeat,
   sensorTelemetry,
@@ -257,11 +256,6 @@ const Map<OutboundOperation, OutboundRoutingRule> kOutboundRoutingRules =
     mode: SendMode.fireAndForget,
     safeToReplay: true,
     requiresAck: false,
-  ),
-  OutboundOperation.bootstrapRegister: OutboundRoutingRule(
-    mode: SendMode.fireAndForget,
-    safeToReplay: true,
-    requiresAck: true,
   ),
   OutboundOperation.bootstrapCapabilitySnapshot: OutboundRoutingRule(
     mode: SendMode.fireAndForget,
