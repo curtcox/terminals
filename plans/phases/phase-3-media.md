@@ -1,39 +1,24 @@
 ---
 title: "Phase 3 — Media Streams"
 kind: plan
-status: planned
-owner: unowned
+status: superseded
+owner: copilot
 validation: none
 last-reviewed: 2026-04-25
 ---
 
 # Phase 3 — Media Streams
 
-See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
+Status: Completed and drained on 2026-04-25.
 
-Enable audio and video streaming between clients and server.
+The completed work from this plan is now documented in:
 
-## Prerequisites
+- [plans/features/protocol.md](../features/protocol.md)
+- [plans/features/io-abstraction.md](../features/io-abstraction.md)
+- [plans/features/application-runtime.md](../features/application-runtime.md)
+- [plans/features/technology.md](../features/technology.md)
+- [docs/usecase-validation-matrix.md](../../docs/usecase-validation-matrix.md)
 
-- [phase-1-foundation.md](phase-1-foundation.md) complete — gRPC control stream and capability reporting exist.
-
-## Deliverables
-
-- [x] **WebRTC integration (server)**: Pion-based SFU — accept, forward, and process media streams. See [protocol.md](../features/protocol.md#media-plane-webrtc).
-- [x] **WebRTC integration (client)**: `flutter_webrtc` — send/receive audio and video.
-- [x] **Signaling over gRPC**: SDP and ICE candidate exchange through the existing control channel (`WebRTCSignal` messages in [protocol.md](../features/protocol.md)).
-- [x] **IO Router (imperative)**: Initial `Connect`/`Disconnect`-style routing of media streams between devices. See [io-abstraction.md](../features/io-abstraction.md). Superseded by the media planner below.
-- [x] **Media planner**: Scenarios declare a `MediaPlan` (node/edge graph); the router compiles it to `StartStream`/`StopStream`/`RouteStream` and WebRTC signaling. See [io-abstraction.md](../features/io-abstraction.md#media-topology-plans-not-connects). Start with source → sink and fork nodes; mix, composite, analyze, and record land in later phases.
-- [x] **Claim manager (basics)**: Per-resource exclusive/shared claims so two activations can coexist on one device (e.g. overlay above main screen). See [io-abstraction.md](../features/io-abstraction.md#resource-claims).
-- [x] **Audio playback**: Server sends audio clips (TTS, alerts) to specific devices. Will migrate onto a one-node-pair media plan once the planner lands.
-
-## Milestone
-
-Stream audio from one client's mic to another client's speaker.
-
-## Related Plans
-
-- [protocol.md](../features/protocol.md) — WebRTC signaling over gRPC.
-- [io-abstraction.md](../features/io-abstraction.md) — Router primitives activated here.
-- [technology.md](../features/technology.md) — Pion (server) and `flutter_webrtc` (client).
-- [phase-4-comms.md](phase-4-comms.md) — Next phase.
+There are no remaining active tasks in this phase plan. Future media expansion
+work should be tracked in feature plans and new phase plans rather than
+reopening this completed phase entry.
