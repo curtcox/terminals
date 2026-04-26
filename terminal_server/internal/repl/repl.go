@@ -81,6 +81,9 @@ func replCommandSpecs() []commandSpec {
 		{Name: "artifact history", Usage: "artifact history <artifact> [--json]", Summary: "Show version history for one artifact", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "artifact create", Usage: "artifact create <kind> <title> [--json]", Summary: "Create a shared artifact", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "artifact patch", Usage: "artifact patch <artifact> <title> [--json]", Summary: "Patch shared artifact metadata", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
+		{Name: "artifact replace", Usage: "artifact replace <artifact> <title> [--json]", Summary: "Replace shared artifact content metadata", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
+		{Name: "artifact template save", Usage: "artifact template save <name> <source-artifact> [--json]", Summary: "Save a reusable artifact template", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
+		{Name: "artifact template apply", Usage: "artifact template apply <name> <target-artifact> [--json]", Summary: "Apply a saved artifact template to a target", Classification: commandMutating, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "canvas ls", Usage: "canvas ls [canvas] [--json]", Summary: "List canvas annotations", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/canvas"}},
 		{Name: "canvas annotate", Usage: "canvas annotate <canvas> <text> [--json]", Summary: "Annotate a shared canvas", Classification: commandMutating, RelatedDocs: []string{"repl/commands/canvas"}},
 		{Name: "search query", Usage: "search query <text> [--json]", Summary: "Run unified search", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/search"}},
@@ -767,6 +770,65 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			_, err = fmt.Fprintf(s.out, "OK  artifact=%s action=patch\n", plain[0])
 			return err
+		case "replace":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: artifact replace <artifact> <title>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/artifact/replace", url.Values{
+				"artifact_id": {plain[0]},
+				"title":       {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  artifact=%s action=replace\n", plain[0])
+			return err
+		case "template":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: artifact template <save|apply> <args>")
+			}
+			action := strings.ToLower(strings.TrimSpace(plain[0]))
+			switch action {
+			case "save":
+				if len(plain) < 3 {
+					return errors.New("usage: artifact template save <name> <source-artifact>")
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/artifact/template/save", url.Values{
+					"name":               {plain[1]},
+					"source_artifact_id": {plain[2]},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  template=%s source=%s action=save\n", plain[1], plain[2])
+				return err
+			case "apply":
+				if len(plain) < 3 {
+					return errors.New("usage: artifact template apply <name> <target-artifact>")
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/artifact/template/apply", url.Values{
+					"name":               {plain[1]},
+					"target_artifact_id": {plain[2]},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  template=%s target=%s action=apply\n", plain[1], plain[2])
+				return err
+			default:
+				return fmt.Errorf("unknown command: artifact template %s", action)
+			}
 		default:
 			return fmt.Errorf("unknown command: artifact %s", sub)
 		}

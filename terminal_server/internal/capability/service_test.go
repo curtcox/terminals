@@ -101,6 +101,51 @@ func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 	}
 }
 
+func TestArtifactReplaceAndTemplateApply(t *testing.T) {
+	svc := NewService()
+
+	source := svc.CreateArtifact("lesson", "fractions basics")
+	target := svc.CreateArtifact("note", "scratchpad")
+
+	replaced, ok := svc.ReplaceArtifact(target.ID, "scratchpad v2")
+	if !ok {
+		t.Fatalf("ReplaceArtifact(%q) reported missing artifact", target.ID)
+	}
+	if replaced.Title != "scratchpad v2" || replaced.Version != 2 {
+		t.Fatalf("ReplaceArtifact result = %+v, want title=scratchpad v2 version=2", replaced)
+	}
+
+	template, ok := svc.SaveArtifactTemplate("lesson-base", source.ID)
+	if !ok {
+		t.Fatalf("SaveArtifactTemplate(lesson-base,%q) failed", source.ID)
+	}
+	if template.SourceArtifactID != source.ID {
+		t.Fatalf("template source = %q, want %q", template.SourceArtifactID, source.ID)
+	}
+
+	applied, ok := svc.ApplyArtifactTemplate("lesson-base", target.ID)
+	if !ok {
+		t.Fatalf("ApplyArtifactTemplate(lesson-base,%q) failed", target.ID)
+	}
+	if applied.Kind != source.Kind || applied.Title != source.Title {
+		t.Fatalf("applied artifact = %+v, want kind=%q title=%q", applied, source.Kind, source.Title)
+	}
+
+	history, ok := svc.ArtifactHistory(target.ID)
+	if !ok {
+		t.Fatalf("ArtifactHistory(%q) reported missing artifact", target.ID)
+	}
+	if len(history) != 3 {
+		t.Fatalf("len(ArtifactHistory(%q)) = %d, want 3", target.ID, len(history))
+	}
+	if history[1].Action != "replace" {
+		t.Fatalf("history[1].Action = %q, want replace", history[1].Action)
+	}
+	if history[2].Action != "template.apply:lesson-base" {
+		t.Fatalf("history[2].Action = %q, want template.apply:lesson-base", history[2].Action)
+	}
+}
+
 func TestSearchTimelineRelatedRecentAndMemoryStream(t *testing.T) {
 	svc := NewService()
 	svc.PostMessage("kitchen", "buy milk and bread")

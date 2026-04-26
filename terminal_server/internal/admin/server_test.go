@@ -389,13 +389,17 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 	}
 
 	postCases := []struct {
-		path string
-		form url.Values
+		path          string
+		form          url.Values
+		allowNotFound bool
 	}{
 		{path: "/admin/api/session/create", form: url.Values{"kind": {"help"}, "target": {"room"}}},
 		{path: "/admin/api/message/post", form: url.Values{"room": {"room-1"}, "text": {"hello"}}},
 		{path: "/admin/api/board/pin", form: url.Values{"board": {"family"}, "text": {"note"}}},
 		{path: "/admin/api/artifact/create", form: url.Values{"kind": {"lesson"}, "title": {"math"}}},
+		{path: "/admin/api/artifact/replace", form: url.Values{"artifact_id": {"missing"}, "title": {"ignored"}}, allowNotFound: true},
+		{path: "/admin/api/artifact/template/save", form: url.Values{"name": {"base"}, "source_artifact_id": {"missing"}}, allowNotFound: true},
+		{path: "/admin/api/artifact/template/apply", form: url.Values{"name": {"base"}, "target_artifact_id": {"missing"}}, allowNotFound: true},
 		{path: "/admin/api/canvas/annotate", form: url.Values{"canvas": {"c1"}, "text": {"draw"}}},
 		{path: "/admin/api/memory/remember", form: url.Values{"scope": {"kitchen"}, "text": {"milk"}}},
 		{path: "/admin/api/store/put", form: url.Values{"namespace": {"ns"}, "key": {"k"}, "value": {"v"}}},
@@ -406,6 +410,9 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, req)
+		if tc.allowNotFound && w.Code == http.StatusNotFound {
+			continue
+		}
 		if w.Code != http.StatusOK {
 			t.Fatalf("POST %s status = %d, want 200 body=%s", tc.path, w.Code, w.Body.String())
 		}
@@ -534,13 +541,55 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		t.Fatalf("patched artifact missing updated title: %s", patchArtifactW.Body.String())
 	}
 
+	replaceArtifactReq := httptest.NewRequest(http.MethodPost, "/admin/api/artifact/replace", strings.NewReader(url.Values{
+		"artifact_id": {artifactID},
+		"title":       {"math replacement"},
+	}.Encode()))
+	replaceArtifactReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	replaceArtifactW := httptest.NewRecorder()
+	h.ServeHTTP(replaceArtifactW, replaceArtifactReq)
+	if replaceArtifactW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/artifact/replace status = %d, want 200 body=%s", replaceArtifactW.Code, replaceArtifactW.Body.String())
+	}
+	if !strings.Contains(replaceArtifactW.Body.String(), "math replacement") {
+		t.Fatalf("replaced artifact missing updated title: %s", replaceArtifactW.Body.String())
+	}
+
+	saveTemplateReq := httptest.NewRequest(http.MethodPost, "/admin/api/artifact/template/save", strings.NewReader(url.Values{
+		"name":               {"lesson-base"},
+		"source_artifact_id": {artifactID},
+	}.Encode()))
+	saveTemplateReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	saveTemplateW := httptest.NewRecorder()
+	h.ServeHTTP(saveTemplateW, saveTemplateReq)
+	if saveTemplateW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/artifact/template/save status = %d, want 200 body=%s", saveTemplateW.Code, saveTemplateW.Body.String())
+	}
+	if !strings.Contains(saveTemplateW.Body.String(), "lesson-base") {
+		t.Fatalf("template save response missing template name: %s", saveTemplateW.Body.String())
+	}
+
+	applyTemplateReq := httptest.NewRequest(http.MethodPost, "/admin/api/artifact/template/apply", strings.NewReader(url.Values{
+		"name":               {"lesson-base"},
+		"target_artifact_id": {artifactID},
+	}.Encode()))
+	applyTemplateReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	applyTemplateW := httptest.NewRecorder()
+	h.ServeHTTP(applyTemplateW, applyTemplateReq)
+	if applyTemplateW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/artifact/template/apply status = %d, want 200 body=%s", applyTemplateW.Code, applyTemplateW.Body.String())
+	}
+	if !strings.Contains(applyTemplateW.Body.String(), "lesson-base") && !strings.Contains(applyTemplateW.Body.String(), "math replacement") {
+		t.Fatalf("template apply response missing expected payload: %s", applyTemplateW.Body.String())
+	}
+
 	getArtifactReq := httptest.NewRequest(http.MethodGet, "/admin/api/artifact/get?artifact_id="+url.QueryEscape(artifactID), nil)
 	getArtifactW := httptest.NewRecorder()
 	h.ServeHTTP(getArtifactW, getArtifactReq)
 	if getArtifactW.Code != http.StatusOK {
 		t.Fatalf("GET /admin/api/artifact/get status = %d, want 200 body=%s", getArtifactW.Code, getArtifactW.Body.String())
 	}
-	if !strings.Contains(getArtifactW.Body.String(), `"version":2`) {
+	if !strings.Contains(getArtifactW.Body.String(), `"version":4`) {
 		t.Fatalf("artifact get body missing updated version: %s", getArtifactW.Body.String())
 	}
 
@@ -550,8 +599,8 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 	if historyW.Code != http.StatusOK {
 		t.Fatalf("GET /admin/api/artifact/history status = %d, want 200 body=%s", historyW.Code, historyW.Body.String())
 	}
-	if !strings.Contains(historyW.Body.String(), `"action":"create"`) || !strings.Contains(historyW.Body.String(), `"action":"patch"`) {
-		t.Fatalf("artifact history missing create/patch entries: %s", historyW.Body.String())
+	if !strings.Contains(historyW.Body.String(), `"action":"create"`) || !strings.Contains(historyW.Body.String(), `"action":"patch"`) || !strings.Contains(historyW.Body.String(), `"action":"replace"`) {
+		t.Fatalf("artifact history missing create/patch/replace entries: %s", historyW.Body.String())
 	}
 }
 

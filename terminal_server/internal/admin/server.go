@@ -113,6 +113,9 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/artifact/history", h.handleArtifactHistory)
 	mux.HandleFunc("/admin/api/artifact/create", h.handleArtifactCreate)
 	mux.HandleFunc("/admin/api/artifact/patch", h.handleArtifactPatch)
+	mux.HandleFunc("/admin/api/artifact/replace", h.handleArtifactReplace)
+	mux.HandleFunc("/admin/api/artifact/template/save", h.handleArtifactTemplateSave)
+	mux.HandleFunc("/admin/api/artifact/template/apply", h.handleArtifactTemplateApply)
 	mux.HandleFunc("/admin/api/canvas", h.handleCanvas)
 	mux.HandleFunc("/admin/api/canvas/annotate", h.handleCanvasAnnotate)
 	mux.HandleFunc("/admin/api/search", h.handleSearch)
@@ -459,6 +462,57 @@ func (h *Handler) handleArtifactPatch(w http.ResponseWriter, req *http.Request) 
 	artifact, ok := h.capability.PatchArtifact(req.Form.Get("artifact_id"), req.Form.Get("title"))
 	if !ok {
 		h.writeJSONError(w, http.StatusNotFound, "artifact not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "artifact": artifact})
+}
+
+func (h *Handler) handleArtifactReplace(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	artifact, ok := h.capability.ReplaceArtifact(req.Form.Get("artifact_id"), req.Form.Get("title"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "artifact not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "artifact": artifact})
+}
+
+func (h *Handler) handleArtifactTemplateSave(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	template, ok := h.capability.SaveArtifactTemplate(req.Form.Get("name"), req.Form.Get("source_artifact_id"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "artifact template source not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "template": template})
+}
+
+func (h *Handler) handleArtifactTemplateApply(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	artifact, ok := h.capability.ApplyArtifactTemplate(req.Form.Get("name"), req.Form.Get("target_artifact_id"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "artifact template or target not found")
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "artifact": artifact})

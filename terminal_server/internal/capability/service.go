@@ -68,6 +68,16 @@ type ArtifactVersion struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// ArtifactTemplate records a reusable artifact template keyed by name.
+type ArtifactTemplate struct {
+	Name             string    `json:"name"`
+	SourceArtifactID string    `json:"source_artifact_id"`
+	SourceKind       string    `json:"source_kind"`
+	SourceTitle      string    `json:"source_title"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
 // Annotation represents a user annotation attached to a canvas.
 type Annotation struct {
 	ID        string    `json:"id"`
@@ -143,6 +153,7 @@ type Service struct {
 	boardItems  []BoardItem
 	artifacts   []Artifact
 	versions    map[string][]ArtifactVersion
+	templates   map[string]ArtifactTemplate
 	annotations []Annotation
 	memories    []MemoryEntry
 	recent      []RecentItem
@@ -155,10 +166,11 @@ type Service struct {
 func NewService() *Service {
 	now := time.Now
 	s := &Service{
-		now:      func() time.Time { return now().UTC() },
-		store:    map[string]StoreRecord{},
-		acks:     map[string]Acknowledgement{},
-		versions: map[string][]ArtifactVersion{},
+		now:       func() time.Time { return now().UTC() },
+		store:     map[string]StoreRecord{},
+		acks:      map[string]Acknowledgement{},
+		versions:  map[string][]ArtifactVersion{},
+		templates: map[string]ArtifactTemplate{},
 		identities: []Identity{
 			{
 				ID:          "system",
@@ -481,6 +493,81 @@ func (s *Service) PatchArtifact(artifactID, title string) (Artifact, bool) {
 	return Artifact{}, false
 }
 
+// ReplaceArtifact replaces the artifact title and records a full replacement version.
+func (s *Service) ReplaceArtifact(artifactID, title string) (Artifact, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	artifactID = strings.TrimSpace(artifactID)
+	title = strings.TrimSpace(title)
+	for i := range s.artifacts {
+		if s.artifacts[i].ID != artifactID {
+			continue
+		}
+		s.artifacts[i].Title = title
+		s.artifacts[i].Version++
+		s.artifacts[i].UpdatedAt = s.now()
+		s.appendArtifactVersionLocked(s.artifacts[i], "replace")
+		s.appendRecentLocked("artifact", s.artifacts[i].ID+" replace "+s.artifacts[i].Title)
+		return s.artifacts[i], true
+	}
+	return Artifact{}, false
+}
+
+// SaveArtifactTemplate stores one template by name using an existing artifact as source.
+func (s *Service) SaveArtifactTemplate(name, sourceArtifactID string) (ArtifactTemplate, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.TrimSpace(name)
+	sourceArtifactID = strings.TrimSpace(sourceArtifactID)
+	if name == "" || sourceArtifactID == "" {
+		return ArtifactTemplate{}, false
+	}
+	artifact, ok := s.getArtifactLocked(sourceArtifactID)
+	if !ok {
+		return ArtifactTemplate{}, false
+	}
+	now := s.now()
+	template := ArtifactTemplate{
+		Name:             name,
+		SourceArtifactID: artifact.ID,
+		SourceKind:       artifact.Kind,
+		SourceTitle:      artifact.Title,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	if existing, ok := s.templates[name]; ok {
+		template.CreatedAt = existing.CreatedAt
+	}
+	s.templates[name] = template
+	s.appendRecentLocked("artifact", "template save "+template.Name+" -> "+template.SourceArtifactID)
+	return template, true
+}
+
+// ApplyArtifactTemplate applies a saved template to an existing target artifact.
+func (s *Service) ApplyArtifactTemplate(name, targetArtifactID string) (Artifact, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.TrimSpace(name)
+	targetArtifactID = strings.TrimSpace(targetArtifactID)
+	template, ok := s.templates[name]
+	if !ok || targetArtifactID == "" {
+		return Artifact{}, false
+	}
+	for i := range s.artifacts {
+		if s.artifacts[i].ID != targetArtifactID {
+			continue
+		}
+		s.artifacts[i].Kind = template.SourceKind
+		s.artifacts[i].Title = template.SourceTitle
+		s.artifacts[i].Version++
+		s.artifacts[i].UpdatedAt = s.now()
+		s.appendArtifactVersionLocked(s.artifacts[i], "template.apply:"+template.Name)
+		s.appendRecentLocked("artifact", s.artifacts[i].ID+" template "+template.Name)
+		return s.artifacts[i], true
+	}
+	return Artifact{}, false
+}
+
 // GetArtifact returns one artifact by ID.
 func (s *Service) GetArtifact(artifactID string) (Artifact, bool) {
 	s.mu.RLock()
@@ -500,6 +587,15 @@ func (s *Service) ListArtifacts() []Artifact {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return append([]Artifact(nil), s.artifacts...)
+}
+
+func (s *Service) getArtifactLocked(artifactID string) (Artifact, bool) {
+	for _, item := range s.artifacts {
+		if item.ID == artifactID {
+			return item, true
+		}
+	}
+	return Artifact{}, false
 }
 
 // ArtifactHistory returns version history for an artifact in creation order.

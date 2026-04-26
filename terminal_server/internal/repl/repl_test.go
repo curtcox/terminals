@@ -266,6 +266,9 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"board pin",
 		"artifact create",
 		"artifact patch",
+		"artifact replace",
+		"artifact template save",
+		"artifact template apply",
 		"canvas annotate",
 		"search query",
 		"search timeline",
@@ -395,6 +398,12 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"artifact_id":"art-1","versions":[{"version":1,"action":"create"},{"version":2,"action":"patch"}]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/patch":
 			_, _ = w.Write([]byte(`{"status":"ok","artifact":{"id":"art-1","title":"math advanced"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/replace":
+			_, _ = w.Write([]byte(`{"status":"ok","artifact":{"id":"art-1","title":"math replacement"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/template/save":
+			_, _ = w.Write([]byte(`{"status":"ok","template":{"name":"lesson-base","source_artifact_id":"art-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/template/apply":
+			_, _ = w.Write([]byte(`{"status":"ok","artifact":{"id":"art-1","title":"fractions basics"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/canvas/annotate":
 			_, _ = w.Write([]byte(`{"status":"ok","annotation":{"id":"ann-1"}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/search":
@@ -435,6 +444,9 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"artifact show art-1",
 		"artifact history art-1",
 		"artifact patch art-1 math advanced",
+		"artifact replace art-1 math replacement",
+		"artifact template save lesson-base art-1",
+		"artifact template apply lesson-base art-1",
 		"canvas annotate canvas-1 note",
 		"search query hello",
 		"search timeline message",
@@ -477,6 +489,15 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, `"action": "patch"`) {
 		t.Fatalf("artifact history output missing patch entry: %q", text)
+	}
+	if !strings.Contains(text, "action=replace") {
+		t.Fatalf("artifact replace output missing: %q", text)
+	}
+	if !strings.Contains(text, "template=lesson-base source=art-1 action=save") {
+		t.Fatalf("artifact template save output missing: %q", text)
+	}
+	if !strings.Contains(text, "template=lesson-base target=art-1 action=apply") {
+		t.Fatalf("artifact template apply output missing: %q", text)
 	}
 	if !strings.Contains(text, "ann-1") {
 		t.Fatalf("canvas output missing: %q", text)
