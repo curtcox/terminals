@@ -41,6 +41,6 @@ Coverage depth labels:
 
 The following planned IDs currently do not have a dedicated `make usecase-validate USECASE=<ID>` mapping yet:
 
-`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`.
+`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`, `PL1`-`PL27`.
 
 Use `make all-check` as the baseline repository gate while dedicated use-case mappings are added.
