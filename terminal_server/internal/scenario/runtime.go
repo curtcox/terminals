@@ -682,7 +682,9 @@ func targetDevices(ctx context.Context, env *Environment, trigger Trigger) []str
 		}
 	}
 	if explicit, ok := trigger.Arguments["device_id"]; ok && explicit != "" {
-		return []string{explicit}
+		if normalized := normalizeDeviceIDs([]string{explicit}); len(normalized) > 0 {
+			return normalized
+		}
 	}
 	if env.Placement != nil {
 		zone := strings.TrimSpace(trigger.Arguments["zone"])

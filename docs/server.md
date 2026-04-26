@@ -207,6 +207,37 @@ label or duration.
 Timer due processing prefers structured records and falls back to parsing
 legacy timer keys, so old scheduled entries still fire and are removed.
 
+## Scenario Engine
+
+The scenario engine in `terminal_server/internal/scenario` is the runtime
+supervisor for server-side behavior modules.
+
+- Registration supports stateless `ScenarioDefinition` entries that create
+  per-activation scenario instances (`NewActivation`).
+- Trigger matching consumes normalized `Trigger` records with typed
+  `IntentRecord` and `EventRecord` payloads. Voice, UI, schedule, automation,
+  webhook, and cascade sources all use the same matcher path.
+- Activation routing resolves explicit targets and placement scopes before
+  activation start, including nearest and zone/role placement helpers.
+- Preemption is priority-driven (`idle` -> `critical`) with optional
+  `Suspendable`/`Resumable` hooks for reclaiming resources when higher-priority
+  scenarios interrupt lower-priority activations.
+- Runtime snapshots persist active/suspended scenario ownership for recovery
+  across process restarts.
+
+Primary implementation files:
+
+- `terminal_server/internal/scenario/scenario.go`
+- `terminal_server/internal/scenario/engine.go`
+- `terminal_server/internal/scenario/runtime.go`
+- `terminal_server/internal/scenario/trigger_bus.go`
+
+Primary validation coverage:
+
+- `terminal_server/internal/scenario/engine_test.go`
+- `terminal_server/internal/scenario/runtime_test.go`
+- `terminal_server/internal/scenario/trigger_bus_test.go`
+
 ## Scenario Operations
 
 Scenarios may opt in to the result-returning path by implementing

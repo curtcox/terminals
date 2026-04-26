@@ -680,6 +680,41 @@ func TestRuntimeTargetDevicesUsesPlacementNearest(t *testing.T) {
 	}
 }
 
+func TestRuntimeTargetDevicesTrimsExplicitDeviceID(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Device 1"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Device 2"})
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &TerminalScenario{}, Priority: PriorityNormal})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	matched, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "terminal",
+		Arguments: map[string]string{
+			"device_id": " d2 ",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleTrigger(terminal+device_id) error = %v", err)
+	}
+	if matched != "terminal" {
+		t.Fatalf("matched scenario = %q, want terminal", matched)
+	}
+
+	if active, ok := engine.Active("d2"); !ok || active != "terminal" {
+		t.Fatalf("active(d2) = (%q, %v), want (terminal, true)", active, ok)
+	}
+	if _, ok := engine.Active("d1"); ok {
+		t.Fatalf("d1 should remain inactive when explicit device_id targets d2")
+	}
+}
+
 type fakePlacement struct {
 	findRefs []DeviceRef
 	findErr  error
