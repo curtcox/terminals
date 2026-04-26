@@ -1080,6 +1080,70 @@ func TestHandleMessageCapabilityDeltaEmitsTypedCapabilityEvents(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCapabilityDeltaNoOpDoesNotEmitCapabilityEvents(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"screen.width":       "1920",
+				"screen.height":      "1080",
+				"microphone.present": "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if len(broadcaster.Events()) != 0 {
+		t.Fatalf("expected no events after initial baseline snapshot")
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Reason:     "noop_refresh",
+			Capabilities: map[string]string{
+				"screen.width":       "1920",
+				"screen.height":      "1080",
+				"microphone.present": "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	if len(broadcaster.Events()) != 0 {
+		messages := make([]string, 0, len(broadcaster.Events()))
+		for _, event := range broadcaster.Events() {
+			messages = append(messages, event.Message)
+		}
+		t.Fatalf("expected no capability lifecycle events for no-op delta: %+v", messages)
+	}
+}
+
 func TestHandleMessageCapabilitySnapshotInitialBaselineDoesNotEmitCapabilityEvents(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

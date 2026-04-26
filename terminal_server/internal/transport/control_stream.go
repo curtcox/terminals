@@ -1031,6 +1031,9 @@ func (h *StreamHandler) handleCapabilityChangeEffects(
 	if deviceID == "" {
 		return nil
 	}
+	if !capabilityStateChanged(beforeCaps, afterCaps) {
+		return nil
+	}
 
 	lostResources := lostCapabilityResources(beforeCaps, afterCaps)
 	gainedResources := gainedCapabilityResources(beforeCaps, afterCaps)
@@ -1561,6 +1564,18 @@ func isAudioRouteCapabilityKey(key string) bool {
 	default:
 		return false
 	}
+}
+
+func capabilityStateChanged(beforeCaps, afterCaps map[string]string) bool {
+	if len(beforeCaps) != len(afterCaps) {
+		return true
+	}
+	for key, beforeValue := range beforeCaps {
+		if afterValue, ok := afterCaps[key]; !ok || afterValue != beforeValue {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *StreamHandler) decorateBugReportAffordance(deviceID string, msg ServerMessage) ServerMessage {
