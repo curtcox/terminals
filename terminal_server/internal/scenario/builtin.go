@@ -8,15 +8,189 @@ import (
 	"io"
 	"math"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/device"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
+
+const (
+	micCaptureFallbackResource    = "mic.capture"
+	micAnalyzeFallbackResource    = "mic.analyze"
+	speakerMainFallbackResource   = "speaker.main"
+	screenOverlayFallbackResource = "screen.overlay"
+)
+
+func resolveAudioInputCaptureResource(env *Environment, deviceID string) string {
+	return resolveEndpointResource(
+		env,
+		deviceID,
+		"microphone",
+		func(endpointID string) string { return "audio_in." + endpointID + ".capture" },
+		micCaptureFallbackResource,
+	)
+}
+
+func resolveAudioInputAnalyzeResource(env *Environment, deviceID string) string {
+	return resolveEndpointResource(
+		env,
+		deviceID,
+		"microphone",
+		func(endpointID string) string { return "audio_in." + endpointID + ".analyze" },
+		micAnalyzeFallbackResource,
+	)
+}
+
+func resolveAudioOutResource(env *Environment, deviceID string) string {
+	return resolveEndpointResource(
+		env,
+		deviceID,
+		"speakers",
+		func(endpointID string) string { return "audio_out." + endpointID },
+		speakerMainFallbackResource,
+	)
+}
+
+func resolveDisplayOverlayResource(env *Environment, deviceID string) string {
+	return resolveEndpointResource(
+		env,
+		deviceID,
+		"display",
+		func(endpointID string) string { return "display." + endpointID + ".overlay" },
+		screenOverlayFallbackResource,
+	)
+}
+
+func resolveEndpointResource(
+	env *Environment,
+	deviceID string,
+	family string,
+	compose func(endpointID string) string,
+	fallback string,
+) string {
+	for _, endpointID := range endpointResourceIDsForDevice(env, deviceID, family) {
+		if endpointID == "" {
+			continue
+		}
+		return compose(endpointID)
+	}
+	return fallback
+}
+
+func endpointResourceIDsForDevice(env *Environment, deviceID string, family string) []string {
+	caps := capabilitiesForDevice(env, deviceID)
+	if len(caps) == 0 {
+		return nil
+	}
+	family = strings.TrimSpace(strings.ToLower(family))
+	if family == "" {
+		return nil
+	}
+
+	endpointPrefix := family + ".endpoint."
+	endpoints := map[string]string{}
+	for key, value := range caps {
+		key = strings.TrimSpace(strings.ToLower(key))
+		if !strings.HasPrefix(key, endpointPrefix) {
+			continue
+		}
+		remainder := strings.TrimPrefix(key, endpointPrefix)
+		parts := strings.Split(remainder, ".")
+		if len(parts) < 2 {
+			continue
+		}
+		indexToken := strings.TrimSpace(parts[0])
+		fieldToken := strings.TrimSpace(parts[1])
+		if indexToken == "" || fieldToken != "id" {
+			continue
+		}
+		index, err := strconv.Atoi(indexToken)
+		if err != nil || index < 0 {
+			continue
+		}
+		if endpointID := sanitizeResourceToken(value); endpointID != "" {
+			endpoints[indexToken] = endpointID
+		}
+	}
+
+	if len(endpoints) == 0 {
+		return nil
+	}
+	indexes := make([]int, 0, len(endpoints))
+	for raw := range endpoints {
+		idx, err := strconv.Atoi(raw)
+		if err != nil {
+			continue
+		}
+		indexes = append(indexes, idx)
+	}
+	sort.Ints(indexes)
+	resolved := make([]string, 0, len(indexes))
+	for _, index := range indexes {
+		endpointID := endpoints[strconv.Itoa(index)]
+		if endpointID == "" {
+			endpointID = fmt.Sprintf("endpoint-%d", index)
+		}
+		resolved = append(resolved, endpointID)
+	}
+	return resolved
+}
+
+func capabilitiesForDevice(env *Environment, deviceID string) map[string]string {
+	if env == nil || env.Devices == nil {
+		return nil
+	}
+	provider, ok := env.Devices.(interface {
+		Get(deviceID string) (device.Device, bool)
+	})
+	if !ok {
+		return nil
+	}
+	record, ok := provider.Get(strings.TrimSpace(deviceID))
+	if !ok {
+		return nil
+	}
+	if len(record.Capabilities) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(record.Capabilities))
+	for key, value := range record.Capabilities {
+		out[key] = value
+	}
+	return out
+}
+
+func sanitizeResourceToken(raw string) string {
+	raw = strings.TrimSpace(strings.ToLower(raw))
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(raw))
+	lastDash := false
+	for _, r := range raw {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	token := strings.Trim(b.String(), "-")
+	if token == "" {
+		return ""
+	}
+	return token
+}
 
 // AlertScenario broadcasts a critical alert across targeted devices.
 type AlertScenario struct{}
@@ -839,25 +1013,28 @@ func (s *VoiceAssistantScenario) Start(ctx context.Context, env *Environment) er
 	activationID := s.ensureActivationID()
 	if routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok {
 		if claims := routeIO.Claims(); claims != nil {
+			analyzeResource := resolveAudioInputAnalyzeResource(env, strings.TrimSpace(s.trigger.SourceID))
+			speakerResource := resolveAudioOutResource(env, strings.TrimSpace(s.trigger.SourceID))
+			overlayResource := resolveDisplayOverlayResource(env, strings.TrimSpace(s.trigger.SourceID))
 			_, err := claims.Request(ctx, []iorouter.Claim{
 				{
 					ActivationID: activationID,
 					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
-					Resource:     "mic.analyze",
+					Resource:     analyzeResource,
 					Mode:         iorouter.ClaimShared,
 					Priority:     int(PriorityNormal),
 				},
 				{
 					ActivationID: activationID,
 					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
-					Resource:     "speaker.main",
+					Resource:     speakerResource,
 					Mode:         iorouter.ClaimExclusive,
 					Priority:     int(PriorityNormal),
 				},
 				{
 					ActivationID: activationID,
 					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
-					Resource:     "screen.overlay",
+					Resource:     overlayResource,
 					Mode:         iorouter.ClaimShared,
 					Priority:     int(PriorityNormal),
 				},
@@ -1105,10 +1282,11 @@ func (s *AudioMonitorScenario) startMonitorLoop(ctx context.Context, env *Enviro
 		Claims() *iorouter.ClaimManager
 	}); ok {
 		if claims := routeIO.Claims(); claims != nil {
+			analyzeResource := resolveAudioInputAnalyzeResource(env, sourceID)
 			_, err := claims.Request(ctx, []iorouter.Claim{{
 				ActivationID: activationID,
 				DeviceID:     sourceID,
-				Resource:     "mic.analyze",
+				Resource:     analyzeResource,
 				Mode:         iorouter.ClaimShared,
 				Priority:     int(PriorityNormal),
 			}})
@@ -1391,19 +1569,21 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 			return peerTargetDeviceIDs(env, sourceID, s.trigger.Arguments)
 		},
 		Claims: func(targets []string) []iorouter.Claim {
+			sourceResource := resolveAudioInputCaptureResource(env, sourceID)
 			out := make([]iorouter.Claim, 0, len(targets)+1)
 			out = append(out, iorouter.Claim{
 				ActivationID: activationID,
 				DeviceID:     sourceID,
-				Resource:     "mic.capture",
+				Resource:     sourceResource,
 				Mode:         iorouter.ClaimExclusive,
 				Priority:     int(PriorityHigh),
 			})
 			for _, targetID := range targets {
+				targetResource := resolveAudioOutResource(env, targetID)
 				out = append(out, iorouter.Claim{
 					ActivationID: activationID,
 					DeviceID:     targetID,
-					Resource:     "speaker.main",
+					Resource:     targetResource,
 					Mode:         iorouter.ClaimExclusive,
 					Priority:     int(PriorityHigh),
 				})
@@ -1411,19 +1591,21 @@ func (s *PASystemScenario) Start(ctx context.Context, env *Environment) error {
 			return out
 		},
 		MediaPlan: func(targets []string) *iorouter.MediaPlan {
+			sourceResource := resolveAudioInputCaptureResource(env, sourceID)
 			nodes := make([]iorouter.MediaNode, 0, 2+len(targets))
 			nodes = append(nodes,
-				iorouter.MediaNode{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
+				iorouter.MediaNode{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID, "resource": sourceResource}},
 				iorouter.MediaNode{ID: "fork", Kind: iorouter.NodeFork},
 			)
 			edges := make([]iorouter.MediaEdge, 0, 1+len(targets))
 			edges = append(edges, iorouter.MediaEdge{From: "mic", To: "fork"})
 			for idx, targetID := range targets {
 				nodeID := fmt.Sprintf("speaker_%d", idx)
+				targetResource := resolveAudioOutResource(env, targetID)
 				nodes = append(nodes, iorouter.MediaNode{
 					ID:   nodeID,
 					Kind: iorouter.NodeSinkSpeaker,
-					Args: map[string]string{"device_id": targetID, "stream_kind": "pa_audio"},
+					Args: map[string]string{"device_id": targetID, "stream_kind": "pa_audio", "resource": targetResource},
 				})
 				edges = append(edges, iorouter.MediaEdge{From: "fork", To: nodeID})
 			}
@@ -1507,19 +1689,21 @@ func (s *AnnouncementScenario) Start(ctx context.Context, env *Environment) erro
 			return peerTargetDeviceIDs(env, sourceID, s.trigger.Arguments)
 		},
 		Claims: func(targets []string) []iorouter.Claim {
+			sourceResource := resolveAudioInputCaptureResource(env, sourceID)
 			out := make([]iorouter.Claim, 0, len(targets)+1)
 			out = append(out, iorouter.Claim{
 				ActivationID: activationID,
 				DeviceID:     sourceID,
-				Resource:     "mic.capture",
+				Resource:     sourceResource,
 				Mode:         iorouter.ClaimExclusive,
 				Priority:     int(PriorityHigh),
 			})
 			for _, targetID := range targets {
+				targetResource := resolveAudioOutResource(env, targetID)
 				out = append(out, iorouter.Claim{
 					ActivationID: activationID,
 					DeviceID:     targetID,
-					Resource:     "speaker.main",
+					Resource:     targetResource,
 					Mode:         iorouter.ClaimExclusive,
 					Priority:     int(PriorityHigh),
 				})
@@ -1527,19 +1711,21 @@ func (s *AnnouncementScenario) Start(ctx context.Context, env *Environment) erro
 			return out
 		},
 		MediaPlan: func(targets []string) *iorouter.MediaPlan {
+			sourceResource := resolveAudioInputCaptureResource(env, sourceID)
 			nodes := make([]iorouter.MediaNode, 0, 2+len(targets))
 			nodes = append(nodes,
-				iorouter.MediaNode{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
+				iorouter.MediaNode{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID, "resource": sourceResource}},
 				iorouter.MediaNode{ID: "fork", Kind: iorouter.NodeFork},
 			)
 			edges := make([]iorouter.MediaEdge, 0, 1+len(targets))
 			edges = append(edges, iorouter.MediaEdge{From: "mic", To: "fork"})
 			for idx, targetID := range targets {
 				nodeID := fmt.Sprintf("speaker_%d", idx)
+				targetResource := resolveAudioOutResource(env, targetID)
 				nodes = append(nodes, iorouter.MediaNode{
 					ID:   nodeID,
 					Kind: iorouter.NodeSinkSpeaker,
-					Args: map[string]string{"device_id": targetID, "stream_kind": "announcement_audio"},
+					Args: map[string]string{"device_id": targetID, "stream_kind": "announcement_audio", "resource": targetResource},
 				})
 				edges = append(edges, iorouter.MediaEdge{From: "fork", To: nodeID})
 			}

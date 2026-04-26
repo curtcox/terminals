@@ -979,6 +979,57 @@ func TestRuntimePAPreemptedByRedAlertSuspendsAndResumesRoutes(t *testing.T) {
 	}
 }
 
+func TestRuntimePAClaimsEndpointScopedResourcesWhenAvailable(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{
+		DeviceID:   "d1",
+		DeviceName: "Kitchen",
+		Capabilities: device.CapabilitySet{
+			"microphone.endpoint_count": "1",
+			"microphone.endpoint.0.id":  "Mic Main",
+		},
+	})
+	_, _ = devices.Register(device.Manifest{
+		DeviceID:   "d2",
+		DeviceName: "Hall",
+		Capabilities: device.CapabilitySet{
+			"speakers.endpoint_count": "1",
+			"speakers.endpoint.0.id":  "Hall Speaker",
+		},
+	})
+	router := iorouter.NewRouter()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: &PASystemScenario{}, Priority: PriorityHigh})
+	runtime := NewRuntime(engine, &Environment{
+		Devices: devices,
+		IO:      router,
+	})
+
+	if _, err := runtime.HandleTrigger(context.Background(), Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "pa_system",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(pa_system) error = %v", err)
+	}
+
+	sourceClaims := router.Claims().Snapshot("d1")
+	if len(sourceClaims) != 1 {
+		t.Fatalf("source claims len = %d, want 1", len(sourceClaims))
+	}
+	if sourceClaims[0].Resource != "audio_in.mic-main.capture" {
+		t.Fatalf("source claim resource = %q, want audio_in.mic-main.capture", sourceClaims[0].Resource)
+	}
+	targetClaims := router.Claims().Snapshot("d2")
+	if len(targetClaims) != 1 {
+		t.Fatalf("target claims len = %d, want 1", len(targetClaims))
+	}
+	if targetClaims[0].Resource != "audio_out.hall-speaker" {
+		t.Fatalf("target claim resource = %q, want audio_out.hall-speaker", targetClaims[0].Resource)
+	}
+}
+
 // TestRuntimeAudioMonitorVoiceTriggerArmsWithParsedTarget verifies that the
 // Phase-6 milestone phrasing ("tell me when the dishwasher stops") is parsed
 // by ParseVoiceTrigger and routed through the runtime to AudioMonitorScenario

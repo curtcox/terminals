@@ -96,3 +96,35 @@ func TestMediaPlannerForkAndAnalyzerEvent(t *testing.T) {
 		t.Fatalf("RouteCount() = %d, want 2 (stt + speaker)", router.RouteCount())
 	}
 }
+
+func TestMediaPlannerInfersStreamKindFromResourceArgs(t *testing.T) {
+	router := iorouter.NewRouter()
+	planner := router.MediaPlanner()
+
+	_, err := planner.Apply(context.Background(), iorouter.MediaPlan{
+		Nodes: []iorouter.MediaNode{
+			{
+				ID:   "mic",
+				Kind: iorouter.NodeSourceSensor,
+				Args: map[string]string{"device_id": "d1", "resource": "audio_in.mic-usb.capture"},
+			},
+			{
+				ID:   "speaker",
+				Kind: iorouter.NodeSinkSpeaker,
+				Args: map[string]string{"device_id": "d2", "resource": "audio_out.kitchen-speaker"},
+			},
+		},
+		Edges: []iorouter.MediaEdge{{From: "mic", To: "speaker"}},
+	})
+	if err != nil {
+		t.Fatalf("Apply() error = %v", err)
+	}
+
+	routes := router.RoutesForDevice("d2")
+	if len(routes) != 1 {
+		t.Fatalf("routes len = %d, want 1", len(routes))
+	}
+	if routes[0].StreamKind != "audio" {
+		t.Fatalf("stream kind = %q, want audio", routes[0].StreamKind)
+	}
+}

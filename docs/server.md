@@ -34,6 +34,9 @@ terminal_server/
   device targets.
 - IO router + claim manager: compiles media plans, applies routing, and
   arbitrates resource preemption.
+- Endpoint-scoped resources are first-class claim targets (`audio_in.<id>.capture`,
+  `audio_out.<id>`, `display.<id>.overlay`), with legacy aliases preserved as
+  fallback for clients that have not yet reported endpoint metadata.
 - Intent/event bus: normalizes triggers from voice, UI actions, schedules,
   analyzers, and automation.
 - Scenario engine: matches triggers, starts/supervises activations, and
@@ -224,6 +227,9 @@ supervisor for server-side behavior modules.
   scenarios interrupt lower-priority activations.
 - Runtime snapshots persist active/suspended scenario ownership for recovery
   across process restarts.
+- Built-in scenario recipes resolve endpoint-scoped resources from device
+  capability snapshots and pass optional `args.resource` hints into media-plan
+  nodes so flow compilation can preserve concrete endpoint intent.
 
 Primary implementation files:
 

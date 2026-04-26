@@ -379,7 +379,12 @@ func (p *MediaPlanner) compileLocked(ctx context.Context, plan FlowPlan) (planRu
 			if sourceDeviceID == "" || targetDeviceID == "" {
 				continue
 			}
+			sourceResource := strings.TrimSpace(sourceNode.Args["resource"])
+			targetResource := strings.TrimSpace(to.Args["resource"])
 			streamKind := streamKindFor(sourceNode.Kind, to.Kind)
+			if inferred := streamKindForResources(sourceResource, targetResource); inferred != "" {
+				streamKind = inferred
+			}
 			if override := strings.TrimSpace(to.Args["stream_kind"]); override != "" {
 				streamKind = override
 			}
@@ -535,4 +540,19 @@ func copyStringMap(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func streamKindForResources(sourceResource, targetResource string) string {
+	sourceResource = strings.TrimSpace(strings.ToLower(sourceResource))
+	targetResource = strings.TrimSpace(strings.ToLower(targetResource))
+	if sourceResource == "" || targetResource == "" {
+		return ""
+	}
+	switch {
+	case strings.HasPrefix(sourceResource, "audio_in.") && strings.HasSuffix(sourceResource, ".capture") && strings.HasPrefix(targetResource, "audio_out."):
+		return "audio"
+	case strings.HasPrefix(sourceResource, "camera.") && strings.HasSuffix(sourceResource, ".capture") && strings.HasPrefix(targetResource, "display.") && strings.HasSuffix(targetResource, ".main"):
+		return "video"
+	}
+	return ""
 }
