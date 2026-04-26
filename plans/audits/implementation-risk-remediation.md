@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-26: Removed synthetic default display identity declarations from client capability metadata (`display.display_id='main'`, `display.display_name='Primary Display'`) in both probe-time snapshots and runtime display refresh so display identity fields are omitted unless explicitly sourced, and added probe regression assertions locking those fields absent by default.
 - 2026-04-26: Removed synthetic default edge runtime declaration from client capability probing so `edge.runtimes` is omitted unless explicitly sourced, and updated probe regression assertions to lock default edge omission at probe time.
 - 2026-04-26: Tightened client media capability truthfulness so microphone/camera/speakers are now declared only when at least one endpoint has a real non-empty `device_id`, preventing capability advertisement from kind-only inventories with blank IDs; added probe regression coverage for invalid-ID-only inventories.
 - 2026-04-26: Removed synthetic fallback media endpoint IDs from client capability probing so audio/camera endpoints are emitted only when media inventory reports a real non-empty `device_id`, with probe regression coverage ensuring blank IDs are skipped rather than synthesized.

@@ -1402,13 +1402,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ..safeArea.bottom = safeAreaInsets.bottom.round();
 
     if (capabilities.displays.isEmpty) {
-      capabilities.displays.add(capv1.DisplayCapability()..displayId = 'main');
+      capabilities.displays.add(capv1.DisplayCapability());
     }
     final display = capabilities.displays.first;
     display
-      ..displayId = display.displayId.isEmpty ? 'main' : display.displayId
-      ..displayName =
-          display.displayName.isEmpty ? 'Primary Display' : display.displayName
       ..primary = true
       ..screen = screen.deepCopy();
     return capabilities;

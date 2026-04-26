@@ -35,6 +35,8 @@ void main() {
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);
     expect(capabilities.screen.hasSafeArea(), isFalse);
     expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
+    expect(capabilities.displays.first.hasDisplayId(), isFalse);
+    expect(capabilities.displays.first.hasDisplayName(), isFalse);
   });
 
   test('probe includes media capabilities when devices are detected', () async {
@@ -85,6 +87,8 @@ void main() {
     expect(capabilities.screen.hasMultiWindowSupported(), isFalse);
     expect(capabilities.screen.hasSafeArea(), isFalse);
     expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
+    expect(capabilities.displays.first.hasDisplayId(), isFalse);
+    expect(capabilities.displays.first.hasDisplayName(), isFalse);
     expect(capabilities.microphone.channels, 0);
     expect(capabilities.microphone.endpoints.first.channels, 0);
     expect(

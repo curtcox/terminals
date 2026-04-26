@@ -75,8 +75,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
             : 'portrait')
       ..displays.add(
         capv1.DisplayCapability()
-          ..displayId = 'main'
-          ..displayName = 'Primary Display'
           ..primary = true
           ..screen = (capv1.ScreenCapability()
             ..width = context.screenWidth
