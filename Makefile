@@ -7,7 +7,7 @@ BUILD_SHA ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 
-.PHONY: server-build server-test server-lint server-coverage \
+.PHONY: server-build server-test server-test-sandbox server-test-network-probe server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
@@ -21,6 +21,12 @@ server-build:
 
 server-test:
 	cd terminal_server && go test ./...
+
+server-test-network-probe:
+	go run ./scripts/probe_server_test_network.go
+
+server-test-sandbox:
+	./scripts/server-test-sandbox.sh
 
 server-lint:
 	cd terminal_server && golangci-lint run ./...

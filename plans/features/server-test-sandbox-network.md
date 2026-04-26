@@ -1,13 +1,42 @@
 ---
 title: "Server Test Sandbox Network Plan"
 kind: plan
-status: planned
-owner: unowned
-validation: none
+status: shipped-untested
+owner: curtcox
+validation: manual
 last-reviewed: 2026-04-25
 ---
 
 # Server Test Sandbox Network Plan
+
+## Status (2026-04-25)
+
+Shipped (manual validation):
+
+- `scripts/probe_server_test_network.go` reports
+  `loopback_listener`, `ipv6_loopback_listener`, `host_interfaces`, and a
+  rolled-up `network_sensitive_tests` flag.
+- `scripts/server-test-sandbox.sh` runs all non-networked server packages,
+  invokes the probe, then runs the networked packages
+  (`./cmd/server`, `./internal/admin`, `./internal/transport`,
+  `./internal/mcpadapter`, `./internal/repl`, `./internal/discovery`) only
+  when the probe reports `ok`. When skipped, it prints the package list and
+  the command (`make server-test`) needed for full validation.
+- `make server-test-sandbox` and `make server-test-network-probe` targets
+  expose the script and probe.
+- `docs/code-quality-and-ci.md` documents the new targets and that
+  `make server-test-sandbox` is a development convenience, not a release
+  gate.
+
+Remaining work (not shipped):
+
+- Step 5 ("Refactor Where It Improves Coverage"): pure setup/validation
+  helpers and mDNS record/interface separation are still mixed in with
+  socket code.
+- Step 6 ("CI Contract"): CI does not yet assert that the network probe
+  reports listener support, so it is theoretically possible for CI to
+  silently degrade. Lower priority because CI today calls `make server-test`
+  directly, not the sandbox target.
 
 ## Context
 

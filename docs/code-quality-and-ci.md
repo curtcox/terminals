@@ -16,6 +16,8 @@ Use these from repository root.
 |---|---|
 | `make server-build` | Build Go server |
 | `make server-test` | Run server tests |
+| `make server-test-sandbox` | Sandbox-friendly server tests; skips packages that need real listeners when blocked |
+| `make server-test-network-probe` | Print whether the current environment can bind loopback listeners and enumerate host interfaces |
 | `make server-lint` | Run Go lint checks |
 | `make server-coverage` | Generate Go coverage profile |
 | `make client-build` | Build Flutter web client |
@@ -69,6 +71,27 @@ Proto CI runs on changes in `api/` and includes:
 - `buf generate`
 - Generated-code drift check (`git diff --exit-code`)
 - `buf breaking` against `main`
+
+## Sandboxed Server Tests
+
+`make server-test` is the canonical server gate and the form CI runs. Some
+restricted local environments (most notably automated agent sandboxes) cannot
+bind loopback listeners or enumerate host interfaces, which causes false
+failures in `cmd/server`, `internal/admin`, `internal/transport`,
+`internal/mcpadapter`, `internal/repl`, and `internal/discovery`.
+
+For those environments, use `make server-test-sandbox`. It:
+
+- runs every server package that does not need real networking,
+- runs `make server-test-network-probe` to detect listener support,
+- runs the networked package group only when the probe reports that loopback
+  binds and host-interface enumeration both work,
+- when the networked group is skipped, prints the package list and the exact
+  command to run for full validation (`make server-test`).
+
+`make server-test-sandbox` is a development convenience, not a release gate.
+CI continues to run the full `make server-test` (and `make all-check`) and
+must not be replaced by the sandbox target.
 
 ## Quality Configuration
 
