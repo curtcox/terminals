@@ -1,9 +1,9 @@
 ---
 title: "Bug Reporting Multimodal Expansion"
 kind: plan
-status: planned
-owner: unowned
-validation: none
+status: shipped-validated
+owner: copilot
+validation: automated:B1
 last-reviewed: 2026-04-26
 ---
 

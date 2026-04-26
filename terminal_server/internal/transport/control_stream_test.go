@@ -15,14 +15,19 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
+	"google.golang.org/protobuf/proto"
 )
 
 type bugReportIntakeStub struct {
-	ack *diagnosticsv1.BugReportAck
-	err error
+	ack        *diagnosticsv1.BugReportAck
+	err        error
+	lastReport *diagnosticsv1.BugReport
 }
 
-func (s bugReportIntakeStub) File(_ context.Context, _ *diagnosticsv1.BugReport) (*diagnosticsv1.BugReportAck, error) {
+func (s *bugReportIntakeStub) File(_ context.Context, report *diagnosticsv1.BugReport) (*diagnosticsv1.BugReportAck, error) {
+	if report != nil {
+		s.lastReport = proto.Clone(report).(*diagnosticsv1.BugReport)
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -665,7 +670,7 @@ func TestHandleMessageBugReportReturnsAck(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
 	handler := NewStreamHandler(service)
-	handler.SetBugReportIntake(bugReportIntakeStub{
+	handler.SetBugReportIntake(&bugReportIntakeStub{
 		ack: &diagnosticsv1.BugReportAck{
 			ReportId:      "bug-2",
 			CorrelationId: "bug:bug-2",
@@ -691,7 +696,7 @@ func TestHandleMessageInputBugReportActionFilesReport(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
 	handler := NewStreamHandler(service)
-	handler.SetBugReportIntake(bugReportIntakeStub{
+	handler.SetBugReportIntake(&bugReportIntakeStub{
 		ack: &diagnosticsv1.BugReportAck{
 			ReportId:      "bug-from-ui-action",
 			CorrelationId: "bug:bug-from-ui-action",
@@ -717,6 +722,63 @@ func TestHandleMessageInputBugReportActionFilesReport(t *testing.T) {
 	}
 	if out[1].Notification == "" {
 		t.Fatalf("second response should include filing notification")
+	}
+}
+
+func TestHandleMessageInputBugReportActionRespectsModalitySources(t *testing.T) {
+	tests := []struct {
+		name       string
+		action     string
+		wantSource diagnosticsv1.BugReportSource
+	}{
+		{name: "screen button", action: "bug_report", wantSource: diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON},
+		{name: "gesture", action: "bug_report.gesture", wantSource: diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_GESTURE},
+		{name: "shake", action: "bug_report.shake", wantSource: diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SHAKE},
+		{name: "keyboard", action: "bug_report.keyboard", wantSource: diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_KEYBOARD},
+		{name: "voice", action: "bug_report.voice", wantSource: diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_VOICE},
+		{name: "qr", action: "bug_report.qr:subject-2", wantSource: diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_QR},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			manager := device.NewManager()
+			service := NewControlService("srv-1", manager)
+			handler := NewStreamHandler(service)
+			intake := &bugReportIntakeStub{
+				ack: &diagnosticsv1.BugReportAck{
+					ReportId:      "bug-from-modality",
+					CorrelationId: "bug:bug-from-modality",
+					Status:        diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED,
+				},
+			}
+			handler.SetBugReportIntake(intake)
+
+			_, err := handler.HandleMessage(context.Background(), ClientMessage{
+				Input: &InputRequest{
+					DeviceID:    "device-1",
+					ComponentID: bugReportButtonID,
+					Action:      tc.action,
+				},
+			})
+			if err != nil {
+				t.Fatalf("HandleMessage(input bug_report) error = %v", err)
+			}
+			if intake.lastReport == nil {
+				t.Fatalf("expected intake to receive bug report payload")
+			}
+			if got := intake.lastReport.GetSource(); got != tc.wantSource {
+				t.Fatalf("source = %v, want %v", got, tc.wantSource)
+			}
+			if tc.wantSource == diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_QR {
+				if got := intake.lastReport.GetSubjectDeviceId(); got != "subject-2" {
+					t.Fatalf("subject_device_id = %q, want subject-2", got)
+				}
+				return
+			}
+			if got := intake.lastReport.GetSubjectDeviceId(); got != "device-1" {
+				t.Fatalf("subject_device_id = %q, want device-1", got)
+			}
+		})
 	}
 }
 

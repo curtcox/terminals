@@ -170,6 +170,72 @@ func TestBugIntakeJSON(t *testing.T) {
 	}
 }
 
+func TestBugIntakeJSONSIPSourceAndTranscriptHints(t *testing.T) {
+	logDir := t.TempDir()
+	h := testHandler(t, config.Config{MDNSName: "HomeServer", LogDir: logDir})
+
+	intakeReq := httptest.NewRequest(http.MethodPost, "/bug/intake", strings.NewReader(`{
+		"reporterDeviceId":"caller-1",
+		"subjectDeviceId":"hallway-panel",
+		"source":"BUG_REPORT_SOURCE_SIP",
+		"description":"speakerphone report",
+		"sourceHints":{
+			"caller_id":"+15551234567",
+			"transcript":"hallway panel is frozen"
+		}
+	}`))
+	intakeReq.Header.Set("Content-Type", "application/json")
+	intakeW := httptest.NewRecorder()
+	h.ServeHTTP(intakeW, intakeReq)
+	if intakeW.Code != http.StatusOK {
+		t.Fatalf("POST /bug/intake (sip json) status = %d, want 200 body=%s", intakeW.Code, intakeW.Body.String())
+	}
+
+	intakePayload := map[string]map[string]any{}
+	if err := json.Unmarshal(intakeW.Body.Bytes(), &intakePayload); err != nil {
+		t.Fatalf("decode sip intake response: %v", err)
+	}
+	ack := intakePayload["ack"]
+	reportID := strings.TrimSpace(asString(ack["report_id"]))
+	if reportID == "" {
+		t.Fatalf("ack.report_id should be populated: %+v", ack)
+	}
+
+	detailReq := httptest.NewRequest(http.MethodGet, "/admin/api/bugs/"+reportID, nil)
+	detailW := httptest.NewRecorder()
+	h.ServeHTTP(detailW, detailReq)
+	if detailW.Code != http.StatusOK {
+		t.Fatalf("GET /admin/api/bugs/%s status = %d, want 200 body=%s", reportID, detailW.Code, detailW.Body.String())
+	}
+
+	detailPayload := map[string]map[string]any{}
+	if err := json.Unmarshal(detailW.Body.Bytes(), &detailPayload); err != nil {
+		t.Fatalf("decode sip detail response: %v", err)
+	}
+	report, ok := detailPayload["report"]
+	if !ok {
+		t.Fatalf("detail payload missing report object: %+v", detailPayload)
+	}
+	summary, ok := report["summary"].(map[string]any)
+	if !ok {
+		t.Fatalf("detail payload missing summary object: %+v", report)
+	}
+	if got := asString(summary["source"]); got != "BUG_REPORT_SOURCE_SIP" {
+		t.Fatalf("summary.source = %q, want BUG_REPORT_SOURCE_SIP", got)
+	}
+	innerReport, ok := report["report"].(map[string]any)
+	if !ok {
+		t.Fatalf("detail payload missing nested report payload: %+v", report)
+	}
+	sourceHints, ok := innerReport["source_hints"].(map[string]any)
+	if !ok {
+		t.Fatalf("nested report missing source_hints: %+v", innerReport)
+	}
+	if got := asString(sourceHints["transcript"]); got != "hallway panel is frozen" {
+		t.Fatalf("source_hints.transcript = %q, want hallway panel is frozen", got)
+	}
+}
+
 func asString(v any) string {
 	if s, ok := v.(string); ok {
 		return s

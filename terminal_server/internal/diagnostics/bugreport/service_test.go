@@ -120,6 +120,47 @@ func TestServiceListFiltered(t *testing.T) {
 	}
 }
 
+func TestServiceFileCrossDeviceSubjectMarksOfflineWhenUnavailable(t *testing.T) {
+	logDir := t.TempDir()
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "rep-1", DeviceName: "Kitchen Panel"})
+
+	svc := NewService(logDir, devices, nil)
+	ack, err := svc.File(context.Background(), &diagnosticsv1.BugReport{
+		ReporterDeviceId: "rep-1",
+		SubjectDeviceId:  "hallway-screen",
+		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_QR,
+		Description:      "filed from another device for broken hallway screen",
+		Tags:             []string{"lost_connection"},
+	})
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+
+	rec, ok, err := svc.Get(ack.GetReportId())
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if !ok {
+		t.Fatalf("Get(%q) should exist", ack.GetReportId())
+	}
+	if rec.Summary.ReporterDeviceID != "rep-1" {
+		t.Fatalf("reporter_device_id = %q, want rep-1", rec.Summary.ReporterDeviceID)
+	}
+	if rec.Summary.SubjectDeviceID != "hallway-screen" {
+		t.Fatalf("subject_device_id = %q, want hallway-screen", rec.Summary.SubjectDeviceID)
+	}
+	if rec.Summary.Source != diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_QR.String() {
+		t.Fatalf("source = %q, want %q", rec.Summary.Source, diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_QR.String())
+	}
+	if !rec.Summary.SubjectOffline {
+		t.Fatalf("subject_offline = false, want true")
+	}
+	if rec.Subject != nil {
+		t.Fatalf("subject snapshot should be nil when subject device is unavailable")
+	}
+}
+
 func TestServiceAutodetectMerge(t *testing.T) {
 	logDir := t.TempDir()
 	devices := device.NewManager()

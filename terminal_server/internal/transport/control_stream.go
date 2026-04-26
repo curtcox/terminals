@@ -2859,12 +2859,7 @@ func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDev
 	if h.bugReports == nil {
 		return nil, ErrBugReportIntakeUnavailable
 	}
-	subjectDeviceID := reporterDeviceID
-	if parts := strings.SplitN(strings.TrimSpace(action), ":", 2); len(parts) == 2 {
-		if parsed := strings.TrimSpace(parts[1]); parsed != "" {
-			subjectDeviceID = parsed
-		}
-	}
+	source, subjectDeviceID := parseBugReportUIAction(action, reporterDeviceID)
 	if subjectDeviceID == "" {
 		subjectDeviceID = strings.TrimSpace(value)
 	}
@@ -2874,7 +2869,7 @@ func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDev
 	ack, err := h.bugReports.File(ctx, &diagnosticsv1.BugReport{
 		ReporterDeviceId: reporterDeviceID,
 		SubjectDeviceId:  subjectDeviceID,
-		Source:           diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON,
+		Source:           source,
 		Description:      "Filed from server-driven report button",
 		Tags:             []string{"other"},
 		TimestampUnixMs:  time.Now().UTC().UnixMilli(),
@@ -2890,6 +2885,53 @@ func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDev
 			Notification: "Bug report filed: " + ack.GetReportId(),
 		},
 	}, nil
+}
+
+func parseBugReportUIAction(action, defaultSubjectDeviceID string) (diagnosticsv1.BugReportSource, string) {
+	source := diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON
+	subjectDeviceID := strings.TrimSpace(defaultSubjectDeviceID)
+	action = strings.TrimSpace(action)
+	if action == "" {
+		return source, subjectDeviceID
+	}
+
+	head := action
+	if parts := strings.SplitN(action, ":", 2); len(parts) == 2 {
+		head = strings.TrimSpace(parts[0])
+		if parsedSubject := strings.TrimSpace(parts[1]); parsedSubject != "" {
+			subjectDeviceID = parsedSubject
+		}
+	}
+
+	modality := ""
+	if parts := strings.SplitN(strings.ToLower(head), ".", 2); len(parts) == 2 {
+		modality = strings.TrimSpace(parts[1])
+	}
+
+	switch modality {
+	case "gesture":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_GESTURE
+	case "shake":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SHAKE
+	case "keyboard":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_KEYBOARD
+	case "voice":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_VOICE
+	case "qr":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_QR
+	case "nfc":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_NFC
+	case "sip":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SIP
+	case "admin":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_ADMIN
+	case "screen", "screen_button", "button", "":
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_SCREEN_BUTTON
+	default:
+		source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_OTHER
+	}
+
+	return source, subjectDeviceID
 }
 
 func (h *StreamHandler) handleMenuOverlayInput(ctx context.Context, deviceID, componentID, action string) ([]ServerMessage, bool, error) {

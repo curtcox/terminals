@@ -186,7 +186,7 @@ func TestWebSocketServerAllowsLoopbackOriginWithoutExplicitAllowList(t *testing.
 	control := NewControlService("srv-1", manager)
 	grpcServer := NewServer(mustAvailableTCPAddress(t))
 	grpcServer.ConfigureControl(control, GeneratedProtoAdapter{})
-	grpcServer.ConfigureBugReportIntake(bugReportIntakeStub{
+	grpcServer.ConfigureBugReportIntake(&bugReportIntakeStub{
 		ack: &diagnosticsv1.BugReportAck{
 			ReportId:      "bug-loopback-ack-1",
 			CorrelationId: "bug:bug-loopback-ack-1",
@@ -255,7 +255,7 @@ func TestWebSocketServerRoundTripBugReportAckWithinDeadline(t *testing.T) {
 	control := NewControlService("srv-1", manager)
 	grpcServer := NewServer(mustAvailableTCPAddress(t))
 	grpcServer.ConfigureControl(control, GeneratedProtoAdapter{})
-	grpcServer.ConfigureBugReportIntake(bugReportIntakeStub{
+	grpcServer.ConfigureBugReportIntake(&bugReportIntakeStub{
 		ack: &diagnosticsv1.BugReportAck{
 			ReportId:      "bug-ws-ack-1",
 			CorrelationId: "bug:bug-ws-ack-1",
