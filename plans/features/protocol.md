@@ -271,8 +271,9 @@ Codegen is driven by Buf (`buf.yaml`, `buf.gen.yaml`). Go and Dart bindings are 
 - Added/updated transport regression coverage for ack invalidation content and proto adapter mapping.
 - Updated durable connection docs to describe `capability_ack` invalidation behavior.
 - Removed client bootstrap emission of deprecated `RegisterDevice` requests; client bootstrap now sends `hello` + `capability_snapshot` and retries snapshot delivery until acknowledgement instead of retrying register payloads.
+- Removed generated-proto ingest support for deprecated `CapabilityUpdate` client payloads; generated clients must use `capability_snapshot` / `capability_delta`.
 
-Remaining protocol-plan work includes server/proto deprecation cleanup for legacy `RegisterDevice` / `CapabilityUpdate` ingest paths and final reconciliation with capability-lifecycle design targets.
+Remaining protocol-plan work includes server/proto deprecation cleanup for legacy `RegisterDevice` ingest paths and final reconciliation with capability-lifecycle design targets.
 
 ## Related Plans
 

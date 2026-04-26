@@ -94,14 +94,7 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 			},
 		}, nil
 	case *controlv1.ConnectRequest_Capability:
-		//nolint:staticcheck // Legacy capability payload remains supported during protocol transition.
-		caps := payload.Capability.GetCapabilities()
-		return ClientMessage{
-			Capability: &CapabilityUpdateRequest{
-				DeviceID:     caps.GetDeviceId(),
-				Capabilities: capabilitiesToDataMap(caps),
-			},
-		}, nil
+		return ClientMessage{}, fmt.Errorf("deprecated payload capability_update is not supported; use capability_snapshot/capability_delta")
 	case *controlv1.ConnectRequest_Heartbeat:
 		return ClientMessage{
 			Heartbeat: &HeartbeatRequest{

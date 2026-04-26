@@ -65,6 +65,23 @@ func TestGeneratedProtoAdapterToInternalRegister(t *testing.T) {
 	}
 }
 
+func TestGeneratedProtoAdapterToInternalCapabilityUpdateDeprecated(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	_, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Capability{
+			Capability: &controlv1.CapabilityUpdate{
+				Capabilities: &capabilitiesv1.DeviceCapabilities{DeviceId: "device-1"},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatalf("ToInternal(capability_update) error = nil, want deprecated-payload error")
+	}
+	if got := err.Error(); got != "deprecated payload capability_update is not supported; use capability_snapshot/capability_delta" {
+		t.Fatalf("ToInternal(capability_update) error = %q, want deprecation guidance", got)
+	}
+}
+
 func TestGeneratedProtoAdapterToInternalHello(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
