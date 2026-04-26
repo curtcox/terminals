@@ -1,9 +1,9 @@
 ---
 title: "Phase 6 — Monitoring and Alerts"
 kind: plan
-status: planned
-owner: unowned
-validation: none
+status: building
+owner: copilot
+validation: automated:M2
 last-reviewed: 2026-04-25
 ---
 
@@ -21,6 +21,7 @@ Ambient intelligence scenarios.
 
 - [x] **Sound classification**: AI backend for detecting specific sounds (silence, beeps, alarms, etc.). See [technology.md](../features/technology.md#ai-backend-pluggable).
 - [x] **Audio monitoring scenario**: "Tell me when X stops" voice command handling and monitoring. See [use-case-flows.md](../features/use-case-flows.md#audio-monitoring-tell-me-when-the-dishwasher-stops). Target form: activation with a shared `mic.analyze` claim and a `mic → analyzer → event` media plan.
+- [x] **Use-case validation wiring (`M2`)**: Add dedicated validation coverage for "tell me when the dryer beeps" via `make usecase-validate USECASE=M2`, with script and matrix mapping synchronized.
 - [x] **Timer and reminder scenario**: Voice-commanded timers and reminders with scheduler persistence. See [use-case-flows.md](../features/use-case-flows.md#timers-and-reminders). Target form: each timer is its own activation, persisted via `ActivationRecord` so the scheduler survives restarts.
 - [x] **Schedule monitoring scenario**: Time-triggered activity monitoring with escalating alerts. See [use-case-flows.md](../features/use-case-flows.md#schedule-monitoring-watch-my-child). Target form: activation targets a zone via placement (e.g. `DevicesInZone("alice_room")`).
 - [x] **Red alert scenario**: Broadcast preemption of all devices with alarm. See [use-case-flows.md](../features/use-case-flows.md#red-alert). Target form: critical-priority activation that claims every exclusive resource on every device; cascade trigger that suspends every lower-priority activation via the claim manager.

@@ -28,6 +28,7 @@ Coverage depth labels:
 | C5 | Internal video call | `make usecase-validate USECASE=C5` | `TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow` | Transport |
 | D1 | Photo frame idle rotation | `make usecase-validate USECASE=D1` | photo-frame config + heartbeat rotation tests | Scenario |
 | M1 | "Tell me when X stops" audio monitor | `make usecase-validate USECASE=M1` | silence classifier integration test | Scenario |
+| M2 | "Tell me when the dryer beeps" audio monitor | `make usecase-validate USECASE=M2` | runtime audio monitor detection test for `dryer_beep` | Scenario |
 | M3 | Red alert broadcast | `make usecase-validate USECASE=M3` | generated+wire red alert integration tests | Transport |
 | M4 | Stand down / stop red alert | `make usecase-validate USECASE=M4` | generated+wire voice stop/stand-down tests | Transport |
 | S1 | Show all cameras | `make usecase-validate USECASE=S1` | generated+wire voice show-all-cameras tests | Transport |
@@ -40,6 +41,6 @@ Coverage depth labels:
 
 The following planned IDs currently do not have a dedicated `make usecase-validate USECASE=<ID>` mapping yet:
 
-`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M2`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`.
+`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`.
 
 Use `make all-check` as the baseline repository gate while dedicated use-case mappings are added.

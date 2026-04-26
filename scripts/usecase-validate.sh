@@ -28,6 +28,7 @@ metadata() {
     C5) echo "C5|Transport|TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow" ;;
     D1) echo "D1|Scenario|photo-frame config + heartbeat rotation tests" ;;
     M1) echo "M1|Scenario|silence classifier integration test" ;;
+    M2) echo "M2|Scenario|audio monitor runtime test for dryer beep detection" ;;
     M3) echo "M3|Transport|generated+wire red alert integration tests" ;;
     M4) echo "M4|Transport|generated+wire voice stop/stand-down tests" ;;
     S1) echo "S1|Transport|generated+wire voice show-all-cameras tests" ;;
@@ -42,7 +43,7 @@ metadata() {
   esac
 }
 
-all_ids=(C1 C3 C5 D1 M1 M3 M4 S1 S2 S3 P1 T1)
+all_ids=(C1 C3 C5 D1 M1 M2 M3 M4 S1 S2 S3 P1 T1)
 
 run_go_test() {
   local pkg="$1"
@@ -75,6 +76,9 @@ run_usecase() {
       ;;
     M1)
       run_go_test ./cmd/server 'TestSilenceClassifierThroughAudioHubNotifiesAudioMonitor$'
+      ;;
+    M2)
+      run_go_test ./internal/scenario 'TestRuntimeAudioMonitorNotifiesWhenDryerBeeps$'
       ;;
     M3)
       run_go_test ./internal/transport 'Test(Generated|Wire)SessionRedAlertRelaysBroadcastNotification$'
