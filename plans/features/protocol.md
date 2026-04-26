@@ -1,9 +1,9 @@
 ---
 title: "Protocol Design"
 kind: plan
-status: shipped-untested
+status: shipped-validated
 owner: copilot
-validation: none
+validation: manual
 last-reviewed: 2026-04-26
 ---
 
@@ -276,8 +276,9 @@ Codegen is driven by Buf (`buf.yaml`, `buf.gen.yaml`). Go and Dart bindings are 
 - Added snapshot bootstrap fallback for unknown devices: capability snapshots now synthesize identity registration when needed before applying generation-ordered capability state.
 - Preserved relay registration semantics for snapshot-first sessions so cross-session route/notification fan-out behavior remains stable.
 - Updated transport carrier and websocket integration tests to accept capability lifecycle bootstrap ordering (`capability_ack` may precede `register_ack`).
+- Re-ran repository validation gates (`make all-check`) and promoted this plan to shipped-validated status.
 
-Remaining protocol-plan work is focused on fully removing deprecated proto fields (`RegisterDevice`/`CapabilityUpdate`) once compatibility windows close, followed by a shipped-validated promotion pass.
+Any future compatibility-window cleanup (for example fully removing deprecated proto request fields) should be tracked as a separate follow-on task, not under this completed protocol design plan.
 
 ## Related Plans
 
