@@ -646,6 +646,136 @@ func TestHandleMessageCapabilityDeltaStopsOnlyAffectedRoutesOnPartialLoss(t *tes
 	}
 }
 
+func TestHandleMessageCapabilityDeltaRestoresOnlyMatchingSuspendedClaimsOnPartialRegain(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"microphone.present": "true",
+				"camera.present":     "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if _, err := router.Claims().Request(context.Background(), []iorouter.Claim{{
+		ActivationID: "activation-mic",
+		DeviceID:     "device-1",
+		Resource:     "mic.capture",
+		Mode:         iorouter.ClaimExclusive,
+		Priority:     1,
+	}, {
+		ActivationID: "activation-camera",
+		DeviceID:     "device-1",
+		Resource:     "camera.capture",
+		Mode:         iorouter.ClaimExclusive,
+		Priority:     1,
+	}}); err != nil {
+		t.Fatalf("Claims().Request() error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:     "device-1",
+			Generation:   2,
+			Reason:       "privacy.toggle",
+			Capabilities: map[string]string{},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability loss delta) error = %v", err)
+	}
+
+	if claims := router.Claims().Snapshot("device-1"); len(claims) != 0 {
+		t.Fatalf("active claims after capability loss = %d, want 0", len(claims))
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 3,
+			Reason:     "camera_readded",
+			Capabilities: map[string]string{
+				"camera.present": "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability partial regain delta) error = %v", err)
+	}
+
+	claimsAfterPartialRegain := router.Claims().Snapshot("device-1")
+	if len(claimsAfterPartialRegain) != 1 {
+		t.Fatalf("active claims after partial regain = %d, want 1", len(claimsAfterPartialRegain))
+	}
+	if claimsAfterPartialRegain[0].Resource != "camera.capture" {
+		t.Fatalf("restored claim resource = %q, want camera.capture", claimsAfterPartialRegain[0].Resource)
+	}
+	if claimsAfterPartialRegain[0].ActivationID != "activation-camera" {
+		t.Fatalf("camera claim activation = %q, want activation-camera", claimsAfterPartialRegain[0].ActivationID)
+	}
+
+	pending := handler.suspendedClaimsByDevice["device-1"]
+	if len(pending) != 1 {
+		t.Fatalf("suspended claim count after partial regain = %d, want 1", len(pending))
+	}
+	if pending[0].Resource != "mic.capture" {
+		t.Fatalf("remaining suspended resource = %q, want mic.capture", pending[0].Resource)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 4,
+			Reason:     "microphone_readded",
+			Capabilities: map[string]string{
+				"camera.present":     "true",
+				"microphone.present": "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability full regain delta) error = %v", err)
+	}
+
+	claimsAfterFullRegain := router.Claims().Snapshot("device-1")
+	if len(claimsAfterFullRegain) != 2 {
+		t.Fatalf("active claims after full regain = %d, want 2", len(claimsAfterFullRegain))
+	}
+	claimByResource := map[string]string{}
+	for _, claim := range claimsAfterFullRegain {
+		claimByResource[claim.Resource] = claim.ActivationID
+	}
+	if claimByResource["camera.capture"] != "activation-camera" {
+		t.Fatalf("camera.capture activation = %q, want activation-camera", claimByResource["camera.capture"])
+	}
+	if claimByResource["mic.capture"] != "activation-mic" {
+		t.Fatalf("mic.capture activation = %q, want activation-mic", claimByResource["mic.capture"])
+	}
+	if len(handler.suspendedClaimsByDevice["device-1"]) != 0 {
+		t.Fatalf("expected no suspended claims after full regain")
+	}
+}
+
 func TestHandleMessageCapabilityDeltaEmitsTypedCapabilityEvents(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
