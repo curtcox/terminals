@@ -88,6 +88,7 @@ Coverage data is written to `terminal_client/coverage/lcov.info`.
 3. The client discovers the server via mDNS, or enter `host:port` manually.
 4. The client communicates over gRPC (port 50051 by default) and uses WebRTC for media streams.
 
-Explicit server alerts (`ConnectResponse.notification`) use in-app status text
-plus speech synthesis on web; native OS notification-center delivery is only
-available on non-web targets.
+Explicit server alerts (`ConnectResponse.notification`) use in-app status text,
+speech synthesis, and the browser Notification API on web when permission is
+granted. If notification permission is denied or unavailable, delivery remains
+best-effort and still falls back to in-app text plus speech.

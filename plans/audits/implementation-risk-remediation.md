@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-25: Implemented Stage 9 web alert parity by replacing the web alert-delivery no-op with browser Notification API dispatch (permission-gated, best-effort) while preserving in-app status text + speech fallback semantics; updated web client docs to describe granted/denied permission behavior.
 - 2026-04-25: Hardened Stage 4 capability-flattening truthfulness in the server generated-proto adapter by omitting default-false sensor/connectivity fields and empty edge runtime/operator declarations (`edge.runtimes`/`edge.operators`) unless explicitly true/non-empty, with transport regression coverage locking omission behavior for sparse capability payloads.
 - 2026-04-25: Fixed a regression in Stage 4/8 capability truthfulness by removing platform-heuristic monitor-tier operator injection (`edge.operators=monitor.tier.foreground_only`) from default client capability probing so monitor operators are omitted unless explicitly sourced; updated probe/widget regressions and server docs to lock omission behavior.
 - 2026-04-25: Hardened Stage 6 edge persistence lifecycle by fixing durable IO bundle reload ID round-tripping (decode persisted filename-encoded bundle IDs on load) and adding deterministic client IO-storage regression coverage for bundle/artifact reload across process restarts, including corrupt bundle-file tolerance while retaining valid entries.
