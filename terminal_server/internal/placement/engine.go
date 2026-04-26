@@ -162,8 +162,7 @@ func hasCapability(d device.Device, capName string) bool {
 	}
 	value, ok := d.Capabilities[capName]
 	if ok {
-		v := strings.ToLower(strings.TrimSpace(value))
-		return v != "" && v != "false" && v != "0" && v != "off" && v != "no"
+		return capabilityValueIsTruthy(value)
 	}
 	// Allow "screen" to match capability keys like "screen.width".
 	prefix := capName + "."
@@ -171,12 +170,16 @@ func hasCapability(d device.Device, capName string) bool {
 		if !strings.HasPrefix(key, prefix) {
 			continue
 		}
-		v := strings.ToLower(strings.TrimSpace(value))
-		if v != "" && v != "false" && v != "0" && v != "off" && v != "no" {
+		if capabilityValueIsTruthy(value) {
 			return true
 		}
 	}
 	return false
+}
+
+func capabilityValueIsTruthy(value string) bool {
+	v := strings.ToLower(strings.TrimSpace(value))
+	return v != "" && v != "false" && v != "0" && v != "off" && v != "no"
 }
 
 func matchesScope(d device.Device, scope scenario.TargetScope) bool {
@@ -210,8 +213,8 @@ func roleRequiresBackgroundSupport(role string) bool {
 }
 
 func deviceSupportsBackgroundMonitoring(d device.Device) bool {
-	if hasCapability(d, "monitor.background_capable") {
-		return true
+	if value, ok := d.Capabilities["monitor.background_capable"]; ok {
+		return capabilityValueIsTruthy(value)
 	}
 	return strings.EqualFold(strings.TrimSpace(d.Capabilities["monitor.support_tier"]), "background_capable")
 }

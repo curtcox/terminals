@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-26: Hardened Stage 4 background-monitor placement truthfulness so an explicit `monitor.background_capable=false` now overrides `monitor.support_tier=background_capable` fallback, preventing contradictory manifests from being treated as background-capable; added placement regression coverage locking explicit-false precedence.
 - 2026-04-26: Removed synthetic display-primary and endpoint-availability defaults from client capability metadata by no longer forcing `display.primary=true` or media endpoint `available=true` in probe/runtime display updates, and added probe/widget regression assertions locking those fields omitted/default-false unless explicitly sourced.
 - 2026-04-26: Removed synthetic default display identity declarations from client capability metadata (`display.display_id='main'`, `display.display_name='Primary Display'`) in both probe-time snapshots and runtime display refresh so display identity fields are omitted unless explicitly sourced, and added probe regression assertions locking those fields absent by default.
 - 2026-04-26: Removed synthetic default edge runtime declaration from client capability probing so `edge.runtimes` is omitted unless explicitly sourced, and updated probe regression assertions to lock default edge omission at probe time.

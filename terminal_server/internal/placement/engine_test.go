@@ -243,3 +243,36 @@ func TestFindBackgroundRoleSkipsForegroundOnlyDevices(t *testing.T) {
 		t.Fatalf("DevicesWithRole(background_monitor) = %+v, want [background-capable]", got)
 	}
 }
+
+func TestFindBackgroundRoleExplicitFalseOverridesSupportTier(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{
+		DeviceID: "background-false",
+		Capabilities: device.CapabilitySet{
+			"monitor.background_capable": "false",
+			"monitor.support_tier":       "background_capable",
+		},
+	})
+	_, _ = devices.Register(device.Manifest{
+		DeviceID: "background-true",
+		Capabilities: device.CapabilitySet{
+			"monitor.background_capable": "true",
+			"monitor.support_tier":       "background_capable",
+		},
+	})
+	_ = devices.UpdatePlacement("background-false", device.PlacementMetadata{
+		Roles: []string{"background_monitor"},
+	})
+	_ = devices.UpdatePlacement("background-true", device.PlacementMetadata{
+		Roles: []string{"background_monitor"},
+	})
+
+	engine := NewManagerBackedEngine(devices)
+	got, err := engine.DevicesWithRole(context.Background(), "background_monitor")
+	if err != nil {
+		t.Fatalf("DevicesWithRole(background_monitor) error = %v", err)
+	}
+	if len(got) != 1 || got[0].DeviceID != "background-true" {
+		t.Fatalf("DevicesWithRole(background_monitor) = %+v, want [background-true]", got)
+	}
+}
