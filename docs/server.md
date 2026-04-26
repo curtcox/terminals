@@ -93,10 +93,27 @@ cd terminal_server && go run ./cmd/server
 
 On startup the server will:
 
-1. Listen for gRPC connections on port 50051 (default).
-2. Advertise itself via mDNS so clients can auto-discover it.
-3. Start the admin dashboard at `http://localhost:50053/admin`.
-4. Optionally start the photo-frame asset server on port 50052.
+1. Listen for gRPC control connections on port 50051 (default).
+2. Listen for WebSocket control connections on port 50054 (default).
+3. Listen for TCP control connections on port 50055 (default).
+4. Listen for HTTP fallback control connections on port 50056 (default).
+5. Advertise service and carrier metadata via mDNS so clients can auto-discover it.
+6. Start the admin dashboard at `http://localhost:50053/admin`.
+7. Optionally start the photo-frame asset server on port 50052.
+
+## Control Transport Carriers
+
+The control plane is carrier-neutral and supports the same logical session
+semantics across these listeners:
+
+- gRPC: preferred transport when HTTP/2 and long-lived streams are available.
+- WebSocket: browser-friendly fallback using binary protobuf envelopes.
+- TCP: length-framed socket fallback for constrained or non-HTTP environments.
+- HTTP: correctness-first fallback for restrictive request/response-only paths.
+
+mDNS TXT metadata advertises per-carrier endpoints (`grpc`, `ws`, `tcp`,
+`http`) and an ordered `priority` list. Clients use this advertised order,
+filtered by runtime support, when selecting or failing over carriers.
 
 ## Test
 

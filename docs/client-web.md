@@ -86,7 +86,16 @@ Coverage data is written to `terminal_client/coverage/lcov.info`.
 1. Start the server first (see [server.md](server.md)).
 2. Start the web client.
 3. The client discovers the server via mDNS, or enter `host:port` manually.
-4. The client communicates over gRPC (port 50051 by default) and uses WebRTC for media streams.
+4. The web runtime communicates over WebSocket control transport (default `ws://<host>:50054/control`) and uses WebRTC for media streams.
+
+### Transport Selection and Fallback
+
+- Web builds only support the WebSocket control carrier.
+- The server still advertises all carrier endpoints and priority over mDNS so
+  non-web clients can automatically fail over across gRPC, WebSocket, TCP, and
+  HTTP as needed.
+- If all attempted carriers fail, the client records transport attempt
+  diagnostics and surfaces the failure in local UI diagnostics.
 
 Explicit server alerts (`ConnectResponse.notification`) use in-app status text,
 speech synthesis, and the browser Notification API on web when permission is
