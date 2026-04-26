@@ -268,7 +268,11 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"artifact patch",
 		"canvas annotate",
 		"search query",
+		"search timeline",
+		"search related",
+		"search recent",
 		"memory remember",
+		"memory stream",
 		"placement ls",
 		"recent ls",
 		"store put",
@@ -391,8 +395,16 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","annotation":{"id":"ann-1"}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/search":
 			_, _ = w.Write([]byte(`{"results":[{"id":"msg-1"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/search/timeline":
+			_, _ = w.Write([]byte(`{"items":[{"id":"timeline-1","kind":"message"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/search/related":
+			_, _ = w.Write([]byte(`{"results":[{"id":"related-1"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/search/recent":
+			_, _ = w.Write([]byte(`{"items":[{"id":"recent-1","kind":"memory"}]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/memory/remember":
 			_, _ = w.Write([]byte(`{"status":"ok","memory":{"id":"mem-1"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/memory/stream":
+			_, _ = w.Write([]byte(`{"memories":[{"id":"mem-1","scope":"kitchen"}]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/placement":
 			_, _ = w.Write([]byte(`{"placements":[{"device_id":"d1","zone":"kitchen"}]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/recent":
@@ -419,7 +431,11 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"artifact patch art-1 math advanced",
 		"canvas annotate canvas-1 note",
 		"search query hello",
+		"search timeline message",
+		"search related board_post_42",
+		"search recent memory",
 		"memory remember kitchen milk",
+		"memory stream kitchen",
 		"placement ls",
 		"recent ls",
 		"store put notes key1 value1",
@@ -452,6 +468,15 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "ann-1") {
 		t.Fatalf("canvas output missing: %q", text)
+	}
+	if !strings.Contains(text, "timeline-1") {
+		t.Fatalf("search timeline output missing: %q", text)
+	}
+	if !strings.Contains(text, "related-1") {
+		t.Fatalf("search related output missing: %q", text)
+	}
+	if !strings.Contains(text, "recent-1") {
+		t.Fatalf("search recent output missing: %q", text)
 	}
 	if !strings.Contains(text, "evt-1") {
 		t.Fatalf("recent output missing: %q", text)

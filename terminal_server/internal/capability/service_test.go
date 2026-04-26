@@ -74,3 +74,41 @@ func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 		t.Fatalf("Search(advanced) should include patched artifact id %q, got %+v", artifact.ID, results)
 	}
 }
+
+func TestSearchTimelineRelatedRecentAndMemoryStream(t *testing.T) {
+	svc := NewService()
+	svc.PostMessage("kitchen", "buy milk and bread")
+	svc.PinBoard("groceries", "milk list")
+	svc.CreateArtifact("note", "family milk plan")
+	memKitchen := svc.Remember("kitchen", "milk on shelf two")
+	svc.Remember("garage", "replace bulb")
+
+	timeline := svc.SearchTimeline("memory")
+	if len(timeline) == 0 {
+		t.Fatalf("SearchTimeline(memory) returned no rows")
+	}
+	if timeline[len(timeline)-1].Kind != "memory" {
+		t.Fatalf("SearchTimeline(memory) last kind = %q, want memory", timeline[len(timeline)-1].Kind)
+	}
+
+	related := svc.SearchRelated("milk")
+	if len(related) < 3 {
+		t.Fatalf("SearchRelated(milk) = %+v, want at least 3 matches", related)
+	}
+
+	recent := svc.SearchRecent("memory", 1)
+	if len(recent) != 1 {
+		t.Fatalf("SearchRecent(memory,1) len = %d, want 1", len(recent))
+	}
+	if recent[0].Kind != "memory" {
+		t.Fatalf("SearchRecent(memory,1) kind = %q, want memory", recent[0].Kind)
+	}
+
+	stream := svc.MemoryStream("kitchen")
+	if len(stream) != 1 {
+		t.Fatalf("MemoryStream(kitchen) len = %d, want 1", len(stream))
+	}
+	if stream[0].ID != memKitchen.ID {
+		t.Fatalf("MemoryStream(kitchen)[0].ID = %q, want %q", stream[0].ID, memKitchen.ID)
+	}
+}

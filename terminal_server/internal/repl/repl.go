@@ -82,8 +82,12 @@ func replCommandSpecs() []commandSpec {
 		{Name: "canvas ls", Usage: "canvas ls [canvas] [--json]", Summary: "List canvas annotations", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/canvas"}},
 		{Name: "canvas annotate", Usage: "canvas annotate <canvas> <text> [--json]", Summary: "Annotate a shared canvas", Classification: commandMutating, RelatedDocs: []string{"repl/commands/canvas"}},
 		{Name: "search query", Usage: "search query <text> [--json]", Summary: "Run unified search", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/search"}},
+		{Name: "search timeline", Usage: "search timeline [scope] [--json]", Summary: "View timeline-oriented search results", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/search"}},
+		{Name: "search related", Usage: "search related <subject-ref> [--json]", Summary: "Find related indexed content", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/search"}},
+		{Name: "search recent", Usage: "search recent [scope] [--json]", Summary: "List recent search-visible activity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/search"}},
 		{Name: "memory remember", Usage: "memory remember <scope> <text> [--json]", Summary: "Store a memory entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/memory"}},
 		{Name: "memory recall", Usage: "memory recall <text> [--json]", Summary: "Recall memory entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
+		{Name: "memory stream", Usage: "memory stream [scope] [--json]", Summary: "Show memory stream entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
 		{Name: "placement ls", Usage: "placement ls [--json]", Summary: "List placement metadata", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/placement"}},
 		{Name: "recent ls", Usage: "recent ls [--json]", Summary: "List recent activity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/recent"}},
 		{Name: "store put", Usage: "store put <namespace> <key> <value> [--json]", Summary: "Write typed key-value state", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
@@ -782,18 +786,52 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			return fmt.Errorf("unknown command: canvas %s", sub)
 		}
 	case "search":
-		if sub != "query" {
+		switch sub {
+		case "query":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) == 0 {
+				return errors.New("usage: search query <text>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/search", url.Values{"q": {strings.Join(plain, " ")}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "timeline":
+			query := url.Values{}
+			plain := nonFlagArgs(args[1:])
+			if len(plain) > 0 {
+				query.Set("scope", plain[0])
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/search/timeline", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "related":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) == 0 {
+				return errors.New("usage: search related <subject-ref>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/search/related", url.Values{"subject": {strings.Join(plain, " ")}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "recent":
+			query := url.Values{}
+			plain := nonFlagArgs(args[1:])
+			if len(plain) > 0 {
+				query.Set("scope", plain[0])
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/search/recent", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		default:
 			return fmt.Errorf("unknown command: search %s", sub)
 		}
-		plain := nonFlagArgs(args[1:])
-		if len(plain) == 0 {
-			return errors.New("usage: search query <text>")
-		}
-		body, err := s.fetchJSONQuery(ctx, "/admin/api/search", url.Values{"q": {strings.Join(plain, " ")}})
-		if err != nil {
-			return err
-		}
-		return writeJSON(s.out, body)
 	case "memory":
 		switch sub {
 		case "remember":
@@ -823,6 +861,17 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return errors.New("usage: memory recall <text>")
 			}
 			body, err := s.fetchJSONQuery(ctx, "/admin/api/memory", url.Values{"q": {strings.Join(plain, " ")}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "stream":
+			query := url.Values{}
+			plain := nonFlagArgs(args[1:])
+			if len(plain) > 0 {
+				query.Set("scope", plain[0])
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/memory/stream", query)
 			if err != nil {
 				return err
 			}

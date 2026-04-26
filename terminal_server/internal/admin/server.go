@@ -114,7 +114,11 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/canvas", h.handleCanvas)
 	mux.HandleFunc("/admin/api/canvas/annotate", h.handleCanvasAnnotate)
 	mux.HandleFunc("/admin/api/search", h.handleSearch)
+	mux.HandleFunc("/admin/api/search/timeline", h.handleSearchTimeline)
+	mux.HandleFunc("/admin/api/search/related", h.handleSearchRelated)
+	mux.HandleFunc("/admin/api/search/recent", h.handleSearchRecent)
 	mux.HandleFunc("/admin/api/memory", h.handleMemoryRecall)
+	mux.HandleFunc("/admin/api/memory/stream", h.handleMemoryStream)
 	mux.HandleFunc("/admin/api/memory/remember", h.handleMemoryRemember)
 	mux.HandleFunc("/admin/api/placement", h.handlePlacement)
 	mux.HandleFunc("/admin/api/recent", h.handleRecent)
@@ -451,12 +455,44 @@ func (h *Handler) handleSearch(w http.ResponseWriter, req *http.Request) {
 	h.writeJSON(w, http.StatusOK, map[string]any{"results": h.capability.Search(req.URL.Query().Get("q"))})
 }
 
+func (h *Handler) handleSearchTimeline(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"items": h.capability.SearchTimeline(req.URL.Query().Get("scope"))})
+}
+
+func (h *Handler) handleSearchRelated(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"results": h.capability.SearchRelated(req.URL.Query().Get("subject"))})
+}
+
+func (h *Handler) handleSearchRecent(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"items": h.capability.SearchRecent(req.URL.Query().Get("scope"), 20)})
+}
+
 func (h *Handler) handleMemoryRecall(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"memories": h.capability.Recall(req.URL.Query().Get("q"))})
+}
+
+func (h *Handler) handleMemoryStream(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"memories": h.capability.MemoryStream(req.URL.Query().Get("scope"))})
 }
 
 func (h *Handler) handleMemoryRemember(w http.ResponseWriter, req *http.Request) {
