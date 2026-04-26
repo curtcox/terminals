@@ -32,6 +32,8 @@ terminal_server/
 - Device manager: tracks connected terminals and runtime state.
 - Placement engine: resolves semantic scopes (zones/roles) into concrete
   device targets.
+- World model: stores calibrated device/entity records plus filtered recent
+  observation history for sensing queries.
 - IO router + claim manager: compiles media plans, applies routing, and
   arbitrates resource preemption.
 - Endpoint-scoped resources are first-class claim targets (`audio_in.<id>.capture`,
@@ -288,6 +290,19 @@ Primary transport evidence lives in generated and wire integration tests under
 
 - `TestGeneratedSessionTerminalTransitions`
 - `TestWireSessionTerminalTransitions`
+
+## World Model and Observation History
+
+The in-memory world model (`terminal_server/internal/world`) provides:
+
+- calibration and verification state for fixed devices,
+- entity lookup helpers (`LocateEntity`, `WhoIsHome`, `VerifyDevice`), and
+- filtered recent-observation queries (`RecentObservations`) over the same
+  observation stream used by sensing scenarios.
+
+The media planner observation sink feeds both the scenario observation store
+and the world model so localization and presence queries can share a
+consistent recent history source.
 
 ## Server-Driven UI Contract
 

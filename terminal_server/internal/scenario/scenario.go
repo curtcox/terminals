@@ -442,4 +442,5 @@ type WorldModel interface {
 	LocateEntity(ctx context.Context, q EntityQuery) (*iorouter.LocationEstimate, error)
 	WhoIsHome(ctx context.Context) ([]EntityRecord, error)
 	VerifyDevice(ctx context.Context, deviceID string, method string) error
+	RecentObservations(ctx context.Context, zone string, kind string, since time.Time) ([]iorouter.Observation, error)
 }

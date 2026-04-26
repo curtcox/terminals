@@ -46,3 +46,32 @@ func TestModelLocateAndVerifyDevice(t *testing.T) {
 		t.Fatalf("verification state = %q, want marker", geometry.VerificationState)
 	}
 }
+
+func TestModelRecentObservations(t *testing.T) {
+	now := time.Now().UTC()
+	model := NewModel()
+
+	model.AddObservation(context.Background(), iorouter.Observation{
+		Kind:       "sound.classifier",
+		Zone:       "kitchen",
+		Subject:    "dishwasher",
+		OccurredAt: now,
+	})
+	model.AddObservation(context.Background(), iorouter.Observation{
+		Kind:       "bluetooth",
+		Zone:       "garage",
+		Subject:    "headphones",
+		OccurredAt: now.Add(-2 * time.Minute),
+	})
+
+	observations, err := model.RecentObservations(context.Background(), "kitchen", "sound", now.Add(-time.Minute))
+	if err != nil {
+		t.Fatalf("RecentObservations() error = %v", err)
+	}
+	if len(observations) != 1 {
+		t.Fatalf("len(observations) = %d, want 1", len(observations))
+	}
+	if observations[0].Subject != "dishwasher" {
+		t.Fatalf("subject = %q, want dishwasher", observations[0].Subject)
+	}
+}

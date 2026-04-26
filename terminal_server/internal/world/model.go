@@ -77,16 +77,19 @@ var ErrNotFound = errors.New("world model record not found")
 
 // Model is an in-memory world model with calibration and entity records.
 type Model struct {
-	mu         sync.RWMutex
-	geometries map[string]DeviceGeometry
-	entities   map[string]EntityRecord
+	mu              sync.RWMutex
+	geometries      map[string]DeviceGeometry
+	entities        map[string]EntityRecord
+	observations    []iorouter.Observation
+	maxObservations int
 }
 
 // NewModel returns an empty world model.
 func NewModel() *Model {
 	return &Model{
-		geometries: make(map[string]DeviceGeometry),
-		entities:   make(map[string]EntityRecord),
+		geometries:      make(map[string]DeviceGeometry),
+		entities:        make(map[string]EntityRecord),
+		maxObservations: 2048,
 	}
 }
 
@@ -128,6 +131,55 @@ func (m *Model) UpsertEntity(_ context.Context, entity EntityRecord) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.entities[entity.EntityID] = entity
+}
+
+// AddObservation stores one recent observation for world-model queries.
+func (m *Model) AddObservation(_ context.Context, observation iorouter.Observation) {
+	if m == nil {
+		return
+	}
+	if observation.OccurredAt.IsZero() {
+		observation.OccurredAt = time.Now().UTC()
+	}
+	if observation.Attributes == nil {
+		observation.Attributes = map[string]string{}
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.observations = append(m.observations, observation)
+	if over := len(m.observations) - m.maxObservations; over > 0 {
+		m.observations = append([]iorouter.Observation(nil), m.observations[over:]...)
+	}
+}
+
+// RecentObservations returns observations filtered by zone/kind/since.
+func (m *Model) RecentObservations(_ context.Context, zone string, kind string, since time.Time) ([]iorouter.Observation, error) {
+	if m == nil {
+		return nil, nil
+	}
+	zone = strings.TrimSpace(strings.ToLower(zone))
+	kind = strings.TrimSpace(strings.ToLower(kind))
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	out := make([]iorouter.Observation, 0, len(m.observations))
+	for i := len(m.observations) - 1; i >= 0; i-- {
+		ob := m.observations[i]
+		if !since.IsZero() && ob.OccurredAt.Before(since) {
+			continue
+		}
+		if zone != "" && strings.ToLower(strings.TrimSpace(ob.Zone)) != zone {
+			continue
+		}
+		if kind != "" && !strings.Contains(strings.ToLower(ob.Kind), kind) {
+			continue
+		}
+		out = append(out, ob)
+	}
+	return out, nil
 }
 
 // LocateEntity resolves an entity to its best-known location.

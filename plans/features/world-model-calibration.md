@@ -1,14 +1,24 @@
 ---
 title: "World Model and Calibration"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # World Model and Calibration
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. The existing [placement plan](placement.md) already gives devices zones and roles. This document extends that world model so the system can localize sounds, people, objects, radios, and terminals.
+
+## Progress (2026-04-26)
+
+Implemented an initial world-model observation query path in the server runtime:
+
+- Added `RecentObservations(zone, kind, since)` to the world-model interface and adapter wiring.
+- Wired the media planner observation sink to store observations in the world model.
+- Added filtering tests for world-model observation history queries.
+
+Remaining work in this plan includes richer calibration geometry fields, dedicated calibration workflows, and admin visualization surfaces.
 
 ## Design Principle
 Semantic placement still matters most. Users speak in room and role language. The spatial model exists to support:

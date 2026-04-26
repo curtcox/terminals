@@ -169,6 +169,7 @@ func main() {
 	})
 	ioRouter.MediaPlanner().SetObservationSink(func(observation iorouter.Observation) {
 		observationStore.AddObservation(context.Background(), observation)
+		worldModel.AddObservation(context.Background(), observation)
 	})
 	if err := scenarioRuntime.RecoverActivations(ctx); err != nil {
 		logger.Error("recover scenario activations", "event", "scenario.recovery.failed", "error", err)
@@ -913,6 +914,13 @@ func (w worldModelAdapter) VerifyDevice(ctx context.Context, deviceID string, me
 		return world.ErrNotFound
 	}
 	return w.model.VerifyDevice(ctx, deviceID, method)
+}
+
+func (w worldModelAdapter) RecentObservations(ctx context.Context, zone string, kind string, since time.Time) ([]iorouter.Observation, error) {
+	if w.model == nil {
+		return nil, nil
+	}
+	return w.model.RecentObservations(ctx, zone, kind, since)
 }
 
 // buildTelephonyBridge returns the configured telephony bridge for the

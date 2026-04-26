@@ -36,6 +36,10 @@ func (s stubWorldModel) VerifyDevice(context.Context, string, string) error {
 	return nil
 }
 
+func (s stubWorldModel) RecentObservations(context.Context, string, string, time.Time) ([]iorouter.Observation, error) {
+	return nil, nil
+}
+
 type stubBroadcast struct {
 	last string
 }
