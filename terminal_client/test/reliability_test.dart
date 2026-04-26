@@ -338,5 +338,40 @@ void main() {
         SendMode.queueUntilReady,
       );
     });
+
+    test('requires ack for register and bug-report operations', () {
+      expect(
+        kOutboundRoutingRules[OutboundOperation.bootstrapRegister]?.requiresAck,
+        isTrue,
+      );
+      expect(
+        kOutboundRoutingRules[OutboundOperation.bugReport]?.requiresAck,
+        isTrue,
+      );
+    });
+
+    test('keeps launch command queue-until-ready without ack requirement', () {
+      final launchRule =
+          kOutboundRoutingRules[OutboundOperation.launchApplication];
+      expect(launchRule, isNotNull);
+      expect(launchRule?.mode, SendMode.queueUntilReady);
+      expect(launchRule?.requiresAck, isFalse);
+    });
+
+    test('marks reliable query operations as safe to replay', () {
+      for (final operation in <OutboundOperation>{
+        OutboundOperation.runtimeQuery,
+        OutboundOperation.deviceQuery,
+        OutboundOperation.scenarioQuery,
+        OutboundOperation.playbackArtifactsQuery,
+        OutboundOperation.playbackMetadataQuery,
+      }) {
+        final rule = kOutboundRoutingRules[operation];
+        expect(rule, isNotNull, reason: 'missing routing rule for $operation');
+        expect(rule?.mode, SendMode.queueUntilReady);
+        expect(rule?.safeToReplay, isTrue);
+        expect(rule?.requiresAck, isFalse);
+      }
+    });
   });
 }

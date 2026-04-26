@@ -50,6 +50,50 @@ the session is expected to stay online.
   diagnostics.
 - If all carriers fail, client schedules reconnect with backoff.
 
+## Reliability Model
+
+The client uses one shared reliability path for outbound control messages.
+
+### Connection phase source of truth
+
+Client connection status is derived from a single phase enum:
+
+- `disconnected`
+- `connecting`
+- `connected_unregistered`
+- `registered`
+- `degraded`
+
+UI connection chips, readiness checks, and dispatch gating use this shared phase
+model rather than per-feature booleans.
+
+### Shared readiness gateway
+
+Before queue-until-ready and ack-required sends, the client calls a shared
+readiness helper (`ensureConnectedAndRegistered`) that:
+
+1. starts transport/registration when needed,
+2. polls for `registered` phase using shared retry timing,
+3. returns typed readiness outcomes (`ready`, `timeout`, `failed`).
+
+### Shared outbound routing rules
+
+Outbound operations declare one routing rule each:
+
+- send mode (`fire_and_forget`, `queue_until_ready`, `require_ack`),
+- replay safety (`safe_to_replay`),
+- whether ack is required.
+
+These rules are centralized in
+`terminal_client/lib/connection/reliability.dart` and consumed by
+`_sendWhenReady(...)` in `terminal_client/lib/main.dart`.
+
+### Shared retry policy
+
+Retry intervals and timeout windows are defined by reusable retry policies and
+controllers (fixed or exponential backoff) instead of duplicated watchdogs in
+individual features.
+
 ## Trust Model
 
 For trusted home LAN deployments, discovery plus direct connection is
