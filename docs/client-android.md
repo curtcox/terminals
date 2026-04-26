@@ -76,13 +76,19 @@ The Android manifest (`terminal_client/android/app/src/main/AndroidManifest.xml`
 
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.CAMERA" />
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 ```
 
 - `INTERNET` — gRPC and WebRTC communication.
+- `CAMERA` — camera access for live video scenarios.
 - `RECORD_AUDIO` — microphone access for voice/WebRTC features.
 - `CHANGE_WIFI_MULTICAST_STATE` — mDNS server discovery on the local network.
+
+When camera or microphone permission is denied at runtime, the client surfaces a
+deterministic control-stream status (`Media permission required`) and emits a
+failure notification for the rejected stream start.
 
 ## Test
 

@@ -58,6 +58,14 @@ terminal_client/build/linux/x64/release/bundle/
 
 The `bundle/` directory is self-contained and can be copied to another machine with the same architecture.
 
+## Media Permission Limits
+
+Linux desktop builds rely on host portal/device-stack behavior for camera and
+microphone access, and prompt UX is compositor/desktop-environment dependent.
+If prompts are blocked or denied, media starts fail with a deterministic
+client status (`Media permission required`) plus a stream-start failure
+notification instead of hanging.
+
 ## Test
 
 ```bash

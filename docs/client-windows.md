@@ -53,6 +53,13 @@ terminal_client\build\windows\x64\runner\Release\
 
 The `Release\` directory is self-contained and can be distributed to other Windows machines.
 
+## Media Permission Limits
+
+Windows camera/microphone access depends on system privacy settings and per-app
+desktop access policy. If camera or microphone access is blocked, media starts
+fail with a deterministic client status (`Media permission required`) and a
+stream-start failure notification instead of hanging.
+
 ## Test
 
 ```powershell

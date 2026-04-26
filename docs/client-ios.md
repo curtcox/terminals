@@ -72,6 +72,7 @@ The iOS `Info.plist` (`terminal_client/ios/Runner/Info.plist`) must include usag
 
 | Key | When needed |
 |-----|-------------|
+| `NSCameraUsageDescription` | Video input / WebRTC |
 | `NSMicrophoneUsageDescription` | Audio input / WebRTC |
 | `NSLocalNetworkUsageDescription` | mDNS server discovery |
 | `NSBonjourServices` | mDNS discovery (`_terminals._tcp`) |
@@ -86,8 +87,14 @@ Example entries:
     <string>_terminals._tcp</string>
 </array>
 <key>NSMicrophoneUsageDescription</key>
-<string>Terminals uses the microphone for voice features.</string>
+<string>Terminals needs microphone access for live audio scenarios.</string>
+<key>NSCameraUsageDescription</key>
+<string>Terminals needs camera access for live video scenarios.</string>
 ```
+
+When camera or microphone permission is denied at runtime, the client surfaces
+a deterministic control-stream status (`Media permission required`) and emits a
+failure notification for the rejected stream start.
 
 ## Test
 

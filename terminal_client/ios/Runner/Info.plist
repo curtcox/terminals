@@ -26,6 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Terminals uses the local network to discover nearby servers.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_terminals._tcp</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Terminals needs camera access for live video scenarios.</string>
 	<key>NSMicrophoneUsageDescription</key>

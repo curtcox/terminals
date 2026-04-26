@@ -19,17 +19,21 @@ void main() {
     }
   });
 
-  test('android manifest includes camera and microphone permissions', () {
+  test('android manifest includes required network and media permissions', () {
     final manifest =
         File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
 
+    expect(manifest, contains('android.permission.INTERNET'));
+    expect(manifest, contains('android.permission.CHANGE_WIFI_MULTICAST_STATE'));
     expect(manifest, contains('android.permission.CAMERA'));
     expect(manifest, contains('android.permission.RECORD_AUDIO'));
   });
 
-  test('ios Info.plist includes camera and microphone usage strings', () {
+  test('ios Info.plist includes network discovery and media usage strings', () {
     final plist = File('ios/Runner/Info.plist').readAsStringSync();
 
+    expect(plist, contains('NSLocalNetworkUsageDescription'));
+    expect(plist, contains('NSBonjourServices'));
     expect(plist, contains('NSCameraUsageDescription'));
     expect(plist, contains('NSMicrophoneUsageDescription'));
   });
