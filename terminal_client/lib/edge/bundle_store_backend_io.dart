@@ -5,12 +5,13 @@ import 'dart:typed_data';
 import 'bundle_store_backend.dart';
 
 class _IOBundleStoreBackend implements BundleStoreBackend {
-  _IOBundleStoreBackend() : _dir = _resolveDir();
+  _IOBundleStoreBackend({Directory? rootDir}) : _dir = _resolveDir(rootDir);
 
   final Directory _dir;
 
-  static Directory _resolveDir() {
-    final root = Directory('${_edgeStorageRootDir().path}/bundles');
+  static Directory _resolveDir(Directory? rootDir) {
+    final root =
+        Directory('${(rootDir ?? _edgeStorageRootDir()).path}/bundles');
     if (!root.existsSync()) {
       root.createSync(recursive: true);
     }
@@ -27,9 +28,10 @@ class _IOBundleStoreBackend implements BundleStoreBackend {
       if (entity is! File || !entity.path.endsWith('.b64')) {
         continue;
       }
-      final id = entity.uri.pathSegments.isNotEmpty
-          ? entity.uri.pathSegments.last.replaceAll('.b64', '')
+      final fileName = entity.uri.pathSegments.isNotEmpty
+          ? entity.uri.pathSegments.last
           : '';
+      final id = _decodeBundleIDFromFileName(fileName);
       if (id.isEmpty) {
         continue;
       }
@@ -45,13 +47,13 @@ class _IOBundleStoreBackend implements BundleStoreBackend {
 
   @override
   Future<void> put(String bundleId, Uint8List payload) async {
-    final file = File('${_dir.path}/${Uri.encodeComponent(bundleId)}.b64');
+    final file = File('${_dir.path}/${_bundleStorageFileName(bundleId)}');
     file.writeAsStringSync(base64Encode(payload), flush: true);
   }
 
   @override
   Future<void> remove(String bundleId) async {
-    final file = File('${_dir.path}/${Uri.encodeComponent(bundleId)}.b64');
+    final file = File('${_dir.path}/${_bundleStorageFileName(bundleId)}');
     if (file.existsSync()) {
       file.deleteSync();
     }
@@ -60,6 +62,27 @@ class _IOBundleStoreBackend implements BundleStoreBackend {
 
 BundleStoreBackend createPlatformBundleStoreBackend() =>
     _IOBundleStoreBackend();
+
+BundleStoreBackend createIOBundleStoreBackend({Directory? rootDir}) =>
+    _IOBundleStoreBackend(rootDir: rootDir);
+
+String _bundleStorageFileName(String bundleId) =>
+    '${Uri.encodeComponent(bundleId)}.b64';
+
+String _decodeBundleIDFromFileName(String fileName) {
+  if (!fileName.endsWith('.b64')) {
+    return '';
+  }
+  final encoded = fileName.substring(0, fileName.length - 4);
+  if (encoded.isEmpty) {
+    return '';
+  }
+  try {
+    return Uri.decodeComponent(encoded);
+  } catch (_) {
+    return '';
+  }
+}
 
 Directory _edgeStorageRootDir() {
   final home = Platform.environment['HOME'] ?? Directory.systemTemp.path;

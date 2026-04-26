@@ -4,12 +4,13 @@ import 'dart:typed_data';
 import 'artifact_export_backend.dart';
 
 class _IOArtifactExportBackend implements ArtifactExportBackend {
-  _IOArtifactExportBackend() : _dir = _resolveDir();
+  _IOArtifactExportBackend({Directory? rootDir}) : _dir = _resolveDir(rootDir);
 
   final Directory _dir;
 
-  static Directory _resolveDir() {
-    final root = Directory('${_edgeStorageRootDir().path}/artifacts');
+  static Directory _resolveDir(Directory? rootDir) {
+    final root =
+        Directory('${(rootDir ?? _edgeStorageRootDir()).path}/artifacts');
     if (!root.existsSync()) {
       root.createSync(recursive: true);
     }
@@ -34,6 +35,9 @@ class _IOArtifactExportBackend implements ArtifactExportBackend {
 
 ArtifactExportBackend createPlatformArtifactExportBackend() =>
     _IOArtifactExportBackend();
+
+ArtifactExportBackend createIOArtifactExportBackend({Directory? rootDir}) =>
+    _IOArtifactExportBackend(rootDir: rootDir);
 
 Directory _edgeStorageRootDir() {
   final home = Platform.environment['HOME'] ?? Directory.systemTemp.path;
