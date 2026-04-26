@@ -178,5 +178,37 @@ void main() {
       );
       expect(fromCorruptHost.activeFlows, isEmpty);
     });
+
+    test('edge host patches active flow bundle assignments', () async {
+      final initialBundleID = 'pkg/audio.initial/v1';
+      final nextBundleID = 'pkg/audio.next/v1';
+
+      final store = await BundleStore.create(
+        backend: createIOBundleStoreBackend(rootDir: tempRoot),
+      );
+      final host = await EdgeHost.create(
+        bundleStore: store,
+        scheduler: EdgeScheduler(maxCPURealtime: 2, maxMemoryMB: 256),
+        retention: RetentionBufferManager(
+          audioSec: 10,
+          videoSec: 10,
+          sensorSec: 10,
+          radioSec: 10,
+        ),
+        stateBackend: createIOEdgeHostStateBackend(rootDir: tempRoot),
+      );
+
+      await host.installBundle(initialBundleID, <int>[1]);
+      await host.installBundle(nextBundleID, <int>[2]);
+      await host.startFlow('flow-c', bundleId: initialBundleID);
+
+      await host.patchFlow('flow-c', bundleId: nextBundleID);
+      expect(host.bundleForFlow('flow-c'), nextBundleID);
+
+      await expectLater(
+        () => host.patchFlow('missing-flow', bundleId: nextBundleID),
+        throwsA(isA<StateError>()),
+      );
+    });
   });
 }

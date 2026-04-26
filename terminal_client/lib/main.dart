@@ -14,6 +14,10 @@ import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/connection/reliability.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/edge/artifact_export.dart';
+import 'package:terminal_client/edge/bundle_store.dart';
+import 'package:terminal_client/edge/host.dart';
+import 'package:terminal_client/edge/retention.dart';
+import 'package:terminal_client/edge/scheduler.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
     as capv1;
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
@@ -1103,6 +1107,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   late final AudioPlayback _audioPlayback;
   late final WakeWordDetectorController _wakeWordDetector;
   late final DurableArtifactExporter _artifactExporter;
+  late final Future<EdgeHost> _edgeHostFuture;
   uiv1.Node? _activeRoot;
   int _activeRootRevision = 0;
   String _activeTransition = 'none';
@@ -1203,6 +1208,20 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   late final RetryController _registerAckRetryController;
 
   int _nowUnixMs() => widget.nowUnixMsProvider();
+
+  Future<EdgeHost> _createEdgeHost() async {
+    final bundleStore = await BundleStore.create();
+    return EdgeHost.create(
+      bundleStore: bundleStore,
+      scheduler: EdgeScheduler(maxCPURealtime: 2, maxMemoryMB: 512),
+      retention: RetentionBufferManager(
+        audioSec: 20,
+        videoSec: 10,
+        sensorSec: 600,
+        radioSec: 300,
+      ),
+    );
+  }
 
   ScreenMetrics? _injectedScreenMetrics() {
     final provider = widget.screenMetricsProvider;
@@ -1938,6 +1957,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _wakeWordDetector = widget.wakeWordDetectorFactory();
     _wakeWordDetector.setOnUtterance(_handleWakeWordUtterance);
     _artifactExporter = DurableArtifactExporter();
+    _edgeHostFuture = _createEdgeHost();
     _readinessGateway = ConnectionReadinessGateway(
       currentPhase: () => _connectionPhase,
       startConnection: _ensureConnectedForDispatch,
@@ -4334,6 +4354,21 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (response.hasPlayAudio()) {
       return 'Play audio';
     }
+    if (response.hasInstallBundle()) {
+      return 'Bundle install requested';
+    }
+    if (response.hasRemoveBundle()) {
+      return 'Bundle removal requested';
+    }
+    if (response.hasStartFlow()) {
+      return 'Flow start requested';
+    }
+    if (response.hasPatchFlow()) {
+      return 'Flow patch requested';
+    }
+    if (response.hasStopFlow()) {
+      return 'Flow stop requested';
+    }
     if (response.hasRequestArtifact()) {
       return 'Artifact requested';
     }
@@ -4407,8 +4442,158 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (response.hasPlayAudio()) {
       unawaited(_executePlayAudio(response.playAudio.deepCopy()));
     }
+    if (response.hasInstallBundle()) {
+      unawaited(_handleInstallBundle(response.installBundle.deepCopy()));
+    }
+    if (response.hasRemoveBundle()) {
+      unawaited(_handleRemoveBundle(response.removeBundle.deepCopy()));
+    }
+    if (response.hasStartFlow()) {
+      unawaited(_handleStartFlow(response.startFlow.deepCopy()));
+    }
+    if (response.hasPatchFlow()) {
+      unawaited(_handlePatchFlow(response.patchFlow.deepCopy()));
+    }
+    if (response.hasStopFlow()) {
+      unawaited(_handleStopFlow(response.stopFlow.deepCopy()));
+    }
     if (response.hasRequestArtifact()) {
       unawaited(_handleRequestArtifact(response.requestArtifact.deepCopy()));
+    }
+  }
+
+  String? _bundleIDFromFlowPlan(iov1.FlowPlan? plan) {
+    if (plan == null) {
+      return null;
+    }
+    for (final node in plan.nodes) {
+      final bundleID = (node.args['bundle_id'] ?? '').trim();
+      if (bundleID.isNotEmpty) {
+        return bundleID;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _handleInstallBundle(iov1.InstallBundle request) async {
+    final bundleID = request.bundleId.trim();
+    if (bundleID.isEmpty) {
+      return;
+    }
+    try {
+      final host = await _edgeHostFuture;
+      await host.installBundle(bundleID, request.tarGz);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Bundle installed: $bundleID';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Bundle install failed: $bundleID ($error)';
+      });
+    }
+  }
+
+  Future<void> _handleRemoveBundle(iov1.RemoveBundle request) async {
+    final bundleID = request.bundleId.trim();
+    if (bundleID.isEmpty) {
+      return;
+    }
+    try {
+      final host = await _edgeHostFuture;
+      await host.removeBundle(bundleID);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Bundle removed: $bundleID';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Bundle removal failed: $bundleID ($error)';
+      });
+    }
+  }
+
+  Future<void> _handleStartFlow(iov1.StartFlow request) async {
+    final flowID = request.flowId.trim();
+    if (flowID.isEmpty) {
+      return;
+    }
+    final bundleID = _bundleIDFromFlowPlan(request.plan);
+    try {
+      final host = await _edgeHostFuture;
+      await host.startFlow(flowID, bundleId: bundleID);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Flow started: $flowID';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Flow start failed: $flowID ($error)';
+      });
+    }
+  }
+
+  Future<void> _handlePatchFlow(iov1.PatchFlow request) async {
+    final flowID = request.flowId.trim();
+    if (flowID.isEmpty) {
+      return;
+    }
+    final bundleID = _bundleIDFromFlowPlan(request.plan);
+    try {
+      final host = await _edgeHostFuture;
+      await host.patchFlow(flowID, bundleId: bundleID);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Flow patched: $flowID';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Flow patch failed: $flowID ($error)';
+      });
+    }
+  }
+
+  Future<void> _handleStopFlow(iov1.StopFlow request) async {
+    final flowID = request.flowId.trim();
+    if (flowID.isEmpty) {
+      return;
+    }
+    try {
+      final host = await _edgeHostFuture;
+      await host.stopFlow(flowID);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Flow stopped: $flowID';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _lastNotification = 'Flow stop failed: $flowID ($error)';
+      });
     }
   }
 

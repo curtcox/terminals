@@ -72,6 +72,19 @@ class EdgeHost {
     await _persist();
   }
 
+  Future<void> patchFlow(String flowId, {String? bundleId}) async {
+    if (!_activeFlows.contains(flowId)) {
+      throw StateError('flow not active: $flowId');
+    }
+    if (bundleId != null && bundleStore.get(bundleId) == null) {
+      throw StateError('bundle not installed: $bundleId');
+    }
+    if (bundleId != null) {
+      _flowBundleByID[flowId] = bundleId;
+    }
+    await _persist();
+  }
+
   Future<void> stopFlow(String flowId) async {
     _activeFlows.remove(flowId);
     _flowBundleByID.remove(flowId);

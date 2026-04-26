@@ -169,6 +169,6 @@ calibration version.
 ## Related Design References
 
 - [observation-plane.md](observation-plane.md)
-- [../plans/features/edge-execution.md](../plans/features/edge-execution.md)
+- [edge-execution-runtime.md](edge-execution-runtime.md)
 - [../plans/features/world-model-calibration.md](../plans/features/world-model-calibration.md)
 - [../plans/features/application-runtime.md](../plans/features/application-runtime.md)
