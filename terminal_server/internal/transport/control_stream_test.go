@@ -451,6 +451,110 @@ func containsMessage(messages []string, target string) bool {
 	return false
 }
 
+func TestCapabilityResourcesCompilesEndpointScopedResources(t *testing.T) {
+	resources := capabilityResources(map[string]string{
+		"screen.width":                "1920",
+		"screen.height":               "1080",
+		"display.count":               "1",
+		"display.0.id":                "Main Display",
+		"speakers.present":            "true",
+		"speakers.endpoint_count":     "1",
+		"speakers.endpoint.0.id":      "Kitchen Speaker",
+		"microphone.present":          "true",
+		"microphone.endpoint_count":   "1",
+		"microphone.endpoint.0.id":    "Mic USB",
+		"camera.present":              "true",
+		"camera.endpoint_count":       "1",
+		"camera.endpoint.0.id":        "Front Cam",
+		"camera.endpoint.1.available": "true", // no id -> deterministic fallback token
+	})
+
+	want := []string{
+		"screen.main",
+		"screen.overlay",
+		"display.main-display.main",
+		"display.main-display.overlay",
+		"speaker.main",
+		"audio_out.kitchen-speaker",
+		"mic.capture",
+		"mic.analyze",
+		"audio_in.mic-usb.capture",
+		"audio_in.mic-usb.analyze",
+		"camera.capture",
+		"camera.analyze",
+		"camera.front-cam.capture",
+		"camera.front-cam.analyze",
+		"camera.endpoint-1.capture",
+		"camera.endpoint-1.analyze",
+	}
+	for _, resource := range want {
+		if _, ok := resources[resource]; !ok {
+			t.Fatalf("resource %q missing from %+v", resource, resources)
+		}
+	}
+}
+
+func TestHandleMessageCapabilityLossReleasesEndpointScopedClaims(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"microphone.present":        "true",
+				"microphone.endpoint_count": "1",
+				"microphone.endpoint.0.id":  "Mic USB",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if _, err := router.Claims().Request(context.Background(), []iorouter.Claim{{
+		ActivationID: "activation-endpoint-mic",
+		DeviceID:     "device-1",
+		Resource:     "audio_in.mic-usb.capture",
+		Mode:         iorouter.ClaimExclusive,
+		Priority:     1,
+	}}); err != nil {
+		t.Fatalf("Claims().Request() error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:     "device-1",
+			Generation:   2,
+			Reason:       "mic_unplugged",
+			Capabilities: map[string]string{},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	if got := router.Claims().Snapshot("device-1"); len(got) != 0 {
+		t.Fatalf("expected endpoint claims to be released for lost endpoint resource, got %+v", got)
+	}
+}
+
 func TestHandleMessageSensorAndStreamReady(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

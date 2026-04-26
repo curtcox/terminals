@@ -1,10 +1,10 @@
 ---
 title: "IO Abstraction Layer"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # IO Abstraction Layer
@@ -12,6 +12,17 @@ last-reviewed: 2026-04-25
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
 Every IO capability maps to a uniform interface on both client and server.
+
+## Progress (2026-04-26)
+
+- Implemented endpoint-scoped resource compilation in `terminal_server/internal/transport/control_stream.go`.
+    Capability snapshots now compile concrete endpoint resources alongside legacy aliases:
+    - `display.<id>.main`, `display.<id>.overlay`
+    - `audio_out.<id>`
+    - `audio_in.<id>.capture`, `audio_in.<id>.analyze`
+    - `camera.<id>.capture`, `camera.<id>.analyze`
+- Added transport tests in `terminal_server/internal/transport/control_stream_test.go` for endpoint resource derivation and endpoint-claim invalidation on capability loss.
+- Remaining work: wire endpoint-scoped resources end-to-end through scenario claim recipes and planner APIs, then promote this plan from `building` to shipped states.
 
 ## IO Categories
 

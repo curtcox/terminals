@@ -1190,6 +1190,10 @@ func capabilityResources(caps map[string]string) map[string]struct{} {
 		resources["screen.main"] = struct{}{}
 		resources["screen.overlay"] = struct{}{}
 	}
+	for _, displayID := range endpointResourceIDs(caps, "display.") {
+		resources["display."+displayID+".main"] = struct{}{}
+		resources["display."+displayID+".overlay"] = struct{}{}
+	}
 	if truthyCapability(caps["keyboard.physical"]) || strings.TrimSpace(caps["keyboard.layout"]) != "" {
 		resources["keyboard.primary"] = struct{}{}
 	}
@@ -1202,13 +1206,24 @@ func capabilityResources(caps map[string]string) map[string]struct{} {
 	if truthyCapability(caps["speakers.present"]) || truthyCapability(caps["speakers.endpoint_count"]) {
 		resources["speaker.main"] = struct{}{}
 	}
+	for _, endpointID := range endpointResourceIDs(caps, "speakers.endpoint.") {
+		resources["audio_out."+endpointID] = struct{}{}
+	}
 	if truthyCapability(caps["microphone.present"]) || truthyCapability(caps["microphone.endpoint_count"]) {
 		resources["mic.capture"] = struct{}{}
 		resources["mic.analyze"] = struct{}{}
 	}
+	for _, endpointID := range endpointResourceIDs(caps, "microphone.endpoint.") {
+		resources["audio_in."+endpointID+".capture"] = struct{}{}
+		resources["audio_in."+endpointID+".analyze"] = struct{}{}
+	}
 	if truthyCapability(caps["camera.present"]) || truthyCapability(caps["camera.endpoint_count"]) {
 		resources["camera.capture"] = struct{}{}
 		resources["camera.analyze"] = struct{}{}
+	}
+	for _, endpointID := range endpointResourceIDs(caps, "camera.endpoint.") {
+		resources["camera."+endpointID+".capture"] = struct{}{}
+		resources["camera."+endpointID+".analyze"] = struct{}{}
 	}
 	if truthyCapability(caps["haptics.supported"]) {
 		resources["haptic.primary"] = struct{}{}
@@ -1241,6 +1256,83 @@ func capabilityResources(caps map[string]string) map[string]struct{} {
 		resources[iorouter.ResourceRadioWiFiScan] = struct{}{}
 	}
 	return resources
+}
+
+func endpointResourceIDs(caps map[string]string, prefix string) []string {
+	if len(caps) == 0 || prefix == "" {
+		return nil
+	}
+
+	indexToID := map[string]string{}
+	indexes := map[string]struct{}{}
+	for key, value := range caps {
+		rest, ok := strings.CutPrefix(key, prefix)
+		if !ok {
+			continue
+		}
+		parts := strings.Split(rest, ".")
+		if len(parts) < 2 {
+			continue
+		}
+		index := strings.TrimSpace(parts[0])
+		if index == "" {
+			continue
+		}
+		indexes[index] = struct{}{}
+		if parts[1] == "id" {
+			if id := sanitizeResourceID(value); id != "" {
+				indexToID[index] = id
+			}
+		}
+	}
+
+	if len(indexes) == 0 {
+		return nil
+	}
+
+	sortedIndexes := make([]string, 0, len(indexes))
+	for index := range indexes {
+		sortedIndexes = append(sortedIndexes, index)
+	}
+	sort.Strings(sortedIndexes)
+
+	ids := make([]string, 0, len(sortedIndexes))
+	for _, index := range sortedIndexes {
+		if id := indexToID[index]; id != "" {
+			ids = append(ids, id)
+			continue
+		}
+		ids = append(ids, "endpoint-"+sanitizeResourceID(index))
+	}
+	return ids
+}
+
+func sanitizeResourceID(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(raw))
+	for _, r := range raw {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r + ('a' - 'A'))
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '-' || r == '_' || r == '.':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-._")
+	if out == "" {
+		return "id"
+	}
+	return out
 }
 
 func truthyCapability(raw string) bool {
