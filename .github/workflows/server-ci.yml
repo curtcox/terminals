@@ -38,7 +38,7 @@ jobs:
       - name: Test (coverage)
         run: go test ./... -coverprofile=coverage.out
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: server-coverage
           path: terminal_server/coverage.out
