@@ -1,44 +1,26 @@
 ---
 title: "Phase X — Dynamic Capability Lifecycle"
 kind: plan
-status: planned
-owner: unowned
+status: superseded
+owner: copilot
 validation: none
 last-reviewed: 2026-04-25
 ---
 
 # Phase X — Dynamic Capability Lifecycle
 
+Status: Completed and drained on 2026-04-25.
+
+The completed work from this phase is now documented in:
+
+- [plans/features/capability-lifecycle.md](../features/capability-lifecycle.md)
+- [plans/features/protocol.md](../features/protocol.md)
+- [plans/features/io-abstraction.md](../features/io-abstraction.md)
+- [plans/features/architecture-client.md](../features/architecture-client.md)
+- [plans/features/architecture-server.md](../features/architecture-server.md)
+
+There are no remaining active tasks in this phase plan. Future capability
+lifecycle expansion work should be tracked in feature plans and new phase
+plans rather than reopening this completed phase entry.
+
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
-
-Make terminal capabilities explicit, typed, and dynamic across the client/server boundary.
-
-This phase deliberately ignores migration and backward-compatibility concerns. There are no existing users.
-
-## Prerequisites
-
-- [phase-1-foundation.md](phase-1-foundation.md) complete — base client/server protocol, registration, and capability reporting exist.
-- [phase-3-media.md](phase-3-media.md) complete — media routing exists and can react to resource changes.
-
-## Deliverables
-
-- [x] **Explicit capability lifecycle protocol**: Replace one-shot capability registration with `Hello`, `CapabilitySnapshot`, `CapabilityDelta`, and `CapabilityAck`. See [capability-lifecycle.md](../features/capability-lifecycle.md) and [protocol.md](../features/protocol.md).
-- [x] **Typed capability schema**: Define strongly typed capability messages for display, keyboard, pointer, touch, speaker, microphone, camera, sensors, haptics, and battery. Avoid opaque JSON blobs.
-- [x] **Generation-based synchronization**: Add monotonically increasing capability generations so the server can reject stale deltas and clients can re-baseline with a fresh snapshot.
-- [x] **Dynamic display support**: Model display size, density, orientation, safe areas, fullscreen support, and multi-window support as explicit display capability fields. Treat runtime display changes as capability updates, not ad-hoc UI events.
-- [x] **Multi-endpoint audio/video support**: Model built-in, external, USB, HDMI, and Bluetooth microphones, speakers, and cameras as individually addressable capabilities.
-- [x] **Client capability monitor**: Add client-side detection for hot-plug peripherals, permission changes, media-route changes, and display geometry changes. Publish batched capability deltas when they occur.
-- [x] **Server capability registry**: Store the latest accepted capability snapshot per terminal, including generation, timestamps, and derived resources.
-- [x] **Capability-to-resource compiler**: Compile capability inventory into claimable resources for the claim manager and IO router.
-- [x] **Claim invalidation on resource loss**: Revoke or degrade active claims when required resources disappear or become unavailable.
-- [x] **Router patching on capability change**: Patch or tear down live media plans when their source or sink resources change.
-- [x] **Typed capability events on the bus**: Emit events such as `terminal.capability.updated`, `terminal.resource.lost`, and `terminal.display.resized` so scenarios can react uniformly.
-- [x] **Tests from the start**: Add proto, client, and server tests for snapshot/delta handling, stale generation rejection, hot-plug behavior, display resize, and claim/routing reactions.
-
-## Exit Criteria
-
-- A terminal always sends a full capability snapshot on initial connection.
-- The server does not assign UI, routing, or scenario work until it has accepted that snapshot.
-- Runtime changes to displays, IO devices, and media routes are observable as capability deltas without reconnecting.
-- The server's device registry, claim manager, and IO router all converge on the same accepted capability generation.
-- Loss of a required capability produces deterministic claim and routing updates rather than silent failure.
