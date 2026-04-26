@@ -478,6 +478,7 @@ Rules:
 - 2026-04-26 (Stage 1 registry lifecycle hardening): Added device-manager regression coverage in `terminal_server/internal/device/manager_test.go` for capability lifecycle invariants: snapshot/delta capability replacement semantics, generation monotonicity enforcement (stale snapshot/delta rejection), and timestamp tracking (`LastSnapshot`/`LastDelta`) on accepted updates.
 - 2026-04-26 (Stage 1 capability events): Server capability delta handling now emits explicit lifecycle events for capability gain/loss and audio route change (`terminal.capability.added`, `terminal.capability.removed`, `terminal.audio_route.changed`) in addition to existing update/loss events. Added transport regression coverage in `terminal_server/internal/transport/control_stream_test.go` for both endpoint gain and endpoint loss/resized paths.
 - 2026-04-26 (Stage 1 generation guardrails): Added `terminal_server/internal/transport/control_stream_test.go` regression coverage asserting stale `CapabilitySnapshot` generations are rejected at the stream boundary with protocol-violation responses and without mutating previously accepted capability state.
+- 2026-04-26 (Stage 1 lifecycle acknowledgment semantics): Hardened capability-ack coverage so transport lifecycle handling and generated-proto response encoding both assert snapshot-vs-delta `snapshot_applied` semantics and accepted generation propagation (`terminal_server/internal/transport/control_stream_test.go`, `terminal_server/internal/transport/generated_proto_adapter_test.go`).
 
 ## Related Plans
 

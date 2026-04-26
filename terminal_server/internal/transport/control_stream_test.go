@@ -344,6 +344,79 @@ func TestHandleMessageCapabilitySnapshotReturnsRegisterAckOnRebaseline(t *testin
 	}
 }
 
+func TestHandleMessageCapabilityLifecycleAckReportsSnapshotAppliedAndGeneration(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	handler := NewStreamHandler(service)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+
+	snapshotOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"screen.width": "1920",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	foundSnapshotAck := false
+	for _, msg := range snapshotOut {
+		if msg.CapabilityAck == nil {
+			continue
+		}
+		foundSnapshotAck = true
+		if !msg.CapabilityAck.SnapshotApplied {
+			t.Fatalf("snapshot capability ack snapshot_applied = false, want true")
+		}
+		if msg.CapabilityAck.AcceptedGeneration != 1 {
+			t.Fatalf("snapshot capability ack accepted_generation = %d, want 1", msg.CapabilityAck.AcceptedGeneration)
+		}
+	}
+	if !foundSnapshotAck {
+		t.Fatalf("expected capability ack for snapshot")
+	}
+
+	deltaOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Reason:     "display_resize",
+			Capabilities: map[string]string{
+				"screen.width": "1280",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	foundDeltaAck := false
+	for _, msg := range deltaOut {
+		if msg.CapabilityAck == nil {
+			continue
+		}
+		foundDeltaAck = true
+		if msg.CapabilityAck.SnapshotApplied {
+			t.Fatalf("delta capability ack snapshot_applied = true, want false")
+		}
+		if msg.CapabilityAck.AcceptedGeneration != 2 {
+			t.Fatalf("delta capability ack accepted_generation = %d, want 2", msg.CapabilityAck.AcceptedGeneration)
+		}
+	}
+	if !foundDeltaAck {
+		t.Fatalf("expected capability ack for delta")
+	}
+}
+
 func TestHandleMessageCapabilitySnapshotBootstrapsUnknownDevice(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

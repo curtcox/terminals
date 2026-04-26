@@ -285,11 +285,38 @@ func TestGeneratedProtoAdapterFromInternalHelloAndCapabilityAck(t *testing.T) {
 	if resp.GetCapabilityAck().GetAcceptedGeneration() != 2 {
 		t.Fatalf("accepted_generation = %d, want 2", resp.GetCapabilityAck().GetAcceptedGeneration())
 	}
+	if resp.GetCapabilityAck().GetSnapshotApplied() {
+		t.Fatalf("snapshot_applied = true, want false")
+	}
 	if len(resp.GetCapabilityAck().GetInvalidations()) != 1 {
 		t.Fatalf("invalidations len = %d, want 1", len(resp.GetCapabilityAck().GetInvalidations()))
 	}
 	if resp.GetCapabilityAck().GetInvalidations()[0].GetResource() != "audio_out.kitchen-speaker" {
 		t.Fatalf("invalidation resource = %q, want audio_out.kitchen-speaker", resp.GetCapabilityAck().GetInvalidations()[0].GetResource())
+	}
+
+	env, err = adapter.FromInternal(ServerMessage{
+		CapabilityAck: &CapabilityLifecycleAck{
+			DeviceID:           "device-1",
+			AcceptedGeneration: 3,
+			SnapshotApplied:    true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(capability_ack snapshot_applied=true) error = %v", err)
+	}
+	resp, ok = env.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("unexpected proto envelope type %T", env)
+	}
+	if resp.GetCapabilityAck() == nil {
+		t.Fatalf("expected capability_ack payload")
+	}
+	if !resp.GetCapabilityAck().GetSnapshotApplied() {
+		t.Fatalf("snapshot_applied = false, want true")
+	}
+	if resp.GetCapabilityAck().GetAcceptedGeneration() != 3 {
+		t.Fatalf("accepted_generation = %d, want 3", resp.GetCapabilityAck().GetAcceptedGeneration())
 	}
 }
 
