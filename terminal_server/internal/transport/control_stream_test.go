@@ -1005,6 +1005,89 @@ func TestHandleMessageCapabilityDeltaStopsAudioRouteOnEndpointAvailabilityLoss(t
 	}
 }
 
+func TestHandleMessageCapabilityDeltaStopsAudioRouteOnSpeakerEndpointAvailabilityLoss(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"speakers.present":              "true",
+				"speakers.endpoint_count":       "1",
+				"speakers.endpoint.0.id":        "Kitchen Speaker",
+				"speakers.endpoint.0.available": "true",
+				"camera.present":                "true",
+				"camera.endpoint_count":         "1",
+				"camera.endpoint.0.id":          "Front Cam",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if err := router.Connect("device-2", "device-1", "audio"); err != nil {
+		t.Fatalf("Connect(audio) error = %v", err)
+	}
+	if err := router.Connect("device-1", "device-2", "video"); err != nil {
+		t.Fatalf("Connect(video) error = %v", err)
+	}
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Reason:     "speaker_endpoint_unavailable",
+			Capabilities: map[string]string{
+				"speakers.present":              "true",
+				"speakers.endpoint_count":       "1",
+				"speakers.endpoint.0.id":        "Kitchen Speaker",
+				"speakers.endpoint.0.available": "false",
+				"camera.present":                "true",
+				"camera.endpoint_count":         "1",
+				"camera.endpoint.0.id":          "Front Cam",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	stopStreamIDs := map[string]struct{}{}
+	for _, msg := range out {
+		if msg.StopStream != nil {
+			stopStreamIDs[msg.StopStream.StreamID] = struct{}{}
+		}
+	}
+	if len(stopStreamIDs) != 1 {
+		t.Fatalf("stop_stream count = %d, want 1 (ids=%v)", len(stopStreamIDs), stopStreamIDs)
+	}
+	if _, ok := stopStreamIDs["route:device-2|device-1|audio"]; !ok {
+		t.Fatalf("missing stop_stream for audio route (ids=%v)", stopStreamIDs)
+	}
+	if _, ok := stopStreamIDs["route:device-1|device-2|video"]; ok {
+		t.Fatalf("unexpected stop_stream for video route (ids=%v)", stopStreamIDs)
+	}
+}
+
 func TestHandleMessageCapabilityDeltaStopsVideoRouteOnDisplayEndpointLoss(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)
