@@ -1,9 +1,9 @@
 ---
 title: "Shared Artifacts Plan"
 kind: plan
-status: shipped-untested
+status: shipped-validated
 owner: copilot
-validation: none
+validation: automated:PL20
 last-reviewed: 2026-04-26
 ---
 
