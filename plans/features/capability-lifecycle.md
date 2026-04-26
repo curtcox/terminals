@@ -491,6 +491,8 @@ Rules:
 - 2026-04-26 (Stage 1 display endpoint route teardown hardening): Added transport regression coverage in `terminal_server/internal/transport/control_stream_test.go` (`TestHandleMessageCapabilityDeltaStopsVideoRouteOnDisplayEndpointLoss`) to lock in that display endpoint loss tears down only affected inbound video routes while preserving unrelated outbound audio routes.
 - 2026-04-26 (Stage 1 snapshot claim-regain parity): Added transport regression coverage in `terminal_server/internal/transport/control_stream_test.go` (`TestHandleMessageCapabilitySnapshotRestoresSuspendedClaimsOnRebaselineRegain`) to lock in that capability snapshot rebaseline loss/regain follows the same scoped claim suspension and restoration behavior as generation-ordered deltas.
 
+- 2026-04-26 (Stage 1 endpoint availability truthfulness): Hardened endpoint resource compilation in terminal_server/internal/transport/control_stream.go so endpoint-scoped resources are skipped when an endpoint is explicitly marked unavailable (*.endpoint.<index>.available=false), preventing false-positive capability side effects for unavailable media hardware. Added regression assertions in terminal_server/internal/transport/control_stream_test.go (TestCapabilityResourcesCompilesEndpointScopedResources) to lock in suppression of unavailable camera endpoint resources while preserving available endpoint fallback behavior.
+
 ## Related Plans
 
 - [protocol.md](protocol.md) — Control-plane message flow and media-plane setup.

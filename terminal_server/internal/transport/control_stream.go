@@ -1306,6 +1306,8 @@ func endpointResourceIDs(caps map[string]string, prefix string) []string {
 
 	indexToID := map[string]string{}
 	indexes := map[string]struct{}{}
+	indexHasAvailability := map[string]bool{}
+	indexAvailable := map[string]bool{}
 	for key, value := range caps {
 		rest, ok := strings.CutPrefix(key, prefix)
 		if !ok {
@@ -1325,6 +1327,10 @@ func endpointResourceIDs(caps map[string]string, prefix string) []string {
 				indexToID[index] = id
 			}
 		}
+		if parts[1] == "available" {
+			indexHasAvailability[index] = true
+			indexAvailable[index] = truthyCapability(value)
+		}
 	}
 
 	if len(indexes) == 0 {
@@ -1339,6 +1345,9 @@ func endpointResourceIDs(caps map[string]string, prefix string) []string {
 
 	ids := make([]string, 0, len(sortedIndexes))
 	for _, index := range sortedIndexes {
+		if indexHasAvailability[index] && !indexAvailable[index] {
+			continue
+		}
 		if id := indexToID[index]; id != "" {
 			ids = append(ids, id)
 			continue

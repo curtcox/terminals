@@ -220,17 +220,6 @@ func TestHandleMessageCapabilityDeltaRejectsStaleGeneration(t *testing.T) {
 		t.Fatalf("LastDelta after snapshot = %v, want zero", baseline.LastDelta)
 	}
 
-	baseline, ok := manager.Get("device-1")
-	if !ok {
-		t.Fatalf("expected device-1 in manager")
-	}
-	if baseline.LastSnapshot.IsZero() {
-		t.Fatalf("expected LastSnapshot to be recorded after accepted snapshot")
-	}
-	if !baseline.LastDelta.IsZero() {
-		t.Fatalf("LastDelta after snapshot = %v, want zero", baseline.LastDelta)
-	}
-
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		CapabilityDelta: &CapabilityDeltaRequest{
 			DeviceID:   "device-1",
@@ -288,6 +277,17 @@ func TestHandleMessageCapabilitySnapshotRejectsStaleGeneration(t *testing.T) {
 		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
 	}
 
+	baseline, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected device-1 in manager")
+	}
+	if baseline.LastSnapshot.IsZero() {
+		t.Fatalf("expected LastSnapshot to be recorded after accepted snapshot")
+	}
+	if !baseline.LastDelta.IsZero() {
+		t.Fatalf("LastDelta after snapshot = %v, want zero", baseline.LastDelta)
+	}
+
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		CapabilitySnap: &CapabilitySnapshotRequest{
 			DeviceID:   "device-1",
@@ -297,6 +297,7 @@ func TestHandleMessageCapabilitySnapshotRejectsStaleGeneration(t *testing.T) {
 			},
 		},
 	})
+
 	if err == nil {
 		t.Fatalf("expected stale generation error")
 	}
@@ -1697,6 +1698,8 @@ func TestCapabilityResourcesCompilesEndpointScopedResources(t *testing.T) {
 		"camera.endpoint_count":       "1",
 		"camera.endpoint.0.id":        "Front Cam",
 		"camera.endpoint.1.available": "true", // no id -> deterministic fallback token
+		"camera.endpoint.2.id":        "Unavailable Cam",
+		"camera.endpoint.2.available": "false",
 	})
 
 	want := []string{
@@ -1720,6 +1723,15 @@ func TestCapabilityResourcesCompilesEndpointScopedResources(t *testing.T) {
 	for _, resource := range want {
 		if _, ok := resources[resource]; !ok {
 			t.Fatalf("resource %q missing from %+v", resource, resources)
+		}
+	}
+	forbidden := []string{
+		"camera.unavailable-cam.capture",
+		"camera.unavailable-cam.analyze",
+	}
+	for _, resource := range forbidden {
+		if _, ok := resources[resource]; ok {
+			t.Fatalf("resource %q unexpectedly present in %+v", resource, resources)
 		}
 	}
 }
