@@ -1405,9 +1405,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       capabilities.displays.add(capv1.DisplayCapability());
     }
     final display = capabilities.displays.first;
-    display
-      ..primary = true
-      ..screen = screen.deepCopy();
+    display.screen = screen.deepCopy();
     return capabilities;
   }
 

@@ -75,7 +75,6 @@ class DefaultCapabilityProbe implements CapabilityProbe {
             : 'portrait')
       ..displays.add(
         capv1.DisplayCapability()
-          ..primary = true
           ..screen = (capv1.ScreenCapability()
             ..width = context.screenWidth
             ..height = context.screenHeight
@@ -115,9 +114,7 @@ class DefaultCapabilityProbe implements CapabilityProbe {
         continue;
       }
       final endpointName = _trimmedOrNull(device.label);
-      final endpoint = capv1.AudioEndpoint()
-        ..endpointId = endpointId
-        ..available = true;
+      final endpoint = capv1.AudioEndpoint()..endpointId = endpointId;
       if (endpointName != null) {
         endpoint.endpointName = endpointName;
       }
@@ -141,9 +138,7 @@ class DefaultCapabilityProbe implements CapabilityProbe {
         continue;
       }
       final endpointName = _trimmedOrNull(device.label);
-      final endpoint = capv1.CameraEndpoint()
-        ..endpointId = endpointId
-        ..available = true;
+      final endpoint = capv1.CameraEndpoint()..endpointId = endpointId;
       if (endpointName != null) {
         endpoint.endpointName = endpointName;
       }

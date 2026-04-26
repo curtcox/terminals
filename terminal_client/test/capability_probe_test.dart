@@ -37,6 +37,7 @@ void main() {
     expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
     expect(capabilities.displays.first.hasDisplayId(), isFalse);
     expect(capabilities.displays.first.hasDisplayName(), isFalse);
+    expect(capabilities.displays.first.hasPrimary(), isFalse);
   });
 
   test('probe includes media capabilities when devices are detected', () async {
@@ -89,13 +90,17 @@ void main() {
     expect(capabilities.displays.first.screen.hasSafeArea(), isFalse);
     expect(capabilities.displays.first.hasDisplayId(), isFalse);
     expect(capabilities.displays.first.hasDisplayName(), isFalse);
+    expect(capabilities.displays.first.hasPrimary(), isFalse);
     expect(capabilities.microphone.channels, 0);
     expect(capabilities.microphone.endpoints.first.channels, 0);
+    expect(capabilities.microphone.endpoints.first.available, isFalse);
     expect(
         capabilities.microphone.endpoints.first.hasConnectionType(), isFalse);
     expect(capabilities.speakers.channels, 0);
     expect(capabilities.speakers.endpoints.first.channels, 0);
+    expect(capabilities.speakers.endpoints.first.available, isFalse);
     expect(capabilities.speakers.endpoints.first.hasConnectionType(), isFalse);
+    expect(capabilities.camera.endpoints.first.available, isFalse);
     expect(capabilities.camera.endpoints.first.hasConnectionType(), isFalse);
     expect(capabilities.camera.endpoints.first.hasFacing(), isFalse);
     expect(capabilities.microphone.endpoints.first.hasEndpointName(), isTrue);

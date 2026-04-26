@@ -435,6 +435,8 @@ void main() {
       expect(screen.safeArea.top, expectedSafeArea.top.round());
       expect(screen.safeArea.right, expectedSafeArea.right.round());
       expect(screen.safeArea.bottom, expectedSafeArea.bottom.round());
+      expect(snapshot.capabilities.displays, isNotEmpty);
+      expect(snapshot.capabilities.displays.first.hasPrimary(), isFalse);
     },
   );
 
@@ -494,6 +496,8 @@ void main() {
       expect(delta.capabilities.screen.orientation, 'portrait');
       expect(delta.capabilities.screen.width, 720);
       expect(delta.capabilities.screen.height, 1280);
+      expect(delta.capabilities.displays, isNotEmpty);
+      expect(delta.capabilities.displays.first.hasPrimary(), isFalse);
     },
   );
 
