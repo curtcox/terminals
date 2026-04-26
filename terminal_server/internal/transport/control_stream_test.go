@@ -209,6 +209,28 @@ func TestHandleMessageCapabilityDeltaRejectsStaleGeneration(t *testing.T) {
 		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
 	}
 
+	baseline, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected device-1 in manager")
+	}
+	if baseline.LastSnapshot.IsZero() {
+		t.Fatalf("expected LastSnapshot to be recorded after accepted snapshot")
+	}
+	if !baseline.LastDelta.IsZero() {
+		t.Fatalf("LastDelta after snapshot = %v, want zero", baseline.LastDelta)
+	}
+
+	baseline, ok := manager.Get("device-1")
+	if !ok {
+		t.Fatalf("expected device-1 in manager")
+	}
+	if baseline.LastSnapshot.IsZero() {
+		t.Fatalf("expected LastSnapshot to be recorded after accepted snapshot")
+	}
+	if !baseline.LastDelta.IsZero() {
+		t.Fatalf("LastDelta after snapshot = %v, want zero", baseline.LastDelta)
+	}
+
 	out, err := handler.HandleMessage(context.Background(), ClientMessage{
 		CapabilityDelta: &CapabilityDeltaRequest{
 			DeviceID:   "device-1",
@@ -231,6 +253,12 @@ func TestHandleMessageCapabilityDeltaRejectsStaleGeneration(t *testing.T) {
 	}
 	if got.Generation != 2 {
 		t.Fatalf("generation = %d, want 2", got.Generation)
+	}
+	if got.LastSnapshot != baseline.LastSnapshot {
+		t.Fatalf("LastSnapshot = %v, want %v", got.LastSnapshot, baseline.LastSnapshot)
+	}
+	if !got.LastDelta.IsZero() {
+		t.Fatalf("LastDelta = %v, want zero", got.LastDelta)
 	}
 	if got.Capabilities["screen.width"] != "1920" {
 		t.Fatalf("screen.width = %q, want 1920", got.Capabilities["screen.width"])
@@ -282,6 +310,12 @@ func TestHandleMessageCapabilitySnapshotRejectsStaleGeneration(t *testing.T) {
 	}
 	if got.Generation != 2 {
 		t.Fatalf("generation = %d, want 2", got.Generation)
+	}
+	if got.LastSnapshot != baseline.LastSnapshot {
+		t.Fatalf("LastSnapshot = %v, want %v", got.LastSnapshot, baseline.LastSnapshot)
+	}
+	if !got.LastDelta.IsZero() {
+		t.Fatalf("LastDelta = %v, want zero", got.LastDelta)
 	}
 	if got.Capabilities["screen.width"] != "1920" {
 		t.Fatalf("screen.width = %q, want 1920", got.Capabilities["screen.width"])

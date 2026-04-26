@@ -116,9 +116,15 @@ func TestApplyCapabilityLifecycleRejectsStaleGeneration(t *testing.T) {
 	m := NewManager()
 	_, _ = m.Register(Manifest{DeviceID: "device-1"})
 
+	snapshotTime := time.Date(2026, 4, 26, 18, 5, 0, 0, time.UTC)
+	m.now = func() time.Time { return snapshotTime }
+
 	if err := m.ApplyCapabilitySnapshot("device-1", 3, CapabilitySet{"screen.width": "1920"}); err != nil {
 		t.Fatalf("ApplyCapabilitySnapshot() error = %v", err)
 	}
+
+	staleAttemptTime := snapshotTime.Add(2 * time.Minute)
+	m.now = func() time.Time { return staleAttemptTime }
 
 	if err := m.ApplyCapabilitySnapshot("device-1", 3, CapabilitySet{"screen.width": "1280"}); err != ErrStaleGeneration {
 		t.Fatalf("ApplyCapabilitySnapshot() stale error = %v, want %v", err, ErrStaleGeneration)
@@ -133,6 +139,12 @@ func TestApplyCapabilityLifecycleRejectsStaleGeneration(t *testing.T) {
 	}
 	if found.Generation != 3 {
 		t.Fatalf("Generation = %d, want 3", found.Generation)
+	}
+	if found.LastSnapshot != snapshotTime {
+		t.Fatalf("LastSnapshot = %v, want %v", found.LastSnapshot, snapshotTime)
+	}
+	if !found.LastDelta.IsZero() {
+		t.Fatalf("LastDelta = %v, want zero", found.LastDelta)
 	}
 	if found.Capabilities["screen.width"] != "1920" {
 		t.Fatalf("screen.width = %q, want 1920", found.Capabilities["screen.width"])
