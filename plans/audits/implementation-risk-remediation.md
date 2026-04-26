@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: cascade
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Implementation Risk Remediation Plan
@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-26: Removed synthetic fallback media endpoint IDs from client capability probing so audio/camera endpoints are emitted only when media inventory reports a real non-empty `device_id`, with probe regression coverage ensuring blank IDs are skipped rather than synthesized.
 - 2026-04-25: Removed synthetic fallback media endpoint labels from client capability probing so `microphone.endpoints.*.endpoint_name`, `speakers.endpoints.*.endpoint_name`, and `camera.endpoints.*.endpoint_name` are omitted unless the platform reports real device labels, with probe regression coverage for both labeled and unlabeled inventories.
 - 2026-04-25: Removed platform-heuristic monitoring operator declarations (`monitor.foreground_only`, `monitor.tier.foreground_only`, and default lifecycle operator) from client capability probing so `edge.operators` remains omitted/empty unless explicitly sourced elsewhere, and updated probe regression assertions to lock the default omission.
 - 2026-04-25: Removed label-derived endpoint heuristics from client capability probing so `audio_endpoint.connection_type`, `camera_endpoint.connection_type`, and `camera_endpoint.facing` are omitted unless explicitly probed, and added regression assertions to keep those fields absent by default.

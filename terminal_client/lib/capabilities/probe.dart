@@ -114,15 +114,14 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     String kind,
   ) {
     final endpoints = <capv1.AudioEndpoint>[];
-    var fallbackIndex = 0;
     for (final device in mediaDevices) {
       if (device.kind != kind) {
         continue;
       }
-      final endpointId = device.deviceId.trim().isEmpty
-          ? '$kind-$fallbackIndex'
-          : device.deviceId.trim();
-      fallbackIndex += 1;
+      final endpointId = _trimmedOrNull(device.deviceId);
+      if (endpointId == null) {
+        continue;
+      }
       final endpointName = _trimmedOrNull(device.label);
       final endpoint = capv1.AudioEndpoint()
         ..endpointId = endpointId
@@ -141,15 +140,14 @@ class DefaultCapabilityProbe implements CapabilityProbe {
     List<MediaDeviceDescriptor> mediaDevices,
   ) {
     final endpoints = <capv1.CameraEndpoint>[];
-    var fallbackIndex = 0;
     for (final device in mediaDevices) {
       if (device.kind != 'videoinput') {
         continue;
       }
-      final endpointId = device.deviceId.trim().isEmpty
-          ? 'camera-$fallbackIndex'
-          : device.deviceId.trim();
-      fallbackIndex += 1;
+      final endpointId = _trimmedOrNull(device.deviceId);
+      if (endpointId == null) {
+        continue;
+      }
       final endpointName = _trimmedOrNull(device.label);
       final endpoint = capv1.CameraEndpoint()
         ..endpointId = endpointId

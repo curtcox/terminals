@@ -180,4 +180,67 @@ void main() {
     expect(capabilities.hasCamera(), isFalse);
     expect(capabilities.hasSpeakers(), isFalse);
   });
+
+  test('probe omits media endpoints without real device IDs', () async {
+    final probe = DefaultCapabilityProbe(
+      mediaDeviceInventoryProvider: () async => const <MediaDeviceDescriptor>[
+        MediaDeviceDescriptor(
+          kind: 'audioinput',
+          deviceId: '   ',
+          label: 'Blank Mic Id',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'audioinput',
+          deviceId: 'mic-1',
+          label: 'Built-in Microphone',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'videoinput',
+          deviceId: '',
+          label: 'Blank Cam Id',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'videoinput',
+          deviceId: 'cam-1',
+          label: 'USB Camera',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'audiooutput',
+          deviceId: '\t',
+          label: 'Blank Speaker Id',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'audiooutput',
+          deviceId: 'spk-1',
+          label: 'Built-in Speakers',
+        ),
+      ],
+    );
+
+    final capabilities = await probe.probe(
+      const CapabilityProbeContext(
+        deviceId: 'device-ids',
+        deviceName: 'Endpoint IDs',
+        deviceType: 'desktop',
+        platform: 'flutter',
+        screenWidth: 1920,
+        screenHeight: 1080,
+        screenDensity: 2.0,
+        targetPlatform: TargetPlatform.macOS,
+      ),
+    );
+
+    expect(capabilities.hasMicrophone(), isTrue);
+    expect(capabilities.hasCamera(), isTrue);
+    expect(capabilities.hasSpeakers(), isTrue);
+
+    expect(capabilities.microphone.endpoints.length, 1);
+    expect(capabilities.microphone.endpoints.first.endpointId, 'mic-1');
+
+    expect(capabilities.camera.endpoints.length, 1);
+    expect(capabilities.camera.endpoints.first.endpointId, 'cam-1');
+
+    expect(capabilities.speakers.endpoints.length, 1);
+    expect(capabilities.speakers.endpoints.first.endpointId, 'spk-1');
+  });
 }
