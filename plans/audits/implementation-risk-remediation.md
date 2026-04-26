@@ -15,6 +15,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for system context.
 
 ## Incremental Progress
 
+- 2026-04-26: Tightened client media capability truthfulness so microphone/camera/speakers are now declared only when at least one endpoint has a real non-empty `device_id`, preventing capability advertisement from kind-only inventories with blank IDs; added probe regression coverage for invalid-ID-only inventories.
 - 2026-04-26: Removed synthetic fallback media endpoint IDs from client capability probing so audio/camera endpoints are emitted only when media inventory reports a real non-empty `device_id`, with probe regression coverage ensuring blank IDs are skipped rather than synthesized.
 - 2026-04-25: Removed synthetic fallback media endpoint labels from client capability probing so `microphone.endpoints.*.endpoint_name`, `speakers.endpoints.*.endpoint_name`, and `camera.endpoints.*.endpoint_name` are omitted unless the platform reports real device labels, with probe regression coverage for both labeled and unlabeled inventories.
 - 2026-04-25: Removed platform-heuristic monitoring operator declarations (`monitor.foreground_only`, `monitor.tier.foreground_only`, and default lifecycle operator) from client capability probing so `edge.operators` remains omitted/empty unless explicitly sourced elsewhere, and updated probe regression assertions to lock the default omission.
