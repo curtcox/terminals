@@ -2,11 +2,13 @@ package transport
 
 import (
 	"testing"
+	"time"
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 	"google.golang.org/protobuf/proto"
 )
@@ -625,6 +627,201 @@ func TestGeneratedProtoAdapterToInternalSensorAndStreamReady(t *testing.T) {
 	}
 	if webrtcMsg.WebRTCSignal.Payload != "{\"sdp\":\"v=0...\"}" {
 		t.Fatalf("webrtc_signal payload = %q, want {\"sdp\":\"v=0...\"}", webrtcMsg.WebRTCSignal.Payload)
+	}
+}
+
+func TestGeneratedProtoAdapterToInternalObservationArtifactAndFlowStats(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	observedAt := time.UnixMilli(1713000100000).UTC()
+
+	observationMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_ObservationMessage{
+			ObservationMessage: &iov1.ObservationMessage{
+				Observation: &iov1.Observation{
+					Kind:           "sound.detected",
+					Subject:        "kitchen",
+					SourceDevice:   &iov1.DeviceRef{DeviceId: "device-1"},
+					OccurredUnixMs: observedAt.UnixMilli(),
+					Confidence:     0.91,
+					Zone:           "kitchen",
+					TrackId:        "track-7",
+					Attributes: map[string]string{
+						"label": "beep",
+					},
+					Provenance: &iov1.ObservationProvenance{
+						FlowId:             "flow-1",
+						NodeId:             "analyze-1",
+						ExecSite:           "client:device-1",
+						ModelId:            "sound-v2",
+						CalibrationVersion: "cal-3",
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(observation_message) error = %v", err)
+	}
+	if observationMsg.Observation == nil {
+		t.Fatalf("expected observation message")
+	}
+	if got := observationMsg.Observation.Observation.Kind; got != "sound.detected" {
+		t.Fatalf("observation kind = %q, want sound.detected", got)
+	}
+	if got := observationMsg.Observation.Observation.SourceDevice.DeviceID; got != "device-1" {
+		t.Fatalf("observation source_device = %q, want device-1", got)
+	}
+	if got := observationMsg.Observation.Observation.OccurredAt; !got.Equal(observedAt) {
+		t.Fatalf("observation occurred_at = %v, want %v", got, observedAt)
+	}
+	if got := observationMsg.Observation.Observation.Provenance.FlowID; got != "flow-1" {
+		t.Fatalf("observation provenance.flow_id = %q, want flow-1", got)
+	}
+
+	artifactMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_ArtifactAvailable{
+			ArtifactAvailable: &iov1.ArtifactAvailable{
+				Artifact: &iov1.ArtifactRef{
+					Id:          "artifact-1",
+					Kind:        "audio_clip",
+					Source:      &iov1.DeviceRef{DeviceId: "device-1"},
+					StartUnixMs: observedAt.UnixMilli(),
+					EndUnixMs:   observedAt.Add(3 * time.Second).UnixMilli(),
+					Uri:         "file:///tmp/a.wav",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(artifact_available) error = %v", err)
+	}
+	if artifactMsg.ArtifactReady == nil {
+		t.Fatalf("expected artifact_available message")
+	}
+	if got := artifactMsg.ArtifactReady.Artifact.ID; got != "artifact-1" {
+		t.Fatalf("artifact id = %q, want artifact-1", got)
+	}
+	if got := artifactMsg.ArtifactReady.Artifact.Source.DeviceID; got != "device-1" {
+		t.Fatalf("artifact source_device = %q, want device-1", got)
+	}
+
+	flowStatsMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_FlowStats{
+			FlowStats: &iov1.FlowStats{
+				FlowId:        "flow-1",
+				CpuPct:        22.5,
+				MemMb:         144.75,
+				DroppedFrames: 3,
+				State:         "healthy",
+				Error:         "",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(flow_stats) error = %v", err)
+	}
+	if flowStatsMsg.FlowStats == nil {
+		t.Fatalf("expected flow_stats message")
+	}
+	if got := flowStatsMsg.FlowStats.FlowID; got != "flow-1" {
+		t.Fatalf("flow_stats flow_id = %q, want flow-1", got)
+	}
+	if got := flowStatsMsg.FlowStats.CPUPct; got != 22.5 {
+		t.Fatalf("flow_stats cpu_pct = %v, want 22.5", got)
+	}
+}
+
+func TestGeneratedProtoAdapterFromInternalFlowAndArtifactControl(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+
+	envelope, err := adapter.FromInternal(ServerMessage{
+		StartFlow: &StartFlowResponse{
+			FlowID: "flow-1",
+			Plan: iorouter.FlowPlan{
+				Nodes: []iorouter.FlowNode{{
+					ID:   "mic",
+					Kind: iorouter.NodeSourceMic,
+					Args: map[string]string{"device_id": "d1"},
+					Exec: iorouter.ExecPreferClient,
+				}},
+				Edges: []iorouter.FlowEdge{},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(start_flow) error = %v", err)
+	}
+	resp, ok := envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("start_flow envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if resp.GetStartFlow() == nil {
+		t.Fatalf("expected start_flow payload")
+	}
+	if got := resp.GetStartFlow().GetFlowId(); got != "flow-1" {
+		t.Fatalf("start_flow flow_id = %q, want flow-1", got)
+	}
+	if got := resp.GetStartFlow().GetPlan().GetNodes()[0].GetKind(); got != string(iorouter.NodeSourceMic) {
+		t.Fatalf("start_flow node kind = %q, want %q", got, iorouter.NodeSourceMic)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		PatchFlow: &PatchFlowResponse{
+			FlowID: "flow-1",
+			Plan: iorouter.FlowPlan{
+				Nodes: []iorouter.FlowNode{{
+					ID:   "speaker",
+					Kind: iorouter.NodeSinkSpeaker,
+					Args: map[string]string{"device_id": "d2"},
+					Exec: iorouter.ExecServerOnly,
+				}},
+				Edges: []iorouter.FlowEdge{},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(patch_flow) error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("patch_flow envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if resp.GetPatchFlow() == nil {
+		t.Fatalf("expected patch_flow payload")
+	}
+	if got := resp.GetPatchFlow().GetFlowId(); got != "flow-1" {
+		t.Fatalf("patch_flow flow_id = %q, want flow-1", got)
+	}
+	if got := resp.GetPatchFlow().GetPlan().GetNodes()[0].GetExec(); got != string(iorouter.ExecServerOnly) {
+		t.Fatalf("patch_flow node exec = %q, want %q", got, iorouter.ExecServerOnly)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		StopFlow: &StopFlowResponse{FlowID: "flow-1"},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(stop_flow) error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("stop_flow envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if got := resp.GetStopFlow().GetFlowId(); got != "flow-1" {
+		t.Fatalf("stop_flow flow_id = %q, want flow-1", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		RequestArtifact: &RequestArtifactResponse{ArtifactID: "artifact-1"},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal(request_artifact) error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("request_artifact envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if got := resp.GetRequestArtifact().GetArtifactId(); got != "artifact-1" {
+		t.Fatalf("request_artifact artifact_id = %q, want artifact-1", got)
 	}
 }
 
