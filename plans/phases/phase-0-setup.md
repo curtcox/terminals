@@ -1,13 +1,27 @@
 ---
 title: "Phase 0 — Repo Setup, Tooling, and CI"
 kind: plan
-status: planned
-owner: unowned
+status: superseded
+owner: copilot
 validation: none
 last-reviewed: 2026-04-25
 ---
 
 # Phase 0 — Repo Setup, Tooling, and CI
+
+Status: Completed and drained on 2026-04-25.
+
+The durable behavior from this phase now lives in:
+
+- [`README.md`](../../README.md) (project setup and quick-start workflow)
+- [`docs/README.md`](../../docs/README.md) (project documentation entry points)
+- [`plans/features/ci.md`](../features/ci.md) (build, lint, test, and CI contract)
+- [`plans/features/agent-config.md`](../features/agent-config.md) (agent configuration contract)
+- [`terminal_server/CLAUDE.md`](../../terminal_server/CLAUDE.md), [`terminal_client/CLAUDE.md`](../../terminal_client/CLAUDE.md), and [`api/CLAUDE.md`](../../api/CLAUDE.md) (subproject conventions)
+
+There are no remaining active tasks in this phase plan. Future setup/tooling
+changes should be tracked in feature-level plans and docs updates rather than
+reopening this bootstrap phase.
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
