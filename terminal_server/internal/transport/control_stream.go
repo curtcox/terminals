@@ -1412,7 +1412,7 @@ func shouldDisconnectRouteForLostResources(route iorouter.Route, deviceID string
 		return true
 	}
 
-	return sourceID == deviceID || targetID == deviceID
+	return false
 }
 
 func emitCapabilityEvents(
