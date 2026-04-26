@@ -576,6 +576,73 @@ func TestHandleMessageCapabilityDeltaEmitsTypedCapabilityEvents(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCapabilityDeltaEmitsDisplayResizedForDisplayCapabilityGeometry(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"display.count":      "1",
+				"display.0.id":       "main",
+				"display.0.width":    "1920",
+				"display.0.height":   "1080",
+				"display.0.density":  "2.0",
+				"display.0.safe.top": "16",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Reason:     "display_geometry_changed",
+			Capabilities: map[string]string{
+				"display.count":      "1",
+				"display.0.id":       "main",
+				"display.0.width":    "1280",
+				"display.0.height":   "720",
+				"display.0.density":  "2.0",
+				"display.0.safe.top": "24",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	events := broadcaster.Events()
+	messages := make([]string, 0, len(events))
+	for _, event := range events {
+		messages = append(messages, event.Message)
+	}
+	if !containsMessage(messages, "terminal.display.resized") {
+		t.Fatalf("expected terminal.display.resized in events: %+v", messages)
+	}
+}
+
 func TestHandleMessageCapabilityDeltaEmitsCapabilityAddedEventOnEndpointGain(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

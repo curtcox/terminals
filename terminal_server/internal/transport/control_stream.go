@@ -1435,7 +1435,7 @@ func emitCapabilityEvents(
 	if len(lostResources) > 0 {
 		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.capability.removed")
 	}
-	if beforeCaps["screen.width"] != afterCaps["screen.width"] || beforeCaps["screen.height"] != afterCaps["screen.height"] {
+	if displayGeometryCapabilitiesChanged(beforeCaps, afterCaps) {
 		_ = runtime.Env.Broadcast.Notify(ctx, targets, "terminal.display.resized")
 	}
 	if audioRouteCapabilitiesChanged(beforeCaps, afterCaps) {
@@ -1467,6 +1467,53 @@ func audioRouteCapabilitiesChanged(beforeCaps, afterCaps map[string]string) bool
 		}
 	}
 	return false
+}
+
+func displayGeometryCapabilitiesChanged(beforeCaps, afterCaps map[string]string) bool {
+	before := displayGeometryCapabilityState(beforeCaps)
+	after := displayGeometryCapabilityState(afterCaps)
+	if len(before) != len(after) {
+		return true
+	}
+	for key, value := range before {
+		if after[key] != value {
+			return true
+		}
+	}
+	return false
+}
+
+func displayGeometryCapabilityState(caps map[string]string) map[string]string {
+	out := map[string]string{}
+	for key, value := range caps {
+		if !isDisplayGeometryCapabilityKey(key) {
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+func isDisplayGeometryCapabilityKey(key string) bool {
+	switch {
+	case key == "screen.width":
+		return true
+	case key == "screen.height":
+		return true
+	case key == "screen.density":
+		return true
+	case key == "screen.orientation":
+		return true
+	case strings.HasPrefix(key, "screen.safe."):
+		return true
+	case strings.HasPrefix(key, "display."):
+		if strings.HasSuffix(key, ".width") || strings.HasSuffix(key, ".height") || strings.HasSuffix(key, ".density") || strings.HasSuffix(key, ".orientation") {
+			return true
+		}
+		return strings.Contains(key, ".safe.")
+	default:
+		return false
+	}
 }
 
 func audioRouteCapabilityState(caps map[string]string) map[string]string {
