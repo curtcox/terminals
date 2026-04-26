@@ -63,7 +63,13 @@ func replCommandSpecs() []commandSpec {
 		{Name: "sessions show", Usage: "sessions show <session>", Summary: "Show one REPL session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/sessions"}},
 		{Name: "sessions terminate", Usage: "sessions terminate <session>", Summary: "Terminate one REPL session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sessions"}},
 		{Name: "identity ls", Usage: "identity ls [--json]", Summary: "List identities and audiences", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
+		{Name: "identity show", Usage: "identity show <identity> [--json]", Summary: "Show one identity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
+		{Name: "identity groups", Usage: "identity groups [--json]", Summary: "List identity groups", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
 		{Name: "identity resolve", Usage: "identity resolve <audience> [--json]", Summary: "Resolve an audience to identities", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
+		{Name: "identity prefs", Usage: "identity prefs <identity> [--json]", Summary: "Show identity preferences", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
+		{Name: "identity ack ls", Usage: "identity ack ls [subject-ref] [--json]", Summary: "List acknowledgements", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
+		{Name: "identity ack show", Usage: "identity ack show <subject-ref> [--json]", Summary: "Show acknowledgements for one subject", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/identity"}},
+		{Name: "identity ack record", Usage: "identity ack record <subject-ref> --actor <actor-ref> [--mode <mode>] [--json]", Summary: "Record an acknowledgement", Classification: commandMutating, RelatedDocs: []string{"repl/commands/identity"}},
 		{Name: "session ls", Usage: "session ls [--json]", Summary: "List interactive sessions", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session create", Usage: "session create <kind> <target> [--json]", Summary: "Create a generalized interactive session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/session"}},
 		{Name: "session show", Usage: "session show <session> [--json]", Summary: "Show one interactive session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/session"}},
@@ -421,6 +427,30 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				rows = append(rows, []string{toString(row["id"]), toString(row["display_name"])})
 			}
 			return printTable(s.out, []string{"ID", "NAME"}, rows)
+		case "show":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: identity show <identity>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/identity/show", url.Values{"identity": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "groups":
+			body, err := s.fetchJSON(ctx, "/admin/api/identity/groups")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			groups, _ := body["groups"].([]any)
+			rows := make([][]string, 0, len(groups))
+			for _, group := range groups {
+				rows = append(rows, []string{toString(group)})
+			}
+			return printTable(s.out, []string{"GROUP"}, rows)
 		case "resolve":
 			plain := nonFlagArgs(args[1:])
 			if len(plain) < 1 {
@@ -449,6 +479,67 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				rows = append(rows, []string{toString(row["id"]), toString(row["display_name"])})
 			}
 			return printTable(s.out, []string{"ID", "NAME"}, rows)
+		case "prefs":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: identity prefs <identity>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/identity/prefs", url.Values{"identity": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "ack":
+			actionTokens := nonFlagArgs(args[1:])
+			if len(actionTokens) == 0 {
+				return errors.New("usage: identity ack <ls|show|record>")
+			}
+			action := strings.ToLower(strings.TrimSpace(actionTokens[0]))
+			switch action {
+			case "ls":
+				query := url.Values{}
+				if len(actionTokens) > 1 {
+					query.Set("subject_ref", actionTokens[1])
+				}
+				body, err := s.fetchJSONQuery(ctx, "/admin/api/identity/ack", query)
+				if err != nil {
+					return err
+				}
+				return writeJSON(s.out, body)
+			case "show":
+				if len(actionTokens) < 2 {
+					return errors.New("usage: identity ack show <subject-ref>")
+				}
+				body, err := s.fetchJSONQuery(ctx, "/admin/api/identity/ack", url.Values{"subject_ref": {actionTokens[1]}})
+				if err != nil {
+					return err
+				}
+				return writeJSON(s.out, body)
+			case "record":
+				if len(actionTokens) < 2 {
+					return errors.New("usage: identity ack record <subject-ref> --actor <actor-ref> [--mode <mode>]")
+				}
+				actor := flagValue(args[1:], "--actor")
+				if strings.TrimSpace(actor) == "" {
+					return errors.New("usage: identity ack record <subject-ref> --actor <actor-ref> [--mode <mode>]")
+				}
+				mode := defaultIfBlank(flagValue(args[1:], "--mode"), "read")
+				body, err := s.postFormJSON(ctx, "/admin/api/identity/ack", url.Values{
+					"subject_ref": {actionTokens[1]},
+					"actor":       {actor},
+					"mode":        {mode},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  subject=%s actor=%s mode=%s action=ack.record\n", actionTokens[1], actor, mode)
+				return err
+			default:
+				return fmt.Errorf("unknown command: identity ack %s", action)
+			}
 		default:
 			return fmt.Errorf("unknown command: identity %s", sub)
 		}
@@ -1877,6 +1968,23 @@ func hasFlag(args []string, name string) bool {
 		}
 	}
 	return false
+}
+
+func flagValue(args []string, name string) string {
+	for i := range args {
+		if !strings.EqualFold(strings.TrimSpace(args[i]), name) {
+			continue
+		}
+		if i+1 >= len(args) {
+			return ""
+		}
+		next := strings.TrimSpace(args[i+1])
+		if strings.HasPrefix(next, "--") {
+			return ""
+		}
+		return next
+	}
+	return ""
 }
 
 func nonFlagArgs(args []string) []string {

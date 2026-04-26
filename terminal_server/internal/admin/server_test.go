@@ -360,7 +360,11 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 
 	getCases := []string{
 		"/admin/api/identity",
+		"/admin/api/identity/show?identity=system",
+		"/admin/api/identity/groups",
+		"/admin/api/identity/prefs?identity=system",
 		"/admin/api/identity/resolve?audience=group:family",
+		"/admin/api/identity/ack?subject_ref=message:msg-1",
 		"/admin/api/session",
 		"/admin/api/message",
 		"/admin/api/message/unread?identity_id=alice",
@@ -393,6 +397,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		form          url.Values
 		allowNotFound bool
 	}{
+		{path: "/admin/api/identity/ack", form: url.Values{"subject_ref": {"message:msg-1"}, "actor": {"device:kitchen-screen"}, "mode": {"dismissed"}}},
 		{path: "/admin/api/session/create", form: url.Values{"kind": {"help"}, "target": {"room"}}},
 		{path: "/admin/api/session/attach", form: url.Values{"session_id": {"missing"}, "device_ref": {"device:screen-1"}}, allowNotFound: true},
 		{path: "/admin/api/session/detach", form: url.Values{"session_id": {"missing"}, "device_ref": {"device:screen-1"}}, allowNotFound: true},

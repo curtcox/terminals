@@ -16,6 +16,47 @@ func TestResolveAudienceByGroupAndAlias(t *testing.T) {
 	}
 }
 
+func TestIdentityLookupGroupsPreferencesAndAcknowledgements(t *testing.T) {
+	svc := NewService()
+
+	identity, ok := svc.GetIdentity("admin")
+	if !ok {
+		t.Fatalf("GetIdentity(admin) = not found, want system")
+	}
+	if identity.ID != "system" {
+		t.Fatalf("GetIdentity(admin).ID = %q, want system", identity.ID)
+	}
+
+	groups := svc.ListGroups()
+	if len(groups) != 2 || groups[0] != "family" || groups[1] != "operators" {
+		t.Fatalf("ListGroups() = %+v, want [family operators]", groups)
+	}
+
+	prefs, ok := svc.GetPreferences("system")
+	if !ok {
+		t.Fatalf("GetPreferences(system) = not found")
+	}
+	if prefs["notifications"] != "normal" {
+		t.Fatalf("GetPreferences(system)[notifications] = %q, want normal", prefs["notifications"])
+	}
+
+	ack, ok := svc.RecordAcknowledgement("message:msg-1", "device:kitchen-screen", "dismissed")
+	if !ok {
+		t.Fatalf("RecordAcknowledgement(...) returned false")
+	}
+	if ack.ActorRef != "device:kitchen-screen" || ack.Mode != "dismissed" {
+		t.Fatalf("ack = %+v, want actor=device:kitchen-screen mode=dismissed", ack)
+	}
+	if _, ok := svc.RecordAcknowledgement("message:msg-1", "invalid", "read"); ok {
+		t.Fatalf("RecordAcknowledgement should reject invalid actor refs")
+	}
+
+	acks := svc.GetAcknowledgements("message:msg-1")
+	if len(acks) != 1 {
+		t.Fatalf("GetAcknowledgements(message:msg-1) len = %d, want 1", len(acks))
+	}
+}
+
 func TestSessionJoinAndLeave(t *testing.T) {
 	svc := NewService()
 	session := svc.CreateSession("lesson", "math-room")
@@ -118,6 +159,13 @@ func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 	}
 	if _, ok := svc.AcknowledgeMessage("alice", message.ID); !ok {
 		t.Fatalf("AcknowledgeMessage(%q,%q) = false, want true", "alice", message.ID)
+	}
+	ackEntries := svc.GetAcknowledgements("message:" + message.ID)
+	if len(ackEntries) != 1 {
+		t.Fatalf("GetAcknowledgements(message:%s) len = %d, want 1", message.ID, len(ackEntries))
+	}
+	if ackEntries[0].ActorRef != "person:alice" || ackEntries[0].Mode != "read" {
+		t.Fatalf("message ack entry = %+v, want actor=person:alice mode=read", ackEntries[0])
 	}
 	unread = svc.ListUnreadMessages("alice", "room-1")
 	if len(unread) != 0 {

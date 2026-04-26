@@ -95,7 +95,11 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/repl/ai/models", h.handleReplAIModels)
 	mux.HandleFunc("/admin/api/repl/ai/selection", h.handleReplAISelection)
 	mux.HandleFunc("/admin/api/identity", h.handleIdentity)
+	mux.HandleFunc("/admin/api/identity/show", h.handleIdentityShow)
+	mux.HandleFunc("/admin/api/identity/groups", h.handleIdentityGroups)
+	mux.HandleFunc("/admin/api/identity/prefs", h.handleIdentityPreferences)
 	mux.HandleFunc("/admin/api/identity/resolve", h.handleIdentityResolve)
+	mux.HandleFunc("/admin/api/identity/ack", h.handleIdentityAcknowledgements)
 	mux.HandleFunc("/admin/api/session", h.handleInteractiveSessions)
 	mux.HandleFunc("/admin/api/session/show", h.handleInteractiveSessionShow)
 	mux.HandleFunc("/admin/api/session/members", h.handleInteractiveSessionMembers)
@@ -229,6 +233,50 @@ func (h *Handler) handleIdentity(w http.ResponseWriter, req *http.Request) {
 	h.writeJSON(w, http.StatusOK, map[string]any{"identities": h.capability.ListIdentities()})
 }
 
+func (h *Handler) handleIdentityShow(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	identityRef := strings.TrimSpace(req.URL.Query().Get("identity"))
+	if identityRef == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "identity is required")
+		return
+	}
+	identity, ok := h.capability.GetIdentity(identityRef)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "identity not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"identity": identity})
+}
+
+func (h *Handler) handleIdentityGroups(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"groups": h.capability.ListGroups()})
+}
+
+func (h *Handler) handleIdentityPreferences(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	identityRef := strings.TrimSpace(req.URL.Query().Get("identity"))
+	if identityRef == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "identity is required")
+		return
+	}
+	prefs, ok := h.capability.GetPreferences(identityRef)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "identity not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"identity": identityRef, "preferences": prefs})
+}
+
 func (h *Handler) handleIdentityResolve(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -239,6 +287,30 @@ func (h *Handler) handleIdentityResolve(w http.ResponseWriter, req *http.Request
 		"audience":   audience,
 		"identities": h.capability.ResolveAudience(audience),
 	})
+}
+
+func (h *Handler) handleIdentityAcknowledgements(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		subjectRef := strings.TrimSpace(req.URL.Query().Get("subject_ref"))
+		h.writeJSON(w, http.StatusOK, map[string]any{
+			"subject_ref":      subjectRef,
+			"acknowledgements": h.capability.GetAcknowledgements(subjectRef),
+		})
+	case http.MethodPost:
+		if err := req.ParseForm(); err != nil {
+			h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+			return
+		}
+		ack, ok := h.capability.RecordAcknowledgement(req.Form.Get("subject_ref"), req.Form.Get("actor"), req.Form.Get("mode"))
+		if !ok {
+			h.writeJSONError(w, http.StatusBadRequest, "invalid acknowledgement")
+			return
+		}
+		h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "ack": ack})
+	default:
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 func (h *Handler) handleInteractiveSessions(w http.ResponseWriter, req *http.Request) {

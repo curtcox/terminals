@@ -1,10 +1,10 @@
 ---
 title: "Identity and Audience Plan"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Identity and Audience Plan

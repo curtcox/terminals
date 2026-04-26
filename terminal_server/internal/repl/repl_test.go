@@ -254,7 +254,13 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 	commands := []string{
 		"identity ls",
+		"identity show",
+		"identity groups",
 		"identity resolve",
+		"identity prefs",
+		"identity ack ls",
+		"identity ack show",
+		"identity ack record",
 		"session create",
 		"session show",
 		"session members",
@@ -434,8 +440,18 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		switch {
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity":
 			_, _ = w.Write([]byte(`{"identities":[{"id":"alice"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity/show":
+			_, _ = w.Write([]byte(`{"identity":{"id":"alice","display_name":"Alice"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity/groups":
+			_, _ = w.Write([]byte(`{"groups":["family","operators"]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity/resolve":
 			_, _ = w.Write([]byte(`{"audience":"group:family","identities":[{"id":"alice"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity/prefs":
+			_, _ = w.Write([]byte(`{"identity":"alice","preferences":{"notifications":"normal"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity/ack":
+			_, _ = w.Write([]byte(`{"subject_ref":"message:msg-1","acknowledgements":[{"actor_ref":"device:kitchen-screen","mode":"dismissed"}]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/identity/ack":
+			_, _ = w.Write([]byte(`{"status":"ok","ack":{"actor_ref":"device:kitchen-screen","mode":"dismissed"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/session/create":
 			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/post":
@@ -490,7 +506,12 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 
 	in := strings.NewReader(strings.Join([]string{
 		"identity ls",
+		"identity show alice",
+		"identity groups",
 		"identity resolve group:family",
+		"identity prefs alice",
+		"identity ack record message:msg-1 --actor device:kitchen-screen --mode dismissed",
+		"identity ack show message:msg-1",
 		"session create help room",
 		"message post room-1 hello",
 		"message unread alice room-1",
@@ -527,6 +548,15 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "group:family") {
 		t.Fatalf("identity resolve output missing audience label: %q", text)
+	}
+	if !strings.Contains(text, "operators") {
+		t.Fatalf("identity groups output missing operators group: %q", text)
+	}
+	if !strings.Contains(text, "notifications") {
+		t.Fatalf("identity prefs output missing preferences payload: %q", text)
+	}
+	if !strings.Contains(text, "action=ack.record") {
+		t.Fatalf("identity ack record output missing: %q", text)
 	}
 	if !strings.Contains(text, "sess-1") {
 		t.Fatalf("session create output missing: %q", text)
