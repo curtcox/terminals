@@ -66,6 +66,7 @@ type SessionAuditEvent struct {
 type Message struct {
 	ID        string    `json:"id"`
 	Room      string    `json:"room"`
+	TargetRef string    `json:"target_ref,omitempty"`
 	Text      string    `json:"text"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -74,6 +75,7 @@ type Message struct {
 type BoardItem struct {
 	ID        string    `json:"id"`
 	Board     string    `json:"board"`
+	Pinned    bool      `json:"pinned,omitempty"`
 	Text      string    `json:"text"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -665,6 +667,25 @@ func (s *Service) PostMessage(room, text string) Message {
 	return msg
 }
 
+// SendDirectMessage posts a direct message to one target actor.
+func (s *Service) SendDirectMessage(targetRef, text string) Message {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	targetRef = normalizeTargetRef(targetRef)
+	text = strings.TrimSpace(text)
+	msg := Message{
+		ID:        s.nextIDLocked("msg"),
+		Room:      "dm:" + strings.ReplaceAll(targetRef, ":", "_"),
+		TargetRef: targetRef,
+		Text:      text,
+		CreatedAt: s.now(),
+	}
+	s.messages = append(s.messages, msg)
+	s.appendRecentLocked("message", msg.ID+" dm "+targetRef+" "+msg.Text)
+	return msg
+}
+
 // ListMessages returns messages in the given room, or all messages if room is empty.
 func (s *Service) ListMessages(room string) []Message {
 	s.mu.RLock()
@@ -790,18 +811,34 @@ func (s *Service) ListUnreadMessages(identityID, room string) []Message {
 	return out
 }
 
+// PostBoard posts a non-pinned entry to a named board.
+func (s *Service) PostBoard(board, text string) BoardItem {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.postBoardLocked(board, text, false)
+}
+
 // PinBoard pins a text item to the named board.
 func (s *Service) PinBoard(board, text string) BoardItem {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.postBoardLocked(board, text, true)
+}
+
+func (s *Service) postBoardLocked(board, text string, pinned bool) BoardItem {
 	item := BoardItem{
 		ID:        s.nextIDLocked("pin"),
 		Board:     defaultIfBlank(board, "default"),
+		Pinned:    pinned,
 		Text:      strings.TrimSpace(text),
 		CreatedAt: s.now(),
 	}
 	s.boardItems = append(s.boardItems, item)
-	s.appendRecentLocked("board", item.ID+" "+item.Text)
+	action := "post"
+	if pinned {
+		action = "pin"
+	}
+	s.appendRecentLocked("board", item.ID+" "+action+" "+item.Text)
 	return item
 }
 
@@ -1255,6 +1292,17 @@ func defaultIfBlank(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func normalizeTargetRef(targetRef string) string {
+	targetRef = strings.TrimSpace(targetRef)
+	if targetRef == "" {
+		return "person:unknown"
+	}
+	if strings.Contains(targetRef, ":") {
+		return targetRef
+	}
+	return "person:" + targetRef
 }
 
 func normalizedTokens(value string) []string {

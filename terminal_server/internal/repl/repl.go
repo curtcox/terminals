@@ -84,8 +84,10 @@ func replCommandSpecs() []commandSpec {
 		{Name: "message ls", Usage: "message ls [room] [--json]", Summary: "List messages", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message unread", Usage: "message unread <identity> [room] [--json]", Summary: "List unread messages for an identity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message post", Usage: "message post <room> <text> [--json]", Summary: "Post a room/direct message", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
+		{Name: "message dm", Usage: "message dm <target> <text> [--json]", Summary: "Send a direct message", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "message ack", Usage: "message ack <identity> <message> [--json]", Summary: "Acknowledge a message for an identity", Classification: commandMutating, RelatedDocs: []string{"repl/commands/message"}},
 		{Name: "board ls", Usage: "board ls [board] [--json]", Summary: "List board or bulletin entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/board"}},
+		{Name: "board post", Usage: "board post <board> <text> [--json]", Summary: "Post a board entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/board"}},
 		{Name: "board pin", Usage: "board pin <board> <text> [--json]", Summary: "Pin a bulletin entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/board"}},
 		{Name: "artifact ls", Usage: "artifact ls [--json]", Summary: "List shared artifacts", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/artifact"}},
 		{Name: "artifact show", Usage: "artifact show <artifact> [--json]", Summary: "Show one shared artifact", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/artifact"}},
@@ -855,6 +857,27 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			_, err = fmt.Fprintf(s.out, "OK  message=%s\n", messageID)
 			return err
+		case "dm":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: message dm <target> <text>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/message/dm", url.Values{
+				"target_ref": {plain[0]},
+				"text":       {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			messageID := ""
+			if msgMap, ok := body["message"].(map[string]any); ok {
+				messageID = toString(msgMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  message=%s target=%s action=dm\n", messageID, plain[0])
+			return err
 		case "ack":
 			plain := nonFlagArgs(args[1:])
 			if len(plain) < 2 {
@@ -908,6 +931,27 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				itemID = toString(itemMap["id"])
 			}
 			_, err = fmt.Fprintf(s.out, "OK  board_item=%s\n", itemID)
+			return err
+		case "post":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: board post <board> <text>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/board/post", url.Values{
+				"board": {plain[0]},
+				"text":  {strings.Join(plain[1:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			itemID := ""
+			if itemMap, ok := body["item"].(map[string]any); ok {
+				itemID = toString(itemMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  board_item=%s action=post\n", itemID)
 			return err
 		default:
 			return fmt.Errorf("unknown command: board %s", sub)

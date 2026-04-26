@@ -1,10 +1,10 @@
 ---
 title: "Messaging and Boards Plan"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Messaging and Boards Plan

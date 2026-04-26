@@ -272,8 +272,10 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"session control grant",
 		"session control revoke",
 		"message post",
+		"message dm",
 		"message unread",
 		"message ack",
+		"board post",
 		"board pin",
 		"artifact create",
 		"artifact patch",
@@ -456,10 +458,14 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","session":{"id":"sess-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/post":
 			_, _ = w.Write([]byte(`{"status":"ok","message":{"id":"msg-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/dm":
+			_, _ = w.Write([]byte(`{"status":"ok","message":{"id":"msg-dm-1","target_ref":"person:mom"}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/message/unread":
 			_, _ = w.Write([]byte(`{"identity_id":"alice","messages":[]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/message/ack":
 			_, _ = w.Write([]byte(`{"status":"ok","ack":{"message_id":"msg-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/board/post":
+			_, _ = w.Write([]byte(`{"status":"ok","item":{"id":"post-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/board/pin":
 			_, _ = w.Write([]byte(`{"status":"ok","item":{"id":"pin-1"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/artifact/create":
@@ -514,8 +520,10 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"identity ack show message:msg-1",
 		"session create help room",
 		"message post room-1 hello",
+		"message dm mom come downstairs",
 		"message unread alice room-1",
 		"message ack alice msg-1",
+		"board post family grocery update",
 		"board pin family reminder",
 		"artifact create lesson-1 math",
 		"artifact show art-1",
@@ -563,6 +571,12 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "msg-1") {
 		t.Fatalf("message output missing: %q", text)
+	}
+	if !strings.Contains(text, "msg-dm-1") {
+		t.Fatalf("direct message output missing: %q", text)
+	}
+	if !strings.Contains(text, "post-1") {
+		t.Fatalf("board post output missing: %q", text)
 	}
 	if !strings.Contains(text, "pin-1") {
 		t.Fatalf("board output missing: %q", text)

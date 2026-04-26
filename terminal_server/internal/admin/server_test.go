@@ -405,6 +405,8 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		{path: "/admin/api/session/control/grant", form: url.Values{"session_id": {"missing"}, "participant": {"alice"}, "granted_by": {"moderator"}, "control_type": {"keyboard"}}, allowNotFound: true},
 		{path: "/admin/api/session/control/revoke", form: url.Values{"session_id": {"missing"}, "participant": {"alice"}, "revoked_by": {"moderator"}}, allowNotFound: true},
 		{path: "/admin/api/message/post", form: url.Values{"room": {"room-1"}, "text": {"hello"}}},
+		{path: "/admin/api/message/dm", form: url.Values{"target_ref": {"mom"}, "text": {"hello"}}},
+		{path: "/admin/api/board/post", form: url.Values{"board": {"family"}, "text": {"note"}}},
 		{path: "/admin/api/board/pin", form: url.Values{"board": {"family"}, "text": {"note"}}},
 		{path: "/admin/api/artifact/create", form: url.Values{"kind": {"lesson"}, "title": {"math"}}},
 		{path: "/admin/api/artifact/replace", form: url.Values{"artifact_id": {"missing"}, "title": {"ignored"}}, allowNotFound: true},
@@ -526,6 +528,34 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 	messageID, _ := messageMap["id"].(string)
 	if strings.TrimSpace(messageID) == "" {
 		t.Fatalf("missing message id in response: %s", postMessageW.Body.String())
+	}
+
+	directReq := httptest.NewRequest(http.MethodPost, "/admin/api/message/dm", strings.NewReader(url.Values{
+		"target_ref": {"mom"},
+		"text":       {"come downstairs"},
+	}.Encode()))
+	directReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	directW := httptest.NewRecorder()
+	h.ServeHTTP(directW, directReq)
+	if directW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/message/dm status = %d, want 200 body=%s", directW.Code, directW.Body.String())
+	}
+	if !strings.Contains(directW.Body.String(), "person:mom") {
+		t.Fatalf("direct message response missing normalized target ref: %s", directW.Body.String())
+	}
+
+	boardPostReq := httptest.NewRequest(http.MethodPost, "/admin/api/board/post", strings.NewReader(url.Values{
+		"board": {"family"},
+		"text":  {"Need milk"},
+	}.Encode()))
+	boardPostReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	boardPostW := httptest.NewRecorder()
+	h.ServeHTTP(boardPostW, boardPostReq)
+	if boardPostW.Code != http.StatusOK {
+		t.Fatalf("POST /admin/api/board/post status = %d, want 200 body=%s", boardPostW.Code, boardPostW.Body.String())
+	}
+	if strings.Contains(boardPostW.Body.String(), `"pinned":true`) {
+		t.Fatalf("board post response should not be pinned: %s", boardPostW.Body.String())
 	}
 
 	ackReq := httptest.NewRequest(http.MethodPost, "/admin/api/message/ack", strings.NewReader(url.Values{

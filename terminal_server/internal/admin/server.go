@@ -114,8 +114,10 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/message", h.handleMessages)
 	mux.HandleFunc("/admin/api/message/unread", h.handleMessageUnread)
 	mux.HandleFunc("/admin/api/message/post", h.handleMessagePost)
+	mux.HandleFunc("/admin/api/message/dm", h.handleMessageDirect)
 	mux.HandleFunc("/admin/api/message/ack", h.handleMessageAck)
 	mux.HandleFunc("/admin/api/board", h.handleBoard)
+	mux.HandleFunc("/admin/api/board/post", h.handleBoardPost)
 	mux.HandleFunc("/admin/api/board/pin", h.handleBoardPin)
 	mux.HandleFunc("/admin/api/artifact", h.handleArtifacts)
 	mux.HandleFunc("/admin/api/artifact/get", h.handleArtifactGet)
@@ -517,6 +519,19 @@ func (h *Handler) handleMessagePost(w http.ResponseWriter, req *http.Request) {
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": message})
 }
 
+func (h *Handler) handleMessageDirect(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	message := h.capability.SendDirectMessage(req.Form.Get("target_ref"), req.Form.Get("text"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "message": message})
+}
+
 func (h *Handler) handleMessageAck(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -540,6 +555,19 @@ func (h *Handler) handleBoard(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"items": h.capability.ListBoard(req.URL.Query().Get("board"))})
+}
+
+func (h *Handler) handleBoardPost(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	item := h.capability.PostBoard(req.Form.Get("board"), req.Form.Get("text"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "item": item})
 }
 
 func (h *Handler) handleBoardPin(w http.ResponseWriter, req *http.Request) {

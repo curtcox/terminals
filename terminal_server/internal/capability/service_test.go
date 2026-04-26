@@ -1,6 +1,9 @@
 package capability
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestResolveAudienceByGroupAndAlias(t *testing.T) {
 	svc := NewService()
@@ -153,6 +156,23 @@ func TestMessageAcknowledgeUnreadAndArtifactPatch(t *testing.T) {
 	svc := NewService()
 
 	message := svc.PostMessage("room-1", "remember the groceries")
+	direct := svc.SendDirectMessage("mom", "come downstairs")
+	if direct.TargetRef != "person:mom" {
+		t.Fatalf("SendDirectMessage target = %q, want person:mom", direct.TargetRef)
+	}
+	if !strings.HasPrefix(direct.Room, "dm:") {
+		t.Fatalf("SendDirectMessage room = %q, want dm:*", direct.Room)
+	}
+
+	boardPost := svc.PostBoard("family", "Need milk")
+	if boardPost.Pinned {
+		t.Fatalf("PostBoard should create non-pinned entries")
+	}
+	boardPin := svc.PinBoard("family", "Dinner in 10")
+	if !boardPin.Pinned {
+		t.Fatalf("PinBoard should create pinned entries")
+	}
+
 	unread := svc.ListUnreadMessages("alice", "room-1")
 	if len(unread) != 1 || unread[0].ID != message.ID {
 		t.Fatalf("ListUnreadMessages before ack = %+v, want [%s]", unread, message.ID)
