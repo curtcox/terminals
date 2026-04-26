@@ -60,6 +60,85 @@ func TestUpdateCapabilities(t *testing.T) {
 	}
 }
 
+func TestApplyCapabilitySnapshotReplacesCapabilitiesAndTracksTimestamp(t *testing.T) {
+	m := NewManager()
+	_, _ = m.Register(Manifest{DeviceID: "device-1"})
+
+	snapshotTime := time.Date(2026, 4, 26, 17, 35, 0, 0, time.UTC)
+	m.now = func() time.Time { return snapshotTime }
+	err := m.ApplyCapabilitySnapshot("device-1", 1, CapabilitySet{
+		"screen.width":       "1920",
+		"microphone.present": "true",
+	})
+	if err != nil {
+		t.Fatalf("ApplyCapabilitySnapshot() error = %v", err)
+	}
+
+	found, ok := m.Get("device-1")
+	if !ok {
+		t.Fatalf("Get() did not find device-1")
+	}
+	if found.Generation != 1 {
+		t.Fatalf("Generation = %d, want 1", found.Generation)
+	}
+	if found.LastSnapshot != snapshotTime {
+		t.Fatalf("LastSnapshot = %v, want %v", found.LastSnapshot, snapshotTime)
+	}
+	if !found.LastDelta.IsZero() {
+		t.Fatalf("LastDelta = %v, want zero", found.LastDelta)
+	}
+	if found.Capabilities["screen.width"] != "1920" {
+		t.Fatalf("screen.width = %q, want 1920", found.Capabilities["screen.width"])
+	}
+
+	deltaTime := snapshotTime.Add(30 * time.Second)
+	m.now = func() time.Time { return deltaTime }
+	err = m.ApplyCapabilityDelta("device-1", 2, CapabilitySet{
+		"screen.width": "1280",
+	})
+	if err != nil {
+		t.Fatalf("ApplyCapabilityDelta() error = %v", err)
+	}
+
+	found, _ = m.Get("device-1")
+	if found.Capabilities["screen.width"] != "1280" {
+		t.Fatalf("screen.width = %q, want 1280", found.Capabilities["screen.width"])
+	}
+	if _, exists := found.Capabilities["microphone.present"]; exists {
+		t.Fatalf("expected snapshot-only capability to be removed on delta replace")
+	}
+	if found.LastDelta != deltaTime {
+		t.Fatalf("LastDelta = %v, want %v", found.LastDelta, deltaTime)
+	}
+}
+
+func TestApplyCapabilityLifecycleRejectsStaleGeneration(t *testing.T) {
+	m := NewManager()
+	_, _ = m.Register(Manifest{DeviceID: "device-1"})
+
+	if err := m.ApplyCapabilitySnapshot("device-1", 3, CapabilitySet{"screen.width": "1920"}); err != nil {
+		t.Fatalf("ApplyCapabilitySnapshot() error = %v", err)
+	}
+
+	if err := m.ApplyCapabilitySnapshot("device-1", 3, CapabilitySet{"screen.width": "1280"}); err != ErrStaleGeneration {
+		t.Fatalf("ApplyCapabilitySnapshot() stale error = %v, want %v", err, ErrStaleGeneration)
+	}
+	if err := m.ApplyCapabilityDelta("device-1", 2, CapabilitySet{"screen.width": "1280"}); err != ErrStaleGeneration {
+		t.Fatalf("ApplyCapabilityDelta() stale error = %v, want %v", err, ErrStaleGeneration)
+	}
+
+	found, ok := m.Get("device-1")
+	if !ok {
+		t.Fatalf("Get() did not find device-1")
+	}
+	if found.Generation != 3 {
+		t.Fatalf("Generation = %d, want 3", found.Generation)
+	}
+	if found.Capabilities["screen.width"] != "1920" {
+		t.Fatalf("screen.width = %q, want 1920", found.Capabilities["screen.width"])
+	}
+}
+
 func TestHeartbeatAndDisconnect(t *testing.T) {
 	m := NewManager()
 	_, _ = m.Register(Manifest{DeviceID: "device-1"})
