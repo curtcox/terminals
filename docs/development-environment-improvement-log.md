@@ -25,7 +25,7 @@ documented in the guides below.
 - `terminal_server/apps/kitchen_timer/README.md` documents the package as a
   TAL/TAR contract example and records that `go run ./cmd/term app test
   kitchen_timer` is a package smoke test, not a synthetic lifecycle simulation.
-- `plans/features/application-runtime.md` defines the `Implemented`, `Partially
+- `docs/application-runtime.md` defines the `Implemented`, `Partially
   implemented`, and `Planned` status vocabulary and includes a runtime status
   table for package loading, manifest validation, exported definitions, TAL
   interpretation, lifecycle snapshots, host operation commit, and simulation.

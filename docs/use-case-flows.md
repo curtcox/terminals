@@ -153,5 +153,5 @@ Flow:
 - [Use Case Validation Matrix](usecase-validation-matrix.md)
 - [Sensing and Edge Observation Use Case Flows](sensing-use-case-flows.md)
 - [Scenario Engine Plan](../plans/features/scenario-engine.md)
-- [Application Runtime Plan](../plans/features/application-runtime.md)
+- [Application Runtime](application-runtime.md)
 - [IO Abstraction Plan](../plans/features/io-abstraction.md)
