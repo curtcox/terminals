@@ -82,6 +82,33 @@ void main() {
     );
   });
 
+  test('resolvePreferredEndpoint prefers manual override when provided', () {
+    final endpoint = resolvePreferredEndpoint(
+      manualEndpoint: '  ws://manual.example:50054/control  ',
+      discoveredEndpoint: 'ws://mdns.example:50054/control',
+    );
+    expect(endpoint, 'ws://manual.example:50054/control');
+  });
+
+  test('resolvePreferredEndpoint falls back to discovered endpoint', () {
+    final endpoint = resolvePreferredEndpoint(
+      manualEndpoint: '   ',
+      discoveredEndpoint: 'host.example:50051',
+    );
+    expect(endpoint, 'host.example:50051');
+  });
+
+  test('websocketPathFromEndpoint returns path from endpoint uri', () {
+    final path = websocketPathFromEndpoint('ws://192.168.0.2:50054/custom');
+    expect(path, '/custom');
+  });
+
+  test('websocketPathFromEndpoint falls back to default path', () {
+    expect(websocketPathFromEndpoint('ws://192.168.0.2:50054'), '/control');
+    expect(websocketPathFromEndpoint(''), '/control');
+    expect(websocketPathFromEndpoint('not a uri'), '/control');
+  });
+
   test('resolveInitialControlHost preserves configured host off web', () {
     final host = resolveInitialControlHost(
       isWebRuntime: false,

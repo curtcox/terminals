@@ -771,6 +771,32 @@ List<ControlCarrierKind> buildCarrierPreference({
   return filtered;
 }
 
+String resolvePreferredEndpoint({
+  required String manualEndpoint,
+  required String discoveredEndpoint,
+}) {
+  final manual = manualEndpoint.trim();
+  if (manual.isNotEmpty) {
+    return manual;
+  }
+  return discoveredEndpoint.trim();
+}
+
+String websocketPathFromEndpoint(String endpoint) {
+  final trimmed = endpoint.trim();
+  if (trimmed.isEmpty) {
+    return '/control';
+  }
+  final parsed = Uri.tryParse(trimmed);
+  if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
+    return '/control';
+  }
+  if (parsed.path.trim().isEmpty) {
+    return '/control';
+  }
+  return parsed.path;
+}
+
 String classifyCarrierFailure({
   required String stage,
   required String rawError,
@@ -1084,6 +1110,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   final TextEditingController _portController = TextEditingController(
     text: _defaultControlPort.toString(),
   );
+  final TextEditingController _grpcEndpointController = TextEditingController();
+  final TextEditingController _websocketEndpointController =
+      TextEditingController();
+  final TextEditingController _tcpEndpointController = TextEditingController();
+  final TextEditingController _httpEndpointController = TextEditingController();
   final TextEditingController _deviceNameController = TextEditingController(
     text: 'Flutter Client',
   );
@@ -1630,19 +1661,46 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   String _websocketPathFor(DiscoveredServer? server) {
-    final endpoint = server?.websocketEndpoint.trim() ?? '';
-    if (endpoint.isEmpty) {
-      return '/control';
+    final endpoint = _endpointForCarrier(
+      carrier: ControlCarrierKind.websocket,
+      server: server,
+    );
+    return websocketPathFromEndpoint(endpoint);
+  }
+
+  String _endpointForCarrier({
+    required ControlCarrierKind carrier,
+    required DiscoveredServer? server,
+  }) {
+    switch (carrier) {
+      case ControlCarrierKind.grpc:
+        return resolvePreferredEndpoint(
+          manualEndpoint: _grpcEndpointController.text,
+          discoveredEndpoint: server?.grpcEndpoint ?? '',
+        );
+      case ControlCarrierKind.websocket:
+        return resolvePreferredEndpoint(
+          manualEndpoint: _websocketEndpointController.text,
+          discoveredEndpoint: server?.websocketEndpoint ?? '',
+        );
+      case ControlCarrierKind.tcp:
+        return resolvePreferredEndpoint(
+          manualEndpoint: _tcpEndpointController.text,
+          discoveredEndpoint: server?.tcpEndpoint ?? '',
+        );
+      case ControlCarrierKind.http:
+        return resolvePreferredEndpoint(
+          manualEndpoint: _httpEndpointController.text,
+          discoveredEndpoint: server?.httpEndpoint ?? '',
+        );
     }
-    final parsed = Uri.tryParse(endpoint);
-    if (parsed != null && parsed.path.isNotEmpty) {
-      return parsed.path;
-    }
-    return '/control';
   }
 
   int _grpcPortFor(DiscoveredServer? server, int fallbackPort) {
-    final endpoint = server?.grpcEndpoint.trim() ?? '';
+    final endpoint = _endpointForCarrier(
+      carrier: ControlCarrierKind.grpc,
+      server: server,
+    );
     if (endpoint.isEmpty) {
       return fallbackPort;
     }
@@ -1661,7 +1719,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }) {
     switch (carrier) {
       case ControlCarrierKind.grpc:
-        final endpoint = server?.grpcEndpoint.trim() ?? '';
+        final endpoint = _endpointForCarrier(carrier: carrier, server: server);
         if (endpoint.isEmpty) {
           return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
         }
@@ -1671,7 +1729,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         }
         return _ConnectionTarget(host: parsed.host, port: parsed.port);
       case ControlCarrierKind.websocket:
-        final endpoint = server?.websocketEndpoint.trim() ?? '';
+        final endpoint = _endpointForCarrier(carrier: carrier, server: server);
         if (endpoint.isEmpty) {
           return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
         }
@@ -1681,7 +1739,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         }
         return _ConnectionTarget(host: parsed.host, port: parsed.port);
       case ControlCarrierKind.tcp:
-        final endpoint = server?.tcpEndpoint.trim() ?? '';
+        final endpoint = _endpointForCarrier(carrier: carrier, server: server);
         if (endpoint.isEmpty) {
           return _ConnectionTarget(host: fallbackHost, port: 50055);
         }
@@ -1691,7 +1749,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         }
         return _ConnectionTarget(host: parsed.host, port: parsed.port);
       case ControlCarrierKind.http:
-        final endpoint = server?.httpEndpoint.trim() ?? '';
+        final endpoint = _endpointForCarrier(carrier: carrier, server: server);
         if (endpoint.isEmpty) {
           return _ConnectionTarget(host: fallbackHost, port: 50056);
         }
@@ -2123,8 +2181,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ControlClientTransportHint.configure(
         carrier: carrier,
         wsPath: _websocketPathFor(selectedServer),
-        tcp: selectedServer?.tcpEndpoint,
-        http: selectedServer?.httpEndpoint,
+        tcp: _endpointForCarrier(
+          carrier: ControlCarrierKind.tcp,
+          server: selectedServer,
+        ),
+        http: _endpointForCarrier(
+          carrier: ControlCarrierKind.http,
+          server: selectedServer,
+        ),
         desiredDeviceIdHint: _deviceId,
         resumeTokenHint: ControlClientTransportHint.resumeToken,
       );
@@ -3349,6 +3413,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return <String, String>{
       'host': _hostController.text.trim(),
       'port': _portController.text.trim(),
+      'grpc_endpoint_override': _grpcEndpointController.text.trim(),
+      'websocket_endpoint_override': _websocketEndpointController.text.trim(),
+      'tcp_endpoint_override': _tcpEndpointController.text.trim(),
+      'http_endpoint_override': _httpEndpointController.text.trim(),
       'status': _status,
       'last_connection_status': _lastConnectionStatus,
       'active_ui_root': _activeRoot == null ? '' : _nodeId(_activeRoot!),
@@ -3894,6 +3962,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     _hostController.dispose();
     _portController.dispose();
+    _grpcEndpointController.dispose();
+    _websocketEndpointController.dispose();
+    _tcpEndpointController.dispose();
+    _httpEndpointController.dispose();
     _deviceNameController.dispose();
     _deviceTypeController.dispose();
     _platformController.dispose();
@@ -4055,6 +4127,44 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                     controller: _portController,
                     decoration: const InputDecoration(labelText: 'Server Port'),
                     keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
+                  ExpansionTile(
+                    title: const Text('Carrier Endpoint Overrides (Optional)'),
+                    childrenPadding: const EdgeInsets.only(bottom: 8),
+                    children: [
+                      TextField(
+                        controller: _grpcEndpointController,
+                        decoration: const InputDecoration(
+                          labelText: 'gRPC Endpoint Override',
+                          hintText: 'host:50051',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _websocketEndpointController,
+                        decoration: const InputDecoration(
+                          labelText: 'WebSocket Endpoint Override',
+                          hintText: 'ws://host:50054/control',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _tcpEndpointController,
+                        decoration: const InputDecoration(
+                          labelText: 'TCP Endpoint Override',
+                          hintText: 'host:50055',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _httpEndpointController,
+                        decoration: const InputDecoration(
+                          labelText: 'HTTP Endpoint Override',
+                          hintText: 'http://host:50056',
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   TextField(

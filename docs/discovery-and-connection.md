@@ -25,6 +25,8 @@ connection with:
 
 - Server host field
 - Server port field
+- Optional per-carrier endpoint overrides (`grpc`, `ws`, `tcp`, `http`) for
+  debugging or constrained network setups
 - Connect button
 
 This is the only client-native connection UI. Application UI after registration

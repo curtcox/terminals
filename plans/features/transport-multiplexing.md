@@ -1,10 +1,10 @@
 ---
 title: "Multi-Transport Control Plane"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: github-copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Multi-Transport Control Plane
