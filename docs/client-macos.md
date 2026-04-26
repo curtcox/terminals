@@ -80,6 +80,11 @@ When the OS denies media permissions at runtime, the client surfaces a
 deterministic control-stream status (`Media permission required`) and records a
 failure notification for the rejected stream start.
 
+Explicit server alerts (`ConnectResponse.notification`) are delivered to the
+native OS notification center on macOS (best-effort) and spoken via the
+client speech helper, while command-result notifications remain in-app status
+text only.
+
 ## Test
 
 ```bash

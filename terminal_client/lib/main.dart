@@ -23,6 +23,7 @@ import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/media/playback.dart';
 import 'package:terminal_client/media/webrtc_engine.dart';
+import 'package:terminal_client/util/alert_delivery.dart';
 import 'package:terminal_client/util/browser_host.dart' as browser_host;
 import 'package:terminal_client/util/speech.dart' as speech;
 
@@ -117,16 +118,19 @@ AudioPlayback _defaultAudioPlaybackFactory() {
   return AudioPlayerPlayback();
 }
 
+final AlertDeliveryService _defaultAlertDeliveryService =
+    AlertDeliveryService();
+
 void _defaultAlertDelivery({
   required String title,
   required String body,
   required String level,
 }) {
-  final spoken = body.trim().isNotEmpty ? body.trim() : title.trim();
-  if (spoken.isEmpty) {
-    return;
-  }
-  speech.speakText(spoken);
+  _defaultAlertDeliveryService.deliver(
+    title: title,
+    body: body,
+    level: level,
+  );
 }
 
 WakeWordDetectorController _defaultWakeWordDetectorFactory() {
