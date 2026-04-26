@@ -28,8 +28,8 @@ func (f *fakeVisionBackend) Analyze(_ context.Context, _ image.Image, prompt str
 }
 
 type fakeSoundBackend struct {
-	events  []ai.SoundEvent
-	err     error
+	events   []ai.SoundEvent
+	err      error
 	captured []byte
 }
 

@@ -16,17 +16,17 @@ type VerificationState string
 
 const (
 	// VerificationUnknown means no verification method has been recorded yet.
-	VerificationUnknown       VerificationState = "unknown"
+	VerificationUnknown VerificationState = "unknown"
 	// VerificationManual indicates a user manually confirmed the location.
-	VerificationManual        VerificationState = "manual"
+	VerificationManual VerificationState = "manual"
 	// VerificationMarker indicates marker-based visual verification.
-	VerificationMarker        VerificationState = "marker"
+	VerificationMarker VerificationState = "marker"
 	// VerificationAudioChirp indicates calibration by emitted/recorded chirps.
-	VerificationAudioChirp    VerificationState = "audio_chirp"
+	VerificationAudioChirp VerificationState = "audio_chirp"
 	// VerificationRFFingerprint indicates RF-based verification.
 	VerificationRFFingerprint VerificationState = "rf_fingerprint"
 	// VerificationMixed indicates multiple verification methods were combined.
-	VerificationMixed         VerificationState = "mixed"
+	VerificationMixed VerificationState = "mixed"
 )
 
 // DeviceGeometry tracks calibrated device placement and sensor metadata.
@@ -45,9 +45,9 @@ type EntityKind string
 
 const (
 	// EntityPerson tracks people presence/location.
-	EntityPerson    EntityKind = "person"
+	EntityPerson EntityKind = "person"
 	// EntityObject tracks household objects.
-	EntityObject    EntityKind = "object"
+	EntityObject EntityKind = "object"
 	// EntityBluetooth tracks Bluetooth devices.
 	EntityBluetooth EntityKind = "bluetooth_device"
 )
@@ -72,10 +72,8 @@ type EntityQuery struct {
 	MinConfidence float64
 }
 
-var (
-	// ErrNotFound indicates no matching world-model record.
-	ErrNotFound = errors.New("world model record not found")
-)
+// ErrNotFound indicates no matching world-model record.
+var ErrNotFound = errors.New("world model record not found")
 
 // Model is an in-memory world model with calibration and entity records.
 type Model struct {

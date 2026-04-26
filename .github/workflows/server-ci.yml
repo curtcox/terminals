@@ -33,6 +33,13 @@ jobs:
         run: go test ./...
       - name: Test (race)
         run: go test -race ./...
+      - name: Test (coverage)
+        run: go test ./... -coverprofile=coverage.out
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-coverage
+          path: terminal_server/coverage.out
       - name: Govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest

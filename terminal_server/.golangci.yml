@@ -16,3 +16,7 @@ linters:
     - revive
     - staticcheck
     - unused
+
+formatters:
+  enable:
+    - gofumpt

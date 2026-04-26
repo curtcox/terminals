@@ -47,10 +47,8 @@ type Grant struct {
 	Preempted []Claim
 }
 
-var (
-	// ErrClaimConflict indicates a lower/equal-priority conflict.
-	ErrClaimConflict = errors.New("claim conflict")
-)
+// ErrClaimConflict indicates a lower/equal-priority conflict.
+var ErrClaimConflict = errors.New("claim conflict")
 
 type resourceKey struct {
 	deviceID string

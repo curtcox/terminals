@@ -1,13 +1,28 @@
 ---
 title: "Code Quality and CI"
 kind: plan
-status: planned
-owner: unowned
+status: superseded
+owner: copilot
 validation: none
 last-reviewed: 2026-04-25
 ---
 
 # Code Quality and CI
+
+Status: Completed and drained on 2026-04-25.
+
+The durable behavior from this plan now lives in:
+
+- [`docs/code-quality-and-ci.md`](../../docs/code-quality-and-ci.md)
+- [`README.md`](../../README.md)
+- [`docs/README.md`](../../docs/README.md)
+- [`.github/workflows/server-ci.yml`](../../.github/workflows/server-ci.yml)
+- [`.github/workflows/client-ci.yml`](../../.github/workflows/client-ci.yml)
+- [`.github/workflows/proto-ci.yml`](../../.github/workflows/proto-ci.yml)
+- [`terminal_server/.golangci.yml`](../../terminal_server/.golangci.yml)
+
+There are no remaining active tasks in this plan. Future CI and quality-tooling
+changes should be tracked as updates to the durable docs and workflow files.
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 

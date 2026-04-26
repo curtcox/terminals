@@ -186,10 +186,8 @@ type planRuntime struct {
 	stops  []func()
 }
 
-var (
-	// ErrInvalidMediaPlan indicates malformed nodes/edges.
-	ErrInvalidMediaPlan = errors.New("invalid media plan")
-)
+// ErrInvalidMediaPlan indicates malformed nodes/edges.
+var ErrInvalidMediaPlan = errors.New("invalid media plan")
 
 // NewMediaPlanner returns an empty planner.
 func NewMediaPlanner(router *Router) *MediaPlanner {

@@ -36,6 +36,13 @@ jobs:
         run: dart format --set-exit-if-changed .
       - name: Test
         run: flutter test --coverage
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-coverage
+          path: terminal_client/coverage/lcov.info
+      - name: Dependency freshness (informational)
+        run: dart pub outdated || true
 
   client-build-matrix:
     strategy:

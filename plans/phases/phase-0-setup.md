@@ -15,7 +15,7 @@ The durable behavior from this phase now lives in:
 
 - [`README.md`](../../README.md) (project setup and quick-start workflow)
 - [`docs/README.md`](../../docs/README.md) (project documentation entry points)
-- [`plans/features/ci.md`](../features/ci.md) (build, lint, test, and CI contract)
+- [`docs/code-quality-and-ci.md`](../../docs/code-quality-and-ci.md) (build, lint, test, and CI contract)
 - [`plans/features/agent-config.md`](../features/agent-config.md) (agent configuration contract)
 - [`terminal_server/CLAUDE.md`](../../terminal_server/CLAUDE.md), [`terminal_client/CLAUDE.md`](../../terminal_client/CLAUDE.md), and [`api/CLAUDE.md`](../../api/CLAUDE.md) (subproject conventions)
 
