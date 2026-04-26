@@ -17,7 +17,7 @@ golangci-lint run ./...
 ## Guardrails
 
 - Keep scenario orchestration in server modules.
-- Keep transport contract changes aligned with protobuf updates in `api/proto`.
+- Keep transport contract changes aligned with protobuf updates in `api/terminals`.
 - Keep AI integrations behind interfaces.
 
 ## Event Logging

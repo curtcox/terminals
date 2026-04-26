@@ -1,13 +1,27 @@
 ---
 title: "Agent Configuration"
 kind: plan
-status: planned
-owner: unowned
+status: superseded
+owner: copilot
 validation: none
 last-reviewed: 2026-04-25
 ---
 
 # Agent Configuration
+
+Status: Completed and drained on 2026-04-25.
+
+The durable behavior from this plan now lives in:
+
+- [`docs/agent-configuration.md`](../../docs/agent-configuration.md)
+- [`CLAUDE.md`](../../CLAUDE.md)
+- [`AGENTS.md`](../../AGENTS.md)
+- [`.github/copilot-instructions.md`](../../.github/copilot-instructions.md)
+- [`terminal_server/CLAUDE.md`](../../terminal_server/CLAUDE.md), [`terminal_client/CLAUDE.md`](../../terminal_client/CLAUDE.md), and [`api/CLAUDE.md`](../../api/CLAUDE.md)
+
+There are no remaining active tasks in this plan. Future agent setup changes
+should be tracked in the durable docs and updated in-place guidance files
+rather than reopening this completed plan.
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 

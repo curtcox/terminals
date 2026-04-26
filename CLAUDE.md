@@ -12,7 +12,7 @@ Terminals is a thin-client system:
 
 - `terminal_server/`: Go server
 - `terminal_client/`: Flutter client
-- `api/proto/`: protobuf definitions
+- `api/terminals/`: protobuf definitions
 
 ## Core Rules
 
