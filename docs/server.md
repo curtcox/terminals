@@ -2,6 +2,53 @@
 
 The Go server lives in `terminal_server/`.
 
+## Architecture Overview
+
+The server is the system orchestrator. Scenario logic, routing, and state live
+in Go on the server; clients remain generic terminals.
+
+### Module layout
+
+```text
+terminal_server/
+|- cmd/server/                    # Server entrypoint and process wiring
+|- internal/discovery/            # mDNS discovery advertisement
+|- internal/transport/            # gRPC/WebSocket/TCP/HTTP control carriers
+|- internal/device/               # Device registry + lifecycle state
+|- internal/placement/            # Semantic target resolution
+|- internal/io/                   # Media plans, claims, routing
+|- internal/intent/               # Typed intent/event ingress and dispatch
+|- internal/scenario/             # Scenario definitions and activation engine
+|- internal/ai/                   # Provider interfaces and adapters
+|- internal/telephony/            # SIP bridge
+|- internal/ui/                   # Server-driven UI descriptor validation
+|- internal/storage/              # Config, scheduler, and persisted state
+|- configs/                       # Runtime configuration defaults/examples
+|- gen/                           # Generated server-side bindings
+```
+
+### Responsibilities
+
+- Device manager: tracks connected terminals and runtime state.
+- Placement engine: resolves semantic scopes (zones/roles) into concrete
+  device targets.
+- IO router + claim manager: compiles media plans, applies routing, and
+  arbitrates resource preemption.
+- Intent/event bus: normalizes triggers from voice, UI actions, schedules,
+  analyzers, and automation.
+- Scenario engine: matches triggers, starts/supervises activations, and
+  coordinates claim lifecycle.
+- AI backends: keep STT/TTS/LLM/vision/classification behind interfaces.
+- Storage: persists scheduler/config/runtime records needed for resilient
+  operation and recovery.
+
+### Contract boundaries
+
+- Client/server message contracts are protobuf under `api/terminals/`.
+- Scenario-specific behavior belongs in server packages, not the Flutter
+  client.
+- UI is server-driven using shared primitives and validated descriptors.
+
 ## Prerequisites
 
 | Tool | Minimum version | Install |
