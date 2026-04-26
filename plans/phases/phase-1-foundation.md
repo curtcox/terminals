@@ -1,13 +1,25 @@
 ---
 title: "Phase 1 — Foundation"
 kind: plan
-status: planned
-owner: unowned
+status: superseded
+owner: copilot
 validation: none
 last-reviewed: 2026-04-25
 ---
 
 # Phase 1 — Foundation
+
+Status: Completed and drained on 2026-04-25.
+
+The durable behavior from this phase is documented in:
+
+- [Protocol Design](../features/protocol.md)
+- [Server-Driven UI](../features/server-driven-ui.md)
+- [Client Architecture](../features/architecture-client.md)
+- [Server Architecture](../features/architecture-server.md)
+- [Discovery and Connection](../features/discovery.md)
+- [IO Abstraction Layer](../features/io-abstraction.md)
+- [Capability Lifecycle and Dynamic Terminal Capabilities](../features/capability-lifecycle.md)
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
 
