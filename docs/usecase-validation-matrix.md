@@ -23,6 +23,8 @@ Coverage depth labels:
 
 | ID | Scenario | Validation Command | Primary Evidence | Coverage Depth |
 |---|---|---|---|---|
+| B3 | Diagnostics autodetect + merge | `make usecase-validate USECASE=B3` | `internal/diagnostics/bugreport` autodetect merge service test | Scenario |
+| B4 | Admin bug report visibility (`/admin/bugs`) | `make usecase-validate USECASE=B4` | `internal/admin` bug intake/list/detail + tag filter tests | Scenario |
 | C1 | Intercom (2-way / route-stop / fan-out) | `make usecase-validate USECASE=C1` | `internal/transport` generated+wire integration tests | Transport |
 | C3 | PA mode | `make usecase-validate USECASE=C3` | PA relay, voice start, voice stop alias tests | Transport |
 | C5 | Internal video call | `make usecase-validate USECASE=C5` | `TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow` | Transport |
@@ -44,6 +46,6 @@ Coverage depth labels:
 
 The following planned IDs currently do not have a dedicated `make usecase-validate USECASE=<ID>` mapping yet:
 
-`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`, `PL2`-`PL7`, `PL9`-`PL19`, `PL21`-`PL27`.
+`B1`, `B2`, `B5`, `C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`, `PL2`-`PL7`, `PL9`-`PL19`, `PL21`-`PL27`.
 
 Use `make all-check` as the baseline repository gate while dedicated use-case mappings are added.

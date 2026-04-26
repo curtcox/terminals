@@ -23,6 +23,8 @@ fi
 metadata() {
   local id="$1"
   case "${id}" in
+    B3) echo "B3|Scenario|diagnostics service autodetect merge test" ;;
+    B4) echo "B4|Scenario|admin bug intake/list/detail and filter tests" ;;
     C1) echo "C1|Transport|internal/transport generated+wire integration tests" ;;
     C3) echo "C3|Transport|PA relay, voice start, voice stop alias tests" ;;
     C5) echo "C5|Transport|TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow" ;;
@@ -46,7 +48,7 @@ metadata() {
   esac
 }
 
-all_ids=(C1 C3 C5 D1 M1 M2 M3 M4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
+all_ids=(B3 B4 C1 C3 C5 D1 M1 M2 M3 M4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
 
 run_go_test() {
   local pkg="$1"
@@ -64,6 +66,12 @@ run_app_test() {
 run_usecase() {
   local id="$1"
   case "${id}" in
+    B3)
+      run_go_test ./internal/diagnostics/bugreport 'TestServiceAutodetectMerge$'
+      ;;
+    B4)
+      run_go_test ./internal/admin 'TestBug(IntakeAndListAndDetail|ListFilterByTag)$'
+      ;;
     C1)
       run_go_test ./internal/transport 'Test(Generated|Wire)SessionIntercom(EmitsRouteStream|StopEmitsStopStream|FanOutRelaysMediaToPeerSession)$'
       ;;
