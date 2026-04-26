@@ -1396,20 +1396,36 @@ func shouldDisconnectRouteForLostResources(route iorouter.Route, deviceID string
 	_, lostCameraAnalyze := lostResources["camera.analyze"]
 	_, lostScreenMain := lostResources["screen.main"]
 	_, lostScreenOverlay := lostResources["screen.overlay"]
+	lostAudioInEndpoint := hasLostResourcePrefix(lostResources, "audio_in.")
+	lostAudioOutEndpoint := hasLostResourcePrefix(lostResources, "audio_out.")
+	lostCameraEndpoint := hasLostResourcePrefix(lostResources, "camera.")
+	lostDisplayEndpoint := hasLostResourcePrefix(lostResources, "display.")
 
-	if (lostMicCapture || lostMicAnalyze) && sourceID == deviceID && strings.Contains(streamKind, "audio") {
+	if (lostMicCapture || lostMicAnalyze || lostAudioInEndpoint) && sourceID == deviceID && strings.Contains(streamKind, "audio") {
 		return true
 	}
-	if lostSpeaker && targetID == deviceID && strings.Contains(streamKind, "audio") {
+	if (lostSpeaker || lostAudioOutEndpoint) && targetID == deviceID && strings.Contains(streamKind, "audio") {
 		return true
 	}
-	if (lostCameraCapture || lostCameraAnalyze) && sourceID == deviceID && strings.Contains(streamKind, "video") {
+	if (lostCameraCapture || lostCameraAnalyze || lostCameraEndpoint) && sourceID == deviceID && strings.Contains(streamKind, "video") {
 		return true
 	}
-	if (lostScreenMain || lostScreenOverlay) && targetID == deviceID && strings.Contains(streamKind, "video") {
+	if (lostScreenMain || lostScreenOverlay || lostDisplayEndpoint) && targetID == deviceID && strings.Contains(streamKind, "video") {
 		return true
 	}
 
+	return false
+}
+
+func hasLostResourcePrefix(lostResources map[string]struct{}, prefix string) bool {
+	if len(lostResources) == 0 || strings.TrimSpace(prefix) == "" {
+		return false
+	}
+	for resource := range lostResources {
+		if strings.HasPrefix(resource, prefix) {
+			return true
+		}
+	}
 	return false
 }
 
