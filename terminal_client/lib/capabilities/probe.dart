@@ -56,10 +56,9 @@ class DefaultCapabilityProbe implements CapabilityProbe {
   @override
   Future<capv1.DeviceCapabilities> probe(CapabilityProbeContext context) async {
     final mediaDevices = await _probeMediaDevices();
-    final mediaKinds = mediaDevices.map((device) => device.kind).toSet();
-    final hasMicrophone = mediaKinds.contains('audioinput');
-    final hasAudioOutput = mediaKinds.contains('audiooutput');
-    final hasCamera = mediaKinds.contains('videoinput');
+    final outputEndpoints = _audioEndpointsForKind(mediaDevices, 'audiooutput');
+    final inputEndpoints = _audioEndpointsForKind(mediaDevices, 'audioinput');
+    final cameraEndpoints = _cameraEndpoints(mediaDevices);
 
     final capabilities = capv1.DeviceCapabilities()
       ..deviceId = context.deviceId
@@ -88,20 +87,17 @@ class DefaultCapabilityProbe implements CapabilityProbe {
                 : 'portrait'),
       );
 
-    if (hasAudioOutput) {
-      final outputEndpoints =
-          _audioEndpointsForKind(mediaDevices, 'audiooutput');
+    if (outputEndpoints.isNotEmpty) {
       capabilities.speakers =
           (capv1.AudioOutputCapability()..endpoints.addAll(outputEndpoints));
     }
-    if (hasMicrophone) {
-      final inputEndpoints = _audioEndpointsForKind(mediaDevices, 'audioinput');
+    if (inputEndpoints.isNotEmpty) {
       capabilities.microphone =
           (capv1.AudioInputCapability()..endpoints.addAll(inputEndpoints));
     }
-    if (hasCamera) {
-      capabilities.camera = (capv1.CameraCapability()
-        ..endpoints.addAll(_cameraEndpoints(mediaDevices)));
+    if (cameraEndpoints.isNotEmpty) {
+      capabilities.camera =
+          (capv1.CameraCapability()..endpoints.addAll(cameraEndpoints));
     }
     capabilities.edge =
         (capv1.EdgeCapability()..runtimes.addAll(<String>['dart']));

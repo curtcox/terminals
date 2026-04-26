@@ -243,4 +243,44 @@ void main() {
     expect(capabilities.speakers.endpoints.length, 1);
     expect(capabilities.speakers.endpoints.first.endpointId, 'spk-1');
   });
+
+  test('probe omits media capabilities when kind exists without valid IDs',
+      () async {
+    final probe = DefaultCapabilityProbe(
+      mediaDeviceInventoryProvider: () async => const <MediaDeviceDescriptor>[
+        MediaDeviceDescriptor(
+          kind: 'audioinput',
+          deviceId: '   ',
+          label: 'Blank Mic Id',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'videoinput',
+          deviceId: '',
+          label: 'Blank Cam Id',
+        ),
+        MediaDeviceDescriptor(
+          kind: 'audiooutput',
+          deviceId: '\t',
+          label: 'Blank Speaker Id',
+        ),
+      ],
+    );
+
+    final capabilities = await probe.probe(
+      const CapabilityProbeContext(
+        deviceId: 'device-invalid-ids-only',
+        deviceName: 'Invalid IDs Only',
+        deviceType: 'desktop',
+        platform: 'flutter',
+        screenWidth: 1920,
+        screenHeight: 1080,
+        screenDensity: 2.0,
+        targetPlatform: TargetPlatform.macOS,
+      ),
+    );
+
+    expect(capabilities.hasMicrophone(), isFalse);
+    expect(capabilities.hasCamera(), isFalse);
+    expect(capabilities.hasSpeakers(), isFalse);
+  });
 }
