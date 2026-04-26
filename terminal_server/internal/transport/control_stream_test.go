@@ -964,6 +964,78 @@ func TestHandleMessageCapabilityLossReleasesEndpointScopedClaims(t *testing.T) {
 	}
 }
 
+func TestHandleMessageCapabilityLossKeepsUnaffectedClaimsForSameActivation(t *testing.T) {
+	manager := device.NewManager()
+	service := NewControlService("srv-1", manager)
+	router := iorouter.NewRouter()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   manager,
+		IO:        router,
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(service, runtime)
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Hello: &HelloRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
+	}); err != nil {
+		t.Fatalf("HandleMessage(hello) error = %v", err)
+	}
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilitySnap: &CapabilitySnapshotRequest{
+			DeviceID:   "device-1",
+			Generation: 1,
+			Capabilities: map[string]string{
+				"microphone.present": "true",
+				"speakers.present":   "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability snapshot) error = %v", err)
+	}
+
+	if _, err := router.Claims().Request(context.Background(), []iorouter.Claim{{
+		ActivationID: "activation-media",
+		DeviceID:     "device-1",
+		Resource:     "mic.capture",
+		Mode:         iorouter.ClaimExclusive,
+		Priority:     1,
+	}, {
+		ActivationID: "activation-media",
+		DeviceID:     "device-1",
+		Resource:     "speaker.main",
+		Mode:         iorouter.ClaimExclusive,
+		Priority:     1,
+	}}); err != nil {
+		t.Fatalf("Claims().Request() error = %v", err)
+	}
+
+	if _, err := handler.HandleMessage(context.Background(), ClientMessage{
+		CapabilityDelta: &CapabilityDeltaRequest{
+			DeviceID:   "device-1",
+			Generation: 2,
+			Reason:     "mic_unplugged",
+			Capabilities: map[string]string{
+				"speakers.present": "true",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("HandleMessage(capability delta) error = %v", err)
+	}
+
+	claims := router.Claims().Snapshot("device-1")
+	if len(claims) != 1 {
+		t.Fatalf("len(claims) = %d, want 1", len(claims))
+	}
+	if claims[0].ActivationID != "activation-media" || claims[0].Resource != "speaker.main" {
+		t.Fatalf("remaining claim = %+v, want activation-media speaker.main", claims[0])
+	}
+}
+
 func TestHandleMessageSensorAndStreamReady(t *testing.T) {
 	manager := device.NewManager()
 	service := NewControlService("srv-1", manager)

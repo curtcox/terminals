@@ -50,6 +50,33 @@ func TestClaimManagerPreemptAndRestore(t *testing.T) {
 	}
 }
 
+func TestClaimManagerReleaseClaimsRemovesOnlyTargetedResources(t *testing.T) {
+	manager := iorouter.NewClaimManager()
+	requested := []iorouter.Claim{
+		{ActivationID: "act-1", DeviceID: "d1", Resource: "mic.capture", Mode: iorouter.ClaimExclusive, Priority: 2},
+		{ActivationID: "act-1", DeviceID: "d1", Resource: "speaker.main", Mode: iorouter.ClaimExclusive, Priority: 2},
+	}
+	if _, err := manager.Request(context.Background(), requested); err != nil {
+		t.Fatalf("Request(act-1) error = %v", err)
+	}
+
+	if err := manager.ReleaseClaims(context.Background(), []iorouter.Claim{{
+		ActivationID: "act-1",
+		DeviceID:     "d1",
+		Resource:     "mic.capture",
+	}}); err != nil {
+		t.Fatalf("ReleaseClaims(mic.capture) error = %v", err)
+	}
+
+	active := manager.Snapshot("d1")
+	if len(active) != 1 {
+		t.Fatalf("len(active) = %d, want 1", len(active))
+	}
+	if active[0].ActivationID != "act-1" || active[0].Resource != "speaker.main" {
+		t.Fatalf("active claim = %+v, want act-1 speaker.main", active[0])
+	}
+}
+
 func TestClaimManagerComputeAndBufferClaims(t *testing.T) {
 	manager := iorouter.NewClaimManager()
 

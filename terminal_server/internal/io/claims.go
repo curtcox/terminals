@@ -178,6 +178,93 @@ func (m *ClaimManager) Release(_ context.Context, activationID string) error {
 	return nil
 }
 
+// ReleaseClaims removes only the provided claims and restores parked claims
+// for affected resources when possible.
+func (m *ClaimManager) ReleaseClaims(_ context.Context, claims []Claim) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	affected := map[resourceKey]struct{}{}
+	for _, claim := range claims {
+		claim = normalizeClaim(claim)
+		if claim.ActivationID == "" || claim.DeviceID == "" || claim.Resource == "" {
+			continue
+		}
+		key := resourceKey{deviceID: claim.DeviceID, resource: claim.Resource}
+
+		active := m.activeByResource[key]
+		if len(active) > 0 {
+			next := active[:0]
+			for _, existing := range active {
+				if existing.ActivationID == claim.ActivationID {
+					continue
+				}
+				next = append(next, existing)
+			}
+			if len(next) == 0 {
+				delete(m.activeByResource, key)
+			} else {
+				m.activeByResource[key] = append([]Claim(nil), next...)
+			}
+		}
+
+		activeByAct := m.activeByAct[claim.ActivationID]
+		if len(activeByAct) > 0 {
+			next := activeByAct[:0]
+			for _, existing := range activeByAct {
+				if existing.DeviceID == claim.DeviceID && existing.Resource == claim.Resource {
+					continue
+				}
+				next = append(next, existing)
+			}
+			if len(next) == 0 {
+				delete(m.activeByAct, claim.ActivationID)
+			} else {
+				m.activeByAct[claim.ActivationID] = append([]Claim(nil), next...)
+			}
+		}
+
+		parked := m.parkedByResource[key]
+		if len(parked) > 0 {
+			next := parked[:0]
+			for _, existing := range parked {
+				if existing.ActivationID == claim.ActivationID {
+					continue
+				}
+				next = append(next, existing)
+			}
+			if len(next) == 0 {
+				delete(m.parkedByResource, key)
+			} else {
+				m.parkedByResource[key] = append([]Claim(nil), next...)
+			}
+		}
+
+		parkedByAct := m.parkedByAct[claim.ActivationID]
+		if len(parkedByAct) > 0 {
+			next := parkedByAct[:0]
+			for _, existing := range parkedByAct {
+				if existing.DeviceID == claim.DeviceID && existing.Resource == claim.Resource {
+					continue
+				}
+				next = append(next, existing)
+			}
+			if len(next) == 0 {
+				delete(m.parkedByAct, claim.ActivationID)
+			} else {
+				m.parkedByAct[claim.ActivationID] = append([]Claim(nil), next...)
+			}
+		}
+
+		affected[key] = struct{}{}
+	}
+
+	for key := range affected {
+		m.restoreParkedForResource(key)
+	}
+	return nil
+}
+
 // Snapshot returns active claims for one device sorted by resource then activation.
 func (m *ClaimManager) Snapshot(deviceID string) []Claim {
 	m.mu.Lock()

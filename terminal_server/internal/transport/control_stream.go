@@ -1051,18 +1051,16 @@ func (h *StreamHandler) handleCapabilityChangeEffects(
 	claims := routeIO.Claims()
 	if claims != nil {
 		if len(lostResources) > 0 {
-			activationIDs := map[string]struct{}{}
 			suspendedClaims := make([]iorouter.Claim, 0)
 			for _, claim := range claims.Snapshot(deviceID) {
 				if _, exists := lostResources[claim.Resource]; !exists {
 					continue
 				}
-				activationIDs[claim.ActivationID] = struct{}{}
 				suspendedClaims = append(suspendedClaims, claim)
 			}
 			h.rememberSuspendedClaims(deviceID, suspendedClaims)
-			for activationID := range activationIDs {
-				_ = claims.Release(ctx, activationID)
+			if len(suspendedClaims) > 0 {
+				_ = claims.ReleaseClaims(ctx, suspendedClaims)
 			}
 		}
 		if len(gainedResources) > 0 {
