@@ -754,12 +754,12 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 		t.Fatalf("ScriptDryRun counts = commands:%d skipped:%d, want 2/2", dryRun.CommandCount, dryRun.SkippedCount)
 	}
 
-	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage post phase12-room fixture-layer2-mutating\nboard post phase12-board fixture-board-mutating\nmessage ls phase12-room\nboard ls phase12-board\nmessage rooms")
+	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage post phase12-room fixture-layer2-mutating\nboard post phase12-board fixture-board-mutating\nartifact create lesson fixture-artifact-mutating\nmessage ls phase12-room\nboard ls phase12-board\nartifact history latest\nmessage rooms")
 	if run.Path != "fixtures/smoke.term" {
 		t.Fatalf("ScriptRun path = %q, want fixtures/smoke.term", run.Path)
 	}
-	if run.CommandCount != 7 || run.SkippedCount != 2 || run.ExecutedCount != 7 || run.FailedCount != 0 {
-		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 7/2/7/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
+	if run.CommandCount != 9 || run.SkippedCount != 2 || run.ExecutedCount != 9 || run.FailedCount != 0 {
+		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 9/2/9/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
 	}
 	stored, ok := svc.StoreGet("notes", "k")
 	if !ok || stored.Value != "v" {
@@ -772,6 +772,21 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 	boards := svc.ListBoard("phase12-board")
 	if len(boards) != 1 || boards[0].Text != "fixture-board-mutating" {
 		t.Fatalf("ScriptRun board side effect missing: %+v", boards)
+	}
+	artifacts := svc.ListArtifacts()
+	artifactID := ""
+	for _, artifact := range artifacts {
+		if artifact.Title == "fixture-artifact-mutating" {
+			artifactID = artifact.ID
+			break
+		}
+	}
+	if strings.TrimSpace(artifactID) == "" {
+		t.Fatalf("ScriptRun artifact side effect missing: %+v", artifacts)
+	}
+	versions, ok := svc.ArtifactHistory(artifactID)
+	if !ok || len(versions) != 1 || versions[0].Action != "create" {
+		t.Fatalf("ScriptRun artifact history side effect missing: ok=%v versions=%+v", ok, versions)
 	}
 	snapshot, ok := svc.UISnapshot("d1")
 	if !ok || snapshot.DeviceID != "d1" {

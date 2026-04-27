@@ -23,7 +23,7 @@ fi
 metadata() {
   local id="$1"
   case "${id}" in
-    AA6) echo "AA6|Simulation|admin scripts run over seeded sim fixture covering sim/store/ui/bus plus a Layer 2 message domain command" ;;
+    AA6) echo "AA6|Simulation|admin scripts run over seeded sim/store/ui/bus fixture plus mutating Layer 2 message, board, and artifact paths" ;;
     B1) echo "B1|Scenario|transport input bug-report action coverage for modality parity" ;;
     B2) echo "B2|Scenario|diagnostics bug-report service cross-device subject/offline coverage" ;;
     B3) echo "B3|Scenario|diagnostics service autodetect merge test" ;;

@@ -933,7 +933,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	if dryRunW.Code != http.StatusOK {
 		t.Fatalf("fixture scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
 	}
-	if !strings.Contains(dryRunW.Body.String(), `"command_count":14`) {
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":16`) {
 		t.Fatalf("fixture scripts dry-run body missing command count: %s", dryRunW.Body.String())
 	}
 
@@ -947,7 +947,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 		t.Fatalf("fixture scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
 	}
 	body := runW.Body.String()
-	if !strings.Contains(body, `"executed_count":14`) || !strings.Contains(body, `"failed_count":0`) {
+	if !strings.Contains(body, `"executed_count":16`) || !strings.Contains(body, `"failed_count":0`) {
 		t.Fatalf("fixture scripts run body missing execution counters: %s", body)
 	}
 
@@ -979,6 +979,42 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	}
 	if !strings.Contains(boardW.Body.String(), `"board":"phase12-board"`) || !strings.Contains(boardW.Body.String(), `"text":"fixture-board-mutating"`) {
 		t.Fatalf("fixture board ls body missing layer2 board side effect: %s", boardW.Body.String())
+	}
+
+	artifactsReq := httptest.NewRequest(http.MethodGet, "/admin/api/artifact", nil)
+	artifactsW := httptest.NewRecorder()
+	h.ServeHTTP(artifactsW, artifactsReq)
+	if artifactsW.Code != http.StatusOK {
+		t.Fatalf("fixture artifact ls status = %d, want 200 body=%s", artifactsW.Code, artifactsW.Body.String())
+	}
+	var artifactsBody map[string]any
+	if err := json.Unmarshal(artifactsW.Body.Bytes(), &artifactsBody); err != nil {
+		t.Fatalf("decode fixture artifact ls body error = %v body=%s", err, artifactsW.Body.String())
+	}
+	artifactItems, _ := artifactsBody["artifacts"].([]any)
+	artifactID := ""
+	for _, item := range artifactItems {
+		artifactMap, _ := item.(map[string]any)
+		if artifactMap == nil {
+			continue
+		}
+		if title, _ := artifactMap["title"].(string); title == "fixture-artifact-mutating" {
+			artifactID, _ = artifactMap["id"].(string)
+			break
+		}
+	}
+	if strings.TrimSpace(artifactID) == "" {
+		t.Fatalf("fixture artifact ls missing layer2 artifact side effect: %s", artifactsW.Body.String())
+	}
+
+	artifactReq := httptest.NewRequest(http.MethodGet, "/admin/api/artifact/history?artifact_id="+url.QueryEscape(artifactID), nil)
+	artifactW := httptest.NewRecorder()
+	h.ServeHTTP(artifactW, artifactReq)
+	if artifactW.Code != http.StatusOK {
+		t.Fatalf("fixture artifact history status = %d, want 200 body=%s", artifactW.Code, artifactW.Body.String())
+	}
+	if !strings.Contains(artifactW.Body.String(), `"artifact_id":"`+artifactID+`"`) || !strings.Contains(artifactW.Body.String(), `"action":"create"`) || !strings.Contains(artifactW.Body.String(), `"title":"fixture-artifact-mutating"`) {
+		t.Fatalf("fixture artifact history missing layer2 artifact side effect: %s", artifactW.Body.String())
 	}
 
 	simReq := httptest.NewRequest(http.MethodGet, "/admin/api/sim/ui?device_id=sim-fixture", nil)

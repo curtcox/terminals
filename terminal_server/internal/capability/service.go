@@ -2446,6 +2446,35 @@ func (s *Service) executeScriptCommand(command string) error {
 		default:
 			return fmt.Errorf("unsupported board command %q", sub)
 		}
+	case "artifact":
+		switch sub {
+		case "create":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: artifact create <kind> <title>")
+			}
+			kind := args[0]
+			title := strings.Join(args[1:], " ")
+			s.CreateArtifact(kind, title)
+			return nil
+		case "history":
+			if len(args) != 1 {
+				return fmt.Errorf("usage: artifact history <artifact>")
+			}
+			artifactID := strings.TrimSpace(args[0])
+			if strings.EqualFold(artifactID, "latest") {
+				artifacts := s.ListArtifacts()
+				if len(artifacts) == 0 {
+					return fmt.Errorf("artifact not found")
+				}
+				artifactID = artifacts[len(artifacts)-1].ID
+			}
+			if _, ok := s.ArtifactHistory(artifactID); !ok {
+				return fmt.Errorf("artifact not found")
+			}
+			return nil
+		default:
+			return fmt.Errorf("unsupported artifact command %q", sub)
+		}
 	case "sim":
 		switch sub {
 		case "device":

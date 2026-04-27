@@ -96,6 +96,12 @@ layering, acceptance rules, and authoring substrate.
   fixture-board-mutating`) plus deterministic read-back (`board ls`
   in-script and admin `/board` assertion) so `scripts run` now covers
   mutating validation across multiple Layer 2 domain families.
+- Extended the Phase 12 AA6 fixture with an additional mutating Layer 2
+  path in the artifact domain (`artifact create lesson
+  fixture-artifact-mutating`) plus deterministic read-back
+  (`artifact history art-1` in-script and admin `/artifact/history`
+  assertion) so `scripts run` now validates durable artifact mutation
+  in the same cross-use-case scripted path.
 
 ## Problem
 

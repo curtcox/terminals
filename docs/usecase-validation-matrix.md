@@ -23,7 +23,7 @@ Coverage depth labels:
 
 | ID | Scenario | Validation Command | Primary Evidence | Coverage Depth |
 |---|---|---|---|---|
-| AA6 | Integration tests with simulated multi-device IO | `make usecase-validate USECASE=AA6` | `internal/admin` `TestScriptsRunCrossUsecaseSimulationFixture` exercises `scripts run` over seeded sim/store/ui/bus fixture plus mutating Layer 2 `message post` + `board post` paths validated via durable read-back (`message ls`, admin `/board` list) | Simulation |
+| AA6 | Integration tests with simulated multi-device IO | `make usecase-validate USECASE=AA6` | `internal/admin` `TestScriptsRunCrossUsecaseSimulationFixture` exercises `scripts run` over seeded sim/store/ui/bus fixture plus mutating Layer 2 `message post` + `board post` + `artifact create` paths validated via durable read-back (`message ls`, admin `/board` list, admin `/artifact/history`) | Simulation |
 | B1 | On-device bug reporting modality parity | `make usecase-validate USECASE=B1` | `internal/transport` bug-report input action tests for screen/gesture/shake/keyboard/voice | Scenario |
 | B2 | Cross-device bug filing for unavailable subject | `make usecase-validate USECASE=B2` | `internal/diagnostics/bugreport` cross-device subject offline coverage test | Scenario |
 | B3 | Diagnostics autodetect + merge | `make usecase-validate USECASE=B3` | `internal/diagnostics/bugreport` autodetect merge service test | Scenario |

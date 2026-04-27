@@ -1,1 +1,1 @@
-For `plans/features/repl-capability/plan.md`, continue the Phase 12 AA6 fixture by adding one more mutating Layer 2 domain-family path (outside `message` and `board`, e.g. `artifact create` + `artifact history`) with deterministic durable read-back assertions.
+For `plans/features/repl-capability/plan.md`, continue the Phase 12 AA6 fixture by adding one more mutating Layer 2 domain-family path (outside `message`, `board`, and `artifact`, e.g. `canvas annotate` + `canvas ls`) with deterministic durable read-back assertions.
