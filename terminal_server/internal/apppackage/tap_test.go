@@ -362,6 +362,151 @@ func TestVerifyPackageRejectsDuplicateNonceTriple(t *testing.T) {
 	}
 }
 
+func TestVerifyPackageRejectsMalformedSignatureBundleTOML(t *testing.T) {
+	tapBytes, _ := minimalTapAndID(t)
+	if _, err := VerifyPackage(tapBytes, []byte("schema = \"tap-sig/1\"\npackage_id = \"sha256:abc\"\n[[statement]\n")); err == nil {
+		t.Fatalf("expected malformed bundle rejection")
+	}
+}
+
+func TestVerifyPackageRejectsSignatureBundleSchemaMismatch(t *testing.T) {
+	tapBytes, packageID := minimalTapAndID(t)
+	bundle := strings.TrimSpace(fmt.Sprintf(`
+schema = "tap-sig/2"
+package_id = "%s"
+`, packageID))
+
+	if _, err := VerifyPackage(tapBytes, []byte(bundle)); err != ErrInvalidSignatureBundle {
+		t.Fatalf("expected invalid signature bundle error, got %v", err)
+	}
+}
+
+func TestVerifyPackageRejectsSignatureBundlePackageIDMismatch(t *testing.T) {
+	tapBytes, _ := minimalTapAndID(t)
+	bundle := strings.TrimSpace(`
+schema = "tap-sig/1"
+package_id = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+`)
+
+	if _, err := VerifyPackage(tapBytes, []byte(bundle)); err != ErrSignaturePackageIDMismatch {
+		t.Fatalf("expected package id mismatch, got %v", err)
+	}
+}
+
+func TestVerifyPackageRejectsMissingStatementNonceField(t *testing.T) {
+	tapBytes, packageID := minimalTapAndID(t)
+	pub, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	bundle := strings.TrimSpace(fmt.Sprintf(`
+schema = "tap-sig/1"
+package_id = "%s"
+
+[[statement]]
+role = "author"
+key_id = "ed25519:%s"
+created_unix = 1714000000
+manifest_name = "kitchen_timer"
+manifest_version = "0.1.0"
+scope = {}
+sig = "base64:AAAA"
+`, packageID, base64.RawURLEncoding.EncodeToString(pub)))
+
+	if _, err := VerifyPackage(tapBytes, []byte(bundle)); err != ErrInvalidSignatureStatement {
+		t.Fatalf("expected invalid statement for missing nonce, got %v", err)
+	}
+}
+
+func TestVerifyPackageRejectsStatementManifestMismatch(t *testing.T) {
+	tapBytes, packageID := minimalTapAndID(t)
+	stmt, _ := signedAuthorStatement(t, packageID, "other_app", "0.1.0")
+	bundle := signedBundleTOML(t, packageID, []signatureStatement{stmt})
+
+	if _, err := VerifyPackage(tapBytes, []byte(bundle)); err != ErrInvalidSignatureStatement {
+		t.Fatalf("expected invalid signature statement for manifest mismatch, got %v", err)
+	}
+}
+
+func TestVerifyPackageRejectsInvalidStatementSignature(t *testing.T) {
+	tapBytes, packageID := minimalTapAndID(t)
+	stmt, _ := signedAuthorStatement(t, packageID, "kitchen_timer", "0.1.0")
+	sigRaw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(stmt.Sig, "base64:"))
+	if err != nil {
+		t.Fatalf("decode signature: %v", err)
+	}
+	sigRaw[0] ^= 0xFF
+	stmt.Sig = "base64:" + base64.StdEncoding.EncodeToString(sigRaw)
+	bundle := signedBundleTOML(t, packageID, []signatureStatement{stmt})
+
+	if _, err := VerifyPackage(tapBytes, []byte(bundle)); err != ErrSignatureVerificationFailed {
+		t.Fatalf("expected signature verification failure, got %v", err)
+	}
+}
+
+func TestVerifyPackageRejectsOversizedSignatureBundle(t *testing.T) {
+	tapBytes, _ := minimalTapAndID(t)
+	bundle := bytes.Repeat([]byte("a"), signatureBundleMaxBytes+1)
+
+	if _, err := VerifyPackage(tapBytes, bundle); err != ErrInvalidSignatureBundle {
+		t.Fatalf("expected oversized bundle rejection, got %v", err)
+	}
+}
+
+func TestVerifyPackageRejectsTooManyStatements(t *testing.T) {
+	tapBytes, packageID := minimalTapAndID(t)
+	pub, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	var sb strings.Builder
+	sb.WriteString("schema = \"tap-sig/1\"\n")
+	_, _ = fmt.Fprintf(&sb, "package_id = \"%s\"\n\n", packageID)
+	for i := 0; i < statementMaxCount+1; i++ {
+		sb.WriteString("[[statement]]\n")
+		sb.WriteString("role = \"author\"\n")
+		_, _ = fmt.Fprintf(&sb, "key_id = \"ed25519:%s\"\n", base64.RawURLEncoding.EncodeToString(pub))
+		_, _ = fmt.Fprintf(&sb, "created_unix = %d\n", 1714000000+i)
+		sb.WriteString("manifest_name = \"kitchen_timer\"\n")
+		sb.WriteString("manifest_version = \"0.1.0\"\n")
+		_, _ = fmt.Fprintf(&sb, "nonce = \"base64url:%s\"\n", base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf("nonce-%010d", i))))
+		sb.WriteString("scope = {}\n")
+		sb.WriteString("sig = \"base64:AAAA\"\n\n")
+	}
+
+	if _, err := VerifyPackage(tapBytes, []byte(sb.String())); err != ErrInvalidSignatureBundle {
+		t.Fatalf("expected too-many-statements rejection, got %v", err)
+	}
+}
+
+func signedAuthorStatement(t *testing.T, packageID string, manifestName string, manifestVersion string) (signatureStatement, ed25519.PrivateKey) {
+	t.Helper()
+
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	nonceRaw := []byte("nonce-nonce-0001")
+	stmt := signatureStatement{
+		Role:            "author",
+		KeyID:           "ed25519:" + base64.RawURLEncoding.EncodeToString(pub),
+		CreatedUnix:     1714000000,
+		ManifestName:    manifestName,
+		ManifestVersion: manifestVersion,
+		Nonce:           "base64url:" + base64.RawURLEncoding.EncodeToString(nonceRaw),
+		Scope:           map[string]any{},
+	}
+	packageHash := packageHashFromID(t, packageID)
+	payload, err := encodeStatementCBOR(stmt, map[string]any{}, packageHash, nonceRaw)
+	if err != nil {
+		t.Fatalf("encode cbor: %v", err)
+	}
+	stmt.Sig = "base64:" + base64.StdEncoding.EncodeToString(ed25519.Sign(priv, payload))
+	return stmt, priv
+}
+
 type tapEntry struct {
 	name string
 	body string

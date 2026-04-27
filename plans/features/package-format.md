@@ -586,3 +586,13 @@ Additional shipped slice in this cycle:
   frame-layer rejection tests for checksum flag, dictionary-id flag, missing
   content-size flag, trailing bytes, multi-frame payloads, skippable frame
   magic, and oversized window descriptors.
+
+Additional shipped slice in this cycle:
+
+- Expanded `.tap.sig` rejection-path coverage in
+  `terminal_server/internal/apppackage/tap_test.go` for malformed TOML,
+  schema mismatch, bundle `package_id` mismatch, missing statement `nonce`,
+  statement manifest mismatch, corrupted Ed25519 signature rejection,
+  oversized bundle rejection, and statement-count quota enforcement.
+- Added reusable signed-statement test helper(s) to reduce duplication while
+  keeping canonical CBOR signing behavior under test.
