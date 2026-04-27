@@ -85,6 +85,20 @@ func TestCommandSpecsExposeOperationalAndDiscouragedFlags(t *testing.T) {
 	if !aiUse.DiscouragedForAgents {
 		t.Fatalf("ai use should be discouraged_for_agents")
 	}
+	appsKeysConfirm, ok := DescribeCommand("apps keys confirm")
+	if !ok {
+		t.Fatalf("DescribeCommand(apps keys confirm) not found")
+	}
+	if appsKeysConfirm.Classification != CommandClassificationCriticalMutating {
+		t.Fatalf("apps keys confirm classification = %q, want %q", appsKeysConfirm.Classification, CommandClassificationCriticalMutating)
+	}
+	appsKeysRevoke, ok := DescribeCommand("apps keys revoke")
+	if !ok {
+		t.Fatalf("DescribeCommand(apps keys revoke) not found")
+	}
+	if appsKeysRevoke.Classification != CommandClassificationCriticalMutating {
+		t.Fatalf("apps keys revoke classification = %q, want %q", appsKeysRevoke.Classification, CommandClassificationCriticalMutating)
+	}
 }
 
 func TestExecuteCommandDocsMarkdownMode(t *testing.T) {

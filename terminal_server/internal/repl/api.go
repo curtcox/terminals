@@ -12,10 +12,17 @@ type CommandClassification string
 
 // CommandClassification values.
 const (
-	CommandClassificationReadOnly    CommandClassification = "read_only"
-	CommandClassificationOperational CommandClassification = "operational"
-	CommandClassificationMutating    CommandClassification = "mutating"
+	CommandClassificationReadOnly         CommandClassification = "read_only"
+	CommandClassificationOperational      CommandClassification = "operational"
+	CommandClassificationMutating         CommandClassification = "mutating"
+	CommandClassificationCriticalMutating CommandClassification = "critical_mutating"
 )
+
+// RequiresApproval reports whether the command classification must pass the
+// out-of-band approval gate before execution.
+func (c CommandClassification) RequiresApproval() bool {
+	return c == CommandClassificationMutating || c == CommandClassificationCriticalMutating
+}
 
 // DocsRenderMode controls how docs commands are rendered.
 type DocsRenderMode string

@@ -9,12 +9,13 @@ The REPL's approval contract is enforced at the MCP adapter boundary, out-of-ban
 | `read_only` | Executes immediately. |
 | `operational` | Executes immediately. Subject to a per-session concurrent-stream cap (`agent.operational.max_streams`) and stream-TTL budget (`agent.operational.stream_ttl`). Exceeding either returns a structured rate-limit error. |
 | `mutating` | Requires out-of-band approval via MCP elicitation or the fallback protocol. Executes only on explicit approve. |
+| `critical_mutating` | Same gate as `mutating` (explicit out-of-band approval), but surfaced as higher-risk in prompts and logs. |
 
 The same limits apply for human-origin and MCP-origin sessions.
 
 ## Primary path: MCP elicitation
 
-1. Agent calls a `mutating` tool.
+1. Agent calls a `mutating` or `critical_mutating` tool.
 2. Adapter issues an MCP `elicitRequest` carrying the rendered command string, arguments, and classification.
 3. Client surfaces the prompt to the user.
 4. On approve → adapter dispatches as if a human had typed the command with `--force` (or answered "yes" at the REPL prompt).
@@ -25,7 +26,7 @@ The same limits apply for human-origin and MCP-origin sessions.
 For clients that don't yet support elicitation (spec 2025-06-18 and later):
 
 1. Session is marked `mutating_via_fallback` when elicitation is unavailable.
-2. First mutating call returns:
+2. First approval-gated call returns:
    ```json
    {
      "status": "confirmation_required",

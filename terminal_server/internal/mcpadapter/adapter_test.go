@@ -20,6 +20,7 @@ func TestToolsIncludeRegistryAndDiscoveryTools(t *testing.T) {
 	foundDescribe := false
 	foundAppReload := false
 	foundLogsTail := false
+	foundAppsKeysRevoke := false
 	for _, tool := range tools {
 		switch tool.Name {
 		case ToolReplComplete:
@@ -36,13 +37,18 @@ func TestToolsIncludeRegistryAndDiscoveryTools(t *testing.T) {
 			if tool.Classification != "operational" {
 				t.Fatalf("logs_tail classification = %q", tool.Classification)
 			}
+		case "apps_keys_revoke":
+			foundAppsKeysRevoke = true
+			if tool.Classification != "critical_mutating" {
+				t.Fatalf("apps_keys_revoke classification = %q", tool.Classification)
+			}
 		}
 		if strings.Contains(tool.Name, "confirm") || strings.Contains(tool.Name, "force") {
 			t.Fatalf("tool catalog should not expose confirm/force controls: %s", tool.Name)
 		}
 	}
-	if !foundComplete || !foundDescribe || !foundAppReload || !foundLogsTail {
-		t.Fatalf("missing expected tools: complete=%v describe=%v app_reload=%v logs_tail=%v", foundComplete, foundDescribe, foundAppReload, foundLogsTail)
+	if !foundComplete || !foundDescribe || !foundAppReload || !foundLogsTail || !foundAppsKeysRevoke {
+		t.Fatalf("missing expected tools: complete=%v describe=%v app_reload=%v logs_tail=%v apps_keys_revoke=%v", foundComplete, foundDescribe, foundAppReload, foundLogsTail, foundAppsKeysRevoke)
 	}
 }
 
@@ -62,6 +68,17 @@ func TestCapabilityNegotiationAndUnsupportedMutations(t *testing.T) {
 	}
 	if resp.ErrorCode != "unsupported_client" {
 		t.Fatalf("error code = %q, want unsupported_client", resp.ErrorCode)
+	}
+	criticalResp, err := adapter.CallTool(context.Background(), CallToolRequest{
+		SessionID: "repl-mcp-1",
+		ToolName:  "apps_keys_revoke",
+		Arguments: map[string]any{"key_id": "ed25519:test", "reason": "test"},
+	})
+	if err != nil {
+		t.Fatalf("critical CallTool() error = %v", err)
+	}
+	if criticalResp.ErrorCode != "unsupported_client" {
+		t.Fatalf("critical error code = %q, want unsupported_client", criticalResp.ErrorCode)
 	}
 }
 

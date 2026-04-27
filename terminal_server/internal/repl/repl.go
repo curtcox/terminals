@@ -33,9 +33,10 @@ type Options struct {
 type commandClassification string
 
 const (
-	commandReadOnly    commandClassification = "read_only"
-	commandOperational commandClassification = "operational"
-	commandMutating    commandClassification = "mutating"
+	commandReadOnly         commandClassification = "read_only"
+	commandOperational      commandClassification = "operational"
+	commandMutating         commandClassification = "mutating"
+	commandCriticalMutating commandClassification = "critical_mutating"
 )
 
 type commandSpec struct {
@@ -165,8 +166,8 @@ func replCommandSpecs() []commandSpec {
 		{Name: "apps keys ls", Usage: "apps keys ls [--json]", Summary: "List trust-store keys", Classification: commandReadOnly},
 		{Name: "apps keys show", Usage: "apps keys show <key-id> [--json]", Summary: "Show one trust key", Classification: commandReadOnly},
 		{Name: "apps keys add", Usage: "apps keys add <key-id> <role[,role]> [note]", Summary: "Add a key to the trust store", Classification: commandMutating},
-		{Name: "apps keys confirm", Usage: "apps keys confirm <key-id> [--json]", Summary: "Confirm a candidate key", Classification: commandMutating},
-		{Name: "apps keys revoke", Usage: "apps keys revoke <key-id> [reason]", Summary: "Revoke a key", Classification: commandMutating},
+		{Name: "apps keys confirm", Usage: "apps keys confirm <key-id> [--json]", Summary: "Confirm a candidate key", Classification: commandCriticalMutating},
+		{Name: "apps keys revoke", Usage: "apps keys revoke <key-id> [reason]", Summary: "Revoke a key", Classification: commandCriticalMutating},
 		{Name: "apps keys archive", Usage: "apps keys archive <key-id> [--json]", Summary: "Archive a non-active key", Classification: commandMutating},
 		{Name: "apps keys verify", Usage: "apps keys verify [--json]", Summary: "Verify trust log chain integrity", Classification: commandReadOnly},
 		{Name: "apps keys log", Usage: "apps keys log [--json]", Summary: "Show trust log entries", Classification: commandReadOnly},

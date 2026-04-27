@@ -608,11 +608,17 @@ func elicitViaProxy(
 ) (bool, error) {
 	toolName := strings.TrimSpace(mcpAnyString(mcpAnyMap(originalRequest["params"])["name"]))
 	rendered := strings.TrimSpace(mcpAnyString(confirmationMeta["rendered_command"]))
+	classification := strings.TrimSpace(mcpAnyString(confirmationMeta["classification"]))
+	if classification == "" {
+		classification = string(repl.CommandClassificationMutating)
+	}
+	promptLabel := strings.ReplaceAll(classification, "_", " ")
 	// Per MCP spec 2025-06-18, elicitation/create requires `message` and
 	// `requestedSchema` (a JSON Schema). Clients treat any other shape as a
 	// malformed request and return action=decline without showing a prompt.
 	message := fmt.Sprintf(
-		"Approve mutating command?\n\nTool: %s\nCommand: %s",
+		"Approve %s command?\n\nTool: %s\nCommand: %s",
+		promptLabel,
 		toolName,
 		rendered,
 	)
@@ -624,16 +630,16 @@ func elicitViaProxy(
 				"approved": map[string]any{
 					"type":        "boolean",
 					"title":       "Approve",
-					"description": "Approve this mutating command",
+					"description": "Approve this command",
 				},
 			},
 			"required": []string{"approved"},
 		},
 		// Preserved for older/custom clients that key off these fields.
-		"title":            "Approve mutating command",
+		"title":            fmt.Sprintf("Approve %s command", promptLabel),
 		"tool_name":        toolName,
 		"rendered_command": rendered,
-		"classification":   "mutating",
+		"classification":   classification,
 	}
 	if err := enc.Encode(map[string]any{
 		"jsonrpc": "2.0",

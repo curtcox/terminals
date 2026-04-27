@@ -30,6 +30,7 @@ Both transports go through the same adapter and expose the same tool catalog.
 - `read_only` — runs immediately.
 - `operational` — runs immediately, but each session has a concurrent-stream cap and stream-TTL budget.
 - `mutating` — requires out-of-band user approval per call.
+- `critical_mutating` — same approval gate as `mutating`, surfaced as higher-risk in the prompt metadata.
   - Primary: MCP elicitation. The client pops a confirmation dialog carrying the rendered command.
   - Fallback: two-call `confirmation_id` protocol, for clients without elicitation support.
     - Streamable HTTP carrier: `Mcp-Confirmation-Id` header.

@@ -292,7 +292,7 @@ func (a *Adapter) CallToolStream(ctx context.Context, req CallToolRequest, onChu
 	if err != nil {
 		return CallToolResponse{Status: "error", ErrorCode: "invalid_arguments", ErrorMessage: err.Error()}, nil
 	}
-	if tool.Classification == repl.CommandClassificationMutating {
+	if tool.Classification.RequiresApproval() {
 		gate, err := a.authorizeMutation(ctx, sess, tool, rendered, canonicalArgs, strings.TrimSpace(req.MetaConfirmationID))
 		if err != nil {
 			return CallToolResponse{}, err
@@ -368,7 +368,7 @@ func (a *Adapter) acquireOperationalSlot(sessionID, rendered string, classificat
 func (a *Adapter) authorizeMutation(ctx context.Context, sess SessionInfo, tool Tool, rendered, canonicalArgs, metaConfirmationID string) (CallToolResponse, error) {
 	switch sess.Capability {
 	case MutatingUnavailable:
-		return CallToolResponse{Status: "error", ErrorCode: "unsupported_client", ErrorMessage: "mutating tools require elicitation or confirmation_id fallback support", RenderedCommand: rendered, Classification: tool.Classification}, nil
+		return CallToolResponse{Status: "error", ErrorCode: "unsupported_client", ErrorMessage: "approval-gated tools require elicitation or confirmation_id fallback support", RenderedCommand: rendered, Classification: tool.Classification}, nil
 	case MutatingViaElicitation:
 		a.mu.Lock()
 		elicit := a.cfg.Elicit

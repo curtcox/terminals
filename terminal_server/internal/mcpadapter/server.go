@@ -592,8 +592,12 @@ func (s *Server) elicitViaStdio(ctx context.Context, req ElicitRequest) (ElicitR
 	if conn == nil {
 		return ElicitResponse{Approved: false}, nil
 	}
+	promptLabel := strings.ReplaceAll(string(req.Classification), "_", " ")
+	if strings.TrimSpace(promptLabel) == "" {
+		promptLabel = "mutating"
+	}
 	result, err := conn.sendRequestAndAwait(ctx, "elicitation/create", map[string]any{
-		"title":             "Approve mutating command",
+		"title":             "Approve " + promptLabel + " command",
 		"tool_name":         req.ToolName,
 		"rendered_command":  req.RenderedCommand,
 		"classification":    string(req.Classification),

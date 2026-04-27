@@ -6,7 +6,7 @@ The adapter generates MCP tools from the REPL command registry at server start.
 
 - **One MCP tool per REPL command.** `app reload` → `app_reload`, `activations stop` → `activations_stop`.
 - **Schema comes from registry metadata.** Argument names, types, required/optional, and defaults mirror the REPL's own `describe` output.
-- **Classification is copied through.** Each tool description includes `classification: read_only | operational | mutating`.
+- **Classification is copied through.** Each tool description includes `classification: read_only | operational | mutating | critical_mutating`.
 - **`discouraged_for_agents` hints are copied through** into descriptions. Honor them — they flag tools that are usually wasteful for an agent turn (e.g. nested `ai_*` calls).
 - **No `confirm` / `force` arguments.** Approval for mutating calls is out-of-band; see [approval-contract.md](approval-contract.md).
 - **No `repl_eval` escape hatch.** If a command isn't in the registry, it isn't reachable — through either the REPL or MCP.
