@@ -356,6 +356,11 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"scenarios show",
 		"scenarios define",
 		"scenarios undefine",
+		"sim device new",
+		"sim device rm",
+		"sim input",
+		"sim ui",
+		"scripts dry-run",
 	}
 	for _, command := range commands {
 		if _, ok := DescribeCommand(command); !ok {
@@ -627,6 +632,16 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","scenario":{"name":"red_alert"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/scenarios/inline/undefine":
 			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/sim/devices/new":
+			_, _ = w.Write([]byte(`{"status":"ok","device":{"device_id":"sim-kitchen","caps":["display","keyboard"]}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/sim/input":
+			_, _ = w.Write([]byte(`{"status":"ok","input":{"id":"simin-1","device_id":"sim-kitchen","component_id":"chat_input","action":"submit"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/sim/ui":
+			_, _ = w.Write([]byte(`{"device":{"device_id":"sim-kitchen","caps":["display","keyboard"]},"snapshot":{"device_id":"sim-kitchen","root_id":"sim-root"},"inputs":[{"id":"simin-1","action":"submit"}]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/sim/devices/rm":
+			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/scripts/dry-run":
+			_, _ = w.Write([]byte(`{"status":"ok","result":{"path":"/tmp/smoke.term","command_count":2,"skipped_count":1}}`))
 		default:
 			http.NotFound(w, req)
 		}
@@ -696,6 +711,11 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"scenarios show red_alert",
 		"scenarios define red_alert --match intent=red_alert --match event=alarm.triggered --priority high --on-start 'ui broadcast all_screens banner' --on-event alarm.triggered 'bus emit event alarm_ack'",
 		"scenarios undefine red_alert",
+		"sim device new sim-kitchen --caps display,keyboard",
+		"sim input sim-kitchen chat_input submit hello",
+		"sim ui sim-kitchen",
+		"sim device rm sim-kitchen",
+		"scripts dry-run /tmp/smoke.term",
 		"exit",
 	}, "\n") + "\n")
 	var out bytes.Buffer
@@ -835,6 +855,21 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "deleted=true scenario=red_alert") {
 		t.Fatalf("scenarios undefine output missing: %q", text)
+	}
+	if !strings.Contains(text, "action=sim.device.new device=sim-kitchen") {
+		t.Fatalf("sim device new output missing: %q", text)
+	}
+	if !strings.Contains(text, "action=sim.input device=sim-kitchen component=chat_input event=submit") {
+		t.Fatalf("sim input output missing: %q", text)
+	}
+	if !strings.Contains(text, `"device_id": "sim-kitchen"`) && !strings.Contains(text, `"device_id":"sim-kitchen"`) {
+		t.Fatalf("sim ui output missing device payload: %q", text)
+	}
+	if !strings.Contains(text, "action=sim.device.rm device=sim-kitchen deleted=true") {
+		t.Fatalf("sim device rm output missing: %q", text)
+	}
+	if !strings.Contains(text, "action=scripts.dry-run path=/tmp/smoke.term commands=2 skipped=1") {
+		t.Fatalf("scripts dry-run output missing: %q", text)
 	}
 	if !strings.Contains(text, "handler=handler-2 selector=scenario=chat action=submit") {
 		t.Fatalf("handlers on output missing summary: %q", text)

@@ -675,6 +675,58 @@ func TestScenarioDefineListGetAndUndefine(t *testing.T) {
 	}
 }
 
+func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
+	svc := NewService()
+
+	device := svc.SimDeviceUpsert("Kitchen-Sim", []string{"display", "keyboard", "display"})
+	if device.DeviceID != "kitchen-sim" {
+		t.Fatalf("SimDeviceUpsert device id = %q, want kitchen-sim", device.DeviceID)
+	}
+	if len(device.Caps) != 2 {
+		t.Fatalf("SimDeviceUpsert caps = %+v, want deduped caps", device.Caps)
+	}
+
+	listed := svc.SimDeviceList()
+	if len(listed) != 1 || listed[0].DeviceID != "kitchen-sim" {
+		t.Fatalf("SimDeviceList = %+v, want kitchen-sim", listed)
+	}
+
+	if _, ok := svc.SimRecordInput("missing", "banner", "tap", ""); ok {
+		t.Fatalf("SimRecordInput for missing device should return false")
+	}
+
+	record, ok := svc.SimRecordInput("kitchen-sim", "banner", "tap", "ack")
+	if !ok {
+		t.Fatalf("SimRecordInput(kitchen-sim,...) = false, want true")
+	}
+	if record.ID == "" || record.Action != "tap" {
+		t.Fatalf("SimRecordInput result = %+v, want id and tap action", record)
+	}
+
+	inputs := svc.SimInputs("kitchen-sim")
+	if len(inputs) != 1 || inputs[0].ID != record.ID {
+		t.Fatalf("SimInputs(kitchen-sim) = %+v, want [%s]", inputs, record.ID)
+	}
+
+	dryRun := svc.ScriptDryRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner")
+	if dryRun.Path != "fixtures/smoke.term" {
+		t.Fatalf("ScriptDryRun path = %q, want fixtures/smoke.term", dryRun.Path)
+	}
+	if dryRun.CommandCount != 2 || dryRun.SkippedCount != 2 {
+		t.Fatalf("ScriptDryRun counts = commands:%d skipped:%d, want 2/2", dryRun.CommandCount, dryRun.SkippedCount)
+	}
+
+	if deleted := svc.SimDeviceDelete("kitchen-sim"); !deleted {
+		t.Fatalf("SimDeviceDelete(kitchen-sim) = false, want true")
+	}
+	if deleted := svc.SimDeviceDelete("kitchen-sim"); deleted {
+		t.Fatalf("second SimDeviceDelete(kitchen-sim) should be false")
+	}
+	if got := svc.SimInputs("kitchen-sim"); len(got) != 0 {
+		t.Fatalf("SimInputs(kitchen-sim) after delete = %+v, want empty", got)
+	}
+}
+
 func TestMessageRoomThreadUnreadAcknowledgeLifecycle(t *testing.T) {
 	svc := NewService()
 

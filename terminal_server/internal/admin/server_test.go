@@ -455,6 +455,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		"/admin/api/bus/replay?from=bus-1&to=bus-9&kind=event",
 		"/admin/api/handlers",
 		"/admin/api/scenarios/inline",
+		"/admin/api/sim/devices",
 	}
 	for _, path := range getCases {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -501,6 +502,9 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		{path: "/admin/api/handlers/off", form: url.Values{"handler_id": {"handler-1"}}},
 		{path: "/admin/api/scenarios/inline/define", form: url.Values{"name": {"red_alert"}, "match_intent": {"red alert"}, "on_start": {"ui broadcast all_screens banner"}}},
 		{path: "/admin/api/scenarios/inline/undefine", form: url.Values{"name": {"red_alert"}}},
+		{path: "/admin/api/sim/devices/new", form: url.Values{"device_id": {"sim-kitchen"}, "caps": {"display,keyboard"}}},
+		{path: "/admin/api/sim/input", form: url.Values{"device_id": {"sim-kitchen"}, "component_id": {"chat_box"}, "action": {"submit"}, "value": {"hello"}}},
+		{path: "/admin/api/sim/devices/rm", form: url.Values{"device_id": {"sim-kitchen"}}},
 	}
 	for _, tc := range postCases {
 		req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.form.Encode()))
@@ -812,6 +816,61 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 	}
 	if !strings.Contains(historyW.Body.String(), `"action":"create"`) || !strings.Contains(historyW.Body.String(), `"action":"patch"`) || !strings.Contains(historyW.Body.String(), `"action":"replace"`) {
 		t.Fatalf("artifact history missing create/patch/replace entries: %s", historyW.Body.String())
+	}
+}
+
+func TestSimAndScriptsEndpoints(t *testing.T) {
+	h := testHandler(t)
+
+	newReq := httptest.NewRequest(http.MethodPost, "/admin/api/sim/devices/new", strings.NewReader(url.Values{
+		"device_id": {"sim-lab"},
+		"caps":      {"display,keyboard"},
+	}.Encode()))
+	newReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	newW := httptest.NewRecorder()
+	h.ServeHTTP(newW, newReq)
+	if newW.Code != http.StatusOK {
+		t.Fatalf("sim device new status = %d, want 200 body=%s", newW.Code, newW.Body.String())
+	}
+
+	inputReq := httptest.NewRequest(http.MethodPost, "/admin/api/sim/input", strings.NewReader(url.Values{
+		"device_id":    {"sim-lab"},
+		"component_id": {"banner"},
+		"action":       {"tap"},
+		"value":        {"ack"},
+	}.Encode()))
+	inputReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	inputW := httptest.NewRecorder()
+	h.ServeHTTP(inputW, inputReq)
+	if inputW.Code != http.StatusOK {
+		t.Fatalf("sim input status = %d, want 200 body=%s", inputW.Code, inputW.Body.String())
+	}
+
+	uiReq := httptest.NewRequest(http.MethodGet, "/admin/api/sim/ui?device_id=sim-lab", nil)
+	uiW := httptest.NewRecorder()
+	h.ServeHTTP(uiW, uiReq)
+	if uiW.Code != http.StatusOK {
+		t.Fatalf("sim ui status = %d, want 200 body=%s", uiW.Code, uiW.Body.String())
+	}
+	if !strings.Contains(uiW.Body.String(), `"device_id":"sim-lab"`) {
+		t.Fatalf("sim ui body missing device id: %s", uiW.Body.String())
+	}
+
+	scriptPath := filepath.Join(t.TempDir(), "smoke.term")
+	if err := os.WriteFile(scriptPath, []byte("# comment\n\nstore put notes k v\nui push d1 banner\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(script) error = %v", err)
+	}
+	dryRunReq := httptest.NewRequest(http.MethodPost, "/admin/api/scripts/dry-run", strings.NewReader(url.Values{
+		"path": {scriptPath},
+	}.Encode()))
+	dryRunReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	dryRunW := httptest.NewRecorder()
+	h.ServeHTTP(dryRunW, dryRunReq)
+	if dryRunW.Code != http.StatusOK {
+		t.Fatalf("scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
+	}
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":2`) {
+		t.Fatalf("scripts dry-run body missing command count: %s", dryRunW.Body.String())
 	}
 }
 

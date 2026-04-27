@@ -264,6 +264,34 @@ type InlineScenarioDefinition struct {
 	UpdatedAt    time.Time                 `json:"updated_at"`
 }
 
+// SimDevice represents one virtual device registered for simulation workflows.
+type SimDevice struct {
+	DeviceID  string    `json:"device_id"`
+	Caps      []string  `json:"caps,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SimInputRecord captures one synthetic input event delivered to a sim device.
+type SimInputRecord struct {
+	ID          string    `json:"id"`
+	DeviceID    string    `json:"device_id"`
+	ComponentID string    `json:"component_id"`
+	Action      string    `json:"action"`
+	Value       string    `json:"value,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// ScriptDryRunResult summarizes parsed commands from a scripts dry-run call.
+type ScriptDryRunResult struct {
+	Path         string    `json:"path"`
+	CommandCount int       `json:"command_count"`
+	SkippedCount int       `json:"skipped_count"`
+	Commands     []string  `json:"commands,omitempty"`
+	Issues       []string  `json:"issues,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 // Service provides typed in-memory storage for capability closure tools.
 type Service struct {
 	mu sync.RWMutex
@@ -290,6 +318,8 @@ type Service struct {
 	uiSnapshots  map[string]UISnapshot
 	uiSubs       map[string][]string
 	scenarios    map[string]InlineScenarioDefinition
+	simDevices   map[string]SimDevice
+	simInputs    map[string][]SimInputRecord
 	acks         map[string]Acknowledgement
 }
 
@@ -305,6 +335,8 @@ func NewService() *Service {
 		uiSnapshots: map[string]UISnapshot{},
 		uiSubs:      map[string][]string{},
 		scenarios:   map[string]InlineScenarioDefinition{},
+		simDevices:  map[string]SimDevice{},
+		simInputs:   map[string][]SimInputRecord{},
 		acks:        map[string]Acknowledgement{},
 		versions:    map[string][]ArtifactVersion{},
 		templates:   map[string]ArtifactTemplate{},
@@ -1969,6 +2001,130 @@ func (s *Service) ScenarioUndefine(name string) bool {
 	return true
 }
 
+// SimDeviceUpsert creates or updates one virtual simulation device.
+func (s *Service) SimDeviceUpsert(deviceID string, caps []string) SimDevice {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.ToLower(strings.TrimSpace(deviceID))
+	now := s.now()
+	existing, ok := s.simDevices[deviceID]
+	createdAt := now
+	if ok {
+		createdAt = existing.CreatedAt
+	}
+	device := SimDevice{
+		DeviceID:  deviceID,
+		Caps:      normalizeSimCaps(caps),
+		CreatedAt: createdAt,
+		UpdatedAt: now,
+	}
+	s.simDevices[deviceID] = device
+	s.appendRecentLocked("sim", "device upsert "+deviceID)
+	return device
+}
+
+// SimDeviceGet returns one simulation device by id.
+func (s *Service) SimDeviceGet(deviceID string) (SimDevice, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	device, ok := s.simDevices[strings.ToLower(strings.TrimSpace(deviceID))]
+	if !ok {
+		return SimDevice{}, false
+	}
+	device.Caps = append([]string(nil), device.Caps...)
+	return device, true
+}
+
+// SimDeviceList returns all simulation devices sorted by id.
+func (s *Service) SimDeviceList() []SimDevice {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]SimDevice, 0, len(s.simDevices))
+	for _, device := range s.simDevices {
+		copyDevice := device
+		copyDevice.Caps = append([]string(nil), device.Caps...)
+		out = append(out, copyDevice)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DeviceID < out[j].DeviceID })
+	return out
+}
+
+// SimDeviceDelete removes one simulation device and its buffered inputs.
+func (s *Service) SimDeviceDelete(deviceID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.ToLower(strings.TrimSpace(deviceID))
+	if _, ok := s.simDevices[deviceID]; !ok {
+		return false
+	}
+	delete(s.simDevices, deviceID)
+	delete(s.simInputs, deviceID)
+	s.appendRecentLocked("sim", "device delete "+deviceID)
+	return true
+}
+
+// SimRecordInput stores one synthetic input event for a simulation device.
+func (s *Service) SimRecordInput(deviceID, componentID, action, value string) (SimInputRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.ToLower(strings.TrimSpace(deviceID))
+	if _, ok := s.simDevices[deviceID]; !ok {
+		return SimInputRecord{}, false
+	}
+	record := SimInputRecord{
+		ID:          s.nextIDLocked("simin"),
+		DeviceID:    deviceID,
+		ComponentID: strings.TrimSpace(componentID),
+		Action:      strings.TrimSpace(action),
+		Value:       strings.TrimSpace(value),
+		CreatedAt:   s.now(),
+	}
+	s.simInputs[deviceID] = append(s.simInputs[deviceID], record)
+	if len(s.simInputs[deviceID]) > 200 {
+		s.simInputs[deviceID] = append([]SimInputRecord(nil), s.simInputs[deviceID][len(s.simInputs[deviceID])-200:]...)
+	}
+	s.appendRecentLocked("sim", "input "+deviceID+" "+record.Action)
+	return record, true
+}
+
+// SimInputs returns buffered synthetic input events for one simulation device.
+func (s *Service) SimInputs(deviceID string) []SimInputRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := s.simInputs[strings.ToLower(strings.TrimSpace(deviceID))]
+	return append([]SimInputRecord(nil), items...)
+}
+
+// ScriptDryRun parses a script and returns a deterministic command summary.
+func (s *Service) ScriptDryRun(path, script string) ScriptDryRunResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := ScriptDryRunResult{
+		Path:      strings.TrimSpace(path),
+		Commands:  []string{},
+		Issues:    []string{},
+		CreatedAt: s.now(),
+	}
+	for _, rawLine := range strings.Split(script, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "#") {
+			result.SkippedCount++
+			continue
+		}
+		result.Commands = append(result.Commands, line)
+	}
+	result.CommandCount = len(result.Commands)
+	s.appendRecentLocked("scripts", "dry-run "+result.Path)
+	return result
+}
+
 func busWindowByID(events []BusEvent, fromID, toID string) []BusEvent {
 	if len(events) == 0 {
 		return nil
@@ -2150,6 +2306,26 @@ func normalizeScenarioPriority(value string) string {
 	default:
 		return "normal"
 	}
+}
+
+func normalizeSimCaps(caps []string) []string {
+	out := make([]string, 0, len(caps))
+	seen := map[string]struct{}{}
+	for _, raw := range caps {
+		for _, part := range strings.Split(raw, ",") {
+			capValue := strings.ToLower(strings.TrimSpace(part))
+			if capValue == "" {
+				continue
+			}
+			if _, exists := seen[capValue]; exists {
+				continue
+			}
+			seen[capValue] = struct{}{}
+			out = append(out, capValue)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func cloneScenarioDefinition(def InlineScenarioDefinition) InlineScenarioDefinition {

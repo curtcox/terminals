@@ -54,7 +54,12 @@ layering, acceptance rules, and authoring substrate.
   `scenarios ls`, `scenarios show`, `scenarios define`, and
   `scenarios undefine` are now wired through capability service +
   admin API + REPL command surface + docs, with focused tests.
-- Next planned slice is Phase 5 `sim` and `scripts`.
+- Landed the first Phase 5 simulation/scripting slice in code:
+  `sim device new|rm`, `sim input`, `sim ui`, and
+  `scripts dry-run` are now wired through capability service +
+  admin API + REPL command surface + docs, with focused tests.
+- Next planned slice is the remaining Phase 5 assertion/execution
+  surface (`sim expect`, `sim record`, and `scripts run`).
 
 ## Problem
 

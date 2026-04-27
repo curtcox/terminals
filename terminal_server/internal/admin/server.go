@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -165,6 +166,12 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/ui/subscribe", h.handleUISubscribe)
 	mux.HandleFunc("/admin/api/ui/snapshot", h.handleUISnapshot)
 	mux.HandleFunc("/admin/api/recent", h.handleRecent)
+	mux.HandleFunc("/admin/api/sim/devices", h.handleSimDevices)
+	mux.HandleFunc("/admin/api/sim/devices/new", h.handleSimDeviceNew)
+	mux.HandleFunc("/admin/api/sim/devices/rm", h.handleSimDeviceRemove)
+	mux.HandleFunc("/admin/api/sim/input", h.handleSimInput)
+	mux.HandleFunc("/admin/api/sim/ui", h.handleSimUI)
+	mux.HandleFunc("/admin/api/scripts/dry-run", h.handleScriptsDryRun)
 	mux.HandleFunc("/admin/api/world/calibration", h.handleWorldCalibration)
 	mux.HandleFunc("/admin/api/world/verify", h.handleWorldVerify)
 	mux.HandleFunc("/admin/api/store/get", h.handleStoreGet)
@@ -1181,6 +1188,123 @@ func (h *Handler) handleRecent(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"items": h.capability.ListRecent()})
+}
+
+func (h *Handler) handleSimDevices(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"devices": h.capability.SimDeviceList()})
+}
+
+func (h *Handler) handleSimDeviceNew(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	if deviceID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+	device := h.capability.SimDeviceUpsert(deviceID, parseCSVValues(req.Form["caps"]))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "device": device})
+}
+
+func (h *Handler) handleSimDeviceRemove(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	if deviceID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+	deleted := h.capability.SimDeviceDelete(deviceID)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
+}
+
+func (h *Handler) handleSimInput(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	componentID := strings.TrimSpace(req.Form.Get("component_id"))
+	action := strings.TrimSpace(req.Form.Get("action"))
+	if deviceID == "" || componentID == "" || action == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id, component_id, and action are required")
+		return
+	}
+	input, ok := h.capability.SimRecordInput(deviceID, componentID, action, req.Form.Get("value"))
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "sim device not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "input": input})
+}
+
+func (h *Handler) handleSimUI(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	deviceID := strings.TrimSpace(req.URL.Query().Get("device_id"))
+	if deviceID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+	device, ok := h.capability.SimDeviceGet(deviceID)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "sim device not found")
+		return
+	}
+	snapshot, hasSnapshot := h.capability.UISnapshot(device.DeviceID)
+	if !hasSnapshot {
+		snapshot = capability.UISnapshot{DeviceID: device.DeviceID}
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"device":   device,
+		"snapshot": snapshot,
+		"inputs":   h.capability.SimInputs(device.DeviceID),
+	})
+}
+
+func (h *Handler) handleScriptsDryRun(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	path := strings.TrimSpace(req.Form.Get("path"))
+	if path == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		h.writeJSONError(w, http.StatusNotFound, "script not found")
+		return
+	}
+	result := h.capability.ScriptDryRun(path, string(content))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "result": result})
 }
 
 func (h *Handler) handleStoreGet(w http.ResponseWriter, req *http.Request) {

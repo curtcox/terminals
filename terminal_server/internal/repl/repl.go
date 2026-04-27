@@ -143,6 +143,11 @@ func replCommandSpecs() []commandSpec {
 		{Name: "scenarios show", Usage: "scenarios show <name> [--json]", Summary: "Show one inline REPL-authored scenario", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/scenarios"}},
 		{Name: "scenarios define", Usage: "scenarios define <name> [--match <intent|intent=x|event=y>]... [--priority <p>] [--on-start <command>] [--on-input <command>] [--on-event <kind> <command>]... [--on-suspend <command>] [--on-resume <command>] [--on-stop <command>] [--json]", Summary: "Define or update one inline scenario", Classification: commandMutating, RelatedDocs: []string{"repl/commands/scenarios"}},
 		{Name: "scenarios undefine", Usage: "scenarios undefine <name> [--json]", Summary: "Remove one inline REPL-authored scenario", Classification: commandMutating, RelatedDocs: []string{"repl/commands/scenarios"}},
+		{Name: "sim device new", Usage: "sim device new <id> [--caps <cap[,cap...]>] [--json]", Summary: "Register a virtual simulation device", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sim"}},
+		{Name: "sim device rm", Usage: "sim device rm <id> [--json]", Summary: "Remove a virtual simulation device", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sim"}},
+		{Name: "sim input", Usage: "sim input <id> <component-id> <action> [<value>] [--json]", Summary: "Inject synthetic input into a simulation device", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sim"}},
+		{Name: "sim ui", Usage: "sim ui <id> [--json]", Summary: "Inspect captured simulated UI state and inputs", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/sim"}},
+		{Name: "scripts dry-run", Usage: "scripts dry-run <path> [--json]", Summary: "Parse and summarize a script without executing it", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/scripts"}},
 		{Name: "activations ls", Usage: "activations ls [--json]", Summary: "List active scenario by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/activations"}},
 		{Name: "claims tree", Usage: "claims tree [--json]", Summary: "Show claims grouped by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/claims"}},
 		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
@@ -321,7 +326,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "scenarios", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
+	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "scenarios", "sim", "scripts", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -1968,6 +1973,107 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		default:
 			return fmt.Errorf("unknown command: scenarios %s", sub)
 		}
+	case "sim":
+		switch sub {
+		case "device":
+			if len(args) < 2 {
+				return errors.New("usage: sim device <new|rm>")
+			}
+			deviceSub := strings.ToLower(strings.TrimSpace(args[1]))
+			switch deviceSub {
+			case "new":
+				plain := nonFlagArgsSkippingFlagValues(args[2:], "--caps")
+				if len(plain) < 1 {
+					return errors.New("usage: sim device new <id> [--caps <cap[,cap...]>]")
+				}
+				form := url.Values{"device_id": {plain[0]}}
+				if capsRaw := strings.TrimSpace(flagValue(args[2:], "--caps")); capsRaw != "" {
+					for _, capValue := range parseCSVValues(capsRaw) {
+						form.Add("caps", capValue)
+					}
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/sim/devices/new", form)
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  action=sim.device.new device=%s\n", plain[0])
+				return err
+			case "rm":
+				plain := nonFlagArgs(args[2:])
+				if len(plain) < 1 {
+					return errors.New("usage: sim device rm <id>")
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/sim/devices/rm", url.Values{"device_id": {plain[0]}})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  action=sim.device.rm device=%s deleted=%s\n", plain[0], toString(body["deleted"]))
+				return err
+			default:
+				return fmt.Errorf("unknown command: sim device %s", deviceSub)
+			}
+		case "input":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 3 {
+				return errors.New("usage: sim input <id> <component-id> <action> [<value>]")
+			}
+			value := ""
+			if len(plain) > 3 {
+				value = strings.Join(plain[3:], " ")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/sim/input", url.Values{
+				"device_id":    {plain[0]},
+				"component_id": {plain[1]},
+				"action":       {plain[2]},
+				"value":        {value},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  action=sim.input device=%s component=%s event=%s\n", plain[0], plain[1], plain[2])
+			return err
+		case "ui":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: sim ui <id>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/sim/ui", url.Values{"device_id": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		default:
+			return fmt.Errorf("unknown command: sim %s", sub)
+		}
+	case "scripts":
+		switch sub {
+		case "dry-run":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: scripts dry-run <path>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/scripts/dry-run", url.Values{"path": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			result, _ := body["result"].(map[string]any)
+			_, err = fmt.Fprintf(s.out, "OK  action=scripts.dry-run path=%s commands=%s skipped=%s\n", plain[0], toString(result["command_count"]), toString(result["skipped_count"]))
+			return err
+		default:
+			return fmt.Errorf("unknown command: scripts %s", sub)
+		}
 	case "activations":
 		if sub != "ls" {
 			return fmt.Errorf("unknown command: activations %s", sub)
@@ -2747,6 +2853,22 @@ func parseHandlersEmitValue(args []string) (kind string, name string, payload st
 		return kind, name, strings.Join(payloadParts, " ")
 	}
 	return "", "", ""
+}
+
+func parseCSVValues(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 type scenarioDefineHook struct {
