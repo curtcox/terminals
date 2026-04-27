@@ -2498,6 +2498,49 @@ func (s *Service) executeScriptCommand(command string) error {
 		default:
 			return fmt.Errorf("unsupported canvas command %q", sub)
 		}
+	case "session":
+		switch sub {
+		case "create":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: session create <kind> <target>")
+			}
+			s.CreateSession(args[0], args[1])
+			return nil
+		case "join":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: session join <session> <participant>")
+			}
+			sessionID := strings.TrimSpace(args[0])
+			if strings.EqualFold(sessionID, "latest") {
+				sessions := s.ListSessions()
+				if len(sessions) == 0 {
+					return fmt.Errorf("session not found")
+				}
+				sessionID = sessions[len(sessions)-1].ID
+			}
+			if _, ok := s.JoinSession(sessionID, args[1]); !ok {
+				return fmt.Errorf("session not found")
+			}
+			return nil
+		case "members":
+			if len(args) != 1 {
+				return fmt.Errorf("usage: session members <session>")
+			}
+			sessionID := strings.TrimSpace(args[0])
+			if strings.EqualFold(sessionID, "latest") {
+				sessions := s.ListSessions()
+				if len(sessions) == 0 {
+					return fmt.Errorf("session not found")
+				}
+				sessionID = sessions[len(sessions)-1].ID
+			}
+			if _, ok := s.ListSessionParticipants(sessionID); !ok {
+				return fmt.Errorf("session not found")
+			}
+			return nil
+		default:
+			return fmt.Errorf("unsupported session command %q", sub)
+		}
 	case "sim":
 		switch sub {
 		case "device":

@@ -108,6 +108,13 @@ layering, acceptance rules, and authoring substrate.
   (`canvas ls phase12-canvas` in-script and admin `/canvas` assertion)
   so `scripts run` now validates durable canvas mutation alongside the
   existing message/board/artifact checks.
+- Extended the Phase 12 AA6 fixture with an additional mutating Layer 2
+  path in the session domain (`session create lesson phase12-session`
+  and `session join latest fixture-session-member`) plus deterministic
+  read-back (`session members latest` in-script and admin
+  `/session/members` assertion) so `scripts run` now validates durable
+  session membership mutation alongside the existing
+  message/board/artifact/canvas checks.
 
 ## Problem
 

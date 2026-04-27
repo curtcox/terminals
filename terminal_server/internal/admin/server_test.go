@@ -933,7 +933,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	if dryRunW.Code != http.StatusOK {
 		t.Fatalf("fixture scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
 	}
-	if !strings.Contains(dryRunW.Body.String(), `"command_count":18`) {
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":21`) {
 		t.Fatalf("fixture scripts dry-run body missing command count: %s", dryRunW.Body.String())
 	}
 
@@ -947,7 +947,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 		t.Fatalf("fixture scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
 	}
 	body := runW.Body.String()
-	if !strings.Contains(body, `"executed_count":18`) || !strings.Contains(body, `"failed_count":0`) {
+	if !strings.Contains(body, `"executed_count":21`) || !strings.Contains(body, `"failed_count":0`) {
 		t.Fatalf("fixture scripts run body missing execution counters: %s", body)
 	}
 
@@ -1025,6 +1025,46 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	}
 	if !strings.Contains(canvasW.Body.String(), `"canvas":"phase12-canvas"`) || !strings.Contains(canvasW.Body.String(), `"text":"fixture-canvas-mutating"`) {
 		t.Fatalf("fixture canvas ls body missing layer2 canvas side effect: %s", canvasW.Body.String())
+	}
+
+	sessionsReq := httptest.NewRequest(http.MethodGet, "/admin/api/session", nil)
+	sessionsW := httptest.NewRecorder()
+	h.ServeHTTP(sessionsW, sessionsReq)
+	if sessionsW.Code != http.StatusOK {
+		t.Fatalf("fixture session ls status = %d, want 200 body=%s", sessionsW.Code, sessionsW.Body.String())
+	}
+	var sessionsBody map[string]any
+	if err := json.Unmarshal(sessionsW.Body.Bytes(), &sessionsBody); err != nil {
+		t.Fatalf("decode fixture session ls body error = %v body=%s", err, sessionsW.Body.String())
+	}
+	sessionItems, _ := sessionsBody["sessions"].([]any)
+	sessionID := ""
+	for _, item := range sessionItems {
+		sessionMap, _ := item.(map[string]any)
+		if sessionMap == nil {
+			continue
+		}
+		if kind, _ := sessionMap["kind"].(string); kind != "lesson" {
+			continue
+		}
+		if target, _ := sessionMap["target"].(string); target != "phase12-session" {
+			continue
+		}
+		sessionID, _ = sessionMap["id"].(string)
+		break
+	}
+	if strings.TrimSpace(sessionID) == "" {
+		t.Fatalf("fixture session ls missing layer2 session side effect: %s", sessionsW.Body.String())
+	}
+
+	sessionReq := httptest.NewRequest(http.MethodGet, "/admin/api/session/members?session_id="+url.QueryEscape(sessionID), nil)
+	sessionW := httptest.NewRecorder()
+	h.ServeHTTP(sessionW, sessionReq)
+	if sessionW.Code != http.StatusOK {
+		t.Fatalf("fixture session members status = %d, want 200 body=%s", sessionW.Code, sessionW.Body.String())
+	}
+	if !strings.Contains(sessionW.Body.String(), `"session_id":"`+sessionID+`"`) || !strings.Contains(sessionW.Body.String(), `"identity_id":"fixture-session-member"`) {
+		t.Fatalf("fixture session members body missing session side effect: %s", sessionW.Body.String())
 	}
 
 	simReq := httptest.NewRequest(http.MethodGet, "/admin/api/sim/ui?device_id=sim-fixture", nil)
