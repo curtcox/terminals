@@ -443,6 +443,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		"/admin/api/memory?q=hello",
 		"/admin/api/memory/stream?scope=kitchen",
 		"/admin/api/placement",
+		"/admin/api/ui/views",
 		"/admin/api/recent",
 		"/admin/api/store/get?namespace=ns&key=k",
 		"/admin/api/store/ns",
@@ -484,6 +485,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		{path: "/admin/api/artifact/template/apply", form: url.Values{"name": {"base"}, "target_artifact_id": {"missing"}}, allowNotFound: true},
 		{path: "/admin/api/canvas/annotate", form: url.Values{"canvas": {"c1"}, "text": {"draw"}}},
 		{path: "/admin/api/memory/remember", form: url.Values{"scope": {"kitchen"}, "text": {"milk"}}},
+		{path: "/admin/api/ui/views/upsert", form: url.Values{"view_id": {"kitchen-home"}, "root_id": {"root-main"}, "descriptor": {`{"type":"stack"}`}}},
 		{path: "/admin/api/store/put", form: url.Values{"namespace": {"ns"}, "key": {"k"}, "value": {"v"}}},
 		{path: "/admin/api/store/bind", form: url.Values{"namespace": {"ns"}, "key": {"k"}, "to": {"device-1:chat"}}},
 		{path: "/admin/api/store/del", form: url.Values{"namespace": {"ns"}, "key": {"k"}}},
@@ -1098,6 +1100,58 @@ func TestCohortEndpointsCRUDAndMembers(t *testing.T) {
 	}
 	if !strings.Contains(delW.Body.String(), `"deleted":true`) {
 		t.Fatalf("cohort delete body missing deleted=true: %s", delW.Body.String())
+	}
+}
+
+func TestUIViewEndpointsCRUD(t *testing.T) {
+	h := testHandler(t)
+
+	upsertReq := httptest.NewRequest(http.MethodPost, "/admin/api/ui/views/upsert", strings.NewReader(url.Values{
+		"view_id":    {"Kitchen-Home"},
+		"root_id":    {"root-main"},
+		"descriptor": {`{"type":"stack","children":[]}`},
+	}.Encode()))
+	upsertReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	upsertW := httptest.NewRecorder()
+	h.ServeHTTP(upsertW, upsertReq)
+	if upsertW.Code != http.StatusOK {
+		t.Fatalf("ui view upsert status = %d, want 200 body=%s", upsertW.Code, upsertW.Body.String())
+	}
+	if !strings.Contains(upsertW.Body.String(), `"view_id":"kitchen-home"`) {
+		t.Fatalf("ui view upsert body missing normalized view_id: %s", upsertW.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/admin/api/ui/views", nil)
+	listW := httptest.NewRecorder()
+	h.ServeHTTP(listW, listReq)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("ui views list status = %d, want 200 body=%s", listW.Code, listW.Body.String())
+	}
+	if !strings.Contains(listW.Body.String(), `"kitchen-home"`) {
+		t.Fatalf("ui views list missing kitchen-home: %s", listW.Body.String())
+	}
+
+	showReq := httptest.NewRequest(http.MethodGet, "/admin/api/ui/views?view_id=kitchen-home", nil)
+	showW := httptest.NewRecorder()
+	h.ServeHTTP(showW, showReq)
+	if showW.Code != http.StatusOK {
+		t.Fatalf("ui views show status = %d, want 200 body=%s", showW.Code, showW.Body.String())
+	}
+	if !strings.Contains(showW.Body.String(), `"root_id":"root-main"`) {
+		t.Fatalf("ui views show missing root_id: %s", showW.Body.String())
+	}
+
+	delReq := httptest.NewRequest(http.MethodPost, "/admin/api/ui/views/del", strings.NewReader(url.Values{
+		"view_id": {"kitchen-home"},
+	}.Encode()))
+	delReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	delW := httptest.NewRecorder()
+	h.ServeHTTP(delW, delReq)
+	if delW.Code != http.StatusOK {
+		t.Fatalf("ui views delete status = %d, want 200 body=%s", delW.Code, delW.Body.String())
+	}
+	if !strings.Contains(delW.Body.String(), `"deleted":true`) {
+		t.Fatalf("ui views delete body missing deleted=true: %s", delW.Body.String())
 	}
 }
 

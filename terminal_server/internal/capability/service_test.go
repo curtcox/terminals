@@ -59,6 +59,45 @@ func TestCohortCRUDAndNormalization(t *testing.T) {
 	}
 }
 
+func TestUIViewCRUDAndNormalization(t *testing.T) {
+	svc := NewService()
+
+	created := svc.UIViewUpsert("Kitchen-Home", "root-main", `{\"type\":\"stack\"}`)
+	if created.ViewID != "kitchen-home" {
+		t.Fatalf("UIViewUpsert view_id = %q, want kitchen-home", created.ViewID)
+	}
+	if created.RootID != "root-main" {
+		t.Fatalf("UIViewUpsert root_id = %q, want root-main", created.RootID)
+	}
+
+	fetched, ok := svc.UIViewGet("KITCHEN-HOME")
+	if !ok {
+		t.Fatalf("UIViewGet(KITCHEN-HOME) = not found")
+	}
+	if fetched.ViewID != created.ViewID {
+		t.Fatalf("UIViewGet view_id = %q, want %q", fetched.ViewID, created.ViewID)
+	}
+
+	svc.UIViewUpsert("alerts", "root-alert", `{\"type\":\"banner\"}`)
+	list := svc.UIViewList()
+	if len(list) != 2 {
+		t.Fatalf("len(UIViewList()) = %d, want 2", len(list))
+	}
+	if list[0].ViewID != "alerts" || list[1].ViewID != "kitchen-home" {
+		t.Fatalf("UIViewList order = %+v, want [alerts kitchen-home]", []string{list[0].ViewID, list[1].ViewID})
+	}
+
+	if deleted := svc.UIViewDelete("kitchen-home"); !deleted {
+		t.Fatalf("UIViewDelete(kitchen-home) = false, want true")
+	}
+	if _, ok := svc.UIViewGet("kitchen-home"); ok {
+		t.Fatalf("UIViewGet(kitchen-home) should not exist after delete")
+	}
+	if deleted := svc.UIViewDelete("kitchen-home"); deleted {
+		t.Fatalf("second UIViewDelete should return false")
+	}
+}
+
 func TestIdentityLookupGroupsPreferencesAndAcknowledgements(t *testing.T) {
 	svc := NewService()
 

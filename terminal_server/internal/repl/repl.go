@@ -116,6 +116,9 @@ func replCommandSpecs() []commandSpec {
 		{Name: "cohort show", Usage: "cohort show <name> [--json]", Summary: "Show one cohort with resolved members", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/cohort"}},
 		{Name: "cohort put", Usage: "cohort put <name> --selectors <selector[,selector...]> [--json]", Summary: "Create or update a named device cohort", Classification: commandMutating, RelatedDocs: []string{"repl/commands/cohort"}},
 		{Name: "cohort del", Usage: "cohort del <name> [--json]", Summary: "Delete a named device cohort", Classification: commandMutating, RelatedDocs: []string{"repl/commands/cohort"}},
+		{Name: "ui views ls", Usage: "ui views ls [--json]", Summary: "List authored UI views", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ui"}},
+		{Name: "ui views show", Usage: "ui views show <view-id> [--json]", Summary: "Show one authored UI view", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ui"}},
+		{Name: "ui views rm", Usage: "ui views rm <view-id> [--json]", Summary: "Remove one authored UI view", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ui"}},
 		{Name: "recent ls", Usage: "recent ls [--json]", Summary: "List recent activity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/recent"}},
 		{Name: "store ns ls", Usage: "store ns ls [--json]", Summary: "List store namespaces", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "store put", Usage: "store put <namespace> <key> <value> [--ttl <duration>] [--json]", Summary: "Write typed key-value state", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
@@ -305,7 +308,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "recent", "store", "bus", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
+	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "ui", "recent", "store", "bus", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -1390,6 +1393,62 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			return err
 		default:
 			return fmt.Errorf("unknown command: cohort %s", sub)
+		}
+	case "ui":
+		switch sub {
+		case "views":
+			if len(args) < 2 {
+				return errors.New("usage: ui views <ls|show|rm>")
+			}
+			viewSub := strings.ToLower(args[1])
+			switch viewSub {
+			case "ls":
+				body, err := s.fetchJSON(ctx, "/admin/api/ui/views")
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				items, _ := body["views"].([]any)
+				rows := make([][]string, 0, len(items))
+				for _, item := range items {
+					row, _ := item.(map[string]any)
+					if row == nil {
+						continue
+					}
+					rows = append(rows, []string{toString(row["view_id"]), toString(row["root_id"])})
+				}
+				return printTable(s.out, []string{"VIEW", "ROOT"}, rows)
+			case "show":
+				plain := nonFlagArgs(args[2:])
+				if len(plain) < 1 {
+					return errors.New("usage: ui views show <view-id>")
+				}
+				body, err := s.fetchJSONQuery(ctx, "/admin/api/ui/views", url.Values{"view_id": {plain[0]}})
+				if err != nil {
+					return err
+				}
+				return writeJSON(s.out, body)
+			case "rm":
+				plain := nonFlagArgs(args[2:])
+				if len(plain) < 1 {
+					return errors.New("usage: ui views rm <view-id>")
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/ui/views/del", url.Values{"view_id": {plain[0]}})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  deleted=%s view=%s\n", toString(body["deleted"]), plain[0])
+				return err
+			default:
+				return fmt.Errorf("unknown command: ui views %s", viewSub)
+			}
+		default:
+			return fmt.Errorf("unknown command: ui %s", sub)
 		}
 	case "recent":
 		if sub != "ls" {

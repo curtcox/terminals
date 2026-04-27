@@ -39,9 +39,11 @@ layering, acceptance rules, and authoring substrate.
   device metadata selectors.
 - Added focused coverage for capability service cohort semantics,
   admin cohort endpoints, and REPL command routing.
-- Next planned slice is Phase 2 `ui` authoring (`UiService`
-  push/patch/transition/broadcast/subscribe/snapshot and authored
-  view inventory).
+- Landed the first Phase 2 UI authoring slice in code: authored
+  view inventory is now REPL-visible via `ui views ls/show/rm`
+  (capability service + admin API + REPL command surface + docs).
+- Next planned slice is active UI operations (`ui push`, `ui patch`,
+  `ui transition`, `ui broadcast`, `ui subscribe`, `ui snapshot`).
 
 ## Problem
 

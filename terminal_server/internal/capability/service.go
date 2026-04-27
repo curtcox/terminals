@@ -191,6 +191,14 @@ type DeviceCohort struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// UIView represents one authored UI view record.
+type UIView struct {
+	ViewID     string    `json:"view_id"`
+	RootID     string    `json:"root_id,omitempty"`
+	Descriptor string    `json:"descriptor,omitempty"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 // BusEvent represents a named event emitted on the internal event bus.
 type BusEvent struct {
 	ID        string    `json:"id"`
@@ -221,6 +229,7 @@ type Service struct {
 	store        map[string]StoreRecord
 	bus          []BusEvent
 	cohorts      map[string]DeviceCohort
+	uiViews      map[string]UIView
 	acks         map[string]Acknowledgement
 }
 
@@ -231,6 +240,7 @@ func NewService() *Service {
 		now:       func() time.Time { return now().UTC() },
 		store:     map[string]StoreRecord{},
 		cohorts:   map[string]DeviceCohort{},
+		uiViews:   map[string]UIView{},
 		acks:      map[string]Acknowledgement{},
 		versions:  map[string][]ArtifactVersion{},
 		templates: map[string]ArtifactTemplate{},
@@ -1389,6 +1399,58 @@ func (s *Service) CohortDelete(name string) bool {
 	}
 	delete(s.cohorts, name)
 	s.appendRecentLocked("cohort", name+" deleted")
+	return true
+}
+
+// UIViewUpsert creates or updates one authored UI view record.
+func (s *Service) UIViewUpsert(viewID, rootID, descriptor string) UIView {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	viewID = strings.ToLower(strings.TrimSpace(viewID))
+	view := UIView{
+		ViewID:     viewID,
+		RootID:     strings.TrimSpace(rootID),
+		Descriptor: strings.TrimSpace(descriptor),
+		UpdatedAt:  s.now(),
+	}
+	s.uiViews[viewID] = view
+	s.appendRecentLocked("ui", viewID+" upsert")
+	return view
+}
+
+// UIViewGet returns one authored UI view record by id.
+func (s *Service) UIViewGet(viewID string) (UIView, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	view, ok := s.uiViews[strings.ToLower(strings.TrimSpace(viewID))]
+	if !ok {
+		return UIView{}, false
+	}
+	return view, true
+}
+
+// UIViewList returns all authored UI view records sorted by id.
+func (s *Service) UIViewList() []UIView {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	views := make([]UIView, 0, len(s.uiViews))
+	for _, view := range s.uiViews {
+		views = append(views, view)
+	}
+	sort.Slice(views, func(i, j int) bool { return views[i].ViewID < views[j].ViewID })
+	return views
+}
+
+// UIViewDelete removes one authored UI view record by id.
+func (s *Service) UIViewDelete(viewID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	viewID = strings.ToLower(strings.TrimSpace(viewID))
+	if _, ok := s.uiViews[viewID]; !ok {
+		return false
+	}
+	delete(s.uiViews, viewID)
+	s.appendRecentLocked("ui", viewID+" deleted")
 	return true
 }
 

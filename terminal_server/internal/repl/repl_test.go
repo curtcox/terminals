@@ -332,6 +332,9 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"cohort show",
 		"cohort put",
 		"cohort del",
+		"ui views ls",
+		"ui views show",
+		"ui views rm",
 		"recent ls",
 		"store ns ls",
 		"store put",
@@ -563,6 +566,12 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","cohort":{"name":"family-screens","selectors":["role:screen","zone:kitchen"]},"members":["d1"]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/cohort/del":
 			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/ui/views" && req.URL.Query().Get("view_id") == "":
+			_, _ = w.Write([]byte(`{"views":[{"view_id":"kitchen-home","root_id":"root-main"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/ui/views" && req.URL.Query().Get("view_id") == "kitchen-home":
+			_, _ = w.Write([]byte(`{"view":{"view_id":"kitchen-home","root_id":"root-main","descriptor":"{\"type\":\"stack\"}"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/ui/views/del":
+			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/recent":
 			_, _ = w.Write([]byte(`{"items":[{"id":"evt-1","kind":"message"}]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/store/ns":
@@ -624,6 +633,9 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"cohort show family-screens",
 		"cohort put family-screens --selectors zone:kitchen,role:screen",
 		"cohort del family-screens",
+		"ui views ls",
+		"ui views show kitchen-home",
+		"ui views rm kitchen-home",
 		"recent ls",
 		"store ns ls",
 		"store put notes key1 value1",
@@ -723,6 +735,12 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "cohort=family-screens") {
 		t.Fatalf("cohort delete output missing cohort summary: %q", text)
+	}
+	if !strings.Contains(text, "kitchen-home") {
+		t.Fatalf("ui views output missing view id: %q", text)
+	}
+	if !strings.Contains(text, "view=kitchen-home") {
+		t.Fatalf("ui views rm output missing view summary: %q", text)
 	}
 	if !strings.Contains(text, "notes") {
 		t.Fatalf("store namespace output missing: %q", text)

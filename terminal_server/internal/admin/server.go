@@ -155,6 +155,9 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/cohort", h.handleCohorts)
 	mux.HandleFunc("/admin/api/cohort/upsert", h.handleCohortUpsert)
 	mux.HandleFunc("/admin/api/cohort/del", h.handleCohortDelete)
+	mux.HandleFunc("/admin/api/ui/views", h.handleUIViews)
+	mux.HandleFunc("/admin/api/ui/views/upsert", h.handleUIViewUpsert)
+	mux.HandleFunc("/admin/api/ui/views/del", h.handleUIViewDelete)
 	mux.HandleFunc("/admin/api/recent", h.handleRecent)
 	mux.HandleFunc("/admin/api/world/calibration", h.handleWorldCalibration)
 	mux.HandleFunc("/admin/api/world/verify", h.handleWorldVerify)
@@ -969,6 +972,64 @@ func (h *Handler) handleCohortDelete(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	deleted := h.capability.CohortDelete(name)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
+}
+
+func (h *Handler) handleUIViews(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	viewID := strings.TrimSpace(req.URL.Query().Get("view_id"))
+	if viewID == "" {
+		h.writeJSON(w, http.StatusOK, map[string]any{"views": h.capability.UIViewList()})
+		return
+	}
+	view, ok := h.capability.UIViewGet(viewID)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "ui view not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"view": view})
+}
+
+func (h *Handler) handleUIViewUpsert(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	viewID := strings.TrimSpace(req.Form.Get("view_id"))
+	if viewID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "view_id is required")
+		return
+	}
+	view := h.capability.UIViewUpsert(
+		viewID,
+		strings.TrimSpace(req.Form.Get("root_id")),
+		strings.TrimSpace(req.Form.Get("descriptor")),
+	)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "view": view})
+}
+
+func (h *Handler) handleUIViewDelete(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	viewID := strings.TrimSpace(req.Form.Get("view_id"))
+	if viewID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "view_id is required")
+		return
+	}
+	deleted := h.capability.UIViewDelete(viewID)
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
 }
 
