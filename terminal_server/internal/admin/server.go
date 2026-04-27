@@ -219,6 +219,10 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
+	mux.HandleFunc("/admin/api/apps/migrate/status", h.handleAppMigrationStatus)
+	mux.HandleFunc("/admin/api/apps/migrate/retry", h.handleAppMigrationRetry)
+	mux.HandleFunc("/admin/api/apps/migrate/abort", h.handleAppMigrationAbort)
+	mux.HandleFunc("/admin/api/apps/migrate/reconcile", h.handleAppMigrationReconcile)
 	mux.HandleFunc("/admin/api/trust/keys", h.handleTrustKeys)
 	mux.HandleFunc("/admin/api/trust/keys/confirm", h.handleTrustKeyConfirm)
 	mux.HandleFunc("/admin/api/trust/keys/revoke", h.handleTrustKeyRevoke)
@@ -2499,6 +2503,136 @@ func (h *Handler) handleRollbackApp(w http.ResponseWriter, req *http.Request) {
 		"version":  pkg.Manifest.Version,
 		"revision": pkg.Revision,
 	})
+}
+
+func (h *Handler) handleAppMigrationStatus(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.appRuntime == nil {
+		h.writeJSONError(w, http.StatusBadRequest, "app runtime not configured")
+		return
+	}
+	name := strings.TrimSpace(req.URL.Query().Get("app"))
+	if name == "" {
+		name = strings.TrimSpace(req.URL.Query().Get("name"))
+	}
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "app is required")
+		return
+	}
+	status, err := h.appRuntime.GetMigrationStatus(name)
+	if err != nil {
+		h.writeMigrationError(w, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"status":    "ok",
+		"migration": mapMigrationStatus(status),
+	})
+}
+
+func (h *Handler) handleAppMigrationRetry(w http.ResponseWriter, req *http.Request) {
+	h.handleAppMigrationAction(w, req, "retry")
+}
+
+func (h *Handler) handleAppMigrationAbort(w http.ResponseWriter, req *http.Request) {
+	h.handleAppMigrationAction(w, req, "abort")
+}
+
+func (h *Handler) handleAppMigrationReconcile(w http.ResponseWriter, req *http.Request) {
+	h.handleAppMigrationAction(w, req, "reconcile")
+}
+
+func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Request, action string) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.appRuntime == nil {
+		h.writeJSONError(w, http.StatusBadRequest, "app runtime not configured")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form")
+		return
+	}
+	name := strings.TrimSpace(req.FormValue("app"))
+	if name == "" {
+		name = strings.TrimSpace(req.FormValue("name"))
+	}
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "app is required")
+		return
+	}
+
+	var (
+		status appruntime.MigrationStatus
+		err    error
+	)
+	switch action {
+	case "retry":
+		status, err = h.appRuntime.RetryMigration(name)
+	case "abort":
+		status, err = h.appRuntime.AbortMigration(name)
+	case "reconcile":
+		recordID := strings.TrimSpace(req.FormValue("record_id"))
+		resolution := strings.TrimSpace(req.FormValue("resolution"))
+		if recordID == "" || resolution == "" {
+			h.writeJSONError(w, http.StatusBadRequest, "record_id and resolution are required")
+			return
+		}
+		status, err = h.appRuntime.ReconcileMigration(name, recordID, resolution)
+	default:
+		h.writeJSONError(w, http.StatusBadRequest, "unknown migration action")
+		return
+	}
+	if err != nil {
+		if errors.Is(err, appruntime.ErrMigrationExecutorUnavailable) {
+			h.writeJSON(w, http.StatusConflict, map[string]any{
+				"status":    "unsupported",
+				"action":    action,
+				"app":       name,
+				"error":     err.Error(),
+				"migration": mapMigrationStatus(status),
+			})
+			return
+		}
+		h.writeMigrationError(w, err)
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"status":    "ok",
+		"action":    action,
+		"app":       name,
+		"migration": mapMigrationStatus(status),
+	})
+}
+
+func (h *Handler) writeMigrationError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, appruntime.ErrPackageNotFound):
+		h.writeJSONError(w, http.StatusNotFound, err.Error())
+	default:
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+	}
+}
+
+func mapMigrationStatus(status appruntime.MigrationStatus) map[string]any {
+	return map[string]any{
+		"app":                 status.App,
+		"version":             status.Version,
+		"revision":            status.Revision,
+		"steps_planned":       status.StepsPlanned,
+		"steps_completed":     status.StepsCompleted,
+		"verdict":             status.Verdict,
+		"last_error":          status.LastError,
+		"journal_path":        status.JournalPath,
+		"reconciliation_path": status.ReconciliationPath,
+		"executor_ready":      status.ExecutorReady,
+	}
 }
 
 func parseDeviceIDs(raw string) []string {

@@ -163,6 +163,10 @@ func replCommandSpecs() []commandSpec {
 		{Name: "app logs", Usage: "app logs <app> [<query>]", Summary: "Query app-related logs", Classification: commandOperational, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app reload", Usage: "app reload <app> [--json]", Summary: "Reload an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app rollback", Usage: "app rollback <app> [--json]", Summary: "Rollback an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "apps migrate status", Usage: "apps migrate status <app> [--json]", Summary: "Show migration status for one app", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "apps migrate retry", Usage: "apps migrate retry <app> [--json]", Summary: "Retry app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "apps migrate abort", Usage: "apps migrate abort <app> [--json]", Summary: "Abort in-flight app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "apps migrate reconcile", Usage: "apps migrate reconcile <app> <record-id> <resolution> [--json]", Summary: "Resolve one migration reconciliation record", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps keys ls", Usage: "apps keys ls [--json]", Summary: "List trust-store keys", Classification: commandReadOnly},
 		{Name: "apps keys show", Usage: "apps keys show <key-id> [--json]", Summary: "Show one trust key", Classification: commandReadOnly},
 		{Name: "apps keys add", Usage: "apps keys add <key-id> <role[,role]> [note]", Summary: "Add a key to the trust store", Classification: commandMutating},
@@ -2385,6 +2389,88 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		}
 	case "apps":
 		switch sub {
+		case "migrate":
+			if len(args) < 2 {
+				return errors.New("usage: apps migrate <status|retry|abort|reconcile>")
+			}
+			migrateSub := strings.TrimSpace(args[1])
+			switch migrateSub {
+			case "status":
+				plain := nonFlagArgs(args[2:])
+				if len(plain) < 1 {
+					return errors.New("usage: apps migrate status <app>")
+				}
+				appName := strings.TrimSpace(plain[0])
+				if appName == "" {
+					return errors.New("usage: apps migrate status <app>")
+				}
+				body, err := s.fetchJSONQuery(ctx, "/admin/api/apps/migrate/status", url.Values{"app": {appName}})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				migration, _ := body["migration"].(map[string]any)
+				_, err = fmt.Fprintf(
+					s.out,
+					"OK  app=%s verdict=%s steps=%v/%v executor_ready=%v\n",
+					appName,
+					toString(migration["verdict"]),
+					migration["steps_completed"],
+					migration["steps_planned"],
+					migration["executor_ready"],
+				)
+				return err
+			case "retry", "abort":
+				plain := nonFlagArgs(args[2:])
+				if len(plain) < 1 {
+					return fmt.Errorf("usage: apps migrate %s <app>", migrateSub)
+				}
+				appName := strings.TrimSpace(plain[0])
+				if appName == "" {
+					return fmt.Errorf("usage: apps migrate %s <app>", migrateSub)
+				}
+				route := "/admin/api/apps/migrate/retry"
+				if migrateSub == "abort" {
+					route = "/admin/api/apps/migrate/abort"
+				}
+				body, err := s.postFormJSON(ctx, route, url.Values{"app": {appName}})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  app=%s action=%s status=%s\n", appName, migrateSub, toString(body["status"]))
+				return err
+			case "reconcile":
+				plain := nonFlagArgs(args[2:])
+				if len(plain) < 3 {
+					return errors.New("usage: apps migrate reconcile <app> <record-id> <resolution>")
+				}
+				appName := strings.TrimSpace(plain[0])
+				recordID := strings.TrimSpace(plain[1])
+				resolution := strings.TrimSpace(plain[2])
+				if appName == "" || recordID == "" || resolution == "" {
+					return errors.New("usage: apps migrate reconcile <app> <record-id> <resolution>")
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/apps/migrate/reconcile", url.Values{
+					"app":        {appName},
+					"record_id":  {recordID},
+					"resolution": {resolution},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  app=%s action=reconcile status=%s\n", appName, toString(body["status"]))
+				return err
+			default:
+				return fmt.Errorf("unknown command: apps migrate %s", migrateSub)
+			}
 		case "keys":
 			if len(args) == 0 {
 				return errors.New("usage: apps keys <ls|show|add|confirm|revoke|archive|rotate|rotate-installer|rotations|verify|log>")

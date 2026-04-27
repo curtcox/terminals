@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -416,6 +417,39 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	}
 	if rolledBack["version"] != "1.0.0" {
 		t.Fatalf("rolled back version = %v, want 1.0.0", rolledBack["version"])
+	}
+
+	statusReq := httptest.NewRequest(http.MethodGet, "/admin/api/apps/migrate/status?app=sound_watch", nil)
+	statusW := httptest.NewRecorder()
+	h.ServeHTTP(statusW, statusReq)
+	if statusW.Code != http.StatusOK {
+		t.Fatalf("migrate status code = %d, want 200 body=%s", statusW.Code, statusW.Body.String())
+	}
+	var statusBody map[string]any
+	if err := json.Unmarshal(statusW.Body.Bytes(), &statusBody); err != nil {
+		t.Fatalf("decode migrate status: %v", err)
+	}
+	migration, _ := statusBody["migration"].(map[string]any)
+	if fmt.Sprint(migration["app"]) != "sound_watch" {
+		t.Fatalf("migration app = %v, want sound_watch", migration["app"])
+	}
+	if fmt.Sprint(migration["verdict"]) != "idle" {
+		t.Fatalf("migration verdict = %v, want idle", migration["verdict"])
+	}
+
+	retryReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/migrate/retry", strings.NewReader(url.Values{"app": {"sound_watch"}}.Encode()))
+	retryReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	retryW := httptest.NewRecorder()
+	h.ServeHTTP(retryW, retryReq)
+	if retryW.Code != http.StatusConflict {
+		t.Fatalf("migrate retry code = %d, want 409 body=%s", retryW.Code, retryW.Body.String())
+	}
+	var retryBody map[string]any
+	if err := json.Unmarshal(retryW.Body.Bytes(), &retryBody); err != nil {
+		t.Fatalf("decode migrate retry: %v", err)
+	}
+	if retryBody["status"] != "unsupported" {
+		t.Fatalf("migrate retry status = %v, want unsupported", retryBody["status"])
 	}
 }
 

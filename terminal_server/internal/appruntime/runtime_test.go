@@ -242,6 +242,47 @@ func TestRuntimeRollbackRequiresPriorVersion(t *testing.T) {
 	}
 }
 
+func TestRuntimeMigrationStatusAndActions(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_stub")
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_stub\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.GetMigrationStatus("migrate_stub")
+	if err != nil {
+		t.Fatalf("GetMigrationStatus() error = %v", err)
+	}
+	if status.App != "migrate_stub" || status.Version != "1.0.0" {
+		t.Fatalf("GetMigrationStatus() = %+v, want app/version populated", status)
+	}
+	if status.ExecutorReady {
+		t.Fatalf("ExecutorReady = true, want false")
+	}
+
+	if _, err := runtime.RetryMigration("migrate_stub"); !errors.Is(err, ErrMigrationExecutorUnavailable) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationExecutorUnavailable", err)
+	}
+	if _, err := runtime.AbortMigration("migrate_stub"); !errors.Is(err, ErrMigrationExecutorUnavailable) {
+		t.Fatalf("AbortMigration() error = %v, want ErrMigrationExecutorUnavailable", err)
+	}
+	if _, err := runtime.ReconcileMigration("migrate_stub", "rec-1", "accept_current"); !errors.Is(err, ErrMigrationExecutorUnavailable) {
+		t.Fatalf("ReconcileMigration() error = %v, want ErrMigrationExecutorUnavailable", err)
+	}
+}
+
 func TestRuntimeDefinitionsUsesExportsAndNameFallback(t *testing.T) {
 	tempDir := t.TempDir()
 

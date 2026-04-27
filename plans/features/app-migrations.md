@@ -64,9 +64,17 @@ who may authorize a migration).
 - Implemented rules enforce contiguous migration step numbering,
   `manifest.toml` declaration/file-count consistency, and file ↔
   manifest step mapping for `migrate/*.tal` files.
+- 2026-04-27: Added migration operator control-plane scaffolding
+  in admin + REPL surfaces:
+  `/admin/api/apps/migrate/status|retry|abort|reconcile` now
+  returns structured migration status and explicit
+  `migration executor unavailable` responses for action requests,
+  and REPL commands `apps migrate status|retry|abort|reconcile`
+  route to those endpoints. Added focused runtime/admin/repl test
+  coverage and command documentation updates.
 - Remaining work in this plan includes executor lifecycle,
-  drain/reconcile semantics, rollback behavior, migration runtime
-  module restrictions, and operator command surfaces.
+  drain/reconcile semantics, rollback behavior, and wiring
+  operator commands to real migration execution/reconciliation.
 
 ## Problem
 

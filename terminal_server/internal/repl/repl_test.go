@@ -99,6 +99,20 @@ func TestCommandSpecsExposeOperationalAndDiscouragedFlags(t *testing.T) {
 	if appsKeysRevoke.Classification != CommandClassificationCriticalMutating {
 		t.Fatalf("apps keys revoke classification = %q, want %q", appsKeysRevoke.Classification, CommandClassificationCriticalMutating)
 	}
+	appsMigrateStatus, ok := DescribeCommand("apps migrate status")
+	if !ok {
+		t.Fatalf("DescribeCommand(apps migrate status) not found")
+	}
+	if appsMigrateStatus.Classification != CommandClassificationReadOnly {
+		t.Fatalf("apps migrate status classification = %q, want %q", appsMigrateStatus.Classification, CommandClassificationReadOnly)
+	}
+	appsMigrateAbort, ok := DescribeCommand("apps migrate abort")
+	if !ok {
+		t.Fatalf("DescribeCommand(apps migrate abort) not found")
+	}
+	if appsMigrateAbort.Classification != CommandClassificationCriticalMutating {
+		t.Fatalf("apps migrate abort classification = %q, want %q", appsMigrateAbort.Classification, CommandClassificationCriticalMutating)
+	}
 }
 
 func TestExecuteCommandDocsMarkdownMode(t *testing.T) {
@@ -215,6 +229,31 @@ func TestMutatingCommandsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "OK  app=sound_watch action=rollback version=1.2.2") {
 		t.Fatalf("missing rollback success output: %q", text)
+	}
+}
+
+func TestAppsMigrateStatusUsesAdminAPI(t *testing.T) {
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/apps/migrate/status":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","migration":{"app":"sound_watch","verdict":"idle","steps_planned":0,"steps_completed":0,"executor_ready":false}}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("apps migrate status sound_watch\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "OK  app=sound_watch verdict=idle steps=0/0 executor_ready=false") {
+		t.Fatalf("missing apps migrate status output: %q", text)
 	}
 }
 

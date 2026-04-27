@@ -33,6 +33,8 @@ var (
 	ErrPackageNotFound = errors.New("app package not found")
 	// ErrNoPriorVersion indicates rollback was requested but no prior version exists.
 	ErrNoPriorVersion = errors.New("no prior app package version")
+	// ErrMigrationExecutorUnavailable indicates migration actions are not wired yet.
+	ErrMigrationExecutorUnavailable = errors.New("migration executor unavailable")
 )
 
 var allowedPermissions = map[string]struct{}{
@@ -120,6 +122,20 @@ type Result struct {
 	Ops   []Op
 	Emit  []Trigger
 	Done  bool
+}
+
+// MigrationStatus exposes app migration control-plane status.
+type MigrationStatus struct {
+	App                string
+	Version            string
+	Revision           uint64
+	StepsPlanned       int
+	StepsCompleted     int
+	Verdict            string
+	LastError          string
+	JournalPath        string
+	ReconciliationPath string
+	ExecutorReady      bool
 }
 
 // AppDefinition provides activation matching and activation construction.
@@ -233,6 +249,57 @@ func (r *Runtime) RollbackPackage(name string) (Package, error) {
 	previous := history[len(history)-1]
 	r.packages[name] = previous
 	return previous, nil
+}
+
+// GetMigrationStatus returns migration status for one app package.
+func (r *Runtime) GetMigrationStatus(name string) (MigrationStatus, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	pkg, ok := r.packages[name]
+	if !ok {
+		return MigrationStatus{}, ErrPackageNotFound
+	}
+	return MigrationStatus{
+		App:                pkg.Manifest.Name,
+		Version:            pkg.Manifest.Version,
+		Revision:           pkg.Revision,
+		StepsPlanned:       0,
+		StepsCompleted:     0,
+		Verdict:            "idle",
+		LastError:          "",
+		JournalPath:        "",
+		ReconciliationPath: "",
+		ExecutorReady:      false,
+	}, nil
+}
+
+// RetryMigration retries an app migration run.
+func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
+	status, err := r.GetMigrationStatus(name)
+	if err != nil {
+		return MigrationStatus{}, err
+	}
+	return status, ErrMigrationExecutorUnavailable
+}
+
+// AbortMigration aborts an in-flight app migration run.
+func (r *Runtime) AbortMigration(name string) (MigrationStatus, error) {
+	status, err := r.GetMigrationStatus(name)
+	if err != nil {
+		return MigrationStatus{}, err
+	}
+	return status, ErrMigrationExecutorUnavailable
+}
+
+// ReconcileMigration attempts to reconcile one migration record.
+func (r *Runtime) ReconcileMigration(name, recordID, resolution string) (MigrationStatus, error) {
+	_ = recordID
+	_ = resolution
+	status, err := r.GetMigrationStatus(name)
+	if err != nil {
+		return MigrationStatus{}, err
+	}
+	return status, ErrMigrationExecutorUnavailable
 }
 
 // GetPackage returns the latest loaded package for one app name.
