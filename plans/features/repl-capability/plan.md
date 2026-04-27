@@ -67,6 +67,12 @@ layering, acceptance rules, and authoring substrate.
   `presence-query` example guides under `docs/repl/examples/`, and
   tightened REPL tests so `docs examples` must continue surfacing all
   required capability-closure topics (including `sim-only-assertion`).
+- Closed the remaining Layer 2 required-example placeholder gap for
+  acceptance: replaced stub docs for `start-room-chat`,
+  `send-direct-message`, `pin-family-bulletin`,
+  `remote-help-session`, `shared-lesson-session`,
+  `annotate-shared-canvas`, `review-learner-progress`, and
+  `resume-multiplayer-session` with concrete typed REPL walkthroughs.
 
 ## Problem
 

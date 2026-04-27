@@ -1,1 +1,1 @@
-Finish `plans/features/repl-capability/plan.md` and move it out of `status: building` once remaining scope is shipped and validated.
+For `plans/features/repl-capability/plan.md`, implement Phase 12 cross-use-case validation via `scripts run` over a seeded simulation fixture so the plan can move beyond `status: building`.
