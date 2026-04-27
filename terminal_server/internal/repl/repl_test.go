@@ -252,6 +252,8 @@ func TestStorePutWithTTLPassesFormValues(t *testing.T) {
 }
 
 func TestAICommandsUseAdminAPIs(t *testing.T) {
+	storePutCalls := 0
+	appReloadCalls := 0
 	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/repl/ai/providers":
@@ -268,10 +270,18 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6"}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/ask":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6","prompt":"why is act_42 suspended?","answer":"act_42 is suspended due to red_alert preemption.","thread":"thread-repl-9","history":["user: why is act_42 suspended?","assistant: act_42 is suspended due to red_alert preemption."]}`))
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6","prompt":"why is act_42 suspended?","answer":"act_42 is suspended due to red_alert preemption.","thread":"thread-repl-9","history":["user: why is act_42 suspended?","assistant: act_42 is suspended due to red_alert preemption."],"proposed_command":"store put notes ai_key ai_value","proposal_summary":"Persist the incident summary for later follow-up"}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/gen":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6","description":"a tal app that rings a chime when the dryer beeps","output":"apps/dryer_chime/main.tal\napps/dryer_chime/manifest.toml","thread":"thread-repl-9","history":["user: why is act_42 suspended?","assistant: act_42 is suspended due to red_alert preemption.","user: a tal app that rings a chime when the dryer beeps","assistant: apps/dryer_chime/main.tal\\napps/dryer_chime/manifest.toml"]}`))
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6","description":"a tal app that rings a chime when the dryer beeps","output":"apps/dryer_chime/main.tal\napps/dryer_chime/manifest.toml","thread":"thread-repl-9","history":["user: why is act_42 suspended?","assistant: act_42 is suspended due to red_alert preemption.","user: a tal app that rings a chime when the dryer beeps","assistant: apps/dryer_chime/main.tal\\napps/dryer_chime/manifest.toml"],"proposed_command":"app reload sound_watch","proposal_summary":"Reload sound_watch to pick up the generated bundle"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/store/put":
+			storePutCalls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/apps/reload":
+			appReloadCalls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","version":"1.2.3"}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/repl/ai/context":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"session_id":"repl-9","pinned":["claims:tree"]}`))
@@ -305,7 +315,7 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 	}))
 	defer admin.Close()
 
-	in := strings.NewReader("ai providers\nai models ollama\nai use openrouter anthropic/claude-sonnet-4-6\nai status\nai ask why is act_42 suspended?\nai gen a tal app that rings a chime when the dryer beeps\nai context\nai context add devices:ls\nai context pin devices:ls\nai context unpin devices:ls\nai context clear\nai policy show\nai policy set prompt-all\nai history\nai reset\nexit\n")
+	in := strings.NewReader("ai providers\nai models ollama\nai use openrouter anthropic/claude-sonnet-4-6\nai status\nai ask why is act_42 suspended?\nai approve\nai gen a tal app that rings a chime when the dryer beeps\nai reject\nai context\nai context add devices:ls\nai context pin devices:ls\nai context unpin devices:ls\nai context clear\nai policy show\nai policy set prompt-all\nai history\nai reset\nexit\n")
 	var out bytes.Buffer
 
 	err := Run(context.Background(), in, &out, Options{
@@ -332,8 +342,23 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 	if !strings.Contains(text, "answer:") || !strings.Contains(text, "red_alert preemption") {
 		t.Fatalf("missing ai ask output: %q", text)
 	}
+	if !strings.Contains(text, "pending proposal (ai): store put notes ai_key ai_value") {
+		t.Fatalf("missing pending proposal output for ai ask: %q", text)
+	}
+	if !strings.Contains(text, "approve? (ai approve / ai run / ai reject)") {
+		t.Fatalf("missing approval prompt output: %q", text)
+	}
+	if !strings.Contains(text, "OK  approved pending command: store put notes ai_key ai_value") {
+		t.Fatalf("missing ai approve output: %q", text)
+	}
+	if !strings.Contains(text, "OK  stored") {
+		t.Fatalf("missing approved command output: %q", text)
+	}
 	if !strings.Contains(text, "generated:") || !strings.Contains(text, "apps/dryer_chime/main.tal") {
 		t.Fatalf("missing ai gen output: %q", text)
+	}
+	if !strings.Contains(text, "OK  rejected pending command: app reload sound_watch") {
+		t.Fatalf("missing ai reject output: %q", text)
 	}
 	if !strings.Contains(text, "pinned:") {
 		t.Fatalf("missing ai context output: %q", text)
@@ -352,6 +377,34 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "cleared AI thread and exchange history") {
 		t.Fatalf("missing ai reset output: %q", text)
+	}
+	if storePutCalls != 1 {
+		t.Fatalf("store put call count = %d, want 1", storePutCalls)
+	}
+	if appReloadCalls != 0 {
+		t.Fatalf("app reload call count = %d, want 0", appReloadCalls)
+	}
+}
+
+func TestAIApproveRejectRequirePendingProposal(t *testing.T) {
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		http.NotFound(w, req)
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("ai approve\nai run\nai reject\nexit\n")
+	var out bytes.Buffer
+	err := Run(context.Background(), in, &out, Options{
+		Prompt:       "repl>",
+		AdminBaseURL: admin.URL,
+		SessionID:    "repl-9",
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	text := out.String()
+	if strings.Count(text, "no pending AI proposal (run ai ask/ai gen first)") != 3 {
+		t.Fatalf("expected missing pending message for approve/run/reject, got: %q", text)
 	}
 }
 

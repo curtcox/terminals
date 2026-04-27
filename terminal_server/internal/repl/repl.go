@@ -189,6 +189,9 @@ func replCommandSpecs() []commandSpec {
 		{Name: "ai status", Usage: "ai status [--json]", Summary: "Show current provider/model selection for this session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai ask", Usage: "ai ask <prompt> [--json]", Summary: "Ask the configured AI provider a question", Classification: commandOperational, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai gen", Usage: "ai gen <description> [--json]", Summary: "Generate text/code from the configured AI provider", Classification: commandOperational, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai run", Usage: "ai run [--json]", Summary: "Execute the pending AI-proposed command (alias of ai approve)", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai approve", Usage: "ai approve [--json]", Summary: "Approve and execute the pending AI-proposed command", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai reject", Usage: "ai reject [--json]", Summary: "Reject and clear the pending AI-proposed command", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai context", Usage: "ai context [--json]", Summary: "Show pinned AI context refs", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai context add", Usage: "ai context add <ref> [--json]", Summary: "Add one-shot AI context for the next turn", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai context pin", Usage: "ai context pin <ref> [--json]", Summary: "Pin AI context across turns", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
@@ -269,6 +272,13 @@ type state struct {
 	client   *http.Client
 	docsMode DocsRenderMode
 	docsRoot string
+	pending  *pendingAIProposal
+}
+
+type pendingAIProposal struct {
+	Command string
+	Summary string
+	Source  string
 }
 
 func newStateWithDocsMode(out io.Writer, adminBaseURL, sessionID string, docsMode DocsRenderMode) *state {
@@ -2798,6 +2808,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if err != nil {
 				return err
 			}
+			s.capturePendingAIProposal(body)
 			if jsonOut {
 				return writeJSON(s.out, body)
 			}
@@ -2822,6 +2833,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			if err != nil {
 				return err
 			}
+			s.capturePendingAIProposal(body)
 			if jsonOut {
 				return writeJSON(s.out, body)
 			}
@@ -2829,6 +2841,43 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return err
 			}
 			_, err = fmt.Fprintf(s.out, "generated:\n%s\n", toString(body["output"]))
+			return err
+		case "run", "approve":
+			pending := s.pending
+			if pending == nil || strings.TrimSpace(pending.Command) == "" {
+				return errors.New("no pending AI proposal (run ai ask/ai gen first)")
+			}
+			command := strings.TrimSpace(pending.Command)
+			s.pending = nil
+			if jsonOut {
+				if err := writeJSON(s.out, map[string]any{"status": "approved", "command": command}); err != nil {
+					return err
+				}
+			}
+			if _, err := fmt.Fprintf(s.out, "OK  approved pending command: %s\n", command); err != nil {
+				return err
+			}
+			exit, err := s.eval(ctx, command)
+			if err != nil {
+				return err
+			}
+			if exit {
+				_, err = fmt.Fprintln(s.out, "warning: approved command requested REPL exit and was ignored")
+				return err
+			}
+			return nil
+		case "reject":
+			pending := s.pending
+			if pending == nil || strings.TrimSpace(pending.Command) == "" {
+				return errors.New("no pending AI proposal (run ai ask/ai gen first)")
+			}
+			s.pending = nil
+			if jsonOut {
+				if err := writeJSON(s.out, map[string]any{"status": "rejected", "command": pending.Command}); err != nil {
+					return err
+				}
+			}
+			_, err := fmt.Fprintf(s.out, "OK  rejected pending command: %s\n", pending.Command)
 			return err
 		case "context":
 			if strings.TrimSpace(s.session) == "" {
@@ -3021,6 +3070,37 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 	default:
 		return fmt.Errorf("unsupported command group: %s", group)
 	}
+}
+
+func (s *state) capturePendingAIProposal(body map[string]any) {
+	command := strings.TrimSpace(toString(lookupMapAny(body,
+		"proposed_command",
+		"pending_command",
+		"proposal_command",
+		"approval_command",
+	)))
+	if command == "" {
+		s.pending = nil
+		return
+	}
+	summary := strings.TrimSpace(toString(lookupMapAny(body,
+		"proposal_summary",
+		"pending_summary",
+		"approval_summary",
+	)))
+	source := strings.TrimSpace(toString(lookupMapAny(body,
+		"proposal_source",
+		"pending_source",
+	)))
+	if source == "" || source == "<nil>" {
+		source = "ai"
+	}
+	s.pending = &pendingAIProposal{Command: command, Summary: summary, Source: source}
+	_, _ = fmt.Fprintf(s.out, "pending proposal (%s): %s\n", source, command)
+	if summary != "" {
+		_, _ = fmt.Fprintf(s.out, "summary: %s\n", summary)
+	}
+	_, _ = fmt.Fprintln(s.out, "approve? (ai approve / ai run / ai reject)")
 }
 
 func (s *state) fetchJSON(ctx context.Context, route string) (map[string]any, error) {
