@@ -1035,6 +1035,72 @@ func TestStoreBindAndBusTailLimitValidation(t *testing.T) {
 	}
 }
 
+func TestCohortEndpointsCRUDAndMembers(t *testing.T) {
+	h := testHandler(t)
+
+	placementReq := httptest.NewRequest(http.MethodPost, "/admin/api/devices/placement", strings.NewReader(url.Values{
+		"device_id": {"d1"},
+		"zone":      {"kitchen"},
+		"roles":     {"screen"},
+	}.Encode()))
+	placementReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	placementW := httptest.NewRecorder()
+	h.ServeHTTP(placementW, placementReq)
+	if placementW.Code != http.StatusOK {
+		t.Fatalf("placement status = %d, want 200 body=%s", placementW.Code, placementW.Body.String())
+	}
+
+	upsertReq := httptest.NewRequest(http.MethodPost, "/admin/api/cohort/upsert", strings.NewReader(url.Values{
+		"name":      {"Family-Screens"},
+		"selectors": {"zone:kitchen,role:screen"},
+	}.Encode()))
+	upsertReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	upsertW := httptest.NewRecorder()
+	h.ServeHTTP(upsertW, upsertReq)
+	if upsertW.Code != http.StatusOK {
+		t.Fatalf("cohort upsert status = %d, want 200 body=%s", upsertW.Code, upsertW.Body.String())
+	}
+	if !strings.Contains(upsertW.Body.String(), `"name":"family-screens"`) {
+		t.Fatalf("cohort upsert body missing normalized name: %s", upsertW.Body.String())
+	}
+	if !strings.Contains(upsertW.Body.String(), `"members":["d1"]`) {
+		t.Fatalf("cohort upsert body missing resolved members: %s", upsertW.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/admin/api/cohort", nil)
+	listW := httptest.NewRecorder()
+	h.ServeHTTP(listW, listReq)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("cohort list status = %d, want 200 body=%s", listW.Code, listW.Body.String())
+	}
+	if !strings.Contains(listW.Body.String(), `"family-screens"`) {
+		t.Fatalf("cohort list body missing family-screens: %s", listW.Body.String())
+	}
+
+	showReq := httptest.NewRequest(http.MethodGet, "/admin/api/cohort?name=family-screens", nil)
+	showW := httptest.NewRecorder()
+	h.ServeHTTP(showW, showReq)
+	if showW.Code != http.StatusOK {
+		t.Fatalf("cohort show status = %d, want 200 body=%s", showW.Code, showW.Body.String())
+	}
+	if !strings.Contains(showW.Body.String(), `"members":["d1"]`) {
+		t.Fatalf("cohort show body missing members: %s", showW.Body.String())
+	}
+
+	delReq := httptest.NewRequest(http.MethodPost, "/admin/api/cohort/del", strings.NewReader(url.Values{
+		"name": {"family-screens"},
+	}.Encode()))
+	delReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	delW := httptest.NewRecorder()
+	h.ServeHTTP(delW, delReq)
+	if delW.Code != http.StatusOK {
+		t.Fatalf("cohort delete status = %d, want 200 body=%s", delW.Code, delW.Body.String())
+	}
+	if !strings.Contains(delW.Body.String(), `"deleted":true`) {
+		t.Fatalf("cohort delete body missing deleted=true: %s", delW.Body.String())
+	}
+}
+
 func createTestAppPackage(t *testing.T, name, version string) string {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), name)

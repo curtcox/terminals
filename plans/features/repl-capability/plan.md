@@ -33,7 +33,15 @@ layering, acceptance rules, and authoring substrate.
   `store ns ls`, `store del`, `store watch`, and `store bind`
   (REPL + admin API + capability service), plus filtered
   `bus tail` and windowed `bus replay`.
-- Next planned slice is Phase 2 (`ui` authoring and `devices cohort`).
+- Phase 2 cohort slice shipped in code: named `cohort` CRUD
+  (`cohort ls|show|put|del`) is now wired through REPL, admin API,
+  and capability service, with dynamic member resolution against live
+  device metadata selectors.
+- Added focused coverage for capability service cohort semantics,
+  admin cohort endpoints, and REPL command routing.
+- Next planned slice is Phase 2 `ui` authoring (`UiService`
+  push/patch/transition/broadcast/subscribe/snapshot and authored
+  view inventory).
 
 ## Problem
 

@@ -184,6 +184,13 @@ type StoreNamespaceSummary struct {
 	RecordCount int    `json:"record_count"`
 }
 
+// DeviceCohort represents a reusable named selector set for device targeting.
+type DeviceCohort struct {
+	Name      string    `json:"name"`
+	Selectors []string  `json:"selectors,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // BusEvent represents a named event emitted on the internal event bus.
 type BusEvent struct {
 	ID        string    `json:"id"`
@@ -213,6 +220,7 @@ type Service struct {
 	recent       []RecentItem
 	store        map[string]StoreRecord
 	bus          []BusEvent
+	cohorts      map[string]DeviceCohort
 	acks         map[string]Acknowledgement
 }
 
@@ -222,6 +230,7 @@ func NewService() *Service {
 	s := &Service{
 		now:       func() time.Time { return now().UTC() },
 		store:     map[string]StoreRecord{},
+		cohorts:   map[string]DeviceCohort{},
 		acks:      map[string]Acknowledgement{},
 		versions:  map[string][]ArtifactVersion{},
 		templates: map[string]ArtifactTemplate{},
@@ -1329,6 +1338,60 @@ func (s *Service) ListRecent() []RecentItem {
 	return append([]RecentItem(nil), s.recent...)
 }
 
+// CohortUpsert creates or updates one named device cohort.
+func (s *Service) CohortUpsert(name string, selectors []string) DeviceCohort {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.ToLower(strings.TrimSpace(name))
+	cohort := DeviceCohort{
+		Name:      name,
+		Selectors: normalizeSelectors(selectors),
+		UpdatedAt: s.now(),
+	}
+	s.cohorts[name] = cohort
+	s.appendRecentLocked("cohort", name+" upsert")
+	return cohort
+}
+
+// CohortGet returns one cohort by name.
+func (s *Service) CohortGet(name string) (DeviceCohort, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cohort, ok := s.cohorts[strings.ToLower(strings.TrimSpace(name))]
+	if !ok {
+		return DeviceCohort{}, false
+	}
+	cohort.Selectors = append([]string(nil), cohort.Selectors...)
+	return cohort, true
+}
+
+// CohortList returns all cohorts sorted by name.
+func (s *Service) CohortList() []DeviceCohort {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cohorts := make([]DeviceCohort, 0, len(s.cohorts))
+	for _, cohort := range s.cohorts {
+		copyCohort := cohort
+		copyCohort.Selectors = append([]string(nil), cohort.Selectors...)
+		cohorts = append(cohorts, copyCohort)
+	}
+	sort.Slice(cohorts, func(i, j int) bool { return cohorts[i].Name < cohorts[j].Name })
+	return cohorts
+}
+
+// CohortDelete removes one cohort by name.
+func (s *Service) CohortDelete(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name = strings.ToLower(strings.TrimSpace(name))
+	if _, ok := s.cohorts[name]; !ok {
+		return false
+	}
+	delete(s.cohorts, name)
+	s.appendRecentLocked("cohort", name+" deleted")
+	return true
+}
+
 // StorePut sets a key/value record in the given namespace.
 // ttl <= 0 means the record does not expire.
 func (s *Service) StorePut(namespace, key, value string, ttl time.Duration) StoreRecord {
@@ -1637,6 +1700,27 @@ func normalizedTokens(value string) []string {
 		seen[field] = struct{}{}
 		out = append(out, field)
 	}
+	return out
+}
+
+func normalizeSelectors(selectors []string) []string {
+	if len(selectors) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(selectors))
+	seen := make(map[string]struct{}, len(selectors))
+	for _, selector := range selectors {
+		normalized := strings.ToLower(strings.TrimSpace(selector))
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+	sort.Strings(out)
 	return out
 }
 

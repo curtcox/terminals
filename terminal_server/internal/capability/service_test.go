@@ -20,6 +20,45 @@ func TestResolveAudienceByGroupAndAlias(t *testing.T) {
 	}
 }
 
+func TestCohortCRUDAndNormalization(t *testing.T) {
+	svc := NewService()
+
+	created := svc.CohortUpsert("Family-Screens", []string{"zone:kitchen", " role:screen ", "ZONE:KITCHEN"})
+	if created.Name != "family-screens" {
+		t.Fatalf("CohortUpsert name = %q, want family-screens", created.Name)
+	}
+	if len(created.Selectors) != 2 || created.Selectors[0] != "role:screen" || created.Selectors[1] != "zone:kitchen" {
+		t.Fatalf("CohortUpsert selectors = %+v, want [role:screen zone:kitchen]", created.Selectors)
+	}
+
+	fetched, ok := svc.CohortGet("FAMILY-SCREENS")
+	if !ok {
+		t.Fatalf("CohortGet(FAMILY-SCREENS) = not found")
+	}
+	if fetched.Name != created.Name {
+		t.Fatalf("CohortGet name = %q, want %q", fetched.Name, created.Name)
+	}
+
+	svc.CohortUpsert("kitchen-only", []string{"zone:kitchen"})
+	list := svc.CohortList()
+	if len(list) != 2 {
+		t.Fatalf("len(CohortList()) = %d, want 2", len(list))
+	}
+	if list[0].Name != "family-screens" || list[1].Name != "kitchen-only" {
+		t.Fatalf("CohortList order = %+v, want [family-screens kitchen-only]", []string{list[0].Name, list[1].Name})
+	}
+
+	if deleted := svc.CohortDelete("family-screens"); !deleted {
+		t.Fatalf("CohortDelete(family-screens) = false, want true")
+	}
+	if _, ok := svc.CohortGet("family-screens"); ok {
+		t.Fatalf("CohortGet(family-screens) should not exist after delete")
+	}
+	if deleted := svc.CohortDelete("family-screens"); deleted {
+		t.Fatalf("second CohortDelete should return false")
+	}
+}
+
 func TestIdentityLookupGroupsPreferencesAndAcknowledgements(t *testing.T) {
 	svc := NewService()
 

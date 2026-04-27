@@ -112,6 +112,10 @@ func replCommandSpecs() []commandSpec {
 		{Name: "memory recall", Usage: "memory recall <text> [--json]", Summary: "Recall memory entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
 		{Name: "memory stream", Usage: "memory stream [scope] [--json]", Summary: "Show memory stream entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
 		{Name: "placement ls", Usage: "placement ls [--json]", Summary: "List placement metadata", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/placement"}},
+		{Name: "cohort ls", Usage: "cohort ls [--json]", Summary: "List named device cohorts", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/cohort"}},
+		{Name: "cohort show", Usage: "cohort show <name> [--json]", Summary: "Show one cohort with resolved members", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/cohort"}},
+		{Name: "cohort put", Usage: "cohort put <name> --selectors <selector[,selector...]> [--json]", Summary: "Create or update a named device cohort", Classification: commandMutating, RelatedDocs: []string{"repl/commands/cohort"}},
+		{Name: "cohort del", Usage: "cohort del <name> [--json]", Summary: "Delete a named device cohort", Classification: commandMutating, RelatedDocs: []string{"repl/commands/cohort"}},
 		{Name: "recent ls", Usage: "recent ls [--json]", Summary: "List recent activity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/recent"}},
 		{Name: "store ns ls", Usage: "store ns ls [--json]", Summary: "List store namespaces", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "store put", Usage: "store put <namespace> <key> <value> [--ttl <duration>] [--json]", Summary: "Write typed key-value state", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
@@ -301,7 +305,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "recent", "store", "bus", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
+	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "recent", "store", "bus", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -1311,6 +1315,82 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			return err
 		}
 		return writeJSON(s.out, body)
+	case "cohort":
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/cohort")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			items, _ := body["cohorts"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				selectors := ""
+				if values, ok := row["selectors"].([]any); ok {
+					parts := make([]string, 0, len(values))
+					for _, value := range values {
+						parts = append(parts, toString(value))
+					}
+					selectors = strings.Join(parts, ",")
+				}
+				rows = append(rows, []string{toString(row["name"]), selectors})
+			}
+			return printTable(s.out, []string{"COHORT", "SELECTORS"}, rows)
+		case "show":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: cohort show <name>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/cohort", url.Values{"name": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "put":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--selectors")
+			if len(plain) < 1 {
+				return errors.New("usage: cohort put <name> --selectors <selector[,selector...]>")
+			}
+			selectors := strings.TrimSpace(flagValue(args[1:], "--selectors"))
+			if selectors == "" {
+				return errors.New("usage: cohort put <name> --selectors <selector[,selector...]>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/cohort/upsert", url.Values{
+				"name":      {plain[0]},
+				"selectors": {selectors},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  cohort=%s selectors=%s\n", plain[0], selectors)
+			return err
+		case "del":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: cohort del <name>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/cohort/del", url.Values{"name": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  deleted=%s cohort=%s\n", toString(body["deleted"]), plain[0])
+			return err
+		default:
+			return fmt.Errorf("unknown command: cohort %s", sub)
+		}
 	case "recent":
 		if sub != "ls" {
 			return fmt.Errorf("unknown command: recent %s", sub)

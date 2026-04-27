@@ -328,6 +328,10 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"memory remember",
 		"memory stream",
 		"placement ls",
+		"cohort ls",
+		"cohort show",
+		"cohort put",
+		"cohort del",
 		"recent ls",
 		"store ns ls",
 		"store put",
@@ -551,6 +555,14 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"memories":[{"id":"mem-1","scope":"kitchen"}]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/placement":
 			_, _ = w.Write([]byte(`{"placements":[{"device_id":"d1","zone":"kitchen"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/cohort" && req.URL.Query().Get("name") == "":
+			_, _ = w.Write([]byte(`{"cohorts":[{"name":"family-screens","selectors":["role:screen","zone:kitchen"]}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/cohort" && req.URL.Query().Get("name") == "family-screens":
+			_, _ = w.Write([]byte(`{"cohort":{"name":"family-screens","selectors":["role:screen","zone:kitchen"]},"members":["d1"]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/cohort/upsert":
+			_, _ = w.Write([]byte(`{"status":"ok","cohort":{"name":"family-screens","selectors":["role:screen","zone:kitchen"]},"members":["d1"]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/cohort/del":
+			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/recent":
 			_, _ = w.Write([]byte(`{"items":[{"id":"evt-1","kind":"message"}]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/store/ns":
@@ -608,6 +620,10 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"memory remember kitchen milk",
 		"memory stream kitchen",
 		"placement ls",
+		"cohort ls",
+		"cohort show family-screens",
+		"cohort put family-screens --selectors zone:kitchen,role:screen",
+		"cohort del family-screens",
 		"recent ls",
 		"store ns ls",
 		"store put notes key1 value1",
@@ -695,6 +711,18 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "evt-1") {
 		t.Fatalf("recent output missing: %q", text)
+	}
+	if !strings.Contains(text, "family-screens") {
+		t.Fatalf("cohort output missing cohort name: %q", text)
+	}
+	if !strings.Contains(text, "\"members\": [\n    \"d1\"\n  ]") && !strings.Contains(text, `"members":["d1"]`) {
+		t.Fatalf("cohort show output missing members payload: %q", text)
+	}
+	if !strings.Contains(text, "selectors=zone:kitchen,role:screen") {
+		t.Fatalf("cohort put output missing selectors summary: %q", text)
+	}
+	if !strings.Contains(text, "cohort=family-screens") {
+		t.Fatalf("cohort delete output missing cohort summary: %q", text)
 	}
 	if !strings.Contains(text, "notes") {
 		t.Fatalf("store namespace output missing: %q", text)

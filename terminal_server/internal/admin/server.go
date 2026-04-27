@@ -152,6 +152,9 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/memory/stream", h.handleMemoryStream)
 	mux.HandleFunc("/admin/api/memory/remember", h.handleMemoryRemember)
 	mux.HandleFunc("/admin/api/placement", h.handlePlacement)
+	mux.HandleFunc("/admin/api/cohort", h.handleCohorts)
+	mux.HandleFunc("/admin/api/cohort/upsert", h.handleCohortUpsert)
+	mux.HandleFunc("/admin/api/cohort/del", h.handleCohortDelete)
 	mux.HandleFunc("/admin/api/recent", h.handleRecent)
 	mux.HandleFunc("/admin/api/world/calibration", h.handleWorldCalibration)
 	mux.HandleFunc("/admin/api/world/verify", h.handleWorldVerify)
@@ -907,6 +910,68 @@ func (h *Handler) handlePlacement(w http.ResponseWriter, req *http.Request) {
 	h.writeJSON(w, http.StatusOK, map[string]any{"placements": placements})
 }
 
+func (h *Handler) handleCohorts(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	name := strings.TrimSpace(req.URL.Query().Get("name"))
+	if name == "" {
+		h.writeJSON(w, http.StatusOK, map[string]any{"cohorts": h.capability.CohortList()})
+		return
+	}
+	cohort, ok := h.capability.CohortGet(name)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "cohort not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"cohort":  cohort,
+		"members": h.resolveCohortMembers(cohort.Selectors),
+	})
+}
+
+func (h *Handler) handleCohortUpsert(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	name := strings.TrimSpace(req.Form.Get("name"))
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	selectors := parseSelectors(req.Form.Get("selectors"))
+	cohort := h.capability.CohortUpsert(name, selectors)
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"cohort":  cohort,
+		"members": h.resolveCohortMembers(cohort.Selectors),
+	})
+}
+
+func (h *Handler) handleCohortDelete(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	name := strings.TrimSpace(req.Form.Get("name"))
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	deleted := h.capability.CohortDelete(name)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
+}
+
 func (h *Handler) handleRecent(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1622,6 +1687,93 @@ func normalizeDeviceIDs(deviceIDs []string) []string {
 		out = append(out, deviceID)
 	}
 	return out
+}
+
+func parseSelectors(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
+}
+
+func (h *Handler) resolveCohortMembers(selectors []string) []string {
+	devices := h.devices.List()
+	members := make([]string, 0, len(devices))
+	for _, d := range devices {
+		if deviceMatchesSelectors(d, selectors) {
+			members = append(members, d.DeviceID)
+		}
+	}
+	sort.Strings(members)
+	return members
+}
+
+func deviceMatchesSelectors(d device.Device, selectors []string) bool {
+	for _, selector := range selectors {
+		selector = strings.ToLower(strings.TrimSpace(selector))
+		if selector == "" {
+			continue
+		}
+		key, value, ok := strings.Cut(selector, ":")
+		if !ok || strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+			return false
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		switch key {
+		case "id", "device":
+			if !strings.EqualFold(d.DeviceID, value) {
+				return false
+			}
+		case "zone":
+			if !strings.EqualFold(d.Placement.Zone, value) {
+				return false
+			}
+		case "role":
+			matched := false
+			for _, role := range d.Placement.Roles {
+				if strings.EqualFold(role, value) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return false
+			}
+		case "platform":
+			if !strings.EqualFold(d.Platform, value) {
+				return false
+			}
+		case "type":
+			if !strings.EqualFold(d.DeviceType, value) {
+				return false
+			}
+		case "state":
+			if !strings.EqualFold(string(d.State), value) {
+				return false
+			}
+		case "mobility":
+			if !strings.EqualFold(d.Placement.Mobility, value) {
+				return false
+			}
+		case "affinity":
+			if !strings.EqualFold(d.Placement.Affinity, value) {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (h *Handler) writeJSONError(w http.ResponseWriter, status int, message string) {
