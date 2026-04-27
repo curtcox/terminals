@@ -242,3 +242,43 @@ func TestUseCaseP2SessionMobilityAndCoexistence(t *testing.T) {
 		t.Fatalf("expected detached device mapping removed")
 	}
 }
+
+func TestUseCaseP4StickyAISelectionSurvivesDetachReattach(t *testing.T) {
+	svc := NewService(terminal.NewManager())
+	ctx := context.Background()
+
+	created, err := svc.CreateSession(ctx, CreateSessionRequest{DeviceID: "device-a"})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	sessionID := created.Session.ID
+	defer func() {
+		_, _ = svc.TerminateSession(ctx, TerminateSessionRequest{SessionID: sessionID})
+	}()
+
+	if err := svc.SetSelection(sessionID, "openrouter", "anthropic/claude-sonnet-4-6"); err != nil {
+		t.Fatalf("SetSelection() error = %v", err)
+	}
+
+	if _, err := svc.DetachSession(ctx, DetachSessionRequest{SessionID: sessionID, DeviceID: "device-a"}); err != nil {
+		t.Fatalf("DetachSession() error = %v", err)
+	}
+	if _, ok := svc.SessionIDForDevice("device-a"); ok {
+		t.Fatalf("expected detached device mapping removed")
+	}
+
+	if _, err := svc.AttachSession(ctx, AttachSessionRequest{SessionID: sessionID, DeviceID: "device-b"}); err != nil {
+		t.Fatalf("AttachSession() error = %v", err)
+	}
+	if mapped, ok := svc.SessionIDForDevice("device-b"); !ok || mapped != sessionID {
+		t.Fatalf("SessionIDForDevice(device-b) = %q,%v want %q,true", mapped, ok, sessionID)
+	}
+
+	provider, model, err := svc.GetSelection(sessionID)
+	if err != nil {
+		t.Fatalf("GetSelection() error = %v", err)
+	}
+	if provider != "openrouter" || model != "anthropic/claude-sonnet-4-6" {
+		t.Fatalf("selection after reattach = %s/%s, want openrouter/anthropic/claude-sonnet-4-6", provider, model)
+	}
+}
