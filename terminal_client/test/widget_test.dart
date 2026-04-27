@@ -804,6 +804,59 @@ void main() {
     },
   );
 
+  testWidgets(
+    'stale capability generation error triggers forced capability snapshot rebaseline',
+    (WidgetTester tester) async {
+      final harness = _FakeClientHarness();
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+        ),
+      );
+
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverId = 'test-server'
+            ..message = 'registered'),
+      );
+      await tester.pumpAndSettle();
+
+      final snapshotsBeforeError = harness.lastClient.requests
+          .where((request) => request.hasCapabilitySnapshot())
+          .toList();
+      expect(snapshotsBeforeError.length, 1);
+      final baselineGeneration =
+          snapshotsBeforeError.single.capabilitySnapshot.generation.toInt();
+
+      harness.lastClient.emitResponse(
+        ConnectResponse()
+          ..error = (ControlError()
+            ..code = ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION
+            ..message = 'stale capability generation: expected newer'),
+      );
+      await tester.pumpAndSettle();
+
+      final snapshotsAfterError = harness.lastClient.requests
+          .where((request) => request.hasCapabilitySnapshot())
+          .toList();
+      expect(snapshotsAfterError.length, 2);
+      final rebaselineGeneration =
+          snapshotsAfterError.last.capabilitySnapshot.generation.toInt();
+      expect(rebaselineGeneration, greaterThan(baselineGeneration));
+
+      final deltas = harness.lastClient.requests
+          .where((request) => request.hasCapabilityDelta())
+          .map((request) => request.capabilityDelta)
+          .where((delta) => delta.reason == 'stale_generation_rebaseline')
+          .toList();
+      expect(deltas, isEmpty);
+    },
+  );
+
   testWidgets('sends periodic sensor telemetry for declared signals only', (
     WidgetTester tester,
   ) async {
