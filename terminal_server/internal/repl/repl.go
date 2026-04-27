@@ -169,6 +169,11 @@ func replCommandSpecs() []commandSpec {
 		{Name: "apps keys confirm", Usage: "apps keys confirm <key-id> [--json]", Summary: "Confirm a candidate key", Classification: commandCriticalMutating},
 		{Name: "apps keys revoke", Usage: "apps keys revoke <key-id> [reason]", Summary: "Revoke a key", Classification: commandCriticalMutating},
 		{Name: "apps keys archive", Usage: "apps keys archive <key-id> [--json]", Summary: "Archive a non-active key", Classification: commandMutating},
+		{Name: "apps keys rotate --accept", Usage: "apps keys rotate --accept <rotation-json>", Summary: "Accept a key rotation (both statements required)", Classification: commandCriticalMutating},
+		{Name: "apps keys rotate --rollback", Usage: "apps keys rotate --rollback <accepted-seq>", Summary: "Roll back a key rotation by accepted-seq", Classification: commandCriticalMutating},
+		{Name: "apps keys rotate --emit", Usage: "apps keys rotate --emit <old-key-id> <new-key-id> [name ...]", Summary: "Print unsigned rotation statement template", Classification: commandReadOnly},
+		{Name: "apps keys rotate-installer", Usage: "apps keys rotate-installer", Summary: "Generate a new installer key pair and rotate", Classification: commandCriticalMutating},
+		{Name: "apps keys rotations", Usage: "apps keys rotations [--json]", Summary: "List all rotation records", Classification: commandReadOnly},
 		{Name: "apps keys verify", Usage: "apps keys verify [--json]", Summary: "Verify trust log chain integrity", Classification: commandReadOnly},
 		{Name: "apps keys log", Usage: "apps keys log [--json]", Summary: "Show trust log entries", Classification: commandReadOnly},
 		{Name: "config show", Usage: "config show [--json]", Summary: "Show effective config", Classification: commandReadOnly},
@@ -2361,7 +2366,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		switch sub {
 		case "keys":
 			if len(args) == 0 {
-				return errors.New("usage: apps keys <ls|show|add|confirm|revoke|archive|verify|log>")
+				return errors.New("usage: apps keys <ls|show|add|confirm|revoke|archive|rotate|rotate-installer|rotations|verify|log>")
 			}
 			keySub := strings.TrimSpace(args[0])
 			switch keySub {
@@ -2487,6 +2492,94 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 					return err
 				}
 				return writeJSON(s.out, body)
+			case "rotations":
+				body, err := s.fetchJSON(ctx, "/admin/api/trust/rotations")
+				if err != nil {
+					return err
+				}
+				return writeJSON(s.out, body)
+			case "rotate":
+				if len(args) < 2 {
+					return errors.New("usage: apps keys rotate <--accept <json> | --rollback <seq> | --emit <old-key> <new-key> [names...]>")
+				}
+				flag := strings.TrimSpace(args[1])
+				switch flag {
+				case "--accept":
+					if len(args) < 3 {
+						return errors.New("usage: apps keys rotate --accept <rotation-json>")
+					}
+					rotJSON := strings.TrimSpace(args[2])
+					var payload map[string]any
+					if err := json.Unmarshal([]byte(rotJSON), &payload); err != nil {
+						return fmt.Errorf("apps keys rotate --accept: invalid JSON: %w", err)
+					}
+					body, err := s.postJSON(ctx, "/admin/api/trust/keys/rotate", payload)
+					if err != nil {
+						return err
+					}
+					if jsonOut {
+						return writeJSON(s.out, body)
+					}
+					_, err = fmt.Fprintf(s.out, "OK  old_key=%s new_key=%s accepted_seq=%v\n",
+						toString(body["old_key"]), toString(body["new_key"]), body["accepted_seq"])
+					return err
+				case "--rollback":
+					if len(args) < 3 {
+						return errors.New("usage: apps keys rotate --rollback <accepted-seq>")
+					}
+					seqStr := strings.TrimSpace(args[2])
+					var seq float64
+					if _, err := fmt.Sscanf(seqStr, "%f", &seq); err != nil {
+						return fmt.Errorf("apps keys rotate --rollback: invalid seq %q", seqStr)
+					}
+					body, err := s.postJSON(ctx, "/admin/api/trust/keys/rotate/rollback", map[string]any{"accepted_seq": int64(seq)})
+					if err != nil {
+						return err
+					}
+					if jsonOut {
+						return writeJSON(s.out, body)
+					}
+					_, err = fmt.Fprintf(s.out, "OK  rolled_back_seq=%v\n", body["rolled_back_seq"])
+					return err
+				case "--emit":
+					if len(args) < 4 {
+						return errors.New("usage: apps keys rotate --emit <old-key-id> <new-key-id> [name ...]")
+					}
+					oldKey := strings.TrimSpace(args[2])
+					newKey := strings.TrimSpace(args[3])
+					names := args[4:]
+					tmpl := map[string]any{
+						"old_stmt": map[string]any{
+							"schema":      "rotation-stmt/1",
+							"old_key":     oldKey,
+							"new_key":     newKey,
+							"proposed_at": "<unix-seconds>",
+							"name_scope":  names,
+							"reason":      "<optional>",
+							"sig_old":     "<base64: signature by old_key over canonical JSON of old_stmt fields>",
+						},
+						"new_stmt": map[string]any{
+							"schema":              "rotation-stmt/1",
+							"old_key_stmt_digest": "<sha256 of serialised old_stmt payload>",
+							"new_key":             newKey,
+							"accept_at":           "<unix-seconds>",
+							"sig_new":             "<base64: signature by new_key over canonical JSON of new_stmt fields>",
+						},
+					}
+					return writeJSON(s.out, tmpl)
+				default:
+					return fmt.Errorf("unknown flag for apps keys rotate: %s", flag)
+				}
+			case "rotate-installer":
+				body, err := s.postJSON(ctx, "/admin/api/trust/keys/rotate-installer", map[string]any{})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  new_installer_key_id=%s\n", toString(body["new_installer_key_id"]))
+				return err
 			default:
 				return fmt.Errorf("unknown command: apps keys %s", keySub)
 			}

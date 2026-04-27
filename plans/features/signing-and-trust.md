@@ -1,7 +1,7 @@
 ---
 title: "Signing and Trust"
 kind: plan
-status: building
+status: shipped-untested
 owner: copilot
 validation: none
 last-reviewed: 2026-04-27

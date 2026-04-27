@@ -57,14 +57,15 @@ func (s *Service) appendLog(actor, op string, args map[string]any) *LogEntry {
 	thisHash := computeLogHash(seq, at, actor, op, args, prevHash)
 	sig := ed25519.Sign(s.installerPrv, []byte(thisHash))
 	e := &LogEntry{
-		Seq:          seq,
-		At:           at,
-		Actor:        actor,
-		Op:           op,
-		Args:         args,
-		PrevHash:     prevHash,
-		ThisHash:     thisHash,
-		InstallerSig: base64.StdEncoding.EncodeToString(sig),
+		Seq:            seq,
+		At:             at,
+		Actor:          actor,
+		Op:             op,
+		Args:           args,
+		PrevHash:       prevHash,
+		ThisHash:       thisHash,
+		InstallerSig:   base64.StdEncoding.EncodeToString(sig),
+		InstallerKeyID: "ed25519:" + base64.RawURLEncoding.EncodeToString(s.installerPub),
 	}
 	s.log = append(s.log, e)
 	return e
@@ -398,12 +399,31 @@ func (s *Service) VerifyChain() error {
 		if i > 0 && e.PrevHash != s.log[i-1].ThisHash {
 			return fmt.Errorf("trust: log chain broken at entry %d: prev_hash mismatch", i+1)
 		}
-		// Verify installer signature over this_hash.
+		// Verify installer signature over this_hash using the key that was active
+		// when the entry was appended (identified by InstallerKeyID).
 		sigBytes, err := base64.StdEncoding.DecodeString(e.InstallerSig)
 		if err != nil {
 			return fmt.Errorf("trust: log entry %d installer_sig is not valid base64: %w", i+1, err)
 		}
-		if !ed25519.Verify(s.installerPub, []byte(e.ThisHash), sigBytes) {
+		// Determine the public key for this entry.
+		var verifyPub ed25519.PublicKey
+		if e.InstallerKeyID == "" {
+			// Legacy entries without a key ID: use the current installer key.
+			verifyPub = s.installerPub
+		} else {
+			rec, ok := s.keys[e.InstallerKeyID]
+			if !ok {
+				// Fall back to parsing from the key ID itself.
+				parsed, parseErr := parseKeyID(e.InstallerKeyID)
+				if parseErr != nil {
+					return fmt.Errorf("trust: log entry %d references unknown installer key %s", i+1, e.InstallerKeyID)
+				}
+				verifyPub = parsed
+			} else {
+				verifyPub = rec.PubKey
+			}
+		}
+		if !ed25519.Verify(verifyPub, []byte(e.ThisHash), sigBytes) {
 			return fmt.Errorf("trust: log entry %d installer signature verification failed", i+1)
 		}
 	}
@@ -417,6 +437,132 @@ func (s *Service) LogEntries() []*LogEntry {
 	out := make([]*LogEntry, len(s.log))
 	for i, e := range s.log {
 		c := *e
+		out[i] = &c
+	}
+	return out
+}
+
+// RotateInstallerKey generates a new installer key pair, adds the old key to the
+// store as archived, and begins signing all future log entries with the new key.
+// The new installer key ID is returned.
+// This is a critical_mutating operation; the caller is responsible for enforcing
+// operator confirmation before calling.
+func (s *Service) RotateInstallerKey() (newKeyID string, err error) {
+	newPub, newPrv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", fmt.Errorf("trust: failed to generate new installer key: %w", err)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	oldKeyID := "ed25519:" + base64.RawURLEncoding.EncodeToString(s.installerPub)
+	newKeyIDStr := "ed25519:" + base64.RawURLEncoding.EncodeToString(newPub)
+
+	// Archive the old installer key in the key store.
+	if _, exists := s.keys[oldKeyID]; !exists {
+		s.keys[oldKeyID] = &KeyRecord{
+			KeyID:           oldKeyID,
+			Roles:           []string{"installer"},
+			State:           StateArchived,
+			FirstObservedAt: s.now().Unix(),
+			PubKey:          s.installerPub,
+		}
+	} else {
+		s.keys[oldKeyID].State = StateArchived
+	}
+
+	// Register the new installer key.
+	s.keys[newKeyIDStr] = &KeyRecord{
+		KeyID:           newKeyIDStr,
+		Roles:           []string{"installer"},
+		State:           StateActive,
+		FirstObservedAt: s.now().Unix(),
+		PubKey:          newPub,
+	}
+
+	// Log the rotation before switching keys (signed by the old key).
+	s.appendLog("operator", "installer.rotate", map[string]any{
+		"old_key": oldKeyID,
+		"new_key": newKeyIDStr,
+	})
+
+	// Switch to the new key for all future log entries.
+	s.installerPub = newPub
+	s.installerPrv = newPrv
+
+	return newKeyIDStr, nil
+}
+
+// RollbackRotation reverses an author-key rotation that was accepted at the given
+// log sequence number. The new key is moved to revoked and the old key is restored
+// to active, provided the old key is currently in state rotated and was accepted
+// at exactly acceptedSeq.
+// This is a critical_mutating operation; the caller is responsible for enforcing
+// operator confirmation before calling.
+func (s *Service) RollbackRotation(acceptedSeq int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var rot *RotationRecord
+	for _, r := range s.rotations {
+		if r.AcceptedSeq == acceptedSeq {
+			rot = r
+			break
+		}
+	}
+	if rot == nil {
+		return fmt.Errorf("trust: no rotation found with accepted_seq %d", acceptedSeq)
+	}
+	oldRec, ok := s.keys[rot.OldKeyID]
+	if !ok {
+		return fmt.Errorf("trust: old key %s not found after rollback lookup", rot.OldKeyID)
+	}
+	if oldRec.State != StateRotated {
+		return fmt.Errorf("trust: old key %s is in state %q, expected rotated; rollback not safe", rot.OldKeyID, oldRec.State)
+	}
+	newRec, ok := s.keys[rot.NewKeyID]
+	if !ok {
+		return fmt.Errorf("trust: new key %s not found after rollback lookup", rot.NewKeyID)
+	}
+
+	// Restore old key to active; revoke the new key.
+	oldRec.State = StateActive
+	newRec.State = StateRevoked
+
+	// Remove the lineage edges that were added by this rotation.
+	for _, lin := range s.lineage {
+		edges := lin.Edges[:0]
+		for _, e := range lin.Edges {
+			if e.AuthorKeyID == rot.NewKeyID && e.AddedAt == rot.AcceptedAt {
+				continue // remove this edge
+			}
+			edges = append(edges, e)
+		}
+		lin.Edges = edges
+	}
+
+	// Remove the rotation record.
+	filtered := s.rotations[:0]
+	for _, r := range s.rotations {
+		if r.AcceptedSeq != acceptedSeq {
+			filtered = append(filtered, r)
+		}
+	}
+	s.rotations = filtered
+
+	s.appendLog("operator", "keys.rotate.rollback", map[string]any{
+		"rolled_back_seq": acceptedSeq,
+		"old_key":         rot.OldKeyID,
+		"new_key":         rot.NewKeyID,
+	})
+	return nil
+}
+
+// Rotations returns a copy of all rotation records.
+func (s *Service) Rotations() []*RotationRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*RotationRecord, len(s.rotations))
+	for i, r := range s.rotations {
+		c := *r
 		out[i] = &c
 	}
 	return out

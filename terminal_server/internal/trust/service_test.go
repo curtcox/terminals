@@ -465,3 +465,115 @@ func TestRevokedKeyCannotRotate(t *testing.T) {
 	}
 	t.Logf("correctly rejected: %v", err)
 }
+
+// TestRotateInstallerKey verifies that a new installer key pair is generated,
+// the old key is archived, and future log entries are signed by the new key.
+func TestRotateInstallerKey(t *testing.T) {
+	svc := NewService()
+	oldKeyID := svc.InstallerKeyID()
+
+	newKeyID, err := svc.RotateInstallerKey()
+	if err != nil {
+		t.Fatalf("RotateInstallerKey: %v", err)
+	}
+	if newKeyID == oldKeyID {
+		t.Fatal("new installer key_id must differ from old")
+	}
+	if svc.InstallerKeyID() != newKeyID {
+		t.Errorf("InstallerKeyID() = %s, want %s", svc.InstallerKeyID(), newKeyID)
+	}
+
+	// Old key must be archived in the key store.
+	rec, err := svc.GetKey(oldKeyID)
+	if err != nil {
+		t.Fatalf("GetKey(old): %v", err)
+	}
+	if rec.State != StateArchived {
+		t.Errorf("old installer key state = %q, want archived", rec.State)
+	}
+
+	// New key must be active in the key store.
+	newRec, err := svc.GetKey(newKeyID)
+	if err != nil {
+		t.Fatalf("GetKey(new): %v", err)
+	}
+	if newRec.State != StateActive {
+		t.Errorf("new installer key state = %q, want active", newRec.State)
+	}
+
+	// Log should include a rotate event and chain should still verify.
+	if err := svc.VerifyChain(); err != nil {
+		t.Fatalf("VerifyChain after installer rotation: %v", err)
+	}
+}
+
+// TestRollbackRotation verifies that a rotation can be reversed: the old key
+// returns to active, the new key is revoked, and the lineage edge is removed.
+func TestRollbackRotation(t *testing.T) {
+	svc := NewService()
+	_, oldPrv, oldKeyID := mustGenKey(t)
+	_, newPrv, newKeyID := mustGenKey(t)
+	addActiveKey(t, svc, oldKeyID, []string{RoleAuthor})
+
+	appName := "my-app"
+	appID, err := svc.RecordLineage(appName, oldKeyID)
+	if err != nil {
+		t.Fatalf("RecordLineage: %v", err)
+	}
+
+	oldStmt, newStmt := buildRotationPair(t, oldKeyID, oldPrv, newKeyID, newPrv, []string{appName})
+	rot, err := svc.RotateAccept(oldStmt, newStmt)
+	if err != nil {
+		t.Fatalf("RotateAccept: %v", err)
+	}
+
+	// Rollback the rotation.
+	if err := svc.RollbackRotation(rot.AcceptedSeq); err != nil {
+		t.Fatalf("RollbackRotation: %v", err)
+	}
+
+	// Old key must be active again.
+	oldRec, err := svc.GetKey(oldKeyID)
+	if err != nil {
+		t.Fatalf("GetKey(old): %v", err)
+	}
+	if oldRec.State != StateActive {
+		t.Errorf("old key state after rollback = %q, want active", oldRec.State)
+	}
+
+	// New key must be revoked.
+	newRec, err := svc.GetKey(newKeyID)
+	if err != nil {
+		t.Fatalf("GetKey(new): %v", err)
+	}
+	if newRec.State != StateRevoked {
+		t.Errorf("new key state after rollback = %q, want revoked", newRec.State)
+	}
+
+	// Lineage edge for the new key must be removed.
+	lin, err := svc.GetLineage(appID)
+	if err != nil {
+		t.Fatalf("GetLineage: %v", err)
+	}
+	for _, e := range lin.Edges {
+		if e.AuthorKeyID == newKeyID {
+			t.Errorf("lineage edge for new key still present after rollback")
+		}
+	}
+
+	// No rotation records should remain for that seq.
+	for _, r := range svc.Rotations() {
+		if r.AcceptedSeq == rot.AcceptedSeq {
+			t.Errorf("rotation record for seq %d still present after rollback", rot.AcceptedSeq)
+		}
+	}
+}
+
+// TestRollbackRotationNotFound verifies that rollback returns an error for
+// an unknown accepted_seq.
+func TestRollbackRotationNotFound(t *testing.T) {
+	svc := NewService()
+	if err := svc.RollbackRotation(99); err == nil {
+		t.Fatal("RollbackRotation(99) succeeded, want error for unknown seq")
+	}
+}

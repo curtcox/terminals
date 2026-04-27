@@ -100,14 +100,15 @@ type RotationRecord struct {
 
 // LogEntry is one appended entry in the trust-mutation log.
 type LogEntry struct {
-	Seq          int64          `json:"seq"`
-	At           int64          `json:"at"`
-	Actor        string         `json:"actor"`
-	Op           string         `json:"op"`
-	Args         map[string]any `json:"args"`
-	PrevHash     string         `json:"prev_hash"`
-	ThisHash     string         `json:"this_hash"`
-	InstallerSig string         `json:"installer_sig"`
+	Seq            int64          `json:"seq"`
+	At             int64          `json:"at"`
+	Actor          string         `json:"actor"`
+	Op             string         `json:"op"`
+	Args           map[string]any `json:"args"`
+	PrevHash       string         `json:"prev_hash"`
+	ThisHash       string         `json:"this_hash"`
+	InstallerSig   string         `json:"installer_sig"`
+	InstallerKeyID string         `json:"installer_key_id"` // which installer key signed this entry
 }
 
 // OldKeyRotationStatement carries the outgoing author's signed rotation intent.
