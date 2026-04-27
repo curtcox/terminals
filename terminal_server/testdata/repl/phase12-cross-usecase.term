@@ -11,6 +11,7 @@ canvas annotate phase12-canvas fixture-canvas-mutating
 session create lesson phase12-session
 session join latest fixture-session-member
 identity ack record phase12-identity-subject --actor person:fixture-identity --mode confirmed
+memory remember phase12-memory fixture-memory-mutating
 message rooms
 message ls phase12-room
 board ls phase12-board
@@ -18,6 +19,7 @@ artifact history latest
 canvas ls phase12-canvas
 session members latest
 identity ack show phase12-identity-subject
+memory recall fixture-memory-mutating
 sim expect sim-fixture ui fixture-ready --within 2s
 sim expect sim-fixture message fixture-alert --within 2s
 sim record sim-fixture --duration 2s

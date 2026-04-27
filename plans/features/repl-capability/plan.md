@@ -123,6 +123,13 @@ layering, acceptance rules, and authoring substrate.
   assertion) so `scripts run` now validates durable identity
   acknowledgement mutation alongside the existing
   message/board/artifact/canvas/session checks.
+- Extended the Phase 12 AA6 fixture with an additional mutating Layer 2
+  path in the memory domain (`memory remember phase12-memory
+  fixture-memory-mutating`) plus deterministic read-back
+  (`memory recall fixture-memory-mutating` in-script and admin
+  `/memory` assertion) so `scripts run` now validates durable memory
+  mutation alongside the existing
+  message/board/artifact/canvas/session/identity checks.
 - Landed the next Phase 11 bug-reporting control-plane extension in
   code: REPL `bug tail` now tails `/admin/logs.jsonl` with a
   bug-report event filter prefix (`bug.report`), with focused REPL

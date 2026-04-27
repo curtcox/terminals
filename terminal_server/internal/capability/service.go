@@ -2600,6 +2600,25 @@ func (s *Service) executeScriptCommand(command string) error {
 		default:
 			return fmt.Errorf("unsupported identity ack action %q", action)
 		}
+	case "memory":
+		switch sub {
+		case "remember":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: memory remember <scope> <text>")
+			}
+			scope := args[0]
+			text := strings.Join(args[1:], " ")
+			s.Remember(scope, text)
+			return nil
+		case "recall":
+			if len(args) < 1 {
+				return fmt.Errorf("usage: memory recall <text>")
+			}
+			_ = s.Recall(strings.Join(args, " "))
+			return nil
+		default:
+			return fmt.Errorf("unsupported memory command %q", sub)
+		}
 	case "sim":
 		switch sub {
 		case "device":

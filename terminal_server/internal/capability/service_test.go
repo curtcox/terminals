@@ -754,12 +754,12 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 		t.Fatalf("ScriptDryRun counts = commands:%d skipped:%d, want 2/2", dryRun.CommandCount, dryRun.SkippedCount)
 	}
 
-	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage post phase12-room fixture-layer2-mutating\nboard post phase12-board fixture-board-mutating\nartifact create lesson fixture-artifact-mutating\ncanvas annotate phase12-canvas fixture-canvas-mutating\nsession create lesson phase12-session\nsession join latest fixture-session-member\nmessage ls phase12-room\nboard ls phase12-board\nartifact history latest\ncanvas ls phase12-canvas\nsession members latest\nmessage rooms")
+	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage post phase12-room fixture-layer2-mutating\nboard post phase12-board fixture-board-mutating\nartifact create lesson fixture-artifact-mutating\ncanvas annotate phase12-canvas fixture-canvas-mutating\nsession create lesson phase12-session\nsession join latest fixture-session-member\nmemory remember phase12-memory fixture-memory-mutating\nmessage ls phase12-room\nboard ls phase12-board\nartifact history latest\ncanvas ls phase12-canvas\nsession members latest\nmemory recall fixture-memory-mutating\nmessage rooms")
 	if run.Path != "fixtures/smoke.term" {
 		t.Fatalf("ScriptRun path = %q, want fixtures/smoke.term", run.Path)
 	}
-	if run.CommandCount != 14 || run.SkippedCount != 2 || run.ExecutedCount != 14 || run.FailedCount != 0 {
-		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 14/2/14/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
+	if run.CommandCount != 16 || run.SkippedCount != 2 || run.ExecutedCount != 16 || run.FailedCount != 0 {
+		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 16/2/16/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
 	}
 	stored, ok := svc.StoreGet("notes", "k")
 	if !ok || stored.Value != "v" {
@@ -799,6 +799,10 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 	participants, ok := svc.ListSessionParticipants(sessions[0].ID)
 	if !ok || len(participants) != 1 || participants[0].IdentityID != "fixture-session-member" {
 		t.Fatalf("ScriptRun session join side effect missing: ok=%v participants=%+v", ok, participants)
+	}
+	memories := svc.Recall("fixture-memory-mutating")
+	if len(memories) != 1 || memories[0].Scope != "phase12-memory" || memories[0].Text != "fixture-memory-mutating" {
+		t.Fatalf("ScriptRun memory side effect missing: %+v", memories)
 	}
 	snapshot, ok := svc.UISnapshot("d1")
 	if !ok || snapshot.DeviceID != "d1" {

@@ -933,7 +933,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	if dryRunW.Code != http.StatusOK {
 		t.Fatalf("fixture scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
 	}
-	if !strings.Contains(dryRunW.Body.String(), `"command_count":23`) {
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":25`) {
 		t.Fatalf("fixture scripts dry-run body missing command count: %s", dryRunW.Body.String())
 	}
 
@@ -947,8 +947,11 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 		t.Fatalf("fixture scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
 	}
 	body := runW.Body.String()
-	if !strings.Contains(body, `"executed_count":23`) || !strings.Contains(body, `"failed_count":0`) {
+	if !strings.Contains(body, `"executed_count":25`) || !strings.Contains(body, `"failed_count":0`) {
 		t.Fatalf("fixture scripts run body missing execution counters: %s", body)
+	}
+	if !strings.Contains(body, `"memory recall fixture-memory-mutating"`) {
+		t.Fatalf("fixture scripts run body missing memory recall command trace: %s", body)
 	}
 
 	storeReq := httptest.NewRequest(http.MethodGet, "/admin/api/store/get?namespace=phase12&key=status", nil)
@@ -1077,6 +1080,17 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 		!strings.Contains(ackW.Body.String(), `"actor_ref":"person:fixture-identity"`) ||
 		!strings.Contains(ackW.Body.String(), `"mode":"confirmed"`) {
 		t.Fatalf("fixture identity ack show body missing identity ack side effect: %s", ackW.Body.String())
+	}
+
+	memoryReq := httptest.NewRequest(http.MethodGet, "/admin/api/memory?q=fixture-memory-mutating", nil)
+	memoryW := httptest.NewRecorder()
+	h.ServeHTTP(memoryW, memoryReq)
+	if memoryW.Code != http.StatusOK {
+		t.Fatalf("fixture memory recall status = %d, want 200 body=%s", memoryW.Code, memoryW.Body.String())
+	}
+	if !strings.Contains(memoryW.Body.String(), `"scope":"phase12-memory"`) ||
+		!strings.Contains(memoryW.Body.String(), `"text":"fixture-memory-mutating"`) {
+		t.Fatalf("fixture memory recall body missing memory side effect: %s", memoryW.Body.String())
 	}
 
 	simReq := httptest.NewRequest(http.MethodGet, "/admin/api/sim/ui?device_id=sim-fixture", nil)
