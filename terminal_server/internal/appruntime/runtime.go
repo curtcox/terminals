@@ -43,6 +43,10 @@ var (
 	ErrMigrationResolutionInvalid = errors.New("migration reconciliation resolution is invalid")
 	// ErrMigrationAbortTargetInvalid indicates an abort target is unsupported.
 	ErrMigrationAbortTargetInvalid = errors.New("migration abort target is invalid")
+	// ErrRollbackModeInvalid indicates rollback data mode options are invalid.
+	ErrRollbackModeInvalid = errors.New("rollback data mode is invalid")
+	// ErrRollbackKeepDataRequiresDowngrade indicates keep-data rollback requires downgrade steps.
+	ErrRollbackKeepDataRequiresDowngrade = errors.New("rollback with keep-data requires migrate/downgrade steps")
 )
 
 const (
@@ -50,6 +54,12 @@ const (
 	MigrationAbortToCheckpoint = "checkpoint"
 	// MigrationAbortToBaseline aborts the migration run and rewinds progress to pre-upgrade baseline.
 	MigrationAbortToBaseline = "baseline"
+	// RollbackDataModeArchiveData archives migration-owned data when reverse steps are unavailable.
+	RollbackDataModeArchiveData = "archive_data"
+	// RollbackDataModeKeepData preserves migration-owned data and requires reverse steps.
+	RollbackDataModeKeepData = "keep_data"
+	// RollbackDataModePurge purges migration-owned data when reverse steps are unavailable.
+	RollbackDataModePurge = "purge"
 )
 
 var allowedPermissions = map[string]struct{}{
@@ -159,6 +169,11 @@ type MigrationStatus struct {
 type MigrationReconciliationRecord struct {
 	RecordID              string
 	RecommendedResolution string
+}
+
+// RollbackOptions controls rollback data handling behavior.
+type RollbackOptions struct {
+	DataMode string
 }
 
 // AppDefinition provides activation matching and activation construction.
@@ -273,7 +288,12 @@ func (r *Runtime) ReloadPackage(_ context.Context, name string) (Package, bool, 
 }
 
 // RollbackPackage restores the previous successfully loaded package version.
-func (r *Runtime) RollbackPackage(name string) (Package, error) {
+func (r *Runtime) RollbackPackage(name string, options ...RollbackOptions) (Package, error) {
+	rollbackOpts, err := normalizeRollbackOptions(options...)
+	if err != nil {
+		return Package{}, err
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	history := r.history[name]
@@ -288,12 +308,40 @@ func (r *Runtime) RollbackPackage(name string) (Package, error) {
 			return Package{}, ErrMigrationReconcilePending
 		}
 	}
+	current := history[len(history)-1]
+	previous := history[len(history)-2]
+	hasDowngradeSteps := countDowngradeMigrationSteps(current.RootPath) > 0 || countDowngradeMigrationSteps(previous.RootPath) > 0
+	if rollbackOpts.DataMode == RollbackDataModeKeepData && !hasDowngradeSteps {
+		return Package{}, ErrRollbackKeepDataRequiresDowngrade
+	}
 	history = history[:len(history)-1]
 	r.history[name] = history
-	previous := history[len(history)-1]
+	previous = history[len(history)-1]
 	r.packages[name] = previous
 	r.migrations[name] = newMigrationState(previous)
 	return previous, nil
+}
+
+func normalizeRollbackOptions(options ...RollbackOptions) (RollbackOptions, error) {
+	if len(options) > 1 {
+		return RollbackOptions{}, ErrRollbackModeInvalid
+	}
+	opts := RollbackOptions{DataMode: RollbackDataModeArchiveData}
+	if len(options) == 1 {
+		opts = options[0]
+	}
+	mode := strings.ToLower(strings.TrimSpace(opts.DataMode))
+	mode = strings.ReplaceAll(mode, "-", "_")
+	if mode == "" {
+		mode = RollbackDataModeArchiveData
+	}
+	switch mode {
+	case RollbackDataModeArchiveData, RollbackDataModeKeepData, RollbackDataModePurge:
+		opts.DataMode = mode
+		return opts, nil
+	default:
+		return RollbackOptions{}, fmt.Errorf("%w: %s", ErrRollbackModeInvalid, opts.DataMode)
+	}
 }
 
 // GetMigrationStatus returns migration status for one app package.
@@ -439,6 +487,14 @@ func newMigrationState(pkg Package) migrationState {
 
 func countMigrationSteps(root string) int {
 	matches, err := filepath.Glob(filepath.Join(root, "migrate", "*.tal"))
+	if err != nil {
+		return 0
+	}
+	return len(matches)
+}
+
+func countDowngradeMigrationSteps(root string) int {
+	matches, err := filepath.Glob(filepath.Join(root, "migrate", "downgrade", "*.tal"))
 	if err != nil {
 		return 0
 	}

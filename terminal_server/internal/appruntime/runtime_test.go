@@ -297,6 +297,80 @@ func TestRuntimeRollbackBlockedWhenMigrationReconcilePending(t *testing.T) {
 	}
 }
 
+func TestRuntimeRollbackKeepDataRequiresDowngradeSteps(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "rollback_keep_data")
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifestPath := filepath.Join(appDir, "manifest.toml")
+	if err := os.WriteFile(manifestPath, []byte("name = \"rollback_keep_data\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage(v1) error = %v", err)
+	}
+
+	time.Sleep(5 * time.Millisecond)
+	if err := os.WriteFile(manifestPath, []byte("name = \"rollback_keep_data\"\nversion = \"1.1.0\"\nlanguage = \"tal/1\"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v2) error = %v", err)
+	}
+	if _, changed, err := runtime.ReloadPackage(context.Background(), "rollback_keep_data"); err != nil || !changed {
+		t.Fatalf("ReloadPackage(v2) = (%v, %v), want changed true no error", err, changed)
+	}
+
+	if _, err := runtime.RollbackPackage("rollback_keep_data", RollbackOptions{DataMode: RollbackDataModeKeepData}); !errors.Is(err, ErrRollbackKeepDataRequiresDowngrade) {
+		t.Fatalf("RollbackPackage(keep_data) error = %v, want ErrRollbackKeepDataRequiresDowngrade", err)
+	}
+}
+
+func TestRuntimeRollbackKeepDataAllowedWithDowngradeSteps(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "rollback_keep_data_downgrade")
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifestPath := filepath.Join(appDir, "manifest.toml")
+	if err := os.WriteFile(manifestPath, []byte("name = \"rollback_keep_data_downgrade\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage(v1) error = %v", err)
+	}
+
+	time.Sleep(5 * time.Millisecond)
+	if err := os.WriteFile(manifestPath, []byte("name = \"rollback_keep_data_downgrade\"\nversion = \"1.1.0\"\nlanguage = \"tal/1\"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v2) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate", "downgrade"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate/downgrade) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "downgrade", "0001_2_to_1.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(downgrade step) error = %v", err)
+	}
+	if _, changed, err := runtime.ReloadPackage(context.Background(), "rollback_keep_data_downgrade"); err != nil || !changed {
+		t.Fatalf("ReloadPackage(v2) = (%v, %v), want changed true no error", err, changed)
+	}
+
+	rolledBack, err := runtime.RollbackPackage("rollback_keep_data_downgrade", RollbackOptions{DataMode: RollbackDataModeKeepData})
+	if err != nil {
+		t.Fatalf("RollbackPackage(keep_data) error = %v", err)
+	}
+	if rolledBack.Manifest.Version != "1.0.0" {
+		t.Fatalf("rolled back version = %q, want 1.0.0", rolledBack.Manifest.Version)
+	}
+}
+
 func TestRuntimeMigrationStatusAndActions(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_stub")

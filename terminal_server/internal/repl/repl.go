@@ -162,7 +162,7 @@ func replCommandSpecs() []commandSpec {
 		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app logs", Usage: "app logs <app> [<query>]", Summary: "Query app-related logs", Classification: commandOperational, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app reload", Usage: "app reload <app> [--json]", Summary: "Reload an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
-		{Name: "app rollback", Usage: "app rollback <app> [--json]", Summary: "Rollback an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "app rollback", Usage: "app rollback <app> [--keep-data|--archive-data|--purge] [--json]", Summary: "Rollback an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate status", Usage: "apps migrate status <app> [--json]", Summary: "Show migration status for one app", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate retry", Usage: "apps migrate retry <app> [--json]", Summary: "Retry app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate abort", Usage: "apps migrate abort <app> [--to <checkpoint|baseline>] [--json]", Summary: "Abort in-flight app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
@@ -2357,18 +2357,45 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			return printTable(s.out, []string{"APP", "VERSION"}, rows)
 		case "reload", "rollback":
-			if len(args) < 2 {
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				if sub == "rollback" {
+					return errors.New("usage: app rollback <app> [--keep-data|--archive-data|--purge]")
+				}
 				return fmt.Errorf("usage: app %s <app>", sub)
 			}
-			appName := strings.TrimSpace(args[1])
+			appName := strings.TrimSpace(plain[0])
 			if appName == "" {
+				if sub == "rollback" {
+					return errors.New("usage: app rollback <app> [--keep-data|--archive-data|--purge]")
+				}
 				return fmt.Errorf("usage: app %s <app>", sub)
 			}
 			route := "/admin/api/apps/reload"
+			form := url.Values{"app": {appName}}
 			if sub == "rollback" {
 				route = "/admin/api/apps/rollback"
+				keepData := hasFlag(args[2:], "--keep-data")
+				archiveData := hasFlag(args[2:], "--archive-data")
+				purge := hasFlag(args[2:], "--purge")
+				selected := 0
+				if keepData {
+					selected++
+					form.Set("mode", "keep_data")
+				}
+				if archiveData {
+					selected++
+					form.Set("mode", "archive_data")
+				}
+				if purge {
+					selected++
+					form.Set("mode", "purge")
+				}
+				if selected > 1 {
+					return errors.New("usage: app rollback <app> [--keep-data|--archive-data|--purge]")
+				}
 			}
-			body, err := s.postFormJSON(ctx, route, url.Values{"app": {appName}})
+			body, err := s.postFormJSON(ctx, route, form)
 			if err != nil {
 				return err
 			}

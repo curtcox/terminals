@@ -493,6 +493,49 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	}
 }
 
+func TestAppsRollbackRejectsKeepDataWithoutDowngradeSteps(t *testing.T) {
+	appRoot := createTestAppPackage(t, "sound_watch_keep", "1.0.0")
+	appRuntime := appruntime.NewRuntime()
+	if _, err := appRuntime.LoadPackage(context.Background(), appRoot); err != nil {
+		t.Fatalf("LoadPackage(v1) error = %v", err)
+	}
+
+	time.Sleep(5 * time.Millisecond)
+	if err := os.WriteFile(filepath.Join(appRoot, "manifest.toml"), []byte(
+		"name = \"sound_watch_keep\"\nversion = \"1.1.0\"\nlanguage = \"tal/1\"\nexports = [\"watch\"]\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v2) error = %v", err)
+	}
+	if _, changed, err := appRuntime.ReloadPackage(context.Background(), "sound_watch_keep"); err != nil || !changed {
+		t.Fatalf("ReloadPackage(v2) = (%v, %v), want changed true no error", err, changed)
+	}
+
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "kitchen-1", DeviceName: "Kitchen"})
+	control := transport.NewControlService("HomeServer", devices)
+	engine := scenario.NewEngine()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	h := NewHandler(control, runtime, nil, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"}, nil, nil)
+
+	rollbackReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/rollback", strings.NewReader(url.Values{
+		"app":       {"sound_watch_keep"},
+		"keep_data": {"1"},
+	}.Encode()))
+	rollbackReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rollbackW := httptest.NewRecorder()
+	h.ServeHTTP(rollbackW, rollbackReq)
+	if rollbackW.Code != http.StatusBadRequest {
+		t.Fatalf("rollback status = %d, want 400 body=%s", rollbackW.Code, rollbackW.Body.String())
+	}
+	if !strings.Contains(rollbackW.Body.String(), appruntime.ErrRollbackKeepDataRequiresDowngrade.Error()) {
+		t.Fatalf("rollback body missing keep-data downgrade error: %s", rollbackW.Body.String())
+	}
+}
+
 func TestCapabilityClosureEndpoints(t *testing.T) {
 	h := testHandler(t)
 

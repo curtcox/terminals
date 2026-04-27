@@ -232,6 +232,38 @@ func TestMutatingCommandsUseAdminAPIs(t *testing.T) {
 	}
 }
 
+func TestAppRollbackKeepDataFlagUsesAdminAPI(t *testing.T) {
+	var capturedMode string
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/apps/rollback":
+			if err := req.ParseForm(); err != nil {
+				t.Fatalf("ParseForm() error = %v", err)
+			}
+			capturedMode = req.FormValue("mode")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","version":"1.2.2"}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("app rollback sound_watch --keep-data\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if capturedMode != "keep_data" {
+		t.Fatalf("rollback mode = %q, want keep_data", capturedMode)
+	}
+	if !strings.Contains(out.String(), "OK  app=sound_watch action=rollback version=1.2.2") {
+		t.Fatalf("missing rollback success output: %q", out.String())
+	}
+}
+
 func TestAppsMigrateStatusUsesAdminAPI(t *testing.T) {
 	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {

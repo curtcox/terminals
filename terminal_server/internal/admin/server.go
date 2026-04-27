@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -2482,7 +2483,12 @@ func (h *Handler) handleRollbackApp(w http.ResponseWriter, req *http.Request) {
 		h.writeJSONError(w, http.StatusBadRequest, "app is required")
 		return
 	}
-	pkg, err := h.appRuntime.RollbackPackage(name)
+	mode, err := rollbackDataModeFromForm(req.Form)
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	pkg, err := h.appRuntime.RollbackPackage(name, appruntime.RollbackOptions{DataMode: mode})
 	if err != nil {
 		h.writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
@@ -2497,12 +2503,67 @@ func (h *Handler) handleRollbackApp(w http.ResponseWriter, req *http.Request) {
 		slog.String("version", pkg.Manifest.Version),
 	)
 	h.writeJSON(w, http.StatusOK, map[string]any{
-		"status":   "ok",
-		"action":   "rollback",
-		"app":      pkg.Manifest.Name,
-		"version":  pkg.Manifest.Version,
-		"revision": pkg.Revision,
+		"status":    "ok",
+		"action":    "rollback",
+		"app":       pkg.Manifest.Name,
+		"version":   pkg.Manifest.Version,
+		"data_mode": normalizeRollbackDataMode(mode),
+		"revision":  pkg.Revision,
 	})
+}
+
+func rollbackDataModeFromForm(form url.Values) (string, error) {
+	mode := strings.TrimSpace(firstNonEmpty(form.Get("mode"), form.Get("rollback_mode"), form.Get("data_mode")))
+	keepData := truthyFormValue(form.Get("keep_data"))
+	archiveData := truthyFormValue(form.Get("archive_data"))
+	purge := truthyFormValue(form.Get("purge"))
+	selected := 0
+	if mode != "" {
+		selected++
+	}
+	if keepData {
+		selected++
+		mode = appruntime.RollbackDataModeKeepData
+	}
+	if archiveData {
+		selected++
+		mode = appruntime.RollbackDataModeArchiveData
+	}
+	if purge {
+		selected++
+		mode = appruntime.RollbackDataModePurge
+	}
+	if selected > 1 {
+		return "", fmt.Errorf("%w: choose exactly one of keep_data, archive_data, purge, or mode", appruntime.ErrRollbackModeInvalid)
+	}
+	return normalizeRollbackDataMode(mode), nil
+}
+
+func normalizeRollbackDataMode(mode string) string {
+	normalized := strings.ToLower(strings.TrimSpace(mode))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	if normalized == "" {
+		return appruntime.RollbackDataModeArchiveData
+	}
+	return normalized
+}
+
+func truthyFormValue(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "t", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func (h *Handler) handleAppMigrationStatus(w http.ResponseWriter, req *http.Request) {

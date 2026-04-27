@@ -21,6 +21,15 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Implemented rollback data-mode enforcement for
+  `app(s) rollback` in runtime, admin API, and REPL. Rollback
+  now defaults to archive mode, rejects `--keep-data` when no
+  `migrate/downgrade/*.tal` reverse steps exist across the
+  rollback span, and accepts keep-data when reverse steps are
+  present. Added coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`,
+  `terminal_server/internal/admin/server_test.go`, and
+  `terminal_server/internal/repl/repl_test.go`.
 - 2026-04-27: Implemented operator-selectable migration abort targets
   (`checkpoint` vs `baseline`) across runtime, admin API, and REPL.
   `apps migrate abort` now accepts `--to <checkpoint|baseline>`,
