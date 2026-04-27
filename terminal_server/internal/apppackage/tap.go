@@ -675,7 +675,7 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 
 	for i, fileStep := range migrationFiles {
 		if fileStep.stepNumber != i+1 {
-			return ErrInvalidManifest
+			return fmt.Errorf("%w: migration step numbering gap: expected step %04d, found %04d", ErrInvalidManifest, i+1, fileStep.stepNumber)
 		}
 		manifestStep := manifest.Migrate.Step[i]
 		if strings.TrimSpace(manifestStep.From) == "" || strings.TrimSpace(manifestStep.To) == "" {
@@ -688,7 +688,7 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 			return ErrInvalidManifest
 		}
 		if manifestStep.Compatibility == "incompatible" && manifestStep.DrainPolicy == "none" {
-			return ErrInvalidManifest
+			return fmt.Errorf("%w: migrate.step %04d declares compatibility=incompatible with drain_policy=none", ErrInvalidManifest, i+1)
 		}
 		if manifestStep.From != fileStep.from || manifestStep.To != fileStep.to {
 			return ErrInvalidManifest

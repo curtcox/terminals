@@ -21,6 +21,13 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added specific Gate 1 migration failure diagnostics
+  for numbering gaps and incompatible drain policy combinations
+  in `.tap` verification (`terminal_server/internal/apppackage/tap.go`).
+  Added message-level assertions in
+  `TestVerifyTapRejectsMigrateStepNumberingGap` and
+  `TestVerifyTapRejectsMigrateIncompatibleWithoutDrain` to lock
+  these errors as explicit acceptance behavior.
 - 2026-04-27: Added Gate 1 migration module-set enforcement in
   `.tap` verification (`terminal_server/internal/apppackage/tap.go`)
   so `migrate/*.tal` may only `load("store")`,

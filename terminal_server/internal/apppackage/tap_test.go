@@ -236,8 +236,12 @@ to = "3"
 		{name: "kitchen_timer/migrate/0003_2_to_3.tal", body: "def migrate(): pass"},
 	})
 
-	if _, err := VerifyTap(tap); !errors.Is(err, ErrInvalidManifest) {
+	_, err := VerifyTap(tap)
+	if !errors.Is(err, ErrInvalidManifest) {
 		t.Fatalf("expected invalid manifest for migration numbering gap, got %v", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "migration step numbering gap") {
+		t.Fatalf("expected specific numbering gap error, got %v", err)
 	}
 }
 
@@ -286,8 +290,12 @@ drain_policy = "none"
 		{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
 	})
 
-	if _, err := VerifyTap(tap); !errors.Is(err, ErrInvalidManifest) {
+	_, err := VerifyTap(tap)
+	if !errors.Is(err, ErrInvalidManifest) {
 		t.Fatalf("expected invalid manifest for incompatible migration without drain, got %v", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "compatibility=incompatible with drain_policy=none") {
+		t.Fatalf("expected specific incompatible/drain policy error, got %v", err)
 	}
 }
 
