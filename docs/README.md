@@ -11,6 +11,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | [Agent Configuration](agent-configuration.md) | Durable conventions and required files for Claude Code, Codex, and Copilot |
 | [Technology Choices](technology-choices.md) | Durable server/client technology decisions and evidence |
 | [Discovery and Connection](discovery-and-connection.md) | mDNS discovery, manual connect, and carrier fallback behavior |
+| [Capability Lifecycle](capability-lifecycle.md) | Durable snapshot/delta contract, generation ordering, and runtime reactions |
 | [Client — Web](client-web.md) | Flutter web client |
 | [Client — macOS](client-macos.md) | Flutter macOS desktop client |
 | [Client — iOS](client-ios.md) | Flutter iOS client |

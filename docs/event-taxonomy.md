@@ -46,6 +46,15 @@ Canonical server event names written to `logs/terminals.jsonl`.
 - `io.flow.stats`
 - `io.analyzer.event`
 
+## Capability Lifecycle (`terminal.*`)
+- `terminal.capability.added`
+- `terminal.capability.updated`
+- `terminal.capability.removed`
+- `terminal.display.resized`
+- `terminal.audio_route.changed`
+- `terminal.resource.lost`
+- `terminal.resource.lost:<resource-id>`
+
 ## Observation (`observation.store`)
 - `observation.emitted`
 
