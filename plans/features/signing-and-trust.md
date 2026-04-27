@@ -1,9 +1,9 @@
 ---
 title: "Signing and Trust"
 kind: plan
-status: shipped-untested
+status: shipped-validated
 owner: copilot
-validation: none
+validation: manual
 last-reviewed: 2026-04-27
 ---
 
