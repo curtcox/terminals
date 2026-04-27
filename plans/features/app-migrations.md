@@ -29,6 +29,11 @@ who may authorize a migration).
   `compatibility = "incompatible"` paired with
   `drain_policy = "none"`, with explicit accept/reject unit
   coverage in `terminal_server/internal/apppackage/tap_test.go`.
+- 2026-04-27: Added Gate 1 migration fixture/schema enforcement:
+  packages with `migrate/*.tal` must declare `[[storage.store_schema]]`
+  and one `[[migrate.fixture]]` per migration step, with fixture
+  file-path presence checks in `.tap` verification and coverage in
+  `terminal_server/internal/apppackage/tap_test.go`.
 - Implemented rules enforce contiguous migration step numbering,
   `manifest.toml` declaration/file-count consistency, and file ↔
   manifest step mapping for `migrate/*.tal` files.

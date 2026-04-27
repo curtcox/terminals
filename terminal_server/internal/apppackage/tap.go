@@ -541,12 +541,24 @@ type manifestIdentity struct {
 }
 
 type manifestMigration struct {
+	Storage manifestStorageConfig   `toml:"storage"`
 	Migrate manifestMigrationConfig `toml:"migrate"`
 }
 
+type manifestStorageConfig struct {
+	StoreSchema []manifestStoreSchema `toml:"store_schema"`
+}
+
+type manifestStoreSchema struct {
+	Store        string `toml:"store"`
+	Version      string `toml:"version"`
+	RecordSchema string `toml:"record_schema"`
+}
+
 type manifestMigrationConfig struct {
-	DeclaredSteps int                     `toml:"declared_steps"`
-	Step          []manifestMigrationStep `toml:"step"`
+	DeclaredSteps int                        `toml:"declared_steps"`
+	Step          []manifestMigrationStep    `toml:"step"`
+	Fixture       []manifestMigrationFixture `toml:"fixture"`
 }
 
 type manifestMigrationStep struct {
@@ -554,6 +566,14 @@ type manifestMigrationStep struct {
 	To            string `toml:"to"`
 	Compatibility string `toml:"compatibility"`
 	DrainPolicy   string `toml:"drain_policy"`
+}
+
+type manifestMigrationFixture struct {
+	Step              string `toml:"step"`
+	PriorVersion      string `toml:"prior_version"`
+	PriorRecordSchema string `toml:"prior_record_schema"`
+	Seed              string `toml:"seed"`
+	Expected          string `toml:"expected"`
 }
 
 type signatureBundle struct {
@@ -592,8 +612,14 @@ func validateManifestMigrations(manifestBytes []byte, files []string) error {
 
 	type parsedStep struct {
 		stepNumber int
+		stepName   string
 		from       string
 		to         string
+	}
+
+	availableFiles := make(map[string]struct{}, len(files))
+	for _, rel := range files {
+		availableFiles[rel] = struct{}{}
 	}
 
 	migrationFiles := make([]parsedStep, 0)
@@ -613,7 +639,7 @@ func validateManifestMigrations(manifestBytes []byte, files []string) error {
 		if err != nil || stepNumber <= 0 {
 			return ErrInvalidManifest
 		}
-		migrationFiles = append(migrationFiles, parsedStep{stepNumber: stepNumber, from: match[2], to: match[3]})
+		migrationFiles = append(migrationFiles, parsedStep{stepNumber: stepNumber, stepName: strings.TrimSuffix(name, ".tal"), from: match[2], to: match[3]})
 	}
 
 	declaredSteps := manifest.Migrate.DeclaredSteps
@@ -651,6 +677,54 @@ func validateManifestMigrations(manifestBytes []byte, files []string) error {
 			return ErrInvalidManifest
 		}
 		if manifestStep.From != fileStep.from || manifestStep.To != fileStep.to {
+			return ErrInvalidManifest
+		}
+	}
+
+	if len(manifest.Storage.StoreSchema) == 0 {
+		return ErrInvalidManifest
+	}
+	for _, schema := range manifest.Storage.StoreSchema {
+		if strings.TrimSpace(schema.Store) == "" || strings.TrimSpace(schema.Version) == "" || strings.TrimSpace(schema.RecordSchema) == "" {
+			return ErrInvalidManifest
+		}
+		if _, ok := availableFiles[schema.RecordSchema]; !ok {
+			return ErrInvalidManifest
+		}
+	}
+
+	if len(manifest.Migrate.Fixture) != len(migrationFiles) {
+		return ErrInvalidManifest
+	}
+
+	stepNames := make(map[string]struct{}, len(migrationFiles))
+	for _, step := range migrationFiles {
+		stepNames[step.stepName] = struct{}{}
+	}
+
+	fixtureByStep := make(map[string]struct{}, len(manifest.Migrate.Fixture))
+	for _, fixture := range manifest.Migrate.Fixture {
+		if strings.TrimSpace(fixture.Step) == "" ||
+			strings.TrimSpace(fixture.PriorVersion) == "" ||
+			strings.TrimSpace(fixture.PriorRecordSchema) == "" ||
+			strings.TrimSpace(fixture.Seed) == "" ||
+			strings.TrimSpace(fixture.Expected) == "" {
+			return ErrInvalidManifest
+		}
+		if _, ok := stepNames[fixture.Step]; !ok {
+			return ErrInvalidManifest
+		}
+		if _, ok := fixtureByStep[fixture.Step]; ok {
+			return ErrInvalidManifest
+		}
+		fixtureByStep[fixture.Step] = struct{}{}
+		if _, ok := availableFiles[fixture.PriorRecordSchema]; !ok {
+			return ErrInvalidManifest
+		}
+		if _, ok := availableFiles[fixture.Seed]; !ok {
+			return ErrInvalidManifest
+		}
+		if _, ok := availableFiles[fixture.Expected]; !ok {
 			return ErrInvalidManifest
 		}
 	}

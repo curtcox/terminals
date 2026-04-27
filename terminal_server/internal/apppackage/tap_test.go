@@ -163,6 +163,11 @@ func TestVerifyTapAcceptsCanonicalMigrateStepLayout(t *testing.T) {
 name = "kitchen_timer"
 version = "2"
 
+[[storage.store_schema]]
+store = "history"
+version = "2"
+record_schema = "tests/schemas/history_v2.json"
+
 [migrate]
 declared_steps = 2
 
@@ -173,6 +178,20 @@ to = "2"
 [[migrate.step]]
 from = "2"
 to = "3"
+
+[[migrate.fixture]]
+step = "0001_1_to_2"
+prior_version = "1"
+prior_record_schema = "tests/schemas/history_v1.json"
+seed = "tests/migrate_fixtures/history_v1_seed.ndjson"
+expected = "tests/migrate_fixtures/history_v2_expected.ndjson"
+
+[[migrate.fixture]]
+step = "0002_2_to_3"
+prior_version = "2"
+prior_record_schema = "tests/schemas/history_v2.json"
+seed = "tests/migrate_fixtures/history_v2_seed.ndjson"
+expected = "tests/migrate_fixtures/history_v3_expected.ndjson"
 `)
 
 	tap := makeTapForTest(t, []tapEntry{
@@ -180,6 +199,12 @@ to = "3"
 		{name: "kitchen_timer/manifest.toml", body: manifest},
 		{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
 		{name: "kitchen_timer/migrate/0002_2_to_3.tal", body: "def migrate(): pass"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v1_seed.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v2_expected.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v2_seed.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v3_expected.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/schemas/history_v1.json", body: `{"type":"object"}`},
+		{name: "kitchen_timer/tests/schemas/history_v2.json", body: `{"type":"object"}`},
 	})
 
 	if _, err := VerifyTap(tap); err != nil {
@@ -271,6 +296,11 @@ func TestVerifyTapAcceptsMigrateIncompatibleWithDrain(t *testing.T) {
 name = "kitchen_timer"
 version = "2"
 
+[[storage.store_schema]]
+store = "history"
+version = "2"
+record_schema = "tests/schemas/history_v2.json"
+
 [migrate]
 declared_steps = 1
 
@@ -279,6 +309,41 @@ from = "1"
 to = "2"
 compatibility = "incompatible"
 drain_policy = "drain"
+
+[[migrate.fixture]]
+step = "0001_1_to_2"
+prior_version = "1"
+prior_record_schema = "tests/schemas/history_v1.json"
+seed = "tests/migrate_fixtures/history_v1_seed.ndjson"
+expected = "tests/migrate_fixtures/history_v2_expected.ndjson"
+`)
+
+	tap := makeTapForTest(t, []tapEntry{
+		{name: "kitchen_timer/main.tal", body: "def on_start(): pass"},
+		{name: "kitchen_timer/manifest.toml", body: manifest},
+		{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v1_seed.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v2_expected.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/schemas/history_v1.json", body: `{"type":"object"}`},
+		{name: "kitchen_timer/tests/schemas/history_v2.json", body: `{"type":"object"}`},
+	})
+
+	if _, err := VerifyTap(tap); err != nil {
+		t.Fatalf("expected incompatible migration with drain to verify, got %v", err)
+	}
+}
+
+func TestVerifyTapRejectsMigrateMissingFixtureMetadata(t *testing.T) {
+	manifest := strings.TrimSpace(`
+name = "kitchen_timer"
+version = "2"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
 `)
 
 	tap := makeTapForTest(t, []tapEntry{
@@ -287,8 +352,8 @@ drain_policy = "drain"
 		{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
 	})
 
-	if _, err := VerifyTap(tap); err != nil {
-		t.Fatalf("expected incompatible migration with drain to verify, got %v", err)
+	if _, err := VerifyTap(tap); !errors.Is(err, ErrInvalidManifest) {
+		t.Fatalf("expected invalid manifest for missing migration fixtures, got %v", err)
 	}
 }
 
