@@ -177,6 +177,9 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/bus", h.handleBusTail)
 	mux.HandleFunc("/admin/api/bus/emit", h.handleBusEmit)
 	mux.HandleFunc("/admin/api/bus/replay", h.handleBusReplay)
+	mux.HandleFunc("/admin/api/handlers", h.handleHandlers)
+	mux.HandleFunc("/admin/api/handlers/on", h.handleHandlersOn)
+	mux.HandleFunc("/admin/api/handlers/off", h.handleHandlersOff)
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
@@ -1331,6 +1334,73 @@ func (h *Handler) handleBusReplay(w http.ResponseWriter, req *http.Request) {
 		limit,
 	)
 	h.writeJSON(w, http.StatusOK, map[string]any{"events": events})
+}
+
+func (h *Handler) handleHandlers(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"handlers": h.capability.HandlerList()})
+}
+
+func (h *Handler) handleHandlersOn(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	selector := strings.TrimSpace(req.Form.Get("selector"))
+	action := strings.TrimSpace(req.Form.Get("action"))
+	if selector == "" || action == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "selector and action are required")
+		return
+	}
+	runCommand := strings.TrimSpace(req.Form.Get("run"))
+	emitKind := strings.TrimSpace(req.Form.Get("emit_kind"))
+	emitName := strings.TrimSpace(req.Form.Get("emit_name"))
+	emitPayload := strings.TrimSpace(req.Form.Get("emit_payload"))
+
+	hasRun := runCommand != ""
+	hasEmit := emitKind != "" || emitName != "" || emitPayload != ""
+	if hasRun == hasEmit {
+		h.writeJSONError(w, http.StatusBadRequest, "provide exactly one target: run or emit_kind/emit_name")
+		return
+	}
+
+	var handler capability.HandlerRegistration
+	if hasRun {
+		handler = h.capability.HandlerOnRun(selector, action, runCommand)
+	} else {
+		if emitName == "" {
+			h.writeJSONError(w, http.StatusBadRequest, "emit_name is required when using emit")
+			return
+		}
+		handler = h.capability.HandlerOnEmit(selector, action, emitKind, emitName, emitPayload)
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "handler": handler})
+}
+
+func (h *Handler) handleHandlersOff(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	handlerID := strings.TrimSpace(req.Form.Get("handler_id"))
+	if handlerID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "handler_id is required")
+		return
+	}
+	deleted := h.capability.HandlerOff(handlerID)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
 }
 
 func (h *Handler) handleReplAIProviders(w http.ResponseWriter, req *http.Request) {

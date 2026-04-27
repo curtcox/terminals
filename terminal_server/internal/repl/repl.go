@@ -136,6 +136,9 @@ func replCommandSpecs() []commandSpec {
 		{Name: "bus emit", Usage: "bus emit <kind> <name> [payload] [--json]", Summary: "Emit typed bus events or intents", Classification: commandMutating, RelatedDocs: []string{"repl/commands/bus"}},
 		{Name: "bus tail", Usage: "bus tail [--kind <kind>] [--name <name>] [--limit <n>] [--json]", Summary: "Tail recent bus events", Classification: commandOperational, RelatedDocs: []string{"repl/commands/bus"}},
 		{Name: "bus replay", Usage: "bus replay <from-id> <to-id> [--kind <kind>] [--name <name>] [--limit <n>] [--json]", Summary: "Replay a filtered bus event window", Classification: commandOperational, RelatedDocs: []string{"repl/commands/bus"}},
+		{Name: "handlers ls", Usage: "handlers ls [--json]", Summary: "List registered input/event handlers", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/handlers"}},
+		{Name: "handlers on", Usage: "handlers on <selector> <action> (--run <command> | --emit <kind> <name> [payload]) [--json]", Summary: "Register an input/event handler", Classification: commandMutating, RelatedDocs: []string{"repl/commands/handlers"}},
+		{Name: "handlers off", Usage: "handlers off <handler-id> [--json]", Summary: "Remove one registered handler", Classification: commandMutating, RelatedDocs: []string{"repl/commands/handlers"}},
 		{Name: "activations ls", Usage: "activations ls [--json]", Summary: "List active scenario by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/activations"}},
 		{Name: "claims tree", Usage: "claims tree [--json]", Summary: "Show claims grouped by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/claims"}},
 		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
@@ -314,7 +317,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "ui", "recent", "store", "bus", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
+	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -1781,6 +1784,94 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		default:
 			return fmt.Errorf("unknown command: bus %s", sub)
 		}
+	case "handlers":
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/handlers")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			items, _ := body["handlers"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				target := toString(row["run_command"])
+				if target == "" {
+					emitKind := toString(row["emit_kind"])
+					emitName := toString(row["emit_name"])
+					emitPayload := toString(row["emit_payload"])
+					target = strings.TrimSpace("emit " + emitKind + " " + emitName + " " + emitPayload)
+				}
+				rows = append(rows, []string{toString(row["id"]), toString(row["selector"]), toString(row["action"]), target})
+			}
+			return printTable(s.out, []string{"HANDLER", "SELECTOR", "ACTION", "TARGET"}, rows)
+		case "on":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--run")
+			if len(plain) < 2 {
+				return errors.New("usage: handlers on <selector> <action> (--run <command> | --emit <kind> <name> [payload])")
+			}
+			selector := plain[0]
+			action := plain[1]
+			runCommand := strings.TrimSpace(flagValue(args[1:], "--run"))
+			emitKind, emitName, emitPayload := parseHandlersEmitValue(args[1:])
+			hasRun := runCommand != ""
+			hasEmit := emitKind != "" || emitName != "" || emitPayload != ""
+			if hasRun == hasEmit {
+				return errors.New("usage: handlers on <selector> <action> (--run <command> | --emit <kind> <name> [payload])")
+			}
+
+			form := url.Values{
+				"selector": {selector},
+				"action":   {action},
+			}
+			if hasRun {
+				form.Set("run", runCommand)
+			} else {
+				if emitName == "" {
+					return errors.New("usage: handlers on <selector> <action> --emit <kind> <name> [payload]")
+				}
+				form.Set("emit_kind", emitKind)
+				form.Set("emit_name", emitName)
+				if emitPayload != "" {
+					form.Set("emit_payload", emitPayload)
+				}
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/handlers/on", form)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			handlerID := ""
+			if itemMap, ok := body["handler"].(map[string]any); ok {
+				handlerID = toString(itemMap["id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  handler=%s selector=%s action=%s\n", handlerID, selector, action)
+			return err
+		case "off":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: handlers off <handler-id>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/handlers/off", url.Values{"handler_id": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  deleted=%s handler=%s\n", toString(body["deleted"]), plain[0])
+			return err
+		default:
+			return fmt.Errorf("unknown command: handlers %s", sub)
+		}
 	case "activations":
 		if sub != "ls" {
 			return fmt.Errorf("unknown command: activations %s", sub)
@@ -2531,6 +2622,35 @@ func nonFlagArgsSkippingFlagValues(args []string, valueFlags ...string) []string
 		out = append(out, trimmed)
 	}
 	return out
+}
+
+func parseHandlersEmitValue(args []string) (kind string, name string, payload string) {
+	for i := 0; i < len(args); i++ {
+		if !strings.EqualFold(strings.TrimSpace(args[i]), "--emit") {
+			continue
+		}
+		if i+1 >= len(args) {
+			return "", "", ""
+		}
+		kind = strings.TrimSpace(args[i+1])
+		if i+2 >= len(args) {
+			return kind, "", ""
+		}
+		name = strings.TrimSpace(args[i+2])
+		if i+3 >= len(args) {
+			return kind, name, ""
+		}
+		payloadParts := make([]string, 0, len(args)-(i+3))
+		for j := i + 3; j < len(args); j++ {
+			part := strings.TrimSpace(args[j])
+			if strings.HasPrefix(part, "--") {
+				break
+			}
+			payloadParts = append(payloadParts, part)
+		}
+		return kind, name, strings.Join(payloadParts, " ")
+	}
+	return "", "", ""
 }
 
 func defaultIfBlank(value, fallback string) string {

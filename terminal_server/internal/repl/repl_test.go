@@ -349,6 +349,9 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"store bind",
 		"bus emit",
 		"bus replay",
+		"handlers ls",
+		"handlers on",
+		"handlers off",
 	}
 	for _, command := range commands {
 		if _, ok := DescribeCommand(command); !ok {
@@ -606,6 +609,12 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","event":{"id":"bus-1"}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/bus/replay":
 			_, _ = w.Write([]byte(`{"events":[{"id":"bus-1","kind":"event","name":"alarm"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/handlers":
+			_, _ = w.Write([]byte(`{"handlers":[{"id":"handler-1","selector":"scenario=chat","action":"submit","run_command":"store put notes key value"}]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/handlers/on":
+			_, _ = w.Write([]byte(`{"status":"ok","handler":{"id":"handler-2","selector":"scenario=chat","action":"submit","emit_kind":"intent","emit_name":"alert_ack"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/handlers/off":
+			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
 		default:
 			http.NotFound(w, req)
 		}
@@ -668,6 +677,9 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"store del notes key1",
 		"bus emit event alarm",
 		"bus replay bus-1 bus-1 --kind event",
+		"handlers ls",
+		"handlers on scenario=chat submit --emit intent alert_ack",
+		"handlers off handler-2",
 		"exit",
 	}, "\n") + "\n")
 	var out bytes.Buffer
@@ -795,5 +807,14 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "bus-1") {
 		t.Fatalf("bus output missing: %q", text)
+	}
+	if !strings.Contains(text, "handler-1") {
+		t.Fatalf("handlers ls output missing handler id: %q", text)
+	}
+	if !strings.Contains(text, "handler=handler-2 selector=scenario=chat action=submit") {
+		t.Fatalf("handlers on output missing summary: %q", text)
+	}
+	if !strings.Contains(text, "handler=handler-2") {
+		t.Fatalf("handlers off output missing handler id: %q", text)
 	}
 }

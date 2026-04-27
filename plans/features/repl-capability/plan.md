@@ -46,7 +46,11 @@ layering, acceptance rules, and authoring substrate.
   `ui push`, `ui patch`, `ui transition`, `ui broadcast`,
   `ui subscribe`, and `ui snapshot` are now wired through
   capability service + admin API + REPL command surface + docs.
-- Next planned slice is Phase 3 `handlers` command routing.
+- Landed the Phase 3 routing slice in code: `handlers ls`,
+  `handlers on` (`--run` and `--emit` targets), and `handlers off`
+  are now wired through capability service + admin API + REPL
+  command surface + docs, with focused tests.
+- Next planned slice is Phase 4 `scenarios define` / `undefine`.
 
 ## Problem
 

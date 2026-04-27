@@ -231,6 +231,18 @@ type BusEvent struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// HandlerRegistration represents one runtime input/event routing rule.
+type HandlerRegistration struct {
+	ID          string    `json:"id"`
+	Selector    string    `json:"selector"`
+	Action      string    `json:"action"`
+	RunCommand  string    `json:"run_command,omitempty"`
+	EmitKind    string    `json:"emit_kind,omitempty"`
+	EmitName    string    `json:"emit_name,omitempty"`
+	EmitPayload string    `json:"emit_payload,omitempty"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // Service provides typed in-memory storage for capability closure tools.
 type Service struct {
 	mu sync.RWMutex
@@ -251,6 +263,7 @@ type Service struct {
 	recent       []RecentItem
 	store        map[string]StoreRecord
 	bus          []BusEvent
+	handlers     map[string]HandlerRegistration
 	cohorts      map[string]DeviceCohort
 	uiViews      map[string]UIView
 	uiSnapshots  map[string]UISnapshot
@@ -264,6 +277,7 @@ func NewService() *Service {
 	s := &Service{
 		now:         func() time.Time { return now().UTC() },
 		store:       map[string]StoreRecord{},
+		handlers:    map[string]HandlerRegistration{},
 		cohorts:     map[string]DeviceCohort{},
 		uiViews:     map[string]UIView{},
 		uiSnapshots: map[string]UISnapshot{},
@@ -1802,6 +1816,65 @@ func (s *Service) BusReplay(fromID, toID, kind, name string, limit int) []BusEve
 	return filterBusEvents(window, kind, name, limit)
 }
 
+// HandlerList returns all registered runtime handlers sorted by id.
+func (s *Service) HandlerList() []HandlerRegistration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]HandlerRegistration, 0, len(s.handlers))
+	for _, handler := range s.handlers {
+		out = append(out, handler)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+// HandlerOnRun registers a routing handler that executes a REPL command when matched.
+func (s *Service) HandlerOnRun(selector, action, command string) HandlerRegistration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	handler := HandlerRegistration{
+		ID:         s.nextIDLocked("handler"),
+		Selector:   normalizeHandlerSelector(selector),
+		Action:     normalizeHandlerAction(action),
+		RunCommand: strings.TrimSpace(command),
+		UpdatedAt:  s.now(),
+	}
+	s.handlers[handler.ID] = handler
+	s.appendRecentLocked("handler", handler.ID+" on")
+	return handler
+}
+
+// HandlerOnEmit registers a routing handler that emits a bus event or intent when matched.
+func (s *Service) HandlerOnEmit(selector, action, emitKind, emitName, emitPayload string) HandlerRegistration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	handler := HandlerRegistration{
+		ID:          s.nextIDLocked("handler"),
+		Selector:    normalizeHandlerSelector(selector),
+		Action:      normalizeHandlerAction(action),
+		EmitKind:    defaultIfBlank(strings.ToLower(strings.TrimSpace(emitKind)), "intent"),
+		EmitName:    strings.TrimSpace(emitName),
+		EmitPayload: strings.TrimSpace(emitPayload),
+		UpdatedAt:   s.now(),
+	}
+	s.handlers[handler.ID] = handler
+	s.appendRecentLocked("handler", handler.ID+" on")
+	return handler
+}
+
+// HandlerOff removes one registered handler by id.
+func (s *Service) HandlerOff(handlerID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	handlerID = strings.TrimSpace(handlerID)
+	if _, ok := s.handlers[handlerID]; !ok {
+		return false
+	}
+	delete(s.handlers, handlerID)
+	s.appendRecentLocked("handler", handlerID+" off")
+	return true
+}
+
 func busWindowByID(events []BusEvent, fromID, toID string) []BusEvent {
 	if len(events) == 0 {
 		return nil
@@ -1976,6 +2049,14 @@ func normalizeDeviceIDs(deviceIDs []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func normalizeHandlerSelector(selector string) string {
+	return strings.ToLower(strings.TrimSpace(selector))
+}
+
+func normalizeHandlerAction(action string) string {
+	return strings.ToLower(strings.TrimSpace(action))
 }
 
 func (s *Service) searchCorpusLocked() []searchableItem {

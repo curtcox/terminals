@@ -569,6 +569,49 @@ func TestBusTailFilterAndReplayWindow(t *testing.T) {
 	}
 }
 
+func TestHandlerRegisterListAndOff(t *testing.T) {
+	svc := NewService()
+
+	runHandler := svc.HandlerOnRun(" scenario=chat ", " submit ", "store put chat last hello")
+	if runHandler.ID == "" {
+		t.Fatalf("HandlerOnRun should assign id")
+	}
+	if runHandler.Selector != "scenario=chat" {
+		t.Fatalf("HandlerOnRun selector = %q, want scenario=chat", runHandler.Selector)
+	}
+	if runHandler.Action != "submit" {
+		t.Fatalf("HandlerOnRun action = %q, want submit", runHandler.Action)
+	}
+	if runHandler.RunCommand != "store put chat last hello" {
+		t.Fatalf("HandlerOnRun run_command = %q, want command", runHandler.RunCommand)
+	}
+
+	emitHandler := svc.HandlerOnEmit("device=d1", "tap", "intent", "alert_ack", "device=d1")
+	if emitHandler.EmitKind != "intent" || emitHandler.EmitName != "alert_ack" {
+		t.Fatalf("HandlerOnEmit = %+v, want intent/alert_ack", emitHandler)
+	}
+
+	list := svc.HandlerList()
+	if len(list) != 2 {
+		t.Fatalf("len(HandlerList()) = %d, want 2", len(list))
+	}
+	if list[0].ID != runHandler.ID || list[1].ID != emitHandler.ID {
+		t.Fatalf("HandlerList order = [%s %s], want [%s %s]", list[0].ID, list[1].ID, runHandler.ID, emitHandler.ID)
+	}
+
+	if deleted := svc.HandlerOff(runHandler.ID); !deleted {
+		t.Fatalf("HandlerOff(%q) = false, want true", runHandler.ID)
+	}
+	if deleted := svc.HandlerOff(runHandler.ID); deleted {
+		t.Fatalf("second HandlerOff(%q) should be false", runHandler.ID)
+	}
+
+	remaining := svc.HandlerList()
+	if len(remaining) != 1 || remaining[0].ID != emitHandler.ID {
+		t.Fatalf("remaining handlers = %+v, want only %s", remaining, emitHandler.ID)
+	}
+}
+
 func TestMessageRoomThreadUnreadAcknowledgeLifecycle(t *testing.T) {
 	svc := NewService()
 
