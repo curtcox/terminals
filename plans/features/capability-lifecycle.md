@@ -496,6 +496,8 @@ Rules:
 
 - 2026-04-26 (Stage 1 endpoint availability truthfulness): Hardened endpoint resource compilation in terminal_server/internal/transport/control_stream.go so endpoint-scoped resources are skipped when an endpoint is explicitly marked unavailable (*.endpoint.<index>.available=false), preventing false-positive capability side effects for unavailable media hardware. Added regression assertions in terminal_server/internal/transport/control_stream_test.go (TestCapabilityResourcesCompilesEndpointScopedResources) to lock in suppression of unavailable camera endpoint resources while preserving available endpoint fallback behavior.
 
+- 2026-04-26 (Stage 1 display endpoint availability route-teardown parity): Added transport regression coverage in `terminal_server/internal/transport/control_stream_test.go` (`TestHandleMessageCapabilityDeltaStopsVideoRouteOnDisplayEndpointAvailabilityLoss`) to lock in that explicit display endpoint availability loss (`display.<index>.available=false`) tears down affected inbound video routes while preserving unrelated outbound audio routes.
+
 ## Related Plans
 
 - [protocol.md](protocol.md) — Control-plane message flow and media-plane setup.
