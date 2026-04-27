@@ -115,6 +115,14 @@ layering, acceptance rules, and authoring substrate.
   `/session/members` assertion) so `scripts run` now validates durable
   session membership mutation alongside the existing
   message/board/artifact/canvas checks.
+- Extended the Phase 12 AA6 fixture with an additional mutating Layer 2
+  path in the identity domain (`identity ack record
+  phase12-identity-subject --actor person:fixture-identity --mode
+  confirmed`) plus deterministic read-back (`identity ack show
+  phase12-identity-subject` in-script and admin `/identity/ack`
+  assertion) so `scripts run` now validates durable identity
+  acknowledgement mutation alongside the existing
+  message/board/artifact/canvas/session checks.
 
 ## Problem
 

@@ -2541,6 +2541,65 @@ func (s *Service) executeScriptCommand(command string) error {
 		default:
 			return fmt.Errorf("unsupported session command %q", sub)
 		}
+	case "identity":
+		if sub != "ack" {
+			return fmt.Errorf("unsupported identity command %q", sub)
+		}
+		if len(args) == 0 {
+			return fmt.Errorf("usage: identity ack <show|record>")
+		}
+		action := strings.ToLower(strings.TrimSpace(args[0]))
+		switch action {
+		case "record":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: identity ack record <subject-ref> --actor <actor-ref> [--mode <mode>]")
+			}
+			subjectRef := strings.TrimSpace(args[1])
+			if subjectRef == "" {
+				return fmt.Errorf("subject-ref is required")
+			}
+			actor := ""
+			mode := "read"
+			rest := args[2:]
+			for i := 0; i < len(rest); i++ {
+				token := rest[i]
+				switch token {
+				case "--actor":
+					if i+1 >= len(rest) {
+						return fmt.Errorf("--actor requires an actor-ref")
+					}
+					actor = strings.TrimSpace(rest[i+1])
+					i++
+				case "--mode":
+					if i+1 >= len(rest) {
+						return fmt.Errorf("--mode requires a mode")
+					}
+					mode = strings.TrimSpace(rest[i+1])
+					i++
+				default:
+					return fmt.Errorf("unsupported flag %q", token)
+				}
+			}
+			if actor == "" {
+				return fmt.Errorf("--actor is required")
+			}
+			if _, ok := s.RecordAcknowledgement(subjectRef, actor, mode); !ok {
+				return fmt.Errorf("invalid acknowledgement")
+			}
+			return nil
+		case "show":
+			if len(args) != 2 {
+				return fmt.Errorf("usage: identity ack show <subject-ref>")
+			}
+			subjectRef := strings.TrimSpace(args[1])
+			if subjectRef == "" {
+				return fmt.Errorf("subject-ref is required")
+			}
+			_ = s.GetAcknowledgements(subjectRef)
+			return nil
+		default:
+			return fmt.Errorf("unsupported identity ack action %q", action)
+		}
 	case "sim":
 		switch sub {
 		case "device":

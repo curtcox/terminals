@@ -933,7 +933,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	if dryRunW.Code != http.StatusOK {
 		t.Fatalf("fixture scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
 	}
-	if !strings.Contains(dryRunW.Body.String(), `"command_count":21`) {
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":23`) {
 		t.Fatalf("fixture scripts dry-run body missing command count: %s", dryRunW.Body.String())
 	}
 
@@ -947,7 +947,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 		t.Fatalf("fixture scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
 	}
 	body := runW.Body.String()
-	if !strings.Contains(body, `"executed_count":21`) || !strings.Contains(body, `"failed_count":0`) {
+	if !strings.Contains(body, `"executed_count":23`) || !strings.Contains(body, `"failed_count":0`) {
 		t.Fatalf("fixture scripts run body missing execution counters: %s", body)
 	}
 
@@ -1065,6 +1065,18 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	}
 	if !strings.Contains(sessionW.Body.String(), `"session_id":"`+sessionID+`"`) || !strings.Contains(sessionW.Body.String(), `"identity_id":"fixture-session-member"`) {
 		t.Fatalf("fixture session members body missing session side effect: %s", sessionW.Body.String())
+	}
+
+	ackReq := httptest.NewRequest(http.MethodGet, "/admin/api/identity/ack?subject_ref=phase12-identity-subject", nil)
+	ackW := httptest.NewRecorder()
+	h.ServeHTTP(ackW, ackReq)
+	if ackW.Code != http.StatusOK {
+		t.Fatalf("fixture identity ack show status = %d, want 200 body=%s", ackW.Code, ackW.Body.String())
+	}
+	if !strings.Contains(ackW.Body.String(), `"subject_ref":"phase12-identity-subject"`) ||
+		!strings.Contains(ackW.Body.String(), `"actor_ref":"person:fixture-identity"`) ||
+		!strings.Contains(ackW.Body.String(), `"mode":"confirmed"`) {
+		t.Fatalf("fixture identity ack show body missing identity ack side effect: %s", ackW.Body.String())
 	}
 
 	simReq := httptest.NewRequest(http.MethodGet, "/admin/api/sim/ui?device_id=sim-fixture", nil)

@@ -1,1 +1,1 @@
-For `plans/features/repl-capability/plan.md`, continue the Phase 12 AA6 fixture by adding one more mutating Layer 2 domain-family path in the identity domain (`identity ack record ...`) with deterministic read-back assertions in both script output and admin API checks.
+For `plans/features/repl-capability/plan.md`, continue the Phase 12 AA6 fixture by adding one more mutating Layer 2 domain-family path in the memory domain (`memory remember ...`) with deterministic read-back assertions in both script output and admin API checks.
