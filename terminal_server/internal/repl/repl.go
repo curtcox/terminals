@@ -147,7 +147,10 @@ func replCommandSpecs() []commandSpec {
 		{Name: "sim device rm", Usage: "sim device rm <id> [--json]", Summary: "Remove a virtual simulation device", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sim"}},
 		{Name: "sim input", Usage: "sim input <id> <component-id> <action> [<value>] [--json]", Summary: "Inject synthetic input into a simulation device", Classification: commandMutating, RelatedDocs: []string{"repl/commands/sim"}},
 		{Name: "sim ui", Usage: "sim ui <id> [--json]", Summary: "Inspect captured simulated UI state and inputs", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/sim"}},
+		{Name: "sim expect", Usage: "sim expect <id> <ui|message> <selector> [--within <duration>] [--json]", Summary: "Assert simulated UI/message output", Classification: commandOperational, RelatedDocs: []string{"repl/commands/sim"}},
+		{Name: "sim record", Usage: "sim record <id> [--duration <duration>] [--json]", Summary: "Capture simulated state over a recording window", Classification: commandOperational, RelatedDocs: []string{"repl/commands/sim"}},
 		{Name: "scripts dry-run", Usage: "scripts dry-run <path> [--json]", Summary: "Parse and summarize a script without executing it", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/scripts"}},
+		{Name: "scripts run", Usage: "scripts run <path> [--json]", Summary: "Execute a REPL script non-interactively", Classification: commandOperational, RelatedDocs: []string{"repl/commands/scripts"}},
 		{Name: "activations ls", Usage: "activations ls [--json]", Summary: "List active scenario by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/activations"}},
 		{Name: "claims tree", Usage: "claims tree [--json]", Summary: "Show claims grouped by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/claims"}},
 		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
@@ -2051,6 +2054,50 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return err
 			}
 			return writeJSON(s.out, body)
+		case "expect":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--within")
+			if len(plain) < 3 {
+				return errors.New("usage: sim expect <id> <ui|message> <selector> [--within <duration>]")
+			}
+			form := url.Values{
+				"device_id": {plain[0]},
+				"kind":      {plain[1]},
+				"selector":  {strings.Join(plain[2:], " ")},
+			}
+			if within := strings.TrimSpace(flagValue(args[1:], "--within")); within != "" {
+				form.Set("within", within)
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/sim/expect", form)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			result, _ := body["result"].(map[string]any)
+			_, err = fmt.Fprintf(s.out, "OK  action=sim.expect device=%s kind=%s matched=%s\n", plain[0], plain[1], toString(result["matched"]))
+			return err
+		case "record":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--duration")
+			if len(plain) < 1 {
+				return errors.New("usage: sim record <id> [--duration <duration>]")
+			}
+			form := url.Values{"device_id": {plain[0]}}
+			if duration := strings.TrimSpace(flagValue(args[1:], "--duration")); duration != "" {
+				form.Set("duration", duration)
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/sim/record", form)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			result, _ := body["result"].(map[string]any)
+			inputs := toAnySlice(result["inputs"])
+			messages := toAnySlice(result["messages"])
+			_, err = fmt.Fprintf(s.out, "OK  action=sim.record device=%s inputs=%d messages=%d\n", plain[0], len(inputs), len(messages))
+			return err
 		default:
 			return fmt.Errorf("unknown command: sim %s", sub)
 		}
@@ -2070,6 +2117,21 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			result, _ := body["result"].(map[string]any)
 			_, err = fmt.Fprintf(s.out, "OK  action=scripts.dry-run path=%s commands=%s skipped=%s\n", plain[0], toString(result["command_count"]), toString(result["skipped_count"]))
+			return err
+		case "run":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: scripts run <path>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/scripts/run", url.Values{"path": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			result, _ := body["result"].(map[string]any)
+			_, err = fmt.Fprintf(s.out, "OK  action=scripts.run path=%s commands=%s executed=%s failed=%s\n", plain[0], toString(result["command_count"]), toString(result["executed_count"]), toString(result["failed_count"]))
 			return err
 		default:
 			return fmt.Errorf("unknown command: scripts %s", sub)

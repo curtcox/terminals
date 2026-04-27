@@ -171,7 +171,10 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/sim/devices/rm", h.handleSimDeviceRemove)
 	mux.HandleFunc("/admin/api/sim/input", h.handleSimInput)
 	mux.HandleFunc("/admin/api/sim/ui", h.handleSimUI)
+	mux.HandleFunc("/admin/api/sim/expect", h.handleSimExpect)
+	mux.HandleFunc("/admin/api/sim/record", h.handleSimRecord)
 	mux.HandleFunc("/admin/api/scripts/dry-run", h.handleScriptsDryRun)
+	mux.HandleFunc("/admin/api/scripts/run", h.handleScriptsRun)
 	mux.HandleFunc("/admin/api/world/calibration", h.handleWorldCalibration)
 	mux.HandleFunc("/admin/api/world/verify", h.handleWorldVerify)
 	mux.HandleFunc("/admin/api/store/get", h.handleStoreGet)
@@ -1284,6 +1287,74 @@ func (h *Handler) handleSimUI(w http.ResponseWriter, req *http.Request) {
 	})
 }
 
+func (h *Handler) handleSimExpect(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	kind := strings.TrimSpace(req.Form.Get("kind"))
+	selector := strings.TrimSpace(req.Form.Get("selector"))
+	if deviceID == "" || kind == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id and kind are required")
+		return
+	}
+	within := time.Duration(0)
+	if rawWithin := strings.TrimSpace(req.Form.Get("within")); rawWithin != "" {
+		parsedWithin, err := time.ParseDuration(rawWithin)
+		if err != nil || parsedWithin <= 0 {
+			h.writeJSONError(w, http.StatusBadRequest, "within must be a positive duration")
+			return
+		}
+		within = parsedWithin
+	}
+	result, ok := h.capability.SimExpect(deviceID, kind, selector, within)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "sim device not found")
+		return
+	}
+	if !result.Matched {
+		h.writeJSON(w, http.StatusConflict, map[string]any{"status": "failed", "result": result})
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "result": result})
+}
+
+func (h *Handler) handleSimRecord(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	if deviceID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+	duration := time.Duration(0)
+	if rawDuration := strings.TrimSpace(req.Form.Get("duration")); rawDuration != "" {
+		parsedDuration, err := time.ParseDuration(rawDuration)
+		if err != nil || parsedDuration <= 0 {
+			h.writeJSONError(w, http.StatusBadRequest, "duration must be a positive duration")
+			return
+		}
+		duration = parsedDuration
+	}
+	record, ok := h.capability.SimRecord(deviceID, duration)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "sim device not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "result": record})
+}
+
 func (h *Handler) handleScriptsDryRun(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1304,6 +1375,29 @@ func (h *Handler) handleScriptsDryRun(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 	result := h.capability.ScriptDryRun(path, string(content))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "result": result})
+}
+
+func (h *Handler) handleScriptsRun(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	path := strings.TrimSpace(req.Form.Get("path"))
+	if path == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "path is required")
+		return
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		h.writeJSONError(w, http.StatusNotFound, "script not found")
+		return
+	}
+	result := h.capability.ScriptRun(path, string(content))
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "result": result})
 }
 

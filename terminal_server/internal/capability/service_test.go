@@ -708,12 +708,58 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 		t.Fatalf("SimInputs(kitchen-sim) = %+v, want [%s]", inputs, record.ID)
 	}
 
+	svc.UIPush("kitchen-sim", `{"type":"stack","children":[{"type":"text","text":"hello"}]}`, "sim-root")
+	if _, ok := svc.SimExpect("missing", "ui", "hello", 0); ok {
+		t.Fatalf("SimExpect for missing device should return false")
+	}
+	uiExpectation, ok := svc.SimExpect("kitchen-sim", "ui", "hello", 2*time.Second)
+	if !ok {
+		t.Fatalf("SimExpect(kitchen-sim,ui,hello) = false, want true")
+	}
+	if !uiExpectation.Matched {
+		t.Fatalf("SimExpect(kitchen-sim,ui,hello) matched = false, want true (%+v)", uiExpectation)
+	}
+	if uiExpectation.Within != "2s" {
+		t.Fatalf("SimExpect within = %q, want 2s", uiExpectation.Within)
+	}
+
+	svc.BusEmit("event", "alarm", "kitchen-sim:alert")
+	messageExpectation, ok := svc.SimExpect("kitchen-sim", "message", "alert", 0)
+	if !ok || !messageExpectation.Matched {
+		t.Fatalf("SimExpect(kitchen-sim,message,alert) = %+v, ok=%v, want matched true", messageExpectation, ok)
+	}
+
+	recording, ok := svc.SimRecord("kitchen-sim", 30*time.Second)
+	if !ok {
+		t.Fatalf("SimRecord(kitchen-sim) = false, want true")
+	}
+	if recording.Snapshot.DeviceID != "kitchen-sim" {
+		t.Fatalf("SimRecord snapshot device = %q, want kitchen-sim", recording.Snapshot.DeviceID)
+	}
+	if len(recording.Inputs) == 0 {
+		t.Fatalf("SimRecord inputs = %+v, want at least one input", recording.Inputs)
+	}
+	if len(recording.Messages) == 0 {
+		t.Fatalf("SimRecord messages = %+v, want at least one message", recording.Messages)
+	}
+	if recording.Duration != "30s" {
+		t.Fatalf("SimRecord duration = %q, want 30s", recording.Duration)
+	}
+
 	dryRun := svc.ScriptDryRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner")
 	if dryRun.Path != "fixtures/smoke.term" {
 		t.Fatalf("ScriptDryRun path = %q, want fixtures/smoke.term", dryRun.Path)
 	}
 	if dryRun.CommandCount != 2 || dryRun.SkippedCount != 2 {
 		t.Fatalf("ScriptDryRun counts = commands:%d skipped:%d, want 2/2", dryRun.CommandCount, dryRun.SkippedCount)
+	}
+
+	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner")
+	if run.Path != "fixtures/smoke.term" {
+		t.Fatalf("ScriptRun path = %q, want fixtures/smoke.term", run.Path)
+	}
+	if run.CommandCount != 2 || run.SkippedCount != 2 || run.ExecutedCount != 2 || run.FailedCount != 0 {
+		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 2/2/2/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
 	}
 
 	if deleted := svc.SimDeviceDelete("kitchen-sim"); !deleted {

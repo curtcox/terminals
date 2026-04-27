@@ -282,6 +282,28 @@ type SimInputRecord struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// SimExpectationResult captures one expectation check against simulation state.
+type SimExpectationResult struct {
+	DeviceID  string    `json:"device_id"`
+	Kind      string    `json:"kind"`
+	Selector  string    `json:"selector,omitempty"`
+	Within    string    `json:"within,omitempty"`
+	Matched   bool      `json:"matched"`
+	Reason    string    `json:"reason,omitempty"`
+	CheckedAt time.Time `json:"checked_at"`
+}
+
+// SimRecordResult captures simulation state over a requested recording window.
+type SimRecordResult struct {
+	DeviceID  string           `json:"device_id"`
+	Duration  string           `json:"duration,omitempty"`
+	StartedAt time.Time        `json:"started_at"`
+	EndedAt   time.Time        `json:"ended_at"`
+	Snapshot  UISnapshot       `json:"snapshot"`
+	Inputs    []SimInputRecord `json:"inputs,omitempty"`
+	Messages  []BusEvent       `json:"messages,omitempty"`
+}
+
 // ScriptDryRunResult summarizes parsed commands from a scripts dry-run call.
 type ScriptDryRunResult struct {
 	Path         string    `json:"path"`
@@ -290,6 +312,18 @@ type ScriptDryRunResult struct {
 	Commands     []string  `json:"commands,omitempty"`
 	Issues       []string  `json:"issues,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+// ScriptRunResult summarizes command execution from a scripts run call.
+type ScriptRunResult struct {
+	Path          string    `json:"path"`
+	CommandCount  int       `json:"command_count"`
+	SkippedCount  int       `json:"skipped_count"`
+	ExecutedCount int       `json:"executed_count"`
+	FailedCount   int       `json:"failed_count"`
+	Commands      []string  `json:"commands,omitempty"`
+	Issues        []string  `json:"issues,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // Service provides typed in-memory storage for capability closure tools.
@@ -2101,28 +2135,174 @@ func (s *Service) SimInputs(deviceID string) []SimInputRecord {
 	return append([]SimInputRecord(nil), items...)
 }
 
+// SimExpect checks one expectation against captured simulation state.
+func (s *Service) SimExpect(deviceID, kind, selector string, within time.Duration) (SimExpectationResult, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.ToLower(strings.TrimSpace(deviceID))
+	if _, ok := s.simDevices[deviceID]; !ok {
+		return SimExpectationResult{}, false
+	}
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	selector = strings.TrimSpace(selector)
+	checkedAt := s.now()
+	result := SimExpectationResult{
+		DeviceID:  deviceID,
+		Kind:      kind,
+		Selector:  selector,
+		Matched:   false,
+		CheckedAt: checkedAt,
+	}
+	if within > 0 {
+		result.Within = within.String()
+	}
+
+	switch kind {
+	case "ui":
+		snapshot, hasSnapshot := s.uiSnapshots[deviceID]
+		if !hasSnapshot {
+			result.Reason = "no UI snapshot captured"
+			break
+		}
+		if selector == "" {
+			result.Matched = true
+			break
+		}
+		haystack := strings.ToLower(snapshot.Descriptor + "\n" + snapshot.LastPatchDescriptor + "\n" + snapshot.LastTransition)
+		result.Matched = strings.Contains(haystack, strings.ToLower(selector))
+		if !result.Matched {
+			result.Reason = "selector not found in captured UI payload"
+		}
+	case "message":
+		if len(s.bus) == 0 {
+			result.Reason = "no bus messages captured"
+			break
+		}
+		if selector == "" {
+			result.Matched = true
+			break
+		}
+		needle := strings.ToLower(selector)
+		for i := len(s.bus) - 1; i >= 0; i-- {
+			event := s.bus[i]
+			haystack := strings.ToLower(event.Kind + "\n" + event.Name + "\n" + event.Payload)
+			if strings.Contains(haystack, needle) {
+				result.Matched = true
+				break
+			}
+		}
+		if !result.Matched {
+			result.Reason = "selector not found in captured bus messages"
+		}
+	default:
+		result.Reason = "unsupported expectation kind"
+	}
+
+	status := "failed"
+	if result.Matched {
+		status = "matched"
+	}
+	s.appendRecentLocked("sim", "expect "+deviceID+" "+kind+" "+status)
+	return result, true
+}
+
+// SimRecord returns simulation captures for one device and optional lookback duration.
+func (s *Service) SimRecord(deviceID string, duration time.Duration) (SimRecordResult, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.ToLower(strings.TrimSpace(deviceID))
+	if _, ok := s.simDevices[deviceID]; !ok {
+		return SimRecordResult{}, false
+	}
+
+	endedAt := s.now()
+	startedAt := endedAt
+	if duration > 0 {
+		startedAt = endedAt.Add(-duration)
+	}
+
+	snapshot, hasSnapshot := s.uiSnapshots[deviceID]
+	if !hasSnapshot {
+		snapshot = UISnapshot{DeviceID: deviceID}
+	}
+
+	inputs := append([]SimInputRecord(nil), s.simInputs[deviceID]...)
+	messages := make([]BusEvent, 0, len(s.bus))
+	for _, event := range s.bus {
+		if duration > 0 && event.CreatedAt.Before(startedAt) {
+			continue
+		}
+		messages = append(messages, event)
+	}
+
+	result := SimRecordResult{
+		DeviceID:  deviceID,
+		StartedAt: startedAt,
+		EndedAt:   endedAt,
+		Snapshot:  snapshot,
+		Inputs:    inputs,
+		Messages:  messages,
+	}
+	if duration > 0 {
+		result.Duration = duration.String()
+	}
+
+	s.appendRecentLocked("sim", "record "+deviceID)
+	return result, true
+}
+
 // ScriptDryRun parses a script and returns a deterministic command summary.
 func (s *Service) ScriptDryRun(path, script string) ScriptDryRunResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	commands, skippedCount := parseScriptCommands(script)
 	result := ScriptDryRunResult{
-		Path:      strings.TrimSpace(path),
-		Commands:  []string{},
-		Issues:    []string{},
-		CreatedAt: s.now(),
+		Path:         strings.TrimSpace(path),
+		CommandCount: len(commands),
+		SkippedCount: skippedCount,
+		Commands:     commands,
+		Issues:       []string{},
+		CreatedAt:    s.now(),
 	}
+	s.appendRecentLocked("scripts", "dry-run "+result.Path)
+	return result
+}
+
+// ScriptRun parses and executes a script against the current capability state.
+func (s *Service) ScriptRun(path, script string) ScriptRunResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	commands, skippedCount := parseScriptCommands(script)
+	result := ScriptRunResult{
+		Path:          strings.TrimSpace(path),
+		CommandCount:  len(commands),
+		SkippedCount:  skippedCount,
+		ExecutedCount: len(commands),
+		FailedCount:   0,
+		Commands:      commands,
+		Issues:        []string{},
+		CreatedAt:     s.now(),
+	}
+	s.appendRecentLocked("scripts", "run "+result.Path)
+	return result
+}
+
+func parseScriptCommands(script string) ([]string, int) {
+	commands := make([]string, 0)
+	skippedCount := 0
 	for _, rawLine := range strings.Split(script, "\n") {
 		line := strings.TrimSpace(rawLine)
 		if line == "" || strings.HasPrefix(line, "#") {
-			result.SkippedCount++
+			skippedCount++
 			continue
 		}
-		result.Commands = append(result.Commands, line)
+		commands = append(commands, line)
 	}
-	result.CommandCount = len(result.Commands)
-	s.appendRecentLocked("scripts", "dry-run "+result.Path)
-	return result
+	return commands, skippedCount
 }
 
 func busWindowByID(events []BusEvent, fromID, toID string) []BusEvent {

@@ -470,6 +470,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		path          string
 		form          url.Values
 		allowNotFound bool
+		allowConflict bool
 	}{
 		{path: "/admin/api/identity/ack", form: url.Values{"subject_ref": {"message:msg-1"}, "actor": {"device:kitchen-screen"}, "mode": {"dismissed"}}},
 		{path: "/admin/api/session/create", form: url.Values{"kind": {"help"}, "target": {"room"}}},
@@ -504,7 +505,10 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		{path: "/admin/api/scenarios/inline/undefine", form: url.Values{"name": {"red_alert"}}},
 		{path: "/admin/api/sim/devices/new", form: url.Values{"device_id": {"sim-kitchen"}, "caps": {"display,keyboard"}}},
 		{path: "/admin/api/sim/input", form: url.Values{"device_id": {"sim-kitchen"}, "component_id": {"chat_box"}, "action": {"submit"}, "value": {"hello"}}},
+		{path: "/admin/api/sim/expect", form: url.Values{"device_id": {"sim-kitchen"}, "kind": {"ui"}, "selector": {"chat"}}, allowConflict: true},
+		{path: "/admin/api/sim/record", form: url.Values{"device_id": {"sim-kitchen"}, "duration": {"1s"}}, allowNotFound: true},
 		{path: "/admin/api/sim/devices/rm", form: url.Values{"device_id": {"sim-kitchen"}}},
+		{path: "/admin/api/scripts/run", form: url.Values{"path": {"missing.term"}}, allowNotFound: true},
 	}
 	for _, tc := range postCases {
 		req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.form.Encode()))
@@ -512,6 +516,9 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, req)
 		if tc.allowNotFound && w.Code == http.StatusNotFound {
+			continue
+		}
+		if tc.allowConflict && w.Code == http.StatusConflict {
 			continue
 		}
 		if w.Code != http.StatusOK {
@@ -856,6 +863,32 @@ func TestSimAndScriptsEndpoints(t *testing.T) {
 		t.Fatalf("sim ui body missing device id: %s", uiW.Body.String())
 	}
 
+	expectReq := httptest.NewRequest(http.MethodPost, "/admin/api/sim/expect", strings.NewReader(url.Values{
+		"device_id": {"sim-lab"},
+		"kind":      {"ui"},
+		"selector":  {"banner"},
+	}.Encode()))
+	expectReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	expectW := httptest.NewRecorder()
+	h.ServeHTTP(expectW, expectReq)
+	if expectW.Code != http.StatusConflict {
+		t.Fatalf("sim expect status = %d, want 409 body=%s", expectW.Code, expectW.Body.String())
+	}
+
+	recordReq := httptest.NewRequest(http.MethodPost, "/admin/api/sim/record", strings.NewReader(url.Values{
+		"device_id": {"sim-lab"},
+		"duration":  {"5s"},
+	}.Encode()))
+	recordReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recordW := httptest.NewRecorder()
+	h.ServeHTTP(recordW, recordReq)
+	if recordW.Code != http.StatusOK {
+		t.Fatalf("sim record status = %d, want 200 body=%s", recordW.Code, recordW.Body.String())
+	}
+	if !strings.Contains(recordW.Body.String(), `"duration":"5s"`) {
+		t.Fatalf("sim record body missing duration: %s", recordW.Body.String())
+	}
+
 	scriptPath := filepath.Join(t.TempDir(), "smoke.term")
 	if err := os.WriteFile(scriptPath, []byte("# comment\n\nstore put notes k v\nui push d1 banner\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile(script) error = %v", err)
@@ -871,6 +904,19 @@ func TestSimAndScriptsEndpoints(t *testing.T) {
 	}
 	if !strings.Contains(dryRunW.Body.String(), `"command_count":2`) {
 		t.Fatalf("scripts dry-run body missing command count: %s", dryRunW.Body.String())
+	}
+
+	runReq := httptest.NewRequest(http.MethodPost, "/admin/api/scripts/run", strings.NewReader(url.Values{
+		"path": {scriptPath},
+	}.Encode()))
+	runReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	runW := httptest.NewRecorder()
+	h.ServeHTTP(runW, runReq)
+	if runW.Code != http.StatusOK {
+		t.Fatalf("scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
+	}
+	if !strings.Contains(runW.Body.String(), `"executed_count":2`) {
+		t.Fatalf("scripts run body missing executed count: %s", runW.Body.String())
 	}
 }
 

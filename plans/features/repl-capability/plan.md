@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: copilot
 validation: none
-last-reviewed: 2026-04-26
+last-reviewed: 2026-04-27
 ---
 
 # REPL Capability Plan
@@ -58,8 +58,10 @@ layering, acceptance rules, and authoring substrate.
   `sim device new|rm`, `sim input`, `sim ui`, and
   `scripts dry-run` are now wired through capability service +
   admin API + REPL command surface + docs, with focused tests.
-- Next planned slice is the remaining Phase 5 assertion/execution
-  surface (`sim expect`, `sim record`, and `scripts run`).
+- Landed the remaining Phase 5 assertion/execution slice in code:
+  `sim expect`, `sim record`, and `scripts run` are now wired
+  through capability service + admin API + REPL command surface +
+  docs, with focused tests.
 
 ## Problem
 
