@@ -162,6 +162,14 @@ func replCommandSpecs() []commandSpec {
 		{Name: "app logs", Usage: "app logs <app> [<query>]", Summary: "Query app-related logs", Classification: commandOperational, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app reload", Usage: "app reload <app> [--json]", Summary: "Reload an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app rollback", Usage: "app rollback <app> [--json]", Summary: "Rollback an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "apps keys ls", Usage: "apps keys ls [--json]", Summary: "List trust-store keys", Classification: commandReadOnly},
+		{Name: "apps keys show", Usage: "apps keys show <key-id> [--json]", Summary: "Show one trust key", Classification: commandReadOnly},
+		{Name: "apps keys add", Usage: "apps keys add <key-id> <role[,role]> [note]", Summary: "Add a key to the trust store", Classification: commandMutating},
+		{Name: "apps keys confirm", Usage: "apps keys confirm <key-id> [--json]", Summary: "Confirm a candidate key", Classification: commandMutating},
+		{Name: "apps keys revoke", Usage: "apps keys revoke <key-id> [reason]", Summary: "Revoke a key", Classification: commandMutating},
+		{Name: "apps keys archive", Usage: "apps keys archive <key-id> [--json]", Summary: "Archive a non-active key", Classification: commandMutating},
+		{Name: "apps keys verify", Usage: "apps keys verify [--json]", Summary: "Verify trust log chain integrity", Classification: commandReadOnly},
+		{Name: "apps keys log", Usage: "apps keys log [--json]", Summary: "Show trust log entries", Classification: commandReadOnly},
 		{Name: "config show", Usage: "config show [--json]", Summary: "Show effective config", Classification: commandReadOnly},
 		{Name: "logs tail", Usage: "logs tail [<query>]", Summary: "Query recent server logs", Classification: commandOperational, RelatedDocs: []string{"repl/commands/logs"}},
 		{Name: "observe tail", Usage: "observe tail [<query>]", Summary: "Alias for logs tail", Classification: commandOperational, RelatedDocs: []string{"repl/commands/logs"}},
@@ -334,7 +342,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "bug", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "scenarios", "sim", "scripts", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
+	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "bug", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "scenarios", "sim", "scripts", "activations", "claims", "app", "apps", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -2348,6 +2356,142 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		default:
 			return fmt.Errorf("unknown command: app %s", sub)
 		}
+	case "apps":
+		switch sub {
+		case "keys":
+			if len(args) == 0 {
+				return errors.New("usage: apps keys <ls|show|add|confirm|revoke|archive|verify|log>")
+			}
+			keySub := strings.TrimSpace(args[0])
+			switch keySub {
+			case "ls":
+				body, err := s.fetchJSON(ctx, "/admin/api/trust/keys")
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				keys, _ := body["keys"].([]any)
+				rows := make([][]string, 0, len(keys))
+				for _, kAny := range keys {
+					k, _ := kAny.(map[string]any)
+					if k == nil {
+						continue
+					}
+					rolesAny, _ := k["roles"].([]any)
+					rolesStrs := make([]string, 0, len(rolesAny))
+					for _, r := range rolesAny {
+						if rs, ok := r.(string); ok {
+							rolesStrs = append(rolesStrs, rs)
+						}
+					}
+					rows = append(rows, []string{toString(k["key_id"]), strings.Join(rolesStrs, ","), toString(k["state"])})
+				}
+				return printTable(s.out, []string{"KEY_ID", "ROLES", "STATE"}, rows)
+			case "show":
+				if len(args) < 2 {
+					return errors.New("usage: apps keys show <key_id>")
+				}
+				body, err := s.fetchJSON(ctx, "/admin/api/trust/keys")
+				if err != nil {
+					return err
+				}
+				want := strings.TrimSpace(args[1])
+				keys, _ := body["keys"].([]any)
+				for _, kAny := range keys {
+					k, _ := kAny.(map[string]any)
+					if k != nil && toString(k["key_id"]) == want {
+						return writeJSON(s.out, k)
+					}
+				}
+				return fmt.Errorf("key not found: %s", want)
+			case "add":
+				if len(args) < 3 {
+					return errors.New("usage: apps keys add <key_id> <role[,role]>")
+				}
+				keyID := strings.TrimSpace(args[1])
+				rolesStr := strings.TrimSpace(args[2])
+				body, err := s.postJSON(ctx, "/admin/api/trust/keys", map[string]any{
+					"key_id": keyID,
+					"roles":  strings.Split(rolesStr, ","),
+					"note":   strings.Join(args[3:], " "),
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  key_id=%s state=candidate\n", keyID)
+				return err
+			case "confirm":
+				if len(args) < 2 {
+					return errors.New("usage: apps keys confirm <key_id>")
+				}
+				keyID := strings.TrimSpace(args[1])
+				body, err := s.postJSON(ctx, "/admin/api/trust/keys/confirm", map[string]any{"key_id": keyID})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  key_id=%s state=active\n", keyID)
+				return err
+			case "revoke":
+				if len(args) < 2 {
+					return errors.New("usage: apps keys revoke <key_id> [--reason <text>]")
+				}
+				keyID := strings.TrimSpace(args[1])
+				reason := strings.Join(args[2:], " ")
+				body, err := s.postJSON(ctx, "/admin/api/trust/keys/revoke", map[string]any{"key_id": keyID, "reason": reason})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				affected, _ := body["affected_apps"].([]any)
+				_, err = fmt.Fprintf(s.out, "OK  key_id=%s state=revoked affected_apps=%d\n", keyID, len(affected))
+				return err
+			case "archive":
+				if len(args) < 2 {
+					return errors.New("usage: apps keys archive <key_id>")
+				}
+				keyID := strings.TrimSpace(args[1])
+				body, err := s.postJSON(ctx, "/admin/api/trust/keys/archive", map[string]any{"key_id": keyID})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  key_id=%s state=archived\n", keyID)
+				return err
+			case "verify":
+				body, err := s.fetchJSON(ctx, "/admin/api/trust/verify")
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "chain=%s entries=%v installer=%s\n",
+					toString(body["chain_status"]), body["entry_count"], toString(body["installer_key"]))
+				return err
+			case "log":
+				body, err := s.fetchJSON(ctx, "/admin/api/trust/log")
+				if err != nil {
+					return err
+				}
+				return writeJSON(s.out, body)
+			default:
+				return fmt.Errorf("unknown command: apps keys %s", keySub)
+			}
+		default:
+			return fmt.Errorf("unknown command: apps %s", sub)
+		}
 	case "config":
 		if sub != "show" {
 			return fmt.Errorf("unknown command: config %s", sub)
@@ -2599,6 +2743,14 @@ func (s *state) postFormJSON(ctx context.Context, route string, form url.Values)
 		form = url.Values{}
 	}
 	return s.doJSON(ctx, http.MethodPost, route, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+}
+
+func (s *state) postJSON(ctx context.Context, route string, payload map[string]any) (map[string]any, error) {
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return s.doJSON(ctx, http.MethodPost, route, "application/json", bytes.NewReader(b))
 }
 
 func (s *state) doJSON(ctx context.Context, method, route, contentType string, body io.Reader) (map[string]any, error) {

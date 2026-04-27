@@ -61,6 +61,7 @@ type Handler struct {
 	bugReports  *bugreport.Service
 	capability  *capability.Service
 	world       worldAdminModel
+	trust       trustService
 	cfg         config.Config
 	now         func() time.Time
 }
@@ -76,6 +77,7 @@ func NewHandler(
 	devices *device.Manager,
 	cfg config.Config,
 	worldModel worldAdminModel,
+	trustSvc trustService,
 ) http.Handler {
 	h := &Handler{
 		control:     control,
@@ -85,6 +87,7 @@ func NewHandler(
 		appRuntime:  appRuntime,
 		syncAppDefs: syncAppDefs,
 		devices:     devices,
+		trust:       trustSvc,
 		bugReports:  bugreport.NewService(cfg.LogDir, devices, runtime),
 		capability:  capability.NewService(),
 		world:       worldModel,
@@ -196,6 +199,12 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
+	mux.HandleFunc("/admin/api/trust/keys", h.handleTrustKeys)
+	mux.HandleFunc("/admin/api/trust/keys/confirm", h.handleTrustKeyConfirm)
+	mux.HandleFunc("/admin/api/trust/keys/revoke", h.handleTrustKeyRevoke)
+	mux.HandleFunc("/admin/api/trust/keys/archive", h.handleTrustKeyArchive)
+	mux.HandleFunc("/admin/api/trust/verify", h.handleTrustVerify)
+	mux.HandleFunc("/admin/api/trust/log", h.handleTrustLog)
 	mux.HandleFunc("/admin/logs", h.handleLogs)
 	mux.HandleFunc("/admin/logs.jsonl", h.handleLogsJSONL)
 	mux.HandleFunc("/admin/logs/trace/", h.handleLogsTrace)

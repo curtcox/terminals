@@ -18,7 +18,10 @@ if ! grep -Fq "Coverage Depth" "${MATRIX}"; then
   fail "use-case validation matrix must include a Coverage Depth column"
 fi
 
-mapfile -t script_ids < <(
+script_ids=()
+while IFS= read -r _line; do
+  script_ids+=("$_line")
+done < <(
   sed -n '/case "${id}" in/,/\*)/p' "${VALIDATOR}" |
     sed -n 's/^[[:space:]]*\([A-Z][0-9][0-9]*\))$/\1/p'
 )

@@ -238,7 +238,7 @@ func TestStartAndStopScenarioEndpoints(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil)
+	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil, nil)
 
 	startReq := httptest.NewRequest(http.MethodPost, "/admin/api/scenarios/start", strings.NewReader(url.Values{
 		"scenario":   {"terminal"},
@@ -281,7 +281,7 @@ func TestUpdateDevicePlacementEndpoint(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil)
+	h := NewHandler(control, runtime, nil, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/api/devices/placement", strings.NewReader(url.Values{
 		"device_id": {"kitchen-1"},
@@ -343,7 +343,7 @@ func testHandler(t *testing.T, cfgOverride ...config.Config) http.Handler {
 			cfg.LogDir = override.LogDir
 		}
 	}
-	return NewHandler(control, runtime, nil, nil, nil, nil, devices, cfg, worldModel)
+	return NewHandler(control, runtime, nil, nil, nil, nil, devices, cfg, worldModel, nil)
 }
 
 func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
@@ -363,7 +363,7 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 		Broadcast: ui.NewMemoryBroadcaster(),
 	})
 
-	h := NewHandler(control, runtime, nil, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"}, nil)
+	h := NewHandler(control, runtime, nil, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"}, nil, nil)
 
 	listReq := httptest.NewRequest(http.MethodGet, "/admin/api/apps", nil)
 	listW := httptest.NewRecorder()
@@ -1137,7 +1137,7 @@ func TestReplSessionGetAndDeleteEndpoints(t *testing.T) {
 		})
 	}()
 
-	h := NewHandler(control, runtime, replSvc, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil)
+	h := NewHandler(control, runtime, replSvc, nil, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil, nil)
 
 	getReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/sessions/"+created.Session.ID, nil)
 	getW := httptest.NewRecorder()
@@ -1193,7 +1193,7 @@ func TestReplAIEndpoints(t *testing.T) {
 		},
 	})
 
-	h := NewHandler(control, runtime, replSvc, aiSvc, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil)
+	h := NewHandler(control, runtime, replSvc, aiSvc, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil, nil)
 
 	providersReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/ai/providers", nil)
 	providersW := httptest.NewRecorder()

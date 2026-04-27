@@ -62,7 +62,6 @@ client-build-ios:
 		else \
 			if grep -Eq "iOS [0-9]+\\.[0-9]+ is not installed|Unable to find a destination matching the provided destination specifier" "$$tmp"; then \
 				echo "Skipping iOS build: required iOS platform components are not installed in Xcode."; \
-				tail -n 20 "$$tmp"; \
 				rm -f "$$tmp"; \
 			else \
 				cat "$$tmp"; \

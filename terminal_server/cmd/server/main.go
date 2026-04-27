@@ -43,6 +43,7 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
 	"github.com/curtcox/terminals/terminal_server/internal/telephony"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
+	"github.com/curtcox/terminals/terminal_server/internal/trust"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 	"github.com/curtcox/terminals/terminal_server/internal/world"
 )
@@ -242,6 +243,7 @@ func main() {
 		deviceManager,
 		cfg,
 		worldModel,
+		trust.NewService(),
 	)
 	adminMux := http.NewServeMux()
 	adminMux.Handle("/mcp", mcpServer)
