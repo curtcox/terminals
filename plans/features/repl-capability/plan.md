@@ -1,13 +1,29 @@
 ---
 title: "REPL Capability Plan"
 kind: plan
-status: building
+status: superseded
 owner: copilot
-validation: automated:AA6
+validation: none
 last-reviewed: 2026-04-27
 ---
 
 # REPL Capability Plan
+
+Status: Completed and drained on 2026-04-27.
+
+The completed work from this umbrella plan now lives in:
+
+- [`plans/features/repl-capability/closure.md`](closure.md)
+- [`plans/features/repl-capability/deferred.md`](deferred.md)
+- [`docs/repl/commands/store.md`](../../../docs/repl/commands/store.md)
+- [`docs/repl/commands/bus.md`](../../../docs/repl/commands/bus.md)
+- [`docs/repl/commands/ui.md`](../../../docs/repl/commands/ui.md)
+- [`docs/repl/commands/sim.md`](../../../docs/repl/commands/sim.md)
+- [`docs/repl/commands/scripts.md`](../../../docs/repl/commands/scripts.md)
+- [`docs/usecase-validation-matrix.md`](../../../docs/usecase-validation-matrix.md)
+
+There are no remaining active tasks in this umbrella plan. Future REPL
+cross-capability work should be scoped in targeted plans under `plans/features/`.
 
 See [masterplan.md](../../../masterplan.md) for overall system context.
 Extends [repl-and-shell.md](../repl-and-shell.md) (base REPL) and
