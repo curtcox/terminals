@@ -1,13 +1,27 @@
 ---
 title: "REPL Plan"
 kind: plan
-status: building
+status: superseded
 owner: copilot
 validation: automated:P2
 last-reviewed: 2026-04-27
 ---
 
 # REPL Plan
+
+Status: Completed and drained on 2026-04-27.
+
+The durable behavior from this plan now lives in:
+
+- [docs/repl/index.md](../../docs/repl/index.md)
+- [docs/repl/quickstart.md](../../docs/repl/quickstart.md)
+- [docs/repl/sessions.md](../../docs/repl/sessions.md)
+- [docs/repl/commands/ai.md](../../docs/repl/commands/ai.md)
+- [docs/repl/api/ai-service.md](../../docs/repl/api/ai-service.md)
+- [docs/usecase-validation-matrix.md](../../docs/usecase-validation-matrix.md)
+
+This plan is retained as historical design context only. New REPL changes should
+be scoped in new plan files under `plans/features/` and reflected in `docs/repl/`.
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. See [usecases.md](../../usecases.md) for the user stories this plan needs to satisfy. See [application-runtime.md](application-runtime.md) for the runtime model this plan extends.
 
