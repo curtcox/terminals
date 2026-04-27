@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/klauspost/compress/zstd"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -451,7 +453,7 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 	seen := make(map[string]struct{})
 	seenCaseFolded := make(map[string]struct{})
 	files := make([]string, 0, 16)
-	migrationSources := make(map[string][]byte)
+	archiveSources := make(map[string][]byte)
 	packageName := ""
 	lastName := ""
 	manifestCount := 0
@@ -527,9 +529,7 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 		case "main.tal":
 			mainCount++
 		}
-		if strings.HasPrefix(rel, "migrate/") {
-			migrationSources[rel] = append([]byte(nil), payload...)
-		}
+		archiveSources[rel] = append([]byte(nil), payload...)
 		files = append(files, rel)
 	}
 
@@ -542,7 +542,7 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 	if mainCount != 1 {
 		return VerifiedTap{}, nil, ErrMissingMainTAL
 	}
-	if err := validateManifestMigrations(manifestBytes, files, migrationSources); err != nil {
+	if err := validateManifestMigrations(manifestBytes, files, archiveSources); err != nil {
 		return VerifiedTap{}, nil, err
 	}
 
@@ -741,6 +741,12 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		if _, ok := availableFiles[fixture.Expected]; !ok {
 			return ErrInvalidManifest
 		}
+		if err := validateMigrationFixtureNDJSON(fixture.Seed, migrationSources[fixture.Seed]); err != nil {
+			return err
+		}
+		if err := validateMigrationFixtureNDJSON(fixture.Expected, migrationSources[fixture.Expected]); err != nil {
+			return err
+		}
 	}
 
 	for _, rel := range files {
@@ -763,6 +769,97 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 	}
 
 	return nil
+}
+
+func validateMigrationFixtureNDJSON(path string, payload []byte) error {
+	if payload == nil {
+		return fmt.Errorf("%w: migration fixture %s missing from archive payload", ErrInvalidManifest, path)
+	}
+	if bytes.Contains(payload, []byte{'\r'}) {
+		return fmt.Errorf("%w: migration fixture %s must use LF line endings", ErrInvalidManifest, path)
+	}
+	if len(payload) == 0 || payload[len(payload)-1] != '\n' {
+		return fmt.Errorf("%w: migration fixture %s must end with trailing LF", ErrInvalidManifest, path)
+	}
+
+	lines := bytes.Split(payload, []byte{'\n'})
+	seenKeys := make(map[string]struct{}, len(lines))
+	var previousKey string
+
+	for i := 0; i < len(lines)-1; i++ {
+		lineNumber := i + 1
+		line := lines[i]
+		if len(line) == 0 {
+			return fmt.Errorf("%w: migration fixture %s line %d is blank", ErrInvalidManifest, path, lineNumber)
+		}
+
+		canonical, key, err := parseCanonicalFixtureRecord(line)
+		if err != nil {
+			return fmt.Errorf("%w: migration fixture %s line %d: %v", ErrInvalidManifest, path, lineNumber, err)
+		}
+		if !bytes.Equal(line, canonical) {
+			return fmt.Errorf("%w: migration fixture %s line %d is not canonical JSON", ErrInvalidManifest, path, lineNumber)
+		}
+		if _, dup := seenKeys[key]; dup {
+			return fmt.Errorf("%w: migration fixture %s line %d has duplicate key %q", ErrInvalidManifest, path, lineNumber, key)
+		}
+		if previousKey != "" && bytes.Compare([]byte(previousKey), []byte(key)) >= 0 {
+			return fmt.Errorf("%w: migration fixture %s line %d is out of key order", ErrInvalidManifest, path, lineNumber)
+		}
+
+		seenKeys[key] = struct{}{}
+		previousKey = key
+	}
+
+	return nil
+}
+
+func parseCanonicalFixtureRecord(line []byte) ([]byte, string, error) {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(line, &envelope); err != nil {
+		return nil, "", fmt.Errorf("invalid JSON object")
+	}
+	if len(envelope) != 2 {
+		return nil, "", fmt.Errorf("fixture record must contain exactly key and value fields")
+	}
+
+	rawKey, ok := envelope["key"]
+	if !ok {
+		return nil, "", fmt.Errorf("fixture record missing key field")
+	}
+	rawValue, ok := envelope["value"]
+	if !ok {
+		return nil, "", fmt.Errorf("fixture record missing value field")
+	}
+
+	var key string
+	if err := json.Unmarshal(rawKey, &key); err != nil {
+		return nil, "", fmt.Errorf("fixture key must be a string")
+	}
+	if !utf8.ValidString(key) {
+		return nil, "", fmt.Errorf("fixture key must be valid UTF-8")
+	}
+	if !norm.NFC.IsNormalString(key) {
+		return nil, "", fmt.Errorf("fixture key must be NFC normalized")
+	}
+	if len([]byte(key)) == 0 || len([]byte(key)) > 256 {
+		return nil, "", fmt.Errorf("fixture key byte length must be 1..256")
+	}
+
+	var value map[string]any
+	if err := json.Unmarshal(rawValue, &value); err != nil {
+		return nil, "", fmt.Errorf("fixture value must be an object")
+	}
+
+	canonical, err := json.Marshal(map[string]any{
+		"key":   key,
+		"value": value,
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to canonicalize fixture record")
+	}
+
+	return canonical, key, nil
 }
 
 func verifySignatureBundle(sigBytes []byte, expectedPackageID string, packageHash []byte, expectedManifestName string, expectedManifestVersion string) ([]VerifiedStatement, error) {

@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added Gate 1 migration fixture NDJSON validation in
+  `.tap` verification (`terminal_server/internal/apppackage/tap.go`):
+  fixture files now require LF-only line endings with trailing LF,
+  canonical per-line JSON envelope (`{"key":...,"value":...}`),
+  UTF-8 NFC key validation, strict key byte-order sorting, and
+  duplicate-key rejection. Added focused coverage in
+  `terminal_server/internal/apppackage/tap_test.go` via
+  `TestVerifyTapRejectsMigrateFixtureCRLFLineEndings`,
+  `TestVerifyTapRejectsMigrateFixtureOutOfOrderKeys`,
+  `TestVerifyTapRejectsMigrateFixtureDuplicateKeys`, and
+  `TestVerifyTapRejectsMigrateFixtureNonCanonicalJSONLine`.
 - 2026-04-27: Added specific Gate 1 migration failure diagnostics
   for numbering gaps and incompatible drain policy combinations
   in `.tap` verification (`terminal_server/internal/apppackage/tap.go`).
