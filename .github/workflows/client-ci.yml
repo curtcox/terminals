@@ -37,7 +37,7 @@ jobs:
       - name: Test
         run: flutter test --coverage
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: client-coverage
           path: terminal_client/coverage/lcov.info
