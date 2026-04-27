@@ -499,6 +499,10 @@ func TestDocsExamplesIncludeCapabilityClosureTopics(t *testing.T) {
 		"search-household-memory",
 		"review-learner-progress",
 		"resume-multiplayer-session",
+		"red-alert-broadcast",
+		"timer-and-reminder",
+		"presence-query",
+		"sim-only-assertion",
 	}
 	for _, topic := range required {
 		if !strings.Contains(result.Output, topic) {

@@ -62,6 +62,11 @@ layering, acceptance rules, and authoring substrate.
   `sim expect`, `sim record`, and `scripts run` are now wired
   through capability service + admin API + REPL command surface +
   docs, with focused tests.
+- Closed the remaining substrate example-topic documentation gap for
+  acceptance: added `red-alert-broadcast`, `timer-and-reminder`, and
+  `presence-query` example guides under `docs/repl/examples/`, and
+  tightened REPL tests so `docs examples` must continue surfacing all
+  required capability-closure topics (including `sim-only-assertion`).
 
 ## Problem
 
