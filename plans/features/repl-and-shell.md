@@ -1,10 +1,10 @@
 ---
 title: "REPL Plan"
 kind: plan
-status: planned
-owner: unowned
-validation: none
-last-reviewed: 2026-04-25
+status: building
+owner: copilot
+validation: automated:P2
+last-reviewed: 2026-04-27
 ---
 
 # REPL Plan

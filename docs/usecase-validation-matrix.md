@@ -37,6 +37,7 @@ Coverage depth labels:
 | M2 | "Tell me when the dryer beeps" audio monitor | `make usecase-validate USECASE=M2` | runtime audio monitor detection test for `dryer_beep` | Scenario |
 | M3 | Red alert broadcast | `make usecase-validate USECASE=M3` | generated+wire red alert integration tests | Transport |
 | M4 | Stand down / stop red alert | `make usecase-validate USECASE=M4` | generated+wire voice stop/stand-down tests | Transport |
+| P2 | REPL session mobility and coexistence | `make usecase-validate USECASE=P2` | `internal/replsession` `TestUseCaseP2SessionMobilityAndCoexistence` proves one session can be shared across devices while multiple sessions coexist | Scenario |
 | S1 | Show all cameras | `make usecase-validate USECASE=S1` | generated+wire voice show-all-cameras tests | Transport |
 | S2 | Focus one camera audio | `make usecase-validate USECASE=S2` | generated+wire focus-action routing tests | Transport |
 | S3 | Mixed multi-camera audio overview | `make usecase-validate USECASE=S3` | generated+wire multi-window audio mix tests | Transport |
@@ -50,6 +51,6 @@ Coverage depth labels:
 
 The following planned IDs currently do not have a dedicated `make usecase-validate USECASE=<ID>` mapping yet:
 
-`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `P2`, `I1`-`I11`, `PL2`-`PL7`, `PL9`-`PL19`, `PL21`-`PL27`.
+`C2`, `C4`, `C6`, `V1`, `V2`, `V3`, `T2`, `T3`, `T4`, `M5`, `D2`, `D3`, `I1`-`I11`, `PL2`-`PL7`, `PL9`-`PL19`, `PL21`-`PL27`.
 
 Use `make all-check` as the baseline repository gate while dedicated use-case mappings are added.

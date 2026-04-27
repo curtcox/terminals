@@ -144,3 +144,65 @@ func TestSelectionPersistence(t *testing.T) {
 		t.Fatalf("selection = %s/%s, want ollama/llama3.1", provider, model)
 	}
 }
+
+func TestUseCaseP2SessionMobilityAndCoexistence(t *testing.T) {
+	svc := NewService(terminal.NewManager())
+	ctx := context.Background()
+
+	primary, err := svc.CreateSession(ctx, CreateSessionRequest{DeviceID: "device-a"})
+	if err != nil {
+		t.Fatalf("CreateSession(primary) error = %v", err)
+	}
+	defer func() {
+		_, _ = svc.TerminateSession(ctx, TerminateSessionRequest{SessionID: primary.Session.ID})
+	}()
+
+	secondary, err := svc.CreateSession(ctx, CreateSessionRequest{DeviceID: "device-b"})
+	if err != nil {
+		t.Fatalf("CreateSession(secondary) error = %v", err)
+	}
+	defer func() {
+		_, _ = svc.TerminateSession(ctx, TerminateSessionRequest{SessionID: secondary.Session.ID})
+	}()
+
+	if primary.Session.ID == secondary.Session.ID {
+		t.Fatalf("expected distinct sessions for separate devices")
+	}
+
+	listed, err := svc.ListSessions(ctx, ListSessionsRequest{})
+	if err != nil {
+		t.Fatalf("ListSessions() error = %v", err)
+	}
+	if len(listed.Sessions) != 2 {
+		t.Fatalf("ListSessions() count = %d, want 2", len(listed.Sessions))
+	}
+
+	attached, err := svc.AttachSession(ctx, AttachSessionRequest{
+		SessionID: primary.Session.ID,
+		DeviceID:  "device-c",
+	})
+	if err != nil {
+		t.Fatalf("AttachSession() error = %v", err)
+	}
+	if len(attached.Session.AttachedDevices) != 2 {
+		t.Fatalf("attached device count = %d, want 2", len(attached.Session.AttachedDevices))
+	}
+
+	if mapped, ok := svc.SessionIDForDevice("device-c"); !ok || mapped != primary.Session.ID {
+		t.Fatalf("SessionIDForDevice(device-c) = %q,%v want %q,true", mapped, ok, primary.Session.ID)
+	}
+
+	detached, err := svc.DetachSession(ctx, DetachSessionRequest{
+		SessionID: primary.Session.ID,
+		DeviceID:  "device-c",
+	})
+	if err != nil {
+		t.Fatalf("DetachSession() error = %v", err)
+	}
+	if len(detached.Session.AttachedDevices) != 1 {
+		t.Fatalf("attached device count after detach = %d, want 1", len(detached.Session.AttachedDevices))
+	}
+	if _, ok := svc.SessionIDForDevice("device-c"); ok {
+		t.Fatalf("expected detached device mapping removed")
+	}
+}

@@ -37,6 +37,7 @@ metadata() {
     M2) echo "M2|Scenario|audio monitor runtime test for dryer beep detection" ;;
     M3) echo "M3|Transport|generated+wire red alert integration tests" ;;
     M4) echo "M4|Transport|generated+wire voice stop/stand-down tests" ;;
+    P2) echo "P2|Scenario|REPL session mobility and coexistence lifecycle test" ;;
     S1) echo "S1|Transport|generated+wire voice show-all-cameras tests" ;;
     S2) echo "S2|Transport|generated+wire focus-action routing tests" ;;
     S3) echo "S3|Transport|generated+wire multi-window audio mix tests" ;;
@@ -52,7 +53,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA6 B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
+all_ids=(AA6 B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 P2 S1 S2 S3 P1 PL1 PL8 PL20 T1)
 
 run_go_test() {
   local pkg="$1"
@@ -112,6 +113,9 @@ run_usecase() {
       ;;
     M4)
       run_go_test ./internal/transport 'Test(Generated|Wire)Session(VoiceStandDownStopsRedAlert|VoiceStopRedAlertStopsRedAlert)$'
+      ;;
+    P2)
+      run_go_test ./internal/replsession 'TestUseCaseP2SessionMobilityAndCoexistence$'
       ;;
     S1)
       run_go_test ./internal/transport 'Test(Generated|Wire)Session(VoiceShowAllCamerasStartsMultiWindow|VoiceAllCamerasStartsMultiWindow)$'
