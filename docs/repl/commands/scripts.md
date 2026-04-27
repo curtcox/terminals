@@ -13,3 +13,7 @@ returns a deterministic command summary without executing commands.
 `run` reads the same script format and executes it through the server-side
 scripts runtime, returning deterministic execution counters (`command_count`,
 `executed_count`, `failed_count`).
+
+AA6 cross-use-case validation uses `scripts run` over a seeded fixture that
+exercises both substrate commands (`sim`/`store`/`ui`/`bus`) and mutating Layer 2
+domain commands (`message post`, `board post`) with deterministic read-back.

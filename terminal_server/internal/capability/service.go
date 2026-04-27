@@ -2423,6 +2423,29 @@ func (s *Service) executeScriptCommand(command string) error {
 		default:
 			return fmt.Errorf("unsupported message command %q", sub)
 		}
+	case "board":
+		switch sub {
+		case "post":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: board post <board> <text>")
+			}
+			board := args[0]
+			text := strings.Join(args[1:], " ")
+			s.PostBoard(board, text)
+			return nil
+		case "ls":
+			if len(args) > 1 {
+				return fmt.Errorf("usage: board ls [board]")
+			}
+			board := ""
+			if len(args) == 1 {
+				board = args[0]
+			}
+			_ = s.ListBoard(board)
+			return nil
+		default:
+			return fmt.Errorf("unsupported board command %q", sub)
+		}
 	case "sim":
 		switch sub {
 		case "device":

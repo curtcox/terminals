@@ -1,1 +1,1 @@
-For `plans/features/repl-capability/plan.md`, extend Phase 12 `scripts run` AA6 coverage with a second mutating Layer 2 domain-family path (outside `message`, e.g. `board post`) and validate its durable side effects with deterministic read-back assertions.
+For `plans/features/repl-capability/plan.md`, continue the Phase 12 AA6 fixture by adding one more mutating Layer 2 domain-family path (outside `message` and `board`, e.g. `artifact create` + `artifact history`) with deterministic durable read-back assertions.

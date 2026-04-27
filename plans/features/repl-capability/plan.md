@@ -91,6 +91,11 @@ layering, acceptance rules, and authoring substrate.
   durable read-back (`message ls phase12-room` and admin assertion)
   so `scripts run` now verifies persisted Layer 2 side effects in
   addition to command routing.
+- Extended the Phase 12 AA6 fixture with a second mutating Layer 2
+  command path outside `message` (`board post phase12-board
+  fixture-board-mutating`) plus deterministic read-back (`board ls`
+  in-script and admin `/board` assertion) so `scripts run` now covers
+  mutating validation across multiple Layer 2 domain families.
 
 ## Problem
 

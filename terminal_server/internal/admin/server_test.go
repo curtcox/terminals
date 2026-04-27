@@ -933,7 +933,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	if dryRunW.Code != http.StatusOK {
 		t.Fatalf("fixture scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
 	}
-	if !strings.Contains(dryRunW.Body.String(), `"command_count":12`) {
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":14`) {
 		t.Fatalf("fixture scripts dry-run body missing command count: %s", dryRunW.Body.String())
 	}
 
@@ -947,7 +947,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 		t.Fatalf("fixture scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
 	}
 	body := runW.Body.String()
-	if !strings.Contains(body, `"executed_count":12`) || !strings.Contains(body, `"failed_count":0`) {
+	if !strings.Contains(body, `"executed_count":14`) || !strings.Contains(body, `"failed_count":0`) {
 		t.Fatalf("fixture scripts run body missing execution counters: %s", body)
 	}
 
@@ -969,6 +969,16 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	}
 	if !strings.Contains(messageW.Body.String(), `"room":"phase12-room"`) || !strings.Contains(messageW.Body.String(), `"text":"fixture-layer2-mutating"`) {
 		t.Fatalf("fixture message ls body missing layer2 message side effect: %s", messageW.Body.String())
+	}
+
+	boardReq := httptest.NewRequest(http.MethodGet, "/admin/api/board?board=phase12-board", nil)
+	boardW := httptest.NewRecorder()
+	h.ServeHTTP(boardW, boardReq)
+	if boardW.Code != http.StatusOK {
+		t.Fatalf("fixture board ls status = %d, want 200 body=%s", boardW.Code, boardW.Body.String())
+	}
+	if !strings.Contains(boardW.Body.String(), `"board":"phase12-board"`) || !strings.Contains(boardW.Body.String(), `"text":"fixture-board-mutating"`) {
+		t.Fatalf("fixture board ls body missing layer2 board side effect: %s", boardW.Body.String())
 	}
 
 	simReq := httptest.NewRequest(http.MethodGet, "/admin/api/sim/ui?device_id=sim-fixture", nil)
