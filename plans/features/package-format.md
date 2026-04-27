@@ -1,9 +1,9 @@
 ---
 title: "Package Format"
 kind: plan
-status: building
+status: shipped-validated
 owner: copilot
-validation: none
+validation: manual
 last-reviewed: 2026-04-26
 ---
 
@@ -529,10 +529,11 @@ limits, error codes) do not bump the schema.
 
 ## Open Questions
 
-- **Encoder parity testing.** §1.2 pins a reference zstd CLI
-  invocation; the Go server needs a CI check that the same
-  source tree produces byte-identical `.tap` under both
-  encoders. The test is straightforward but needs a home.
+- **Encoder parity in CI environments without zstd CLI.** The
+  repository now includes a parity test in
+  `internal/apppackage/tap_test.go`, but it skips when `zstd`
+  is not installed. Decide whether CI must install `zstd` in all
+  environments or whether a dedicated parity lane is sufficient.
 - **Maximum package size.** Not fixed here beyond the 1 MiB
   bundle cap. Distribution has to enforce a size cap at fetch
   time; the choice is deployment-specific and belongs in the
@@ -596,3 +597,14 @@ Additional shipped slice in this cycle:
   oversized bundle rejection, and statement-count quota enforcement.
 - Added reusable signed-statement test helper(s) to reduce duplication while
   keeping canonical CBOR signing behavior under test.
+
+Additional shipped slice in this cycle:
+
+- Added zstd encoder parity validation in
+  `terminal_server/internal/apppackage/tap_test.go` that compares
+  `BuildTapFromDir` and pinned `zstd -19 --no-check --format=zstd
+  --single-thread` CLI re-encoding against the same canonical tar bytes,
+  asserting both verify and produce the same `package_id`.
+- Documented current package-format runtime coverage in
+  `docs/application-runtime.md` to reflect canonical tar, signature-bundle
+  pre-trust checks, and encoder parity testing.

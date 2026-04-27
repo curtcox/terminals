@@ -33,7 +33,7 @@ Use these labels to distinguish shipped behavior from planned contract:
 | Surface | Status | Current validation |
 |---|---|---|
 | Package loading | Implemented | `term app check <name>` loads app directories through `internal/appruntime`. |
-| Package file format (`.tap`) | Partially implemented | `internal/apppackage` builds deterministic `.tap` archives and verifies canonical tar rules (`go test ./internal/apppackage`). |
+| Package file format (`.tap`) | Partially implemented | `internal/apppackage` builds deterministic `.tap` archives, verifies canonical tar and signature-bundle pre-trust rules, and includes zstd CLI parity coverage for pinned encoding (`go test ./internal/apppackage`). |
 | Manifest validation | Implemented | package load rejects invalid manifest shape and unsupported language declarations. |
 | Exported definitions | Partially implemented | manifests declare exports and packages register exported app definitions, but TAL `match` bodies are not interpreted. |
 | TAL parsing/interpretation | Planned | TAL files are present as contract examples; lifecycle hooks are not executed by an interpreter. |
