@@ -933,7 +933,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	if dryRunW.Code != http.StatusOK {
 		t.Fatalf("fixture scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
 	}
-	if !strings.Contains(dryRunW.Body.String(), `"command_count":9`) {
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":10`) {
 		t.Fatalf("fixture scripts dry-run body missing command count: %s", dryRunW.Body.String())
 	}
 
@@ -947,7 +947,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 		t.Fatalf("fixture scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
 	}
 	body := runW.Body.String()
-	if !strings.Contains(body, `"executed_count":9`) || !strings.Contains(body, `"failed_count":0`) {
+	if !strings.Contains(body, `"executed_count":10`) || !strings.Contains(body, `"failed_count":0`) {
 		t.Fatalf("fixture scripts run body missing execution counters: %s", body)
 	}
 

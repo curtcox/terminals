@@ -2394,6 +2394,15 @@ func (s *Service) executeScriptCommand(command string) error {
 		}
 		s.UIPush(deviceID, strings.Join(descriptorParts, " "), rootID)
 		return nil
+	case "message":
+		if sub != "rooms" {
+			return fmt.Errorf("unsupported message command %q", sub)
+		}
+		if len(args) != 0 {
+			return fmt.Errorf("usage: message rooms")
+		}
+		_ = s.ListMessageRooms()
+		return nil
 	case "sim":
 		switch sub {
 		case "device":

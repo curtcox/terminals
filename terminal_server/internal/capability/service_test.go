@@ -754,12 +754,12 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 		t.Fatalf("ScriptDryRun counts = commands:%d skipped:%d, want 2/2", dryRun.CommandCount, dryRun.SkippedCount)
 	}
 
-	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner")
+	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage rooms")
 	if run.Path != "fixtures/smoke.term" {
 		t.Fatalf("ScriptRun path = %q, want fixtures/smoke.term", run.Path)
 	}
-	if run.CommandCount != 2 || run.SkippedCount != 2 || run.ExecutedCount != 2 || run.FailedCount != 0 {
-		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 2/2/2/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
+	if run.CommandCount != 3 || run.SkippedCount != 2 || run.ExecutedCount != 3 || run.FailedCount != 0 {
+		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 3/2/3/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
 	}
 	stored, ok := svc.StoreGet("notes", "k")
 	if !ok || stored.Value != "v" {

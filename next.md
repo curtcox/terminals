@@ -1,1 +1,1 @@
-For `plans/features/repl-capability/plan.md`, expand Phase 12 `scripts run` coverage from the current seeded sim/store/ui/bus fixture to include at least one Layer 2 domain-family script example and wire it into automated validation.
+For `plans/features/repl-capability/plan.md`, extend Phase 12 `scripts run` beyond read-only Layer 2 coverage by adding one mutating Layer 2 domain command path to the deterministic AA6 fixture and validating its durable side effects.

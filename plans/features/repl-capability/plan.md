@@ -82,6 +82,10 @@ layering, acceptance rules, and authoring substrate.
   `sim`/`store`/`ui`/`bus`, with AA6 wired into
   `make usecase-validate USECASE=AA6` and reflected in the validation
   matrix.
+- Expanded the Phase 12 AA6 fixture to include a Layer 2 domain-family
+  command (`message rooms`) so `scripts run` now validates both
+  substrate (`sim`/`store`/`ui`/`bus`) and Layer 2 command routing in
+  one deterministic scripted path.
 
 ## Problem
 
