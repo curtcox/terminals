@@ -441,15 +441,19 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	retryReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	retryW := httptest.NewRecorder()
 	h.ServeHTTP(retryW, retryReq)
-	if retryW.Code != http.StatusConflict {
-		t.Fatalf("migrate retry code = %d, want 409 body=%s", retryW.Code, retryW.Body.String())
+	if retryW.Code != http.StatusOK {
+		t.Fatalf("migrate retry code = %d, want 200 body=%s", retryW.Code, retryW.Body.String())
 	}
 	var retryBody map[string]any
 	if err := json.Unmarshal(retryW.Body.Bytes(), &retryBody); err != nil {
 		t.Fatalf("decode migrate retry: %v", err)
 	}
-	if retryBody["status"] != "unsupported" {
-		t.Fatalf("migrate retry status = %v, want unsupported", retryBody["status"])
+	if retryBody["status"] != "ok" {
+		t.Fatalf("migrate retry status = %v, want ok", retryBody["status"])
+	}
+	retryMigration, _ := retryBody["migration"].(map[string]any)
+	if fmt.Sprint(retryMigration["verdict"]) != "idle" {
+		t.Fatalf("migrate retry verdict = %v, want idle", retryMigration["verdict"])
 	}
 }
 

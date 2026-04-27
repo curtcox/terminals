@@ -272,14 +272,135 @@ func TestRuntimeMigrationStatusAndActions(t *testing.T) {
 		t.Fatalf("ExecutorReady = true, want false")
 	}
 
-	if _, err := runtime.RetryMigration("migrate_stub"); !errors.Is(err, ErrMigrationExecutorUnavailable) {
-		t.Fatalf("RetryMigration() error = %v, want ErrMigrationExecutorUnavailable", err)
+	status, err = runtime.RetryMigration("migrate_stub")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
 	}
-	if _, err := runtime.AbortMigration("migrate_stub"); !errors.Is(err, ErrMigrationExecutorUnavailable) {
-		t.Fatalf("AbortMigration() error = %v, want ErrMigrationExecutorUnavailable", err)
+	if status.Verdict != "idle" {
+		t.Fatalf("RetryMigration() verdict = %q, want idle", status.Verdict)
 	}
+
+	status, err = runtime.AbortMigration("migrate_stub")
+	if err != nil {
+		t.Fatalf("AbortMigration() error = %v", err)
+	}
+	if status.Verdict != "idle" {
+		t.Fatalf("AbortMigration() verdict = %q, want idle", status.Verdict)
+	}
+
 	if _, err := runtime.ReconcileMigration("migrate_stub", "rec-1", "accept_current"); !errors.Is(err, ErrMigrationExecutorUnavailable) {
 		t.Fatalf("ReconcileMigration() error = %v, want ErrMigrationExecutorUnavailable", err)
+	}
+}
+
+func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_live")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_live\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 2) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.GetMigrationStatus("migrate_live")
+	if err != nil {
+		t.Fatalf("GetMigrationStatus() error = %v", err)
+	}
+	if !status.ExecutorReady {
+		t.Fatalf("ExecutorReady = false, want true")
+	}
+	if status.StepsPlanned != 2 || status.StepsCompleted != 0 {
+		t.Fatalf("status steps = %d/%d, want 0/2", status.StepsCompleted, status.StepsPlanned)
+	}
+
+	status, err = runtime.RetryMigration("migrate_live")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() verdict = %q, want ok", status.Verdict)
+	}
+	if status.StepsCompleted != 2 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 2", status.StepsCompleted)
+	}
+	if status.JournalPath == "" {
+		t.Fatalf("RetryMigration() journal_path empty")
+	}
+
+	status, err = runtime.AbortMigration("migrate_live")
+	if err != nil {
+		t.Fatalf("AbortMigration() error = %v", err)
+	}
+	if status.Verdict != "aborted" {
+		t.Fatalf("AbortMigration() verdict = %q, want aborted", status.Verdict)
+	}
+	if status.StepsCompleted != 1 {
+		t.Fatalf("AbortMigration() steps_completed = %d, want 1", status.StepsCompleted)
+	}
+}
+
+func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_reconcile")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_reconcile\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	runtime.mu.Lock()
+	state := runtime.migrations["migrate_reconcile"]
+	state.Verdict = "reconcile_pending"
+	state.LastError = ErrMigrationReconcilePending.Error()
+	state.ReconciliationPath = "apps/migrate_reconcile/migrate/r1/reconcile.json"
+	state.PendingRecords = map[string]string{"rec-1": "force_rewind"}
+	runtime.migrations["migrate_reconcile"] = state
+	runtime.mu.Unlock()
+
+	if _, err := runtime.RetryMigration("migrate_reconcile"); !errors.Is(err, ErrMigrationReconcilePending) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationReconcilePending", err)
+	}
+	if _, err := runtime.ReconcileMigration("migrate_reconcile", "rec-1", "bad_resolution"); !errors.Is(err, ErrMigrationResolutionInvalid) {
+		t.Fatalf("ReconcileMigration() invalid resolution error = %v, want ErrMigrationResolutionInvalid", err)
+	}
+	status, err := runtime.ReconcileMigration("migrate_reconcile", "rec-1", "force_rewind")
+	if err != nil {
+		t.Fatalf("ReconcileMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("ReconcileMigration() verdict = %q, want ok", status.Verdict)
+	}
+	if status.ReconciliationPath != "" {
+		t.Fatalf("ReconcileMigration() reconciliation_path = %q, want empty", status.ReconciliationPath)
 	}
 }
 

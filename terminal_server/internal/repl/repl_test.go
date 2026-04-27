@@ -257,6 +257,31 @@ func TestAppsMigrateStatusUsesAdminAPI(t *testing.T) {
 	}
 }
 
+func TestAppsMigrateRetryUsesAdminAPI(t *testing.T) {
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/apps/migrate/retry":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","action":"retry","app":"sound_watch","migration":{"app":"sound_watch","verdict":"idle"}}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("apps migrate retry sound_watch\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "OK  app=sound_watch action=retry status=ok") {
+		t.Fatalf("missing apps migrate retry output: %q", text)
+	}
+}
+
 func TestStorePutWithTTLPassesFormValues(t *testing.T) {
 	var capturedTTL string
 	var capturedValue string

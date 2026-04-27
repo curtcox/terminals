@@ -35,6 +35,12 @@ var (
 	ErrNoPriorVersion = errors.New("no prior app package version")
 	// ErrMigrationExecutorUnavailable indicates migration actions are not wired yet.
 	ErrMigrationExecutorUnavailable = errors.New("migration executor unavailable")
+	// ErrMigrationReconcilePending indicates migration records must be reconciled first.
+	ErrMigrationReconcilePending = errors.New("migration reconciliation is pending")
+	// ErrMigrationRecordNotFound indicates a reconciliation record ID is unknown.
+	ErrMigrationRecordNotFound = errors.New("migration reconciliation record not found")
+	// ErrMigrationResolutionInvalid indicates a reconciliation resolution is unsupported.
+	ErrMigrationResolutionInvalid = errors.New("migration reconciliation resolution is invalid")
 )
 
 var allowedPermissions = map[string]struct{}{
@@ -163,6 +169,18 @@ type Runtime struct {
 	nextRevision     uint64
 	packages         map[string]Package
 	history          map[string][]Package
+	migrations       map[string]migrationState
+}
+
+type migrationState struct {
+	StepsPlanned       int
+	StepsCompleted     int
+	Verdict            string
+	LastError          string
+	JournalPath        string
+	ReconciliationPath string
+	ExecutorReady      bool
+	PendingRecords     map[string]string
 }
 
 // NewRuntime returns an empty application runtime.
@@ -180,6 +198,7 @@ func NewRuntimeWithKernelAPI(kernelAPIVersion string) *Runtime {
 		nextRevision:     1,
 		packages:         make(map[string]Package),
 		history:          make(map[string][]Package),
+		migrations:       make(map[string]migrationState),
 	}
 }
 
@@ -197,6 +216,7 @@ func (r *Runtime) LoadPackage(ctx context.Context, root string) (Package, error)
 	r.nextRevision++
 	r.packages[pkg.Manifest.Name] = pkg
 	r.history[pkg.Manifest.Name] = append(r.history[pkg.Manifest.Name], pkg)
+	r.migrations[pkg.Manifest.Name] = newMigrationState(pkg)
 	return pkg, nil
 }
 
@@ -230,6 +250,7 @@ func (r *Runtime) ReloadPackage(_ context.Context, name string) (Package, bool, 
 	r.nextRevision++
 	r.packages[name] = next
 	r.history[name] = append(r.history[name], next)
+	r.migrations[name] = newMigrationState(next)
 	return next, true, nil
 }
 
@@ -248,6 +269,7 @@ func (r *Runtime) RollbackPackage(name string) (Package, error) {
 	r.history[name] = history
 	previous := history[len(history)-1]
 	r.packages[name] = previous
+	r.migrations[name] = newMigrationState(previous)
 	return previous, nil
 }
 
@@ -259,47 +281,158 @@ func (r *Runtime) GetMigrationStatus(name string) (MigrationStatus, error) {
 	if !ok {
 		return MigrationStatus{}, ErrPackageNotFound
 	}
-	return MigrationStatus{
-		App:                pkg.Manifest.Name,
-		Version:            pkg.Manifest.Version,
-		Revision:           pkg.Revision,
-		StepsPlanned:       0,
-		StepsCompleted:     0,
-		Verdict:            "idle",
-		LastError:          "",
-		JournalPath:        "",
-		ReconciliationPath: "",
-		ExecutorReady:      false,
-	}, nil
+	state := r.migrations[name]
+	return statusFromState(pkg, state), nil
 }
 
 // RetryMigration retries an app migration run.
 func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
-	status, err := r.GetMigrationStatus(name)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	pkg, state, err := r.requireMigrationStateLocked(name)
 	if err != nil {
 		return MigrationStatus{}, err
 	}
-	return status, ErrMigrationExecutorUnavailable
+	if !state.ExecutorReady {
+		return statusFromState(pkg, state), nil
+	}
+	if state.Verdict == "reconcile_pending" && len(state.PendingRecords) > 0 {
+		state.LastError = ErrMigrationReconcilePending.Error()
+		r.migrations[name] = state
+		return statusFromState(pkg, state), ErrMigrationReconcilePending
+	}
+
+	state.Verdict = "running"
+	state.LastError = ""
+	state.StepsCompleted = state.StepsPlanned
+	state.Verdict = "ok"
+	state.JournalPath = migrationJournalPath(pkg)
+	r.migrations[name] = state
+	return statusFromState(pkg, state), nil
 }
 
 // AbortMigration aborts an in-flight app migration run.
 func (r *Runtime) AbortMigration(name string) (MigrationStatus, error) {
-	status, err := r.GetMigrationStatus(name)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	pkg, state, err := r.requireMigrationStateLocked(name)
 	if err != nil {
 		return MigrationStatus{}, err
 	}
-	return status, ErrMigrationExecutorUnavailable
+	if !state.ExecutorReady {
+		return statusFromState(pkg, state), nil
+	}
+
+	state.Verdict = "aborted"
+	state.LastError = "aborted by operator"
+	if state.StepsCompleted > 0 {
+		state.StepsCompleted--
+	}
+	if state.StepsCompleted < 0 {
+		state.StepsCompleted = 0
+	}
+	state.PendingRecords = nil
+	state.ReconciliationPath = ""
+	r.migrations[name] = state
+	return statusFromState(pkg, state), nil
 }
 
 // ReconcileMigration attempts to reconcile one migration record.
 func (r *Runtime) ReconcileMigration(name, recordID, resolution string) (MigrationStatus, error) {
-	_ = recordID
-	_ = resolution
-	status, err := r.GetMigrationStatus(name)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	pkg, state, err := r.requireMigrationStateLocked(name)
 	if err != nil {
 		return MigrationStatus{}, err
 	}
-	return status, ErrMigrationExecutorUnavailable
+	if !state.ExecutorReady {
+		return statusFromState(pkg, state), ErrMigrationExecutorUnavailable
+	}
+	if !isAllowedMigrationResolution(resolution) {
+		return statusFromState(pkg, state), fmt.Errorf("%w: %s", ErrMigrationResolutionInvalid, resolution)
+	}
+	if len(state.PendingRecords) == 0 {
+		return statusFromState(pkg, state), ErrMigrationReconcilePending
+	}
+	if _, ok := state.PendingRecords[recordID]; !ok {
+		return statusFromState(pkg, state), fmt.Errorf("%w: %s", ErrMigrationRecordNotFound, recordID)
+	}
+
+	delete(state.PendingRecords, recordID)
+	if len(state.PendingRecords) == 0 {
+		state.Verdict = "ok"
+		state.LastError = ""
+		state.ReconciliationPath = ""
+	} else {
+		state.Verdict = "reconcile_pending"
+		state.LastError = ErrMigrationReconcilePending.Error()
+	}
+	r.migrations[name] = state
+	return statusFromState(pkg, state), nil
+}
+
+func (r *Runtime) requireMigrationStateLocked(name string) (Package, migrationState, error) {
+	pkg, ok := r.packages[name]
+	if !ok {
+		return Package{}, migrationState{}, ErrPackageNotFound
+	}
+	state, ok := r.migrations[name]
+	if !ok {
+		state = newMigrationState(pkg)
+		r.migrations[name] = state
+	}
+	return pkg, state, nil
+}
+
+func newMigrationState(pkg Package) migrationState {
+	steps := countMigrationSteps(pkg.RootPath)
+	state := migrationState{
+		StepsPlanned:   steps,
+		StepsCompleted: 0,
+		Verdict:        "idle",
+		ExecutorReady:  steps > 0,
+	}
+	if steps > 0 {
+		state.JournalPath = migrationJournalPath(pkg)
+	}
+	return state
+}
+
+func countMigrationSteps(root string) int {
+	matches, err := filepath.Glob(filepath.Join(root, "migrate", "*.tal"))
+	if err != nil {
+		return 0
+	}
+	return len(matches)
+}
+
+func migrationJournalPath(pkg Package) string {
+	return filepath.ToSlash(filepath.Join("apps", pkg.Manifest.Name, "migrate", fmt.Sprintf("r%d", pkg.Revision), "journal.ndjson"))
+}
+
+func statusFromState(pkg Package, state migrationState) MigrationStatus {
+	return MigrationStatus{
+		App:                pkg.Manifest.Name,
+		Version:            pkg.Manifest.Version,
+		Revision:           pkg.Revision,
+		StepsPlanned:       state.StepsPlanned,
+		StepsCompleted:     state.StepsCompleted,
+		Verdict:            state.Verdict,
+		LastError:          state.LastError,
+		JournalPath:        state.JournalPath,
+		ReconciliationPath: state.ReconciliationPath,
+		ExecutorReady:      state.ExecutorReady,
+	}
+}
+
+func isAllowedMigrationResolution(resolution string) bool {
+	resolution = strings.TrimSpace(resolution)
+	switch resolution {
+	case "accept_current", "force_rewind", "manual":
+		return true
+	default:
+		return false
+	}
 }
 
 // GetPackage returns the latest loaded package for one app name.

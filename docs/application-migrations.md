@@ -28,4 +28,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the migration executor, drain policy orchestration, rollback/reconcile flow, migration runtime module restrictions, or `term apps migrate *` operational APIs. Those remain tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the migration executor, drain policy orchestration, rollback/reconcile semantics, or migration runtime module restrictions. The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, while full executor behavior remains tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
