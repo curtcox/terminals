@@ -42,8 +42,11 @@ layering, acceptance rules, and authoring substrate.
 - Landed the first Phase 2 UI authoring slice in code: authored
   view inventory is now REPL-visible via `ui views ls/show/rm`
   (capability service + admin API + REPL command surface + docs).
-- Next planned slice is active UI operations (`ui push`, `ui patch`,
-  `ui transition`, `ui broadcast`, `ui subscribe`, `ui snapshot`).
+- Landed the active Phase 2 UI operations slice in code:
+  `ui push`, `ui patch`, `ui transition`, `ui broadcast`,
+  `ui subscribe`, and `ui snapshot` are now wired through
+  capability service + admin API + REPL command surface + docs.
+- Next planned slice is Phase 3 `handlers` command routing.
 
 ## Problem
 

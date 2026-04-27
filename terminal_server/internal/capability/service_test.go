@@ -98,6 +98,56 @@ func TestUIViewCRUDAndNormalization(t *testing.T) {
 	}
 }
 
+func TestUIActiveOperationsAndSnapshot(t *testing.T) {
+	svc := NewService()
+
+	pushed := svc.UIPush("device-1", `{"type":"stack"}`, "root-main")
+	if pushed.DeviceID != "device-1" {
+		t.Fatalf("UIPush device_id = %q, want device-1", pushed.DeviceID)
+	}
+	if pushed.RootID != "root-main" {
+		t.Fatalf("UIPush root_id = %q, want root-main", pushed.RootID)
+	}
+
+	patched := svc.UIPatch("device-1", "banner", `{"type":"text"}`)
+	if patched.LastPatchComponentID != "banner" {
+		t.Fatalf("UIPatch component_id = %q, want banner", patched.LastPatchComponentID)
+	}
+
+	transitioned := svc.UITransition("device-1", "banner", "fade", 150)
+	if transitioned.LastTransition != "fade" || transitioned.LastTransitionDurationMS != 150 {
+		t.Fatalf("UITransition = %+v, want transition fade with duration 150", transitioned)
+	}
+
+	broadcast := svc.UIBroadcast("family-screens", `{"type":"banner"}`, "alert-banner", []string{"device-1", "device-2", "device-1"})
+	if len(broadcast.Devices) != 2 || broadcast.Devices[0] != "device-1" || broadcast.Devices[1] != "device-2" {
+		t.Fatalf("UIBroadcast devices = %+v, want [device-1 device-2]", broadcast.Devices)
+	}
+
+	subscribed := svc.UISubscribe("device-1", "cohort:family-screens")
+	if len(subscribed.Subscriptions) != 1 || subscribed.Subscriptions[0] != "cohort:family-screens" {
+		t.Fatalf("UISubscribe subscriptions = %+v, want [cohort:family-screens]", subscribed.Subscriptions)
+	}
+
+	snapshot, ok := svc.UISnapshot("device-1")
+	if !ok {
+		t.Fatalf("UISnapshot(device-1) = not found")
+	}
+	if snapshot.LastPatchComponentID != "alert-banner" {
+		t.Fatalf("UISnapshot last patch component = %q, want alert-banner", snapshot.LastPatchComponentID)
+	}
+	if !strings.Contains(strings.ToLower(snapshot.LastPatchDescriptor), "banner") {
+		t.Fatalf("UISnapshot patch descriptor = %q, want banner descriptor", snapshot.LastPatchDescriptor)
+	}
+	if len(snapshot.Subscriptions) != 1 || snapshot.Subscriptions[0] != "cohort:family-screens" {
+		t.Fatalf("UISnapshot subscriptions = %+v, want [cohort:family-screens]", snapshot.Subscriptions)
+	}
+
+	if _, ok := svc.UISnapshot("missing-device"); ok {
+		t.Fatalf("UISnapshot(missing-device) should report not found")
+	}
+}
+
 func TestIdentityLookupGroupsPreferencesAndAcknowledgements(t *testing.T) {
 	svc := NewService()
 

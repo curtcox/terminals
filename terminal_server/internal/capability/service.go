@@ -199,6 +199,29 @@ type UIView struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+// UISnapshot represents current server-authored UI state for one device.
+type UISnapshot struct {
+	DeviceID                  string    `json:"device_id"`
+	RootID                    string    `json:"root_id,omitempty"`
+	Descriptor                string    `json:"descriptor,omitempty"`
+	LastPatchComponentID      string    `json:"last_patch_component_id,omitempty"`
+	LastPatchDescriptor       string    `json:"last_patch_descriptor,omitempty"`
+	LastTransitionComponentID string    `json:"last_transition_component_id,omitempty"`
+	LastTransition            string    `json:"last_transition,omitempty"`
+	LastTransitionDurationMS  int       `json:"last_transition_duration_ms,omitempty"`
+	Subscriptions             []string  `json:"subscriptions,omitempty"`
+	UpdatedAt                 time.Time `json:"updated_at"`
+}
+
+// UIBroadcast represents one fan-out UI operation targeting a named cohort.
+type UIBroadcast struct {
+	Cohort     string    `json:"cohort"`
+	Descriptor string    `json:"descriptor,omitempty"`
+	PatchID    string    `json:"patch_id,omitempty"`
+	Devices    []string  `json:"devices,omitempty"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 // BusEvent represents a named event emitted on the internal event bus.
 type BusEvent struct {
 	ID        string    `json:"id"`
@@ -230,6 +253,8 @@ type Service struct {
 	bus          []BusEvent
 	cohorts      map[string]DeviceCohort
 	uiViews      map[string]UIView
+	uiSnapshots  map[string]UISnapshot
+	uiSubs       map[string][]string
 	acks         map[string]Acknowledgement
 }
 
@@ -237,13 +262,15 @@ type Service struct {
 func NewService() *Service {
 	now := time.Now
 	s := &Service{
-		now:       func() time.Time { return now().UTC() },
-		store:     map[string]StoreRecord{},
-		cohorts:   map[string]DeviceCohort{},
-		uiViews:   map[string]UIView{},
-		acks:      map[string]Acknowledgement{},
-		versions:  map[string][]ArtifactVersion{},
-		templates: map[string]ArtifactTemplate{},
+		now:         func() time.Time { return now().UTC() },
+		store:       map[string]StoreRecord{},
+		cohorts:     map[string]DeviceCohort{},
+		uiViews:     map[string]UIView{},
+		uiSnapshots: map[string]UISnapshot{},
+		uiSubs:      map[string][]string{},
+		acks:        map[string]Acknowledgement{},
+		versions:    map[string][]ArtifactVersion{},
+		templates:   map[string]ArtifactTemplate{},
 		identities: []Identity{
 			{
 				ID:          "system",
@@ -1454,6 +1481,150 @@ func (s *Service) UIViewDelete(viewID string) bool {
 	return true
 }
 
+// UIPush applies a full authored descriptor to one device snapshot.
+func (s *Service) UIPush(deviceID, descriptor, rootID string) UISnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		deviceID = "unknown"
+	}
+	now := s.now()
+	snapshot := s.uiSnapshots[deviceID]
+	snapshot.DeviceID = deviceID
+	snapshot.RootID = strings.TrimSpace(rootID)
+	snapshot.Descriptor = strings.TrimSpace(descriptor)
+	snapshot.UpdatedAt = now
+	snapshot.Subscriptions = append([]string(nil), s.uiSubs[deviceID]...)
+	s.uiSnapshots[deviceID] = snapshot
+	s.appendRecentLocked("ui", "push "+deviceID)
+	return snapshot
+}
+
+// UIPatch applies a patch descriptor to one device snapshot.
+func (s *Service) UIPatch(deviceID, componentID, descriptor string) UISnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		deviceID = "unknown"
+	}
+	now := s.now()
+	snapshot := s.uiSnapshots[deviceID]
+	snapshot.DeviceID = deviceID
+	snapshot.LastPatchComponentID = strings.TrimSpace(componentID)
+	snapshot.LastPatchDescriptor = strings.TrimSpace(descriptor)
+	snapshot.UpdatedAt = now
+	snapshot.Subscriptions = append([]string(nil), s.uiSubs[deviceID]...)
+	s.uiSnapshots[deviceID] = snapshot
+	s.appendRecentLocked("ui", "patch "+deviceID)
+	return snapshot
+}
+
+// UITransition applies a transition hint to one device snapshot.
+func (s *Service) UITransition(deviceID, componentID, transition string, durationMS int) UISnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		deviceID = "unknown"
+	}
+	now := s.now()
+	snapshot := s.uiSnapshots[deviceID]
+	snapshot.DeviceID = deviceID
+	snapshot.LastTransitionComponentID = strings.TrimSpace(componentID)
+	snapshot.LastTransition = strings.TrimSpace(transition)
+	snapshot.LastTransitionDurationMS = durationMS
+	snapshot.UpdatedAt = now
+	snapshot.Subscriptions = append([]string(nil), s.uiSubs[deviceID]...)
+	s.uiSnapshots[deviceID] = snapshot
+	s.appendRecentLocked("ui", "transition "+deviceID)
+	return snapshot
+}
+
+// UIBroadcast fans out an authored descriptor or patch to the given device ids.
+func (s *Service) UIBroadcast(cohort, descriptor, patchID string, deviceIDs []string) UIBroadcast {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cohort = strings.ToLower(strings.TrimSpace(cohort))
+	devices := normalizeDeviceIDs(deviceIDs)
+	descriptor = strings.TrimSpace(descriptor)
+	patchID = strings.TrimSpace(patchID)
+	now := s.now()
+	for _, deviceID := range devices {
+		snapshot := s.uiSnapshots[deviceID]
+		snapshot.DeviceID = deviceID
+		if patchID == "" {
+			snapshot.Descriptor = descriptor
+		} else {
+			snapshot.LastPatchComponentID = patchID
+			snapshot.LastPatchDescriptor = descriptor
+		}
+		snapshot.UpdatedAt = now
+		snapshot.Subscriptions = append([]string(nil), s.uiSubs[deviceID]...)
+		s.uiSnapshots[deviceID] = snapshot
+	}
+	broadcast := UIBroadcast{
+		Cohort:     cohort,
+		Descriptor: descriptor,
+		PatchID:    patchID,
+		Devices:    devices,
+		UpdatedAt:  now,
+	}
+	s.appendRecentLocked("ui", "broadcast "+cohort)
+	return broadcast
+}
+
+// UISubscribe records a device subscription target and returns the updated snapshot.
+func (s *Service) UISubscribe(deviceID, to string) UISnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		deviceID = "unknown"
+	}
+	to = strings.TrimSpace(to)
+	if to != "" {
+		existing := append([]string(nil), s.uiSubs[deviceID]...)
+		if !sliceContainsFold(existing, to) {
+			existing = append(existing, to)
+		}
+		sort.Slice(existing, func(i, j int) bool { return existing[i] < existing[j] })
+		s.uiSubs[deviceID] = existing
+	}
+	now := s.now()
+	snapshot := s.uiSnapshots[deviceID]
+	snapshot.DeviceID = deviceID
+	snapshot.Subscriptions = append([]string(nil), s.uiSubs[deviceID]...)
+	snapshot.UpdatedAt = now
+	s.uiSnapshots[deviceID] = snapshot
+	s.appendRecentLocked("ui", "subscribe "+deviceID)
+	return snapshot
+}
+
+// UISnapshot returns one device UI snapshot if any authored state exists.
+func (s *Service) UISnapshot(deviceID string) (UISnapshot, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	deviceID = strings.TrimSpace(deviceID)
+	snapshot, ok := s.uiSnapshots[deviceID]
+	subs := s.uiSubs[deviceID]
+	if !ok && len(subs) == 0 {
+		return UISnapshot{}, false
+	}
+	if !ok {
+		snapshot = UISnapshot{DeviceID: deviceID}
+	}
+	snapshot.Subscriptions = append([]string(nil), subs...)
+	return snapshot, true
+}
+
 // StorePut sets a key/value record in the given namespace.
 // ttl <= 0 means the record does not expire.
 func (s *Service) StorePut(namespace, key, value string, ttl time.Duration) StoreRecord {
@@ -1773,6 +1944,27 @@ func normalizeSelectors(selectors []string) []string {
 	seen := make(map[string]struct{}, len(selectors))
 	for _, selector := range selectors {
 		normalized := strings.ToLower(strings.TrimSpace(selector))
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func normalizeDeviceIDs(deviceIDs []string) []string {
+	if len(deviceIDs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(deviceIDs))
+	seen := make(map[string]struct{}, len(deviceIDs))
+	for _, deviceID := range deviceIDs {
+		normalized := strings.TrimSpace(deviceID)
 		if normalized == "" {
 			continue
 		}

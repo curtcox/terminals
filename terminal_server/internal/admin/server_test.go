@@ -444,6 +444,7 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		"/admin/api/memory/stream?scope=kitchen",
 		"/admin/api/placement",
 		"/admin/api/ui/views",
+		"/admin/api/ui/snapshot?device_id=d1",
 		"/admin/api/recent",
 		"/admin/api/store/get?namespace=ns&key=k",
 		"/admin/api/store/ns",
@@ -486,6 +487,10 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		{path: "/admin/api/canvas/annotate", form: url.Values{"canvas": {"c1"}, "text": {"draw"}}},
 		{path: "/admin/api/memory/remember", form: url.Values{"scope": {"kitchen"}, "text": {"milk"}}},
 		{path: "/admin/api/ui/views/upsert", form: url.Values{"view_id": {"kitchen-home"}, "root_id": {"root-main"}, "descriptor": {`{"type":"stack"}`}}},
+		{path: "/admin/api/ui/push", form: url.Values{"device_id": {"d1"}, "descriptor": {`{"type":"stack"}`}, "root_id": {"root-main"}}},
+		{path: "/admin/api/ui/patch", form: url.Values{"device_id": {"d1"}, "component_id": {"banner"}, "descriptor": {`{"type":"text"}`}}},
+		{path: "/admin/api/ui/transition", form: url.Values{"device_id": {"d1"}, "component_id": {"banner"}, "transition": {"fade"}, "duration_ms": {"150"}}},
+		{path: "/admin/api/ui/subscribe", form: url.Values{"device_id": {"d1"}, "to": {"cohort:family-screens"}}},
 		{path: "/admin/api/store/put", form: url.Values{"namespace": {"ns"}, "key": {"k"}, "value": {"v"}}},
 		{path: "/admin/api/store/bind", form: url.Values{"namespace": {"ns"}, "key": {"k"}, "to": {"device-1:chat"}}},
 		{path: "/admin/api/store/del", form: url.Values{"namespace": {"ns"}, "key": {"k"}}},
@@ -1152,6 +1157,114 @@ func TestUIViewEndpointsCRUD(t *testing.T) {
 	}
 	if !strings.Contains(delW.Body.String(), `"deleted":true`) {
 		t.Fatalf("ui views delete body missing deleted=true: %s", delW.Body.String())
+	}
+
+	placementReq := httptest.NewRequest(http.MethodPost, "/admin/api/devices/placement", strings.NewReader(url.Values{
+		"device_id": {"d1"},
+		"zone":      {"kitchen"},
+		"roles":     {"screen"},
+	}.Encode()))
+	placementReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	placementW := httptest.NewRecorder()
+	h.ServeHTTP(placementW, placementReq)
+	if placementW.Code != http.StatusOK {
+		t.Fatalf("placement status = %d, want 200 body=%s", placementW.Code, placementW.Body.String())
+	}
+
+	cohortReq := httptest.NewRequest(http.MethodPost, "/admin/api/cohort/upsert", strings.NewReader(url.Values{
+		"name":      {"family-screens"},
+		"selectors": {"zone:kitchen,role:screen"},
+	}.Encode()))
+	cohortReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	cohortW := httptest.NewRecorder()
+	h.ServeHTTP(cohortW, cohortReq)
+	if cohortW.Code != http.StatusOK {
+		t.Fatalf("cohort upsert status = %d, want 200 body=%s", cohortW.Code, cohortW.Body.String())
+	}
+
+	pushReq := httptest.NewRequest(http.MethodPost, "/admin/api/ui/push", strings.NewReader(url.Values{
+		"device_id":  {"d1"},
+		"root_id":    {"root-main"},
+		"descriptor": {`{"type":"stack"}`},
+	}.Encode()))
+	pushReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	pushW := httptest.NewRecorder()
+	h.ServeHTTP(pushW, pushReq)
+	if pushW.Code != http.StatusOK {
+		t.Fatalf("ui push status = %d, want 200 body=%s", pushW.Code, pushW.Body.String())
+	}
+	if !strings.Contains(pushW.Body.String(), `"device_id":"d1"`) {
+		t.Fatalf("ui push body missing device id: %s", pushW.Body.String())
+	}
+
+	patchReq := httptest.NewRequest(http.MethodPost, "/admin/api/ui/patch", strings.NewReader(url.Values{
+		"device_id":    {"d1"},
+		"component_id": {"banner"},
+		"descriptor":   {`{"type":"text"}`},
+	}.Encode()))
+	patchReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	patchW := httptest.NewRecorder()
+	h.ServeHTTP(patchW, patchReq)
+	if patchW.Code != http.StatusOK {
+		t.Fatalf("ui patch status = %d, want 200 body=%s", patchW.Code, patchW.Body.String())
+	}
+	if !strings.Contains(patchW.Body.String(), `"last_patch_component_id":"banner"`) {
+		t.Fatalf("ui patch body missing patch component id: %s", patchW.Body.String())
+	}
+
+	transitionReq := httptest.NewRequest(http.MethodPost, "/admin/api/ui/transition", strings.NewReader(url.Values{
+		"device_id":    {"d1"},
+		"component_id": {"banner"},
+		"transition":   {"fade"},
+		"duration_ms":  {"150"},
+	}.Encode()))
+	transitionReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	transitionW := httptest.NewRecorder()
+	h.ServeHTTP(transitionW, transitionReq)
+	if transitionW.Code != http.StatusOK {
+		t.Fatalf("ui transition status = %d, want 200 body=%s", transitionW.Code, transitionW.Body.String())
+	}
+	if !strings.Contains(transitionW.Body.String(), `"last_transition":"fade"`) {
+		t.Fatalf("ui transition body missing transition name: %s", transitionW.Body.String())
+	}
+
+	broadcastReq := httptest.NewRequest(http.MethodPost, "/admin/api/ui/broadcast", strings.NewReader(url.Values{
+		"cohort":     {"family-screens"},
+		"descriptor": {`{"type":"banner"}`},
+		"patch_id":   {"alert-banner"},
+	}.Encode()))
+	broadcastReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	broadcastW := httptest.NewRecorder()
+	h.ServeHTTP(broadcastW, broadcastReq)
+	if broadcastW.Code != http.StatusOK {
+		t.Fatalf("ui broadcast status = %d, want 200 body=%s", broadcastW.Code, broadcastW.Body.String())
+	}
+	if !strings.Contains(broadcastW.Body.String(), `"members":["d1"]`) {
+		t.Fatalf("ui broadcast body missing resolved members: %s", broadcastW.Body.String())
+	}
+
+	subscribeReq := httptest.NewRequest(http.MethodPost, "/admin/api/ui/subscribe", strings.NewReader(url.Values{
+		"device_id": {"d1"},
+		"to":        {"cohort:family-screens"},
+	}.Encode()))
+	subscribeReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	subscribeW := httptest.NewRecorder()
+	h.ServeHTTP(subscribeW, subscribeReq)
+	if subscribeW.Code != http.StatusOK {
+		t.Fatalf("ui subscribe status = %d, want 200 body=%s", subscribeW.Code, subscribeW.Body.String())
+	}
+	if !strings.Contains(subscribeW.Body.String(), `"subscriptions":["cohort:family-screens"]`) {
+		t.Fatalf("ui subscribe body missing subscription target: %s", subscribeW.Body.String())
+	}
+
+	snapshotReq := httptest.NewRequest(http.MethodGet, "/admin/api/ui/snapshot?device_id=d1", nil)
+	snapshotW := httptest.NewRecorder()
+	h.ServeHTTP(snapshotW, snapshotReq)
+	if snapshotW.Code != http.StatusOK {
+		t.Fatalf("ui snapshot status = %d, want 200 body=%s", snapshotW.Code, snapshotW.Body.String())
+	}
+	if !strings.Contains(snapshotW.Body.String(), `"device_id":"d1"`) {
+		t.Fatalf("ui snapshot body missing device id: %s", snapshotW.Body.String())
 	}
 }
 

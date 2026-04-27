@@ -158,6 +158,12 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/ui/views", h.handleUIViews)
 	mux.HandleFunc("/admin/api/ui/views/upsert", h.handleUIViewUpsert)
 	mux.HandleFunc("/admin/api/ui/views/del", h.handleUIViewDelete)
+	mux.HandleFunc("/admin/api/ui/push", h.handleUIPush)
+	mux.HandleFunc("/admin/api/ui/patch", h.handleUIPatch)
+	mux.HandleFunc("/admin/api/ui/transition", h.handleUITransition)
+	mux.HandleFunc("/admin/api/ui/broadcast", h.handleUIBroadcast)
+	mux.HandleFunc("/admin/api/ui/subscribe", h.handleUISubscribe)
+	mux.HandleFunc("/admin/api/ui/snapshot", h.handleUISnapshot)
 	mux.HandleFunc("/admin/api/recent", h.handleRecent)
 	mux.HandleFunc("/admin/api/world/calibration", h.handleWorldCalibration)
 	mux.HandleFunc("/admin/api/world/verify", h.handleWorldVerify)
@@ -1031,6 +1037,136 @@ func (h *Handler) handleUIViewDelete(w http.ResponseWriter, req *http.Request) {
 	}
 	deleted := h.capability.UIViewDelete(viewID)
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
+}
+
+func (h *Handler) handleUIPush(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	descriptor := strings.TrimSpace(req.Form.Get("descriptor"))
+	if deviceID == "" || descriptor == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id and descriptor are required")
+		return
+	}
+	snapshot := h.capability.UIPush(deviceID, descriptor, strings.TrimSpace(req.Form.Get("root_id")))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "snapshot": snapshot})
+}
+
+func (h *Handler) handleUIPatch(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	componentID := strings.TrimSpace(req.Form.Get("component_id"))
+	descriptor := strings.TrimSpace(req.Form.Get("descriptor"))
+	if deviceID == "" || componentID == "" || descriptor == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id, component_id, and descriptor are required")
+		return
+	}
+	snapshot := h.capability.UIPatch(deviceID, componentID, descriptor)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "snapshot": snapshot})
+}
+
+func (h *Handler) handleUITransition(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	componentID := strings.TrimSpace(req.Form.Get("component_id"))
+	transition := strings.TrimSpace(req.Form.Get("transition"))
+	if deviceID == "" || componentID == "" || transition == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id, component_id, and transition are required")
+		return
+	}
+	durationMS := 0
+	if raw := strings.TrimSpace(req.Form.Get("duration_ms")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			h.writeJSONError(w, http.StatusBadRequest, "duration_ms must be an integer")
+			return
+		}
+		durationMS = parsed
+	}
+	snapshot := h.capability.UITransition(deviceID, componentID, transition, durationMS)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "snapshot": snapshot})
+}
+
+func (h *Handler) handleUIBroadcast(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	cohortName := strings.TrimSpace(req.Form.Get("cohort"))
+	descriptor := strings.TrimSpace(req.Form.Get("descriptor"))
+	if cohortName == "" || descriptor == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "cohort and descriptor are required")
+		return
+	}
+	cohort, ok := h.capability.CohortGet(cohortName)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "cohort not found")
+		return
+	}
+	members := h.resolveCohortMembers(cohort.Selectors)
+	broadcast := h.capability.UIBroadcast(cohort.Name, descriptor, strings.TrimSpace(req.Form.Get("patch_id")), members)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "broadcast": broadcast, "members": members})
+}
+
+func (h *Handler) handleUISubscribe(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deviceID := strings.TrimSpace(req.Form.Get("device_id"))
+	target := strings.TrimSpace(req.Form.Get("to"))
+	if deviceID == "" || target == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id and to are required")
+		return
+	}
+	snapshot := h.capability.UISubscribe(deviceID, target)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "snapshot": snapshot})
+}
+
+func (h *Handler) handleUISnapshot(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	deviceID := strings.TrimSpace(req.URL.Query().Get("device_id"))
+	if deviceID == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+	snapshot, ok := h.capability.UISnapshot(deviceID)
+	if !ok {
+		h.writeJSON(w, http.StatusOK, map[string]any{"snapshot": nil})
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"snapshot": snapshot})
 }
 
 func (h *Handler) handleRecent(w http.ResponseWriter, req *http.Request) {

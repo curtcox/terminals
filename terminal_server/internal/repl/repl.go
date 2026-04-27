@@ -116,6 +116,12 @@ func replCommandSpecs() []commandSpec {
 		{Name: "cohort show", Usage: "cohort show <name> [--json]", Summary: "Show one cohort with resolved members", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/cohort"}},
 		{Name: "cohort put", Usage: "cohort put <name> --selectors <selector[,selector...]> [--json]", Summary: "Create or update a named device cohort", Classification: commandMutating, RelatedDocs: []string{"repl/commands/cohort"}},
 		{Name: "cohort del", Usage: "cohort del <name> [--json]", Summary: "Delete a named device cohort", Classification: commandMutating, RelatedDocs: []string{"repl/commands/cohort"}},
+		{Name: "ui push", Usage: "ui push <device> <descriptor-expr> [--root <id>] [--json]", Summary: "Push an authored UI descriptor to a device", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ui"}},
+		{Name: "ui patch", Usage: "ui patch <device> <component-id> <descriptor-expr> [--json]", Summary: "Patch one UI component on a device", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ui"}},
+		{Name: "ui transition", Usage: "ui transition <device> <component-id> <transition> [--duration-ms <n>] [--json]", Summary: "Apply a UI transition hint on a device", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ui"}},
+		{Name: "ui broadcast", Usage: "ui broadcast <cohort> <descriptor-expr> [--patch <component-id>] [--json]", Summary: "Broadcast a UI descriptor to all cohort members", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ui"}},
+		{Name: "ui subscribe", Usage: "ui subscribe <device> --to <activation|cohort> [--json]", Summary: "Subscribe a device to a cohort or activation UI stream", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ui"}},
+		{Name: "ui snapshot", Usage: "ui snapshot <device> [--json]", Summary: "Show current authored UI snapshot for a device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ui"}},
 		{Name: "ui views ls", Usage: "ui views ls [--json]", Summary: "List authored UI views", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ui"}},
 		{Name: "ui views show", Usage: "ui views show <view-id> [--json]", Summary: "Show one authored UI view", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ui"}},
 		{Name: "ui views rm", Usage: "ui views rm <view-id> [--json]", Summary: "Remove one authored UI view", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ui"}},
@@ -1396,6 +1402,119 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		}
 	case "ui":
 		switch sub {
+		case "push":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--root")
+			if len(plain) < 2 {
+				return errors.New("usage: ui push <device> <descriptor-expr> [--root <id>]")
+			}
+			form := url.Values{
+				"device_id":  {plain[0]},
+				"descriptor": {strings.Join(plain[1:], " ")},
+			}
+			if rootID := strings.TrimSpace(flagValue(args[1:], "--root")); rootID != "" {
+				form.Set("root_id", rootID)
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/ui/push", form)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  action=push device=%s\n", plain[0])
+			return err
+		case "patch":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 3 {
+				return errors.New("usage: ui patch <device> <component-id> <descriptor-expr>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/ui/patch", url.Values{
+				"device_id":    {plain[0]},
+				"component_id": {plain[1]},
+				"descriptor":   {strings.Join(plain[2:], " ")},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  action=patch device=%s component=%s\n", plain[0], plain[1])
+			return err
+		case "transition":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--duration-ms")
+			if len(plain) < 3 {
+				return errors.New("usage: ui transition <device> <component-id> <transition> [--duration-ms <n>]")
+			}
+			form := url.Values{
+				"device_id":    {plain[0]},
+				"component_id": {plain[1]},
+				"transition":   {plain[2]},
+			}
+			if duration := strings.TrimSpace(flagValue(args[1:], "--duration-ms")); duration != "" {
+				form.Set("duration_ms", duration)
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/ui/transition", form)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  action=transition device=%s transition=%s\n", plain[0], plain[2])
+			return err
+		case "broadcast":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--patch")
+			if len(plain) < 2 {
+				return errors.New("usage: ui broadcast <cohort> <descriptor-expr> [--patch <component-id>]")
+			}
+			form := url.Values{
+				"cohort":     {plain[0]},
+				"descriptor": {strings.Join(plain[1:], " ")},
+			}
+			if patchID := strings.TrimSpace(flagValue(args[1:], "--patch")); patchID != "" {
+				form.Set("patch_id", patchID)
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/ui/broadcast", form)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  action=broadcast cohort=%s\n", plain[0])
+			return err
+		case "subscribe":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--to")
+			if len(plain) < 1 {
+				return errors.New("usage: ui subscribe <device> --to <activation|cohort>")
+			}
+			target := strings.TrimSpace(flagValue(args[1:], "--to"))
+			if target == "" {
+				return errors.New("usage: ui subscribe <device> --to <activation|cohort>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/ui/subscribe", url.Values{
+				"device_id": {plain[0]},
+				"to":        {target},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  action=subscribe device=%s to=%s\n", plain[0], target)
+			return err
+		case "snapshot":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: ui snapshot <device>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/ui/snapshot", url.Values{"device_id": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
 		case "views":
 			if len(args) < 2 {
 				return errors.New("usage: ui views <ls|show|rm>")

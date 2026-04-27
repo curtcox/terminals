@@ -332,6 +332,12 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"cohort show",
 		"cohort put",
 		"cohort del",
+		"ui push",
+		"ui patch",
+		"ui transition",
+		"ui broadcast",
+		"ui subscribe",
+		"ui snapshot",
 		"ui views ls",
 		"ui views show",
 		"ui views rm",
@@ -566,6 +572,18 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","cohort":{"name":"family-screens","selectors":["role:screen","zone:kitchen"]},"members":["d1"]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/cohort/del":
 			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/ui/push":
+			_, _ = w.Write([]byte(`{"status":"ok","snapshot":{"device_id":"d1","root_id":"root-main"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/ui/patch":
+			_, _ = w.Write([]byte(`{"status":"ok","snapshot":{"device_id":"d1","last_patch_component_id":"banner"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/ui/transition":
+			_, _ = w.Write([]byte(`{"status":"ok","snapshot":{"device_id":"d1","last_transition":"fade"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/ui/broadcast":
+			_, _ = w.Write([]byte(`{"status":"ok","broadcast":{"cohort":"family-screens"},"members":["d1"]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/ui/subscribe":
+			_, _ = w.Write([]byte(`{"status":"ok","snapshot":{"device_id":"d1","subscriptions":["cohort:family-screens"]}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/ui/snapshot":
+			_, _ = w.Write([]byte(`{"snapshot":{"device_id":"d1","root_id":"root-main"}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/ui/views" && req.URL.Query().Get("view_id") == "":
 			_, _ = w.Write([]byte(`{"views":[{"view_id":"kitchen-home","root_id":"root-main"}]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/ui/views" && req.URL.Query().Get("view_id") == "kitchen-home":
@@ -633,6 +651,12 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"cohort show family-screens",
 		"cohort put family-screens --selectors zone:kitchen,role:screen",
 		"cohort del family-screens",
+		"ui push d1 '{\"type\":\"stack\"}' --root root-main",
+		"ui patch d1 banner '{\"type\":\"text\"}'",
+		"ui transition d1 banner fade --duration-ms 150",
+		"ui broadcast family-screens '{\"type\":\"banner\"}' --patch alert-banner",
+		"ui subscribe d1 --to cohort:family-screens",
+		"ui snapshot d1",
 		"ui views ls",
 		"ui views show kitchen-home",
 		"ui views rm kitchen-home",
@@ -735,6 +759,24 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "cohort=family-screens") {
 		t.Fatalf("cohort delete output missing cohort summary: %q", text)
+	}
+	if !strings.Contains(text, "action=push device=d1") {
+		t.Fatalf("ui push output missing summary: %q", text)
+	}
+	if !strings.Contains(text, "action=patch device=d1 component=banner") {
+		t.Fatalf("ui patch output missing summary: %q", text)
+	}
+	if !strings.Contains(text, "action=transition device=d1 transition=fade") {
+		t.Fatalf("ui transition output missing summary: %q", text)
+	}
+	if !strings.Contains(text, "action=broadcast cohort=family-screens") {
+		t.Fatalf("ui broadcast output missing summary: %q", text)
+	}
+	if !strings.Contains(text, "action=subscribe device=d1 to=cohort:family-screens") {
+		t.Fatalf("ui subscribe output missing summary: %q", text)
+	}
+	if !strings.Contains(text, `"snapshot": {`) {
+		t.Fatalf("ui snapshot output missing JSON payload: %q", text)
 	}
 	if !strings.Contains(text, "kitchen-home") {
 		t.Fatalf("ui views output missing view id: %q", text)
