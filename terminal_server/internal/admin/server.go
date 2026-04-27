@@ -41,6 +41,8 @@ type replAIService interface {
 	ListModels(ctx context.Context, req replai.ListModelsRequest) (*replai.ListModelsResponse, error)
 	GetSelection(ctx context.Context, req replai.GetSelectionRequest) (*replai.GetSelectionResponse, error)
 	SetSelection(ctx context.Context, req replai.SetSelectionRequest) (*replai.SetSelectionResponse, error)
+	Ask(ctx context.Context, req replai.AskRequest) (*replai.AskResponse, error)
+	Generate(ctx context.Context, req replai.GenerateRequest) (*replai.GenerateResponse, error)
 	GetContext(ctx context.Context, req replai.GetContextRequest) (*replai.GetContextResponse, error)
 	AddContext(ctx context.Context, req replai.AddContextRequest) (*replai.AddContextResponse, error)
 	PinContext(ctx context.Context, req replai.PinContextRequest) (*replai.PinContextResponse, error)
@@ -118,6 +120,8 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/repl/ai/providers", h.handleReplAIProviders)
 	mux.HandleFunc("/admin/api/repl/ai/models", h.handleReplAIModels)
 	mux.HandleFunc("/admin/api/repl/ai/selection", h.handleReplAISelection)
+	mux.HandleFunc("/admin/api/repl/ai/ask", h.handleReplAIAsk)
+	mux.HandleFunc("/admin/api/repl/ai/gen", h.handleReplAIGenerate)
 	mux.HandleFunc("/admin/api/repl/ai/context", h.handleReplAIContext)
 	mux.HandleFunc("/admin/api/repl/ai/context/pin", h.handleReplAIPinContext)
 	mux.HandleFunc("/admin/api/repl/ai/context/unpin", h.handleReplAIUnpinContext)
@@ -1830,6 +1834,54 @@ func (h *Handler) handleReplAISelection(w http.ResponseWriter, req *http.Request
 	}
 }
 
+func (h *Handler) handleReplAIAsk(w http.ResponseWriter, req *http.Request) {
+	if h.ai == nil {
+		h.writeJSONError(w, http.StatusNotFound, "repl ai service not configured")
+		return
+	}
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	resp, err := h.ai.Ask(req.Context(), replai.AskRequest{
+		SessionID: strings.TrimSpace(req.Form.Get("session_id")),
+		Prompt:    strings.TrimSpace(req.Form.Get("prompt")),
+	})
+	if err != nil {
+		h.writeReplAIError(w, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) handleReplAIGenerate(w http.ResponseWriter, req *http.Request) {
+	if h.ai == nil {
+		h.writeJSONError(w, http.StatusNotFound, "repl ai service not configured")
+		return
+	}
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	resp, err := h.ai.Generate(req.Context(), replai.GenerateRequest{
+		SessionID:   strings.TrimSpace(req.Form.Get("session_id")),
+		Description: strings.TrimSpace(req.Form.Get("description")),
+	})
+	if err != nil {
+		h.writeReplAIError(w, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, resp)
+}
+
 func (h *Handler) handleReplAIContext(w http.ResponseWriter, req *http.Request) {
 	if h.ai == nil {
 		h.writeJSONError(w, http.StatusNotFound, "repl ai service not configured")
@@ -2015,7 +2067,8 @@ func (h *Handler) writeReplAIError(w http.ResponseWriter, err error) {
 		errors.Is(err, replai.ErrMissingModel) ||
 		errors.Is(err, replai.ErrProviderNotFound) ||
 		errors.Is(err, replai.ErrMissingContextRef) ||
-		errors.Is(err, replai.ErrUnsupportedApprovalPolicy) {
+		errors.Is(err, replai.ErrUnsupportedApprovalPolicy) ||
+		errors.Is(err, replai.ErrMissingPrompt) {
 		status = http.StatusBadRequest
 	}
 	if errors.Is(err, replsession.ErrSessionNotFound) {

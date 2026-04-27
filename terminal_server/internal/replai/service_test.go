@@ -3,7 +3,17 @@ package replai
 import (
 	"context"
 	"testing"
+
+	"github.com/curtcox/terminals/terminal_server/internal/ai"
 )
+
+type fakeLLM struct {
+	response string
+}
+
+func (f fakeLLM) Query(context.Context, []ai.Message, ai.LLMOptions) (*ai.LLMResponse, error) {
+	return &ai.LLMResponse{Text: f.response, FinishReason: "stop"}, nil
+}
 
 type memorySelections struct {
 	state   map[string][2]string
@@ -272,5 +282,62 @@ func TestServiceContextAndPolicyLifecycle(t *testing.T) {
 	}
 	if postReset.Thread != "" || len(postReset.History) != 0 {
 		t.Fatalf("post-reset thread snapshot = %#v, want empty thread/history", postReset)
+	}
+}
+
+func TestServiceAskAndGeneratePersistThreadHistory(t *testing.T) {
+	store := &memorySelections{}
+	svc := NewService(store, Config{
+		DefaultProvider: "ollama",
+		DefaultModel:    "llama3.1",
+		LLM:             fakeLLM{response: "result text"},
+		Providers: []ProviderConfig{
+			{Name: "ollama", Models: []string{"llama3.1"}},
+		},
+	})
+
+	askResp, err := svc.Ask(context.Background(), AskRequest{SessionID: "repl-1", Prompt: "why suspended"})
+	if err != nil {
+		t.Fatalf("Ask() error = %v", err)
+	}
+	if askResp.Thread == "" {
+		t.Fatalf("Ask() thread empty, want non-empty")
+	}
+	if len(askResp.History) != 2 {
+		t.Fatalf("Ask() history len = %d, want 2", len(askResp.History))
+	}
+	if askResp.History[0] != "user: why suspended" || askResp.History[1] != "assistant: result text" {
+		t.Fatalf("Ask() history = %#v, want user/assistant entries", askResp.History)
+	}
+
+	genResp, err := svc.Generate(context.Background(), GenerateRequest{SessionID: "repl-1", Description: "generate dryer app"})
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+	if genResp.Thread != askResp.Thread {
+		t.Fatalf("Generate() thread = %q, want %q", genResp.Thread, askResp.Thread)
+	}
+	if len(genResp.History) != 4 {
+		t.Fatalf("Generate() history len = %d, want 4", len(genResp.History))
+	}
+	if genResp.History[2] != "user: generate dryer app" || genResp.History[3] != "assistant: result text" {
+		t.Fatalf("Generate() history tail = %#v, want appended user/assistant entries", genResp.History)
+	}
+}
+
+func TestServiceAskAndGenerateRequirePrompt(t *testing.T) {
+	svc := NewService(nil, Config{
+		DefaultProvider: "ollama",
+		DefaultModel:    "llama3.1",
+		Providers: []ProviderConfig{
+			{Name: "ollama", Models: []string{"llama3.1"}},
+		},
+	})
+
+	if _, err := svc.Ask(context.Background(), AskRequest{SessionID: "repl-1", Prompt: ""}); err == nil {
+		t.Fatalf("Ask(empty prompt) expected error")
+	}
+	if _, err := svc.Generate(context.Background(), GenerateRequest{SessionID: "repl-1", Description: ""}); err == nil {
+		t.Fatalf("Generate(empty description) expected error")
 	}
 }

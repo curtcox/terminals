@@ -187,6 +187,8 @@ func replCommandSpecs() []commandSpec {
 		{Name: "ai models", Usage: "ai models [provider] [--json]", Summary: "List models for a provider", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai use", Usage: "ai use <provider> <model> [--json]", Summary: "Set sticky provider/model selection for this session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai status", Usage: "ai status [--json]", Summary: "Show current provider/model selection for this session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai ask", Usage: "ai ask <prompt> [--json]", Summary: "Ask the configured AI provider a question", Classification: commandOperational, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai gen", Usage: "ai gen <description> [--json]", Summary: "Generate text/code from the configured AI provider", Classification: commandOperational, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai context", Usage: "ai context [--json]", Summary: "Show pinned AI context refs", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai context add", Usage: "ai context add <ref> [--json]", Summary: "Add one-shot AI context for the next turn", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai context pin", Usage: "ai context pin <ref> [--json]", Summary: "Pin AI context across turns", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
@@ -2779,6 +2781,54 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return writeJSON(s.out, body)
 			}
 			_, err = fmt.Fprintf(s.out, "session: %s\nprovider: %s\nmodel: %s\n", toString(body["session_id"]), toString(body["provider"]), toString(body["model"]))
+			return err
+		case "ask":
+			if strings.TrimSpace(s.session) == "" {
+				return errors.New("ai ask requires session id (TERMINALS_REPL_SESSION_ID)")
+			}
+			plain := nonFlagArgs(args[1:])
+			if len(plain) == 0 {
+				return errors.New("usage: ai ask <prompt>")
+			}
+			prompt := strings.TrimSpace(strings.Join(plain, " "))
+			body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/ask", url.Values{
+				"session_id": {s.session},
+				"prompt":     {prompt},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			if _, err := fmt.Fprintf(s.out, "session: %s\nprovider: %s\nmodel: %s\nthread: %s\n", toString(body["session_id"]), toString(body["provider"]), toString(body["model"]), toString(body["thread"])); err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(s.out, "answer:\n%s\n", toString(body["answer"]))
+			return err
+		case "gen":
+			if strings.TrimSpace(s.session) == "" {
+				return errors.New("ai gen requires session id (TERMINALS_REPL_SESSION_ID)")
+			}
+			plain := nonFlagArgs(args[1:])
+			if len(plain) == 0 {
+				return errors.New("usage: ai gen <description>")
+			}
+			description := strings.TrimSpace(strings.Join(plain, " "))
+			body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/gen", url.Values{
+				"session_id":  {s.session},
+				"description": {description},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			if _, err := fmt.Fprintf(s.out, "session: %s\nprovider: %s\nmodel: %s\nthread: %s\n", toString(body["session_id"]), toString(body["provider"]), toString(body["model"]), toString(body["thread"])); err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(s.out, "generated:\n%s\n", toString(body["output"]))
 			return err
 		case "context":
 			if strings.TrimSpace(s.session) == "" {

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/curtcox/terminals/terminal_server/internal/ai"
 )
 
 var (
@@ -22,6 +24,8 @@ var (
 	ErrMissingContextRef = errors.New("missing context ref")
 	// ErrUnsupportedApprovalPolicy indicates the policy value is invalid.
 	ErrUnsupportedApprovalPolicy = errors.New("unsupported approval policy")
+	// ErrMissingPrompt indicates a prompt/description was not provided.
+	ErrMissingPrompt = errors.New("missing prompt")
 )
 
 const (
@@ -71,6 +75,7 @@ type Config struct {
 	DefaultProvider string
 	DefaultModel    string
 	Providers       []ProviderConfig
+	LLM             ai.LLM
 }
 
 // Provider is a runtime provider summary.
@@ -230,12 +235,47 @@ type ResetThreadResponse struct {
 	History   []string `json:"history"`
 }
 
+// AskRequest invokes an AI question for one session.
+type AskRequest struct {
+	SessionID string
+	Prompt    string
+}
+
+// AskResponse reports the answer and updated thread state.
+type AskResponse struct {
+	SessionID string   `json:"session_id"`
+	Provider  string   `json:"provider"`
+	Model     string   `json:"model"`
+	Prompt    string   `json:"prompt"`
+	Answer    string   `json:"answer"`
+	Thread    string   `json:"thread"`
+	History   []string `json:"history"`
+}
+
+// GenerateRequest invokes AI code generation text for one session.
+type GenerateRequest struct {
+	SessionID   string
+	Description string
+}
+
+// GenerateResponse reports generated output and updated thread state.
+type GenerateResponse struct {
+	SessionID   string   `json:"session_id"`
+	Provider    string   `json:"provider"`
+	Model       string   `json:"model"`
+	Description string   `json:"description"`
+	Output      string   `json:"output"`
+	Thread      string   `json:"thread"`
+	History     []string `json:"history"`
+}
+
 // Service provides typed AI selection APIs used by REPL commands.
 type Service struct {
 	sessions        SessionSelectionStore
 	contexts        SessionContextStore
 	policies        SessionPolicyStore
 	threads         SessionThreadStore
+	llm             ai.LLM
 	providersByName map[string]Provider
 	providerOrder   []string
 	defaultProvider string
@@ -246,6 +286,7 @@ type Service struct {
 func NewService(sessions SessionSelectionStore, cfg Config) *Service {
 	svc := &Service{
 		sessions:        sessions,
+		llm:             cfg.LLM,
 		providersByName: map[string]Provider{},
 		providerOrder:   []string{},
 		defaultProvider: strings.TrimSpace(cfg.DefaultProvider),
@@ -503,6 +544,119 @@ func (s *Service) ResetThread(_ context.Context, req ResetThreadRequest) (*Reset
 		return nil, err
 	}
 	return &ResetThreadResponse{SessionID: sessionID, Thread: "", History: []string{}}, nil
+}
+
+// Ask queries the configured LLM with a prompt and records thread history.
+func (s *Service) Ask(ctx context.Context, req AskRequest) (*AskResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	prompt := strings.TrimSpace(req.Prompt)
+	if prompt == "" {
+		return nil, ErrMissingPrompt
+	}
+	provider, model, answer, thread, history, err := s.runPrompt(ctx, sessionID, prompt)
+	if err != nil {
+		return nil, err
+	}
+	return &AskResponse{
+		SessionID: sessionID,
+		Provider:  provider,
+		Model:     model,
+		Prompt:    prompt,
+		Answer:    answer,
+		Thread:    thread,
+		History:   history,
+	}, nil
+}
+
+// Generate queries the configured LLM for generated output text.
+func (s *Service) Generate(ctx context.Context, req GenerateRequest) (*GenerateResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	description := strings.TrimSpace(req.Description)
+	if description == "" {
+		return nil, ErrMissingPrompt
+	}
+	provider, model, output, thread, history, err := s.runPrompt(ctx, sessionID, description)
+	if err != nil {
+		return nil, err
+	}
+	return &GenerateResponse{
+		SessionID:   sessionID,
+		Provider:    provider,
+		Model:       model,
+		Description: description,
+		Output:      output,
+		Thread:      thread,
+		History:     history,
+	}, nil
+}
+
+func (s *Service) runPrompt(ctx context.Context, sessionID, prompt string) (provider string, model string, output string, thread string, history []string, err error) {
+	selection, err := s.GetSelection(ctx, GetSelectionRequest{SessionID: sessionID})
+	if err != nil {
+		return "", "", "", "", nil, err
+	}
+	provider = strings.TrimSpace(selection.Provider)
+	model = strings.TrimSpace(selection.Model)
+
+	thread, history, err = s.getThread(sessionID)
+	if err != nil {
+		return "", "", "", "", nil, err
+	}
+
+	messages := historyToMessages(history)
+	messages = append(messages, ai.Message{Role: "user", Content: prompt})
+	llm := s.llm
+	if llm == nil {
+		llm = ai.NoopLLM{}
+	}
+	resp, err := llm.Query(ctx, messages, ai.LLMOptions{Model: model})
+	if err != nil {
+		return "", "", "", "", nil, err
+	}
+	if resp != nil {
+		output = strings.TrimSpace(resp.Text)
+	}
+
+	updatedHistory := append([]string{}, history...)
+	updatedHistory = append(updatedHistory, "user: "+prompt)
+	updatedHistory = append(updatedHistory, "assistant: "+output)
+	if thread == "" {
+		thread = "thread-" + sessionID
+	}
+	if err := s.saveThread(sessionID, thread, updatedHistory); err != nil {
+		return "", "", "", "", nil, err
+	}
+	return provider, model, output, thread, updatedHistory, nil
+}
+
+func historyToMessages(history []string) []ai.Message {
+	messages := make([]ai.Message, 0, len(history))
+	for _, line := range history {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "user: "):
+			messages = append(messages, ai.Message{Role: "user", Content: strings.TrimSpace(strings.TrimPrefix(trimmed, "user: "))})
+		case strings.HasPrefix(trimmed, "assistant: "):
+			messages = append(messages, ai.Message{Role: "assistant", Content: strings.TrimSpace(strings.TrimPrefix(trimmed, "assistant: "))})
+		}
+	}
+	return messages
+}
+
+func (s *Service) saveThread(sessionID, thread string, history []string) error {
+	if s.threads == nil {
+		return nil
+	}
+	if err := s.threads.SetThread(sessionID, thread); err != nil {
+		return err
+	}
+	return s.threads.SetHistory(sessionID, history)
 }
 
 func (s *Service) resolveProviderAndModel(provider, model string) (string, string, error) {

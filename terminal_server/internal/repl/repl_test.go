@@ -266,6 +266,12 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/repl/ai/selection":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/ask":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6","prompt":"why is act_42 suspended?","answer":"act_42 is suspended due to red_alert preemption.","thread":"thread-repl-9","history":["user: why is act_42 suspended?","assistant: act_42 is suspended due to red_alert preemption."]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/gen":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6","description":"a tal app that rings a chime when the dryer beeps","output":"apps/dryer_chime/main.tal\napps/dryer_chime/manifest.toml","thread":"thread-repl-9","history":["user: why is act_42 suspended?","assistant: act_42 is suspended due to red_alert preemption.","user: a tal app that rings a chime when the dryer beeps","assistant: apps/dryer_chime/main.tal\\napps/dryer_chime/manifest.toml"]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/repl/ai/context":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"session_id":"repl-9","pinned":["claims:tree"]}`))
@@ -299,7 +305,7 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 	}))
 	defer admin.Close()
 
-	in := strings.NewReader("ai providers\nai models ollama\nai use openrouter anthropic/claude-sonnet-4-6\nai status\nai context\nai context add devices:ls\nai context pin devices:ls\nai context unpin devices:ls\nai context clear\nai policy show\nai policy set prompt-all\nai history\nai reset\nexit\n")
+	in := strings.NewReader("ai providers\nai models ollama\nai use openrouter anthropic/claude-sonnet-4-6\nai status\nai ask why is act_42 suspended?\nai gen a tal app that rings a chime when the dryer beeps\nai context\nai context add devices:ls\nai context pin devices:ls\nai context unpin devices:ls\nai context clear\nai policy show\nai policy set prompt-all\nai history\nai reset\nexit\n")
 	var out bytes.Buffer
 
 	err := Run(context.Background(), in, &out, Options{
@@ -322,6 +328,12 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "session: repl-9") {
 		t.Fatalf("missing ai status output: %q", text)
+	}
+	if !strings.Contains(text, "answer:") || !strings.Contains(text, "red_alert preemption") {
+		t.Fatalf("missing ai ask output: %q", text)
+	}
+	if !strings.Contains(text, "generated:") || !strings.Contains(text, "apps/dryer_chime/main.tal") {
+		t.Fatalf("missing ai gen output: %q", text)
 	}
 	if !strings.Contains(text, "pinned:") {
 		t.Fatalf("missing ai context output: %q", text)

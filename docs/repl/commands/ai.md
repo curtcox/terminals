@@ -6,6 +6,8 @@ Current AI selection commands:
 - `ai models [provider] [--json]` list configured models for one provider.
 - `ai use <provider> <model> [--json]` set sticky provider/model selection for the current REPL session.
 - `ai status [--json]` show the sticky provider/model selection for the current REPL session.
+- `ai ask <prompt> [--json]` ask the configured model a question and record the exchange in session history.
+- `ai gen <description> [--json]` request generated output from the configured model and record the exchange in session history.
 - `ai context [--json]` show pinned context refs that persist across turns.
 - `ai context add <ref> [--json]` add one-shot context for the next turn.
 - `ai context pin <ref> [--json]` pin a context ref across turns.

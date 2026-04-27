@@ -1253,6 +1253,34 @@ func TestReplAIEndpoints(t *testing.T) {
 		t.Fatalf("selection POST body = %s", setSelectionW.Body.String())
 	}
 
+	askReq := httptest.NewRequest(http.MethodPost, "/admin/api/repl/ai/ask", strings.NewReader(url.Values{
+		"session_id": {created.Session.ID},
+		"prompt":     {"why is act_42 suspended?"},
+	}.Encode()))
+	askReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	askW := httptest.NewRecorder()
+	h.ServeHTTP(askW, askReq)
+	if askW.Code != http.StatusOK {
+		t.Fatalf("ask POST status = %d, want 200 body=%s", askW.Code, askW.Body.String())
+	}
+	if !strings.Contains(askW.Body.String(), "\"answer\"") {
+		t.Fatalf("ask POST body = %s", askW.Body.String())
+	}
+
+	genReq := httptest.NewRequest(http.MethodPost, "/admin/api/repl/ai/gen", strings.NewReader(url.Values{
+		"session_id":  {created.Session.ID},
+		"description": {"a tal app that rings a chime when the dryer beeps"},
+	}.Encode()))
+	genReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	genW := httptest.NewRecorder()
+	h.ServeHTTP(genW, genReq)
+	if genW.Code != http.StatusOK {
+		t.Fatalf("gen POST status = %d, want 200 body=%s", genW.Code, genW.Body.String())
+	}
+	if !strings.Contains(genW.Body.String(), "\"output\"") {
+		t.Fatalf("gen POST body = %s", genW.Body.String())
+	}
+
 	pinContextReq := httptest.NewRequest(http.MethodPost, "/admin/api/repl/ai/context/pin", strings.NewReader(url.Values{
 		"session_id": {created.Session.ID},
 		"ref":        {"claims:tree"},

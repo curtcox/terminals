@@ -208,6 +208,7 @@ func main() {
 	replAIService := replai.NewService(controlStream.ReplSessions(), replai.Config{
 		DefaultProvider: cfg.AI.DefaultProvider,
 		DefaultModel:    cfg.AI.DefaultModel,
+		LLM:             aiBackends.LLM,
 		Providers: []replai.ProviderConfig{
 			{
 				Name:         "openrouter",
