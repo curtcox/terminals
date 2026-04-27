@@ -6,7 +6,9 @@ import (
 )
 
 type memorySelections struct {
-	state map[string][2]string
+	state   map[string][2]string
+	context map[string][]string
+	policy  map[string]string
 }
 
 func (m *memorySelections) GetSelection(sessionID string) (string, string, error) {
@@ -19,6 +21,36 @@ func (m *memorySelections) SetSelection(sessionID, provider, model string) error
 		m.state = map[string][2]string{}
 	}
 	m.state[sessionID] = [2]string{provider, model}
+	return nil
+}
+
+func (m *memorySelections) GetPinnedContext(sessionID string) ([]string, error) {
+	if m.context == nil {
+		return nil, nil
+	}
+	return append([]string(nil), m.context[sessionID]...), nil
+}
+
+func (m *memorySelections) SetPinnedContext(sessionID string, refs []string) error {
+	if m.context == nil {
+		m.context = map[string][]string{}
+	}
+	m.context[sessionID] = append([]string(nil), refs...)
+	return nil
+}
+
+func (m *memorySelections) GetApprovalPolicy(sessionID string) (string, error) {
+	if m.policy == nil {
+		return "", nil
+	}
+	return m.policy[sessionID], nil
+}
+
+func (m *memorySelections) SetApprovalPolicy(sessionID, policy string) error {
+	if m.policy == nil {
+		m.policy = map[string]string{}
+	}
+	m.policy[sessionID] = policy
 	return nil
 }
 
@@ -100,5 +132,84 @@ func TestServiceRejectsUnknownProviderOrModel(t *testing.T) {
 		Model:     "bad-model",
 	}); err == nil {
 		t.Fatalf("SetSelection(bad model) expected error")
+	}
+}
+
+func TestServiceContextAndPolicyLifecycle(t *testing.T) {
+	store := &memorySelections{}
+	svc := NewService(store, Config{
+		DefaultProvider: "ollama",
+		DefaultModel:    "llama3.1",
+		Providers: []ProviderConfig{
+			{Name: "ollama", Models: []string{"llama3.1"}},
+		},
+	})
+
+	contextResp, err := svc.GetContext(context.Background(), GetContextRequest{SessionID: "repl-1"})
+	if err != nil {
+		t.Fatalf("GetContext(default) error = %v", err)
+	}
+	if len(contextResp.Pinned) != 0 {
+		t.Fatalf("default pinned context = %#v, want empty", contextResp.Pinned)
+	}
+
+	if _, err := svc.PinContext(context.Background(), PinContextRequest{SessionID: "repl-1", Ref: "devices:ls"}); err != nil {
+		t.Fatalf("PinContext(devices:ls) error = %v", err)
+	}
+	if _, err := svc.PinContext(context.Background(), PinContextRequest{SessionID: "repl-1", Ref: "claims:tree"}); err != nil {
+		t.Fatalf("PinContext(claims:tree) error = %v", err)
+	}
+	pinned, err := svc.GetContext(context.Background(), GetContextRequest{SessionID: "repl-1"})
+	if err != nil {
+		t.Fatalf("GetContext(pinned) error = %v", err)
+	}
+	if len(pinned.Pinned) != 2 {
+		t.Fatalf("len(pinned) = %d, want 2", len(pinned.Pinned))
+	}
+
+	if _, err := svc.UnpinContext(context.Background(), UnpinContextRequest{SessionID: "repl-1", Ref: "devices:ls"}); err != nil {
+		t.Fatalf("UnpinContext() error = %v", err)
+	}
+	unpinned, err := svc.GetContext(context.Background(), GetContextRequest{SessionID: "repl-1"})
+	if err != nil {
+		t.Fatalf("GetContext(unpinned) error = %v", err)
+	}
+	if len(unpinned.Pinned) != 1 || unpinned.Pinned[0] != "claims:tree" {
+		t.Fatalf("unpinned state = %#v, want [claims:tree]", unpinned.Pinned)
+	}
+
+	if _, err := svc.ClearContext(context.Background(), ClearContextRequest{SessionID: "repl-1"}); err != nil {
+		t.Fatalf("ClearContext() error = %v", err)
+	}
+	cleared, err := svc.GetContext(context.Background(), GetContextRequest{SessionID: "repl-1"})
+	if err != nil {
+		t.Fatalf("GetContext(cleared) error = %v", err)
+	}
+	if len(cleared.Pinned) != 0 {
+		t.Fatalf("cleared pinned context = %#v, want empty", cleared.Pinned)
+	}
+
+	defaultPolicy, err := svc.GetPolicy(context.Background(), GetPolicyRequest{SessionID: "repl-1"})
+	if err != nil {
+		t.Fatalf("GetPolicy(default) error = %v", err)
+	}
+	if defaultPolicy.Policy != ApprovalPolicyPromptMutating {
+		t.Fatalf("default policy = %q, want %q", defaultPolicy.Policy, ApprovalPolicyPromptMutating)
+	}
+
+	setPolicy, err := svc.SetPolicy(context.Background(), SetPolicyRequest{SessionID: "repl-1", Policy: "auto-readonly"})
+	if err != nil {
+		t.Fatalf("SetPolicy(auto-readonly) error = %v", err)
+	}
+	if setPolicy.Policy != ApprovalPolicyPromptMutating {
+		t.Fatalf("set policy = %q, want %q", setPolicy.Policy, ApprovalPolicyPromptMutating)
+	}
+
+	if _, err := svc.SetPolicy(context.Background(), SetPolicyRequest{SessionID: "repl-1", Policy: "invalid"}); err == nil {
+		t.Fatalf("SetPolicy(invalid) expected error")
+	}
+
+	if _, err := svc.AddContext(context.Background(), AddContextRequest{SessionID: "repl-1", Ref: ""}); err == nil {
+		t.Fatalf("AddContext(empty ref) expected error")
 	}
 }

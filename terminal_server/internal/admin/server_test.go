@@ -1239,6 +1239,54 @@ func TestReplAIEndpoints(t *testing.T) {
 	if !strings.Contains(setSelectionW.Body.String(), "\"provider\":\"openrouter\"") {
 		t.Fatalf("selection POST body = %s", setSelectionW.Body.String())
 	}
+
+	pinContextReq := httptest.NewRequest(http.MethodPost, "/admin/api/repl/ai/context/pin", strings.NewReader(url.Values{
+		"session_id": {created.Session.ID},
+		"ref":        {"claims:tree"},
+	}.Encode()))
+	pinContextReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	pinContextW := httptest.NewRecorder()
+	h.ServeHTTP(pinContextW, pinContextReq)
+	if pinContextW.Code != http.StatusOK {
+		t.Fatalf("context pin status = %d, want 200 body=%s", pinContextW.Code, pinContextW.Body.String())
+	}
+	if !strings.Contains(pinContextW.Body.String(), "claims:tree") {
+		t.Fatalf("context pin body = %s", pinContextW.Body.String())
+	}
+
+	getContextReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/ai/context?session_id="+created.Session.ID, nil)
+	getContextW := httptest.NewRecorder()
+	h.ServeHTTP(getContextW, getContextReq)
+	if getContextW.Code != http.StatusOK {
+		t.Fatalf("context GET status = %d, want 200 body=%s", getContextW.Code, getContextW.Body.String())
+	}
+	if !strings.Contains(getContextW.Body.String(), "claims:tree") {
+		t.Fatalf("context GET body = %s", getContextW.Body.String())
+	}
+
+	setPolicyReq := httptest.NewRequest(http.MethodPost, "/admin/api/repl/ai/policy", strings.NewReader(url.Values{
+		"session_id": {created.Session.ID},
+		"policy":     {"prompt-all"},
+	}.Encode()))
+	setPolicyReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	setPolicyW := httptest.NewRecorder()
+	h.ServeHTTP(setPolicyW, setPolicyReq)
+	if setPolicyW.Code != http.StatusOK {
+		t.Fatalf("policy POST status = %d, want 200 body=%s", setPolicyW.Code, setPolicyW.Body.String())
+	}
+	if !strings.Contains(setPolicyW.Body.String(), "\"policy\":\"prompt-all\"") {
+		t.Fatalf("policy POST body = %s", setPolicyW.Body.String())
+	}
+
+	getPolicyReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/ai/policy?session_id="+created.Session.ID, nil)
+	getPolicyW := httptest.NewRecorder()
+	h.ServeHTTP(getPolicyW, getPolicyReq)
+	if getPolicyW.Code != http.StatusOK {
+		t.Fatalf("policy GET status = %d, want 200 body=%s", getPolicyW.Code, getPolicyW.Body.String())
+	}
+	if !strings.Contains(getPolicyW.Body.String(), "\"policy\":\"prompt-all\"") {
+		t.Fatalf("policy GET body = %s", getPolicyW.Body.String())
+	}
 }
 
 func TestStorePutTTLValidation(t *testing.T) {

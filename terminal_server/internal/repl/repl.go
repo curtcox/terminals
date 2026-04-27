@@ -187,6 +187,13 @@ func replCommandSpecs() []commandSpec {
 		{Name: "ai models", Usage: "ai models [provider] [--json]", Summary: "List models for a provider", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai use", Usage: "ai use <provider> <model> [--json]", Summary: "Set sticky provider/model selection for this session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai status", Usage: "ai status [--json]", Summary: "Show current provider/model selection for this session", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai context", Usage: "ai context [--json]", Summary: "Show pinned AI context refs", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai context add", Usage: "ai context add <ref> [--json]", Summary: "Add one-shot AI context for the next turn", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai context pin", Usage: "ai context pin <ref> [--json]", Summary: "Pin AI context across turns", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai context unpin", Usage: "ai context unpin <ref> [--json]", Summary: "Remove one pinned AI context ref", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai context clear", Usage: "ai context clear [--json]", Summary: "Clear pinned AI context refs", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai policy show", Usage: "ai policy show [--json]", Summary: "Show AI approval policy", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai policy set", Usage: "ai policy set <auto-readonly|prompt-all|prompt-mutating> [--json]", Summary: "Set AI approval policy for this session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 	}
 }
 
@@ -2771,6 +2778,145 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			_, err = fmt.Fprintf(s.out, "session: %s\nprovider: %s\nmodel: %s\n", toString(body["session_id"]), toString(body["provider"]), toString(body["model"]))
 			return err
+		case "context":
+			if strings.TrimSpace(s.session) == "" {
+				return errors.New("ai context requires session id (TERMINALS_REPL_SESSION_ID)")
+			}
+			action := "show"
+			if len(args) > 1 {
+				action = strings.ToLower(strings.TrimSpace(args[1]))
+			}
+			switch action {
+			case "show":
+				body, err := s.fetchJSONQuery(ctx, "/admin/api/repl/ai/context", url.Values{"session_id": {s.session}})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				pinned, _ := body["pinned"].([]any)
+				if _, err := fmt.Fprintf(s.out, "session: %s\n", toString(body["session_id"])); err != nil {
+					return err
+				}
+				if len(pinned) == 0 {
+					_, err := fmt.Fprintln(s.out, "pinned: (none)")
+					return err
+				}
+				if _, err := fmt.Fprintln(s.out, "pinned:"); err != nil {
+					return err
+				}
+				for _, ref := range pinned {
+					if _, err := fmt.Fprintf(s.out, "- %s\n", toString(ref)); err != nil {
+						return err
+					}
+				}
+				return nil
+			case "add":
+				if len(args) < 3 {
+					return errors.New("usage: ai context add <ref>")
+				}
+				ref := strings.TrimSpace(args[2])
+				body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/context", url.Values{
+					"session_id": {s.session},
+					"ref":        {ref},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  added context ref for next turn: %s\n", toString(body["ref"]))
+				return err
+			case "pin":
+				if len(args) < 3 {
+					return errors.New("usage: ai context pin <ref>")
+				}
+				ref := strings.TrimSpace(args[2])
+				body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/context/pin", url.Values{
+					"session_id": {s.session},
+					"ref":        {ref},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  pinned context ref: %s\n", ref)
+				return err
+			case "unpin":
+				if len(args) < 3 {
+					return errors.New("usage: ai context unpin <ref>")
+				}
+				ref := strings.TrimSpace(args[2])
+				body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/context/unpin", url.Values{
+					"session_id": {s.session},
+					"ref":        {ref},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  unpinned context ref: %s\n", ref)
+				return err
+			case "clear":
+				body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/context/clear", url.Values{
+					"session_id": {s.session},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintln(s.out, "OK  cleared pinned context refs")
+				return err
+			default:
+				return fmt.Errorf("unknown command: ai context %s", action)
+			}
+		case "policy":
+			if strings.TrimSpace(s.session) == "" {
+				return errors.New("ai policy requires session id (TERMINALS_REPL_SESSION_ID)")
+			}
+			action := "show"
+			if len(args) > 1 {
+				action = strings.ToLower(strings.TrimSpace(args[1]))
+			}
+			switch action {
+			case "show":
+				body, err := s.fetchJSONQuery(ctx, "/admin/api/repl/ai/policy", url.Values{"session_id": {s.session}})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "session: %s\npolicy: %s\n", toString(body["session_id"]), toString(body["policy"]))
+				return err
+			case "set":
+				if len(args) < 3 {
+					return errors.New("usage: ai policy set <auto-readonly|prompt-all|prompt-mutating>")
+				}
+				policy := strings.TrimSpace(args[2])
+				body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/policy", url.Values{
+					"session_id": {s.session},
+					"policy":     {policy},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  policy set to %s\n", toString(body["policy"]))
+				return err
+			default:
+				return fmt.Errorf("unknown command: ai policy %s", action)
+			}
 		default:
 			return fmt.Errorf("unknown command: ai %s", sub)
 		}

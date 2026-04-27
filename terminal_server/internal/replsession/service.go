@@ -443,6 +443,81 @@ func (s *Service) SetSelection(sessionID, provider, model string) error {
 	return nil
 }
 
+// GetPinnedContext returns pinned AI context refs for a session.
+func (s *Service) GetPinnedContext(sessionID string) ([]string, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return nil, ErrSessionNotFound
+	}
+	return append([]string(nil), live.meta.State.PinnedContext...), nil
+}
+
+// SetPinnedContext replaces pinned AI context refs for a session.
+func (s *Service) SetPinnedContext(sessionID string, refs []string) error {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return ErrMissingSessionID
+	}
+	normalized := make([]string, 0, len(refs))
+	seen := make(map[string]struct{}, len(refs))
+	for _, ref := range refs {
+		value := strings.TrimSpace(ref)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	live.meta.State.PinnedContext = normalized
+	return nil
+}
+
+// GetApprovalPolicy returns the AI approval policy for a session.
+func (s *Service) GetApprovalPolicy(sessionID string) (string, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return "", ErrMissingSessionID
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return "", ErrSessionNotFound
+	}
+	return strings.TrimSpace(live.meta.State.ApprovalPolicy), nil
+}
+
+// SetApprovalPolicy updates the AI approval policy for a session.
+func (s *Service) SetApprovalPolicy(sessionID, policy string) error {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return ErrMissingSessionID
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	live.meta.State.ApprovalPolicy = strings.TrimSpace(policy)
+	return nil
+}
+
 // SessionIDForDevice returns the attached session id for a device.
 func (s *Service) SessionIDForDevice(deviceID string) (string, bool) {
 	deviceID = strings.TrimSpace(deviceID)

@@ -700,6 +700,10 @@ Invariants:
 - Session lifecycle events, command execution, and LLM proposals/approvals/rejections are all logged in structured form.
 - API credentials for AI providers live in server config only and are never exposed to the REPL or to the LLM.
 
+## Progress Notes
+
+- 2026-04-27: Added typed session context and approval-policy APIs (`ai context*`, `ai policy*`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests. `ai ask` / `ai gen` streaming and approval-loop execution remain in progress.
+
 ## Implementation Phases
 
 ### Phase A — session substrate

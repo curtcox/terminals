@@ -145,6 +145,42 @@ func TestSelectionPersistence(t *testing.T) {
 	}
 }
 
+func TestContextAndPolicyPersistence(t *testing.T) {
+	svc := NewService(terminal.NewManager())
+	ctx := context.Background()
+
+	created, err := svc.CreateSession(ctx, CreateSessionRequest{DeviceID: "dev-ctx"})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	sessionID := created.Session.ID
+	defer func() {
+		_, _ = svc.TerminateSession(ctx, TerminateSessionRequest{SessionID: sessionID})
+	}()
+
+	if err := svc.SetPinnedContext(sessionID, []string{"devices:ls", "claims:tree", "devices:ls", " "}); err != nil {
+		t.Fatalf("SetPinnedContext() error = %v", err)
+	}
+	pinned, err := svc.GetPinnedContext(sessionID)
+	if err != nil {
+		t.Fatalf("GetPinnedContext() error = %v", err)
+	}
+	if len(pinned) != 2 || pinned[0] != "devices:ls" || pinned[1] != "claims:tree" {
+		t.Fatalf("pinned context = %#v, want [devices:ls claims:tree]", pinned)
+	}
+
+	if err := svc.SetApprovalPolicy(sessionID, "prompt-all"); err != nil {
+		t.Fatalf("SetApprovalPolicy() error = %v", err)
+	}
+	policy, err := svc.GetApprovalPolicy(sessionID)
+	if err != nil {
+		t.Fatalf("GetApprovalPolicy() error = %v", err)
+	}
+	if policy != "prompt-all" {
+		t.Fatalf("policy = %q, want prompt-all", policy)
+	}
+}
+
 func TestUseCaseP2SessionMobilityAndCoexistence(t *testing.T) {
 	svc := NewService(terminal.NewManager())
 	ctx := context.Background()

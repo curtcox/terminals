@@ -18,12 +18,37 @@ var (
 	ErrMissingModel = errors.New("missing model")
 	// ErrProviderNotFound indicates a provider is unknown.
 	ErrProviderNotFound = errors.New("provider not found")
+	// ErrMissingContextRef indicates a context ref was not provided.
+	ErrMissingContextRef = errors.New("missing context ref")
+	// ErrUnsupportedApprovalPolicy indicates the policy value is invalid.
+	ErrUnsupportedApprovalPolicy = errors.New("unsupported approval policy")
+)
+
+const (
+	// ApprovalPolicyPromptMutating prompts only for mutating calls.
+	ApprovalPolicyPromptMutating = "prompt-mutating"
+	// ApprovalPolicyPromptAll prompts for all tool calls.
+	ApprovalPolicyPromptAll = "prompt-all"
+	// ApprovalPolicyAutoReadOnly aliases prompt-mutating for readability.
+	ApprovalPolicyAutoReadOnly = "auto-readonly"
 )
 
 // SessionSelectionStore persists sticky provider/model selection per session.
 type SessionSelectionStore interface {
 	GetSelection(sessionID string) (provider, model string, err error)
 	SetSelection(sessionID, provider, model string) error
+}
+
+// SessionContextStore persists pinned context refs per session.
+type SessionContextStore interface {
+	GetPinnedContext(sessionID string) ([]string, error)
+	SetPinnedContext(sessionID string, refs []string) error
+}
+
+// SessionPolicyStore persists approval policy per session.
+type SessionPolicyStore interface {
+	GetApprovalPolicy(sessionID string) (string, error)
+	SetApprovalPolicy(sessionID, policy string) error
 }
 
 // ProviderConfig declares one configured AI provider.
@@ -92,9 +117,92 @@ type SetSelectionResponse struct {
 	Model     string `json:"model"`
 }
 
+// GetContextRequest returns pinned context for one session.
+type GetContextRequest struct {
+	SessionID string
+}
+
+// GetContextResponse reports pinned context refs.
+type GetContextResponse struct {
+	SessionID string   `json:"session_id"`
+	Pinned    []string `json:"pinned"`
+}
+
+// AddContextRequest adds a one-shot context ref for next prompt.
+type AddContextRequest struct {
+	SessionID string
+	Ref       string
+}
+
+// AddContextResponse reports accepted one-shot context ref.
+type AddContextResponse struct {
+	SessionID string `json:"session_id"`
+	Ref       string `json:"ref"`
+}
+
+// PinContextRequest pins one context ref for future turns.
+type PinContextRequest struct {
+	SessionID string
+	Ref       string
+}
+
+// PinContextResponse reports pinned context refs.
+type PinContextResponse struct {
+	SessionID string   `json:"session_id"`
+	Pinned    []string `json:"pinned"`
+}
+
+// UnpinContextRequest removes one pinned context ref.
+type UnpinContextRequest struct {
+	SessionID string
+	Ref       string
+}
+
+// UnpinContextResponse reports pinned context refs.
+type UnpinContextResponse struct {
+	SessionID string   `json:"session_id"`
+	Pinned    []string `json:"pinned"`
+}
+
+// ClearContextRequest clears all pinned context refs.
+type ClearContextRequest struct {
+	SessionID string
+}
+
+// ClearContextResponse reports pinned context refs after clear.
+type ClearContextResponse struct {
+	SessionID string   `json:"session_id"`
+	Pinned    []string `json:"pinned"`
+}
+
+// GetPolicyRequest returns approval policy for one session.
+type GetPolicyRequest struct {
+	SessionID string
+}
+
+// GetPolicyResponse reports current approval policy.
+type GetPolicyResponse struct {
+	SessionID string `json:"session_id"`
+	Policy    string `json:"policy"`
+}
+
+// SetPolicyRequest sets approval policy for one session.
+type SetPolicyRequest struct {
+	SessionID string
+	Policy    string
+}
+
+// SetPolicyResponse reports updated approval policy.
+type SetPolicyResponse struct {
+	SessionID string `json:"session_id"`
+	Policy    string `json:"policy"`
+}
+
 // Service provides typed AI selection APIs used by REPL commands.
 type Service struct {
 	sessions        SessionSelectionStore
+	contexts        SessionContextStore
+	policies        SessionPolicyStore
 	providersByName map[string]Provider
 	providerOrder   []string
 	defaultProvider string
@@ -109,6 +217,12 @@ func NewService(sessions SessionSelectionStore, cfg Config) *Service {
 		providerOrder:   []string{},
 		defaultProvider: strings.TrimSpace(cfg.DefaultProvider),
 		defaultModel:    strings.TrimSpace(cfg.DefaultModel),
+	}
+	if store, ok := sessions.(SessionContextStore); ok {
+		svc.contexts = store
+	}
+	if store, ok := sessions.(SessionPolicyStore); ok {
+		svc.policies = store
 	}
 	for _, provider := range cfg.Providers {
 		name := strings.TrimSpace(strings.ToLower(provider.Name))
@@ -210,6 +324,126 @@ func (s *Service) SetSelection(_ context.Context, req SetSelectionRequest) (*Set
 	return &SetSelectionResponse{SessionID: sessionID, Provider: provider, Model: model}, nil
 }
 
+// GetContext returns pinned context refs for a session.
+func (s *Service) GetContext(_ context.Context, req GetContextRequest) (*GetContextResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	pinned, err := s.getPinnedContext(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return &GetContextResponse{SessionID: sessionID, Pinned: pinned}, nil
+}
+
+// AddContext validates one-shot context refs for upcoming prompts.
+func (s *Service) AddContext(_ context.Context, req AddContextRequest) (*AddContextResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	ref := strings.TrimSpace(req.Ref)
+	if ref == "" {
+		return nil, ErrMissingContextRef
+	}
+	return &AddContextResponse{SessionID: sessionID, Ref: ref}, nil
+}
+
+// PinContext adds a context ref to the pinned set.
+func (s *Service) PinContext(_ context.Context, req PinContextRequest) (*PinContextResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	ref := strings.TrimSpace(req.Ref)
+	if ref == "" {
+		return nil, ErrMissingContextRef
+	}
+	pinned, err := s.getPinnedContext(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	updated := append([]string(nil), pinned...)
+	if !containsString(updated, ref) {
+		updated = append(updated, ref)
+	}
+	if err := s.setPinnedContext(sessionID, updated); err != nil {
+		return nil, err
+	}
+	return &PinContextResponse{SessionID: sessionID, Pinned: updated}, nil
+}
+
+// UnpinContext removes one context ref from the pinned set.
+func (s *Service) UnpinContext(_ context.Context, req UnpinContextRequest) (*UnpinContextResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	ref := strings.TrimSpace(req.Ref)
+	if ref == "" {
+		return nil, ErrMissingContextRef
+	}
+	pinned, err := s.getPinnedContext(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	updated := make([]string, 0, len(pinned))
+	for _, candidate := range pinned {
+		if candidate != ref {
+			updated = append(updated, candidate)
+		}
+	}
+	if err := s.setPinnedContext(sessionID, updated); err != nil {
+		return nil, err
+	}
+	return &UnpinContextResponse{SessionID: sessionID, Pinned: updated}, nil
+}
+
+// ClearContext removes all pinned context refs for a session.
+func (s *Service) ClearContext(_ context.Context, req ClearContextRequest) (*ClearContextResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	if err := s.setPinnedContext(sessionID, nil); err != nil {
+		return nil, err
+	}
+	return &ClearContextResponse{SessionID: sessionID, Pinned: []string{}}, nil
+}
+
+// GetPolicy returns the approval policy for a session.
+func (s *Service) GetPolicy(_ context.Context, req GetPolicyRequest) (*GetPolicyResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	policy, err := s.getPolicy(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if policy == "" {
+		policy = ApprovalPolicyPromptMutating
+	}
+	return &GetPolicyResponse{SessionID: sessionID, Policy: policy}, nil
+}
+
+// SetPolicy validates and persists approval policy for a session.
+func (s *Service) SetPolicy(_ context.Context, req SetPolicyRequest) (*SetPolicyResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	policy, err := normalizePolicy(req.Policy)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.setPolicy(sessionID, policy); err != nil {
+		return nil, err
+	}
+	return &SetPolicyResponse{SessionID: sessionID, Policy: policy}, nil
+}
+
 func (s *Service) resolveProviderAndModel(provider, model string) (string, string, error) {
 	provider = strings.TrimSpace(strings.ToLower(provider))
 	model = strings.TrimSpace(model)
@@ -262,4 +496,64 @@ func dedupeSorted(in []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func (s *Service) getPinnedContext(sessionID string) ([]string, error) {
+	if s.contexts == nil {
+		return []string{}, nil
+	}
+	pinned, err := s.contexts.GetPinnedContext(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return append([]string(nil), pinned...), nil
+}
+
+func (s *Service) setPinnedContext(sessionID string, refs []string) error {
+	if s.contexts == nil {
+		return nil
+	}
+	return s.contexts.SetPinnedContext(sessionID, refs)
+}
+
+func (s *Service) getPolicy(sessionID string) (string, error) {
+	if s.policies == nil {
+		return ApprovalPolicyPromptMutating, nil
+	}
+	policy, err := s.policies.GetApprovalPolicy(sessionID)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(policy) == "" {
+		return ApprovalPolicyPromptMutating, nil
+	}
+	return normalizePolicy(policy)
+}
+
+func (s *Service) setPolicy(sessionID, policy string) error {
+	if s.policies == nil {
+		return nil
+	}
+	return s.policies.SetApprovalPolicy(sessionID, policy)
+}
+
+func normalizePolicy(policy string) (string, error) {
+	value := strings.ToLower(strings.TrimSpace(policy))
+	switch value {
+	case ApprovalPolicyPromptMutating, ApprovalPolicyPromptAll:
+		return value, nil
+	case ApprovalPolicyAutoReadOnly:
+		return ApprovalPolicyPromptMutating, nil
+	default:
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedApprovalPolicy, policy)
+	}
+}
+
+func containsString(list []string, value string) bool {
+	for _, candidate := range list {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
 }

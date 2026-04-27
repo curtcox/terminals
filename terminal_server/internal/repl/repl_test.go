@@ -266,13 +266,34 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/repl/ai/selection":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"session_id":"repl-9","provider":"openrouter","model":"anthropic/claude-sonnet-4-6"}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/repl/ai/context":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","pinned":["claims:tree"]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/context":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","ref":"devices:ls"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/context/pin":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","pinned":["claims:tree","devices:ls"]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/context/unpin":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","pinned":["claims:tree"]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/context/clear":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","pinned":[]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/repl/ai/policy":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","policy":"prompt-mutating"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/policy":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","policy":"prompt-all"}`))
 		default:
 			http.NotFound(w, req)
 		}
 	}))
 	defer admin.Close()
 
-	in := strings.NewReader("ai providers\nai models ollama\nai use openrouter anthropic/claude-sonnet-4-6\nai status\nexit\n")
+	in := strings.NewReader("ai providers\nai models ollama\nai use openrouter anthropic/claude-sonnet-4-6\nai status\nai context\nai context add devices:ls\nai context pin devices:ls\nai context unpin devices:ls\nai context clear\nai policy show\nai policy set prompt-all\nexit\n")
 	var out bytes.Buffer
 
 	err := Run(context.Background(), in, &out, Options{
@@ -295,6 +316,18 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "session: repl-9") {
 		t.Fatalf("missing ai status output: %q", text)
+	}
+	if !strings.Contains(text, "pinned:") {
+		t.Fatalf("missing ai context output: %q", text)
+	}
+	if !strings.Contains(text, "added context ref for next turn") {
+		t.Fatalf("missing ai context add output: %q", text)
+	}
+	if !strings.Contains(text, "policy: prompt-mutating") {
+		t.Fatalf("missing ai policy show output: %q", text)
+	}
+	if !strings.Contains(text, "policy set to prompt-all") {
+		t.Fatalf("missing ai policy set output: %q", text)
 	}
 }
 
