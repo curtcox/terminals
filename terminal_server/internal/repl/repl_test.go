@@ -327,6 +327,10 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"search recent",
 		"memory remember",
 		"memory stream",
+		"bug ls",
+		"bug show",
+		"bug file",
+		"bug confirm",
 		"placement ls",
 		"cohort ls",
 		"cohort show",
@@ -581,6 +585,14 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","memory":{"id":"mem-1"}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/memory/stream":
 			_, _ = w.Write([]byte(`{"memories":[{"id":"mem-1","scope":"kitchen"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/bugs":
+			_, _ = w.Write([]byte(`{"bugs":[{"report_id":"bug-1","subject_device_id":"hallway-panel","reporter_device_id":"kitchen-screen","source":"BUG_REPORT_SOURCE_SIP","confirmed":false}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/bugs/bug-1":
+			_, _ = w.Write([]byte(`{"report":{"summary":{"report_id":"bug-1","subject_device_id":"hallway-panel","source":"BUG_REPORT_SOURCE_SIP"},"confirmed":false}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/bug/intake":
+			_, _ = w.Write([]byte(`{"ack":{"report_id":"bug-1"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/bugs/bug-1/confirm":
+			_, _ = w.Write([]byte(`{"report":{"summary":{"report_id":"bug-1"},"confirmed":true}}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/placement":
 			_, _ = w.Write([]byte(`{"placements":[{"device_id":"d1","zone":"kitchen"}]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/cohort" && req.URL.Query().Get("name") == "":
@@ -695,6 +707,10 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"search recent memory",
 		"memory remember kitchen milk",
 		"memory stream kitchen",
+		"bug ls",
+		"bug show bug-1",
+		"bug file kitchen-screen hallway-panel panel frozen --source sip --tags ui_glitch,lost_connection",
+		"bug confirm bug-1",
 		"placement ls",
 		"cohort ls",
 		"cohort show family-screens",
@@ -808,6 +824,15 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "recent-1") {
 		t.Fatalf("search recent output missing: %q", text)
+	}
+	if !strings.Contains(text, "bug-1") {
+		t.Fatalf("bug output missing report id: %q", text)
+	}
+	if !strings.Contains(text, "action=file") {
+		t.Fatalf("bug file output missing action summary: %q", text)
+	}
+	if !strings.Contains(text, "action=confirm") {
+		t.Fatalf("bug confirm output missing action summary: %q", text)
 	}
 	if !strings.Contains(text, "evt-1") {
 		t.Fatalf("recent output missing: %q", text)

@@ -111,6 +111,10 @@ func replCommandSpecs() []commandSpec {
 		{Name: "memory remember", Usage: "memory remember <scope> <text> [--json]", Summary: "Store a memory entry", Classification: commandMutating, RelatedDocs: []string{"repl/commands/memory"}},
 		{Name: "memory recall", Usage: "memory recall <text> [--json]", Summary: "Recall memory entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
 		{Name: "memory stream", Usage: "memory stream [scope] [--json]", Summary: "Show memory stream entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
+		{Name: "bug ls", Usage: "bug ls [--json]", Summary: "List bug reports", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/bug"}},
+		{Name: "bug show", Usage: "bug show <report-id> [--json]", Summary: "Show one bug report", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/bug"}},
+		{Name: "bug file", Usage: "bug file <reporter-device-id> <subject-device-id> <description> [--source <source>] [--tags <tag[,tag...]>] [--json]", Summary: "File a bug report", Classification: commandMutating, RelatedDocs: []string{"repl/commands/bug"}},
+		{Name: "bug confirm", Usage: "bug confirm <report-id> [--json]", Summary: "Confirm one bug report", Classification: commandMutating, RelatedDocs: []string{"repl/commands/bug"}},
 		{Name: "placement ls", Usage: "placement ls [--json]", Summary: "List placement metadata", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/placement"}},
 		{Name: "cohort ls", Usage: "cohort ls [--json]", Summary: "List named device cohorts", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/cohort"}},
 		{Name: "cohort show", Usage: "cohort show <name> [--json]", Summary: "Show one cohort with resolved members", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/cohort"}},
@@ -329,7 +333,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "scenarios", "sim", "scripts", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
+	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "bug", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "scenarios", "sim", "scripts", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -1329,6 +1333,93 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			return writeJSON(s.out, body)
 		default:
 			return fmt.Errorf("unknown command: memory %s", sub)
+		}
+	case "bug":
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/bugs")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			items, _ := body["bugs"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				rows = append(rows, []string{
+					toString(row["report_id"]),
+					toString(row["subject_device_id"]),
+					toString(row["reporter_device_id"]),
+					toString(row["source"]),
+					toString(row["confirmed"]),
+				})
+			}
+			return printTable(s.out, []string{"REPORT", "SUBJECT", "REPORTER", "SOURCE", "CONFIRMED"}, rows)
+		case "show":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: bug show <report-id>")
+			}
+			body, err := s.fetchJSON(ctx, "/admin/api/bugs/"+url.PathEscape(plain[0]))
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "file":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--source", "--tags")
+			if len(plain) < 3 {
+				return errors.New("usage: bug file <reporter-device-id> <subject-device-id> <description> [--source <source>] [--tags <tag[,tag...]>]")
+			}
+			reporterDeviceID := plain[0]
+			subjectDeviceID := plain[1]
+			description := strings.Join(plain[2:], " ")
+			source := normalizeBugSource(flagValue(args[1:], "--source"))
+			tags := parseCSVValues(flagValue(args[1:], "--tags"))
+
+			payload, err := json.Marshal(map[string]any{
+				"reporterDeviceId": reporterDeviceID,
+				"subjectDeviceId":  subjectDeviceID,
+				"description":      description,
+				"source":           source,
+				"tags":             tags,
+			})
+			if err != nil {
+				return err
+			}
+			body, err := s.doJSON(ctx, http.MethodPost, "/bug/intake", "application/json", strings.NewReader(string(payload)))
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			reportID := ""
+			if ack, ok := body["ack"].(map[string]any); ok {
+				reportID = toString(ack["report_id"])
+			}
+			_, err = fmt.Fprintf(s.out, "OK  report=%s subject=%s reporter=%s action=file\n", reportID, subjectDeviceID, reporterDeviceID)
+			return err
+		case "confirm":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: bug confirm <report-id>")
+			}
+			body, err := s.doJSON(ctx, http.MethodPost, "/admin/api/bugs/"+url.PathEscape(plain[0])+"/confirm", "", nil)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  report=%s action=confirm\n", plain[0])
+			return err
+		default:
+			return fmt.Errorf("unknown command: bug %s", sub)
 		}
 	case "placement":
 		if sub != "ls" {
@@ -2859,6 +2950,17 @@ func nonFlagArgs(args []string) []string {
 		out = append(out, trimmed)
 	}
 	return out
+}
+
+func normalizeBugSource(raw string) string {
+	source := strings.TrimSpace(strings.ToUpper(raw))
+	if source == "" {
+		return "BUG_REPORT_SOURCE_ADMIN"
+	}
+	if !strings.HasPrefix(source, "BUG_REPORT_SOURCE_") {
+		source = "BUG_REPORT_SOURCE_" + source
+	}
+	return source
 }
 
 func nonFlagArgsSkippingFlagValues(args []string, valueFlags ...string) []string {

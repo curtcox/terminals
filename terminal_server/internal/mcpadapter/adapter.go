@@ -460,6 +460,9 @@ func generateTools() []Tool {
 	base := make([]Tool, 0, len(repl.CommandSpecs())+2)
 	for _, spec := range repl.CommandSpecs() {
 		name := strings.ReplaceAll(spec.Name, " ", "_")
+		if strings.Contains(name, "_confirm") || strings.Contains(name, "_force") {
+			continue
+		}
 		base = append(base, Tool{
 			Name:                 name,
 			CommandName:          spec.Name,

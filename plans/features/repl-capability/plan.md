@@ -73,6 +73,10 @@ layering, acceptance rules, and authoring substrate.
   `remote-help-session`, `shared-lesson-session`,
   `annotate-shared-canvas`, `review-learner-progress`, and
   `resume-multiplayer-session` with concrete typed REPL walkthroughs.
+- Landed the first Phase 11 bug-reporting control-plane slice in code:
+  REPL `bug ls|show|file|confirm` now routes through the existing
+  bug-reporting admin APIs, with command docs and focused REPL/MCP
+  coverage to preserve catalog safety constraints.
 
 ## Problem
 
