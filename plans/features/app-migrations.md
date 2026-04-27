@@ -21,6 +21,15 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added Gate 1 migration module-set enforcement in
+  `.tap` verification (`terminal_server/internal/apppackage/tap.go`)
+  so `migrate/*.tal` may only `load("store")`,
+  `load("artifact.self")`, `load("log")`, and
+  `load("migrate.env")`; disallowed modules (for example `bus`)
+  now fail verification with a specific error message. Covered by
+  `TestVerifyTapRejectsMigrateLoadBusModule` and
+  `TestVerifyTapAcceptsMigrateAllowedModules` in
+  `terminal_server/internal/apppackage/tap_test.go`.
 - 2026-04-27: Implemented Gate 1 migration package-structure
   checks in `.tap` verification (`terminal_server/internal/apppackage/tap.go`)
   with unit coverage in

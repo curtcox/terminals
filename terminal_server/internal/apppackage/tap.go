@@ -84,7 +84,17 @@ var allowedTopLevelDirs = map[string]struct{}{
 	"migrate": {},
 }
 
-var migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
+var (
+	migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
+	migrateLoadPattern     = regexp.MustCompile(`(?m)load\(\s*["']([^"']+)["']`)
+)
+
+var allowedMigrationModules = map[string]struct{}{
+	"store":         {},
+	"artifact.self": {},
+	"log":           {},
+	"migrate.env":   {},
+}
 
 // VerifiedTap is the pre-trust parsed output for a .tap archive.
 type VerifiedTap struct {
@@ -441,6 +451,7 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 	seen := make(map[string]struct{})
 	seenCaseFolded := make(map[string]struct{})
 	files := make([]string, 0, 16)
+	migrationSources := make(map[string][]byte)
 	packageName := ""
 	lastName := ""
 	manifestCount := 0
@@ -516,6 +527,9 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 		case "main.tal":
 			mainCount++
 		}
+		if strings.HasPrefix(rel, "migrate/") {
+			migrationSources[rel] = append([]byte(nil), payload...)
+		}
 		files = append(files, rel)
 	}
 
@@ -528,7 +542,7 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 	if mainCount != 1 {
 		return VerifiedTap{}, nil, ErrMissingMainTAL
 	}
-	if err := validateManifestMigrations(manifestBytes, files); err != nil {
+	if err := validateManifestMigrations(manifestBytes, files, migrationSources); err != nil {
 		return VerifiedTap{}, nil, err
 	}
 
@@ -604,7 +618,7 @@ func parseManifestIdentity(manifestBytes []byte) (string, string, error) {
 	return manifest.Name, manifest.Version, nil
 }
 
-func validateManifestMigrations(manifestBytes []byte, files []string) error {
+func validateManifestMigrations(manifestBytes []byte, files []string, migrationSources map[string][]byte) error {
 	var manifest manifestMigration
 	if _, err := toml.Decode(string(manifestBytes), &manifest); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidManifest, err)
@@ -726,6 +740,25 @@ func validateManifestMigrations(manifestBytes []byte, files []string) error {
 		}
 		if _, ok := availableFiles[fixture.Expected]; !ok {
 			return ErrInvalidManifest
+		}
+	}
+
+	for _, rel := range files {
+		if !strings.HasPrefix(rel, "migrate/") {
+			continue
+		}
+		source, ok := migrationSources[rel]
+		if !ok {
+			return ErrInvalidManifest
+		}
+		for _, match := range migrateLoadPattern.FindAllSubmatch(source, -1) {
+			if len(match) < 2 {
+				continue
+			}
+			module := strings.TrimSpace(string(match[1]))
+			if _, allowed := allowedMigrationModules[module]; !allowed {
+				return fmt.Errorf("%w: migration %s loads disallowed module %q", ErrInvalidManifest, rel, module)
+			}
 		}
 	}
 
