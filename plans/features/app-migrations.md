@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Extended migration operator status detail end-to-end
+  across runtime, admin API, and REPL. `MigrationStatus` now includes
+  explicit `last_step` and sorted pending reconciliation record details
+  (`record_id`, `recommended_resolution`) from
+  `terminal_server/internal/appruntime/runtime.go`; admin status payloads
+  expose those fields via `mapMigrationStatus` in
+  `terminal_server/internal/admin/server.go`; and
+  `apps migrate status` now prints last-step, last-error, and pending
+  record IDs in `terminal_server/internal/repl/repl.go`. Added/updated
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`,
+  `terminal_server/internal/admin/server_test.go`, and
+  `terminal_server/internal/repl/repl_test.go`.
 - 2026-04-27: Added Gate 1 migration fixture NDJSON validation in
   `.tap` verification (`terminal_server/internal/apppackage/tap.go`):
   fixture files now require LF-only line endings with trailing LF,

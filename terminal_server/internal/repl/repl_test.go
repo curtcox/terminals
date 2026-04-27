@@ -237,7 +237,7 @@ func TestAppsMigrateStatusUsesAdminAPI(t *testing.T) {
 		switch {
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/apps/migrate/status":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"status":"ok","migration":{"app":"sound_watch","verdict":"idle","steps_planned":0,"steps_completed":0,"executor_ready":false}}`))
+			_, _ = w.Write([]byte(`{"status":"ok","migration":{"app":"sound_watch","verdict":"reconcile_pending","steps_planned":3,"steps_completed":1,"last_step":1,"last_error":"migration reconciliation is pending","pending_records":[{"record_id":"rec-9","recommended_resolution":"manual"},{"record_id":"rec-2","recommended_resolution":"force_rewind"}],"executor_ready":true}}`))
 		default:
 			http.NotFound(w, req)
 		}
@@ -252,7 +252,7 @@ func TestAppsMigrateStatusUsesAdminAPI(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 	text := out.String()
-	if !strings.Contains(text, "OK  app=sound_watch verdict=idle steps=0/0 executor_ready=false") {
+	if !strings.Contains(text, "OK  app=sound_watch verdict=reconcile_pending steps=1/3 last_step=1 pending_records=rec-2,rec-9 last_error=\"migration reconciliation is pending\" executor_ready=true") {
 		t.Fatalf("missing apps migrate status output: %q", text)
 	}
 }

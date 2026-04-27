@@ -328,6 +328,9 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	if status.StepsPlanned != 2 || status.StepsCompleted != 0 {
 		t.Fatalf("status steps = %d/%d, want 0/2", status.StepsCompleted, status.StepsPlanned)
 	}
+	if status.LastStep != 0 {
+		t.Fatalf("status last_step = %d, want 0", status.LastStep)
+	}
 
 	status, err = runtime.RetryMigration("migrate_live")
 	if err != nil {
@@ -338,6 +341,9 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	}
 	if status.StepsCompleted != 2 {
 		t.Fatalf("RetryMigration() steps_completed = %d, want 2", status.StepsCompleted)
+	}
+	if status.LastStep != 2 {
+		t.Fatalf("RetryMigration() last_step = %d, want 2", status.LastStep)
 	}
 	if status.JournalPath == "" {
 		t.Fatalf("RetryMigration() journal_path empty")
@@ -352,6 +358,9 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	}
 	if status.StepsCompleted != 1 {
 		t.Fatalf("AbortMigration() steps_completed = %d, want 1", status.StepsCompleted)
+	}
+	if status.LastStep != 1 {
+		t.Fatalf("AbortMigration() last_step = %d, want 1", status.LastStep)
 	}
 }
 
@@ -401,6 +410,29 @@ func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	}
 	if status.ReconciliationPath != "" {
 		t.Fatalf("ReconcileMigration() reconciliation_path = %q, want empty", status.ReconciliationPath)
+	}
+	if len(status.PendingRecords) != 0 {
+		t.Fatalf("ReconcileMigration() pending_records = %d, want 0", len(status.PendingRecords))
+	}
+
+	runtime.mu.Lock()
+	state = runtime.migrations["migrate_reconcile"]
+	state.PendingRecords = map[string]string{"rec-9": "manual", "rec-2": "force_rewind"}
+	runtime.migrations["migrate_reconcile"] = state
+	runtime.mu.Unlock()
+
+	status, err = runtime.GetMigrationStatus("migrate_reconcile")
+	if err != nil {
+		t.Fatalf("GetMigrationStatus() error = %v", err)
+	}
+	if len(status.PendingRecords) != 2 {
+		t.Fatalf("GetMigrationStatus() pending_records = %d, want 2", len(status.PendingRecords))
+	}
+	if status.PendingRecords[0].RecordID != "rec-2" || status.PendingRecords[0].RecommendedResolution != "force_rewind" {
+		t.Fatalf("GetMigrationStatus() pending_records[0] = %+v, want rec-2/force_rewind", status.PendingRecords[0])
+	}
+	if status.PendingRecords[1].RecordID != "rec-9" || status.PendingRecords[1].RecommendedResolution != "manual" {
+		t.Fatalf("GetMigrationStatus() pending_records[1] = %+v, want rec-9/manual", status.PendingRecords[1])
 	}
 }
 

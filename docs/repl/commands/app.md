@@ -8,3 +8,7 @@
 - `apps migrate retry <app> [--json]`
 - `apps migrate abort <app> [--json]`
 - `apps migrate reconcile <app> <record-id> <resolution> [--json]`
+
+`apps migrate status` reports the migration verdict, step progress, `last_step`,
+`last_error`, and pending reconciliation record IDs so operators can decide
+whether to retry, abort, or reconcile.

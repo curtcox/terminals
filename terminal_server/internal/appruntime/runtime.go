@@ -137,11 +137,19 @@ type MigrationStatus struct {
 	Revision           uint64
 	StepsPlanned       int
 	StepsCompleted     int
+	LastStep           int
 	Verdict            string
 	LastError          string
 	JournalPath        string
 	ReconciliationPath string
 	ExecutorReady      bool
+	PendingRecords     []MigrationReconciliationRecord
+}
+
+// MigrationReconciliationRecord describes one unresolved migration reconciliation item.
+type MigrationReconciliationRecord struct {
+	RecordID              string
+	RecommendedResolution string
 }
 
 // AppDefinition provides activation matching and activation construction.
@@ -175,6 +183,7 @@ type Runtime struct {
 type migrationState struct {
 	StepsPlanned       int
 	StepsCompleted     int
+	LastStep           int
 	Verdict            string
 	LastError          string
 	JournalPath        string
@@ -305,6 +314,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	state.Verdict = "running"
 	state.LastError = ""
 	state.StepsCompleted = state.StepsPlanned
+	state.LastStep = state.StepsCompleted
 	state.Verdict = "ok"
 	state.JournalPath = migrationJournalPath(pkg)
 	r.migrations[name] = state
@@ -331,6 +341,7 @@ func (r *Runtime) AbortMigration(name string) (MigrationStatus, error) {
 	if state.StepsCompleted < 0 {
 		state.StepsCompleted = 0
 	}
+	state.LastStep = state.StepsCompleted
 	state.PendingRecords = nil
 	state.ReconciliationPath = ""
 	r.migrations[name] = state
@@ -389,6 +400,7 @@ func newMigrationState(pkg Package) migrationState {
 	state := migrationState{
 		StepsPlanned:   steps,
 		StepsCompleted: 0,
+		LastStep:       0,
 		Verdict:        "idle",
 		ExecutorReady:  steps > 0,
 	}
@@ -411,17 +423,32 @@ func migrationJournalPath(pkg Package) string {
 }
 
 func statusFromState(pkg Package, state migrationState) MigrationStatus {
+	recordIDs := make([]string, 0, len(state.PendingRecords))
+	for recordID := range state.PendingRecords {
+		recordIDs = append(recordIDs, recordID)
+	}
+	sort.Strings(recordIDs)
+	records := make([]MigrationReconciliationRecord, 0, len(recordIDs))
+	for _, recordID := range recordIDs {
+		records = append(records, MigrationReconciliationRecord{
+			RecordID:              recordID,
+			RecommendedResolution: state.PendingRecords[recordID],
+		})
+	}
+
 	return MigrationStatus{
 		App:                pkg.Manifest.Name,
 		Version:            pkg.Manifest.Version,
 		Revision:           pkg.Revision,
 		StepsPlanned:       state.StepsPlanned,
 		StepsCompleted:     state.StepsCompleted,
+		LastStep:           state.LastStep,
 		Verdict:            state.Verdict,
 		LastError:          state.LastError,
 		JournalPath:        state.JournalPath,
 		ReconciliationPath: state.ReconciliationPath,
 		ExecutorReady:      state.ExecutorReady,
+		PendingRecords:     records,
 	}
 }
 

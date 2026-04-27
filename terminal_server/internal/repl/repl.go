@@ -2412,13 +2412,17 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 					return writeJSON(s.out, body)
 				}
 				migration, _ := body["migration"].(map[string]any)
+				recordSummary := migrationPendingRecordSummary(migration)
 				_, err = fmt.Fprintf(
 					s.out,
-					"OK  app=%s verdict=%s steps=%v/%v executor_ready=%v\n",
+					"OK  app=%s verdict=%s steps=%v/%v last_step=%v pending_records=%s last_error=%q executor_ready=%v\n",
 					appName,
 					toString(migration["verdict"]),
 					migration["steps_completed"],
 					migration["steps_planned"],
+					migration["last_step"],
+					recordSummary,
+					toString(migration["last_error"]),
 					migration["executor_ready"],
 				)
 				return err
@@ -3922,6 +3926,30 @@ func toAnySlice(v any) []any {
 	default:
 		return nil
 	}
+}
+
+func migrationPendingRecordSummary(migration map[string]any) string {
+	if migration == nil {
+		return "none"
+	}
+	records := toAnySlice(migration["pending_records"])
+	if len(records) == 0 {
+		return "none"
+	}
+	ids := make([]string, 0, len(records))
+	for _, raw := range records {
+		record, _ := raw.(map[string]any)
+		recordID := strings.TrimSpace(toString(record["record_id"]))
+		if recordID == "" {
+			continue
+		}
+		ids = append(ids, recordID)
+	}
+	if len(ids) == 0 {
+		return "none"
+	}
+	sort.Strings(ids)
+	return strings.Join(ids, ",")
 }
 
 func printTable(out io.Writer, headers []string, rows [][]string) error {

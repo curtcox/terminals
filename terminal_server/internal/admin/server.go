@@ -2621,17 +2621,27 @@ func (h *Handler) writeMigrationError(w http.ResponseWriter, err error) {
 }
 
 func mapMigrationStatus(status appruntime.MigrationStatus) map[string]any {
+	pending := make([]map[string]any, 0, len(status.PendingRecords))
+	for _, record := range status.PendingRecords {
+		pending = append(pending, map[string]any{
+			"record_id":              record.RecordID,
+			"recommended_resolution": record.RecommendedResolution,
+		})
+	}
+
 	return map[string]any{
 		"app":                 status.App,
 		"version":             status.Version,
 		"revision":            status.Revision,
 		"steps_planned":       status.StepsPlanned,
 		"steps_completed":     status.StepsCompleted,
+		"last_step":           status.LastStep,
 		"verdict":             status.Verdict,
 		"last_error":          status.LastError,
 		"journal_path":        status.JournalPath,
 		"reconciliation_path": status.ReconciliationPath,
 		"executor_ready":      status.ExecutorReady,
+		"pending_records":     pending,
 	}
 }
 

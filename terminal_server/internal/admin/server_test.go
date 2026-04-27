@@ -436,6 +436,13 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	if fmt.Sprint(migration["verdict"]) != "idle" {
 		t.Fatalf("migration verdict = %v, want idle", migration["verdict"])
 	}
+	if fmt.Sprint(migration["last_step"]) != "0" {
+		t.Fatalf("migration last_step = %v, want 0", migration["last_step"])
+	}
+	pendingRecords, _ := migration["pending_records"].([]any)
+	if len(pendingRecords) != 0 {
+		t.Fatalf("migration pending_records len = %d, want 0", len(pendingRecords))
+	}
 
 	retryReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/migrate/retry", strings.NewReader(url.Values{"app": {"sound_watch"}}.Encode()))
 	retryReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -454,6 +461,9 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	retryMigration, _ := retryBody["migration"].(map[string]any)
 	if fmt.Sprint(retryMigration["verdict"]) != "idle" {
 		t.Fatalf("migrate retry verdict = %v, want idle", retryMigration["verdict"])
+	}
+	if fmt.Sprint(retryMigration["last_error"]) != "" {
+		t.Fatalf("migrate retry last_error = %v, want empty", retryMigration["last_error"])
 	}
 }
 
