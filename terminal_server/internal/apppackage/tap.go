@@ -550,8 +550,10 @@ type manifestMigrationConfig struct {
 }
 
 type manifestMigrationStep struct {
-	From string `toml:"from"`
-	To   string `toml:"to"`
+	From          string `toml:"from"`
+	To            string `toml:"to"`
+	Compatibility string `toml:"compatibility"`
+	DrainPolicy   string `toml:"drain_policy"`
 }
 
 type signatureBundle struct {
@@ -637,6 +639,15 @@ func validateManifestMigrations(manifestBytes []byte, files []string) error {
 		}
 		manifestStep := manifest.Migrate.Step[i]
 		if strings.TrimSpace(manifestStep.From) == "" || strings.TrimSpace(manifestStep.To) == "" {
+			return ErrInvalidManifest
+		}
+		if manifestStep.Compatibility != "" && manifestStep.Compatibility != "compatible" && manifestStep.Compatibility != "incompatible" {
+			return ErrInvalidManifest
+		}
+		if manifestStep.DrainPolicy != "" && manifestStep.DrainPolicy != "none" && manifestStep.DrainPolicy != "drain" && manifestStep.DrainPolicy != "multi_version" {
+			return ErrInvalidManifest
+		}
+		if manifestStep.Compatibility == "incompatible" && manifestStep.DrainPolicy == "none" {
 			return ErrInvalidManifest
 		}
 		if manifestStep.From != fileStep.from || manifestStep.To != fileStep.to {

@@ -12,6 +12,7 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - Migration files must be one level under `migrate/` and match `<step>_<from>_to_<to>.tal`.
 - Step numbers must be contiguous and start at `1` (no gaps).
 - Each sorted migration file must match the corresponding manifest step `from`/`to` values.
+- When a step declares `compatibility = "incompatible"`, it cannot also declare `drain_policy = "none"`.
 
 Invalid layouts are rejected as `ErrInvalidManifest`.
 
@@ -22,6 +23,8 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapAcceptsCanonicalMigrateStepLayout`
 - `TestVerifyTapRejectsMigrateStepNumberingGap`
 - `TestVerifyTapRejectsMigrateDeclaredStepMismatch`
+- `TestVerifyTapRejectsMigrateIncompatibleWithoutDrain`
+- `TestVerifyTapAcceptsMigrateIncompatibleWithDrain`
 
 ## Not yet implemented
 

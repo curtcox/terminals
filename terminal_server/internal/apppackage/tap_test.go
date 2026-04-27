@@ -240,6 +240,58 @@ to = "2"
 	}
 }
 
+func TestVerifyTapRejectsMigrateIncompatibleWithoutDrain(t *testing.T) {
+	manifest := strings.TrimSpace(`
+name = "kitchen_timer"
+version = "2"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "incompatible"
+drain_policy = "none"
+`)
+
+	tap := makeTapForTest(t, []tapEntry{
+		{name: "kitchen_timer/main.tal", body: "def on_start(): pass"},
+		{name: "kitchen_timer/manifest.toml", body: manifest},
+		{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
+	})
+
+	if _, err := VerifyTap(tap); !errors.Is(err, ErrInvalidManifest) {
+		t.Fatalf("expected invalid manifest for incompatible migration without drain, got %v", err)
+	}
+}
+
+func TestVerifyTapAcceptsMigrateIncompatibleWithDrain(t *testing.T) {
+	manifest := strings.TrimSpace(`
+name = "kitchen_timer"
+version = "2"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "incompatible"
+drain_policy = "drain"
+`)
+
+	tap := makeTapForTest(t, []tapEntry{
+		{name: "kitchen_timer/main.tal", body: "def on_start(): pass"},
+		{name: "kitchen_timer/manifest.toml", body: manifest},
+		{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
+	})
+
+	if _, err := VerifyTap(tap); err != nil {
+		t.Fatalf("expected incompatible migration with drain to verify, got %v", err)
+	}
+}
+
 func TestVerifyTapRejectsZstdChecksumFlag(t *testing.T) {
 	tapBytes, _ := minimalTapAndID(t)
 	mutated := append([]byte(nil), tapBytes...)
