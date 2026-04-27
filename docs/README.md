@@ -24,6 +24,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | [Sensing and Edge Observation Use Case Flows](sensing-use-case-flows.md) | Durable sensing-heavy edge-observation flow reference |
 | [Observation Plane and Flow Model](observation-plane.md) | Durable FlowPlan, observation, and artifact control-plane contract |
 | [Edge Execution and Operator Runtime](edge-execution-runtime.md) | Durable edge capability, bundle/flow lifecycle, and runtime module reference |
+| [Application Migrations](application-migrations.md) | Implemented Gate 1 migration package validation plus remaining-scope boundary |
 | [Development Environment Improvement Log](development-environment-improvement-log.md) | Completed improvements plus local sandbox listener/network test restrictions |
 | [Bug Reporting and Diagnostics](bug-reporting.md) | Bug-intake contracts, endpoints, persistence paths, and validation references |
 

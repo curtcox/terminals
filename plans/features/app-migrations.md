@@ -1,10 +1,10 @@
 ---
 title: "Application Migrations"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: github-copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-27
 ---
 
 # Application Migrations
@@ -18,6 +18,19 @@ Referenced by [application-distribution.md](application-distribution.md)
 (upgrade lifecycle, Install Transaction) and
 [signing-and-trust.md](signing-and-trust.md) (app_id lineage,
 who may authorize a migration).
+
+## Implementation Progress
+
+- 2026-04-27: Implemented Gate 1 migration package-structure
+  checks in `.tap` verification (`terminal_server/internal/apppackage/tap.go`)
+  with unit coverage in
+  `terminal_server/internal/apppackage/tap_test.go`.
+- Implemented rules enforce contiguous migration step numbering,
+  `manifest.toml` declaration/file-count consistency, and file ↔
+  manifest step mapping for `migrate/*.tal` files.
+- Remaining work in this plan includes executor lifecycle,
+  drain/reconcile semantics, rollback behavior, migration runtime
+  module restrictions, and operator command surfaces.
 
 ## Problem
 

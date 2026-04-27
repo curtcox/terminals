@@ -16,7 +16,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -81,6 +83,8 @@ var allowedTopLevelDirs = map[string]struct{}{
 	"assets":  {},
 	"migrate": {},
 }
+
+var migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
 
 // VerifiedTap is the pre-trust parsed output for a .tap archive.
 type VerifiedTap struct {
@@ -524,6 +528,9 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 	if mainCount != 1 {
 		return VerifiedTap{}, nil, ErrMissingMainTAL
 	}
+	if err := validateManifestMigrations(manifestBytes, files); err != nil {
+		return VerifiedTap{}, nil, err
+	}
 
 	return VerifiedTap{PackageName: packageName, Files: files}, manifestBytes, nil
 }
@@ -531,6 +538,20 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 type manifestIdentity struct {
 	Name    string `toml:"name"`
 	Version string `toml:"version"`
+}
+
+type manifestMigration struct {
+	Migrate manifestMigrationConfig `toml:"migrate"`
+}
+
+type manifestMigrationConfig struct {
+	DeclaredSteps int                     `toml:"declared_steps"`
+	Step          []manifestMigrationStep `toml:"step"`
+}
+
+type manifestMigrationStep struct {
+	From string `toml:"from"`
+	To   string `toml:"to"`
 }
 
 type signatureBundle struct {
@@ -559,6 +580,71 @@ func parseManifestIdentity(manifestBytes []byte) (string, string, error) {
 		return "", "", ErrInvalidManifest
 	}
 	return manifest.Name, manifest.Version, nil
+}
+
+func validateManifestMigrations(manifestBytes []byte, files []string) error {
+	var manifest manifestMigration
+	if _, err := toml.Decode(string(manifestBytes), &manifest); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidManifest, err)
+	}
+
+	type parsedStep struct {
+		stepNumber int
+		from       string
+		to         string
+	}
+
+	migrationFiles := make([]parsedStep, 0)
+	for _, rel := range files {
+		if !strings.HasPrefix(rel, "migrate/") {
+			continue
+		}
+		name := strings.TrimPrefix(rel, "migrate/")
+		if strings.Contains(name, "/") {
+			return ErrInvalidManifest
+		}
+		match := migrateStepFilePattern.FindStringSubmatch(name)
+		if match == nil {
+			return ErrInvalidManifest
+		}
+		stepNumber, err := strconv.Atoi(match[1])
+		if err != nil || stepNumber <= 0 {
+			return ErrInvalidManifest
+		}
+		migrationFiles = append(migrationFiles, parsedStep{stepNumber: stepNumber, from: match[2], to: match[3]})
+	}
+
+	declaredSteps := manifest.Migrate.DeclaredSteps
+	declaredManifestSteps := len(manifest.Migrate.Step)
+	if len(migrationFiles) == 0 {
+		if declaredSteps != 0 || declaredManifestSteps != 0 {
+			return ErrInvalidManifest
+		}
+		return nil
+	}
+
+	if declaredSteps <= 0 || declaredSteps != declaredManifestSteps || declaredSteps != len(migrationFiles) {
+		return ErrInvalidManifest
+	}
+
+	sort.Slice(migrationFiles, func(i, j int) bool {
+		return migrationFiles[i].stepNumber < migrationFiles[j].stepNumber
+	})
+
+	for i, fileStep := range migrationFiles {
+		if fileStep.stepNumber != i+1 {
+			return ErrInvalidManifest
+		}
+		manifestStep := manifest.Migrate.Step[i]
+		if strings.TrimSpace(manifestStep.From) == "" || strings.TrimSpace(manifestStep.To) == "" {
+			return ErrInvalidManifest
+		}
+		if manifestStep.From != fileStep.from || manifestStep.To != fileStep.to {
+			return ErrInvalidManifest
+		}
+	}
+
+	return nil
 }
 
 func verifySignatureBundle(sigBytes []byte, expectedPackageID string, packageHash []byte, expectedManifestName string, expectedManifestVersion string) ([]VerifiedStatement, error) {
