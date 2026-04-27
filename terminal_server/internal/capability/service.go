@@ -2,6 +2,7 @@
 package capability
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -2273,22 +2274,247 @@ func (s *Service) ScriptDryRun(path, script string) ScriptDryRunResult {
 
 // ScriptRun parses and executes a script against the current capability state.
 func (s *Service) ScriptRun(path, script string) ScriptRunResult {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	commands, skippedCount := parseScriptCommands(script)
 	result := ScriptRunResult{
 		Path:          strings.TrimSpace(path),
 		CommandCount:  len(commands),
 		SkippedCount:  skippedCount,
-		ExecutedCount: len(commands),
+		ExecutedCount: 0,
 		FailedCount:   0,
 		Commands:      commands,
 		Issues:        []string{},
 		CreatedAt:     s.now(),
 	}
+	for i, command := range commands {
+		if err := s.executeScriptCommand(command); err != nil {
+			result.FailedCount++
+			result.Issues = append(result.Issues, fmt.Sprintf("command %d (%q): %v", i+1, command, err))
+			continue
+		}
+		result.ExecutedCount++
+	}
+	s.mu.Lock()
 	s.appendRecentLocked("scripts", "run "+result.Path)
+	s.mu.Unlock()
 	return result
+}
+
+func (s *Service) executeScriptCommand(command string) error {
+	tokens := strings.Fields(strings.TrimSpace(command))
+	if len(tokens) == 0 {
+		return nil
+	}
+	if len(tokens) < 2 {
+		return fmt.Errorf("invalid command")
+	}
+	group := strings.ToLower(tokens[0])
+	sub := strings.ToLower(tokens[1])
+	args := tokens[2:]
+
+	switch group {
+	case "store":
+		if sub != "put" {
+			return fmt.Errorf("unsupported store command %q", sub)
+		}
+		if len(args) < 3 {
+			return fmt.Errorf("usage: store put <namespace> <key> <value> [--ttl <duration>]")
+		}
+		namespace := args[0]
+		key := args[1]
+		rest := args[2:]
+		valueParts := make([]string, 0, len(rest))
+		ttl := time.Duration(0)
+		for i := 0; i < len(rest); i++ {
+			token := rest[i]
+			if token == "--ttl" {
+				if i+1 >= len(rest) {
+					return fmt.Errorf("--ttl requires a duration")
+				}
+				parsedTTL, err := time.ParseDuration(rest[i+1])
+				if err != nil || parsedTTL <= 0 {
+					return fmt.Errorf("invalid --ttl duration %q", rest[i+1])
+				}
+				ttl = parsedTTL
+				i++
+				continue
+			}
+			if strings.HasPrefix(token, "--") {
+				return fmt.Errorf("unsupported flag %q", token)
+			}
+			valueParts = append(valueParts, token)
+		}
+		if len(valueParts) == 0 {
+			return fmt.Errorf("value is required")
+		}
+		s.StorePut(namespace, key, strings.Join(valueParts, " "), ttl)
+		return nil
+	case "bus":
+		if sub != "emit" {
+			return fmt.Errorf("unsupported bus command %q", sub)
+		}
+		if len(args) < 2 {
+			return fmt.Errorf("usage: bus emit <kind> <name> [payload]")
+		}
+		kind := args[0]
+		name := args[1]
+		payload := ""
+		if len(args) > 2 {
+			payload = strings.Join(args[2:], " ")
+		}
+		s.BusEmit(kind, name, payload)
+		return nil
+	case "ui":
+		if sub != "push" {
+			return fmt.Errorf("unsupported ui command %q", sub)
+		}
+		if len(args) < 2 {
+			return fmt.Errorf("usage: ui push <device> <descriptor-expr> [--root <id>]")
+		}
+		deviceID := args[0]
+		rest := args[1:]
+		descriptorParts := make([]string, 0, len(rest))
+		rootID := ""
+		for i := 0; i < len(rest); i++ {
+			token := rest[i]
+			if token == "--root" {
+				if i+1 >= len(rest) {
+					return fmt.Errorf("--root requires an id")
+				}
+				rootID = rest[i+1]
+				i++
+				continue
+			}
+			if strings.HasPrefix(token, "--") {
+				return fmt.Errorf("unsupported flag %q", token)
+			}
+			descriptorParts = append(descriptorParts, token)
+		}
+		if len(descriptorParts) == 0 {
+			return fmt.Errorf("descriptor-expr is required")
+		}
+		s.UIPush(deviceID, strings.Join(descriptorParts, " "), rootID)
+		return nil
+	case "sim":
+		switch sub {
+		case "device":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: sim device <new|rm> <id>")
+			}
+			action := strings.ToLower(args[0])
+			deviceID := args[1]
+			switch action {
+			case "new":
+				caps := []string{}
+				if len(args) > 2 {
+					rest := args[2:]
+					for i := 0; i < len(rest); i++ {
+						if rest[i] != "--caps" {
+							return fmt.Errorf("unsupported sim device flag %q", rest[i])
+						}
+						if i+1 >= len(rest) {
+							return fmt.Errorf("--caps requires comma-separated values")
+						}
+						caps = strings.Split(rest[i+1], ",")
+						i++
+					}
+				}
+				s.SimDeviceUpsert(deviceID, caps)
+				return nil
+			case "rm":
+				if ok := s.SimDeviceDelete(deviceID); !ok {
+					return fmt.Errorf("sim device not found")
+				}
+				return nil
+			default:
+				return fmt.Errorf("unsupported sim device action %q", action)
+			}
+		case "input":
+			if len(args) < 3 {
+				return fmt.Errorf("usage: sim input <id> <component-id> <action> [<value>]")
+			}
+			deviceID := args[0]
+			componentID := args[1]
+			action := args[2]
+			value := ""
+			if len(args) > 3 {
+				value = strings.Join(args[3:], " ")
+			}
+			if _, ok := s.SimRecordInput(deviceID, componentID, action, value); !ok {
+				return fmt.Errorf("sim device not found")
+			}
+			return nil
+		case "expect":
+			if len(args) < 3 {
+				return fmt.Errorf("usage: sim expect <id> <ui|message> <selector> [--within <duration>]")
+			}
+			deviceID := args[0]
+			kind := args[1]
+			rest := args[2:]
+			selectorParts := make([]string, 0, len(rest))
+			within := time.Duration(0)
+			for i := 0; i < len(rest); i++ {
+				token := rest[i]
+				if token == "--within" {
+					if i+1 >= len(rest) {
+						return fmt.Errorf("--within requires a duration")
+					}
+					dur, err := time.ParseDuration(rest[i+1])
+					if err != nil || dur <= 0 {
+						return fmt.Errorf("invalid --within duration %q", rest[i+1])
+					}
+					within = dur
+					i++
+					continue
+				}
+				if strings.HasPrefix(token, "--") {
+					return fmt.Errorf("unsupported flag %q", token)
+				}
+				selectorParts = append(selectorParts, token)
+			}
+			if len(selectorParts) == 0 {
+				return fmt.Errorf("selector is required")
+			}
+			result, ok := s.SimExpect(deviceID, kind, strings.Join(selectorParts, " "), within)
+			if !ok {
+				return fmt.Errorf("sim device not found")
+			}
+			if !result.Matched {
+				return fmt.Errorf("expectation not matched")
+			}
+			return nil
+		case "record":
+			if len(args) < 1 {
+				return fmt.Errorf("usage: sim record <id> [--duration <duration>]")
+			}
+			deviceID := args[0]
+			duration := time.Duration(0)
+			if len(args) > 1 {
+				rest := args[1:]
+				for i := 0; i < len(rest); i++ {
+					if rest[i] != "--duration" {
+						return fmt.Errorf("unsupported flag %q", rest[i])
+					}
+					if i+1 >= len(rest) {
+						return fmt.Errorf("--duration requires a duration")
+					}
+					parsed, err := time.ParseDuration(rest[i+1])
+					if err != nil || parsed <= 0 {
+						return fmt.Errorf("invalid --duration %q", rest[i+1])
+					}
+					duration = parsed
+					i++
+				}
+			}
+			if _, ok := s.SimRecord(deviceID, duration); !ok {
+				return fmt.Errorf("sim device not found")
+			}
+			return nil
+		default:
+			return fmt.Errorf("unsupported sim command %q", sub)
+		}
+	default:
+		return fmt.Errorf("unsupported command group %q", group)
+	}
 }
 
 func parseScriptCommands(script string) ([]string, int) {

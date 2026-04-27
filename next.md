@@ -1,1 +1,1 @@
-For `plans/features/repl-capability/plan.md`, implement Phase 12 cross-use-case validation via `scripts run` over a seeded simulation fixture so the plan can move beyond `status: building`.
+For `plans/features/repl-capability/plan.md`, expand Phase 12 `scripts run` coverage from the current seeded sim/store/ui/bus fixture to include at least one Layer 2 domain-family script example and wire it into automated validation.

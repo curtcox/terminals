@@ -761,6 +761,22 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 	if run.CommandCount != 2 || run.SkippedCount != 2 || run.ExecutedCount != 2 || run.FailedCount != 0 {
 		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 2/2/2/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
 	}
+	stored, ok := svc.StoreGet("notes", "k")
+	if !ok || stored.Value != "v" {
+		t.Fatalf("ScriptRun store side effect missing: ok=%v record=%+v", ok, stored)
+	}
+	snapshot, ok := svc.UISnapshot("d1")
+	if !ok || snapshot.DeviceID != "d1" {
+		t.Fatalf("ScriptRun ui push side effect missing: ok=%v snapshot=%+v", ok, snapshot)
+	}
+
+	failed := svc.ScriptRun("fixtures/fail.term", "sim device rm missing")
+	if failed.CommandCount != 1 || failed.ExecutedCount != 0 || failed.FailedCount != 1 {
+		t.Fatalf("failed ScriptRun counts = commands:%d executed:%d failed:%d, want 1/0/1", failed.CommandCount, failed.ExecutedCount, failed.FailedCount)
+	}
+	if len(failed.Issues) != 1 || !strings.Contains(failed.Issues[0], "sim device not found") {
+		t.Fatalf("failed ScriptRun issues = %+v, want sim device not found", failed.Issues)
+	}
 
 	if deleted := svc.SimDeviceDelete("kitchen-sim"); !deleted {
 		t.Fatalf("SimDeviceDelete(kitchen-sim) = false, want true")

@@ -1,0 +1,10 @@
+# Phase 12 cross-use-case fixture for scripts run over seeded simulation state.
+sim device new sim-fixture --caps display,keyboard
+store put phase12 status seeded --ttl 10s
+ui push sim-fixture {"type":"stack","children":[{"type":"text","text":"fixture-ready"}]} --root fixture-root
+sim input sim-fixture fixture-banner submit ack
+bus emit event fixture.signal sim-fixture:fixture-alert
+sim expect sim-fixture ui fixture-ready --within 2s
+sim expect sim-fixture message fixture-alert --within 2s
+sim record sim-fixture --duration 2s
+sim device rm sim-fixture

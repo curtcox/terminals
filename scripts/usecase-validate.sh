@@ -23,6 +23,7 @@ fi
 metadata() {
   local id="$1"
   case "${id}" in
+    AA6) echo "AA6|Simulation|admin scripts run over seeded sim fixture covering sim/store/ui/bus cross-use-case path" ;;
     B1) echo "B1|Scenario|transport input bug-report action coverage for modality parity" ;;
     B2) echo "B2|Scenario|diagnostics bug-report service cross-device subject/offline coverage" ;;
     B3) echo "B3|Scenario|diagnostics service autodetect merge test" ;;
@@ -51,7 +52,7 @@ metadata() {
   esac
 }
 
-all_ids=(B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
+all_ids=(AA6 B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
 
 run_go_test() {
   local pkg="$1"
@@ -69,6 +70,9 @@ run_app_test() {
 run_usecase() {
   local id="$1"
   case "${id}" in
+    AA6)
+      run_go_test ./internal/admin 'TestScriptsRunCrossUsecaseSimulationFixture$'
+      ;;
     B1)
       run_go_test ./internal/transport 'TestHandleMessageInputBugReportAction(FilesReport|RespectsModalitySources)$'
       ;;

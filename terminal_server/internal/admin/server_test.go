@@ -920,6 +920,55 @@ func TestSimAndScriptsEndpoints(t *testing.T) {
 	}
 }
 
+func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
+	h := testHandler(t)
+	fixturePath := filepath.Join("..", "..", "testdata", "repl", "phase12-cross-usecase.term")
+
+	dryRunReq := httptest.NewRequest(http.MethodPost, "/admin/api/scripts/dry-run", strings.NewReader(url.Values{
+		"path": {fixturePath},
+	}.Encode()))
+	dryRunReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	dryRunW := httptest.NewRecorder()
+	h.ServeHTTP(dryRunW, dryRunReq)
+	if dryRunW.Code != http.StatusOK {
+		t.Fatalf("fixture scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
+	}
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":9`) {
+		t.Fatalf("fixture scripts dry-run body missing command count: %s", dryRunW.Body.String())
+	}
+
+	runReq := httptest.NewRequest(http.MethodPost, "/admin/api/scripts/run", strings.NewReader(url.Values{
+		"path": {fixturePath},
+	}.Encode()))
+	runReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	runW := httptest.NewRecorder()
+	h.ServeHTTP(runW, runReq)
+	if runW.Code != http.StatusOK {
+		t.Fatalf("fixture scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
+	}
+	body := runW.Body.String()
+	if !strings.Contains(body, `"executed_count":9`) || !strings.Contains(body, `"failed_count":0`) {
+		t.Fatalf("fixture scripts run body missing execution counters: %s", body)
+	}
+
+	storeReq := httptest.NewRequest(http.MethodGet, "/admin/api/store/get?namespace=phase12&key=status", nil)
+	storeW := httptest.NewRecorder()
+	h.ServeHTTP(storeW, storeReq)
+	if storeW.Code != http.StatusOK {
+		t.Fatalf("fixture store get status = %d, want 200 body=%s", storeW.Code, storeW.Body.String())
+	}
+	if !strings.Contains(storeW.Body.String(), `"namespace":"phase12"`) || !strings.Contains(storeW.Body.String(), `"value":"seeded"`) {
+		t.Fatalf("fixture store get body missing seeded record: %s", storeW.Body.String())
+	}
+
+	simReq := httptest.NewRequest(http.MethodGet, "/admin/api/sim/ui?device_id=sim-fixture", nil)
+	simW := httptest.NewRecorder()
+	h.ServeHTTP(simW, simReq)
+	if simW.Code != http.StatusNotFound {
+		t.Fatalf("fixture sim ui status after cleanup = %d, want 404 body=%s", simW.Code, simW.Body.String())
+	}
+}
+
 func TestIdentityResolveEndpointRequiresGET(t *testing.T) {
 	h := testHandler(t)
 	req := httptest.NewRequest(http.MethodPost, "/admin/api/identity/resolve", nil)

@@ -3,7 +3,7 @@ title: "REPL Capability Plan"
 kind: plan
 status: building
 owner: copilot
-validation: none
+validation: automated:AA6
 last-reviewed: 2026-04-27
 ---
 
@@ -77,6 +77,11 @@ layering, acceptance rules, and authoring substrate.
   REPL `bug ls|show|file|confirm` now routes through the existing
   bug-reporting admin APIs, with command docs and focused REPL/MCP
   coverage to preserve catalog safety constraints.
+- Landed the first Phase 12 cross-use-case validation slice in code:
+  `scripts run` now executes a deterministic simulation fixture over
+  `sim`/`store`/`ui`/`bus`, with AA6 wired into
+  `make usecase-validate USECASE=AA6` and reflected in the validation
+  matrix.
 
 ## Problem
 
