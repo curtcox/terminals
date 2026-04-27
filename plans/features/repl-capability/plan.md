@@ -123,6 +123,10 @@ layering, acceptance rules, and authoring substrate.
   assertion) so `scripts run` now validates durable identity
   acknowledgement mutation alongside the existing
   message/board/artifact/canvas/session checks.
+- Landed the next Phase 11 bug-reporting control-plane extension in
+  code: REPL `bug tail` now tails `/admin/logs.jsonl` with a
+  bug-report event filter prefix (`bug.report`), with focused REPL
+  coverage and command docs updates.
 
 ## Problem
 

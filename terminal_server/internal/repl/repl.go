@@ -115,6 +115,7 @@ func replCommandSpecs() []commandSpec {
 		{Name: "bug show", Usage: "bug show <report-id> [--json]", Summary: "Show one bug report", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/bug"}},
 		{Name: "bug file", Usage: "bug file <reporter-device-id> <subject-device-id> <description> [--source <source>] [--tags <tag[,tag...]>] [--json]", Summary: "File a bug report", Classification: commandMutating, RelatedDocs: []string{"repl/commands/bug"}},
 		{Name: "bug confirm", Usage: "bug confirm <report-id> [--json]", Summary: "Confirm one bug report", Classification: commandMutating, RelatedDocs: []string{"repl/commands/bug"}},
+		{Name: "bug tail", Usage: "bug tail [<query>]", Summary: "Tail bug-reporting control-plane logs", Classification: commandOperational, RelatedDocs: []string{"repl/commands/bug"}},
 		{Name: "placement ls", Usage: "placement ls [--json]", Summary: "List placement metadata", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/placement"}},
 		{Name: "cohort ls", Usage: "cohort ls [--json]", Summary: "List named device cohorts", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/cohort"}},
 		{Name: "cohort show", Usage: "cohort show <name> [--json]", Summary: "Show one cohort with resolved members", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/cohort"}},
@@ -1418,6 +1419,14 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			}
 			_, err = fmt.Fprintf(s.out, "OK  report=%s action=confirm\n", plain[0])
 			return err
+		case "tail":
+			query := strings.TrimSpace(strings.Join(args[1:], " "))
+			if query == "" {
+				query = "bug.report"
+			} else {
+				query = "bug.report " + query
+			}
+			return s.queryLogs(ctx, "", query)
 		default:
 			return fmt.Errorf("unknown command: bug %s", sub)
 		}

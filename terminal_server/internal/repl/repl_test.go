@@ -331,6 +331,7 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"bug show",
 		"bug file",
 		"bug confirm",
+		"bug tail",
 		"placement ls",
 		"cohort ls",
 		"cohort show",
@@ -517,6 +518,11 @@ func TestDocsExamplesIncludeCapabilityClosureTopics(t *testing.T) {
 
 func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/admin/logs.jsonl" {
+			w.Header().Set("Content-Type", "application/x-ndjson")
+			_, _ = w.Write([]byte("{\"event\":\"bug.report.filed\",\"report_id\":\"bug-1\"}\n"))
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/identity":
@@ -711,6 +717,7 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"bug show bug-1",
 		"bug file kitchen-screen hallway-panel panel frozen --source sip --tags ui_glitch,lost_connection",
 		"bug confirm bug-1",
+		"bug tail",
 		"placement ls",
 		"cohort ls",
 		"cohort show family-screens",
@@ -834,6 +841,9 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	if !strings.Contains(text, "action=confirm") {
 		t.Fatalf("bug confirm output missing action summary: %q", text)
 	}
+	if !strings.Contains(text, "bug.report.filed") {
+		t.Fatalf("bug tail output missing bug report log event: %q", text)
+	}
 	if !strings.Contains(text, "evt-1") {
 		t.Fatalf("recent output missing: %q", text)
 	}
@@ -926,5 +936,30 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "handler=handler-2") {
 		t.Fatalf("handlers off output missing handler id: %q", text)
+	}
+}
+
+func TestBugTailFiltersLogsToBugReportingEvents(t *testing.T) {
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet || req.URL.Path != "/admin/logs.jsonl" {
+			http.NotFound(w, req)
+			return
+		}
+		if got := req.URL.Query().Get("q"); got != "bug.report severity:error" {
+			t.Fatalf("bug tail query = %q, want %q", got, "bug.report severity:error")
+		}
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		_, _ = w.Write([]byte("{\"event\":\"bug.report.autodetect.failed\",\"severity\":\"error\"}\n"))
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("bug tail severity:error\nexit\n")
+	var out bytes.Buffer
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "bug.report.autodetect.failed") {
+		t.Fatalf("bug tail output missing filtered event: %q", out.String())
 	}
 }
