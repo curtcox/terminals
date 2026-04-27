@@ -702,6 +702,7 @@ Invariants:
 
 ## Progress Notes
 
+- 2026-04-27: Added automated P3 validation (`TestUseCaseP3AIAssistanceAskGenerateAndMutatingGateMetadata`) and wired `make usecase-validate USECASE=P3` plus matrix coverage for AI ask/gen command paths and mutating approval-gate metadata.
 - 2026-04-27: Added typed `ai ask` / `ai gen` request paths across `replai`, admin APIs, and REPL command dispatch with session-thread/history persistence; REPL now supports direct question and generation turns over the configured provider/model selection.
 - 2026-04-27: Added typed AI thread history/reset APIs (`ai history`, `ai reset`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests so thread state can be inspected and cleared per session.
 - 2026-04-27: Added typed session context and approval-policy APIs (`ai context*`, `ai policy*`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests. `ai ask` / `ai gen` streaming and approval-loop execution remain in progress.

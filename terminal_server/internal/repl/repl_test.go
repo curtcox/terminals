@@ -355,6 +355,58 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 	}
 }
 
+func TestUseCaseP3AIAssistanceAskGenerateAndMutatingGateMetadata(t *testing.T) {
+	mutating, ok := DescribeCommand("app reload")
+	if !ok {
+		t.Fatalf("DescribeCommand(app reload) not found")
+	}
+	if !mutating.Classification.RequiresApproval() {
+		t.Fatalf("app reload classification %q should require approval", mutating.Classification)
+	}
+
+	readOnly, ok := DescribeCommand("devices ls")
+	if !ok {
+		t.Fatalf("DescribeCommand(devices ls) not found")
+	}
+	if readOnly.Classification.RequiresApproval() {
+		t.Fatalf("devices ls classification %q should not require approval", readOnly.Classification)
+	}
+
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/ask":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-3","provider":"openrouter","model":"anthropic/claude-sonnet-4-6","prompt":"why is act_42 suspended?","answer":"act_42 is suspended due to red_alert preemption.","thread":"thread-repl-3"}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/gen":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-3","provider":"openrouter","model":"anthropic/claude-sonnet-4-6","description":"a tal app that rings a chime when the dryer beeps","output":"apps/dryer_chime/main.tal","thread":"thread-repl-3"}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("ai ask why is act_42 suspended?\nai gen a tal app that rings a chime when the dryer beeps\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{
+		Prompt:       "repl>",
+		AdminBaseURL: admin.URL,
+		SessionID:    "repl-3",
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	text := out.String()
+	if !strings.Contains(text, "answer:") || !strings.Contains(text, "red_alert preemption") {
+		t.Fatalf("missing ai ask output: %q", text)
+	}
+	if !strings.Contains(text, "generated:") || !strings.Contains(text, "apps/dryer_chime/main.tal") {
+		t.Fatalf("missing ai gen output: %q", text)
+	}
+}
+
 func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 	commands := []string{
 		"identity ls",

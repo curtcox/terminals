@@ -38,6 +38,7 @@ metadata() {
     M3) echo "M3|Transport|generated+wire red alert integration tests" ;;
     M4) echo "M4|Transport|generated+wire voice stop/stand-down tests" ;;
     P2) echo "P2|Scenario|REPL session mobility and coexistence lifecycle test" ;;
+    P3) echo "P3|Scenario|REPL ai ask/gen commands plus mutating approval-gate metadata test" ;;
     P4) echo "P4|Scenario|sticky REPL AI provider/model survives detach and reattach" ;;
     S1) echo "S1|Transport|generated+wire voice show-all-cameras tests" ;;
     S2) echo "S2|Transport|generated+wire focus-action routing tests" ;;
@@ -54,7 +55,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA6 B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 P2 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
+all_ids=(AA6 B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
 
 run_go_test() {
   local pkg="$1"
@@ -117,6 +118,9 @@ run_usecase() {
       ;;
     P2)
       run_go_test ./internal/replsession 'TestUseCaseP2SessionMobilityAndCoexistence$'
+      ;;
+    P3)
+      run_go_test ./internal/repl 'TestUseCaseP3AIAssistanceAskGenerateAndMutatingGateMetadata$'
       ;;
     P4)
       run_go_test ./internal/replsession 'TestUseCaseP4StickyAISelectionSurvivesDetachReattach$'
