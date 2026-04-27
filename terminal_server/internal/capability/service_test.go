@@ -754,12 +754,12 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 		t.Fatalf("ScriptDryRun counts = commands:%d skipped:%d, want 2/2", dryRun.CommandCount, dryRun.SkippedCount)
 	}
 
-	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage post phase12-room fixture-layer2-mutating\nboard post phase12-board fixture-board-mutating\nartifact create lesson fixture-artifact-mutating\nmessage ls phase12-room\nboard ls phase12-board\nartifact history latest\nmessage rooms")
+	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage post phase12-room fixture-layer2-mutating\nboard post phase12-board fixture-board-mutating\nartifact create lesson fixture-artifact-mutating\ncanvas annotate phase12-canvas fixture-canvas-mutating\nmessage ls phase12-room\nboard ls phase12-board\nartifact history latest\ncanvas ls phase12-canvas\nmessage rooms")
 	if run.Path != "fixtures/smoke.term" {
 		t.Fatalf("ScriptRun path = %q, want fixtures/smoke.term", run.Path)
 	}
-	if run.CommandCount != 9 || run.SkippedCount != 2 || run.ExecutedCount != 9 || run.FailedCount != 0 {
-		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 9/2/9/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
+	if run.CommandCount != 11 || run.SkippedCount != 2 || run.ExecutedCount != 11 || run.FailedCount != 0 {
+		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 11/2/11/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
 	}
 	stored, ok := svc.StoreGet("notes", "k")
 	if !ok || stored.Value != "v" {
@@ -787,6 +787,10 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 	versions, ok := svc.ArtifactHistory(artifactID)
 	if !ok || len(versions) != 1 || versions[0].Action != "create" {
 		t.Fatalf("ScriptRun artifact history side effect missing: ok=%v versions=%+v", ok, versions)
+	}
+	annotations := svc.ListCanvas("phase12-canvas")
+	if len(annotations) != 1 || annotations[0].Text != "fixture-canvas-mutating" {
+		t.Fatalf("ScriptRun canvas side effect missing: %+v", annotations)
 	}
 	snapshot, ok := svc.UISnapshot("d1")
 	if !ok || snapshot.DeviceID != "d1" {

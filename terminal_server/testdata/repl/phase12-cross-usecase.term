@@ -7,10 +7,12 @@ bus emit event fixture.signal sim-fixture:fixture-alert
 message post phase12-room fixture-layer2-mutating
 board post phase12-board fixture-board-mutating
 artifact create lesson fixture-artifact-mutating
+canvas annotate phase12-canvas fixture-canvas-mutating
 message rooms
 message ls phase12-room
 board ls phase12-board
 artifact history latest
+canvas ls phase12-canvas
 sim expect sim-fixture ui fixture-ready --within 2s
 sim expect sim-fixture message fixture-alert --within 2s
 sim record sim-fixture --duration 2s

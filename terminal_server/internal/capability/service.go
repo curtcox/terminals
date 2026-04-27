@@ -2475,6 +2475,29 @@ func (s *Service) executeScriptCommand(command string) error {
 		default:
 			return fmt.Errorf("unsupported artifact command %q", sub)
 		}
+	case "canvas":
+		switch sub {
+		case "annotate":
+			if len(args) < 2 {
+				return fmt.Errorf("usage: canvas annotate <canvas> <text>")
+			}
+			canvas := args[0]
+			text := strings.Join(args[1:], " ")
+			s.AnnotateCanvas(canvas, text)
+			return nil
+		case "ls":
+			if len(args) > 1 {
+				return fmt.Errorf("usage: canvas ls [canvas]")
+			}
+			canvas := ""
+			if len(args) == 1 {
+				canvas = args[0]
+			}
+			_ = s.ListCanvas(canvas)
+			return nil
+		default:
+			return fmt.Errorf("unsupported canvas command %q", sub)
+		}
 	case "sim":
 		switch sub {
 		case "device":

@@ -102,6 +102,12 @@ layering, acceptance rules, and authoring substrate.
   (`artifact history art-1` in-script and admin `/artifact/history`
   assertion) so `scripts run` now validates durable artifact mutation
   in the same cross-use-case scripted path.
+- Extended the Phase 12 AA6 fixture with an additional mutating Layer 2
+  path in the canvas domain (`canvas annotate phase12-canvas
+  fixture-canvas-mutating`) plus deterministic read-back
+  (`canvas ls phase12-canvas` in-script and admin `/canvas` assertion)
+  so `scripts run` now validates durable canvas mutation alongside the
+  existing message/board/artifact checks.
 
 ## Problem
 

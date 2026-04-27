@@ -933,7 +933,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	if dryRunW.Code != http.StatusOK {
 		t.Fatalf("fixture scripts dry-run status = %d, want 200 body=%s", dryRunW.Code, dryRunW.Body.String())
 	}
-	if !strings.Contains(dryRunW.Body.String(), `"command_count":16`) {
+	if !strings.Contains(dryRunW.Body.String(), `"command_count":18`) {
 		t.Fatalf("fixture scripts dry-run body missing command count: %s", dryRunW.Body.String())
 	}
 
@@ -947,7 +947,7 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 		t.Fatalf("fixture scripts run status = %d, want 200 body=%s", runW.Code, runW.Body.String())
 	}
 	body := runW.Body.String()
-	if !strings.Contains(body, `"executed_count":16`) || !strings.Contains(body, `"failed_count":0`) {
+	if !strings.Contains(body, `"executed_count":18`) || !strings.Contains(body, `"failed_count":0`) {
 		t.Fatalf("fixture scripts run body missing execution counters: %s", body)
 	}
 
@@ -1015,6 +1015,16 @@ func TestScriptsRunCrossUsecaseSimulationFixture(t *testing.T) {
 	}
 	if !strings.Contains(artifactW.Body.String(), `"artifact_id":"`+artifactID+`"`) || !strings.Contains(artifactW.Body.String(), `"action":"create"`) || !strings.Contains(artifactW.Body.String(), `"title":"fixture-artifact-mutating"`) {
 		t.Fatalf("fixture artifact history missing layer2 artifact side effect: %s", artifactW.Body.String())
+	}
+
+	canvasReq := httptest.NewRequest(http.MethodGet, "/admin/api/canvas?canvas=phase12-canvas", nil)
+	canvasW := httptest.NewRecorder()
+	h.ServeHTTP(canvasW, canvasReq)
+	if canvasW.Code != http.StatusOK {
+		t.Fatalf("fixture canvas ls status = %d, want 200 body=%s", canvasW.Code, canvasW.Body.String())
+	}
+	if !strings.Contains(canvasW.Body.String(), `"canvas":"phase12-canvas"`) || !strings.Contains(canvasW.Body.String(), `"text":"fixture-canvas-mutating"`) {
+		t.Fatalf("fixture canvas ls body missing layer2 canvas side effect: %s", canvasW.Body.String())
 	}
 
 	simReq := httptest.NewRequest(http.MethodGet, "/admin/api/sim/ui?device_id=sim-fixture", nil)
