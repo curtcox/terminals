@@ -559,3 +559,19 @@ This plan moved to `building` with an initial shipped slice in server code:
 Remaining work includes full `.tap.sig` statement verification, strict zstd
 frame flag enforcement, and comprehensive golden-vector coverage described in
  this plan.
+
+Additional shipped slice in this cycle:
+
+- Added `VerifyPackage(tapBytes, sigBytes)` pre-trust API that validates
+  canonical tar structure, parses manifest identity, and verifies
+  `tap-sig/1` statement bundles against the computed package hash.
+- Implemented statement-level checks for required fields, schema/package
+  binding, author-presence minimum acceptance, duplicate
+  `(key_id, package_id, nonce)` rejection, and role-specific scope shaping
+  (`author`, `voucher`, `publisher`) with unknown authority-bearing keys
+  rejected.
+- Added deterministic CBOR statement encoding and Ed25519 verification for
+  statement signatures, with bundle/parser quotas for v1 boundaries.
+- Expanded `terminal_server/internal/apppackage/tap_test.go` with
+  `VerifyPackage` success and rejection coverage (unknown voucher scope key,
+  missing author statement, duplicate nonce triple).

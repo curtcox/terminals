@@ -4,7 +4,9 @@ package apppackage
 import (
 	"archive/tar"
 	"bytes"
+	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -18,12 +20,22 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/BurntSushi/toml"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/klauspost/compress/zstd"
 )
 
 const (
 	canonicalFileMode = 0o644
 	zstdWindowSize    = 8 << 20
+
+	signatureBundleSchema   = "tap-sig/1"
+	signatureBundleMaxBytes = 1 << 20
+	statementMaxCount       = 64
+	stringFieldMaxBytes     = 8 << 10
+	statementNonceLen       = 16
+	voucherNotesMaxBytes    = 2 << 10
+	publisherViaMaxBytes    = 256
 )
 
 var (
@@ -45,6 +57,18 @@ var (
 	ErrNonCanonicalOrder = errors.New("tap archive entries are not sorted")
 	// ErrPathTraversalDetected indicates an archive or source path is unsafe.
 	ErrPathTraversalDetected = errors.New("tap contains unsafe path")
+	// ErrInvalidManifest indicates the manifest is missing required fields.
+	ErrInvalidManifest = errors.New("tap manifest is invalid")
+	// ErrInvalidSignatureBundle indicates the signature bundle is malformed.
+	ErrInvalidSignatureBundle = errors.New("tap signature bundle is invalid")
+	// ErrInvalidSignatureStatement indicates one signature statement is malformed.
+	ErrInvalidSignatureStatement = errors.New("tap signature statement is invalid")
+	// ErrSignaturePackageIDMismatch indicates the bundle package_id mismatches the tap bytes.
+	ErrSignaturePackageIDMismatch = errors.New("tap signature bundle package_id mismatch")
+	// ErrSignatureVerificationFailed indicates cryptographic signature verification failed.
+	ErrSignatureVerificationFailed = errors.New("tap signature verification failed")
+	// ErrMissingAuthorSignature indicates no author statement exists in the bundle.
+	ErrMissingAuthorSignature = errors.New("tap signature bundle missing author statement")
 )
 
 var allowedTopLevelDirs = map[string]struct{}{
@@ -61,6 +85,25 @@ type VerifiedTap struct {
 	PackageID   string
 	PackageName string
 	Files       []string
+}
+
+// VerifiedStatement is one parsed and verified statement from a .tap.sig bundle.
+type VerifiedStatement struct {
+	Role            string
+	KeyID           string
+	CreatedUnix     uint64
+	ManifestName    string
+	ManifestVersion string
+	Nonce           string
+	Scope           map[string]any
+}
+
+// VerifiedPackage is the full pre-trust output for a .tap + .tap.sig pair.
+type VerifiedPackage struct {
+	Tap             VerifiedTap
+	ManifestName    string
+	ManifestVersion string
+	Statements      []VerifiedStatement
 }
 
 // BuildTapFromDir builds a canonical .tap archive from one app root directory.
@@ -99,7 +142,7 @@ func VerifyTap(tapBytes []byte) (VerifiedTap, error) {
 		return VerifiedTap{}, err
 	}
 
-	result, err := validateCanonicalTar(canonicalTar)
+	result, _, err := validateCanonicalTarWithManifest(canonicalTar)
 	if err != nil {
 		return VerifiedTap{}, err
 	}
@@ -107,6 +150,40 @@ func VerifyTap(tapBytes []byte) (VerifiedTap, error) {
 	hash := sha256.Sum256(canonicalTar)
 	result.PackageID = "sha256:" + hex.EncodeToString(hash[:])
 	return result, nil
+}
+
+// VerifyPackage validates both .tap archive bytes and a .tap.sig signature bundle.
+func VerifyPackage(tapBytes []byte, sigBytes []byte) (VerifiedPackage, error) {
+	canonicalTar, err := decompressTap(tapBytes)
+	if err != nil {
+		return VerifiedPackage{}, err
+	}
+
+	verifiedTap, manifestBytes, err := validateCanonicalTarWithManifest(canonicalTar)
+	if err != nil {
+		return VerifiedPackage{}, err
+	}
+
+	manifestName, manifestVersion, err := parseManifestIdentity(manifestBytes)
+	if err != nil {
+		return VerifiedPackage{}, err
+	}
+
+	hash := sha256.Sum256(canonicalTar)
+	packageID := "sha256:" + hex.EncodeToString(hash[:])
+	verifiedTap.PackageID = packageID
+
+	statements, err := verifySignatureBundle(sigBytes, packageID, hash[:], manifestName, manifestVersion)
+	if err != nil {
+		return VerifiedPackage{}, err
+	}
+
+	return VerifiedPackage{
+		Tap:             verifiedTap,
+		ManifestName:    manifestName,
+		ManifestVersion: manifestVersion,
+		Statements:      statements,
+	}, nil
 }
 
 func collectSourceFiles(root string) ([]string, error) {
@@ -239,7 +316,7 @@ func decompressTap(tapBytes []byte) ([]byte, error) {
 	return canonicalTar, nil
 }
 
-func validateCanonicalTar(canonicalTar []byte) (VerifiedTap, error) {
+func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte, error) {
 	tr := tar.NewReader(bytes.NewReader(canonicalTar))
 	seen := make(map[string]struct{})
 	seenCaseFolded := make(map[string]struct{})
@@ -248,6 +325,7 @@ func validateCanonicalTar(canonicalTar []byte) (VerifiedTap, error) {
 	lastName := ""
 	manifestCount := 0
 	mainCount := 0
+	var manifestBytes []byte
 
 	for {
 		hdr, err := tr.Next()
@@ -255,78 +333,401 @@ func validateCanonicalTar(canonicalTar []byte) (VerifiedTap, error) {
 			break
 		}
 		if err != nil {
-			return VerifiedTap{}, fmt.Errorf("%w: %v", ErrInvalidTarEntry, err)
+			return VerifiedTap{}, nil, fmt.Errorf("%w: %v", ErrInvalidTarEntry, err)
 		}
 
 		if hdr.Typeflag != tar.TypeReg {
-			return VerifiedTap{}, ErrInvalidTarEntry
+			return VerifiedTap{}, nil, ErrInvalidTarEntry
 		}
 		if hdr.Name <= lastName {
-			return VerifiedTap{}, ErrNonCanonicalOrder
+			return VerifiedTap{}, nil, ErrNonCanonicalOrder
 		}
 		lastName = hdr.Name
 
 		if err := validateArchivePath(hdr.Name); err != nil {
-			return VerifiedTap{}, err
+			return VerifiedTap{}, nil, err
 		}
 		if _, ok := seen[hdr.Name]; ok {
-			return VerifiedTap{}, ErrDuplicateArchivePath
+			return VerifiedTap{}, nil, ErrDuplicateArchivePath
 		}
 		seen[hdr.Name] = struct{}{}
 
 		folded := strings.ToLower(hdr.Name)
 		if _, ok := seenCaseFolded[folded]; ok {
-			return VerifiedTap{}, ErrCaseCollidingPath
+			return VerifiedTap{}, nil, ErrCaseCollidingPath
 		}
 		seenCaseFolded[folded] = struct{}{}
 
 		parts := strings.Split(hdr.Name, "/")
 		if len(parts) < 2 {
-			return VerifiedTap{}, ErrInvalidTarEntry
+			return VerifiedTap{}, nil, ErrInvalidTarEntry
 		}
 		entryPackage := parts[0]
 		if packageName == "" {
 			packageName = entryPackage
 		}
 		if entryPackage != packageName {
-			return VerifiedTap{}, ErrInvalidTarEntry
+			return VerifiedTap{}, nil, ErrInvalidTarEntry
 		}
 		rel := strings.Join(parts[1:], "/")
 		if err := validateTopLevelPath(rel); err != nil {
-			return VerifiedTap{}, err
+			return VerifiedTap{}, nil, err
 		}
 
 		if hdr.Mode != canonicalFileMode || hdr.Uid != 0 || hdr.Gid != 0 || hdr.Uname != "" || hdr.Gname != "" {
-			return VerifiedTap{}, ErrInvalidTarEntry
+			return VerifiedTap{}, nil, ErrInvalidTarEntry
 		}
 		if !hdr.ModTime.Equal(time.Unix(0, 0).UTC()) {
-			return VerifiedTap{}, ErrInvalidTarEntry
+			return VerifiedTap{}, nil, ErrInvalidTarEntry
+		}
+
+		payload, err := io.ReadAll(tr)
+		if err != nil {
+			return VerifiedTap{}, nil, fmt.Errorf("%w: %v", ErrInvalidTarEntry, err)
+		}
+		if int64(len(payload)) != hdr.Size {
+			return VerifiedTap{}, nil, ErrInvalidTarEntry
 		}
 
 		switch rel {
 		case "manifest.toml":
 			manifestCount++
+			manifestBytes = append([]byte(nil), payload...)
 		case "main.tal":
 			mainCount++
-		}
-
-		if _, err := io.Copy(io.Discard, tr); err != nil {
-			return VerifiedTap{}, fmt.Errorf("%w: %v", ErrInvalidTarEntry, err)
 		}
 		files = append(files, rel)
 	}
 
 	if packageName == "" {
-		return VerifiedTap{}, fmt.Errorf("%w: no entries", ErrInvalidTapFormat)
+		return VerifiedTap{}, nil, fmt.Errorf("%w: no entries", ErrInvalidTapFormat)
 	}
 	if manifestCount != 1 {
-		return VerifiedTap{}, ErrMissingManifest
+		return VerifiedTap{}, nil, ErrMissingManifest
 	}
 	if mainCount != 1 {
-		return VerifiedTap{}, ErrMissingMainTAL
+		return VerifiedTap{}, nil, ErrMissingMainTAL
 	}
 
-	return VerifiedTap{PackageName: packageName, Files: files}, nil
+	return VerifiedTap{PackageName: packageName, Files: files}, manifestBytes, nil
+}
+
+type manifestIdentity struct {
+	Name    string `toml:"name"`
+	Version string `toml:"version"`
+}
+
+type signatureBundle struct {
+	Schema    string               `toml:"schema"`
+	PackageID string               `toml:"package_id"`
+	Statement []signatureStatement `toml:"statement"`
+}
+
+type signatureStatement struct {
+	Role            string         `toml:"role"`
+	KeyID           string         `toml:"key_id"`
+	CreatedUnix     uint64         `toml:"created_unix"`
+	ManifestName    string         `toml:"manifest_name"`
+	ManifestVersion string         `toml:"manifest_version"`
+	Nonce           string         `toml:"nonce"`
+	Scope           map[string]any `toml:"scope"`
+	Sig             string         `toml:"sig"`
+}
+
+func parseManifestIdentity(manifestBytes []byte) (string, string, error) {
+	var manifest manifestIdentity
+	if _, err := toml.Decode(string(manifestBytes), &manifest); err != nil {
+		return "", "", fmt.Errorf("%w: %v", ErrInvalidManifest, err)
+	}
+	if strings.TrimSpace(manifest.Name) == "" || strings.TrimSpace(manifest.Version) == "" {
+		return "", "", ErrInvalidManifest
+	}
+	return manifest.Name, manifest.Version, nil
+}
+
+func verifySignatureBundle(sigBytes []byte, expectedPackageID string, packageHash []byte, expectedManifestName string, expectedManifestVersion string) ([]VerifiedStatement, error) {
+	if len(sigBytes) == 0 || len(sigBytes) > signatureBundleMaxBytes {
+		return nil, ErrInvalidSignatureBundle
+	}
+
+	var bundle signatureBundle
+	if _, err := toml.Decode(string(sigBytes), &bundle); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidSignatureBundle, err)
+	}
+
+	if bundle.Schema != signatureBundleSchema {
+		return nil, ErrInvalidSignatureBundle
+	}
+	if err := requireMaxStringLen(bundle.PackageID); err != nil {
+		return nil, err
+	}
+	if bundle.PackageID != expectedPackageID {
+		return nil, ErrSignaturePackageIDMismatch
+	}
+	if len(bundle.Statement) == 0 || len(bundle.Statement) > statementMaxCount {
+		return nil, ErrInvalidSignatureBundle
+	}
+
+	seen := make(map[string]struct{}, len(bundle.Statement))
+	authorSeen := false
+	verified := make([]VerifiedStatement, 0, len(bundle.Statement))
+
+	for _, stmt := range bundle.Statement {
+		if err := validateStatementFields(stmt); err != nil {
+			return nil, err
+		}
+		nonceRaw, err := parsePrefixedBase64URL(stmt.Nonce, "base64url:", statementNonceLen)
+		if err != nil {
+			return nil, err
+		}
+		sigRaw, err := parsePrefixedBase64(stmt.Sig, "base64:")
+		if err != nil {
+			return nil, err
+		}
+		publicKey, err := parseKeyID(stmt.KeyID)
+		if err != nil {
+			return nil, err
+		}
+		scope, err := normalizeScope(stmt.Role, stmt.Scope)
+		if err != nil {
+			return nil, err
+		}
+
+		payload, err := encodeStatementCBOR(stmt, scope, packageHash, nonceRaw)
+		if err != nil {
+			return nil, err
+		}
+		if !ed25519.Verify(publicKey, payload, sigRaw) {
+			return nil, ErrSignatureVerificationFailed
+		}
+
+		if stmt.ManifestName != expectedManifestName || stmt.ManifestVersion != expectedManifestVersion {
+			return nil, ErrInvalidSignatureStatement
+		}
+
+		nonceKey := base64.RawURLEncoding.EncodeToString(nonceRaw)
+		triple := stmt.KeyID + "\x00" + expectedPackageID + "\x00" + nonceKey
+		if _, ok := seen[triple]; ok {
+			return nil, ErrInvalidSignatureStatement
+		}
+		seen[triple] = struct{}{}
+
+		if stmt.Role == "author" {
+			authorSeen = true
+		}
+
+		verified = append(verified, VerifiedStatement{
+			Role:            stmt.Role,
+			KeyID:           stmt.KeyID,
+			CreatedUnix:     stmt.CreatedUnix,
+			ManifestName:    stmt.ManifestName,
+			ManifestVersion: stmt.ManifestVersion,
+			Nonce:           stmt.Nonce,
+			Scope:           scope,
+		})
+	}
+
+	if !authorSeen {
+		return nil, ErrMissingAuthorSignature
+	}
+
+	return verified, nil
+}
+
+func validateStatementFields(stmt signatureStatement) error {
+	if stmt.Role == "" || stmt.KeyID == "" || stmt.ManifestName == "" || stmt.ManifestVersion == "" || stmt.Nonce == "" || stmt.Sig == "" {
+		return ErrInvalidSignatureStatement
+	}
+	if err := requireMaxStringLen(stmt.Role, stmt.KeyID, stmt.ManifestName, stmt.ManifestVersion, stmt.Nonce, stmt.Sig); err != nil {
+		return err
+	}
+	return nil
+}
+
+func requireMaxStringLen(values ...string) error {
+	for _, value := range values {
+		if len(value) > stringFieldMaxBytes {
+			return ErrInvalidSignatureStatement
+		}
+	}
+	return nil
+}
+
+func parsePrefixedBase64URL(raw string, prefix string, expectedLen int) ([]byte, error) {
+	if !strings.HasPrefix(raw, prefix) {
+		return nil, ErrInvalidSignatureStatement
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(raw, prefix))
+	if err != nil {
+		return nil, ErrInvalidSignatureStatement
+	}
+	if len(decoded) != expectedLen {
+		return nil, ErrInvalidSignatureStatement
+	}
+	return decoded, nil
+}
+
+func parsePrefixedBase64(raw string, prefix string) ([]byte, error) {
+	if !strings.HasPrefix(raw, prefix) {
+		return nil, ErrInvalidSignatureStatement
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(raw, prefix))
+	if err != nil {
+		return nil, ErrInvalidSignatureStatement
+	}
+	if len(decoded) == 0 {
+		return nil, ErrInvalidSignatureStatement
+	}
+	return decoded, nil
+}
+
+func parseKeyID(keyID string) (ed25519.PublicKey, error) {
+	const prefix = "ed25519:"
+	if !strings.HasPrefix(keyID, prefix) {
+		return nil, ErrInvalidSignatureStatement
+	}
+	encoded := strings.TrimPrefix(keyID, prefix)
+	publicKey, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		publicKey, err = base64.StdEncoding.DecodeString(encoded)
+	}
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
+		return nil, ErrInvalidSignatureStatement
+	}
+	return ed25519.PublicKey(publicKey), nil
+}
+
+func normalizeScope(role string, input map[string]any) (map[string]any, error) {
+	if input == nil {
+		input = map[string]any{}
+	}
+
+	switch role {
+	case "author":
+		if len(input) != 0 {
+			return nil, ErrInvalidSignatureStatement
+		}
+		return map[string]any{}, nil
+	case "voucher":
+		allowed := map[string]struct{}{"tier": {}, "reviewed": {}, "tested_under": {}, "notes": {}, "expires_unix": {}}
+		for key := range input {
+			if _, ok := allowed[key]; !ok {
+				return nil, ErrInvalidSignatureStatement
+			}
+		}
+
+		tier, ok := input["tier"].(string)
+		if !ok || (tier != "full" && tier != "quarantine" && tier != "custom") {
+			return nil, ErrInvalidSignatureStatement
+		}
+
+		reviewedRaw, ok := input["reviewed"].([]any)
+		if !ok {
+			return nil, ErrInvalidSignatureStatement
+		}
+		reviewed := make([]string, 0, len(reviewedRaw))
+		for _, value := range reviewedRaw {
+			v, ok := value.(string)
+			if !ok {
+				return nil, ErrInvalidSignatureStatement
+			}
+			switch v {
+			case "manifest", "tal", "tests", "kernels", "models", "assets":
+				reviewed = append(reviewed, v)
+			default:
+				return nil, ErrInvalidSignatureStatement
+			}
+		}
+
+		testedUnder, ok := input["tested_under"].(string)
+		if !ok || (testedUnder != "sim-only" && testedUnder != "hardware" && testedUnder != "production") {
+			return nil, ErrInvalidSignatureStatement
+		}
+
+		normalized := map[string]any{
+			"tier":         tier,
+			"reviewed":     reviewed,
+			"tested_under": testedUnder,
+		}
+		if notesRaw, ok := input["notes"]; ok {
+			notes, ok := notesRaw.(string)
+			if !ok || len(notes) > voucherNotesMaxBytes {
+				return nil, ErrInvalidSignatureStatement
+			}
+			normalized["notes"] = notes
+		}
+		if expiresRaw, ok := input["expires_unix"]; ok {
+			expiresUnix, ok := asUint64(expiresRaw)
+			if !ok {
+				return nil, ErrInvalidSignatureStatement
+			}
+			normalized["expires_unix"] = expiresUnix
+		}
+		return normalized, nil
+	case "publisher":
+		allowed := map[string]struct{}{"via": {}}
+		for key := range input {
+			if _, ok := allowed[key]; !ok {
+				return nil, ErrInvalidSignatureStatement
+			}
+		}
+		via, ok := input["via"].(string)
+		if !ok || via == "" || len(via) > publisherViaMaxBytes {
+			return nil, ErrInvalidSignatureStatement
+		}
+		return map[string]any{"via": via}, nil
+	default:
+		return nil, ErrInvalidSignatureStatement
+	}
+}
+
+func asUint64(value any) (uint64, bool) {
+	switch v := value.(type) {
+	case int64:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case int:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case uint64:
+		return v, true
+	case float64:
+		if v < 0 || float64(uint64(v)) != v {
+			return 0, false
+		}
+		return uint64(v), true
+	default:
+		return 0, false
+	}
+}
+
+func encodeStatementCBOR(stmt signatureStatement, normalizedScope map[string]any, packageHash []byte, nonceRaw []byte) ([]byte, error) {
+	encMode, err := cbor.CanonicalEncOptions().EncMode()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidSignatureStatement, err)
+	}
+
+	payload := map[uint64]any{
+		0: uint64(1),
+		1: append([]byte(nil), packageHash...),
+		2: stmt.Role,
+		3: stmt.KeyID,
+		4: stmt.CreatedUnix,
+		5: stmt.ManifestName,
+		6: stmt.ManifestVersion,
+		7: normalizedScope,
+		8: append([]byte(nil), nonceRaw...),
+	}
+
+	b, err := encMode.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidSignatureStatement, err)
+	}
+	return b, nil
 }
 
 func validateArchivePath(name string) error {
