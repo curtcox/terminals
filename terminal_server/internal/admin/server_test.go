@@ -936,6 +936,52 @@ func TestReplAIEndpoints(t *testing.T) {
 	}
 }
 
+func TestStorePutTTLValidation(t *testing.T) {
+	h := testHandler(t)
+
+	badTTLReq := httptest.NewRequest(http.MethodPost, "/admin/api/store/put", strings.NewReader(url.Values{
+		"namespace": {"ns"},
+		"key":       {"k"},
+		"value":     {"v"},
+		"ttl":       {"invalid"},
+	}.Encode()))
+	badTTLReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	badTTLW := httptest.NewRecorder()
+	h.ServeHTTP(badTTLW, badTTLReq)
+	if badTTLW.Code != http.StatusBadRequest {
+		t.Fatalf("invalid ttl status = %d, want 400 body=%s", badTTLW.Code, badTTLW.Body.String())
+	}
+
+	zeroTTLReq := httptest.NewRequest(http.MethodPost, "/admin/api/store/put", strings.NewReader(url.Values{
+		"namespace": {"ns"},
+		"key":       {"k"},
+		"value":     {"v"},
+		"ttl":       {"0s"},
+	}.Encode()))
+	zeroTTLReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	zeroTTLW := httptest.NewRecorder()
+	h.ServeHTTP(zeroTTLW, zeroTTLReq)
+	if zeroTTLW.Code != http.StatusBadRequest {
+		t.Fatalf("zero ttl status = %d, want 400 body=%s", zeroTTLW.Code, zeroTTLW.Body.String())
+	}
+
+	goodTTLReq := httptest.NewRequest(http.MethodPost, "/admin/api/store/put", strings.NewReader(url.Values{
+		"namespace": {"ns"},
+		"key":       {"k"},
+		"value":     {"v"},
+		"ttl":       {"1m"},
+	}.Encode()))
+	goodTTLReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	goodTTLW := httptest.NewRecorder()
+	h.ServeHTTP(goodTTLW, goodTTLReq)
+	if goodTTLW.Code != http.StatusOK {
+		t.Fatalf("valid ttl status = %d, want 200 body=%s", goodTTLW.Code, goodTTLW.Body.String())
+	}
+	if !strings.Contains(goodTTLW.Body.String(), "expires_at") {
+		t.Fatalf("valid ttl response missing expires_at: %s", goodTTLW.Body.String())
+	}
+}
+
 func createTestAppPackage(t *testing.T, name, version string) string {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), name)

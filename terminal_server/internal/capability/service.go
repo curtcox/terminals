@@ -170,10 +170,11 @@ type searchableItem struct {
 
 // StoreRecord represents a key/value entry in a named namespace store.
 type StoreRecord struct {
-	Namespace string    `json:"namespace"`
-	Key       string    `json:"key"`
-	Value     string    `json:"value"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Namespace string     `json:"namespace"`
+	Key       string     `json:"key"`
+	Value     string     `json:"value"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
 // BusEvent represents a named event emitted on the internal event bus.
@@ -1322,7 +1323,8 @@ func (s *Service) ListRecent() []RecentItem {
 }
 
 // StorePut sets a key/value record in the given namespace.
-func (s *Service) StorePut(namespace, key, value string) StoreRecord {
+// ttl <= 0 means the record does not expire.
+func (s *Service) StorePut(namespace, key, value string, ttl time.Duration) StoreRecord {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	record := StoreRecord{
@@ -1330,6 +1332,10 @@ func (s *Service) StorePut(namespace, key, value string) StoreRecord {
 		Key:       strings.TrimSpace(key),
 		Value:     value,
 		UpdatedAt: s.now(),
+	}
+	if ttl > 0 {
+		expiresAt := s.now().Add(ttl)
+		record.ExpiresAt = &expiresAt
 	}
 	storeKey := record.Namespace + ":" + record.Key
 	s.store[storeKey] = record
@@ -1339,26 +1345,42 @@ func (s *Service) StorePut(namespace, key, value string) StoreRecord {
 
 // StoreGet retrieves a record by namespace and key, returning false if not found.
 func (s *Service) StoreGet(namespace, key string) (StoreRecord, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	storeKey := defaultIfBlank(namespace, "default") + ":" + strings.TrimSpace(key)
 	record, ok := s.store[storeKey]
+	if !ok {
+		return StoreRecord{}, false
+	}
+	if storeRecordExpired(record, s.now()) {
+		delete(s.store, storeKey)
+		return StoreRecord{}, false
+	}
 	return record, ok
 }
 
 // StoreList returns all records in the given namespace sorted by key.
 func (s *Service) StoreList(namespace string) []StoreRecord {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	ns := defaultIfBlank(namespace, "default")
 	out := make([]StoreRecord, 0)
-	for _, record := range s.store {
+	now := s.now()
+	for key, record := range s.store {
+		if storeRecordExpired(record, now) {
+			delete(s.store, key)
+			continue
+		}
 		if record.Namespace == ns {
 			out = append(out, record)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 	return out
+}
+
+func storeRecordExpired(record StoreRecord, now time.Time) bool {
+	return record.ExpiresAt != nil && !record.ExpiresAt.After(now)
 }
 
 // BusEmit emits a named event with an optional payload on the event bus.

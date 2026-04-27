@@ -113,7 +113,7 @@ func replCommandSpecs() []commandSpec {
 		{Name: "memory stream", Usage: "memory stream [scope] [--json]", Summary: "Show memory stream entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
 		{Name: "placement ls", Usage: "placement ls [--json]", Summary: "List placement metadata", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/placement"}},
 		{Name: "recent ls", Usage: "recent ls [--json]", Summary: "List recent activity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/recent"}},
-		{Name: "store put", Usage: "store put <namespace> <key> <value> [--json]", Summary: "Write typed key-value state", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
+		{Name: "store put", Usage: "store put <namespace> <key> <value> [--ttl <duration>] [--json]", Summary: "Write typed key-value state", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "store get", Usage: "store get <namespace> <key> [--json]", Summary: "Read typed key-value state", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "store ls", Usage: "store ls <namespace> [--json]", Summary: "List typed key-value state", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "bus emit", Usage: "bus emit <kind> <name> [payload] [--json]", Summary: "Emit typed bus events or intents", Classification: commandMutating, RelatedDocs: []string{"repl/commands/bus"}},
@@ -1318,15 +1318,19 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 	case "store":
 		switch sub {
 		case "put":
-			plain := nonFlagArgs(args[1:])
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--ttl")
 			if len(plain) < 3 {
-				return errors.New("usage: store put <namespace> <key> <value>")
+				return errors.New("usage: store put <namespace> <key> <value> [--ttl <duration>]")
 			}
-			body, err := s.postFormJSON(ctx, "/admin/api/store/put", url.Values{
+			form := url.Values{
 				"namespace": {plain[0]},
 				"key":       {plain[1]},
 				"value":     {strings.Join(plain[2:], " ")},
-			})
+			}
+			if ttl := strings.TrimSpace(flagValue(args[1:], "--ttl")); ttl != "" {
+				form.Set("ttl", ttl)
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/store/put", form)
 			if err != nil {
 				return err
 			}
@@ -2118,6 +2122,33 @@ func nonFlagArgs(args []string) []string {
 	for _, arg := range args {
 		trimmed := strings.TrimSpace(arg)
 		if strings.HasPrefix(trimmed, "--") {
+			continue
+		}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+func nonFlagArgsSkippingFlagValues(args []string, valueFlags ...string) []string {
+	skipValueFlags := make(map[string]struct{}, len(valueFlags))
+	for _, flag := range valueFlags {
+		skipValueFlags[strings.ToLower(strings.TrimSpace(flag))] = struct{}{}
+	}
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		trimmed := strings.TrimSpace(args[i])
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "--") {
+			if _, ok := skipValueFlags[strings.ToLower(trimmed)]; ok {
+				if i+1 < len(args) {
+					next := strings.TrimSpace(args[i+1])
+					if !strings.HasPrefix(next, "--") {
+						i++
+					}
+				}
+			}
 			continue
 		}
 		out = append(out, trimmed)

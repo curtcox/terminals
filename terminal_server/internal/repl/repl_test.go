@@ -204,6 +204,39 @@ func TestMutatingCommandsUseAdminAPIs(t *testing.T) {
 	}
 }
 
+func TestStorePutWithTTLPassesFormValues(t *testing.T) {
+	var capturedTTL string
+	var capturedValue string
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/store/put":
+			if err := req.ParseForm(); err != nil {
+				t.Fatalf("ParseForm() error = %v", err)
+			}
+			capturedTTL = req.Form.Get("ttl")
+			capturedValue = req.Form.Get("value")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("store put notes key1 hello world --ttl 5s\nexit\n")
+	var out bytes.Buffer
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if capturedTTL != "5s" {
+		t.Fatalf("store put ttl form value = %q, want 5s", capturedTTL)
+	}
+	if capturedValue != "hello world" {
+		t.Fatalf("store put value form value = %q, want hello world", capturedValue)
+	}
+}
+
 func TestAICommandsUseAdminAPIs(t *testing.T) {
 	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {

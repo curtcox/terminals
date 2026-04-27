@@ -1,10 +1,10 @@
 ---
 title: "REPL Capability Plan"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # REPL Capability Plan
@@ -22,6 +22,15 @@ runtime's capability surface against
 Detailed designs live in the per-family plans listed under
 **Component Plans** below; this document owns the overall shape,
 layering, acceptance rules, and authoring substrate.
+
+## Progress (2026-04-26)
+
+- Phase 1 slice shipped in code: `store put` now accepts optional
+  `--ttl <duration>` (REPL + admin API + capability service), and
+  expired records are pruned lazily on `store get` / `store ls`.
+- Added focused coverage in capability, admin, and REPL tests.
+- Remaining Phase 1 work from this plan: namespace inventory,
+  delete/watch/bind semantics, and richer bus filtering/replay.
 
 ## Problem
 

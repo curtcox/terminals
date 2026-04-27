@@ -939,7 +939,17 @@ func (h *Handler) handleStorePut(w http.ResponseWriter, req *http.Request) {
 		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
 		return
 	}
-	record := h.capability.StorePut(req.Form.Get("namespace"), req.Form.Get("key"), req.Form.Get("value"))
+	ttl := time.Duration(0)
+	ttlRaw := strings.TrimSpace(req.Form.Get("ttl"))
+	if ttlRaw != "" {
+		parsedTTL, err := time.ParseDuration(ttlRaw)
+		if err != nil || parsedTTL <= 0 {
+			h.writeJSONError(w, http.StatusBadRequest, "ttl must be a positive duration")
+			return
+		}
+		ttl = parsedTTL
+	}
+	record := h.capability.StorePut(req.Form.Get("namespace"), req.Form.Get("key"), req.Form.Get("value"), ttl)
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "record": record})
 }
 

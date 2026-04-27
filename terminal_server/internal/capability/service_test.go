@@ -3,6 +3,7 @@ package capability
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestResolveAudienceByGroupAndAlias(t *testing.T) {
@@ -346,6 +347,41 @@ func TestSearchTimelineRelatedRecentAndMemoryStream(t *testing.T) {
 	}
 	if stream[0].ID != memKitchen.ID {
 		t.Fatalf("MemoryStream(kitchen)[0].ID = %q, want %q", stream[0].ID, memKitchen.ID)
+	}
+}
+
+func TestStoreTTLExpirationAndPruning(t *testing.T) {
+	svc := NewService()
+	now := time.Date(2026, time.April, 26, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	stored := svc.StorePut("notes", "timer", "active", 2*time.Second)
+	if stored.ExpiresAt == nil {
+		t.Fatalf("StorePut with ttl should set expires_at")
+	}
+
+	record, ok := svc.StoreGet("notes", "timer")
+	if !ok {
+		t.Fatalf("StoreGet(notes,timer) before expiry = false, want true")
+	}
+	if record.ExpiresAt == nil || !record.ExpiresAt.Equal(now.Add(2*time.Second)) {
+		t.Fatalf("StoreGet(notes,timer) expires_at = %v, want %v", record.ExpiresAt, now.Add(2*time.Second))
+	}
+
+	now = now.Add(3 * time.Second)
+	if _, ok := svc.StoreGet("notes", "timer"); ok {
+		t.Fatalf("StoreGet(notes,timer) after expiry = true, want false")
+	}
+	if records := svc.StoreList("notes"); len(records) != 0 {
+		t.Fatalf("StoreList(notes) after expiry = %+v, want empty", records)
+	}
+}
+
+func TestStorePutWithoutTTLHasNoExpiration(t *testing.T) {
+	svc := NewService()
+	record := svc.StorePut("notes", "persist", "value", 0)
+	if record.ExpiresAt != nil {
+		t.Fatalf("StorePut without ttl should not set expires_at, got %v", record.ExpiresAt)
 	}
 }
 
