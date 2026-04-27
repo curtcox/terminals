@@ -86,6 +86,11 @@ layering, acceptance rules, and authoring substrate.
   command (`message rooms`) so `scripts run` now validates both
   substrate (`sim`/`store`/`ui`/`bus`) and Layer 2 command routing in
   one deterministic scripted path.
+- Extended the Phase 12 AA6 fixture with a mutating Layer 2 command
+  path (`message post phase12-room fixture-layer2-mutating`) plus
+  durable read-back (`message ls phase12-room` and admin assertion)
+  so `scripts run` now verifies persisted Layer 2 side effects in
+  addition to command routing.
 
 ## Problem
 

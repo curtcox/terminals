@@ -1,1 +1,1 @@
-For `plans/features/repl-capability/plan.md`, extend Phase 12 `scripts run` beyond read-only Layer 2 coverage by adding one mutating Layer 2 domain command path to the deterministic AA6 fixture and validating its durable side effects.
+For `plans/features/repl-capability/plan.md`, extend Phase 12 `scripts run` AA6 coverage with a second mutating Layer 2 domain-family path (outside `message`, e.g. `board post`) and validate its durable side effects with deterministic read-back assertions.

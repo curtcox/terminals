@@ -754,16 +754,20 @@ func TestSimDeviceInputAndScriptDryRunLifecycle(t *testing.T) {
 		t.Fatalf("ScriptDryRun counts = commands:%d skipped:%d, want 2/2", dryRun.CommandCount, dryRun.SkippedCount)
 	}
 
-	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage rooms")
+	run := svc.ScriptRun("fixtures/smoke.term", "# comment\n\nstore put notes k v\nui push d1 banner\nmessage post phase12-room fixture-layer2-mutating\nmessage ls phase12-room\nmessage rooms")
 	if run.Path != "fixtures/smoke.term" {
 		t.Fatalf("ScriptRun path = %q, want fixtures/smoke.term", run.Path)
 	}
-	if run.CommandCount != 3 || run.SkippedCount != 2 || run.ExecutedCount != 3 || run.FailedCount != 0 {
-		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 3/2/3/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
+	if run.CommandCount != 5 || run.SkippedCount != 2 || run.ExecutedCount != 5 || run.FailedCount != 0 {
+		t.Fatalf("ScriptRun counts = commands:%d skipped:%d executed:%d failed:%d, want 5/2/5/0", run.CommandCount, run.SkippedCount, run.ExecutedCount, run.FailedCount)
 	}
 	stored, ok := svc.StoreGet("notes", "k")
 	if !ok || stored.Value != "v" {
 		t.Fatalf("ScriptRun store side effect missing: ok=%v record=%+v", ok, stored)
+	}
+	messages := svc.ListMessages("phase12-room")
+	if len(messages) != 1 || messages[0].Text != "fixture-layer2-mutating" {
+		t.Fatalf("ScriptRun message side effect missing: %+v", messages)
 	}
 	snapshot, ok := svc.UISnapshot("d1")
 	if !ok || snapshot.DeviceID != "d1" {

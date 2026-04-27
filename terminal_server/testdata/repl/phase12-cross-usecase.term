@@ -4,7 +4,9 @@ store put phase12 status seeded --ttl 10s
 ui push sim-fixture {"type":"stack","children":[{"type":"text","text":"fixture-ready"}]} --root fixture-root
 sim input sim-fixture fixture-banner submit ack
 bus emit event fixture.signal sim-fixture:fixture-alert
+message post phase12-room fixture-layer2-mutating
 message rooms
+message ls phase12-room
 sim expect sim-fixture ui fixture-ready --within 2s
 sim expect sim-fixture message fixture-alert --within 2s
 sim record sim-fixture --duration 2s
