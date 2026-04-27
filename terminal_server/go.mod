@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/creack/pty v1.1.24
 	github.com/hashicorp/mdns v1.0.6
+	github.com/klauspost/compress v1.18.5
 	github.com/pion/rtp v1.10.1
 	github.com/pion/webrtc/v4 v4.2.11
 	golang.org/x/net v0.51.0

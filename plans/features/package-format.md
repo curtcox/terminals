@@ -1,10 +1,10 @@
 ---
 title: "Package Format"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-04-26
 ---
 
 # Package Format
@@ -541,3 +541,21 @@ limits, error codes) do not bump the schema.
   `tap-sig/2` will add an `alg` key (CBOR key 9) and widen the
   `key_id` prefix set. Until then, non-`ed25519:` prefixes are
   rejected at Gate 0.
+
+## Implementation Progress (2026-04-26)
+
+This plan moved to `building` with an initial shipped slice in server code:
+
+- Added `terminal_server/internal/apppackage` with deterministic `.tap` build
+  and pre-trust `.tap` verification APIs.
+- Implemented canonical tar validation guards for sorted archive paths,
+  duplicate/case-colliding paths, path traversal rejection, required
+  `manifest.toml` and `main.tal`, and top-level directory allow-list.
+- Implemented package identity as `sha256` over decompressed canonical tar
+  bytes (`package_id`), aligning pre-trust identity with this plan.
+- Added unit tests in `terminal_server/internal/apppackage/tap_test.go` for
+  deterministic builds and representative rejection paths.
+
+Remaining work includes full `.tap.sig` statement verification, strict zstd
+frame flag enforcement, and comprehensive golden-vector coverage described in
+ this plan.
