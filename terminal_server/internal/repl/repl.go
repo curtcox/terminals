@@ -139,6 +139,10 @@ func replCommandSpecs() []commandSpec {
 		{Name: "handlers ls", Usage: "handlers ls [--json]", Summary: "List registered input/event handlers", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/handlers"}},
 		{Name: "handlers on", Usage: "handlers on <selector> <action> (--run <command> | --emit <kind> <name> [payload]) [--json]", Summary: "Register an input/event handler", Classification: commandMutating, RelatedDocs: []string{"repl/commands/handlers"}},
 		{Name: "handlers off", Usage: "handlers off <handler-id> [--json]", Summary: "Remove one registered handler", Classification: commandMutating, RelatedDocs: []string{"repl/commands/handlers"}},
+		{Name: "scenarios ls", Usage: "scenarios ls [--json]", Summary: "List inline REPL-authored scenarios", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/scenarios"}},
+		{Name: "scenarios show", Usage: "scenarios show <name> [--json]", Summary: "Show one inline REPL-authored scenario", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/scenarios"}},
+		{Name: "scenarios define", Usage: "scenarios define <name> [--match <intent|intent=x|event=y>]... [--priority <p>] [--on-start <command>] [--on-input <command>] [--on-event <kind> <command>]... [--on-suspend <command>] [--on-resume <command>] [--on-stop <command>] [--json]", Summary: "Define or update one inline scenario", Classification: commandMutating, RelatedDocs: []string{"repl/commands/scenarios"}},
+		{Name: "scenarios undefine", Usage: "scenarios undefine <name> [--json]", Summary: "Remove one inline REPL-authored scenario", Classification: commandMutating, RelatedDocs: []string{"repl/commands/scenarios"}},
 		{Name: "activations ls", Usage: "activations ls [--json]", Summary: "List active scenario by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/activations"}},
 		{Name: "claims tree", Usage: "claims tree [--json]", Summary: "Show claims grouped by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/claims"}},
 		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
@@ -317,7 +321,7 @@ func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
 		return true, err
-	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
+	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "scenarios", "activations", "claims", "app", "config", "docs", "logs", "observe", "ai":
 		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
 	default:
 		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
@@ -1872,6 +1876,98 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		default:
 			return fmt.Errorf("unknown command: handlers %s", sub)
 		}
+	case "scenarios":
+		switch sub {
+		case "ls":
+			body, err := s.fetchJSON(ctx, "/admin/api/scenarios/inline")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			items, _ := body["scenarios"].([]any)
+			rows := make([][]string, 0, len(items))
+			for _, item := range items {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				intents := joinAnyStrings(row["match_intents"], ",")
+				events := joinAnyStrings(row["match_events"], ",")
+				rows = append(rows, []string{toString(row["name"]), toString(row["priority"]), intents, events})
+			}
+			return printTable(s.out, []string{"SCENARIO", "PRIORITY", "INTENTS", "EVENTS"}, rows)
+		case "show":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: scenarios show <name>")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/scenarios/inline", url.Values{"name": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "define":
+			def, err := parseScenariosDefineArgs(args[1:])
+			if err != nil {
+				return err
+			}
+			form := url.Values{"name": {def.name}}
+			for _, intent := range def.matchIntents {
+				form.Add("match_intent", intent)
+			}
+			for _, event := range def.matchEvents {
+				form.Add("match_event", event)
+			}
+			if def.priority != "" {
+				form.Set("priority", def.priority)
+			}
+			if def.onStart != "" {
+				form.Set("on_start", def.onStart)
+			}
+			if def.onInput != "" {
+				form.Set("on_input", def.onInput)
+			}
+			if def.onSuspend != "" {
+				form.Set("on_suspend", def.onSuspend)
+			}
+			if def.onResume != "" {
+				form.Set("on_resume", def.onResume)
+			}
+			if def.onStop != "" {
+				form.Set("on_stop", def.onStop)
+			}
+			for _, hook := range def.onEvents {
+				form.Add("on_event_kind", hook.kind)
+				form.Add("on_event_command", hook.command)
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/scenarios/inline/define", form)
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  action=define scenario=%s\n", def.name)
+			return err
+		case "undefine":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 {
+				return errors.New("usage: scenarios undefine <name>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/scenarios/inline/undefine", url.Values{"name": {plain[0]}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  deleted=%s scenario=%s\n", toString(body["deleted"]), plain[0])
+			return err
+		default:
+			return fmt.Errorf("unknown command: scenarios %s", sub)
+		}
 	case "activations":
 		if sub != "ls" {
 			return fmt.Errorf("unknown command: activations %s", sub)
@@ -2651,6 +2747,166 @@ func parseHandlersEmitValue(args []string) (kind string, name string, payload st
 		return kind, name, strings.Join(payloadParts, " ")
 	}
 	return "", "", ""
+}
+
+type scenarioDefineHook struct {
+	kind    string
+	command string
+}
+
+type scenarioDefineArgs struct {
+	name         string
+	matchIntents []string
+	matchEvents  []string
+	priority     string
+	onStart      string
+	onInput      string
+	onEvents     []scenarioDefineHook
+	onSuspend    string
+	onResume     string
+	onStop       string
+}
+
+func parseScenariosDefineArgs(args []string) (scenarioDefineArgs, error) {
+	out := scenarioDefineArgs{}
+	if len(args) == 0 {
+		return out, errors.New("usage: scenarios define <name> [--match <intent|intent=x|event=y>]... [--priority <p>] [--on-start <command>] [--on-input <command>] [--on-event <kind> <command>]... [--on-suspend <command>] [--on-resume <command>] [--on-stop <command>]")
+	}
+	out.name = strings.TrimSpace(args[0])
+	if out.name == "" || strings.HasPrefix(out.name, "--") {
+		return out, errors.New("usage: scenarios define <name> [--match <intent|intent=x|event=y>]... [--priority <p>] [--on-start <command>] [--on-input <command>] [--on-event <kind> <command>]... [--on-suspend <command>] [--on-resume <command>] [--on-stop <command>]")
+	}
+
+	for i := 1; i < len(args); i++ {
+		flag := strings.TrimSpace(args[i])
+		if flag == "" || !strings.HasPrefix(flag, "--") {
+			return out, fmt.Errorf("unexpected token in scenarios define: %s", args[i])
+		}
+		switch flag {
+		case "--json":
+			continue
+		case "--match":
+			if i+1 >= len(args) || strings.HasPrefix(strings.TrimSpace(args[i+1]), "--") {
+				return out, errors.New("usage: scenarios define <name> ... --match <intent|intent=x|event=y>")
+			}
+			for _, token := range strings.Split(strings.TrimSpace(args[i+1]), ",") {
+				token = strings.TrimSpace(token)
+				if token == "" {
+					continue
+				}
+				lower := strings.ToLower(token)
+				switch {
+				case strings.HasPrefix(lower, "event="):
+					out.matchEvents = append(out.matchEvents, strings.TrimSpace(token[len("event="):]))
+				case strings.HasPrefix(lower, "intent="):
+					out.matchIntents = append(out.matchIntents, strings.TrimSpace(token[len("intent="):]))
+				default:
+					out.matchIntents = append(out.matchIntents, token)
+				}
+			}
+			i++
+		case "--priority":
+			if i+1 >= len(args) || strings.HasPrefix(strings.TrimSpace(args[i+1]), "--") {
+				return out, errors.New("usage: scenarios define <name> ... --priority <p>")
+			}
+			out.priority = strings.TrimSpace(args[i+1])
+			i++
+		case "--on-start":
+			if i+1 >= len(args) || strings.HasPrefix(strings.TrimSpace(args[i+1]), "--") {
+				return out, errors.New("usage: scenarios define <name> ... --on-start <command>")
+			}
+			out.onStart = strings.TrimSpace(args[i+1])
+			i++
+		case "--on-input":
+			if i+1 >= len(args) || strings.HasPrefix(strings.TrimSpace(args[i+1]), "--") {
+				return out, errors.New("usage: scenarios define <name> ... --on-input <command>")
+			}
+			out.onInput = strings.TrimSpace(args[i+1])
+			i++
+		case "--on-event":
+			if i+2 >= len(args) {
+				return out, errors.New("usage: scenarios define <name> ... --on-event <kind> <command>")
+			}
+			kind := strings.TrimSpace(args[i+1])
+			if kind == "" || strings.HasPrefix(kind, "--") {
+				return out, errors.New("usage: scenarios define <name> ... --on-event <kind> <command>")
+			}
+			j := i + 2
+			parts := make([]string, 0, 2)
+			for ; j < len(args); j++ {
+				part := strings.TrimSpace(args[j])
+				if strings.HasPrefix(part, "--") {
+					break
+				}
+				parts = append(parts, part)
+			}
+			if len(parts) == 0 {
+				return out, errors.New("usage: scenarios define <name> ... --on-event <kind> <command>")
+			}
+			out.onEvents = append(out.onEvents, scenarioDefineHook{kind: kind, command: strings.Join(parts, " ")})
+			i = j - 1
+		case "--on-suspend":
+			if i+1 >= len(args) || strings.HasPrefix(strings.TrimSpace(args[i+1]), "--") {
+				return out, errors.New("usage: scenarios define <name> ... --on-suspend <command>")
+			}
+			out.onSuspend = strings.TrimSpace(args[i+1])
+			i++
+		case "--on-resume":
+			if i+1 >= len(args) || strings.HasPrefix(strings.TrimSpace(args[i+1]), "--") {
+				return out, errors.New("usage: scenarios define <name> ... --on-resume <command>")
+			}
+			out.onResume = strings.TrimSpace(args[i+1])
+			i++
+		case "--on-stop":
+			if i+1 >= len(args) || strings.HasPrefix(strings.TrimSpace(args[i+1]), "--") {
+				return out, errors.New("usage: scenarios define <name> ... --on-stop <command>")
+			}
+			out.onStop = strings.TrimSpace(args[i+1])
+			i++
+		default:
+			return out, fmt.Errorf("unknown flag for scenarios define: %s", flag)
+		}
+	}
+	out.matchIntents = uniqueStrings(out.matchIntents)
+	out.matchEvents = uniqueStrings(out.matchEvents)
+	return out, nil
+}
+
+func uniqueStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		exists := false
+		for _, existing := range out {
+			if strings.EqualFold(existing, trimmed) {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+func joinAnyStrings(value any, sep string) string {
+	items, ok := value.([]any)
+	if !ok {
+		return ""
+	}
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		text := strings.TrimSpace(toString(item))
+		if text == "" {
+			continue
+		}
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, sep)
 }
 
 func defaultIfBlank(value, fallback string) string {

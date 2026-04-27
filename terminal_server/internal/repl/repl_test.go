@@ -352,6 +352,10 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"handlers ls",
 		"handlers on",
 		"handlers off",
+		"scenarios ls",
+		"scenarios show",
+		"scenarios define",
+		"scenarios undefine",
 	}
 	for _, command := range commands {
 		if _, ok := DescribeCommand(command); !ok {
@@ -615,6 +619,14 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"status":"ok","handler":{"id":"handler-2","selector":"scenario=chat","action":"submit","emit_kind":"intent","emit_name":"alert_ack"}}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/handlers/off":
 			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/scenarios/inline" && req.URL.Query().Get("name") == "":
+			_, _ = w.Write([]byte(`{"scenarios":[{"name":"red_alert","priority":"high","match_intents":["red alert"],"match_events":["alarm.triggered"]}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/scenarios/inline" && req.URL.Query().Get("name") == "red_alert":
+			_, _ = w.Write([]byte(`{"scenario":{"name":"red_alert","priority":"high","on_start":"ui broadcast all_screens banner"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/scenarios/inline/define":
+			_, _ = w.Write([]byte(`{"status":"ok","scenario":{"name":"red_alert"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/scenarios/inline/undefine":
+			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
 		default:
 			http.NotFound(w, req)
 		}
@@ -680,6 +692,10 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"handlers ls",
 		"handlers on scenario=chat submit --emit intent alert_ack",
 		"handlers off handler-2",
+		"scenarios ls",
+		"scenarios show red_alert",
+		"scenarios define red_alert --match intent=red_alert --match event=alarm.triggered --priority high --on-start 'ui broadcast all_screens banner' --on-event alarm.triggered 'bus emit event alarm_ack'",
+		"scenarios undefine red_alert",
 		"exit",
 	}, "\n") + "\n")
 	var out bytes.Buffer
@@ -810,6 +826,15 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "handler-1") {
 		t.Fatalf("handlers ls output missing handler id: %q", text)
+	}
+	if !strings.Contains(text, "red_alert") {
+		t.Fatalf("scenarios output missing: %q", text)
+	}
+	if !strings.Contains(text, "action=define scenario=red_alert") {
+		t.Fatalf("scenarios define output missing: %q", text)
+	}
+	if !strings.Contains(text, "deleted=true scenario=red_alert") {
+		t.Fatalf("scenarios undefine output missing: %q", text)
 	}
 	if !strings.Contains(text, "handler=handler-2 selector=scenario=chat action=submit") {
 		t.Fatalf("handlers on output missing summary: %q", text)

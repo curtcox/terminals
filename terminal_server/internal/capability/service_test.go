@@ -612,6 +612,69 @@ func TestHandlerRegisterListAndOff(t *testing.T) {
 	}
 }
 
+func TestScenarioDefineListGetAndUndefine(t *testing.T) {
+	svc := NewService()
+
+	defined := svc.ScenarioDefine(InlineScenarioDefinition{
+		Name:         " Red_Alert ",
+		MatchIntents: []string{"red alert", " red alert ", "all hands"},
+		MatchEvents:  []string{"alarm.triggered"},
+		Priority:     "HIGH",
+		OnStart:      "ui broadcast all_screens '{\"type\":\"banner\"}'",
+		OnInput:      "handlers on scenario=red_alert submit --emit intent alert_ack",
+		OnEvents: []InlineScenarioEventHook{
+			{Kind: "alarm.triggered", Command: "bus emit event alarm.ack"},
+			{Kind: "", Command: "ignored"},
+		},
+		OnSuspend: "store put alerts red_alert suspended",
+		OnResume:  "store put alerts red_alert resumed",
+		OnStop:    "ui broadcast all_screens '{\"type\":\"clear\"}'",
+	})
+	if defined.Name != "red_alert" {
+		t.Fatalf("ScenarioDefine name = %q, want red_alert", defined.Name)
+	}
+	if defined.Priority != "high" {
+		t.Fatalf("ScenarioDefine priority = %q, want high", defined.Priority)
+	}
+	if len(defined.MatchIntents) != 2 {
+		t.Fatalf("ScenarioDefine intents = %+v, want 2 unique intents", defined.MatchIntents)
+	}
+	if len(defined.OnEvents) != 1 {
+		t.Fatalf("ScenarioDefine on_events = %+v, want 1 valid event hook", defined.OnEvents)
+	}
+
+	listed := svc.ScenarioList()
+	if len(listed) != 1 {
+		t.Fatalf("len(ScenarioList()) = %d, want 1", len(listed))
+	}
+	if listed[0].Name != "red_alert" {
+		t.Fatalf("ScenarioList()[0].Name = %q, want red_alert", listed[0].Name)
+	}
+
+	found, ok := svc.ScenarioGet("RED_ALERT")
+	if !ok {
+		t.Fatalf("ScenarioGet(RED_ALERT) = false, want true")
+	}
+	if found.OnStart == "" || found.OnStop == "" {
+		t.Fatalf("ScenarioGet hooks missing expected values: %+v", found)
+	}
+
+	updated := svc.ScenarioDefine(InlineScenarioDefinition{Name: "red_alert", Priority: "unknown"})
+	if updated.Priority != "normal" {
+		t.Fatalf("ScenarioDefine unknown priority = %q, want normal", updated.Priority)
+	}
+
+	if deleted := svc.ScenarioUndefine("red_alert"); !deleted {
+		t.Fatalf("ScenarioUndefine(red_alert) = false, want true")
+	}
+	if deleted := svc.ScenarioUndefine("red_alert"); deleted {
+		t.Fatalf("second ScenarioUndefine(red_alert) should be false")
+	}
+	if _, ok := svc.ScenarioGet("red_alert"); ok {
+		t.Fatalf("ScenarioGet(red_alert) after undefine = true, want false")
+	}
+}
+
 func TestMessageRoomThreadUnreadAcknowledgeLifecycle(t *testing.T) {
 	svc := NewService()
 

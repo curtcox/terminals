@@ -180,6 +180,9 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/handlers", h.handleHandlers)
 	mux.HandleFunc("/admin/api/handlers/on", h.handleHandlersOn)
 	mux.HandleFunc("/admin/api/handlers/off", h.handleHandlersOff)
+	mux.HandleFunc("/admin/api/scenarios/inline", h.handleInlineScenarios)
+	mux.HandleFunc("/admin/api/scenarios/inline/define", h.handleInlineScenarioDefine)
+	mux.HandleFunc("/admin/api/scenarios/inline/undefine", h.handleInlineScenarioUndefine)
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
@@ -1403,6 +1406,87 @@ func (h *Handler) handleHandlersOff(w http.ResponseWriter, req *http.Request) {
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
 }
 
+func (h *Handler) handleInlineScenarios(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	name := strings.TrimSpace(req.URL.Query().Get("name"))
+	if name == "" {
+		h.writeJSON(w, http.StatusOK, map[string]any{"scenarios": h.capability.ScenarioList()})
+		return
+	}
+	def, ok := h.capability.ScenarioGet(name)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "inline scenario not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"scenario": def})
+}
+
+func (h *Handler) handleInlineScenarioDefine(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	name := strings.TrimSpace(req.Form.Get("name"))
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	onEventKinds := req.Form["on_event_kind"]
+	onEventCommands := req.Form["on_event_command"]
+	if len(onEventKinds) != len(onEventCommands) {
+		h.writeJSONError(w, http.StatusBadRequest, "on_event_kind and on_event_command counts must match")
+		return
+	}
+	onEvents := make([]capability.InlineScenarioEventHook, 0, len(onEventKinds))
+	for i := range onEventKinds {
+		kind := strings.TrimSpace(onEventKinds[i])
+		command := strings.TrimSpace(onEventCommands[i])
+		if kind == "" || command == "" {
+			h.writeJSONError(w, http.StatusBadRequest, "on_event_kind and on_event_command values must be non-empty")
+			return
+		}
+		onEvents = append(onEvents, capability.InlineScenarioEventHook{Kind: kind, Command: command})
+	}
+	def := h.capability.ScenarioDefine(capability.InlineScenarioDefinition{
+		Name:         name,
+		MatchIntents: parseCSVValues(req.Form["match_intent"]),
+		MatchEvents:  parseCSVValues(req.Form["match_event"]),
+		Priority:     strings.TrimSpace(req.Form.Get("priority")),
+		OnStart:      strings.TrimSpace(req.Form.Get("on_start")),
+		OnInput:      strings.TrimSpace(req.Form.Get("on_input")),
+		OnEvents:     onEvents,
+		OnSuspend:    strings.TrimSpace(req.Form.Get("on_suspend")),
+		OnResume:     strings.TrimSpace(req.Form.Get("on_resume")),
+		OnStop:       strings.TrimSpace(req.Form.Get("on_stop")),
+	})
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "scenario": def})
+}
+
+func (h *Handler) handleInlineScenarioUndefine(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	name := strings.TrimSpace(req.Form.Get("name"))
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	deleted := h.capability.ScenarioUndefine(name)
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
+}
+
 func (h *Handler) handleReplAIProviders(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -1968,6 +2052,20 @@ func parseSelectors(raw string) []string {
 			continue
 		}
 		out = append(out, part)
+	}
+	return out
+}
+
+func parseCSVValues(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, raw := range values {
+		for _, part := range strings.Split(raw, ",") {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			out = append(out, trimmed)
+		}
 	}
 	return out
 }

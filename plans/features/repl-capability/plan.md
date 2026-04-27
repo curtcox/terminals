@@ -50,7 +50,11 @@ layering, acceptance rules, and authoring substrate.
   `handlers on` (`--run` and `--emit` targets), and `handlers off`
   are now wired through capability service + admin API + REPL
   command surface + docs, with focused tests.
-- Next planned slice is Phase 4 `scenarios define` / `undefine`.
+- Landed the Phase 4 inline authoring slice in code:
+  `scenarios ls`, `scenarios show`, `scenarios define`, and
+  `scenarios undefine` are now wired through capability service +
+  admin API + REPL command surface + docs, with focused tests.
+- Next planned slice is Phase 5 `sim` and `scripts`.
 
 ## Problem
 
