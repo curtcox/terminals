@@ -519,6 +519,70 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	}
 }
 
+func TestRuntimeRetryMigrationRequiresDrainReadiness(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_drain_guard")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := `name = "migrate_drain_guard"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "incompatible"
+drain_policy = "drain"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_drain_guard")
+	if !errors.Is(err, ErrMigrationDrainTimeout) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationDrainTimeout", err)
+	}
+	if status.Verdict != "aborted" {
+		t.Fatalf("RetryMigration() verdict = %q, want aborted", status.Verdict)
+	}
+	if status.LastError != ErrMigrationDrainTimeout.Error() {
+		t.Fatalf("RetryMigration() last_error = %q, want %q", status.LastError, ErrMigrationDrainTimeout.Error())
+	}
+	if status.StepsCompleted != 0 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+	}
+
+	if err := runtime.SetMigrationDrainReady("migrate_drain_guard", true); err != nil {
+		t.Fatalf("SetMigrationDrainReady() error = %v", err)
+	}
+
+	status, err = runtime.RetryMigration("migrate_drain_guard")
+	if err != nil {
+		t.Fatalf("RetryMigration() after drain ready error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() after drain ready verdict = %q, want ok", status.Verdict)
+	}
+	if status.StepsCompleted != 1 {
+		t.Fatalf("RetryMigration() after drain ready steps_completed = %d, want 1", status.StepsCompleted)
+	}
+}
+
 func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_reconcile")

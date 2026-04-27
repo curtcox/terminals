@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added runtime drain-guard enforcement for incompatible
+  migration steps in `terminal_server/internal/appruntime/runtime.go`.
+  `RetryMigration` now aborts with
+  `ErrMigrationDrainTimeout` when a package declares
+  `[[migrate.step]] compatibility = "incompatible"` with
+  `drain_policy = "drain"` and drain readiness has not been
+  explicitly marked; step progress is preserved in that blocked
+  state. Added `SetMigrationDrainReady` as an executor/orchestrator
+  hook and regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationRequiresDrainReadiness`) for blocked
+  and resumed retry paths.
 - 2026-04-27: Implemented `apps migrate logs` operator surface
   across runtime-backed admin API and REPL. Added
   `/admin/api/apps/migrate/logs` in

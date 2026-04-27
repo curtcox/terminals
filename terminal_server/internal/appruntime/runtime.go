@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
 const (
@@ -47,6 +49,8 @@ var (
 	ErrRollbackModeInvalid = errors.New("rollback data mode is invalid")
 	// ErrRollbackKeepDataRequiresDowngrade indicates keep-data rollback requires downgrade steps.
 	ErrRollbackKeepDataRequiresDowngrade = errors.New("rollback with keep-data requires migrate/downgrade steps")
+	// ErrMigrationDrainTimeout indicates incompatible migration drain prerequisites were not satisfied.
+	ErrMigrationDrainTimeout = errors.New("migration drain timeout elapsed before executor run")
 )
 
 const (
@@ -213,6 +217,8 @@ type migrationState struct {
 	JournalPath        string
 	ReconciliationPath string
 	ExecutorReady      bool
+	RequiresDrain      bool
+	DrainReady         bool
 	PendingRecords     map[string]string
 }
 
@@ -372,6 +378,12 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		r.migrations[name] = state
 		return statusFromState(pkg, state), ErrMigrationReconcilePending
 	}
+	if state.RequiresDrain && !state.DrainReady {
+		state.Verdict = "aborted"
+		state.LastError = ErrMigrationDrainTimeout.Error()
+		r.migrations[name] = state
+		return statusFromState(pkg, state), ErrMigrationDrainTimeout
+	}
 
 	state.Verdict = "running"
 	state.LastError = ""
@@ -381,6 +393,23 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	state.JournalPath = migrationJournalPath(pkg)
 	r.migrations[name] = state
 	return statusFromState(pkg, state), nil
+}
+
+// SetMigrationDrainReady updates whether incompatible migration steps are safe to execute.
+func (r *Runtime) SetMigrationDrainReady(name string, ready bool) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, state, err := r.requireMigrationStateLocked(name)
+	if err != nil {
+		return err
+	}
+	state.DrainReady = ready
+	if ready && state.Verdict == "aborted" && state.LastError == ErrMigrationDrainTimeout.Error() {
+		state.Verdict = "idle"
+		state.LastError = ""
+	}
+	r.migrations[name] = state
+	return nil
 }
 
 // AbortMigration aborts an in-flight app migration run.
@@ -478,17 +507,45 @@ func (r *Runtime) requireMigrationStateLocked(name string) (Package, migrationSt
 
 func newMigrationState(pkg Package) migrationState {
 	steps := countMigrationSteps(pkg.RootPath)
+	requiresDrain := packageRequiresDrainMigration(pkg.RootPath)
 	state := migrationState{
 		StepsPlanned:   steps,
 		StepsCompleted: 0,
 		LastStep:       0,
 		Verdict:        "idle",
 		ExecutorReady:  steps > 0,
+		RequiresDrain:  requiresDrain,
+		DrainReady:     !requiresDrain,
 	}
 	if steps > 0 {
 		state.JournalPath = migrationJournalPath(pkg)
 	}
 	return state
+}
+
+type runtimeMigrationManifest struct {
+	Migrate struct {
+		Step []struct {
+			Compatibility string `toml:"compatibility"`
+			DrainPolicy   string `toml:"drain_policy"`
+		} `toml:"step"`
+	} `toml:"migrate"`
+}
+
+func packageRequiresDrainMigration(root string) bool {
+	manifestPath := filepath.Join(root, "manifest.toml")
+	var manifest runtimeMigrationManifest
+	if _, err := toml.DecodeFile(manifestPath, &manifest); err != nil {
+		return false
+	}
+	for _, step := range manifest.Migrate.Step {
+		compatibility := strings.ToLower(strings.TrimSpace(step.Compatibility))
+		drainPolicy := strings.ToLower(strings.TrimSpace(step.DrainPolicy))
+		if compatibility == "incompatible" && drainPolicy == "drain" {
+			return true
+		}
+	}
+	return false
 }
 
 func countMigrationSteps(root string) int {
