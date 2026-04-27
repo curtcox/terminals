@@ -2570,12 +2570,14 @@ func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Requ
 	var (
 		status appruntime.MigrationStatus
 		err    error
+		target string
 	)
 	switch action {
 	case "retry":
 		status, err = h.appRuntime.RetryMigration(name)
 	case "abort":
-		status, err = h.appRuntime.AbortMigration(name)
+		target = strings.TrimSpace(req.FormValue("to"))
+		status, err = h.appRuntime.AbortMigration(name, target)
 	case "reconcile":
 		recordID := strings.TrimSpace(req.FormValue("record_id"))
 		resolution := strings.TrimSpace(req.FormValue("resolution"))
@@ -2603,12 +2605,19 @@ func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	h.writeJSON(w, http.StatusOK, map[string]any{
+	response := map[string]any{
 		"status":    "ok",
 		"action":    action,
 		"app":       name,
 		"migration": mapMigrationStatus(status),
-	})
+	}
+	if action == "abort" {
+		if strings.TrimSpace(target) == "" {
+			target = appruntime.MigrationAbortToCheckpoint
+		}
+		response["to"] = target
+	}
+	h.writeJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) writeMigrationError(w http.ResponseWriter, err error) {

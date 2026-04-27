@@ -41,6 +41,15 @@ var (
 	ErrMigrationRecordNotFound = errors.New("migration reconciliation record not found")
 	// ErrMigrationResolutionInvalid indicates a reconciliation resolution is unsupported.
 	ErrMigrationResolutionInvalid = errors.New("migration reconciliation resolution is invalid")
+	// ErrMigrationAbortTargetInvalid indicates an abort target is unsupported.
+	ErrMigrationAbortTargetInvalid = errors.New("migration abort target is invalid")
+)
+
+const (
+	// MigrationAbortToCheckpoint aborts the current step and rewinds to the last checkpoint.
+	MigrationAbortToCheckpoint = "checkpoint"
+	// MigrationAbortToBaseline aborts the migration run and rewinds progress to pre-upgrade baseline.
+	MigrationAbortToBaseline = "baseline"
 )
 
 var allowedPermissions = map[string]struct{}{
@@ -327,12 +336,19 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 }
 
 // AbortMigration aborts an in-flight app migration run.
-func (r *Runtime) AbortMigration(name string) (MigrationStatus, error) {
+func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	pkg, state, err := r.requireMigrationStateLocked(name)
 	if err != nil {
 		return MigrationStatus{}, err
+	}
+	target = strings.TrimSpace(target)
+	if target == "" {
+		target = MigrationAbortToCheckpoint
+	}
+	if target != MigrationAbortToCheckpoint && target != MigrationAbortToBaseline {
+		return statusFromState(pkg, state), fmt.Errorf("%w: %s", ErrMigrationAbortTargetInvalid, target)
 	}
 	if !state.ExecutorReady {
 		return statusFromState(pkg, state), nil
@@ -340,13 +356,19 @@ func (r *Runtime) AbortMigration(name string) (MigrationStatus, error) {
 
 	state.Verdict = "aborted"
 	state.LastError = "aborted by operator"
-	if state.StepsCompleted > 0 {
-		state.StepsCompleted--
-	}
-	if state.StepsCompleted < 0 {
+	if target == MigrationAbortToBaseline {
 		state.StepsCompleted = 0
+		state.LastStep = 0
+		state.LastError = "aborted to baseline by operator"
+	} else {
+		if state.StepsCompleted > 0 {
+			state.StepsCompleted--
+		}
+		if state.StepsCompleted < 0 {
+			state.StepsCompleted = 0
+		}
+		state.LastStep = state.StepsCompleted
 	}
-	state.LastStep = state.StepsCompleted
 	state.PendingRecords = nil
 	state.ReconciliationPath = ""
 	r.migrations[name] = state

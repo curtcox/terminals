@@ -282,6 +282,39 @@ func TestAppsMigrateRetryUsesAdminAPI(t *testing.T) {
 	}
 }
 
+func TestAppsMigrateAbortUsesAdminAPIToTarget(t *testing.T) {
+	var capturedTo string
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/apps/migrate/abort":
+			if err := req.ParseForm(); err != nil {
+				t.Fatalf("ParseForm() error = %v", err)
+			}
+			capturedTo = req.Form.Get("to")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","action":"abort","app":"sound_watch","to":"baseline","migration":{"app":"sound_watch","verdict":"aborted"}}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("apps migrate abort sound_watch --to baseline\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if capturedTo != "baseline" {
+		t.Fatalf("apps migrate abort to = %q, want baseline", capturedTo)
+	}
+	text := out.String()
+	if !strings.Contains(text, "OK  app=sound_watch action=abort to=baseline status=ok") {
+		t.Fatalf("missing apps migrate abort output: %q", text)
+	}
+}
+
 func TestStorePutWithTTLPassesFormValues(t *testing.T) {
 	var capturedTTL string
 	var capturedValue string

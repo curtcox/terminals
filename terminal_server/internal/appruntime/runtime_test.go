@@ -335,7 +335,7 @@ func TestRuntimeMigrationStatusAndActions(t *testing.T) {
 		t.Fatalf("RetryMigration() verdict = %q, want idle", status.Verdict)
 	}
 
-	status, err = runtime.AbortMigration("migrate_stub")
+	status, err = runtime.AbortMigration("migrate_stub", "")
 	if err != nil {
 		t.Fatalf("AbortMigration() error = %v", err)
 	}
@@ -404,7 +404,7 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 		t.Fatalf("RetryMigration() journal_path empty")
 	}
 
-	status, err = runtime.AbortMigration("migrate_live")
+	status, err = runtime.AbortMigration("migrate_live", MigrationAbortToCheckpoint)
 	if err != nil {
 		t.Fatalf("AbortMigration() error = %v", err)
 	}
@@ -416,6 +416,32 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	}
 	if status.LastStep != 1 {
 		t.Fatalf("AbortMigration() last_step = %d, want 1", status.LastStep)
+	}
+
+	status, err = runtime.RetryMigration("migrate_live")
+	if err != nil {
+		t.Fatalf("RetryMigration() second run error = %v", err)
+	}
+	if status.StepsCompleted != 2 {
+		t.Fatalf("RetryMigration() second run steps_completed = %d, want 2", status.StepsCompleted)
+	}
+
+	status, err = runtime.AbortMigration("migrate_live", MigrationAbortToBaseline)
+	if err != nil {
+		t.Fatalf("AbortMigration(to baseline) error = %v", err)
+	}
+	if status.StepsCompleted != 0 {
+		t.Fatalf("AbortMigration(to baseline) steps_completed = %d, want 0", status.StepsCompleted)
+	}
+	if status.LastStep != 0 {
+		t.Fatalf("AbortMigration(to baseline) last_step = %d, want 0", status.LastStep)
+	}
+	if status.LastError != "aborted to baseline by operator" {
+		t.Fatalf("AbortMigration(to baseline) last_error = %q, want %q", status.LastError, "aborted to baseline by operator")
+	}
+
+	if _, err := runtime.AbortMigration("migrate_live", "invalid_target"); !errors.Is(err, ErrMigrationAbortTargetInvalid) {
+		t.Fatalf("AbortMigration(invalid target) error = %v, want ErrMigrationAbortTargetInvalid", err)
 	}
 }
 

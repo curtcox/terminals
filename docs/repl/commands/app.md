@@ -6,7 +6,7 @@
 - `app rollback <app> [--json]`
 - `apps migrate status <app> [--json]`
 - `apps migrate retry <app> [--json]`
-- `apps migrate abort <app> [--json]`
+- `apps migrate abort <app> [--to <checkpoint|baseline>] [--json]`
 - `apps migrate reconcile <app> <record-id> <resolution> [--json]`
 
 `apps migrate status` reports the migration verdict, step progress, `last_step`,

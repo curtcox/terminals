@@ -165,7 +165,7 @@ func replCommandSpecs() []commandSpec {
 		{Name: "app rollback", Usage: "app rollback <app> [--json]", Summary: "Rollback an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate status", Usage: "apps migrate status <app> [--json]", Summary: "Show migration status for one app", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate retry", Usage: "apps migrate retry <app> [--json]", Summary: "Retry app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
-		{Name: "apps migrate abort", Usage: "apps migrate abort <app> [--json]", Summary: "Abort in-flight app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "apps migrate abort", Usage: "apps migrate abort <app> [--to <checkpoint|baseline>] [--json]", Summary: "Abort in-flight app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate reconcile", Usage: "apps migrate reconcile <app> <record-id> <resolution> [--json]", Summary: "Resolve one migration reconciliation record", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps keys ls", Usage: "apps keys ls [--json]", Summary: "List trust-store keys", Classification: commandReadOnly},
 		{Name: "apps keys show", Usage: "apps keys show <key-id> [--json]", Summary: "Show one trust key", Classification: commandReadOnly},
@@ -2427,24 +2427,47 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				)
 				return err
 			case "retry", "abort":
-				plain := nonFlagArgs(args[2:])
+				plain := nonFlagArgsSkippingFlagValues(args[2:], "--to")
 				if len(plain) < 1 {
+					if migrateSub == "abort" {
+						return errors.New("usage: apps migrate abort <app> [--to <checkpoint|baseline>]")
+					}
 					return fmt.Errorf("usage: apps migrate %s <app>", migrateSub)
 				}
 				appName := strings.TrimSpace(plain[0])
 				if appName == "" {
+					if migrateSub == "abort" {
+						return errors.New("usage: apps migrate abort <app> [--to <checkpoint|baseline>]")
+					}
 					return fmt.Errorf("usage: apps migrate %s <app>", migrateSub)
 				}
 				route := "/admin/api/apps/migrate/retry"
+				values := url.Values{"app": {appName}}
+				target := ""
 				if migrateSub == "abort" {
 					route = "/admin/api/apps/migrate/abort"
+					target = strings.TrimSpace(flagValue(args[2:], "--to"))
+					if target != "" {
+						values.Set("to", target)
+					}
 				}
-				body, err := s.postFormJSON(ctx, route, url.Values{"app": {appName}})
+				body, err := s.postFormJSON(ctx, route, values)
 				if err != nil {
 					return err
 				}
 				if jsonOut {
 					return writeJSON(s.out, body)
+				}
+				if migrateSub == "abort" {
+					resolvedTarget := toString(body["to"])
+					if resolvedTarget == "" {
+						resolvedTarget = target
+					}
+					if resolvedTarget == "" {
+						resolvedTarget = "checkpoint"
+					}
+					_, err = fmt.Fprintf(s.out, "OK  app=%s action=%s to=%s status=%s\n", appName, migrateSub, resolvedTarget, toString(body["status"]))
+					return err
 				}
 				_, err = fmt.Fprintf(s.out, "OK  app=%s action=%s status=%s\n", appName, migrateSub, toString(body["status"]))
 				return err

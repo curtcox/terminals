@@ -465,6 +465,32 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	if fmt.Sprint(retryMigration["last_error"]) != "" {
 		t.Fatalf("migrate retry last_error = %v, want empty", retryMigration["last_error"])
 	}
+
+	abortReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/migrate/abort", strings.NewReader(url.Values{"app": {"sound_watch"}, "to": {"baseline"}}.Encode()))
+	abortReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	abortW := httptest.NewRecorder()
+	h.ServeHTTP(abortW, abortReq)
+	if abortW.Code != http.StatusOK {
+		t.Fatalf("migrate abort code = %d, want 200 body=%s", abortW.Code, abortW.Body.String())
+	}
+	var abortBody map[string]any
+	if err := json.Unmarshal(abortW.Body.Bytes(), &abortBody); err != nil {
+		t.Fatalf("decode migrate abort: %v", err)
+	}
+	if abortBody["status"] != "ok" {
+		t.Fatalf("migrate abort status = %v, want ok", abortBody["status"])
+	}
+	if fmt.Sprint(abortBody["to"]) != "baseline" {
+		t.Fatalf("migrate abort to = %v, want baseline", abortBody["to"])
+	}
+
+	invalidAbortReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/migrate/abort", strings.NewReader(url.Values{"app": {"sound_watch"}, "to": {"bad"}}.Encode()))
+	invalidAbortReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	invalidAbortW := httptest.NewRecorder()
+	h.ServeHTTP(invalidAbortW, invalidAbortReq)
+	if invalidAbortW.Code != http.StatusBadRequest {
+		t.Fatalf("invalid migrate abort code = %d, want 400 body=%s", invalidAbortW.Code, invalidAbortW.Body.String())
+	}
 }
 
 func TestCapabilityClosureEndpoints(t *testing.T) {

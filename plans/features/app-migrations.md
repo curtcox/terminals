@@ -21,6 +21,15 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Implemented operator-selectable migration abort targets
+  (`checkpoint` vs `baseline`) across runtime, admin API, and REPL.
+  `apps migrate abort` now accepts `--to <checkpoint|baseline>`,
+  runtime enforces target validation and baseline rewinds progress to
+  step 0, and admin responses surface the resolved `to` value for
+  operator visibility. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`,
+  `terminal_server/internal/admin/server_test.go`, and
+  `terminal_server/internal/repl/repl_test.go`.
 - 2026-04-27: Enforced rollback guard semantics in runtime so
   `RollbackPackage` refuses while migration reconciliation is
   pending (`verdict == reconcile_pending` or unresolved pending
