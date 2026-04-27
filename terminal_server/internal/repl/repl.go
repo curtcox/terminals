@@ -164,6 +164,7 @@ func replCommandSpecs() []commandSpec {
 		{Name: "app reload", Usage: "app reload <app> [--json]", Summary: "Reload an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "app rollback", Usage: "app rollback <app> [--keep-data|--archive-data|--purge] [--json]", Summary: "Rollback an app package", Classification: commandMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate status", Usage: "apps migrate status <app> [--json]", Summary: "Show migration status for one app", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "apps migrate logs", Usage: "apps migrate logs <app> [--step <n>] [--json]", Summary: "Tail structured migration logs for one app", Classification: commandOperational, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate retry", Usage: "apps migrate retry <app> [--json]", Summary: "Retry app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate abort", Usage: "apps migrate abort <app> [--to <checkpoint|baseline>] [--json]", Summary: "Abort in-flight app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate reconcile", Usage: "apps migrate reconcile <app> <record-id> <resolution> [--json]", Summary: "Resolve one migration reconciliation record", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
@@ -2451,6 +2452,44 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 					recordSummary,
 					toString(migration["last_error"]),
 					migration["executor_ready"],
+				)
+				return err
+			case "logs":
+				plain := nonFlagArgsSkippingFlagValues(args[2:], "--step")
+				if len(plain) < 1 {
+					return errors.New("usage: apps migrate logs <app> [--step <n>]")
+				}
+				appName := strings.TrimSpace(plain[0])
+				if appName == "" {
+					return errors.New("usage: apps migrate logs <app> [--step <n>]")
+				}
+				values := url.Values{"app": {appName}}
+				if stepRaw := strings.TrimSpace(flagValue(args[2:], "--step")); stepRaw != "" {
+					step, err := strconv.Atoi(stepRaw)
+					if err != nil || step <= 0 {
+						return errors.New("usage: apps migrate logs <app> [--step <n>]")
+					}
+					values.Set("step", strconv.Itoa(step))
+				}
+				body, err := s.fetchJSONQuery(ctx, "/admin/api/apps/migrate/logs", values)
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				linesAny, _ := body["lines"].([]any)
+				for _, line := range linesAny {
+					if _, err := fmt.Fprintln(s.out, toString(line)); err != nil {
+						return err
+					}
+				}
+				_, err = fmt.Fprintf(
+					s.out,
+					"OK  app=%s lines=%d journal_exists=%v\n",
+					appName,
+					len(linesAny),
+					body["journal_exists"],
 				)
 				return err
 			case "retry", "abort":

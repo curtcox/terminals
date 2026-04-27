@@ -289,6 +289,39 @@ func TestAppsMigrateStatusUsesAdminAPI(t *testing.T) {
 	}
 }
 
+func TestAppsMigrateLogsUsesAdminAPIStepFilter(t *testing.T) {
+	var capturedStep string
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/apps/migrate/logs":
+			capturedStep = req.URL.Query().Get("step")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","app":"sound_watch","journal_path":"apps/sound_watch/migrate/r7/journal.ndjson","journal_exists":true,"line_count":1,"lines":["{\"step\":2,\"event\":\"commit\"}"]}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("apps migrate logs sound_watch --step 2\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if capturedStep != "2" {
+		t.Fatalf("apps migrate logs step = %q, want 2", capturedStep)
+	}
+	text := out.String()
+	if !strings.Contains(text, `{"step":2,"event":"commit"}`) {
+		t.Fatalf("missing apps migrate logs line output: %q", text)
+	}
+	if !strings.Contains(text, "OK  app=sound_watch lines=1 journal_exists=true") {
+		t.Fatalf("missing apps migrate logs summary output: %q", text)
+	}
+}
+
 func TestAppsMigrateRetryUsesAdminAPI(t *testing.T) {
 	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {

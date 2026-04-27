@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Implemented `apps migrate logs` operator surface
+  across runtime-backed admin API and REPL. Added
+  `/admin/api/apps/migrate/logs` in
+  `terminal_server/internal/admin/server.go` with optional
+  `step` filtering and bounded tail reads from migration
+  journals, then wired `apps migrate logs <app> [--step <n>]`
+  in `terminal_server/internal/repl/repl.go`. Added regression
+  coverage in `terminal_server/internal/admin/server_test.go`
+  and `terminal_server/internal/repl/repl_test.go`, and
+  documented command usage in `docs/repl/commands/app.md`.
 - 2026-04-27: Enforced reconciliation guard semantics for
   migration abort/rewind in runtime so `AbortMigration` now
   refuses while reconciliation is pending (`verdict ==

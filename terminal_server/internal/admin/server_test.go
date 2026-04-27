@@ -349,6 +349,12 @@ func testHandler(t *testing.T, cfgOverride ...config.Config) http.Handler {
 
 func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	appRoot := createTestAppPackage(t, "sound_watch", "1.0.0")
+	if err := os.MkdirAll(filepath.Join(appRoot, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appRoot, "migrate", "0001_v1_to_v2.tal"), []byte("def migrate():\n    return\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate step) error = %v", err)
+	}
 	appRuntime := appruntime.NewRuntime()
 	if _, err := appRuntime.LoadPackage(context.Background(), appRoot); err != nil {
 		t.Fatalf("LoadPackage(v1) error = %v", err)
@@ -443,6 +449,42 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	if len(pendingRecords) != 0 {
 		t.Fatalf("migration pending_records len = %d, want 0", len(pendingRecords))
 	}
+	journalPath := fmt.Sprint(migration["journal_path"])
+	if journalPath == "" {
+		t.Fatalf("migration journal_path empty")
+	}
+	journalFile := filepath.Join(appRoot, filepath.FromSlash(journalPath))
+	if err := os.MkdirAll(filepath.Dir(journalFile), 0o755); err != nil {
+		t.Fatalf("MkdirAll(journal dir) error = %v", err)
+	}
+	if err := os.WriteFile(journalFile, []byte("{\"step\":1,\"event\":\"start\"}\n{\"step\":2,\"event\":\"commit\"}\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(journal) error = %v", err)
+	}
+
+	logsReq := httptest.NewRequest(http.MethodGet, "/admin/api/apps/migrate/logs?app=sound_watch&step=2", nil)
+	logsW := httptest.NewRecorder()
+	h.ServeHTTP(logsW, logsReq)
+	if logsW.Code != http.StatusOK {
+		t.Fatalf("migrate logs code = %d, want 200 body=%s", logsW.Code, logsW.Body.String())
+	}
+	var logsBody map[string]any
+	if err := json.Unmarshal(logsW.Body.Bytes(), &logsBody); err != nil {
+		t.Fatalf("decode migrate logs: %v", err)
+	}
+	if fmt.Sprint(logsBody["journal_exists"]) != "true" {
+		t.Fatalf("migrate logs journal_exists = %v, want true", logsBody["journal_exists"])
+	}
+	lines, _ := logsBody["lines"].([]any)
+	if len(lines) != 1 || !strings.Contains(fmt.Sprint(lines[0]), `"step":2`) {
+		t.Fatalf("migrate logs lines = %v, want only step 2 entry", lines)
+	}
+
+	invalidLogsReq := httptest.NewRequest(http.MethodGet, "/admin/api/apps/migrate/logs?app=sound_watch&step=0", nil)
+	invalidLogsW := httptest.NewRecorder()
+	h.ServeHTTP(invalidLogsW, invalidLogsReq)
+	if invalidLogsW.Code != http.StatusBadRequest {
+		t.Fatalf("invalid migrate logs code = %d, want 400 body=%s", invalidLogsW.Code, invalidLogsW.Body.String())
+	}
 
 	retryReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/migrate/retry", strings.NewReader(url.Values{"app": {"sound_watch"}}.Encode()))
 	retryReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -459,8 +501,8 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 		t.Fatalf("migrate retry status = %v, want ok", retryBody["status"])
 	}
 	retryMigration, _ := retryBody["migration"].(map[string]any)
-	if fmt.Sprint(retryMigration["verdict"]) != "idle" {
-		t.Fatalf("migrate retry verdict = %v, want idle", retryMigration["verdict"])
+	if fmt.Sprint(retryMigration["verdict"]) != "ok" {
+		t.Fatalf("migrate retry verdict = %v, want ok", retryMigration["verdict"])
 	}
 	if fmt.Sprint(retryMigration["last_error"]) != "" {
 		t.Fatalf("migrate retry last_error = %v, want empty", retryMigration["last_error"])

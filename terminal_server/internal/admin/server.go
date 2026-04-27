@@ -2,6 +2,7 @@
 package admin
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -221,6 +223,7 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
 	mux.HandleFunc("/admin/api/apps/migrate/status", h.handleAppMigrationStatus)
+	mux.HandleFunc("/admin/api/apps/migrate/logs", h.handleAppMigrationLogs)
 	mux.HandleFunc("/admin/api/apps/migrate/retry", h.handleAppMigrationRetry)
 	mux.HandleFunc("/admin/api/apps/migrate/abort", h.handleAppMigrationAbort)
 	mux.HandleFunc("/admin/api/apps/migrate/reconcile", h.handleAppMigrationReconcile)
@@ -2594,6 +2597,75 @@ func (h *Handler) handleAppMigrationStatus(w http.ResponseWriter, req *http.Requ
 	})
 }
 
+func (h *Handler) handleAppMigrationLogs(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.appRuntime == nil {
+		h.writeJSONError(w, http.StatusBadRequest, "app runtime not configured")
+		return
+	}
+	name := strings.TrimSpace(req.URL.Query().Get("app"))
+	if name == "" {
+		name = strings.TrimSpace(req.URL.Query().Get("name"))
+	}
+	if name == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "app is required")
+		return
+	}
+
+	step, err := parsePositiveOptionalInt(req.URL.Query().Get("step"))
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "step must be a positive integer")
+		return
+	}
+	limit, err := parsePositiveOptionalInt(req.URL.Query().Get("limit"))
+	if err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "limit must be a positive integer")
+		return
+	}
+	if limit == 0 {
+		limit = 50
+	}
+
+	status, err := h.appRuntime.GetMigrationStatus(name)
+	if err != nil {
+		h.writeMigrationError(w, err)
+		return
+	}
+	pkg, ok := h.appRuntime.GetPackage(name)
+	if !ok {
+		h.writeMigrationError(w, appruntime.ErrPackageNotFound)
+		return
+	}
+
+	journalPath := status.JournalPath
+	entries := []string{}
+	exists := false
+	if strings.TrimSpace(journalPath) != "" {
+		absolutePath := filepath.Join(pkg.RootPath, filepath.FromSlash(journalPath))
+		entries, exists, err = readMigrationJournalTail(absolutePath, step, limit)
+		if err != nil {
+			h.writeJSONError(w, http.StatusInternalServerError, "failed to read migration logs")
+			return
+		}
+	}
+
+	response := map[string]any{
+		"status":         "ok",
+		"app":            name,
+		"journal_path":   journalPath,
+		"journal_exists": exists,
+		"line_count":     len(entries),
+		"lines":          entries,
+	}
+	if step > 0 {
+		response["step"] = step
+	}
+	h.writeJSON(w, http.StatusOK, response)
+}
+
 func (h *Handler) handleAppMigrationRetry(w http.ResponseWriter, req *http.Request) {
 	h.handleAppMigrationAction(w, req, "retry")
 }
@@ -2712,6 +2784,72 @@ func mapMigrationStatus(status appruntime.MigrationStatus) map[string]any {
 		"reconciliation_path": status.ReconciliationPath,
 		"executor_ready":      status.ExecutorReady,
 		"pending_records":     pending,
+	}
+}
+
+func parsePositiveOptionalInt(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		return 0, errors.New("invalid positive int")
+	}
+	return v, nil
+}
+
+func readMigrationJournalTail(path string, step, limit int) ([]string, bool, error) {
+	file, err := os.Open(filepath.Clean(path))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 1024), 1024*1024)
+	lines := make([]string, 0, limit)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if step > 0 && !migrationLogMatchesStep(line, step) {
+			continue
+		}
+		lines = append(lines, line)
+		if len(lines) > limit {
+			lines = lines[1:]
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, true, err
+	}
+	return lines, true, nil
+}
+
+func migrationLogMatchesStep(line string, step int) bool {
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(line), &payload); err != nil {
+		return false
+	}
+	raw, ok := payload["step"]
+	if !ok {
+		return false
+	}
+	switch v := raw.(type) {
+	case float64:
+		return v == float64(step)
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(v))
+		return err == nil && parsed == step
+	default:
+		return false
 	}
 }
 
