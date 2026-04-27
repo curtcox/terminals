@@ -550,6 +550,17 @@ func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	runtime.migrations["migrate_reconcile"] = state
 	runtime.mu.Unlock()
 
+	if status, err := runtime.AbortMigration("migrate_reconcile", MigrationAbortToBaseline); !errors.Is(err, ErrMigrationReconcilePending) {
+		t.Fatalf("AbortMigration() error = %v, want ErrMigrationReconcilePending", err)
+	} else {
+		if status.Verdict != "reconcile_pending" {
+			t.Fatalf("AbortMigration() verdict = %q, want reconcile_pending", status.Verdict)
+		}
+		if len(status.PendingRecords) != 1 || status.PendingRecords[0].RecordID != "rec-1" {
+			t.Fatalf("AbortMigration() pending_records = %+v, want rec-1 preserved", status.PendingRecords)
+		}
+	}
+
 	if _, err := runtime.RetryMigration("migrate_reconcile"); !errors.Is(err, ErrMigrationReconcilePending) {
 		t.Fatalf("RetryMigration() error = %v, want ErrMigrationReconcilePending", err)
 	}

@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Enforced reconciliation guard semantics for
+  migration abort/rewind in runtime so `AbortMigration` now
+  refuses while reconciliation is pending (`verdict ==
+  reconcile_pending` or unresolved pending records). Abort no
+  longer clears unresolved records or rewrites status to
+  `aborted` in that state, preserving operator-required
+  reconciliation behavior. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeReconcileMigrationPendingRecords`) to verify
+  abort is blocked and pending record IDs remain intact.
 - 2026-04-27: Implemented rollback data-mode enforcement for
   `app(s) rollback` in runtime, admin API, and REPL. Rollback
   now defaults to archive mode, rejects `--keep-data` when no

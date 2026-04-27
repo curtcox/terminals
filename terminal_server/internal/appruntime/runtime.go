@@ -398,6 +398,12 @@ func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error) {
 	if target != MigrationAbortToCheckpoint && target != MigrationAbortToBaseline {
 		return statusFromState(pkg, state), fmt.Errorf("%w: %s", ErrMigrationAbortTargetInvalid, target)
 	}
+	if state.Verdict == "reconcile_pending" || len(state.PendingRecords) > 0 {
+		state.Verdict = "reconcile_pending"
+		state.LastError = ErrMigrationReconcilePending.Error()
+		r.migrations[name] = state
+		return statusFromState(pkg, state), ErrMigrationReconcilePending
+	}
 	if !state.ExecutorReady {
 		return statusFromState(pkg, state), nil
 	}
