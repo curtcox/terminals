@@ -9,6 +9,8 @@ type memorySelections struct {
 	state   map[string][2]string
 	context map[string][]string
 	policy  map[string]string
+	thread  map[string]string
+	history map[string][]string
 }
 
 func (m *memorySelections) GetSelection(sessionID string) (string, string, error) {
@@ -51,6 +53,36 @@ func (m *memorySelections) SetApprovalPolicy(sessionID, policy string) error {
 		m.policy = map[string]string{}
 	}
 	m.policy[sessionID] = policy
+	return nil
+}
+
+func (m *memorySelections) GetThread(sessionID string) (string, error) {
+	if m.thread == nil {
+		return "", nil
+	}
+	return m.thread[sessionID], nil
+}
+
+func (m *memorySelections) SetThread(sessionID, thread string) error {
+	if m.thread == nil {
+		m.thread = map[string]string{}
+	}
+	m.thread[sessionID] = thread
+	return nil
+}
+
+func (m *memorySelections) GetHistory(sessionID string) ([]string, error) {
+	if m.history == nil {
+		return nil, nil
+	}
+	return append([]string(nil), m.history[sessionID]...), nil
+}
+
+func (m *memorySelections) SetHistory(sessionID string, history []string) error {
+	if m.history == nil {
+		m.history = map[string][]string{}
+	}
+	m.history[sessionID] = append([]string(nil), history...)
 	return nil
 }
 
@@ -211,5 +243,34 @@ func TestServiceContextAndPolicyLifecycle(t *testing.T) {
 
 	if _, err := svc.AddContext(context.Background(), AddContextRequest{SessionID: "repl-1", Ref: ""}); err == nil {
 		t.Fatalf("AddContext(empty ref) expected error")
+	}
+
+	if err := store.SetThread("repl-1", "thread-42"); err != nil {
+		t.Fatalf("store.SetThread() error = %v", err)
+	}
+	if err := store.SetHistory("repl-1", []string{"user: why suspended?", "assistant: preempted by red_alert"}); err != nil {
+		t.Fatalf("store.SetHistory() error = %v", err)
+	}
+	thread, err := svc.GetThread(context.Background(), GetThreadRequest{SessionID: "repl-1"})
+	if err != nil {
+		t.Fatalf("GetThread() error = %v", err)
+	}
+	if thread.Thread != "thread-42" || len(thread.History) != 2 {
+		t.Fatalf("thread snapshot = %#v, want thread-42 + 2 history entries", thread)
+	}
+
+	reset, err := svc.ResetThread(context.Background(), ResetThreadRequest{SessionID: "repl-1"})
+	if err != nil {
+		t.Fatalf("ResetThread() error = %v", err)
+	}
+	if reset.Thread != "" || len(reset.History) != 0 {
+		t.Fatalf("reset snapshot = %#v, want empty thread/history", reset)
+	}
+	postReset, err := svc.GetThread(context.Background(), GetThreadRequest{SessionID: "repl-1"})
+	if err != nil {
+		t.Fatalf("GetThread(post-reset) error = %v", err)
+	}
+	if postReset.Thread != "" || len(postReset.History) != 0 {
+		t.Fatalf("post-reset thread snapshot = %#v, want empty thread/history", postReset)
 	}
 }

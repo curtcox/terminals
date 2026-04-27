@@ -48,6 +48,8 @@ type replAIService interface {
 	ClearContext(ctx context.Context, req replai.ClearContextRequest) (*replai.ClearContextResponse, error)
 	GetPolicy(ctx context.Context, req replai.GetPolicyRequest) (*replai.GetPolicyResponse, error)
 	SetPolicy(ctx context.Context, req replai.SetPolicyRequest) (*replai.SetPolicyResponse, error)
+	GetThread(ctx context.Context, req replai.GetThreadRequest) (*replai.GetThreadResponse, error)
+	ResetThread(ctx context.Context, req replai.ResetThreadRequest) (*replai.ResetThreadResponse, error)
 }
 
 type worldAdminModel interface {
@@ -121,6 +123,8 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/repl/ai/context/unpin", h.handleReplAIUnpinContext)
 	mux.HandleFunc("/admin/api/repl/ai/context/clear", h.handleReplAIClearContext)
 	mux.HandleFunc("/admin/api/repl/ai/policy", h.handleReplAIPolicy)
+	mux.HandleFunc("/admin/api/repl/ai/history", h.handleReplAIHistory)
+	mux.HandleFunc("/admin/api/repl/ai/reset", h.handleReplAIReset)
 	mux.HandleFunc("/admin/api/identity", h.handleIdentity)
 	mux.HandleFunc("/admin/api/identity/show", h.handleIdentityShow)
 	mux.HandleFunc("/admin/api/identity/groups", h.handleIdentityGroups)
@@ -1961,6 +1965,47 @@ func (h *Handler) handleReplAIPolicy(w http.ResponseWriter, req *http.Request) {
 	default:
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func (h *Handler) handleReplAIHistory(w http.ResponseWriter, req *http.Request) {
+	if h.ai == nil {
+		h.writeJSONError(w, http.StatusNotFound, "repl ai service not configured")
+		return
+	}
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	sessionID := strings.TrimSpace(req.URL.Query().Get("session_id"))
+	resp, err := h.ai.GetThread(req.Context(), replai.GetThreadRequest{SessionID: sessionID})
+	if err != nil {
+		h.writeReplAIError(w, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) handleReplAIReset(w http.ResponseWriter, req *http.Request) {
+	if h.ai == nil {
+		h.writeJSONError(w, http.StatusNotFound, "repl ai service not configured")
+		return
+	}
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	resp, err := h.ai.ResetThread(req.Context(), replai.ResetThreadRequest{
+		SessionID: strings.TrimSpace(req.Form.Get("session_id")),
+	})
+	if err != nil {
+		h.writeReplAIError(w, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) writeReplAIError(w http.ResponseWriter, err error) {

@@ -287,13 +287,19 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/policy":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"session_id":"repl-9","policy":"prompt-all"}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/repl/ai/history":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","thread":"thread-1","history":["user: why suspended?","assistant: preempted by red_alert"]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/repl/ai/reset":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"session_id":"repl-9","thread":"","history":[]}`))
 		default:
 			http.NotFound(w, req)
 		}
 	}))
 	defer admin.Close()
 
-	in := strings.NewReader("ai providers\nai models ollama\nai use openrouter anthropic/claude-sonnet-4-6\nai status\nai context\nai context add devices:ls\nai context pin devices:ls\nai context unpin devices:ls\nai context clear\nai policy show\nai policy set prompt-all\nexit\n")
+	in := strings.NewReader("ai providers\nai models ollama\nai use openrouter anthropic/claude-sonnet-4-6\nai status\nai context\nai context add devices:ls\nai context pin devices:ls\nai context unpin devices:ls\nai context clear\nai policy show\nai policy set prompt-all\nai history\nai reset\nexit\n")
 	var out bytes.Buffer
 
 	err := Run(context.Background(), in, &out, Options{
@@ -328,6 +334,12 @@ func TestAICommandsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "policy set to prompt-all") {
 		t.Fatalf("missing ai policy set output: %q", text)
+	}
+	if !strings.Contains(text, "thread: thread-1") || !strings.Contains(text, "preempted by red_alert") {
+		t.Fatalf("missing ai history output: %q", text)
+	}
+	if !strings.Contains(text, "cleared AI thread and exchange history") {
+		t.Fatalf("missing ai reset output: %q", text)
 	}
 }
 

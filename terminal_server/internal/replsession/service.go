@@ -518,6 +518,76 @@ func (s *Service) SetApprovalPolicy(sessionID, policy string) error {
 	return nil
 }
 
+// GetThread returns the stored LLM thread identifier for a session.
+func (s *Service) GetThread(sessionID string) (string, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return "", ErrMissingSessionID
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return "", ErrSessionNotFound
+	}
+	return strings.TrimSpace(live.meta.State.LLMThread), nil
+}
+
+// SetThread updates the stored LLM thread identifier for a session.
+func (s *Service) SetThread(sessionID, thread string) error {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return ErrMissingSessionID
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	live.meta.State.LLMThread = strings.TrimSpace(thread)
+	return nil
+}
+
+// GetHistory returns the persisted LLM exchange history for a session.
+func (s *Service) GetHistory(sessionID string) ([]string, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return nil, ErrSessionNotFound
+	}
+	return append([]string(nil), live.meta.State.History...), nil
+}
+
+// SetHistory replaces the persisted LLM exchange history for a session.
+func (s *Service) SetHistory(sessionID string, history []string) error {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return ErrMissingSessionID
+	}
+	normalized := make([]string, 0, len(history))
+	for _, line := range history {
+		value := strings.TrimSpace(line)
+		if value == "" {
+			continue
+		}
+		normalized = append(normalized, value)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	live, ok := s.sessions[sessionID]
+	if !ok {
+		return ErrSessionNotFound
+	}
+	live.meta.State.History = normalized
+	return nil
+}
+
 // SessionIDForDevice returns the attached session id for a device.
 func (s *Service) SessionIDForDevice(deviceID string) (string, bool) {
 	deviceID = strings.TrimSpace(deviceID)

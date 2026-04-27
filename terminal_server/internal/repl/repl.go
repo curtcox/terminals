@@ -194,6 +194,8 @@ func replCommandSpecs() []commandSpec {
 		{Name: "ai context clear", Usage: "ai context clear [--json]", Summary: "Clear pinned AI context refs", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai policy show", Usage: "ai policy show [--json]", Summary: "Show AI approval policy", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 		{Name: "ai policy set", Usage: "ai policy set <auto-readonly|prompt-all|prompt-mutating> [--json]", Summary: "Set AI approval policy for this session", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai history", Usage: "ai history [--json]", Summary: "Show AI thread id and recent exchange history", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
+		{Name: "ai reset", Usage: "ai reset [--json]", Summary: "Clear AI thread id and exchange history", Classification: commandMutating, RelatedDocs: []string{"repl/commands/ai"}, DiscouragedForAgents: true},
 	}
 }
 
@@ -2917,6 +2919,52 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			default:
 				return fmt.Errorf("unknown command: ai policy %s", action)
 			}
+		case "history":
+			if strings.TrimSpace(s.session) == "" {
+				return errors.New("ai history requires session id (TERMINALS_REPL_SESSION_ID)")
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/repl/ai/history", url.Values{"session_id": {s.session}})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			if _, err := fmt.Fprintf(s.out, "session: %s\n", toString(body["session_id"])); err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(s.out, "thread: %s\n", toString(body["thread"])); err != nil {
+				return err
+			}
+			history, _ := body["history"].([]any)
+			if len(history) == 0 {
+				_, err := fmt.Fprintln(s.out, "history: (empty)")
+				return err
+			}
+			if _, err := fmt.Fprintln(s.out, "history:"); err != nil {
+				return err
+			}
+			for _, line := range history {
+				if _, err := fmt.Fprintf(s.out, "- %s\n", toString(line)); err != nil {
+					return err
+				}
+			}
+			return nil
+		case "reset":
+			if strings.TrimSpace(s.session) == "" {
+				return errors.New("ai reset requires session id (TERMINALS_REPL_SESSION_ID)")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/repl/ai/reset", url.Values{
+				"session_id": {s.session},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintln(s.out, "OK  cleared AI thread and exchange history")
+			return err
 		default:
 			return fmt.Errorf("unknown command: ai %s", sub)
 		}

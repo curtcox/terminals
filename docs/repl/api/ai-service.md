@@ -6,9 +6,9 @@ Current typed operations exposed via admin-backed REPL APIs:
 - Sticky provider/model selection per REPL session: `ai use`, `ai status`
 - Session context management: `ai context`, `ai context add`, `ai context pin`, `ai context unpin`, `ai context clear`
 - Session approval policy: `ai policy show`, `ai policy set`
+- Session thread inspection and reset: `ai history`, `ai reset`
 
 Still planned:
 
 - Streaming `ai ask` and `ai gen`
 - Tool-call proposal/approval loop (`ai approve`, `ai reject`, pending tool-call lifecycle)
-- Managed AI thread history and reset APIs

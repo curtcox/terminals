@@ -13,6 +13,8 @@ Current AI selection commands:
 - `ai context clear [--json]` clear all pinned context refs.
 - `ai policy show [--json]` show current approval policy (`prompt-mutating` by default).
 - `ai policy set <auto-readonly|prompt-all|prompt-mutating> [--json]` update approval policy for the current session.
+- `ai history [--json]` show the current AI thread id and recent exchange history.
+- `ai reset [--json]` clear the current AI thread id and exchange history.
 
 Selections are stored per REPL session and persist across detach/reattach.
 

@@ -1179,6 +1179,12 @@ func TestReplAIEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
+	if err := replSvc.SetThread(created.Session.ID, "thread-99"); err != nil {
+		t.Fatalf("SetThread() error = %v", err)
+	}
+	if err := replSvc.SetHistory(created.Session.ID, []string{"user: why suspended?", "assistant: preempted by red_alert"}); err != nil {
+		t.Fatalf("SetHistory() error = %v", err)
+	}
 	defer func() {
 		_, _ = replSvc.TerminateSession(context.Background(), replsession.TerminateSessionRequest{
 			SessionID: created.Session.ID,
@@ -1192,6 +1198,13 @@ func TestReplAIEndpoints(t *testing.T) {
 			{Name: "ollama", Models: []string{"llama3.1"}},
 		},
 	})
+	threadSnapshot, err := aiSvc.GetThread(context.Background(), replai.GetThreadRequest{SessionID: created.Session.ID})
+	if err != nil {
+		t.Fatalf("GetThread() error = %v", err)
+	}
+	if threadSnapshot.Thread != "thread-99" || len(threadSnapshot.History) != 2 {
+		t.Fatalf("thread snapshot = %#v, want thread-99 + 2 entries", threadSnapshot)
+	}
 
 	h := NewHandler(control, runtime, replSvc, aiSvc, nil, nil, devices, config.Config{MDNSName: "HomeServer"}, nil, nil)
 
@@ -1286,6 +1299,29 @@ func TestReplAIEndpoints(t *testing.T) {
 	}
 	if !strings.Contains(getPolicyW.Body.String(), "\"policy\":\"prompt-all\"") {
 		t.Fatalf("policy GET body = %s", getPolicyW.Body.String())
+	}
+
+	historyReq := httptest.NewRequest(http.MethodGet, "/admin/api/repl/ai/history?session_id="+created.Session.ID, nil)
+	historyW := httptest.NewRecorder()
+	h.ServeHTTP(historyW, historyReq)
+	if historyW.Code != http.StatusOK {
+		t.Fatalf("history GET status = %d, want 200 body=%s", historyW.Code, historyW.Body.String())
+	}
+	if !strings.Contains(historyW.Body.String(), "\"thread\":\"thread-99\"") || !strings.Contains(historyW.Body.String(), "preempted by red_alert") {
+		t.Fatalf("history GET body = %s", historyW.Body.String())
+	}
+
+	resetReq := httptest.NewRequest(http.MethodPost, "/admin/api/repl/ai/reset", strings.NewReader(url.Values{
+		"session_id": {created.Session.ID},
+	}.Encode()))
+	resetReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resetW := httptest.NewRecorder()
+	h.ServeHTTP(resetW, resetReq)
+	if resetW.Code != http.StatusOK {
+		t.Fatalf("reset POST status = %d, want 200 body=%s", resetW.Code, resetW.Body.String())
+	}
+	if !strings.Contains(resetW.Body.String(), "\"thread\":\"\"") || !strings.Contains(resetW.Body.String(), "\"history\":[]") {
+		t.Fatalf("reset POST body = %s", resetW.Body.String())
 	}
 }
 

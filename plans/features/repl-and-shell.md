@@ -702,6 +702,7 @@ Invariants:
 
 ## Progress Notes
 
+- 2026-04-27: Added typed AI thread history/reset APIs (`ai history`, `ai reset`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests so thread state can be inspected and cleared per session.
 - 2026-04-27: Added typed session context and approval-policy APIs (`ai context*`, `ai policy*`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests. `ai ask` / `ai gen` streaming and approval-loop execution remain in progress.
 - 2026-04-27: Added automated P4 validation (`TestUseCaseP4StickyAISelectionSurvivesDetachReattach`) and wired `make usecase-validate USECASE=P4` plus matrix coverage for sticky provider/model selection across detach/reattach.
 

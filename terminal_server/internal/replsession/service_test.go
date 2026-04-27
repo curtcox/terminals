@@ -179,6 +179,28 @@ func TestContextAndPolicyPersistence(t *testing.T) {
 	if policy != "prompt-all" {
 		t.Fatalf("policy = %q, want prompt-all", policy)
 	}
+
+	if err := svc.SetThread(sessionID, "thread-abc"); err != nil {
+		t.Fatalf("SetThread() error = %v", err)
+	}
+	thread, err := svc.GetThread(sessionID)
+	if err != nil {
+		t.Fatalf("GetThread() error = %v", err)
+	}
+	if thread != "thread-abc" {
+		t.Fatalf("thread = %q, want thread-abc", thread)
+	}
+
+	if err := svc.SetHistory(sessionID, []string{"user: hello", "assistant: hi", " "}); err != nil {
+		t.Fatalf("SetHistory() error = %v", err)
+	}
+	history, err := svc.GetHistory(sessionID)
+	if err != nil {
+		t.Fatalf("GetHistory() error = %v", err)
+	}
+	if len(history) != 2 || history[0] != "user: hello" || history[1] != "assistant: hi" {
+		t.Fatalf("history = %#v, want [user: hello assistant: hi]", history)
+	}
 }
 
 func TestUseCaseP2SessionMobilityAndCoexistence(t *testing.T) {

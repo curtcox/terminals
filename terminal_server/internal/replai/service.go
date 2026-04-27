@@ -51,6 +51,14 @@ type SessionPolicyStore interface {
 	SetApprovalPolicy(sessionID, policy string) error
 }
 
+// SessionThreadStore persists LLM thread and exchange history per session.
+type SessionThreadStore interface {
+	GetThread(sessionID string) (string, error)
+	SetThread(sessionID, thread string) error
+	GetHistory(sessionID string) ([]string, error)
+	SetHistory(sessionID string, history []string) error
+}
+
 // ProviderConfig declares one configured AI provider.
 type ProviderConfig struct {
 	Name         string
@@ -198,11 +206,36 @@ type SetPolicyResponse struct {
 	Policy    string `json:"policy"`
 }
 
+// GetThreadRequest returns the current AI thread snapshot for one session.
+type GetThreadRequest struct {
+	SessionID string
+}
+
+// GetThreadResponse reports the current thread id and exchange history.
+type GetThreadResponse struct {
+	SessionID string   `json:"session_id"`
+	Thread    string   `json:"thread"`
+	History   []string `json:"history"`
+}
+
+// ResetThreadRequest clears thread state for one session.
+type ResetThreadRequest struct {
+	SessionID string
+}
+
+// ResetThreadResponse reports cleared thread state.
+type ResetThreadResponse struct {
+	SessionID string   `json:"session_id"`
+	Thread    string   `json:"thread"`
+	History   []string `json:"history"`
+}
+
 // Service provides typed AI selection APIs used by REPL commands.
 type Service struct {
 	sessions        SessionSelectionStore
 	contexts        SessionContextStore
 	policies        SessionPolicyStore
+	threads         SessionThreadStore
 	providersByName map[string]Provider
 	providerOrder   []string
 	defaultProvider string
@@ -223,6 +256,9 @@ func NewService(sessions SessionSelectionStore, cfg Config) *Service {
 	}
 	if store, ok := sessions.(SessionPolicyStore); ok {
 		svc.policies = store
+	}
+	if store, ok := sessions.(SessionThreadStore); ok {
+		svc.threads = store
 	}
 	for _, provider := range cfg.Providers {
 		name := strings.TrimSpace(strings.ToLower(provider.Name))
@@ -444,6 +480,31 @@ func (s *Service) SetPolicy(_ context.Context, req SetPolicyRequest) (*SetPolicy
 	return &SetPolicyResponse{SessionID: sessionID, Policy: policy}, nil
 }
 
+// GetThread returns thread id and exchange history for one session.
+func (s *Service) GetThread(_ context.Context, req GetThreadRequest) (*GetThreadResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	thread, history, err := s.getThread(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return &GetThreadResponse{SessionID: sessionID, Thread: thread, History: history}, nil
+}
+
+// ResetThread clears thread id and exchange history for one session.
+func (s *Service) ResetThread(_ context.Context, req ResetThreadRequest) (*ResetThreadResponse, error) {
+	sessionID := strings.TrimSpace(req.SessionID)
+	if sessionID == "" {
+		return nil, ErrMissingSessionID
+	}
+	if err := s.resetThread(sessionID); err != nil {
+		return nil, err
+	}
+	return &ResetThreadResponse{SessionID: sessionID, Thread: "", History: []string{}}, nil
+}
+
 func (s *Service) resolveProviderAndModel(provider, model string) (string, string, error) {
 	provider = strings.TrimSpace(strings.ToLower(provider))
 	model = strings.TrimSpace(model)
@@ -535,6 +596,31 @@ func (s *Service) setPolicy(sessionID, policy string) error {
 		return nil
 	}
 	return s.policies.SetApprovalPolicy(sessionID, policy)
+}
+
+func (s *Service) getThread(sessionID string) (string, []string, error) {
+	if s.threads == nil {
+		return "", []string{}, nil
+	}
+	thread, err := s.threads.GetThread(sessionID)
+	if err != nil {
+		return "", nil, err
+	}
+	history, err := s.threads.GetHistory(sessionID)
+	if err != nil {
+		return "", nil, err
+	}
+	return strings.TrimSpace(thread), append([]string(nil), history...), nil
+}
+
+func (s *Service) resetThread(sessionID string) error {
+	if s.threads == nil {
+		return nil
+	}
+	if err := s.threads.SetThread(sessionID, ""); err != nil {
+		return err
+	}
+	return s.threads.SetHistory(sessionID, nil)
 }
 
 func normalizePolicy(policy string) (string, error) {
