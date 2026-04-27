@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Enforced rollback guard semantics in runtime so
+  `RollbackPackage` refuses while migration reconciliation is
+  pending (`verdict == reconcile_pending` or unresolved pending
+  records). This aligns runtime behavior with the plan's rollback
+  contract and prevents silently burying partial rollback state.
+  Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRollbackBlockedWhenMigrationReconcilePending`) to
+  verify rollback is blocked and package/history state remains
+  unchanged.
 - 2026-04-27: Extended migration operator status detail end-to-end
   across runtime, admin API, and REPL. `MigrationStatus` now includes
   explicit `last_step` and sorted pending reconciliation record details

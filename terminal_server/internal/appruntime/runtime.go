@@ -274,6 +274,11 @@ func (r *Runtime) RollbackPackage(name string) (Package, error) {
 	if len(history) < 2 {
 		return Package{}, ErrNoPriorVersion
 	}
+	if state, ok := r.migrations[name]; ok {
+		if state.Verdict == "reconcile_pending" || len(state.PendingRecords) > 0 {
+			return Package{}, ErrMigrationReconcilePending
+		}
+	}
 	history = history[:len(history)-1]
 	r.history[name] = history
 	previous := history[len(history)-1]

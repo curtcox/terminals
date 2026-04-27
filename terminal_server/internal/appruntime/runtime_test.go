@@ -242,6 +242,61 @@ func TestRuntimeRollbackRequiresPriorVersion(t *testing.T) {
 	}
 }
 
+func TestRuntimeRollbackBlockedWhenMigrationReconcilePending(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "rollback_pending")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifestPath := filepath.Join(appDir, "manifest.toml")
+	if err := os.WriteFile(manifestPath, []byte("name = \"rollback_pending\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage(v1) error = %v", err)
+	}
+
+	time.Sleep(5 * time.Millisecond)
+	if err := os.WriteFile(manifestPath, []byte("name = \"rollback_pending\"\nversion = \"1.1.0\"\nlanguage = \"tal/1\"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v2) error = %v", err)
+	}
+	if _, changed, err := runtime.ReloadPackage(context.Background(), "rollback_pending"); err != nil || !changed {
+		t.Fatalf("ReloadPackage(v2) = (%v, %v), want changed true no error", err, changed)
+	}
+
+	runtime.mu.Lock()
+	state := runtime.migrations["rollback_pending"]
+	state.Verdict = "reconcile_pending"
+	state.LastError = ErrMigrationReconcilePending.Error()
+	state.ReconciliationPath = "apps/rollback_pending/migrate/r2/reconcile.json"
+	state.PendingRecords = map[string]string{"rec-1": "manual"}
+	runtime.migrations["rollback_pending"] = state
+	runtime.mu.Unlock()
+
+	if _, err := runtime.RollbackPackage("rollback_pending"); !errors.Is(err, ErrMigrationReconcilePending) {
+		t.Fatalf("RollbackPackage() error = %v, want ErrMigrationReconcilePending", err)
+	}
+
+	current, ok := runtime.GetPackage("rollback_pending")
+	if !ok {
+		t.Fatalf("GetPackage(rollback_pending) ok = false, want true")
+	}
+	if current.Manifest.Version != "1.1.0" {
+		t.Fatalf("current version = %q, want 1.1.0", current.Manifest.Version)
+	}
+	if len(runtime.ListPackageHistory("rollback_pending")) != 2 {
+		t.Fatalf("history length after blocked rollback = %d, want 2", len(runtime.ListPackageHistory("rollback_pending")))
+	}
+}
+
 func TestRuntimeMigrationStatusAndActions(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_stub")
