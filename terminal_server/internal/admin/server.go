@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -155,10 +156,15 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/world/calibration", h.handleWorldCalibration)
 	mux.HandleFunc("/admin/api/world/verify", h.handleWorldVerify)
 	mux.HandleFunc("/admin/api/store/get", h.handleStoreGet)
+	mux.HandleFunc("/admin/api/store/ns", h.handleStoreNamespaces)
 	mux.HandleFunc("/admin/api/store/ls", h.handleStoreList)
 	mux.HandleFunc("/admin/api/store/put", h.handleStorePut)
+	mux.HandleFunc("/admin/api/store/del", h.handleStoreDelete)
+	mux.HandleFunc("/admin/api/store/watch", h.handleStoreWatch)
+	mux.HandleFunc("/admin/api/store/bind", h.handleStoreBind)
 	mux.HandleFunc("/admin/api/bus", h.handleBusTail)
 	mux.HandleFunc("/admin/api/bus/emit", h.handleBusEmit)
+	mux.HandleFunc("/admin/api/bus/replay", h.handleBusReplay)
 	mux.HandleFunc("/admin/api/apps", h.handleApps)
 	mux.HandleFunc("/admin/api/apps/reload", h.handleReloadApp)
 	mux.HandleFunc("/admin/api/apps/rollback", h.handleRollbackApp)
@@ -922,6 +928,14 @@ func (h *Handler) handleStoreGet(w http.ResponseWriter, req *http.Request) {
 	h.writeJSON(w, http.StatusOK, map[string]any{"record": record})
 }
 
+func (h *Handler) handleStoreNamespaces(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"namespaces": h.capability.StoreNamespaces()})
+}
+
 func (h *Handler) handleStoreList(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -953,12 +967,71 @@ func (h *Handler) handleStorePut(w http.ResponseWriter, req *http.Request) {
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "record": record})
 }
 
+func (h *Handler) handleStoreDelete(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	deleted := h.capability.StoreDelete(req.Form.Get("namespace"), req.Form.Get("key"))
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "deleted": deleted})
+}
+
+func (h *Handler) handleStoreWatch(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	namespace := req.URL.Query().Get("namespace")
+	prefix := req.URL.Query().Get("prefix")
+	h.writeJSON(w, http.StatusOK, map[string]any{
+		"namespace": namespace,
+		"prefix":    prefix,
+		"records":   h.capability.StoreWatch(namespace, prefix),
+	})
+}
+
+func (h *Handler) handleStoreBind(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	binding := strings.TrimSpace(req.Form.Get("to"))
+	parts := strings.SplitN(binding, ":", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		h.writeJSONError(w, http.StatusBadRequest, "to must be formatted as <device>:<scenario>")
+		return
+	}
+	record, ok := h.capability.StoreBind(req.Form.Get("namespace"), req.Form.Get("key"), binding)
+	if !ok {
+		h.writeJSONError(w, http.StatusNotFound, "store record not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "record": record})
+}
+
 func (h *Handler) handleBusTail(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	h.writeJSON(w, http.StatusOK, map[string]any{"events": h.capability.BusTail()})
+	limit := 0
+	if rawLimit := strings.TrimSpace(req.URL.Query().Get("limit")); rawLimit != "" {
+		parsedLimit, err := strconv.Atoi(rawLimit)
+		if err != nil || parsedLimit <= 0 {
+			h.writeJSONError(w, http.StatusBadRequest, "limit must be a positive integer")
+			return
+		}
+		limit = parsedLimit
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"events": h.capability.BusTail(req.URL.Query().Get("kind"), req.URL.Query().Get("name"), limit)})
 }
 
 func (h *Handler) handleBusEmit(w http.ResponseWriter, req *http.Request) {
@@ -972,6 +1045,30 @@ func (h *Handler) handleBusEmit(w http.ResponseWriter, req *http.Request) {
 	}
 	event := h.capability.BusEmit(req.Form.Get("kind"), req.Form.Get("name"), req.Form.Get("payload"))
 	h.writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "event": event})
+}
+
+func (h *Handler) handleBusReplay(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	limit := 0
+	if rawLimit := strings.TrimSpace(req.URL.Query().Get("limit")); rawLimit != "" {
+		parsedLimit, err := strconv.Atoi(rawLimit)
+		if err != nil || parsedLimit <= 0 {
+			h.writeJSONError(w, http.StatusBadRequest, "limit must be a positive integer")
+			return
+		}
+		limit = parsedLimit
+	}
+	events := h.capability.BusReplay(
+		req.URL.Query().Get("from"),
+		req.URL.Query().Get("to"),
+		req.URL.Query().Get("kind"),
+		req.URL.Query().Get("name"),
+		limit,
+	)
+	h.writeJSON(w, http.StatusOK, map[string]any{"events": events})
 }
 
 func (h *Handler) handleReplAIProviders(w http.ResponseWriter, req *http.Request) {

@@ -385,6 +385,62 @@ func TestStorePutWithoutTTLHasNoExpiration(t *testing.T) {
 	}
 }
 
+func TestStoreNamespacesDeleteWatchAndBind(t *testing.T) {
+	svc := NewService()
+	svc.StorePut("notes", "alpha", "one", 0)
+	svc.StorePut("notes", "beta", "two", 0)
+	svc.StorePut("alerts", "fire", "active", 0)
+
+	namespaces := svc.StoreNamespaces()
+	if len(namespaces) != 2 {
+		t.Fatalf("len(StoreNamespaces()) = %d, want 2", len(namespaces))
+	}
+	if namespaces[0].Name != "alerts" || namespaces[0].RecordCount != 1 {
+		t.Fatalf("StoreNamespaces()[0] = %+v, want alerts with 1 record", namespaces[0])
+	}
+	if namespaces[1].Name != "notes" || namespaces[1].RecordCount != 2 {
+		t.Fatalf("StoreNamespaces()[1] = %+v, want notes with 2 records", namespaces[1])
+	}
+
+	watched := svc.StoreWatch("notes", "a")
+	if len(watched) != 1 || watched[0].Key != "alpha" {
+		t.Fatalf("StoreWatch(notes,a) = %+v, want only alpha", watched)
+	}
+
+	record, ok := svc.StoreBind("notes", "alpha", "device-1:chat")
+	if !ok {
+		t.Fatalf("StoreBind(notes,alpha,...) = false, want true")
+	}
+	if record.Binding != "device-1:chat" {
+		t.Fatalf("StoreBind binding = %q, want device-1:chat", record.Binding)
+	}
+
+	deleted := svc.StoreDelete("notes", "beta")
+	if !deleted {
+		t.Fatalf("StoreDelete(notes,beta) = false, want true")
+	}
+	if _, ok := svc.StoreGet("notes", "beta"); ok {
+		t.Fatalf("StoreGet(notes,beta) after delete = true, want false")
+	}
+}
+
+func TestBusTailFilterAndReplayWindow(t *testing.T) {
+	svc := NewService()
+	one := svc.BusEmit("event", "alarm", "ring")
+	two := svc.BusEmit("event", "door", "open")
+	three := svc.BusEmit("intent", "assist", "kitchen")
+
+	filtered := svc.BusTail("event", "", 1)
+	if len(filtered) != 1 || filtered[0].ID != two.ID {
+		t.Fatalf("BusTail(event,limit=1) = %+v, want only %s", filtered, two.ID)
+	}
+
+	replay := svc.BusReplay(one.ID, three.ID, "event", "door", 0)
+	if len(replay) != 1 || replay[0].ID != two.ID {
+		t.Fatalf("BusReplay window/filter = %+v, want only %s", replay, two.ID)
+	}
+}
+
 func TestMessageRoomThreadUnreadAcknowledgeLifecycle(t *testing.T) {
 	svc := NewService()
 

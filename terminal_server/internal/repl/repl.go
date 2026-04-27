@@ -113,11 +113,16 @@ func replCommandSpecs() []commandSpec {
 		{Name: "memory stream", Usage: "memory stream [scope] [--json]", Summary: "Show memory stream entries", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/memory"}},
 		{Name: "placement ls", Usage: "placement ls [--json]", Summary: "List placement metadata", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/placement"}},
 		{Name: "recent ls", Usage: "recent ls [--json]", Summary: "List recent activity", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/recent"}},
+		{Name: "store ns ls", Usage: "store ns ls [--json]", Summary: "List store namespaces", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "store put", Usage: "store put <namespace> <key> <value> [--ttl <duration>] [--json]", Summary: "Write typed key-value state", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "store get", Usage: "store get <namespace> <key> [--json]", Summary: "Read typed key-value state", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "store ls", Usage: "store ls <namespace> [--json]", Summary: "List typed key-value state", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/store"}},
+		{Name: "store del", Usage: "store del <namespace> <key> [--json]", Summary: "Delete typed key-value state", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
+		{Name: "store watch", Usage: "store watch <namespace> [--prefix <p>] [--json]", Summary: "Watch typed key-value state by prefix", Classification: commandOperational, RelatedDocs: []string{"repl/commands/store"}},
+		{Name: "store bind", Usage: "store bind <namespace> <key> --to <device>:<scenario> [--json]", Summary: "Bind state keys to a device/scenario pair", Classification: commandMutating, RelatedDocs: []string{"repl/commands/store"}},
 		{Name: "bus emit", Usage: "bus emit <kind> <name> [payload] [--json]", Summary: "Emit typed bus events or intents", Classification: commandMutating, RelatedDocs: []string{"repl/commands/bus"}},
-		{Name: "bus tail", Usage: "bus tail [--json]", Summary: "Tail recent bus events", Classification: commandOperational, RelatedDocs: []string{"repl/commands/bus"}},
+		{Name: "bus tail", Usage: "bus tail [--kind <kind>] [--name <name>] [--limit <n>] [--json]", Summary: "Tail recent bus events", Classification: commandOperational, RelatedDocs: []string{"repl/commands/bus"}},
+		{Name: "bus replay", Usage: "bus replay <from-id> <to-id> [--kind <kind>] [--name <name>] [--limit <n>] [--json]", Summary: "Replay a filtered bus event window", Classification: commandOperational, RelatedDocs: []string{"repl/commands/bus"}},
 		{Name: "activations ls", Usage: "activations ls [--json]", Summary: "List active scenario by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/activations"}},
 		{Name: "claims tree", Usage: "claims tree [--json]", Summary: "Show claims grouped by device", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/claims"}},
 		{Name: "app ls", Usage: "app ls [--json]", Summary: "List loaded apps", Classification: commandReadOnly, RelatedDocs: []string{"repl/commands/app"}},
@@ -1317,6 +1322,28 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		return writeJSON(s.out, body)
 	case "store":
 		switch sub {
+		case "ns":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 1 || !strings.EqualFold(plain[0], "ls") {
+				return errors.New("usage: store ns ls")
+			}
+			body, err := s.fetchJSON(ctx, "/admin/api/store/ns")
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			namespaces, _ := body["namespaces"].([]any)
+			rows := make([][]string, 0, len(namespaces))
+			for _, item := range namespaces {
+				row, _ := item.(map[string]any)
+				if row == nil {
+					continue
+				}
+				rows = append(rows, []string{toString(row["name"]), toString(row["record_count"])})
+			}
+			return printTable(s.out, []string{"NAMESPACE", "RECORDS"}, rows)
 		case "put":
 			plain := nonFlagArgsSkippingFlagValues(args[1:], "--ttl")
 			if len(plain) < 3 {
@@ -1364,6 +1391,59 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				return err
 			}
 			return writeJSON(s.out, body)
+		case "del":
+			plain := nonFlagArgs(args[1:])
+			if len(plain) < 2 {
+				return errors.New("usage: store del <namespace> <key>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/store/del", url.Values{
+				"namespace": {plain[0]},
+				"key":       {plain[1]},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  deleted=%s namespace=%s key=%s\n", toString(body["deleted"]), plain[0], plain[1])
+			return err
+		case "watch":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--prefix")
+			if len(plain) < 1 {
+				return errors.New("usage: store watch <namespace> [--prefix <p>]")
+			}
+			query := url.Values{"namespace": {plain[0]}}
+			if prefix := strings.TrimSpace(flagValue(args[1:], "--prefix")); prefix != "" {
+				query.Set("prefix", prefix)
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/store/watch", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "bind":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--to")
+			if len(plain) < 2 {
+				return errors.New("usage: store bind <namespace> <key> --to <device>:<scenario>")
+			}
+			binding := strings.TrimSpace(flagValue(args[1:], "--to"))
+			if binding == "" {
+				return errors.New("usage: store bind <namespace> <key> --to <device>:<scenario>")
+			}
+			body, err := s.postFormJSON(ctx, "/admin/api/store/bind", url.Values{
+				"namespace": {plain[0]},
+				"key":       {plain[1]},
+				"to":        {binding},
+			})
+			if err != nil {
+				return err
+			}
+			if jsonOut {
+				return writeJSON(s.out, body)
+			}
+			_, err = fmt.Fprintf(s.out, "OK  namespace=%s key=%s bound_to=%s\n", plain[0], plain[1], binding)
+			return err
 		default:
 			return fmt.Errorf("unknown command: store %s", sub)
 		}
@@ -1396,7 +1476,46 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 			_, err = fmt.Fprintf(s.out, "OK  event=%s\n", eventID)
 			return err
 		case "tail":
-			body, err := s.fetchJSON(ctx, "/admin/api/bus")
+			query := url.Values{}
+			if kind := strings.TrimSpace(flagValue(args[1:], "--kind")); kind != "" {
+				query.Set("kind", kind)
+			}
+			if name := strings.TrimSpace(flagValue(args[1:], "--name")); name != "" {
+				query.Set("name", name)
+			}
+			if limitRaw := strings.TrimSpace(flagValue(args[1:], "--limit")); limitRaw != "" {
+				if limit, err := strconv.Atoi(limitRaw); err != nil || limit <= 0 {
+					return errors.New("usage: bus tail [--kind <kind>] [--name <name>] [--limit <n>]")
+				}
+				query.Set("limit", limitRaw)
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/bus", query)
+			if err != nil {
+				return err
+			}
+			return writeJSON(s.out, body)
+		case "replay":
+			plain := nonFlagArgsSkippingFlagValues(args[1:], "--kind", "--name", "--limit")
+			if len(plain) < 2 {
+				return errors.New("usage: bus replay <from-id> <to-id> [--kind <kind>] [--name <name>] [--limit <n>]")
+			}
+			query := url.Values{
+				"from": {plain[0]},
+				"to":   {plain[1]},
+			}
+			if kind := strings.TrimSpace(flagValue(args[1:], "--kind")); kind != "" {
+				query.Set("kind", kind)
+			}
+			if name := strings.TrimSpace(flagValue(args[1:], "--name")); name != "" {
+				query.Set("name", name)
+			}
+			if limitRaw := strings.TrimSpace(flagValue(args[1:], "--limit")); limitRaw != "" {
+				if limit, err := strconv.Atoi(limitRaw); err != nil || limit <= 0 {
+					return errors.New("usage: bus replay <from-id> <to-id> [--kind <kind>] [--name <name>] [--limit <n>]")
+				}
+				query.Set("limit", limitRaw)
+			}
+			body, err := s.fetchJSONQuery(ctx, "/admin/api/bus/replay", query)
 			if err != nil {
 				return err
 			}

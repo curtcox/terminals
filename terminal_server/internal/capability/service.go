@@ -173,8 +173,15 @@ type StoreRecord struct {
 	Namespace string     `json:"namespace"`
 	Key       string     `json:"key"`
 	Value     string     `json:"value"`
+	Binding   string     `json:"binding,omitempty"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+// StoreNamespaceSummary represents aggregate inventory for one store namespace.
+type StoreNamespaceSummary struct {
+	Name        string `json:"name"`
+	RecordCount int    `json:"record_count"`
 }
 
 // BusEvent represents a named event emitted on the internal event bus.
@@ -1327,17 +1334,23 @@ func (s *Service) ListRecent() []RecentItem {
 func (s *Service) StorePut(namespace, key, value string, ttl time.Duration) StoreRecord {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	ns := defaultIfBlank(namespace, "default")
+	trimmedKey := strings.TrimSpace(key)
+	storeKey := ns + ":" + trimmedKey
+	existing, hasExisting := s.store[storeKey]
 	record := StoreRecord{
-		Namespace: defaultIfBlank(namespace, "default"),
-		Key:       strings.TrimSpace(key),
+		Namespace: ns,
+		Key:       trimmedKey,
 		Value:     value,
 		UpdatedAt: s.now(),
+	}
+	if hasExisting {
+		record.Binding = existing.Binding
 	}
 	if ttl > 0 {
 		expiresAt := s.now().Add(ttl)
 		record.ExpiresAt = &expiresAt
 	}
-	storeKey := record.Namespace + ":" + record.Key
 	s.store[storeKey] = record
 	s.appendRecentLocked("store", storeKey)
 	return record
@@ -1379,6 +1392,85 @@ func (s *Service) StoreList(namespace string) []StoreRecord {
 	return out
 }
 
+// StoreDelete removes a record by namespace and key.
+func (s *Service) StoreDelete(namespace, key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	storeKey := defaultIfBlank(namespace, "default") + ":" + strings.TrimSpace(key)
+	if _, ok := s.store[storeKey]; !ok {
+		return false
+	}
+	delete(s.store, storeKey)
+	s.appendRecentLocked("store", storeKey+" deleted")
+	return true
+}
+
+// StoreNamespaces returns namespace inventory sorted by namespace.
+func (s *Service) StoreNamespaces() []StoreNamespaceSummary {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
+	counts := map[string]int{}
+	for key, record := range s.store {
+		if storeRecordExpired(record, now) {
+			delete(s.store, key)
+			continue
+		}
+		counts[record.Namespace]++
+	}
+	namespaces := make([]StoreNamespaceSummary, 0, len(counts))
+	for namespace, count := range counts {
+		namespaces = append(namespaces, StoreNamespaceSummary{Name: namespace, RecordCount: count})
+	}
+	sort.Slice(namespaces, func(i, j int) bool { return namespaces[i].Name < namespaces[j].Name })
+	return namespaces
+}
+
+// StoreWatch returns records in a namespace with an optional key prefix.
+func (s *Service) StoreWatch(namespace, prefix string) []StoreRecord {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ns := defaultIfBlank(namespace, "default")
+	prefix = strings.TrimSpace(prefix)
+	out := make([]StoreRecord, 0)
+	now := s.now()
+	for key, record := range s.store {
+		if storeRecordExpired(record, now) {
+			delete(s.store, key)
+			continue
+		}
+		if record.Namespace != ns {
+			continue
+		}
+		if prefix != "" && !strings.HasPrefix(record.Key, prefix) {
+			continue
+		}
+		out = append(out, record)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
+}
+
+// StoreBind binds an existing record to a device:scenario selector.
+func (s *Service) StoreBind(namespace, key, binding string) (StoreRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	storeKey := defaultIfBlank(namespace, "default") + ":" + strings.TrimSpace(key)
+	record, ok := s.store[storeKey]
+	if !ok {
+		return StoreRecord{}, false
+	}
+	if storeRecordExpired(record, s.now()) {
+		delete(s.store, storeKey)
+		return StoreRecord{}, false
+	}
+	record.Binding = strings.TrimSpace(binding)
+	record.UpdatedAt = s.now()
+	s.store[storeKey] = record
+	s.appendRecentLocked("store", storeKey+" bound")
+	return record, true
+}
+
 func storeRecordExpired(record StoreRecord, now time.Time) bool {
 	return record.ExpiresAt != nil && !record.ExpiresAt.After(now)
 }
@@ -1399,11 +1491,66 @@ func (s *Service) BusEmit(kind, name, payload string) BusEvent {
 	return event
 }
 
-// BusTail returns all events emitted on the event bus.
-func (s *Service) BusTail() []BusEvent {
+// BusTail returns events emitted on the event bus with optional filtering.
+func (s *Service) BusTail(kind, name string, limit int) []BusEvent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]BusEvent(nil), s.bus...)
+	return filterBusEvents(s.bus, kind, name, limit)
+}
+
+// BusReplay returns events within an inclusive ID window with optional filtering.
+func (s *Service) BusReplay(fromID, toID, kind, name string, limit int) []BusEvent {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	window := busWindowByID(s.bus, strings.TrimSpace(fromID), strings.TrimSpace(toID))
+	return filterBusEvents(window, kind, name, limit)
+}
+
+func busWindowByID(events []BusEvent, fromID, toID string) []BusEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	start := 0
+	if fromID != "" {
+		for i, event := range events {
+			if event.ID == fromID {
+				start = i
+				break
+			}
+		}
+	}
+	end := len(events) - 1
+	if toID != "" {
+		for i := len(events) - 1; i >= 0; i-- {
+			if events[i].ID == toID {
+				end = i
+				break
+			}
+		}
+	}
+	if start > end {
+		return nil
+	}
+	return append([]BusEvent(nil), events[start:end+1]...)
+}
+
+func filterBusEvents(events []BusEvent, kind, name string, limit int) []BusEvent {
+	kind = strings.TrimSpace(kind)
+	name = strings.TrimSpace(name)
+	filtered := make([]BusEvent, 0, len(events))
+	for _, event := range events {
+		if kind != "" && !strings.EqualFold(event.Kind, kind) {
+			continue
+		}
+		if name != "" && !strings.EqualFold(event.Name, name) {
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	if limit > 0 && len(filtered) > limit {
+		return append([]BusEvent(nil), filtered[len(filtered)-limit:]...)
+	}
+	return filtered
 }
 
 func (s *Service) nextIDLocked(prefix string) string {

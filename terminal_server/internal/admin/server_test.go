@@ -445,8 +445,12 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		"/admin/api/placement",
 		"/admin/api/recent",
 		"/admin/api/store/get?namespace=ns&key=k",
+		"/admin/api/store/ns",
 		"/admin/api/store/ls?namespace=ns",
+		"/admin/api/store/watch?namespace=ns&prefix=k",
 		"/admin/api/bus",
+		"/admin/api/bus?kind=event&name=alarm&limit=1",
+		"/admin/api/bus/replay?from=bus-1&to=bus-9&kind=event",
 	}
 	for _, path := range getCases {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -481,6 +485,8 @@ func TestCapabilityClosureEndpoints(t *testing.T) {
 		{path: "/admin/api/canvas/annotate", form: url.Values{"canvas": {"c1"}, "text": {"draw"}}},
 		{path: "/admin/api/memory/remember", form: url.Values{"scope": {"kitchen"}, "text": {"milk"}}},
 		{path: "/admin/api/store/put", form: url.Values{"namespace": {"ns"}, "key": {"k"}, "value": {"v"}}},
+		{path: "/admin/api/store/bind", form: url.Values{"namespace": {"ns"}, "key": {"k"}, "to": {"device-1:chat"}}},
+		{path: "/admin/api/store/del", form: url.Values{"namespace": {"ns"}, "key": {"k"}}},
 		{path: "/admin/api/bus/emit", form: url.Values{"kind": {"event"}, "name": {"alarm"}, "payload": {"ring"}}},
 	}
 	for _, tc := range postCases {
@@ -979,6 +985,53 @@ func TestStorePutTTLValidation(t *testing.T) {
 	}
 	if !strings.Contains(goodTTLW.Body.String(), "expires_at") {
 		t.Fatalf("valid ttl response missing expires_at: %s", goodTTLW.Body.String())
+	}
+}
+
+func TestStoreBindAndBusTailLimitValidation(t *testing.T) {
+	h := testHandler(t)
+
+	putReq := httptest.NewRequest(http.MethodPost, "/admin/api/store/put", strings.NewReader(url.Values{
+		"namespace": {"ns"},
+		"key":       {"k"},
+		"value":     {"v"},
+	}.Encode()))
+	putReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	putW := httptest.NewRecorder()
+	h.ServeHTTP(putW, putReq)
+	if putW.Code != http.StatusOK {
+		t.Fatalf("store put status = %d, want 200 body=%s", putW.Code, putW.Body.String())
+	}
+
+	badBindReq := httptest.NewRequest(http.MethodPost, "/admin/api/store/bind", strings.NewReader(url.Values{
+		"namespace": {"ns"},
+		"key":       {"k"},
+		"to":        {"badbinding"},
+	}.Encode()))
+	badBindReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	badBindW := httptest.NewRecorder()
+	h.ServeHTTP(badBindW, badBindReq)
+	if badBindW.Code != http.StatusBadRequest {
+		t.Fatalf("bad bind status = %d, want 400 body=%s", badBindW.Code, badBindW.Body.String())
+	}
+
+	goodBindReq := httptest.NewRequest(http.MethodPost, "/admin/api/store/bind", strings.NewReader(url.Values{
+		"namespace": {"ns"},
+		"key":       {"k"},
+		"to":        {"device-1:chat"},
+	}.Encode()))
+	goodBindReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	goodBindW := httptest.NewRecorder()
+	h.ServeHTTP(goodBindW, goodBindReq)
+	if goodBindW.Code != http.StatusOK {
+		t.Fatalf("good bind status = %d, want 200 body=%s", goodBindW.Code, goodBindW.Body.String())
+	}
+
+	badLimitReq := httptest.NewRequest(http.MethodGet, "/admin/api/bus?limit=zero", nil)
+	badLimitW := httptest.NewRecorder()
+	h.ServeHTTP(badLimitW, badLimitReq)
+	if badLimitW.Code != http.StatusBadRequest {
+		t.Fatalf("bad bus limit status = %d, want 400 body=%s", badLimitW.Code, badLimitW.Body.String())
 	}
 }
 

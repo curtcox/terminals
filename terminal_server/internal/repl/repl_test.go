@@ -329,8 +329,13 @@ func TestDescribeIncludesCapabilityClosureCommands(t *testing.T) {
 		"memory stream",
 		"placement ls",
 		"recent ls",
+		"store ns ls",
 		"store put",
+		"store del",
+		"store watch",
+		"store bind",
 		"bus emit",
+		"bus replay",
 	}
 	for _, command := range commands {
 		if _, ok := DescribeCommand(command); !ok {
@@ -548,10 +553,20 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 			_, _ = w.Write([]byte(`{"placements":[{"device_id":"d1","zone":"kitchen"}]}`))
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/recent":
 			_, _ = w.Write([]byte(`{"items":[{"id":"evt-1","kind":"message"}]}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/store/ns":
+			_, _ = w.Write([]byte(`{"namespaces":[{"name":"notes","record_count":2}]}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/store/put":
 			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/store/watch":
+			_, _ = w.Write([]byte(`{"namespace":"notes","prefix":"key","records":[{"namespace":"notes","key":"key1","value":"value1"}]}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/store/bind":
+			_, _ = w.Write([]byte(`{"status":"ok","record":{"namespace":"notes","key":"key1","binding":"device-1:chat"}}`))
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/store/del":
+			_, _ = w.Write([]byte(`{"status":"ok","deleted":true}`))
 		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/bus/emit":
 			_, _ = w.Write([]byte(`{"status":"ok","event":{"id":"bus-1"}}`))
+		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/bus/replay":
+			_, _ = w.Write([]byte(`{"events":[{"id":"bus-1","kind":"event","name":"alarm"}]}`))
 		default:
 			http.NotFound(w, req)
 		}
@@ -594,8 +609,13 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 		"memory stream kitchen",
 		"placement ls",
 		"recent ls",
+		"store ns ls",
 		"store put notes key1 value1",
+		"store watch notes --prefix key",
+		"store bind notes key1 --to device-1:chat",
+		"store del notes key1",
 		"bus emit event alarm",
+		"bus replay bus-1 bus-1 --kind event",
 		"exit",
 	}, "\n") + "\n")
 	var out bytes.Buffer
@@ -675,6 +695,15 @@ func TestCapabilityClosureGroupsUseAdminAPIs(t *testing.T) {
 	}
 	if !strings.Contains(text, "evt-1") {
 		t.Fatalf("recent output missing: %q", text)
+	}
+	if !strings.Contains(text, "notes") {
+		t.Fatalf("store namespace output missing: %q", text)
+	}
+	if !strings.Contains(text, "bound_to=device-1:chat") {
+		t.Fatalf("store bind output missing: %q", text)
+	}
+	if !strings.Contains(text, "deleted=true") {
+		t.Fatalf("store delete output missing: %q", text)
 	}
 	if !strings.Contains(text, "bus-1") {
 		t.Fatalf("bus output missing: %q", text)

@@ -29,8 +29,11 @@ layering, acceptance rules, and authoring substrate.
   `--ttl <duration>` (REPL + admin API + capability service), and
   expired records are pruned lazily on `store get` / `store ls`.
 - Added focused coverage in capability, admin, and REPL tests.
-- Remaining Phase 1 work from this plan: namespace inventory,
-  delete/watch/bind semantics, and richer bus filtering/replay.
+- Completed the remaining Phase 1 scope from this plan:
+  `store ns ls`, `store del`, `store watch`, and `store bind`
+  (REPL + admin API + capability service), plus filtered
+  `bus tail` and windowed `bus replay`.
+- Next planned slice is Phase 2 (`ui` authoring and `devices cohort`).
 
 ## Problem
 
