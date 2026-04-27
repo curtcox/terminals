@@ -575,3 +575,14 @@ Additional shipped slice in this cycle:
 - Expanded `terminal_server/internal/apppackage/tap_test.go` with
   `VerifyPackage` success and rejection coverage (unknown voucher scope key,
   missing author statement, duplicate nonce triple).
+
+Additional shipped slice in this cycle:
+
+- Added strict canonical zstd frame validation in pre-trust verification:
+  rejects skippable/non-zstd magic, enforces content-size flag present,
+  rejects checksum/dictionary-id flags, enforces max window log/size, and
+  rejects trailing bytes or concatenated extra frames before decompression.
+- Expanded `terminal_server/internal/apppackage/tap_test.go` with explicit
+  frame-layer rejection tests for checksum flag, dictionary-id flag, missing
+  content-size flag, trailing bytes, multi-frame payloads, skippable frame
+  magic, and oversized window descriptors.

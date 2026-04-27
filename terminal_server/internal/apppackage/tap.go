@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -28,6 +29,7 @@ import (
 const (
 	canonicalFileMode = 0o644
 	zstdWindowSize    = 8 << 20
+	zstdFrameMagic    = 0xFD2FB528
 
 	signatureBundleSchema   = "tap-sig/1"
 	signatureBundleMaxBytes = 1 << 20
@@ -300,6 +302,10 @@ func compressCanonicalTar(canonicalTar []byte) ([]byte, error) {
 }
 
 func decompressTap(tapBytes []byte) ([]byte, error) {
+	if err := validateCanonicalZstdFrame(tapBytes); err != nil {
+		return nil, err
+	}
+
 	zr, err := zstd.NewReader(bytes.NewReader(tapBytes))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidTapFormat, err)
@@ -314,6 +320,116 @@ func decompressTap(tapBytes []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%w: empty payload", ErrInvalidTapFormat)
 	}
 	return canonicalTar, nil
+}
+
+func validateCanonicalZstdFrame(tapBytes []byte) error {
+	if len(tapBytes) < 4 {
+		return fmt.Errorf("%w: truncated zstd frame", ErrInvalidTapFormat)
+	}
+
+	magic := binary.LittleEndian.Uint32(tapBytes[:4])
+	if magic&0xFFFFFFF0 == 0x184D2A50 {
+		return fmt.Errorf("%w: skippable zstd frame not allowed", ErrInvalidTapFormat)
+	}
+	if magic != zstdFrameMagic {
+		return fmt.Errorf("%w: unsupported zstd magic", ErrInvalidTapFormat)
+	}
+
+	offset := 4
+	if len(tapBytes) < offset+1 {
+		return fmt.Errorf("%w: truncated zstd frame header", ErrInvalidTapFormat)
+	}
+	descriptor := tapBytes[offset]
+	offset++
+
+	fcsFlag := descriptor >> 6
+	singleSegment := descriptor&0x20 != 0
+	if descriptor&0x04 != 0 {
+		return fmt.Errorf("%w: zstd content checksum flag must be unset", ErrInvalidTapFormat)
+	}
+	if descriptor&0x03 != 0 {
+		return fmt.Errorf("%w: zstd dictionary id flag must be unset", ErrInvalidTapFormat)
+	}
+	if fcsFlag == 0 {
+		return fmt.Errorf("%w: zstd content size flag must be set", ErrInvalidTapFormat)
+	}
+
+	if !singleSegment {
+		if len(tapBytes) < offset+1 {
+			return fmt.Errorf("%w: truncated zstd window descriptor", ErrInvalidTapFormat)
+		}
+		windowDescriptor := tapBytes[offset]
+		offset++
+
+		windowLog := uint(windowDescriptor>>3) + 10
+		if windowLog > 23 {
+			return fmt.Errorf("%w: zstd window log too large", ErrInvalidTapFormat)
+		}
+		windowBase := uint64(1) << windowLog
+		windowAdd := (windowBase / 8) * uint64(windowDescriptor&0x07)
+		windowSize := windowBase + windowAdd
+		if windowSize > uint64(zstdWindowSize) {
+			return fmt.Errorf("%w: zstd window size too large", ErrInvalidTapFormat)
+		}
+	}
+
+	contentSizeFieldLen := zstdContentSizeFieldLen(fcsFlag, singleSegment)
+	if len(tapBytes) < offset+contentSizeFieldLen {
+		return fmt.Errorf("%w: truncated zstd content size field", ErrInvalidTapFormat)
+	}
+	offset += contentSizeFieldLen
+
+	for {
+		if len(tapBytes) < offset+3 {
+			return fmt.Errorf("%w: truncated zstd block header", ErrInvalidTapFormat)
+		}
+		blockHeader := uint32(tapBytes[offset]) | uint32(tapBytes[offset+1])<<8 | uint32(tapBytes[offset+2])<<16
+		offset += 3
+
+		lastBlock := blockHeader&0x1 != 0
+		blockType := (blockHeader >> 1) & 0x3
+		blockSize := int(blockHeader >> 3)
+
+		switch blockType {
+		case 0, 2:
+			if len(tapBytes) < offset+blockSize {
+				return fmt.Errorf("%w: truncated zstd block payload", ErrInvalidTapFormat)
+			}
+			offset += blockSize
+		case 1:
+			if len(tapBytes) < offset+1 {
+				return fmt.Errorf("%w: truncated zstd RLE payload", ErrInvalidTapFormat)
+			}
+			offset++
+		default:
+			return fmt.Errorf("%w: reserved zstd block type", ErrInvalidTapFormat)
+		}
+
+		if lastBlock {
+			break
+		}
+	}
+
+	if offset != len(tapBytes) {
+		return fmt.Errorf("%w: trailing bytes or extra frame detected", ErrInvalidTapFormat)
+	}
+	return nil
+}
+
+func zstdContentSizeFieldLen(fcsFlag byte, singleSegment bool) int {
+	switch fcsFlag {
+	case 0:
+		if singleSegment {
+			return 1
+		}
+		return 0
+	case 1:
+		return 2
+	case 2:
+		return 4
+	default:
+		return 8
+	}
 }
 
 func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte, error) {
