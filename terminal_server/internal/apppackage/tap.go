@@ -642,6 +642,13 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 			continue
 		}
 		name := strings.TrimPrefix(rel, "migrate/")
+		if strings.HasPrefix(name, "downgrade/") {
+			downgradeName := strings.TrimPrefix(name, "downgrade/")
+			if strings.TrimSpace(downgradeName) == "" || strings.Contains(downgradeName, "/") || !strings.HasSuffix(downgradeName, ".tal") {
+				return ErrInvalidManifest
+			}
+			continue
+		}
 		if strings.Contains(name, "/") {
 			return ErrInvalidManifest
 		}

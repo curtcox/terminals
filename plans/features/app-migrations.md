@@ -21,6 +21,15 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Updated Gate 1 migration package validation to
+  allow reverse-step scripts under `migrate/downgrade/*.tal`
+  for rollback workflows while continuing to reject unsupported
+  nested downgrade paths. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapAcceptsMigrateDowngradeScripts`,
+  `TestVerifyTapRejectsNestedMigrateDowngradePath`) so
+  keep-data rollback packages with reverse scripts pass
+  verification.
 - 2026-04-27: Added runtime drain-guard enforcement for incompatible
   migration steps in `terminal_server/internal/appruntime/runtime.go`.
   `RetryMigration` now aborts with

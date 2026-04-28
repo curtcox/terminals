@@ -10,6 +10,7 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - If no `migrate/*.tal` files exist, migration declarations must be absent (`declared_steps = 0` and no `[[migrate.step]]`).
 - If migration files exist, `[migrate].declared_steps`, `[[migrate.step]]` count, and migration file count must match.
 - Migration files must be one level under `migrate/` and match `<step>_<from>_to_<to>.tal`.
+- Reverse migration scripts under `migrate/downgrade/*.tal` are allowed for rollback flows, but must remain single-level files (nested downgrade folders are rejected).
 - Step numbers must be contiguous and start at `1` (no gaps).
 - Each sorted migration file must match the corresponding manifest step `from`/`to` values.
 - When a step declares `compatibility = "incompatible"`, it cannot also declare `drain_policy = "none"`.
