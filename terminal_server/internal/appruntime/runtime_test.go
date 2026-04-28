@@ -1045,6 +1045,123 @@ func TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes(t *testing.T) 
 	}
 }
 
+func TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries(t *testing.T) {
+	testCases := []struct {
+		name                string
+		event               string
+		step                int
+		wantReplayCompleted int
+		wantReplayLastStep  int
+		wantReplayLastError string
+	}{
+		{
+			name:                "retry started boundary",
+			event:               "retry_started",
+			step:                0,
+			wantReplayCompleted: 0,
+			wantReplayLastStep:  0,
+			wantReplayLastError: ErrMigrationInterrupted.Error(),
+		},
+		{
+			name:                "step started boundary",
+			event:               "step_started",
+			step:                1,
+			wantReplayCompleted: 0,
+			wantReplayLastStep:  1,
+			wantReplayLastError: "step 1 interrupted before commit",
+		},
+		{
+			name:                "step committed boundary",
+			event:               "step_committed",
+			step:                1,
+			wantReplayCompleted: 1,
+			wantReplayLastStep:  1,
+			wantReplayLastError: "step 1 interrupted before commit",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			appDir := filepath.Join(tempDir, "migrate_crash_replay")
+			if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+				t.Fatalf("MkdirAll() error = %v", err)
+			}
+			manifest := "name = \"migrate_crash_replay\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+			if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+				t.Fatalf("WriteFile(manifest) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(main) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(migrate 1) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(migrate 2) error = %v", err)
+			}
+
+			runtime := NewRuntime()
+			if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+				t.Fatalf("LoadPackage() error = %v", err)
+			}
+
+			crashInjected := false
+			runtime.migrationHook = func(event string, step int) error {
+				if crashInjected {
+					return nil
+				}
+				if event == tc.event && step == tc.step {
+					crashInjected = true
+					return errors.New("injected crash")
+				}
+				return nil
+			}
+
+			status, err := runtime.RetryMigration("migrate_crash_replay")
+			if !errors.Is(err, ErrMigrationInterrupted) {
+				t.Fatalf("RetryMigration() error = %v, want ErrMigrationInterrupted", err)
+			}
+			if status.Verdict != "running" {
+				t.Fatalf("RetryMigration() verdict = %q, want running", status.Verdict)
+			}
+
+			restarted := NewRuntime()
+			if _, err := restarted.LoadPackage(context.Background(), appDir); err != nil {
+				t.Fatalf("LoadPackage() after restart error = %v", err)
+			}
+
+			replayed, err := restarted.GetMigrationStatus("migrate_crash_replay")
+			if err != nil {
+				t.Fatalf("GetMigrationStatus() after restart error = %v", err)
+			}
+			if replayed.Verdict != "step_failed" {
+				t.Fatalf("GetMigrationStatus() verdict = %q, want step_failed", replayed.Verdict)
+			}
+			if replayed.StepsCompleted != tc.wantReplayCompleted {
+				t.Fatalf("GetMigrationStatus() steps_completed = %d, want %d", replayed.StepsCompleted, tc.wantReplayCompleted)
+			}
+			if replayed.LastStep != tc.wantReplayLastStep {
+				t.Fatalf("GetMigrationStatus() last_step = %d, want %d", replayed.LastStep, tc.wantReplayLastStep)
+			}
+			if replayed.LastError != tc.wantReplayLastError {
+				t.Fatalf("GetMigrationStatus() last_error = %q, want %q", replayed.LastError, tc.wantReplayLastError)
+			}
+
+			replayed, err = restarted.RetryMigration("migrate_crash_replay")
+			if err != nil {
+				t.Fatalf("RetryMigration() after replay error = %v", err)
+			}
+			if replayed.Verdict != "ok" {
+				t.Fatalf("RetryMigration() verdict = %q, want ok", replayed.Verdict)
+			}
+			if replayed.StepsCompleted != 2 {
+				t.Fatalf("RetryMigration() steps_completed = %d, want 2", replayed.StepsCompleted)
+			}
+		})
+	}
+}
+
 func TestRuntimeRetryMigrationRequiresDrainReadiness(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_drain_guard")

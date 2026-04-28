@@ -234,6 +234,7 @@ type Runtime struct {
 	packages         map[string]Package
 	history          map[string][]Package
 	migrations       map[string]migrationState
+	migrationHook    func(event string, step int) error
 }
 
 type migrationState struct {
@@ -461,6 +462,10 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	state.LastError = ""
 	state.DrainBlockedAt = time.Time{}
 	appendMigrationJournalEntry(pkg, state, "retry_started", map[string]any{"from_step": nextStep})
+	state, err = r.maybeInterruptMigrationLocked(name, state, "retry_started")
+	if err != nil {
+		return statusFromState(pkg, state), err
+	}
 	for _, step := range migrationPlanPendingSteps(state.StepPlan, nextStep) {
 		stepPath := filepath.Join(pkg.RootPath, "migrate", step.ScriptName)
 		if _, statErr := os.Stat(stepPath); statErr != nil {
@@ -513,6 +518,10 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 			"to_version":   step.ToVersion,
 			"script":       step.ScriptName,
 		})
+		state, err = r.maybeInterruptMigrationLocked(name, state, "step_started")
+		if err != nil {
+			return statusFromState(pkg, state), err
+		}
 		if fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step); fixtureErr != nil {
 			state.Verdict = "step_failed"
 			state.LastStep = step.Number
@@ -549,6 +558,10 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 			"to_version":   step.ToVersion,
 			"script":       step.ScriptName,
 		})
+		state, err = r.maybeInterruptMigrationLocked(name, state, "step_committed")
+		if err != nil {
+			return statusFromState(pkg, state), err
+		}
 	}
 	if state.StepsCompleted > state.StepsPlanned {
 		state.StepsCompleted = state.StepsPlanned
@@ -563,6 +576,18 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	r.migrations[name] = state
 	appendMigrationJournalEntry(pkg, state, "retry_committed", map[string]any{"from_step": nextStep, "to_step": state.StepsCompleted})
 	return statusFromState(pkg, state), nil
+}
+
+func (r *Runtime) maybeInterruptMigrationLocked(name string, state migrationState, event string) (migrationState, error) {
+	if r.migrationHook == nil {
+		return state, nil
+	}
+	if err := r.migrationHook(event, state.LastStep); err != nil {
+		state.Verdict = "running"
+		r.migrations[name] = state
+		return state, fmt.Errorf("%w: %v", ErrMigrationInterrupted, err)
+	}
+	return state, nil
 }
 
 // SetMigrationDrainReady updates whether incompatible migration steps are safe to execute.

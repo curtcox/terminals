@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added runtime crash-injection replay coverage at
+  migration journal boundaries in
+  `terminal_server/internal/appruntime/runtime.go`.
+  `RetryMigration` now supports an internal interruption hook at
+  `retry_started`, `step_started`, and `step_committed` boundaries,
+  persisting in-progress `verdict = running` state for restart replay
+  normalization tests. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`),
+  and documented behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Added runtime migration fixture expected-output
   comparison guard in `terminal_server/internal/appruntime/runtime.go`.
   `RetryMigration` now checks declared `[[migrate.fixture]]` entries

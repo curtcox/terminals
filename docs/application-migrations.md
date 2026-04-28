@@ -83,6 +83,11 @@ of replaying the entire migration range on every retry.
 - If a declared fixture file cannot be read at execution time, retry stops
 	with `ErrMigrationFixtureUnavailable`, marks `verdict = step_failed`, and
 	emits `step_failed_fixture_unavailable` journal entries.
+- Runtime retry now supports crash-injection testing at journal boundaries
+	(`retry_started`, `step_started`, `step_committed`). Injected interruptions
+	persist as `verdict = running` snapshots in the journal; restart replay
+	normalizes them to `verdict = step_failed` with interruption context so
+	operators can retry from the last committed checkpoint.
 - Invalid runtime migration step plans (for example malformed script filenames,
 	numbering gaps, or manifest `[[migrate.step]]` / script-count mismatches) now
 	leave migration status with `executor_ready = false` and a specific
@@ -127,6 +132,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
 - `TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes`
+- `TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
@@ -135,4 +141,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle (actual step execution over synthetic seeded stores and full crash-injection coverage at journal boundaries). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry enforces declared fixture expected-output equality for identity dry-run comparison, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle (actual step execution over synthetic seeded stores and the full Gate 4 dry-run harness). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry enforces declared fixture expected-output equality for identity dry-run comparison, runtime replay now has journal-boundary crash-injection coverage, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
