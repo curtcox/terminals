@@ -61,6 +61,11 @@ of replaying the entire migration range on every retry.
 	Runtime journal entries for `step_started` / `step_committed` now include
 	`from_version`, `to_version`, and `script` metadata so operator logs show the
 	exact version edge and script for each executed step.
+- Retry now verifies each pending migration script still exists on disk at
+	execution time. If a pending script is unavailable, retry stops with
+	`ErrMigrationStepUnavailable`, preserves completed checkpoint progress, marks
+	`verdict = step_failed`, and emits `step_failed_unavailable` journal metadata
+	for the failed step.
 - Invalid runtime migration step plans (for example malformed script filenames,
 	numbering gaps, or manifest `[[migrate.step]]` / script-count mismatches) now
 	leave migration status with `executor_ready = false` and a specific

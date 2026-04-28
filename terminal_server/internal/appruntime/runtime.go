@@ -53,6 +53,8 @@ var (
 	ErrMigrationDrainTimeout = errors.New("migration drain timeout elapsed before executor run")
 	// ErrMigrationDrainPending indicates incompatible migration drain prerequisites are still in progress.
 	ErrMigrationDrainPending = errors.New("migration drain is pending")
+	// ErrMigrationStepUnavailable indicates a migration step script could not be read at execution time.
+	ErrMigrationStepUnavailable = errors.New("migration step script unavailable")
 )
 
 const defaultMigrationDrainTimeout = 90 * time.Second
@@ -441,6 +443,21 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	state.DrainBlockedAt = time.Time{}
 	appendMigrationJournalEntry(pkg, state, "retry_started", map[string]any{"from_step": nextStep})
 	for _, step := range migrationPlanPendingSteps(state.StepPlan, nextStep) {
+		stepPath := filepath.Join(pkg.RootPath, "migrate", step.ScriptName)
+		if _, statErr := os.Stat(stepPath); statErr != nil {
+			state.Verdict = "step_failed"
+			state.LastStep = step.Number
+			state.LastError = fmt.Sprintf("step %d script unavailable: %s", step.Number, step.ScriptName)
+			r.migrations[name] = state
+			appendMigrationJournalEntry(pkg, state, "step_failed_unavailable", map[string]any{
+				"step_id":      step.Number,
+				"from_version": step.FromVersion,
+				"to_version":   step.ToVersion,
+				"script":       step.ScriptName,
+				"error":        statErr.Error(),
+			})
+			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepUnavailable, step.Number, step.ScriptName, statErr)
+		}
 		state.LastStep = step.Number
 		appendMigrationJournalEntry(pkg, state, "step_started", map[string]any{
 			"step_id":      step.Number,

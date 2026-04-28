@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added execution-time migration script availability
+  enforcement in `terminal_server/internal/appruntime/runtime.go`.
+  `RetryMigration` now verifies each pending step script exists on
+  disk before execution; missing scripts fail fast with
+  `ErrMigrationStepUnavailable`, preserve completed checkpoint
+  progress, set `verdict = step_failed`, and append
+  `step_failed_unavailable` entries with per-step metadata in the
+  migration journal. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenPendingScriptUnavailable`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Enforced migration fixture version-edge consistency
   in `terminal_server/internal/apppackage/tap.go`.
   `VerifyTap` now requires each `[[migrate.fixture]].prior_version`
