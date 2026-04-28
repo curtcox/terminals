@@ -135,6 +135,26 @@ func TestRuntimeRejectsIncompatibleKernelAPI(t *testing.T) {
 	}
 }
 
+func TestRuntimeRejectsInvalidAppID(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "bad_app_id")
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"bad_app_id\"\napp_id = \"not-an-app-id\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+
+	_, err := NewRuntime().LoadPackage(context.Background(), appDir)
+	if !errors.Is(err, ErrInvalidManifest) {
+		t.Fatalf("LoadPackage() error = %v, want ErrInvalidManifest", err)
+	}
+}
+
 func TestRuntimeReloadFailureKeepsLastGood(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "sticky")
@@ -552,6 +572,37 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 
 	if _, err := runtime.AbortMigration("migrate_live", "invalid_target"); !errors.Is(err, ErrMigrationAbortTargetInvalid) {
 		t.Fatalf("AbortMigration(invalid target) error = %v, want ErrMigrationAbortTargetInvalid", err)
+	}
+}
+
+func TestRuntimeMigrationJournalPathUsesAppID(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_identity")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_identity\"\napp_id = \"app:sha256:1111111111111111111111111111111111111111111111111111111111111111\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_identity")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if !strings.Contains(status.JournalPath, "apps/app:sha256:1111111111111111111111111111111111111111111111111111111111111111/migrate/") {
+		t.Fatalf("RetryMigration() journal_path = %q, want app_id-scoped migration path", status.JournalPath)
 	}
 }
 

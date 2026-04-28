@@ -55,6 +55,11 @@ migration control actions:
 Retry now resumes at the first incomplete step (`steps_completed + 1`) instead
 of replaying the entire migration range on every retry.
 
+When `manifest.toml` declares `app_id`, migration journal paths are now rooted
+under `apps/<app_id>/migrate/...` instead of `apps/<manifest_name>/...` so
+runtime migration state remains anchored to lineage identity during key
+rotation. Packages that omit `app_id` keep the existing manifest-name fallback.
+
 These entries are written to the status-provided `journal_path` consumed by
 `/admin/api/apps/migrate/logs` and `apps migrate logs`.
 
@@ -82,6 +87,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeMigrationLifecycleWithSteps`
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
+- `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
 - `TestExecuteCommandAppsMigrateUsageIncludesLogs`

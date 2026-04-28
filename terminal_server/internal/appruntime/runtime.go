@@ -98,6 +98,7 @@ var allowedPermissions = map[string]struct{}{
 // Manifest is the TAR/TAL app package descriptor.
 type Manifest struct {
 	Name              string
+	AppID             string
 	Version           string
 	Language          string
 	RequiresKernelAPI string
@@ -747,7 +748,15 @@ func countDowngradeMigrationSteps(root string) int {
 }
 
 func migrationJournalPath(pkg Package) string {
-	return filepath.ToSlash(filepath.Join("apps", pkg.Manifest.Name, "migrate", fmt.Sprintf("r%d", pkg.Revision), "journal.ndjson"))
+	return filepath.ToSlash(filepath.Join("apps", migrationIdentity(pkg.Manifest), "migrate", fmt.Sprintf("r%d", pkg.Revision), "journal.ndjson"))
+}
+
+func migrationIdentity(manifest Manifest) string {
+	appID := strings.TrimSpace(manifest.AppID)
+	if appID != "" {
+		return appID
+	}
+	return strings.TrimSpace(manifest.Name)
 }
 
 func appendMigrationJournalEntry(pkg Package, state migrationState, event string, fields map[string]any) {
@@ -909,6 +918,9 @@ func validateManifest(manifest Manifest, kernelAPIVersion string) error {
 		strings.TrimSpace(manifest.Language) == "" {
 		return ErrInvalidManifest
 	}
+	if !isValidAppID(manifest.AppID) {
+		return ErrInvalidManifest
+	}
 	if manifest.Language != LanguageTALV1 {
 		return ErrInvalidManifest
 	}
@@ -953,6 +965,8 @@ func parseManifest(path string) (Manifest, error) {
 		switch key {
 		case "name":
 			manifest.Name = parseString(raw)
+		case "app_id":
+			manifest.AppID = parseString(raw)
 		case "version":
 			manifest.Version = parseString(raw)
 		case "language":
@@ -984,6 +998,27 @@ func parseManifest(path string) (Manifest, error) {
 	manifest.Kernels = normalizeStringSet(manifest.Kernels)
 	manifest.Models = normalizeStringSet(manifest.Models)
 	return manifest, nil
+}
+
+func isValidAppID(appID string) bool {
+	appID = strings.TrimSpace(appID)
+	if appID == "" {
+		return true
+	}
+	const prefix = "app:sha256:"
+	if !strings.HasPrefix(appID, prefix) {
+		return false
+	}
+	hexPart := strings.TrimPrefix(appID, prefix)
+	if len(hexPart) != 64 {
+		return false
+	}
+	for _, r := range hexPart {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func collectDigest(root string) (map[string]time.Time, error) {

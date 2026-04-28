@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Keyed runtime migration journals by lineage identity
+  when available. `terminal_server/internal/appruntime/runtime.go`
+  now parses optional `app_id` from `manifest.toml`, validates
+  `app:sha256:<64-hex>` format, and writes migration journal paths
+  under `apps/<app_id>/migrate/...` (with manifest-name fallback
+  when `app_id` is absent). Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationJournalPathUsesAppID`,
+  `TestRuntimeRejectsInvalidAppID`) and documented the behavior in
+  `docs/application-migrations.md`.
+
 - 2026-04-27: Tightened migration operator-surface coverage in
   `terminal_server/internal/repl/repl.go` and
   `terminal_server/internal/repl/repl_test.go`. The
