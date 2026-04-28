@@ -1284,6 +1284,22 @@ func TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries(t *testin
 			wantReplayLastStep:  1,
 			wantReplayLastError: "step 1 interrupted before commit",
 		},
+		{
+			name:                "second step started boundary",
+			event:               "step_started",
+			step:                2,
+			wantReplayCompleted: 1,
+			wantReplayLastStep:  2,
+			wantReplayLastError: "step 2 interrupted before commit",
+		},
+		{
+			name:                "second step committed boundary",
+			event:               "step_committed",
+			step:                2,
+			wantReplayCompleted: 2,
+			wantReplayLastStep:  2,
+			wantReplayLastError: "step 2 interrupted before commit",
+		},
 	}
 
 	for _, tc := range testCases {

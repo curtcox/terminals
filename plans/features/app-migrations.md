@@ -21,6 +21,15 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Expanded migration crash-injection replay coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`.
+  `TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`
+  now exercises boundary interruptions on later pending steps
+  (step 2 `step_started` and `step_committed`) in addition to first-step
+  boundaries, verifying journal replay preserves completed-step checkpoints
+  and per-step interruption context before retry resumes to `verdict = ok`.
+  Documented the broader coverage in `docs/application-migrations.md`.
+
 - 2026-04-28: Enforced execution-time migration fixture record limits
   in `terminal_server/internal/appruntime/runtime.go`.
   `readRuntimeFixtureRecords` now rejects fixture files with more than

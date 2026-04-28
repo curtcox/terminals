@@ -144,6 +144,8 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeReconcileMigrationPendingRecords`
 - `TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes`
 - `TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`
+	(covers retry/step journal-boundary interruption replay across first and
+	later pending steps)
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
 - `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`
