@@ -38,6 +38,9 @@ migration control actions:
 	(`checkpoint` or `baseline`).
 - `ReconcileMigration` writes `reconcile_record` entries with `record_id` and
 	selected `resolution`.
+- Checkpoint abort now leaves migration state at `verdict = "step_failed"`
+	with `last_step` pinned to the failed step and checkpoint progress preserved
+	for `apps migrate retry`; baseline abort remains `verdict = "aborted"`.
 
 Retry now resumes at the first incomplete step (`steps_completed + 1`) instead
 of replaying the entire migration range on every retry.

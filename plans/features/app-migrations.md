@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Aligned checkpoint abort semantics with design intent in
+  `terminal_server/internal/appruntime/runtime.go`. `AbortMigration`
+  now returns `verdict = step_failed` for checkpoint-target aborts,
+  preserves retry checkpoint progress, and surfaces failed-step detail in
+  `last_step` / `last_error`; baseline aborts remain `verdict = aborted`.
+  Added regression assertions in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationLifecycleWithSteps`) and documented the behavior in
+  `docs/application-migrations.md`.
+
 - 2026-04-27: Improved runtime migration retry lifecycle in
   `terminal_server/internal/appruntime/runtime.go` so retries now
   resume from the first incomplete step instead of replaying all

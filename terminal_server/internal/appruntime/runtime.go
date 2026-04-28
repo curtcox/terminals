@@ -464,13 +464,19 @@ func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error) {
 		state.LastStep = 0
 		state.LastError = "aborted to baseline by operator"
 	} else {
+		failedStep := state.StepsCompleted
+		if failedStep < 1 {
+			failedStep = 1
+		}
 		if state.StepsCompleted > 0 {
 			state.StepsCompleted--
 		}
 		if state.StepsCompleted < 0 {
 			state.StepsCompleted = 0
 		}
-		state.LastStep = state.StepsCompleted
+		state.LastStep = failedStep
+		state.Verdict = "step_failed"
+		state.LastError = fmt.Sprintf("step %d aborted by operator", failedStep)
 	}
 	state.PendingRecords = nil
 	state.ReconciliationPath = ""

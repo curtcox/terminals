@@ -500,14 +500,17 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AbortMigration() error = %v", err)
 	}
-	if status.Verdict != "aborted" {
-		t.Fatalf("AbortMigration() verdict = %q, want aborted", status.Verdict)
+	if status.Verdict != "step_failed" {
+		t.Fatalf("AbortMigration() verdict = %q, want step_failed", status.Verdict)
 	}
 	if status.StepsCompleted != 1 {
 		t.Fatalf("AbortMigration() steps_completed = %d, want 1", status.StepsCompleted)
 	}
-	if status.LastStep != 1 {
-		t.Fatalf("AbortMigration() last_step = %d, want 1", status.LastStep)
+	if status.LastStep != 2 {
+		t.Fatalf("AbortMigration() last_step = %d, want 2", status.LastStep)
+	}
+	if status.LastError != "step 2 aborted by operator" {
+		t.Fatalf("AbortMigration() last_error = %q, want %q", status.LastError, "step 2 aborted by operator")
 	}
 
 	status, err = runtime.RetryMigration("migrate_live")
