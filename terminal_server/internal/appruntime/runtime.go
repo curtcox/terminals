@@ -1044,6 +1044,16 @@ func resolveRuntimeFixturePath(root string, relPath string) (string, error) {
 	if relToRoot == ".." || strings.HasPrefix(relToRoot, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("%w: %s must resolve within package root", ErrMigrationFixtureMismatch, relPath)
 	}
+	resolvedRoot, err := filepath.EvalSymlinks(cleanRoot)
+	if err == nil {
+		resolvedPath, resolvedErr := filepath.EvalSymlinks(fullPath)
+		if resolvedErr == nil {
+			relResolved, relErr := filepath.Rel(resolvedRoot, resolvedPath)
+			if relErr != nil || relResolved == ".." || strings.HasPrefix(relResolved, ".."+string(filepath.Separator)) {
+				return "", fmt.Errorf("%w: %s must resolve within package root", ErrMigrationFixtureMismatch, relPath)
+			}
+		}
+	}
 	return fullPath, nil
 }
 

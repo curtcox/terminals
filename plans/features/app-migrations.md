@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Hardened execution-time migration fixture root checks
+  against symlink traversal in
+  `terminal_server/internal/appruntime/runtime.go`.
+  `resolveRuntimeFixturePath` now resolves fixture symlink targets
+  when available and rejects paths that resolve outside the loaded
+  package root, preventing fixture declarations such as
+  `tests/migrate_fixtures/history_seed.ndjson` from escaping via a
+  symlink to external files. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRootViaSymlink`)
+  and documented behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Hardened execution-time migration fixture path resolution
   in `terminal_server/internal/appruntime/runtime.go`.
   `readRuntimeFixtureRecords` now rejects fixture seed/expected paths

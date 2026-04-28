@@ -100,6 +100,11 @@ of replaying the entire migration range on every retry.
 	package root (for example `../outside_seed.ndjson`). Escape attempts fail
 	retry with `ErrMigrationFixtureMismatch` before step commit and emit
 	`step_failed_fixture_mismatch` journal entries.
+- Runtime fixture path checks now also resolve symlink targets before reads;
+	fixture files that lexically appear under the package root but resolve
+	outside it (for example via `tests/migrate_fixtures/history_seed.ndjson`
+	-> `/tmp/outside_seed.ndjson`) are rejected with
+	`ErrMigrationFixtureMismatch`.
 - When fixture declarations are present in `manifest.toml`, retry now also
 	requires a `[[migrate.fixture]]` entry for each pending step. Missing
 	per-step fixture metadata fails retry with `ErrMigrationFixtureUnavailable`
@@ -164,6 +169,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordNotCanonical`
 - `TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRoot`
+- `TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRootViaSymlink`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
 - `TestExecuteCommandAppsMigrateUsageIncludesLogs`
