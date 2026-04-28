@@ -116,6 +116,10 @@ var migrateRecordLowerTrimPattern = regexp.MustCompile(`^lower\(\s*trim\(\s*reco
 
 var migrateRecordLowerTrimGetPattern = regexp.MustCompile(`^lower\(\s*trim\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)\s*\)$`)
 
+var migrateRecordNormalizeGetPattern = regexp.MustCompile(`^_normalize\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)$`)
+
+var migrateRecordNormalizePattern = regexp.MustCompile(`^_normalize\(\s*record\["([^"]+)"\]\s*\)$`)
+
 var migrateAbortPattern = regexp.MustCompile(`^abort\(\s*("(?:\\.|[^"\\])*")\s*\)$`)
 
 var migrateArtifactSelfLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']artifact\.self["']\s*,(?P<args>[^)]*)\)`)
@@ -125,6 +129,18 @@ var migrateLoadAliasPattern = regexp.MustCompile(`\bpatch\s*=\s*["']([A-Za-z_][A
 var migrateLogLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']log["']\s*,(?P<args>[^)]*)\)`)
 
 var migrateLogAliasPattern = regexp.MustCompile(`\b(?:debug|info|warn|error)\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
+var migrateStoreLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']store["']\s*,(?P<args>[^)]*)\)`)
+
+var migrateStoreListKeysAliasPattern = regexp.MustCompile(`\blist_keys\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
+var migrateStoreGetAliasPattern = regexp.MustCompile(`\bget\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
+var migrateStorePutAliasPattern = regexp.MustCompile(`\bput\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
+var migrateEnvLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']migrate\.env["']\s*,(?P<args>[^)]*)\)`)
+
+var migrateEnvCheckpointAliasPattern = regexp.MustCompile(`\bcheckpoint\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
 
 var migrateCallPattern = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*$`)
 
@@ -1447,6 +1463,56 @@ func migrationLogAliases(scriptSource []byte) map[string]struct{} {
 	return aliases
 }
 
+type runtimeMigrationStoreAliases struct {
+	ListKeys map[string]struct{}
+	Get      map[string]struct{}
+	Put      map[string]struct{}
+}
+
+func migrationStoreAliases(scriptSource []byte) runtimeMigrationStoreAliases {
+	aliases := runtimeMigrationStoreAliases{
+		ListKeys: make(map[string]struct{}),
+		Get:      make(map[string]struct{}),
+		Put:      make(map[string]struct{}),
+	}
+	for _, match := range migrateStoreLoadPattern.FindAllSubmatch(scriptSource, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		for _, aliasMatch := range migrateStoreListKeysAliasPattern.FindAllSubmatch(match[1], -1) {
+			if len(aliasMatch) >= 2 {
+				aliases.ListKeys[string(aliasMatch[1])] = struct{}{}
+			}
+		}
+		for _, aliasMatch := range migrateStoreGetAliasPattern.FindAllSubmatch(match[1], -1) {
+			if len(aliasMatch) >= 2 {
+				aliases.Get[string(aliasMatch[1])] = struct{}{}
+			}
+		}
+		for _, aliasMatch := range migrateStorePutAliasPattern.FindAllSubmatch(match[1], -1) {
+			if len(aliasMatch) >= 2 {
+				aliases.Put[string(aliasMatch[1])] = struct{}{}
+			}
+		}
+	}
+	return aliases
+}
+
+func migrationCheckpointAliases(scriptSource []byte) map[string]struct{} {
+	aliases := make(map[string]struct{})
+	for _, match := range migrateEnvLoadPattern.FindAllSubmatch(scriptSource, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		for _, aliasMatch := range migrateEnvCheckpointAliasPattern.FindAllSubmatch(match[1], -1) {
+			if len(aliasMatch) >= 2 {
+				aliases[string(aliasMatch[1])] = struct{}{}
+			}
+		}
+	}
+	return aliases
+}
+
 func migrationStringArgument(args string) string {
 	match := migrateStringArgPattern.FindStringSubmatch(args)
 	if match == nil {
@@ -1492,6 +1558,11 @@ type runtimeMigrationResourceLimits struct {
 	MaxStoreOps              int
 	MaxWriteVolumeBytes      int64
 	MaxArtifactPatchAttempts int
+}
+
+type runtimeMigrationStoreFixturePlan struct {
+	Prefix     string
+	Transforms []runtimeMigrationFixtureTransform
 }
 
 func defaultRuntimeMigrationResourceLimits() runtimeMigrationResourceLimits {
@@ -1564,7 +1635,7 @@ type runtimeMigrationFixtureTransform struct {
 func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]string) (map[string]string, runtimeMigrationResourceStats, error) {
 	transforms, err := parseRuntimeMigrationFixtureTransforms(scriptSource)
 	if err != nil {
-		return nil, runtimeMigrationResourceStats{}, err
+		return executeRuntimeMigrationStoreFixture(scriptSource, seedRecords, err)
 	}
 	if len(transforms) == 0 {
 		out := make(map[string]string, len(seedRecords))
@@ -1635,6 +1706,91 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 		writeVolume += int64(len(canonical))
 	}
 	return out, runtimeMigrationResourceStats{StoreOps: len(seedRecords), WriteVolumeBytes: writeVolume}, nil
+}
+
+func executeRuntimeMigrationStoreFixture(scriptSource []byte, seedRecords map[string]string, recordModeErr error) (map[string]string, runtimeMigrationResourceStats, error) {
+	plan, err := parseRuntimeMigrationStoreFixturePlan(scriptSource)
+	if err != nil {
+		if recordModeErr != nil {
+			return nil, runtimeMigrationResourceStats{}, recordModeErr
+		}
+		return nil, runtimeMigrationResourceStats{}, err
+	}
+	if plan == nil {
+		return nil, runtimeMigrationResourceStats{}, recordModeErr
+	}
+
+	out := make(map[string]string, len(seedRecords))
+	for key, value := range seedRecords {
+		out[key] = value
+	}
+
+	keys := make([]string, 0, len(seedRecords))
+	for key := range seedRecords {
+		if strings.HasPrefix(key, plan.Prefix) {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+
+	var stats runtimeMigrationResourceStats
+	for _, key := range keys {
+		var record map[string]any
+		if err := json.Unmarshal([]byte(out[key]), &record); err != nil {
+			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
+		}
+		skipPut := false
+		for _, transform := range plan.Transforms {
+			if skipPut {
+				break
+			}
+			switch transform.Operation {
+			case "skip_if_present":
+				if _, ok := record[transform.Source]; ok {
+					skipPut = true
+				}
+			case "copy":
+				record[transform.Destination] = runtimeMigrationFixtureValue(record, transform)
+			case "lower":
+				value, ok := runtimeMigrationFixtureStringValue(record, transform)
+				if !ok {
+					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
+				}
+				record[transform.Destination] = strings.ToLower(value)
+			case "trim":
+				value, ok := runtimeMigrationFixtureStringValue(record, transform)
+				if !ok {
+					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for trim()", key, transform.Source)
+				}
+				record[transform.Destination] = strings.TrimSpace(value)
+			case "lower_trim":
+				value, ok := runtimeMigrationFixtureStringValue(record, transform)
+				if !ok {
+					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for lower(trim())", key, transform.Source)
+				}
+				record[transform.Destination] = strings.ToLower(strings.TrimSpace(value))
+			case "literal":
+				record[transform.Destination] = transform.Value
+			case "delete":
+				delete(record, transform.Destination)
+			case "abort":
+				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
+			default:
+				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
+			}
+		}
+		if skipPut {
+			continue
+		}
+		canonical, err := json.Marshal(record)
+		if err != nil {
+			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
+		}
+		out[key] = string(canonical)
+		stats.StoreOps++
+		stats.WriteVolumeBytes += int64(len(canonical))
+	}
+	return out, stats, nil
 }
 
 func validateRuntimeMigrationResourceLimits(stats runtimeMigrationResourceStats, limits runtimeMigrationResourceLimits) error {
@@ -1716,8 +1872,161 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 	return transforms, nil
 }
 
+func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrationStoreFixturePlan, error) {
+	storeAliases := migrationStoreAliases(scriptSource)
+	if len(storeAliases.ListKeys) == 0 || len(storeAliases.Get) == 0 || len(storeAliases.Put) == 0 {
+		return nil, nil
+	}
+	checkpointAliases := migrationCheckpointAliases(scriptSource)
+	logAliases := migrationLogAliases(scriptSource)
+	lines := strings.Split(string(scriptSource), "\n")
+	transforms := make([]runtimeMigrationFixtureTransform, 0)
+	prefix := ""
+	sawGet := false
+	sawPut := false
+	for lineNumber, rawLine := range lines {
+		line := strings.TrimSpace(stripTALLineComment(rawLine))
+		if line == "" || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "def ") || line == "pass" {
+			continue
+		}
+		if line == "cursor = None" || line == "count = 0" || line == "while True:" ||
+			line == "if len(page) == 0: break" || line == "for key in page:" ||
+			line == "count += 1" || line == "cursor = page[-1]" ||
+			line == "return label.strip().lower()" {
+			continue
+		}
+		if parsedPrefix, ok := migrationStoreListKeysPrefix(line, storeAliases.ListKeys); ok {
+			if prefix != "" && prefix != parsedPrefix {
+				return nil, fmt.Errorf("line %d uses multiple list_keys prefixes", lineNumber+1)
+			}
+			prefix = parsedPrefix
+			continue
+		}
+		if migrationStoreGetStatement(line, storeAliases.Get) {
+			sawGet = true
+			continue
+		}
+		if migrationStorePutStatement(line, storeAliases.Put) {
+			sawPut = true
+			continue
+		}
+		if match := migrateAbortPattern.FindStringSubmatch(line); match != nil {
+			var reason string
+			if err := json.Unmarshal([]byte(match[1]), &reason); err != nil {
+				return nil, fmt.Errorf("line %d: invalid abort reason: %w", lineNumber+1, err)
+			}
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Operation: "abort",
+				Reason:    reason,
+			})
+			continue
+		}
+		recordLine := migrationStoreRecordLine(line)
+		if match := migrateRecordDeletePattern.FindStringSubmatch(recordLine); match != nil {
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Destination: match[1],
+				Operation:   "delete",
+			})
+			continue
+		}
+		if match := migrateRecordSkipIfPresentPattern.FindStringSubmatch(recordLine); match != nil {
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Source:    match[1],
+				Operation: "skip_if_present",
+			})
+			continue
+		}
+		if match := migrateRecordAssignmentPattern.FindStringSubmatch(recordLine); match != nil {
+			transform, err := parseRuntimeMigrationFixtureAssignment(match[1], match[2])
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNumber+1, err)
+			}
+			transforms = append(transforms, transform)
+			continue
+		}
+		if match := migrateCallPattern.FindStringSubmatch(line); match != nil {
+			if _, ok := logAliases[match[1]]; ok {
+				continue
+			}
+			if _, ok := checkpointAliases[match[1]]; ok {
+				continue
+			}
+		}
+		return nil, fmt.Errorf("line %d uses unsupported store fixture migration statement %q", lineNumber+1, line)
+	}
+	if prefix == "" {
+		return nil, errors.New("store fixture migration missing list_keys prefix")
+	}
+	if !sawGet || !sawPut {
+		return nil, errors.New("store fixture migration must get and put records")
+	}
+	return &runtimeMigrationStoreFixturePlan{
+		Prefix:     prefix,
+		Transforms: transforms,
+	}, nil
+}
+
+func migrationStoreListKeysPrefix(line string, aliases map[string]struct{}) (string, bool) {
+	match := regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)$`).FindStringSubmatch(line)
+	if match == nil {
+		return "", false
+	}
+	if _, ok := aliases[match[1]]; !ok {
+		return "", false
+	}
+	prefix := migrationKeywordStringArgument(regexp.MustCompile(`\bprefix\s*=\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`), match[2])
+	return prefix, prefix != ""
+}
+
+func migrationStoreGetStatement(line string, aliases map[string]struct{}) bool {
+	match := regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*key\s*\)$`).FindStringSubmatch(line)
+	if match == nil {
+		return false
+	}
+	_, ok := aliases[match[1]]
+	return ok
+}
+
+func migrationStorePutStatement(line string, aliases map[string]struct{}) bool {
+	match := regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*key\s*,\s*[A-Za-z_][A-Za-z0-9_]*\s*\)$`).FindStringSubmatch(line)
+	if match == nil {
+		return false
+	}
+	_, ok := aliases[match[1]]
+	return ok
+}
+
+func migrationStoreRecordLine(line string) string {
+	replacer := strings.NewReplacer(
+		`rec["`, `record["`,
+		"rec.get(", "record.get(",
+		"in rec:", "in record:",
+	)
+	return replacer.Replace(line)
+}
+
 func parseRuntimeMigrationFixtureAssignment(destination string, expression string) (runtimeMigrationFixtureTransform, error) {
 	expression = strings.TrimSpace(expression)
+	if match := migrateRecordNormalizeGetPattern.FindStringSubmatch(expression); match != nil {
+		defaultValue, err := decodeMigrationDefaultLiteral(match[2])
+		if err != nil {
+			return runtimeMigrationFixtureTransform{}, err
+		}
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Default:     defaultValue,
+			HasDefault:  true,
+			Operation:   "lower_trim",
+		}, nil
+	}
+	if match := migrateRecordNormalizePattern.FindStringSubmatch(expression); match != nil {
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Operation:   "lower_trim",
+		}, nil
+	}
 	if match := migrateRecordLowerTrimGetPattern.FindStringSubmatch(expression); match != nil {
 		defaultValue, err := decodeMigrationDefaultLiteral(match[2])
 		if err != nil {

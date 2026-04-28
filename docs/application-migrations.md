@@ -90,6 +90,14 @@ of replaying the entire migration range on every retry.
 	`debug`/`info`/`warn`/`error` aliases. Mismatches stop retry with
 	`ErrMigrationFixtureMismatch`, mark `verdict = step_failed`, and emit
 	`step_failed_fixture_mismatch` entries.
+	The deterministic fixture subset also supports the worked-example paged
+	`store` loop shape: loaded `list_keys`/`get`/`put` aliases, a literal
+	`prefix` scan, `rec = get(key)`, idempotent presence guards,
+	`rec[...]` assignment transforms including `_normalize(rec.get(...))`,
+	`put(key, rec)`, no-op loaded `checkpoint` calls, and no-op structured
+	log calls. Fixture replay applies the transform only to matching keys and
+	counts successful `put` calls as synthetic store effects for checkpoint
+	evidence and hard-cap accounting.
 	Value mismatches now include the first divergent key plus canonical
 	expected/actual JSON bytes in the journal error evidence.
 - If a declared fixture file cannot be read at execution time, retry stops
@@ -253,6 +261,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationAppliesTrimFixtureTransforms`
 - `TestRuntimeRetryMigrationAppliesRecordGetFixtureTransforms`
 - `TestRuntimeRetryMigrationAppliesIdempotentFixtureGuard`
+- `TestRuntimeRetryMigrationAppliesPagedStoreFixtureTransforms`
 - `TestRuntimeRetryMigrationAllowsLogCallsInFixtureTransforms`
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`
@@ -273,4 +282,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes a small deterministic `migrate(record)` fixture subset before expected-output comparison, retry honors `migrate.env.abort(reason)` in that subset, retry enforces the configured max-runtime budget and hard resource caps around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, retry emits checkpoint evidence for fixture-backed synthetic effects at `[migrate].checkpoint_every`, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes small deterministic fixture subsets for `migrate(record)` scripts and the worked-example paged `store` loop before expected-output comparison, retry honors `migrate.env.abort(reason)` in that subset, retry enforces the configured max-runtime budget and hard resource caps around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, retry emits checkpoint evidence for fixture-backed synthetic effects at `[migrate].checkpoint_every`, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).

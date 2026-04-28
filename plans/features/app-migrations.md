@@ -23,6 +23,20 @@ who may authorize a migration).
 
 - 2026-04-28: Extended the runtime fixture-backed deterministic
   migration subset in `terminal_server/internal/appruntime/runtime.go`
+  to support the worked-example paged `store` loop shape with loaded
+  `list_keys`/`get`/`put` aliases, literal-prefix fixture scans,
+  `rec = get(key)`, idempotent presence guards, `_normalize(...)`
+  assignments, `put(key, rec)`, and no-op checkpoint/log calls.
+  Fixture replay now applies these store-loop transforms only to
+  matching fixture keys and counts successful `put` calls as synthetic
+  store effects for checkpoint evidence and resource caps. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesPagedStoreFixtureTransforms`) and
+  documented the expanded subset in `docs/application-migrations.md`.
+
+- 2026-04-28: Extended the runtime fixture-backed deterministic
+  migration subset in `terminal_server/internal/appruntime/runtime.go`
   to support idempotent `if "field" in record: continue` guards.
   Gate 4 fixture replay can now prove the worked-example pattern
   where already-migrated rows are left untouched while missing rows
