@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Hardened runtime fixture declaration enforcement in
+  `terminal_server/internal/appruntime/runtime.go`.
+  `RetryMigration` now treats missing `[[migrate.fixture]]` metadata
+  for a pending step as execution-time fixture unavailability when
+  fixture mode is active (manifest declares fixtures), preventing
+  step commits that bypass fixture coverage after package mutation.
+  Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`),
+  and documented behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Added runtime crash-injection replay coverage at
   migration journal boundaries in
   `terminal_server/internal/appruntime/runtime.go`.

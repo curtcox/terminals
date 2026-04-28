@@ -934,6 +934,7 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 	if _, err := toml.DecodeFile(manifestPath, &manifest); err != nil {
 		return nil, nil
 	}
+	hasFixtureDeclarations := len(manifest.Migrate.Fixture) > 0
 
 	var match *runtimeMigrationFixture
 	for _, fixture := range manifest.Migrate.Fixture {
@@ -966,6 +967,9 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 			SeedPath:     seedPath,
 			ExpectedPath: expectedPath,
 		}
+	}
+	if match == nil && hasFixtureDeclarations {
+		return nil, fmt.Errorf("%w: step %04d missing migrate.fixture declaration", ErrMigrationFixtureUnavailable, step.Number)
 	}
 
 	return match, nil

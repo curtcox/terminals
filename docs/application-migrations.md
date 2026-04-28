@@ -83,6 +83,10 @@ of replaying the entire migration range on every retry.
 - If a declared fixture file cannot be read at execution time, retry stops
 	with `ErrMigrationFixtureUnavailable`, marks `verdict = step_failed`, and
 	emits `step_failed_fixture_unavailable` journal entries.
+- When fixture declarations are present in `manifest.toml`, retry now also
+	requires a `[[migrate.fixture]]` entry for each pending step. Missing
+	per-step fixture metadata fails retry with `ErrMigrationFixtureUnavailable`
+	and emits `step_failed_fixture_unavailable` journal entries.
 - Runtime retry now supports crash-injection testing at journal boundaries
 	(`retry_started`, `step_started`, `step_committed`). Injected interruptions
 	persist as `verdict = running` snapshots in the journal; restart replay
@@ -135,6 +139,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
+- `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
 - `TestExecuteCommandAppsMigrateUsageIncludesLogs`
