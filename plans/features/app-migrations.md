@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added Gate 4 seed-schema validation during package
+  verification in `terminal_server/internal/apppackage/tap.go`.
+  Migration seed fixtures are now parsed into canonical records and
+  each `value` object is validated against the fixture's declared
+  `prior_record_schema` (`[[migrate.fixture]].prior_record_schema`).
+  Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsMigrateFixtureSeedSchemaMismatch`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Added operator-surface drain-readiness controls
   across admin API and REPL. `terminal_server/internal/admin/server.go`
   now serves `/admin/api/apps/migrate/drain-ready` and wires
@@ -299,9 +309,9 @@ who may authorize a migration).
   pending reconciliation records with guarded resolution values.
   Admin + REPL tests now cover the non-stubbed API path and command
   output for migration retry.
-- Remaining work in this plan includes full executor lifecycle,
-  drain-policy orchestration, and end-to-end rollback/reconcile
-  semantics from this design.
+- Remaining work in this plan includes the full executor lifecycle
+  from this design (step execution against fixtures, crash-injection
+  replay at journal boundaries, and expected-output comparisons).
 
 ## Problem
 
