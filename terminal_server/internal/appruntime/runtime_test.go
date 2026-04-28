@@ -2814,6 +2814,64 @@ func TestRuntimeRetryMigrationFailsWhenMaxRuntimeExceeded(t *testing.T) {
 	}
 }
 
+func TestRuntimeRetryMigrationAppliesMaxRuntimePerStep(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_runtime_per_step")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := `name = "migrate_runtime_per_step"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 2
+max_runtime_seconds = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+
+[[migrate.step]]
+from = "2"
+to = "3"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(step 1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(step 2) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+	runtime.migrationHook = func(event string, _ int) error {
+		if event == "step_started" {
+			time.Sleep(600 * time.Millisecond)
+		}
+		return nil
+	}
+
+	status, err := runtime.RetryMigration("migrate_runtime_per_step")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() verdict = %q, want ok", status.Verdict)
+	}
+	if status.StepsCompleted != 2 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 2", status.StepsCompleted)
+	}
+}
+
 func TestRuntimeDefinitionsUsesExportsAndNameFallback(t *testing.T) {
 	tempDir := t.TempDir()
 

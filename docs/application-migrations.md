@@ -156,11 +156,11 @@ of replaying the entire migration range on every retry.
 	`[migrate].max_runtime_seconds` and `[migrate].checkpoint_every`; invalid
 	limits set `executor_ready = false` with a field-specific `last_error` and
 	keep retry from executing.
-- Retry now enforces `[migrate].max_runtime_seconds` as an execution budget
-	around the runtime migration path. If the budget elapses before the run
-	commits, retry fails with `ErrMigrationRuntimeTimeout`, keeps checkpoint
-	progress at the last committed step, marks `verdict = step_failed`, and
-	emits a `step_failed_timeout` journal entry with the configured budget.
+- Retry now enforces `[migrate].max_runtime_seconds` as a per-step execution
+	budget. If the budget elapses before the current step commits, retry fails
+	with `ErrMigrationRuntimeTimeout`, keeps checkpoint progress at the last
+	committed step, marks `verdict = step_failed`, and emits a
+	`step_failed_timeout` journal entry with the configured budget.
 - The deterministic fixture execution subset now treats
 	`migrate.env.abort(reason)` calls as first-class executor aborts. Runtime
 	retry fails the current step with `ErrMigrationAborted`, keeps checkpoint
@@ -244,6 +244,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRoot`
 - `TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRootViaSymlink`
 - `TestRuntimeRetryMigrationFailsWhenMaxRuntimeExceeded`
+- `TestRuntimeRetryMigrationAppliesMaxRuntimePerStep`
 - `TestRuntimeRetryMigrationAbortCallFailsCurrentStep`
 - `TestRuntimeRetryMigrationRejectsArtifactPatchForDifferentLineage`
 - `TestRuntimeRetryMigrationRejectsArtifactPatchWithoutOwnerAppID`

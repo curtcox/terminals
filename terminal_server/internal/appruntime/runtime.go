@@ -547,16 +547,17 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	state.Verdict = "running"
 	state.LastError = ""
 	state.DrainBlockedAt = time.Time{}
-	startedAt := time.Now()
+	retryStartedAt := time.Now()
 	appendMigrationJournalEntry(pkg, state, "retry_started", map[string]any{"from_step": nextStep})
 	state, err = r.maybeInterruptMigrationLocked(name, state, "retry_started")
 	if err != nil {
 		return statusFromState(pkg, state), err
 	}
-	if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, 0, startedAt); timedOut {
+	if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, 0, retryStartedAt); timedOut {
 		return timeoutStatus, ErrMigrationRuntimeTimeout
 	}
 	for _, step := range migrationPlanPendingSteps(state.StepPlan, nextStep) {
+		stepStartedAt := time.Now()
 		stepPath := filepath.Join(pkg.RootPath, "migrate", step.ScriptName)
 		if _, statErr := os.Stat(stepPath); statErr != nil {
 			state.Verdict = "step_failed"
@@ -626,7 +627,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		if err != nil {
 			return statusFromState(pkg, state), err
 		}
-		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, startedAt); timedOut {
+		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, stepStartedAt); timedOut {
 			return timeoutStatus, ErrMigrationRuntimeTimeout
 		}
 		effectCount, fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step, scriptSource)
@@ -682,7 +683,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		if err != nil {
 			return statusFromState(pkg, state), err
 		}
-		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, startedAt); timedOut {
+		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, stepStartedAt); timedOut {
 			return timeoutStatus, ErrMigrationRuntimeTimeout
 		}
 	}

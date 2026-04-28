@@ -21,6 +21,19 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Aligned runtime migration timeout enforcement with
+  the plan's per-step budget semantics in
+  `terminal_server/internal/appruntime/runtime.go`.
+  `RetryMigration` now starts a fresh
+  `[migrate].max_runtime_seconds` timer for each pending step
+  instead of sharing one run-wide timer across the whole retry,
+  so multi-step migrations whose individual steps stay under the
+  configured budget can complete. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesMaxRuntimePerStep`) and
+  documented the per-step timeout boundary in
+  `docs/application-migrations.md`.
+
 - 2026-04-28: Extended the runtime fixture-backed deterministic
   migration subset in `terminal_server/internal/appruntime/runtime.go`
   to treat structured `log` calls as no-op execution statements when
