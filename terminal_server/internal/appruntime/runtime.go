@@ -55,6 +55,8 @@ var (
 	ErrMigrationDrainPending = errors.New("migration drain is pending")
 	// ErrMigrationStepUnavailable indicates a migration step script could not be read at execution time.
 	ErrMigrationStepUnavailable = errors.New("migration step script unavailable")
+	// ErrMigrationInterrupted indicates a migration run was interrupted before committing.
+	ErrMigrationInterrupted = errors.New("migration execution interrupted before commit")
 )
 
 const defaultMigrationDrainTimeout = 90 * time.Second
@@ -660,6 +662,7 @@ func replayMigrationStateFromJournal(pkg Package, state migrationState) migratio
 	}()
 
 	scanner := bufio.NewScanner(file)
+	lastEvent := ""
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -668,6 +671,9 @@ func replayMigrationStateFromJournal(pkg Package, state migrationState) migratio
 		var entry map[string]any
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			continue
+		}
+		if event := migrationJournalString(entry["event"]); event != "" {
+			lastEvent = event
 		}
 		if stepsCompleted, ok := migrationJournalInt(entry["steps_completed"]); ok {
 			state.StepsCompleted = stepsCompleted
@@ -701,6 +707,22 @@ func replayMigrationStateFromJournal(pkg Package, state migrationState) migratio
 	}
 	if state.LastStep > state.StepsPlanned {
 		state.LastStep = state.StepsPlanned
+	}
+	if state.Verdict == "running" {
+		state.Verdict = "step_failed"
+		if state.LastError == "" {
+			if state.LastStep > 0 {
+				state.LastError = fmt.Sprintf("step %d interrupted before commit", state.LastStep)
+			} else {
+				state.LastError = ErrMigrationInterrupted.Error()
+			}
+		}
+		if state.LastStep <= 0 && strings.HasPrefix(lastEvent, "step_") {
+			state.LastStep = state.StepsCompleted + 1
+			if state.LastStep > state.StepsPlanned {
+				state.LastStep = state.StepsPlanned
+			}
+		}
 	}
 
 	return state

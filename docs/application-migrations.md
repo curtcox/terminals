@@ -86,6 +86,12 @@ empty state after process restart. Drain-guard retries also replay
 `blocked_since` so timeout windows continue across restart instead of resetting
 to a fresh pending window.
 
+If the last replayed journal state is `verdict = running` (for example, a
+process crash after `step_started` but before `step_committed`), runtime now
+normalizes status to `verdict = step_failed` with an explicit interruption
+error. This keeps migration state operator-visible and retryable from the last
+committed checkpoint instead of leaving status indefinitely in `running`.
+
 Invalid layouts are rejected as `ErrInvalidManifest`.
 
 ## Test coverage
@@ -103,6 +109,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeMigrationLifecycleWithSteps`
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
+- `TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
@@ -110,4 +117,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle (step execution, crash-injection replay, and expected-output comparisons from Gate 4). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart. Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle (step execution and expected-output comparisons from Gate 4, plus a full crash-injection harness). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).

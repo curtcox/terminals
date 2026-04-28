@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Hardened migration replay recovery for interrupted runs
+  in `terminal_server/internal/appruntime/runtime.go`.
+  Journal replay now normalizes stale `verdict = running` state
+  to `verdict = step_failed` with explicit interruption context,
+  so restart surfaces actionable retry state instead of showing
+  indefinitely running migrations after process interruption.
+  Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes`)
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Added execution-time migration script availability
   enforcement in `terminal_server/internal/appruntime/runtime.go`.
   `RetryMigration` now verifies each pending step script exists on
