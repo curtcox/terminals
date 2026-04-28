@@ -21,6 +21,21 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Hardened runtime migration step execution planning in
+  `terminal_server/internal/appruntime/runtime.go`. Retry now
+  builds a deterministic step plan from `migrate/*.tal`
+  (`<step>_<from>_to_<to>.tal`) rather than iterating by file
+  count alone, emits `from_version`/`to_version`/`script` metadata
+  on per-step journal events, and disables executor readiness with
+  surfaced `last_error` when runtime step plans are malformed
+  (filename format, numbering gaps, or manifest-step mismatch).
+  Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationInvalidStepPlanDisablesExecutor` plus
+  metadata assertions in `TestRuntimeMigrationLifecycleWithSteps`),
+  and documented the operator-visible behavior in
+  `docs/application-migrations.md`.
+
 - 2026-04-27: Added Gate 4 seed-schema validation during package
   verification in `terminal_server/internal/apppackage/tap.go`.
   Migration seed fixtures are now parsed into canonical records and

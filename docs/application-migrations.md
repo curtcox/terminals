@@ -55,6 +55,15 @@ migration control actions:
 
 Retry now resumes at the first incomplete step (`steps_completed + 1`) instead
 of replaying the entire migration range on every retry.
+- Retry execution now uses a parsed runtime step plan from `migrate/*.tal`
+	filenames (`<step>_<from>_to_<to>.tal`) instead of a raw file count.
+	Runtime journal entries for `step_started` / `step_committed` now include
+	`from_version`, `to_version`, and `script` metadata so operator logs show the
+	exact version edge and script for each executed step.
+- Invalid runtime migration step plans (for example malformed script filenames,
+	numbering gaps, or manifest `[[migrate.step]]` / script-count mismatches) now
+	leave migration status with `executor_ready = false` and a specific
+	`last_error`, preventing retries from running against ambiguous step plans.
 
 When `manifest.toml` declares `app_id`, migration journal paths are now rooted
 under `apps/<app_id>/migrate/...` instead of `apps/<manifest_name>/...` so

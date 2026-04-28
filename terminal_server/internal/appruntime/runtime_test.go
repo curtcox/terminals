@@ -509,6 +509,12 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	if !hasMigrationJournalEvent(entries, "retry_started") || !hasMigrationJournalEvent(entries, "retry_committed") {
 		t.Fatalf("migration journal missing retry events: %+v", entries)
 	}
+	if !hasMigrationStepMetadata(entries, "step_started", 2, "2", "3", "0002_2_to_3.tal") {
+		t.Fatalf("migration journal missing step metadata for step 2 start: %+v", entries)
+	}
+	if !hasMigrationStepMetadata(entries, "step_committed", 2, "2", "3", "0002_2_to_3.tal") {
+		t.Fatalf("migration journal missing step metadata for step 2 commit: %+v", entries)
+	}
 	if !hasMigrationJournalEventForStep(entries, "step_started", 1) || !hasMigrationJournalEventForStep(entries, "step_committed", 1) {
 		t.Fatalf("migration journal missing step 1 lifecycle events: %+v", entries)
 	}
@@ -927,6 +933,54 @@ func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	}
 }
 
+func TestRuntimeMigrationInvalidStepPlanDisablesExecutor(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_invalid_plan")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_invalid_plan\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "not_a_step.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.GetMigrationStatus("migrate_invalid_plan")
+	if err != nil {
+		t.Fatalf("GetMigrationStatus() error = %v", err)
+	}
+	if status.ExecutorReady {
+		t.Fatalf("ExecutorReady = true, want false")
+	}
+	if !strings.Contains(status.LastError, "must match <step>_<from>_to_<to>.tal") {
+		t.Fatalf("LastError = %q, want migration step format message", status.LastError)
+	}
+
+	status, err = runtime.RetryMigration("migrate_invalid_plan")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.ExecutorReady {
+		t.Fatalf("RetryMigration() ExecutorReady = true, want false")
+	}
+	if status.StepsCompleted != 0 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+	}
+	if status.Verdict != "idle" {
+		t.Fatalf("RetryMigration() verdict = %q, want idle", status.Verdict)
+	}
+}
+
 func TestRuntimeDefinitionsUsesExportsAndNameFallback(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -1033,8 +1087,11 @@ func TestRuntimeDefinitionActivationPinnedToRevision(t *testing.T) {
 }
 
 type migrationJournalEntry struct {
-	Event string `json:"event"`
-	Step  int    `json:"step"`
+	Event       string `json:"event"`
+	Step        int    `json:"step"`
+	FromVersion string `json:"from_version"`
+	ToVersion   string `json:"to_version"`
+	Script      string `json:"script"`
 }
 
 func parseMigrationJournalEntries(t *testing.T, data []byte) []migrationJournalEntry {
@@ -1087,6 +1144,18 @@ func hasMigrationJournalEventSequence(entries []migrationJournalEntry, sequence 
 		}
 		index++
 		if index == len(sequence) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMigrationStepMetadata(entries []migrationJournalEntry, event string, step int, fromVersion string, toVersion string, script string) bool {
+	for _, entry := range entries {
+		if entry.Event != event || entry.Step != step {
+			continue
+		}
+		if entry.FromVersion == fromVersion && entry.ToVersion == toVersion && entry.Script == script {
 			return true
 		}
 	}

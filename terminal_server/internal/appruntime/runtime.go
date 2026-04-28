@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,6 +56,8 @@ var (
 )
 
 const defaultMigrationDrainTimeout = 90 * time.Second
+
+var migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
 
 const (
 	// MigrationAbortToCheckpoint aborts the current step and rewinds to the last checkpoint.
@@ -215,6 +218,7 @@ type Runtime struct {
 type migrationState struct {
 	StepsPlanned       int
 	StepsCompleted     int
+	StepPlan           []migrationPlanStep
 	LastStep           int
 	Verdict            string
 	LastError          string
@@ -226,6 +230,14 @@ type migrationState struct {
 	DrainTimeout       time.Duration
 	DrainBlockedAt     time.Time
 	PendingRecords     map[string]string
+}
+
+type migrationPlanStep struct {
+	Number        int
+	FromVersion   string
+	ToVersion     string
+	ScriptName    string
+	RequiresDrain bool
 }
 
 // NewRuntime returns an empty application runtime.
@@ -419,23 +431,41 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	if nextStep < 1 {
 		nextStep = 1
 	}
+	state.RequiresDrain = migrationPlanRequiresDrainFromStep(state.StepPlan, nextStep)
+	if !state.RequiresDrain {
+		state.DrainReady = true
+	}
 
 	state.Verdict = "running"
 	state.LastError = ""
 	state.DrainBlockedAt = time.Time{}
 	appendMigrationJournalEntry(pkg, state, "retry_started", map[string]any{"from_step": nextStep})
-	for step := nextStep; step <= state.StepsPlanned; step++ {
-		state.LastStep = step
-		appendMigrationJournalEntry(pkg, state, "step_started", map[string]any{"step_id": step})
-		state.StepsCompleted = step
-		state.LastStep = step
-		appendMigrationJournalEntry(pkg, state, "step_committed", map[string]any{"step_id": step})
+	for _, step := range migrationPlanPendingSteps(state.StepPlan, nextStep) {
+		state.LastStep = step.Number
+		appendMigrationJournalEntry(pkg, state, "step_started", map[string]any{
+			"step_id":      step.Number,
+			"from_version": step.FromVersion,
+			"to_version":   step.ToVersion,
+			"script":       step.ScriptName,
+		})
+		state.StepsCompleted = step.Number
+		state.LastStep = step.Number
+		appendMigrationJournalEntry(pkg, state, "step_committed", map[string]any{
+			"step_id":      step.Number,
+			"from_version": step.FromVersion,
+			"to_version":   step.ToVersion,
+			"script":       step.ScriptName,
+		})
 	}
 	if state.StepsCompleted > state.StepsPlanned {
 		state.StepsCompleted = state.StepsPlanned
 	}
 	state.LastStep = state.StepsCompleted
 	state.Verdict = "ok"
+	state.RequiresDrain = migrationPlanRequiresDrainFromStep(state.StepPlan, state.StepsCompleted+1)
+	if !state.RequiresDrain {
+		state.DrainReady = true
+	}
 	state.JournalPath = migrationJournalPath(pkg)
 	r.migrations[name] = state
 	appendMigrationJournalEntry(pkg, state, "retry_committed", map[string]any{"from_step": nextStep, "to_step": state.StepsCompleted})
@@ -571,21 +601,29 @@ func (r *Runtime) requireMigrationStateLocked(name string) (Package, migrationSt
 }
 
 func newMigrationState(pkg Package) migrationState {
-	steps := countMigrationSteps(pkg.RootPath)
-	requiresDrain := packageRequiresDrainMigration(pkg.RootPath)
+	steps, plan, planErr := loadMigrationPlan(pkg.RootPath)
+	requiresDrain := migrationPlanRequiresDrainFromStep(plan, 1)
 	state := migrationState{
 		StepsPlanned:   steps,
 		StepsCompleted: 0,
+		StepPlan:       plan,
 		LastStep:       0,
 		Verdict:        "idle",
-		ExecutorReady:  steps > 0,
+		ExecutorReady:  steps > 0 && planErr == nil,
 		RequiresDrain:  requiresDrain,
 		DrainReady:     !requiresDrain,
 		DrainTimeout:   packageDrainTimeout(rootOrFallbackPath(pkg)),
 	}
+	if planErr != nil {
+		state.LastError = planErr.Error()
+	}
 	if steps > 0 {
 		state.JournalPath = migrationJournalPath(pkg)
 		state = replayMigrationStateFromJournal(pkg, state)
+		state.RequiresDrain = migrationPlanRequiresDrainFromStep(state.StepPlan, state.StepsCompleted+1)
+		if !state.RequiresDrain {
+			state.DrainReady = true
+		}
 	}
 	return state
 }
@@ -688,12 +726,99 @@ func migrationJournalTime(raw any) (time.Time, bool) {
 
 type runtimeMigrationManifest struct {
 	Migrate struct {
+		DeclaredSteps       int `toml:"declared_steps"`
 		DrainTimeoutSeconds int `toml:"drain_timeout_seconds"`
 		Step                []struct {
+			From          string `toml:"from"`
+			To            string `toml:"to"`
 			Compatibility string `toml:"compatibility"`
 			DrainPolicy   string `toml:"drain_policy"`
 		} `toml:"step"`
 	} `toml:"migrate"`
+}
+
+func loadMigrationPlan(root string) (int, []migrationPlanStep, error) {
+	matches, err := filepath.Glob(filepath.Join(root, "migrate", "*.tal"))
+	if err != nil {
+		return 0, nil, nil
+	}
+	if len(matches) == 0 {
+		return 0, nil, nil
+	}
+
+	steps := make([]migrationPlanStep, 0, len(matches))
+	for _, match := range matches {
+		base := filepath.Base(match)
+		parts := migrateStepFilePattern.FindStringSubmatch(base)
+		if parts == nil {
+			return len(matches), nil, fmt.Errorf("%w: migration script %s must match <step>_<from>_to_<to>.tal", ErrInvalidManifest, base)
+		}
+		stepNumber, err := strconv.Atoi(parts[1])
+		if err != nil || stepNumber <= 0 {
+			return len(matches), nil, fmt.Errorf("%w: migration script %s has invalid step number", ErrInvalidManifest, base)
+		}
+		steps = append(steps, migrationPlanStep{
+			Number:      stepNumber,
+			FromVersion: strings.TrimSpace(parts[2]),
+			ToVersion:   strings.TrimSpace(parts[3]),
+			ScriptName:  base,
+		})
+	}
+
+	sort.Slice(steps, func(i, j int) bool {
+		return steps[i].Number < steps[j].Number
+	})
+	for i := range steps {
+		expected := i + 1
+		if steps[i].Number != expected {
+			return len(matches), nil, fmt.Errorf("%w: migration step numbering gap: expected step %04d, found %04d", ErrInvalidManifest, expected, steps[i].Number)
+		}
+	}
+
+	manifestPath := filepath.Join(root, "manifest.toml")
+	var manifest runtimeMigrationManifest
+	if _, err := toml.DecodeFile(manifestPath, &manifest); err == nil && len(manifest.Migrate.Step) > 0 {
+		if manifest.Migrate.DeclaredSteps > 0 && manifest.Migrate.DeclaredSteps != len(manifest.Migrate.Step) {
+			return len(matches), nil, fmt.Errorf("%w: migrate.declared_steps (%d) does not match migrate.step entries (%d)", ErrInvalidManifest, manifest.Migrate.DeclaredSteps, len(manifest.Migrate.Step))
+		}
+		if len(manifest.Migrate.Step) != len(steps) {
+			return len(matches), nil, fmt.Errorf("%w: migrate.step entries (%d) do not match migrate scripts (%d)", ErrInvalidManifest, len(manifest.Migrate.Step), len(steps))
+		}
+		for i := range steps {
+			manifestStep := manifest.Migrate.Step[i]
+			steps[i].RequiresDrain = strings.EqualFold(strings.TrimSpace(manifestStep.Compatibility), "incompatible") && strings.EqualFold(strings.TrimSpace(manifestStep.DrainPolicy), "drain")
+			if strings.TrimSpace(manifestStep.From) != "" && strings.TrimSpace(manifestStep.To) != "" {
+				if strings.TrimSpace(manifestStep.From) != steps[i].FromVersion || strings.TrimSpace(manifestStep.To) != steps[i].ToVersion {
+					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d from/to does not match script %s", ErrInvalidManifest, i+1, steps[i].ScriptName)
+				}
+			}
+		}
+	}
+
+	return len(steps), steps, nil
+}
+
+func migrationPlanPendingSteps(plan []migrationPlanStep, nextStep int) []migrationPlanStep {
+	if nextStep < 1 {
+		nextStep = 1
+	}
+	out := make([]migrationPlanStep, 0, len(plan))
+	for _, step := range plan {
+		if step.Number < nextStep {
+			continue
+		}
+		out = append(out, step)
+	}
+	return out
+}
+
+func migrationPlanRequiresDrainFromStep(plan []migrationPlanStep, nextStep int) bool {
+	for _, step := range migrationPlanPendingSteps(plan, nextStep) {
+		if step.RequiresDrain {
+			return true
+		}
+	}
+	return false
 }
 
 func rootOrFallbackPath(pkg Package) string {
@@ -713,30 +838,6 @@ func packageDrainTimeout(root string) time.Duration {
 		return defaultMigrationDrainTimeout
 	}
 	return time.Duration(manifest.Migrate.DrainTimeoutSeconds) * time.Second
-}
-
-func packageRequiresDrainMigration(root string) bool {
-	manifestPath := filepath.Join(root, "manifest.toml")
-	var manifest runtimeMigrationManifest
-	if _, err := toml.DecodeFile(manifestPath, &manifest); err != nil {
-		return false
-	}
-	for _, step := range manifest.Migrate.Step {
-		compatibility := strings.ToLower(strings.TrimSpace(step.Compatibility))
-		drainPolicy := strings.ToLower(strings.TrimSpace(step.DrainPolicy))
-		if compatibility == "incompatible" && drainPolicy == "drain" {
-			return true
-		}
-	}
-	return false
-}
-
-func countMigrationSteps(root string) int {
-	matches, err := filepath.Glob(filepath.Join(root, "migrate", "*.tal"))
-	if err != nil {
-		return 0
-	}
-	return len(matches)
 }
 
 func countDowngradeMigrationSteps(root string) int {
