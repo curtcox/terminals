@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Hardened execution-time migration fixture path resolution
+  in `terminal_server/internal/appruntime/runtime.go`.
+  `readRuntimeFixtureRecords` now rejects fixture seed/expected paths
+  that escape the loaded package root (for example `../outside.ndjson`)
+  and fails retry with `ErrMigrationFixtureMismatch` while preserving
+  existing `step_failed_fixture_mismatch` journaling semantics. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRoot`) and
+  documented behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Hardened execution-time fixture canonicality checks in
   `terminal_server/internal/appruntime/runtime.go`.
   `readRuntimeFixtureRecords` now enforces LF-only NDJSON, trailing

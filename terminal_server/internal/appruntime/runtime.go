@@ -979,8 +979,11 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 }
 
 func readRuntimeFixtureRecords(root string, relPath string) (map[string]string, error) {
-	fullPath := filepath.Join(root, filepath.FromSlash(relPath))
-	payload, err := os.ReadFile(filepath.Clean(fullPath))
+	fullPath, resolveErr := resolveRuntimeFixturePath(root, relPath)
+	if resolveErr != nil {
+		return nil, resolveErr
+	}
+	payload, err := os.ReadFile(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %v", ErrMigrationFixtureUnavailable, relPath, err)
 	}
@@ -1025,6 +1028,23 @@ func readRuntimeFixtureRecords(root string, relPath string) (map[string]string, 
 	}
 
 	return records, nil
+}
+
+func resolveRuntimeFixturePath(root string, relPath string) (string, error) {
+	cleanRoot := filepath.Clean(root)
+	cleanRel := filepath.Clean(filepath.FromSlash(strings.TrimSpace(relPath)))
+	if cleanRel == "." || cleanRel == string(filepath.Separator) || filepath.IsAbs(cleanRel) {
+		return "", fmt.Errorf("%w: %s must resolve within package root", ErrMigrationFixtureMismatch, relPath)
+	}
+	fullPath := filepath.Join(cleanRoot, cleanRel)
+	relToRoot, err := filepath.Rel(cleanRoot, fullPath)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s must resolve within package root", ErrMigrationFixtureMismatch, relPath)
+	}
+	if relToRoot == ".." || strings.HasPrefix(relToRoot, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("%w: %s must resolve within package root", ErrMigrationFixtureMismatch, relPath)
+	}
+	return fullPath, nil
 }
 
 func parseRuntimeFixtureRecord(line []byte) (key string, canonicalEnvelope []byte, canonicalValue string, err error) {
