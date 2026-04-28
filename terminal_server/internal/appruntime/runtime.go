@@ -285,6 +285,7 @@ type migrationState struct {
 	DrainTimeout       time.Duration
 	DrainBlockedAt     time.Time
 	MaxRuntime         time.Duration
+	CheckpointEvery    int
 	PendingRecords     map[string]string
 }
 
@@ -590,7 +591,8 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, startedAt); timedOut {
 			return timeoutStatus, ErrMigrationRuntimeTimeout
 		}
-		if fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step, scriptSource); fixtureErr != nil {
+		effectCount, fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step, scriptSource)
+		if fixtureErr != nil {
 			state.Verdict = "step_failed"
 			state.LastStep = step.Number
 			switch {
@@ -618,6 +620,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 				return statusFromState(pkg, state), fixtureErr
 			}
 		}
+		appendMigrationCheckpointEntries(pkg, state, step, effectCount)
 		state.StepsCompleted = step.Number
 		state.LastStep = step.Number
 		appendMigrationJournalEntry(pkg, state, "step_committed", map[string]any{
@@ -666,6 +669,22 @@ func (r *Runtime) maybeFailMigrationRuntimeTimeoutLocked(name string, pkg Packag
 		"error":               ErrMigrationRuntimeTimeout.Error(),
 	})
 	return true, statusFromState(pkg, state)
+}
+
+func appendMigrationCheckpointEntries(pkg Package, state migrationState, step migrationPlanStep, effectCount int) {
+	if state.CheckpointEvery <= 0 || effectCount <= 0 {
+		return
+	}
+	for effectSequence := state.CheckpointEvery; effectSequence <= effectCount; effectSequence += state.CheckpointEvery {
+		appendMigrationJournalEntry(pkg, state, "checkpoint_committed", map[string]any{
+			"step_id":          step.Number,
+			"from_version":     step.FromVersion,
+			"to_version":       step.ToVersion,
+			"script":           step.ScriptName,
+			"effect_sequence":  effectSequence,
+			"checkpoint_every": state.CheckpointEvery,
+		})
+	}
 }
 
 func (r *Runtime) maybeInterruptMigrationLocked(name string, state migrationState, event string) (migrationState, error) {
@@ -1035,16 +1054,17 @@ func newMigrationState(pkg Package, installedVersion string) migrationState {
 		verdict = "ok"
 	}
 	state := migrationState{
-		StepsPlanned:   steps,
-		StepsCompleted: stepsCompleted,
-		StepPlan:       plan,
-		LastStep:       lastStep,
-		Verdict:        verdict,
-		ExecutorReady:  steps > 0 && planErr == nil,
-		RequiresDrain:  requiresDrain,
-		DrainReady:     !requiresDrain,
-		DrainTimeout:   packageDrainTimeout(rootOrFallbackPath(pkg)),
-		MaxRuntime:     packageMigrationMaxRuntime(rootOrFallbackPath(pkg)),
+		StepsPlanned:    steps,
+		StepsCompleted:  stepsCompleted,
+		StepPlan:        plan,
+		LastStep:        lastStep,
+		Verdict:         verdict,
+		ExecutorReady:   steps > 0 && planErr == nil,
+		RequiresDrain:   requiresDrain,
+		DrainReady:      !requiresDrain,
+		DrainTimeout:    packageDrainTimeout(rootOrFallbackPath(pkg)),
+		MaxRuntime:      packageMigrationMaxRuntime(rootOrFallbackPath(pkg)),
+		CheckpointEvery: packageMigrationCheckpointEvery(rootOrFallbackPath(pkg)),
 	}
 	if planErr != nil {
 		state.LastError = planErr.Error()
@@ -1227,47 +1247,47 @@ type runtimeMigrationFixture struct {
 	ExpectedPath string
 }
 
-func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSource []byte) error {
+func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSource []byte) (int, error) {
 	fixture, err := findRuntimeMigrationFixture(root, step)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if fixture == nil {
-		return nil
+		return 0, nil
 	}
 
 	seedRecords, err := readRuntimeFixtureRecords(root, fixture.SeedPath)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	expectedRecords, err := readRuntimeFixtureRecords(root, fixture.ExpectedPath)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	actualRecords, err := executeRuntimeMigrationFixture(scriptSource, seedRecords)
+	actualRecords, effectCount, err := executeRuntimeMigrationFixture(scriptSource, seedRecords)
 	if err != nil {
-		return fmt.Errorf("%w: step %04d fixture execution failed: %v", ErrMigrationFixtureMismatch, step.Number, err)
+		return 0, fmt.Errorf("%w: step %04d fixture execution failed: %v", ErrMigrationFixtureMismatch, step.Number, err)
 	}
 
 	if len(actualRecords) != len(expectedRecords) {
-		return fmt.Errorf("%w: step %04d key count mismatch (actual=%d expected=%d)", ErrMigrationFixtureMismatch, step.Number, len(actualRecords), len(expectedRecords))
+		return 0, fmt.Errorf("%w: step %04d key count mismatch (actual=%d expected=%d)", ErrMigrationFixtureMismatch, step.Number, len(actualRecords), len(expectedRecords))
 	}
 	for key, actualValue := range actualRecords {
 		expectedValue, ok := expectedRecords[key]
 		if !ok {
-			return fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
+			return 0, fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
 		if expectedValue != actualValue {
-			return fmt.Errorf("%w: step %04d value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step.Number, key, expectedValue, actualValue)
+			return 0, fmt.Errorf("%w: step %04d value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step.Number, key, expectedValue, actualValue)
 		}
 	}
 	for key := range expectedRecords {
 		if _, ok := actualRecords[key]; !ok {
-			return fmt.Errorf("%w: step %04d expected contains extra key %q", ErrMigrationFixtureMismatch, step.Number, key)
+			return 0, fmt.Errorf("%w: step %04d expected contains extra key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
 	}
 
-	return nil
+	return effectCount, nil
 }
 
 type runtimeMigrationFixtureTransform struct {
@@ -1277,24 +1297,24 @@ type runtimeMigrationFixtureTransform struct {
 	Value       any
 }
 
-func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]string) (map[string]string, error) {
+func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]string) (map[string]string, int, error) {
 	transforms, err := parseRuntimeMigrationFixtureTransforms(scriptSource)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if len(transforms) == 0 {
 		out := make(map[string]string, len(seedRecords))
 		for key, value := range seedRecords {
 			out[key] = value
 		}
-		return out, nil
+		return out, 0, nil
 	}
 
 	out := make(map[string]string, len(seedRecords))
 	for key, rawValue := range seedRecords {
 		var record map[string]any
 		if err := json.Unmarshal([]byte(rawValue), &record); err != nil {
-			return nil, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
+			return nil, 0, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
 		}
 		for _, transform := range transforms {
 			switch transform.Operation {
@@ -1303,7 +1323,7 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 			case "lower":
 				value, ok := record[transform.Source].(string)
 				if !ok {
-					return nil, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
+					return nil, 0, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
 				}
 				record[transform.Destination] = strings.ToLower(value)
 			case "literal":
@@ -1311,16 +1331,16 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 			case "delete":
 				delete(record, transform.Destination)
 			default:
-				return nil, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
+				return nil, 0, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
 			}
 		}
 		canonical, err := json.Marshal(record)
 		if err != nil {
-			return nil, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
+			return nil, 0, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
 		}
 		out[key] = string(canonical)
 	}
-	return out, nil
+	return out, len(seedRecords), nil
 }
 
 func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigrationFixtureTransform, error) {
@@ -1731,6 +1751,17 @@ func packageMigrationMaxRuntime(root string) time.Duration {
 		return 0
 	}
 	return time.Duration(*manifest.Migrate.MaxRuntimeSeconds) * time.Second
+}
+
+func packageMigrationCheckpointEvery(root string) int {
+	var manifest runtimeMigrationManifest
+	if _, err := toml.DecodeFile(filepath.Join(root, "manifest.toml"), &manifest); err != nil {
+		return 0
+	}
+	if manifest.Migrate.CheckpointEvery == nil || *manifest.Migrate.CheckpointEvery <= 0 {
+		return 0
+	}
+	return *manifest.Migrate.CheckpointEvery
 }
 
 func countDowngradeMigrationSteps(root string) int {

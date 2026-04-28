@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Wired `[migrate].checkpoint_every` into the
+  runtime migration retry scaffold in
+  `terminal_server/internal/appruntime/runtime.go`. Fixture-backed
+  deterministic migrations now count transformed fixture records as
+  synthetic store effects and emit `checkpoint_committed` journal
+  evidence at the configured cadence before step commit. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationEmitsCheckpointEveryForFixtureEffects`)
+  and documented the current checkpoint-evidence behavior in
+  `docs/application-migrations.md`.
+
 - 2026-04-28: Made Gate 4 load-time dry-run enforcement
   conservatively block `drain_policy = "multi_version"` migration
   steps until read-adapter replay validation exists. This prevents
