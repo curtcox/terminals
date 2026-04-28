@@ -4,6 +4,7 @@ package appruntime
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -376,22 +377,26 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	if state.Verdict == "reconcile_pending" && len(state.PendingRecords) > 0 {
 		state.LastError = ErrMigrationReconcilePending.Error()
 		r.migrations[name] = state
+		appendMigrationJournalEntry(pkg, state, "retry_blocked_reconcile_pending", nil)
 		return statusFromState(pkg, state), ErrMigrationReconcilePending
 	}
 	if state.RequiresDrain && !state.DrainReady {
 		state.Verdict = "aborted"
 		state.LastError = ErrMigrationDrainTimeout.Error()
 		r.migrations[name] = state
+		appendMigrationJournalEntry(pkg, state, "retry_blocked_drain_timeout", nil)
 		return statusFromState(pkg, state), ErrMigrationDrainTimeout
 	}
 
 	state.Verdict = "running"
 	state.LastError = ""
+	appendMigrationJournalEntry(pkg, state, "retry_started", nil)
 	state.StepsCompleted = state.StepsPlanned
 	state.LastStep = state.StepsCompleted
 	state.Verdict = "ok"
 	state.JournalPath = migrationJournalPath(pkg)
 	r.migrations[name] = state
+	appendMigrationJournalEntry(pkg, state, "retry_committed", nil)
 	return statusFromState(pkg, state), nil
 }
 
@@ -431,6 +436,7 @@ func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error) {
 		state.Verdict = "reconcile_pending"
 		state.LastError = ErrMigrationReconcilePending.Error()
 		r.migrations[name] = state
+		appendMigrationJournalEntry(pkg, state, "abort_blocked_reconcile_pending", map[string]any{"target": target})
 		return statusFromState(pkg, state), ErrMigrationReconcilePending
 	}
 	if !state.ExecutorReady {
@@ -455,6 +461,7 @@ func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error) {
 	state.PendingRecords = nil
 	state.ReconciliationPath = ""
 	r.migrations[name] = state
+	appendMigrationJournalEntry(pkg, state, "aborted", map[string]any{"target": target})
 	return statusFromState(pkg, state), nil
 }
 
@@ -489,6 +496,10 @@ func (r *Runtime) ReconcileMigration(name, recordID, resolution string) (Migrati
 		state.LastError = ErrMigrationReconcilePending.Error()
 	}
 	r.migrations[name] = state
+	appendMigrationJournalEntry(pkg, state, "reconcile_record", map[string]any{
+		"record_id":  recordID,
+		"resolution": resolution,
+	})
 	return statusFromState(pkg, state), nil
 }
 
@@ -566,6 +577,42 @@ func countDowngradeMigrationSteps(root string) int {
 
 func migrationJournalPath(pkg Package) string {
 	return filepath.ToSlash(filepath.Join("apps", pkg.Manifest.Name, "migrate", fmt.Sprintf("r%d", pkg.Revision), "journal.ndjson"))
+}
+
+func appendMigrationJournalEntry(pkg Package, state migrationState, event string, fields map[string]any) {
+	if strings.TrimSpace(state.JournalPath) == "" {
+		return
+	}
+
+	absolutePath := filepath.Join(pkg.RootPath, filepath.FromSlash(state.JournalPath))
+	if err := os.MkdirAll(filepath.Dir(absolutePath), 0o755); err != nil {
+		return
+	}
+	file, err := os.OpenFile(filepath.Clean(absolutePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	entry := map[string]any{
+		"ts":              time.Now().UTC().Format(time.RFC3339Nano),
+		"event":           strings.TrimSpace(event),
+		"step":            state.LastStep,
+		"steps_completed": state.StepsCompleted,
+		"steps_planned":   state.StepsPlanned,
+		"verdict":         state.Verdict,
+	}
+	for key, value := range fields {
+		entry[key] = value
+	}
+
+	payload, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	_, _ = file.Write(append(payload, '\n'))
 }
 
 func statusFromState(pkg Package, state migrationState) MigrationStatus {

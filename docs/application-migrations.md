@@ -23,6 +23,24 @@ The runtime migration control path in [terminal_server/internal/appruntime/runti
 - A blocked retry returns `ErrMigrationDrainTimeout`, marks migration `verdict = "aborted"`, and preserves the current checkpoint (no step advancement while drain is unsafe).
 - Operators/orchestrators can mark readiness through `SetMigrationDrainReady`, after which retry proceeds normally.
 
+## Implemented migration runtime journaling
+
+The runtime now emits structured NDJSON migration journal entries directly from
+`terminal_server/internal/appruntime/runtime.go` when operators invoke
+migration control actions:
+
+- `RetryMigration` writes `retry_started` and `retry_committed` entries on
+	successful runs.
+- Blocked retries emit explicit events (`retry_blocked_reconcile_pending` and
+	`retry_blocked_drain_timeout`) with current verdict/step context.
+- `AbortMigration` writes `aborted` entries including the selected target
+	(`checkpoint` or `baseline`).
+- `ReconcileMigration` writes `reconcile_record` entries with `record_id` and
+	selected `resolution`.
+
+These entries are written to the status-provided `journal_path` consumed by
+`/admin/api/apps/migrate/logs` and `apps migrate logs`.
+
 Invalid layouts are rejected as `ErrInvalidManifest`.
 
 ## Test coverage
@@ -35,6 +53,8 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapRejectsMigrateIncompatibleWithoutDrain`
 - `TestVerifyTapAcceptsMigrateIncompatibleWithDrain`
 - `TestRuntimeRetryMigrationRequiresDrainReadiness`
+- `TestRuntimeMigrationLifecycleWithSteps`
+- `TestRuntimeReconcileMigrationPendingRecords`
 
 ## Not yet implemented
 

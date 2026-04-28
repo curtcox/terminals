@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -477,6 +478,15 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	if status.JournalPath == "" {
 		t.Fatalf("RetryMigration() journal_path empty")
 	}
+	journalFile := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+	journalBytes, err := os.ReadFile(journalFile)
+	if err != nil {
+		t.Fatalf("ReadFile(journal) error = %v", err)
+	}
+	journalText := string(journalBytes)
+	if !strings.Contains(journalText, `"event":"retry_started"`) || !strings.Contains(journalText, `"event":"retry_committed"`) {
+		t.Fatalf("migration journal missing retry events: %q", journalText)
+	}
 
 	status, err = runtime.AbortMigration("migrate_live", MigrationAbortToCheckpoint)
 	if err != nil {
@@ -512,6 +522,14 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	}
 	if status.LastError != "aborted to baseline by operator" {
 		t.Fatalf("AbortMigration(to baseline) last_error = %q, want %q", status.LastError, "aborted to baseline by operator")
+	}
+	journalBytes, err = os.ReadFile(journalFile)
+	if err != nil {
+		t.Fatalf("ReadFile(journal after abort) error = %v", err)
+	}
+	journalText = string(journalBytes)
+	if !strings.Contains(journalText, `"event":"aborted"`) || !strings.Contains(journalText, `"target":"baseline"`) {
+		t.Fatalf("migration journal missing abort baseline entry: %q", journalText)
 	}
 
 	if _, err := runtime.AbortMigration("migrate_live", "invalid_target"); !errors.Is(err, ErrMigrationAbortTargetInvalid) {
@@ -643,6 +661,18 @@ func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	}
 	if len(status.PendingRecords) != 0 {
 		t.Fatalf("ReconcileMigration() pending_records = %d, want 0", len(status.PendingRecords))
+	}
+	if strings.TrimSpace(status.JournalPath) == "" {
+		t.Fatalf("ReconcileMigration() journal_path empty")
+	}
+	reconcileJournalPath := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+	reconcileJournalBytes, err := os.ReadFile(reconcileJournalPath)
+	if err != nil {
+		t.Fatalf("ReadFile(reconcile journal) error = %v", err)
+	}
+	reconcileJournalText := string(reconcileJournalBytes)
+	if !strings.Contains(reconcileJournalText, `"event":"reconcile_record"`) || !strings.Contains(reconcileJournalText, `"record_id":"rec-1"`) {
+		t.Fatalf("migration journal missing reconcile entry: %q", reconcileJournalText)
 	}
 
 	runtime.mu.Lock()

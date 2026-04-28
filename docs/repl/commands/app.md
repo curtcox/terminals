@@ -15,7 +15,9 @@
 whether to retry, abort, or reconcile.
 
 `apps migrate logs` tails structured migration journal lines and supports
-`--step <n>` to focus on one step's records.
+`--step <n>` to focus on one step's records. Entries are emitted by runtime
+migration actions (`retry_*`, `aborted`, `reconcile_record`) and include step
+and verdict context.
 
 `app rollback` defaults to `--archive-data`. `--keep-data` is refused when the
 rollback span has no `migrate/downgrade/*.tal` reverse steps.

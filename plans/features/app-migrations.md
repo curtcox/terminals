@@ -21,6 +21,20 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Runtime migration actions now emit structured
+  journal NDJSON entries directly from
+  `terminal_server/internal/appruntime/runtime.go` so operator
+  logs reflect real state transitions instead of only fixture data.
+  `RetryMigration` writes `retry_started`/`retry_committed` (or
+  blocked events for reconcile/drain guard), `AbortMigration`
+  writes `aborted` with target metadata, and
+  `ReconcileMigration` writes `reconcile_record` entries with
+  record/resolution context. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationLifecycleWithSteps`,
+  `TestRuntimeReconcileMigrationPendingRecords`) to assert
+  journal file creation and emitted event payloads.
+
 - 2026-04-27: Updated Gate 1 migration package validation to
   allow reverse-step scripts under `migrate/downgrade/*.tal`
   for rollback workflows while continuing to reject unsupported
