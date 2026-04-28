@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Extended Gate 4 migration crash-replay coverage to
+  include fixture-backed `checkpoint_committed` journal boundaries.
+  Runtime checkpoint journaling in
+  `terminal_server/internal/appruntime/runtime.go` is now
+  interruptible through the same migration hook used for retry and
+  step boundaries, and dry-run boundary discovery includes checkpoint
+  commits only for steps whose fixture execution actually emits
+  checkpoint evidence. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeDryRunMigrationJournalReplayExercisesAllBoundaries`)
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Added runtime migration hard-cap enforcement for
   the current execution scaffold in
   `terminal_server/internal/appruntime/runtime.go`.

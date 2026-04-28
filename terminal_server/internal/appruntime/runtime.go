@@ -710,7 +710,10 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 				return statusFromState(pkg, state), fixtureErr
 			}
 		}
-		appendMigrationCheckpointEntries(pkg, state, step, stats.StoreOps)
+		state, err = r.appendMigrationCheckpointEntriesLocked(name, pkg, state, step, stats.StoreOps)
+		if err != nil {
+			return statusFromState(pkg, state), err
+		}
 		state.StepsCompleted = step.Number
 		state.LastStep = step.Number
 		appendMigrationJournalEntry(pkg, state, "step_committed", map[string]any{
@@ -761,9 +764,9 @@ func (r *Runtime) maybeFailMigrationRuntimeTimeoutLocked(name string, pkg Packag
 	return true, statusFromState(pkg, state)
 }
 
-func appendMigrationCheckpointEntries(pkg Package, state migrationState, step migrationPlanStep, effectCount int) {
+func (r *Runtime) appendMigrationCheckpointEntriesLocked(name string, pkg Package, state migrationState, step migrationPlanStep, effectCount int) (migrationState, error) {
 	if state.CheckpointEvery <= 0 || effectCount <= 0 {
-		return
+		return state, nil
 	}
 	for effectSequence := state.CheckpointEvery; effectSequence <= effectCount; effectSequence += state.CheckpointEvery {
 		appendMigrationJournalEntry(pkg, state, "checkpoint_committed", map[string]any{
@@ -774,7 +777,13 @@ func appendMigrationCheckpointEntries(pkg Package, state migrationState, step mi
 			"effect_sequence":  effectSequence,
 			"checkpoint_every": state.CheckpointEvery,
 		})
+		var err error
+		state, err = r.maybeInterruptMigrationLocked(name, state, "checkpoint_committed")
+		if err != nil {
+			return state, err
+		}
 	}
+	return state, nil
 }
 
 func (r *Runtime) maybeInterruptMigrationLocked(name string, state migrationState, event string) (migrationState, error) {
@@ -818,8 +827,9 @@ func (r *Runtime) SetMigrationDrainReady(name string, ready bool) error {
 // DryRunMigrationJournalReplay runs crash-injection replay checks at each migration journal boundary.
 //
 // The harness executes each boundary in isolation by copying the package tree,
-// injecting one interruption (`retry_started`, `step_started`, `step_committed`),
-// reloading runtime state from journal, and asserting retry reaches `verdict = ok`.
+// injecting one interruption (`retry_started`, `step_started`,
+// `checkpoint_committed`, `step_committed`), reloading runtime state from
+// journal, and asserting retry reaches `verdict = ok`.
 func (r *Runtime) DryRunMigrationJournalReplay(name string) ([]MigrationDryRunResult, error) {
 	r.mu.RLock()
 	pkg, ok := r.packages[name]
@@ -847,7 +857,10 @@ func (r *Runtime) dryRunMigrationJournalReplayForPackage(pkg Package, name strin
 		return nil, err
 	}
 
-	boundaries := migrationJournalDryRunBoundaries(plan)
+	boundaries, err := migrationJournalDryRunBoundaries(pkg.RootPath, plan)
+	if err != nil {
+		return nil, err
+	}
 	results := make([]MigrationDryRunResult, 0, len(boundaries))
 	for _, boundary := range boundaries {
 		result, runErr := dryRunMigrationBoundary(pkg, kernelAPIVersion, name, boundary)
@@ -951,16 +964,47 @@ func dryRunMigrationBoundary(pkg Package, kernelAPIVersion string, name string, 
 	}, nil
 }
 
-func migrationJournalDryRunBoundaries(plan []migrationPlanStep) []MigrationDryRunBoundary {
+func migrationJournalDryRunBoundaries(root string, plan []migrationPlanStep) ([]MigrationDryRunBoundary, error) {
 	boundaries := make([]MigrationDryRunBoundary, 0, 1+(len(plan)*2))
 	boundaries = append(boundaries, MigrationDryRunBoundary{Event: "retry_started", Step: 0})
+	checkpointEvery := packageMigrationCheckpointEvery(root)
 	for _, step := range plan {
-		boundaries = append(boundaries,
-			MigrationDryRunBoundary{Event: "step_started", Step: step.Number},
-			MigrationDryRunBoundary{Event: "step_committed", Step: step.Number},
-		)
+		boundaries = append(boundaries, MigrationDryRunBoundary{Event: "step_started", Step: step.Number})
+		if checkpointEvery > 0 {
+			emitsCheckpoint, err := migrationStepEmitsCheckpoint(root, step, checkpointEvery)
+			if err != nil {
+				return nil, err
+			}
+			if emitsCheckpoint {
+				boundaries = append(boundaries, MigrationDryRunBoundary{Event: "checkpoint_committed", Step: step.Number})
+			}
+		}
+		boundaries = append(boundaries, MigrationDryRunBoundary{Event: "step_committed", Step: step.Number})
 	}
-	return boundaries
+	return boundaries, nil
+}
+
+func migrationStepEmitsCheckpoint(root string, step migrationPlanStep, checkpointEvery int) (bool, error) {
+	fixture, err := findRuntimeMigrationFixture(root, step)
+	if err != nil {
+		return false, err
+	}
+	if fixture == nil {
+		return false, nil
+	}
+	scriptSource, err := os.ReadFile(filepath.Join(root, "migrate", step.ScriptName))
+	if err != nil {
+		return false, fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepUnavailable, step.Number, step.ScriptName, err)
+	}
+	seedRecords, err := readRuntimeFixtureRecords(root, fixture.SeedPath)
+	if err != nil {
+		return false, err
+	}
+	_, stats, err := executeRuntimeMigrationFixture(scriptSource, seedRecords)
+	if err != nil {
+		return false, err
+	}
+	return stats.StoreOps >= checkpointEvery, nil
 }
 
 func copyDirTree(src, dst string) error {

@@ -191,6 +191,11 @@ of replaying the entire migration range on every retry.
 	cadence before committing the step. Packages without fixture-backed effects
 	continue to produce no checkpoint entries until the full durable store
 	executor lands.
+- The Gate 4 crash-replay harness now treats fixture-backed
+	`checkpoint_committed` entries as interruptible journal boundaries. Dry-run
+	replay only injects this boundary for steps whose fixture execution actually
+	emits checkpoint evidence, then reloads from the journal and verifies retry
+	resumes to `verdict = ok`.
 
 When `manifest.toml` declares `app_id`, migration journal paths are now rooted
 under `apps/<app_id>/migrate/...` instead of `apps/<manifest_name>/...` so

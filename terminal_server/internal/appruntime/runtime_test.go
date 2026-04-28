@@ -2337,21 +2337,61 @@ func TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries(t *testin
 func TestRuntimeDryRunMigrationJournalReplayExercisesAllBoundaries(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_dryrun_harness")
+	fixtureDir := filepath.Join(appDir, "tests", "migrate_fixtures")
 	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
-	manifest := "name = \"migrate_dryrun_harness\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.MkdirAll(fixtureDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(fixtures) error = %v", err)
+	}
+	manifest := strings.Join([]string{
+		"name = \"migrate_dryrun_harness\"",
+		"version = \"1.0.0\"",
+		"language = \"tal/1\"",
+		"",
+		"[migrate]",
+		"checkpoint_every = 2",
+		"",
+		"[[migrate.fixture]]",
+		"step = \"1\"",
+		"prior_version = \"1\"",
+		"seed = \"tests/migrate_fixtures/step1_seed.ndjson\"",
+		"expected = \"tests/migrate_fixtures/step1_expected.ndjson\"",
+		"",
+		"[[migrate.fixture]]",
+		"step = \"2\"",
+		"prior_version = \"2\"",
+		"seed = \"tests/migrate_fixtures/step2_seed.ndjson\"",
+		"expected = \"tests/migrate_fixtures/step2_expected.ndjson\"",
+		"",
+	}, "\n")
 	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
 		t.Fatalf("WriteFile(manifest) error = %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile(main) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+	step1Script := "def migrate(record):\n    record[\"label_normalized\"] = lower(trim(record[\"label\"]))\n"
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(step1Script), 0o644); err != nil {
 		t.Fatalf("WriteFile(migrate 1) error = %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile(migrate 2) error = %v", err)
+	}
+	step1Seed := "{\"key\":\"history/1\",\"value\":{\"label\":\"  Foo  \"}}\n{\"key\":\"history/2\",\"value\":{\"label\":\"Bar\"}}\n"
+	step1Expected := "{\"key\":\"history/1\",\"value\":{\"label\":\"  Foo  \",\"label_normalized\":\"foo\"}}\n{\"key\":\"history/2\",\"value\":{\"label\":\"Bar\",\"label_normalized\":\"bar\"}}\n"
+	step2Rows := "{\"key\":\"history/3\",\"value\":{\"label\":\"Baz\"}}\n"
+	if err := os.WriteFile(filepath.Join(fixtureDir, "step1_seed.ndjson"), []byte(step1Seed), 0o644); err != nil {
+		t.Fatalf("WriteFile(step1 seed) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fixtureDir, "step1_expected.ndjson"), []byte(step1Expected), 0o644); err != nil {
+		t.Fatalf("WriteFile(step1 expected) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fixtureDir, "step2_seed.ndjson"), []byte(step2Rows), 0o644); err != nil {
+		t.Fatalf("WriteFile(step2 seed) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fixtureDir, "step2_expected.ndjson"), []byte(step2Rows), 0o644); err != nil {
+		t.Fatalf("WriteFile(step2 expected) error = %v", err)
 	}
 
 	runtime := NewRuntime()
@@ -2367,6 +2407,7 @@ func TestRuntimeDryRunMigrationJournalReplayExercisesAllBoundaries(t *testing.T)
 	wantBoundaries := []MigrationDryRunBoundary{
 		{Event: "retry_started", Step: 0},
 		{Event: "step_started", Step: 1},
+		{Event: "checkpoint_committed", Step: 1},
 		{Event: "step_committed", Step: 1},
 		{Event: "step_started", Step: 2},
 		{Event: "step_committed", Step: 2},
