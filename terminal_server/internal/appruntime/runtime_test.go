@@ -1723,6 +1723,34 @@ func TestRuntimeDryRunMigrationJournalReplayReturnsEmptyWhenNoSteps(t *testing.T
 	}
 }
 
+func TestRuntimeLoadPackageRejectsMigrationWhenDryRunGateFails(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_dryrun_gate_fail")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_dryrun_gate_fail\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def not_migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	runtime.SetMigrationDryRunGateEnabled(true)
+	_, err := runtime.LoadPackage(context.Background(), appDir)
+	if !errors.Is(err, ErrMigrationDryRunFailed) {
+		t.Fatalf("LoadPackage() error = %v, want ErrMigrationDryRunFailed", err)
+	}
+	if _, ok := runtime.GetPackage("migrate_dryrun_gate_fail"); ok {
+		t.Fatalf("GetPackage() ok = true, want false")
+	}
+}
+
 func TestRuntimeRetryMigrationRequiresDrainReadiness(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_drain_guard")

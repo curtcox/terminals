@@ -66,6 +66,8 @@ var (
 	ErrMigrationFixtureMismatch = errors.New("migration fixture expected output mismatch")
 	// ErrMigrationInterrupted indicates a migration run was interrupted before committing.
 	ErrMigrationInterrupted = errors.New("migration execution interrupted before commit")
+	// ErrMigrationDryRunFailed indicates Gate 4 replay checks failed while loading a package.
+	ErrMigrationDryRunFailed = errors.New("migration dry-run gate failed")
 )
 
 const defaultMigrationDrainTimeout = 90 * time.Second
@@ -247,13 +249,15 @@ type AppActivation interface {
 
 // Runtime loads and hot-reloads app packages from disk.
 type Runtime struct {
-	mu               sync.RWMutex
-	kernelAPIVersion string
-	nextRevision     uint64
-	packages         map[string]Package
-	history          map[string][]Package
-	migrations       map[string]migrationState
-	migrationHook    func(event string, step int) error
+	mu                         sync.RWMutex
+	kernelAPIVersion           string
+	nextRevision               uint64
+	packages                   map[string]Package
+	history                    map[string][]Package
+	migrations                 map[string]migrationState
+	migrationHook              func(event string, step int) error
+	migrationDryRunGateEnabled bool
+	skipDryRunGate             bool
 }
 
 type migrationState struct {
@@ -300,11 +304,21 @@ func NewRuntimeWithKernelAPI(kernelAPIVersion string) *Runtime {
 	}
 }
 
+// SetMigrationDryRunGateEnabled configures whether load-time migration replay checks run as a blocking gate.
+func (r *Runtime) SetMigrationDryRunGateEnabled(enabled bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.migrationDryRunGateEnabled = enabled
+}
+
 // LoadPackage parses and registers one app package.
 func (r *Runtime) LoadPackage(ctx context.Context, root string) (Package, error) {
 	_ = ctx
 	pkg, err := r.packageFromDisk(root)
 	if err != nil {
+		return Package{}, err
+	}
+	if err := r.runMigrationDryRunGate(pkg, pkg.Manifest.Name); err != nil {
 		return Package{}, err
 	}
 
@@ -316,6 +330,21 @@ func (r *Runtime) LoadPackage(ctx context.Context, root string) (Package, error)
 	r.history[pkg.Manifest.Name] = append(r.history[pkg.Manifest.Name], pkg)
 	r.migrations[pkg.Manifest.Name] = newMigrationState(pkg)
 	return pkg, nil
+}
+
+func (r *Runtime) runMigrationDryRunGate(pkg Package, name string) error {
+	if !r.migrationDryRunGateEnabled || r.skipDryRunGate {
+		return nil
+	}
+
+	results, err := r.dryRunMigrationJournalReplayForPackage(pkg, name)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrMigrationDryRunFailed, err)
+	}
+	if len(results) == 0 {
+		return nil
+	}
+	return nil
 }
 
 // ReloadPackage reloads one known package if sources changed.
@@ -643,11 +672,18 @@ func (r *Runtime) SetMigrationDrainReady(name string, ready bool) error {
 func (r *Runtime) DryRunMigrationJournalReplay(name string) ([]MigrationDryRunResult, error) {
 	r.mu.RLock()
 	pkg, ok := r.packages[name]
-	kernelAPIVersion := r.kernelAPIVersion
 	r.mu.RUnlock()
 	if !ok {
 		return nil, ErrPackageNotFound
 	}
+
+	return r.dryRunMigrationJournalReplayForPackage(pkg, name)
+}
+
+func (r *Runtime) dryRunMigrationJournalReplayForPackage(pkg Package, name string) ([]MigrationDryRunResult, error) {
+	r.mu.RLock()
+	kernelAPIVersion := r.kernelAPIVersion
+	r.mu.RUnlock()
 
 	_, plan, err := loadMigrationPlan(pkg.RootPath)
 	if err != nil {
@@ -685,6 +721,7 @@ func dryRunMigrationBoundary(pkg Package, kernelAPIVersion string, name string, 
 	}
 
 	isolated := NewRuntimeWithKernelAPI(kernelAPIVersion)
+	isolated.skipDryRunGate = true
 	loadedPkg, err := isolated.LoadPackage(context.Background(), copyRoot)
 	if err != nil {
 		return MigrationDryRunResult{}, fmt.Errorf("load dry-run package: %w", err)
@@ -715,6 +752,7 @@ func dryRunMigrationBoundary(pkg Package, kernelAPIVersion string, name string, 
 	}
 
 	restarted := NewRuntimeWithKernelAPI(kernelAPIVersion)
+	restarted.skipDryRunGate = true
 	if _, err := restarted.LoadPackage(context.Background(), copyRoot); err != nil {
 		return MigrationDryRunResult{}, fmt.Errorf("reload dry-run package: %w", err)
 	}

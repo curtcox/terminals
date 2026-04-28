@@ -21,6 +21,19 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Added optional Gate 4 load-time migration replay enforcement
+  in `terminal_server/internal/appruntime/runtime.go`.
+  Runtime now exposes `SetMigrationDryRunGateEnabled(true)`;
+  when enabled, `LoadPackage` runs migration crash-replay checks via
+  `DryRunMigrationJournalReplay` and rejects migration-bearing packages with
+  `ErrMigrationDryRunFailed` if any journal boundary replay does not
+  normalize and resume to `verdict = ok`.
+  Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeLoadPackageRejectsMigrationWhenDryRunGateFails`) and
+  documented behavior/remaining install-path wiring in
+  `docs/application-migrations.md`.
+
 - 2026-04-28: Added a reusable migration crash-replay dry-run harness in
   `terminal_server/internal/appruntime/runtime.go` via
   `DryRunMigrationJournalReplay`.

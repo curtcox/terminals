@@ -120,6 +120,11 @@ of replaying the entire migration range on every retry.
 	`step_started`/`step_committed` for each planned step) in isolated package
 	copies. Each boundary run verifies interrupted replay state (`step_failed`)
 	and resumed completion (`ok`) before returning.
+- Runtime now also supports a blocking Gate 4 load-time check via
+	`SetMigrationDryRunGateEnabled(true)`. When enabled, `LoadPackage` runs
+	`DryRunMigrationJournalReplay` for migration-bearing packages and rejects
+	load with `ErrMigrationDryRunFailed` if any replay boundary does not
+	normalize and resume to `verdict = ok`.
 - Invalid runtime migration step plans (for example malformed script filenames,
 	numbering gaps, or manifest `[[migrate.step]]` / script-count mismatches) now
 	leave migration status with `executor_ready = false` and a specific
@@ -169,6 +174,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 	later pending steps)
 - `TestRuntimeDryRunMigrationJournalReplayExercisesAllBoundaries`
 - `TestRuntimeDryRunMigrationJournalReplayReturnsEmptyWhenNoSteps`
+- `TestRuntimeLoadPackageRejectsMigrationWhenDryRunGateFails`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
 - `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`
@@ -184,4 +190,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle (actual step execution over synthetic seeded stores and full Gate 4 install-gate wiring). A reusable boundary-replay harness now exists in runtime, but Gate 4 package vetting does not yet invoke it as a blocking install gate. The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry enforces declared fixture expected-output equality for identity dry-run comparison, runtime replay now has journal-boundary crash-injection coverage, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle (actual step execution over synthetic seeded stores and full Gate 4 install-gate wiring). Runtime can now enforce Gate 4 replay as a blocking load-time gate when explicitly enabled, but the distribution/install path has not yet enabled this by default. The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry enforces declared fixture expected-output equality for identity dry-run comparison, runtime replay now has journal-boundary crash-injection coverage, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
