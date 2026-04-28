@@ -125,6 +125,10 @@ of replaying the entire migration range on every retry.
 	`DryRunMigrationJournalReplay` for migration-bearing packages and rejects
 	load with `ErrMigrationDryRunFailed` if any replay boundary does not
 	normalize and resume to `verdict = ok`.
+- The `term` CLI now creates app runtimes with Gate 4 enabled by default for
+	`app check`, `app load`, `app test`, local `app reload` fallback, and
+	`sim run`, so local operator/developer flows reject migration-bearing
+	packages whose replay dry-run cannot normalize to `verdict = ok`.
 - Invalid runtime migration step plans (for example malformed script filenames,
 	numbering gaps, or manifest `[[migrate.step]]` / script-count mismatches) now
 	leave migration status with `executor_ready = false` and a specific
@@ -190,4 +194,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle (actual step execution over synthetic seeded stores and full Gate 4 install-gate wiring). Runtime now enforces Gate 4 replay as a blocking load-time gate in the server startup path by default (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry enforces declared fixture expected-output equality for identity dry-run comparison, runtime replay now has journal-boundary crash-injection coverage, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle (actual step execution over synthetic seeded stores). Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry enforces declared fixture expected-output equality for identity dry-run comparison, runtime replay now has journal-boundary crash-injection coverage, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).

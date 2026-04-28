@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
 )
 
 func TestRunAppNewCreatesScaffold(t *testing.T) {
@@ -28,6 +30,36 @@ func TestRunAppNewCreatesScaffold(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(cwd, "apps", "sound_watch", "main.tal")); err != nil {
 			t.Fatalf("main.tal missing: %v", err)
+		}
+	})
+}
+
+func TestRunAppCheckRejectsMigrationWhenDryRunGateFails(t *testing.T) {
+	cwd := t.TempDir()
+	appDir := filepath.Join(cwd, "apps", "migrate_dryrun_gate_fail")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	manifest := "name = \"migrate_dryrun_gate_fail\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main.tal) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def not_migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate step) error = %v", err)
+	}
+
+	withCWD(t, cwd, func() {
+		var out bytes.Buffer
+		var errOut bytes.Buffer
+		code := run([]string{"app", "check", "migrate_dryrun_gate_fail"}, &out, &errOut)
+		if code == 0 {
+			t.Fatalf("run() code = %d, want non-zero", code)
+		}
+		if !strings.Contains(errOut.String(), appruntime.ErrMigrationDryRunFailed.Error()) {
+			t.Fatalf("stderr = %q, want migration dry-run gate failure", errOut.String())
 		}
 	})
 }

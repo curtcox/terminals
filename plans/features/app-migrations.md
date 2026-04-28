@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Wired Gate 4 migration replay enforcement into local
+  `term` app-runtime flows in `terminal_server/cmd/term/main.go`.
+  Added `newAppRuntime()` to enable
+  `SetMigrationDryRunGateEnabled(true)` for `app check`, `app load`,
+  `app test`, local `app reload` fallback, and `sim run` package load
+  paths so local operator/developer commands reject migration-bearing
+  packages that fail replay normalization. Added regression coverage in
+  `terminal_server/cmd/term/main_test.go`
+  (`TestRunAppCheckRejectsMigrationWhenDryRunGateFails`) and
+  documented behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Wired Gate 4 load-time migration replay enforcement
   into the server startup install path by default in
   `terminal_server/cmd/server/main.go`.

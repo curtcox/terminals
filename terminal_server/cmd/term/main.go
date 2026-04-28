@@ -28,6 +28,12 @@ var adminHTTPClient = http.DefaultClient
 
 var testDeclPattern = regexp.MustCompile(`^test\((?:"([^"]+)"|'([^']+)')\):$`)
 
+func newAppRuntime() *appruntime.Runtime {
+	runtime := appruntime.NewRuntime()
+	runtime.SetMigrationDryRunGateEnabled(true)
+	return runtime
+}
+
 func main() {
 	code := run(os.Args[1:], os.Stdout, os.Stderr)
 	if code != 0 {
@@ -93,7 +99,7 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	case "check", "load":
-		runtime := appruntime.NewRuntime()
+		runtime := newAppRuntime()
 		pkg, err := runtime.LoadPackage(context.Background(), root)
 		if err != nil {
 			return fail(stderr, err)
@@ -103,7 +109,7 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	case "test":
-		runtime := appruntime.NewRuntime()
+		runtime := newAppRuntime()
 		pkg, err := runtime.LoadPackage(context.Background(), root)
 		if err != nil {
 			return fail(stderr, err)
@@ -148,7 +154,7 @@ func runApp(args []string, stdout, stderr io.Writer) int {
 		result, err := postAdminAppCommand(command, name)
 		if err != nil {
 			if command == "reload" {
-				runtime := appruntime.NewRuntime()
+				runtime := newAppRuntime()
 				if _, loadErr := runtime.LoadPackage(context.Background(), root); loadErr != nil {
 					return fail(stderr, loadErr)
 				}
@@ -246,7 +252,7 @@ func runSim(args []string, stdout, stderr io.Writer) int {
 	}
 
 	root := filepath.Join("apps", name)
-	runtime := appruntime.NewRuntime()
+	runtime := newAppRuntime()
 	pkg, err := runtime.LoadPackage(context.Background(), root)
 	if err != nil {
 		return fail(stderr, err)
