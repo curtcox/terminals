@@ -22,7 +22,8 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 The runtime migration control path in [terminal_server/internal/appruntime/runtime.go](../terminal_server/internal/appruntime/runtime.go) now enforces an incompatible-step drain guard:
 
 - If any `[[migrate.step]]` declares `compatibility = "incompatible"` and `drain_policy = "drain"`, `RetryMigration` refuses to run until drain readiness is explicitly marked.
-- A blocked retry returns `ErrMigrationDrainTimeout`, marks migration `verdict = "aborted"`, and preserves the current checkpoint (no step advancement while drain is unsafe).
+- Blocked retries first return `ErrMigrationDrainPending` and set `verdict = "drain_pending"` while drain is still within its timeout window.
+- Drain timeout uses `[migrate].drain_timeout_seconds` (default 90s). Once that window elapses, `RetryMigration` returns `ErrMigrationDrainTimeout`, marks `verdict = "aborted"`, and preserves the current checkpoint (no step advancement while drain is unsafe).
 - Operators/orchestrators can mark readiness through `SetMigrationDrainReady`, after which retry proceeds normally.
 
 ## Implemented migration runtime journaling

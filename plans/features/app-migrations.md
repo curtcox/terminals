@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Implemented drain-timeout orchestration in
+  `terminal_server/internal/appruntime/runtime.go` so
+  incompatible `drain` migrations no longer abort immediately.
+  `RetryMigration` now enters `drain_pending`, tracks first
+  blocked-at time, honors `[migrate].drain_timeout_seconds`
+  (default 90s), and only returns `ErrMigrationDrainTimeout`
+  after the timeout window elapses. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationRequiresDrainReadiness`) for both
+  pre-timeout pending and post-timeout abort behavior.
+
 - 2026-04-27: Added migration journal replay in
   `terminal_server/internal/appruntime/runtime.go` so package load now
   restores migration status fields (`verdict`, `steps_completed`,

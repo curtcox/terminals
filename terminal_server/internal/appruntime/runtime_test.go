@@ -622,6 +622,7 @@ language = "tal/1"
 
 [migrate]
 declared_steps = 1
+drain_timeout_seconds = 2
 
 [[migrate.step]]
 from = "1"
@@ -645,6 +646,26 @@ drain_policy = "drain"
 	}
 
 	status, err := runtime.RetryMigration("migrate_drain_guard")
+	if !errors.Is(err, ErrMigrationDrainPending) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationDrainPending", err)
+	}
+	if status.Verdict != "drain_pending" {
+		t.Fatalf("RetryMigration() verdict = %q, want drain_pending", status.Verdict)
+	}
+	if status.LastError != ErrMigrationDrainPending.Error() {
+		t.Fatalf("RetryMigration() last_error = %q, want %q", status.LastError, ErrMigrationDrainPending.Error())
+	}
+	if status.StepsCompleted != 0 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+	}
+
+	runtime.mu.Lock()
+	state := runtime.migrations["migrate_drain_guard"]
+	state.DrainBlockedAt = time.Now().Add(-3 * time.Second)
+	runtime.migrations["migrate_drain_guard"] = state
+	runtime.mu.Unlock()
+
+	status, err = runtime.RetryMigration("migrate_drain_guard")
 	if !errors.Is(err, ErrMigrationDrainTimeout) {
 		t.Fatalf("RetryMigration() error = %v, want ErrMigrationDrainTimeout", err)
 	}
@@ -653,9 +674,6 @@ drain_policy = "drain"
 	}
 	if status.LastError != ErrMigrationDrainTimeout.Error() {
 		t.Fatalf("RetryMigration() last_error = %q, want %q", status.LastError, ErrMigrationDrainTimeout.Error())
-	}
-	if status.StepsCompleted != 0 {
-		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
 	}
 
 	if err := runtime.SetMigrationDrainReady("migrate_drain_guard", true); err != nil {

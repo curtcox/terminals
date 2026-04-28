@@ -52,7 +52,11 @@ var (
 	ErrRollbackKeepDataRequiresDowngrade = errors.New("rollback with keep-data requires migrate/downgrade steps")
 	// ErrMigrationDrainTimeout indicates incompatible migration drain prerequisites were not satisfied.
 	ErrMigrationDrainTimeout = errors.New("migration drain timeout elapsed before executor run")
+	// ErrMigrationDrainPending indicates incompatible migration drain prerequisites are still in progress.
+	ErrMigrationDrainPending = errors.New("migration drain is pending")
 )
+
+const defaultMigrationDrainTimeout = 90 * time.Second
 
 const (
 	// MigrationAbortToCheckpoint aborts the current step and rewinds to the last checkpoint.
@@ -220,6 +224,8 @@ type migrationState struct {
 	ExecutorReady      bool
 	RequiresDrain      bool
 	DrainReady         bool
+	DrainTimeout       time.Duration
+	DrainBlockedAt     time.Time
 	PendingRecords     map[string]string
 }
 
@@ -382,10 +388,30 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		return statusFromState(pkg, state), ErrMigrationReconcilePending
 	}
 	if state.RequiresDrain && !state.DrainReady {
+		now := time.Now().UTC()
+		if state.DrainBlockedAt.IsZero() {
+			state.DrainBlockedAt = now
+		}
+		timeout := state.DrainTimeout
+		if timeout <= 0 {
+			timeout = defaultMigrationDrainTimeout
+		}
+		if now.Sub(state.DrainBlockedAt) < timeout {
+			state.Verdict = "drain_pending"
+			state.LastError = ErrMigrationDrainPending.Error()
+			r.migrations[name] = state
+			appendMigrationJournalEntry(pkg, state, "retry_blocked_drain_pending", map[string]any{
+				"timeout_seconds": int(timeout.Seconds()),
+			})
+			return statusFromState(pkg, state), ErrMigrationDrainPending
+		}
 		state.Verdict = "aborted"
 		state.LastError = ErrMigrationDrainTimeout.Error()
 		r.migrations[name] = state
-		appendMigrationJournalEntry(pkg, state, "retry_blocked_drain_timeout", nil)
+		appendMigrationJournalEntry(pkg, state, "retry_blocked_drain_timeout", map[string]any{
+			"timeout_seconds": int(timeout.Seconds()),
+			"blocked_since":   state.DrainBlockedAt.Format(time.RFC3339Nano),
+		})
 		return statusFromState(pkg, state), ErrMigrationDrainTimeout
 	}
 
@@ -396,6 +422,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 
 	state.Verdict = "running"
 	state.LastError = ""
+	state.DrainBlockedAt = time.Time{}
 	appendMigrationJournalEntry(pkg, state, "retry_started", map[string]any{"from_step": nextStep})
 	for step := nextStep; step <= state.StepsPlanned; step++ {
 		state.LastStep = step
@@ -424,9 +451,18 @@ func (r *Runtime) SetMigrationDrainReady(name string, ready bool) error {
 		return err
 	}
 	state.DrainReady = ready
-	if ready && state.Verdict == "aborted" && state.LastError == ErrMigrationDrainTimeout.Error() {
-		state.Verdict = "idle"
-		state.LastError = ""
+	if ready {
+		state.DrainBlockedAt = time.Time{}
+		if state.Verdict == "aborted" && state.LastError == ErrMigrationDrainTimeout.Error() {
+			state.Verdict = "idle"
+			state.LastError = ""
+		}
+		if state.Verdict == "drain_pending" && state.LastError == ErrMigrationDrainPending.Error() {
+			state.Verdict = "idle"
+			state.LastError = ""
+		}
+	} else {
+		state.DrainBlockedAt = time.Time{}
 	}
 	r.migrations[name] = state
 	return nil
@@ -548,6 +584,7 @@ func newMigrationState(pkg Package) migrationState {
 		ExecutorReady:  steps > 0,
 		RequiresDrain:  requiresDrain,
 		DrainReady:     !requiresDrain,
+		DrainTimeout:   packageDrainTimeout(rootOrFallbackPath(pkg)),
 	}
 	if steps > 0 {
 		state.JournalPath = migrationJournalPath(pkg)
@@ -637,11 +674,31 @@ func migrationJournalString(raw any) string {
 
 type runtimeMigrationManifest struct {
 	Migrate struct {
-		Step []struct {
+		DrainTimeoutSeconds int `toml:"drain_timeout_seconds"`
+		Step                []struct {
 			Compatibility string `toml:"compatibility"`
 			DrainPolicy   string `toml:"drain_policy"`
 		} `toml:"step"`
 	} `toml:"migrate"`
+}
+
+func rootOrFallbackPath(pkg Package) string {
+	if strings.TrimSpace(pkg.RootPath) != "" {
+		return pkg.RootPath
+	}
+	return "."
+}
+
+func packageDrainTimeout(root string) time.Duration {
+	manifestPath := filepath.Join(root, "manifest.toml")
+	var manifest runtimeMigrationManifest
+	if _, err := toml.DecodeFile(manifestPath, &manifest); err != nil {
+		return defaultMigrationDrainTimeout
+	}
+	if manifest.Migrate.DrainTimeoutSeconds <= 0 {
+		return defaultMigrationDrainTimeout
+	}
+	return time.Duration(manifest.Migrate.DrainTimeoutSeconds) * time.Second
 }
 
 func packageRequiresDrainMigration(root string) bool {
