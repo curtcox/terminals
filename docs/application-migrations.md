@@ -82,6 +82,9 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeMigrationLifecycleWithSteps`
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
+- `TestAppsMigrateLogsUsesAdminAPIStepFilter`
+- `TestAppsMigrateReconcileUsesAdminAPI`
+- `TestExecuteCommandAppsMigrateUsageIncludesLogs`
 
 ## Not yet implemented
 

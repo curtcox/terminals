@@ -2419,7 +2419,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		switch sub {
 		case "migrate":
 			if len(args) < 2 {
-				return errors.New("usage: apps migrate <status|retry|abort|reconcile>")
+				return errors.New("usage: apps migrate <status|logs|retry|abort|reconcile>")
 			}
 			migrateSub := strings.TrimSpace(args[1])
 			switch migrateSub {

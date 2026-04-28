@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Tightened migration operator-surface coverage in
+  `terminal_server/internal/repl/repl.go` and
+  `terminal_server/internal/repl/repl_test.go`. The
+  `apps migrate` top-level usage string now correctly includes
+  the `logs` subcommand (`<status|logs|retry|abort|reconcile>`),
+  and added regression tests for reconcile form wiring/output
+  (`TestAppsMigrateReconcileUsesAdminAPI`) plus usage guidance
+  (`TestExecuteCommandAppsMigrateUsageIncludesLogs`). Documented
+  this coverage in `docs/application-migrations.md`.
+
 - 2026-04-27: Normalized migration reconcile semantics for apps
   without runnable migration steps. `ReconcileMigration` in
   `terminal_server/internal/appruntime/runtime.go` now returns

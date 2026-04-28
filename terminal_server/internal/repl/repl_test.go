@@ -380,6 +380,56 @@ func TestAppsMigrateAbortUsesAdminAPIToTarget(t *testing.T) {
 	}
 }
 
+func TestAppsMigrateReconcileUsesAdminAPI(t *testing.T) {
+	var (
+		capturedRecordID   string
+		capturedResolution string
+	)
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/apps/migrate/reconcile":
+			if err := req.ParseForm(); err != nil {
+				t.Fatalf("ParseForm() error = %v", err)
+			}
+			capturedRecordID = req.Form.Get("record_id")
+			capturedResolution = req.Form.Get("resolution")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","action":"reconcile","app":"sound_watch","migration":{"app":"sound_watch","verdict":"ok"}}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("apps migrate reconcile sound_watch rec-9 force_rewind\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if capturedRecordID != "rec-9" {
+		t.Fatalf("apps migrate reconcile record_id = %q, want rec-9", capturedRecordID)
+	}
+	if capturedResolution != "force_rewind" {
+		t.Fatalf("apps migrate reconcile resolution = %q, want force_rewind", capturedResolution)
+	}
+	text := out.String()
+	if !strings.Contains(text, "OK  app=sound_watch action=reconcile status=ok") {
+		t.Fatalf("missing apps migrate reconcile output: %q", text)
+	}
+}
+
+func TestExecuteCommandAppsMigrateUsageIncludesLogs(t *testing.T) {
+	_, err := ExecuteCommand(context.Background(), "apps migrate", ExecuteOptions{})
+	if err == nil {
+		t.Fatalf("ExecuteCommand(apps migrate) error = nil, want usage error")
+	}
+	if !strings.Contains(err.Error(), "usage: apps migrate <status|logs|retry|abort|reconcile>") {
+		t.Fatalf("ExecuteCommand(apps migrate) error = %q, want usage including logs", err.Error())
+	}
+}
+
 func TestStorePutWithTTLPassesFormValues(t *testing.T) {
 	var capturedTTL string
 	var capturedValue string
