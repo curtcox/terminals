@@ -13,6 +13,7 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - Reverse migration scripts under `migrate/downgrade/*.tal` are allowed for rollback flows, but must remain single-level files (nested downgrade folders are rejected).
 - Step numbers must be contiguous and start at `1` (no gaps).
 - Each sorted migration file must match the corresponding manifest step `from`/`to` values.
+- Invalid migration script paths now return specific diagnostics, including nested path violations under `migrate/` / `migrate/downgrade/` and malformed step filenames that do not match `<step>_<from>_to_<to>.tal`.
 - When a step declares `compatibility = "incompatible"`, it cannot also declare `drain_policy = "none"`.
 - Migration fixture NDJSON files are bounded to at most 4096 records per file to keep Gate 4 synthetic-store input sizes predictable.
 

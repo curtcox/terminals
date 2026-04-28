@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added explicit Gate 1 migration path diagnostics in
+  `terminal_server/internal/apppackage/tap.go` for invalid nested
+  `migrate/` layouts and malformed migration filenames. `VerifyTap`
+  now reports specific `ErrInvalidManifest` context when downgrade
+  scripts are nested under `migrate/downgrade/` or migration steps do
+  not follow `<step>_<from>_to_<to>.tal`. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsNestedMigrateDowngradePath`,
+  `TestVerifyTapRejectsMigrateMalformedStepFilename`) and documented
+  the diagnostics in `docs/application-migrations.md`.
+
 - 2026-04-27: Added migration fixture volume guard in
   `terminal_server/internal/apppackage/tap.go` so
   `validateMigrationFixtureNDJSON` rejects seed/expected fixture

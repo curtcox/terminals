@@ -645,21 +645,27 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		name := strings.TrimPrefix(rel, "migrate/")
 		if strings.HasPrefix(name, "downgrade/") {
 			downgradeName := strings.TrimPrefix(name, "downgrade/")
-			if strings.TrimSpace(downgradeName) == "" || strings.Contains(downgradeName, "/") || !strings.HasSuffix(downgradeName, ".tal") {
-				return ErrInvalidManifest
+			if strings.TrimSpace(downgradeName) == "" {
+				return fmt.Errorf("%w: migration downgrade script path is empty", ErrInvalidManifest)
+			}
+			if strings.Contains(downgradeName, "/") {
+				return fmt.Errorf("%w: migration downgrade script %s must be a single-level file under migrate/downgrade/", ErrInvalidManifest, rel)
+			}
+			if !strings.HasSuffix(downgradeName, ".tal") {
+				return fmt.Errorf("%w: migration downgrade script %s must end with .tal", ErrInvalidManifest, rel)
 			}
 			continue
 		}
 		if strings.Contains(name, "/") {
-			return ErrInvalidManifest
+			return fmt.Errorf("%w: migration script %s must be a single-level file under migrate/", ErrInvalidManifest, rel)
 		}
 		match := migrateStepFilePattern.FindStringSubmatch(name)
 		if match == nil {
-			return ErrInvalidManifest
+			return fmt.Errorf("%w: migration script %s must match <step>_<from>_to_<to>.tal", ErrInvalidManifest, rel)
 		}
 		stepNumber, err := strconv.Atoi(match[1])
 		if err != nil || stepNumber <= 0 {
-			return ErrInvalidManifest
+			return fmt.Errorf("%w: migration script %s has invalid step number", ErrInvalidManifest, rel)
 		}
 		migrationFiles = append(migrationFiles, parsedStep{stepNumber: stepNumber, stepName: strings.TrimSuffix(name, ".tal"), from: match[2], to: match[3]})
 	}
