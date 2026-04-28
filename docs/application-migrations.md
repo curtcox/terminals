@@ -14,6 +14,7 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - Step numbers must be contiguous and start at `1` (no gaps).
 - Each sorted migration file must match the corresponding manifest step `from`/`to` values.
 - When a step declares `compatibility = "incompatible"`, it cannot also declare `drain_policy = "none"`.
+- Migration fixture NDJSON files are bounded to at most 4096 records per file to keep Gate 4 synthetic-store input sizes predictable.
 
 ## Implemented runtime migration guard
 
@@ -62,6 +63,8 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapRejectsMigrateDeclaredStepMismatch`
 - `TestVerifyTapRejectsMigrateIncompatibleWithoutDrain`
 - `TestVerifyTapAcceptsMigrateIncompatibleWithDrain`
+- `TestVerifyTapRejectsMigrateFixtureTooManyRecords`
+- `TestVerifyTapAcceptsMigrateFixtureAtRecordLimit`
 - `TestRuntimeRetryMigrationRequiresDrainReadiness`
 - `TestRuntimeMigrationLifecycleWithSteps`
 - `TestRuntimeReconcileMigrationPendingRecords`

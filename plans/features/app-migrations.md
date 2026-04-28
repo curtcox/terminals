@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added migration fixture volume guard in
+  `terminal_server/internal/apppackage/tap.go` so
+  `validateMigrationFixtureNDJSON` rejects seed/expected fixture
+  files that exceed 4096 records, keeping Gate 4 synthetic-store
+  inputs bounded per fixture. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsMigrateFixtureTooManyRecords`,
+  `TestVerifyTapAcceptsMigrateFixtureAtRecordLimit`) and
+  documented the limit in `docs/application-migrations.md`.
+
 - 2026-04-27: Tightened runtime reconciliation guard semantics in
   `terminal_server/internal/appruntime/runtime.go` so
   `RetryMigration` now blocks whenever migration status is

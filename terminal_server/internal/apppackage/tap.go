@@ -42,6 +42,7 @@ const (
 	statementNonceLen       = 16
 	voucherNotesMaxBytes    = 2 << 10
 	publisherViaMaxBytes    = 256
+	migrationFixtureMaxRows = 4096
 )
 
 var (
@@ -790,6 +791,10 @@ func validateMigrationFixtureNDJSON(path string, payload []byte) error {
 	}
 
 	lines := bytes.Split(payload, []byte{'\n'})
+	recordCount := len(lines) - 1
+	if recordCount > migrationFixtureMaxRows {
+		return fmt.Errorf("%w: migration fixture %s exceeds max records (%d > %d)", ErrInvalidManifest, path, recordCount, migrationFixtureMaxRows)
+	}
 	seenKeys := make(map[string]struct{}, len(lines))
 	var previousKey string
 
