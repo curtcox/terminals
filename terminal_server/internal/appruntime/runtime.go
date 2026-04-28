@@ -67,6 +67,8 @@ var (
 
 const defaultMigrationDrainTimeout = 90 * time.Second
 
+const runtimeMigrationFixtureMaxRows = 4096
+
 var migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
 
 var migrateLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']([^"']+)["']`)
@@ -988,11 +990,16 @@ func readRuntimeFixtureRecords(root string, relPath string) (map[string]string, 
 	scanner := bufio.NewScanner(file)
 	records := make(map[string]string)
 	line := 0
+	recordCount := 0
 	for scanner.Scan() {
 		line++
 		payload := strings.TrimSpace(scanner.Text())
 		if payload == "" {
 			continue
+		}
+		recordCount++
+		if recordCount > runtimeMigrationFixtureMaxRows {
+			return nil, fmt.Errorf("%w: %s exceeds maximum records (%d)", ErrMigrationFixtureMismatch, relPath, runtimeMigrationFixtureMaxRows)
 		}
 		var envelope struct {
 			Key   string          `json:"key"`

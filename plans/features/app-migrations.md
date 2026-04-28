@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: github-copilot
 validation: none
-last-reviewed: 2026-04-27
+last-reviewed: 2026-04-28
 ---
 
 # Application Migrations
@@ -20,6 +20,17 @@ Referenced by [application-distribution.md](application-distribution.md)
 who may authorize a migration).
 
 ## Implementation Progress
+
+- 2026-04-28: Enforced execution-time migration fixture record limits
+  in `terminal_server/internal/appruntime/runtime.go`.
+  `readRuntimeFixtureRecords` now rejects fixture files with more than
+  4096 records using `ErrMigrationFixtureMismatch`, preserving step
+  checkpoint state and existing `step_failed_fixture_mismatch` journal
+  semantics when oversized fixtures are encountered after package load.
+  Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`) and
+  documented behavior in `docs/application-migrations.md`.
 
 - 2026-04-27: Hardened migration module-load parsing to ignore
   commented `load(...)` text while still enforcing disallowed

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -698,6 +699,88 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	status, err := runtime.RetryMigration("migrate_fixture_mismatch")
 	if !errors.Is(err, ErrMigrationFixtureMismatch) {
 		t.Fatalf("RetryMigration() error = %v, want ErrMigrationFixtureMismatch", err)
+	}
+	if status.Verdict != "step_failed" {
+		t.Fatalf("RetryMigration() verdict = %q, want step_failed", status.Verdict)
+	}
+	if status.StepsCompleted != 0 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+	}
+	if status.LastStep != 1 {
+		t.Fatalf("RetryMigration() last_step = %d, want 1", status.LastStep)
+	}
+	if !strings.Contains(status.LastError, "fixture mismatch") {
+		t.Fatalf("RetryMigration() last_error = %q, want fixture mismatch message", status.LastError)
+	}
+
+	journalPath := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+	journalBytes, readErr := os.ReadFile(journalPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(journal) error = %v", readErr)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalEvent(entries, "step_failed_fixture_mismatch") {
+		t.Fatalf("migration journal missing step_failed_fixture_mismatch event: %+v", entries)
+	}
+}
+
+func TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_fixture_limit")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(appDir, "tests", "migrate_fixtures"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(tests/migrate_fixtures) error = %v", err)
+	}
+	manifest := `name = "migrate_fixture_limit"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "none"
+
+[[migrate.fixture]]
+step = "0001"
+prior_version = "1"
+seed = "tests/migrate_fixtures/history_seed.ndjson"
+expected = "tests/migrate_fixtures/history_expected.ndjson"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+	seed := buildRuntimeFixtureRows(runtimeMigrationFixtureMaxRows + 1)
+	expected := "{\"key\":\"history/1\",\"value\":{\"count\":1}}\n"
+	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_seed.ndjson"), []byte(seed), 0o644); err != nil {
+		t.Fatalf("WriteFile(seed fixture) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_expected.ndjson"), []byte(expected), 0o644); err != nil {
+		t.Fatalf("WriteFile(expected fixture) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_fixture_limit")
+	if !errors.Is(err, ErrMigrationFixtureMismatch) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationFixtureMismatch", err)
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum records") {
+		t.Fatalf("RetryMigration() error = %q, want max records detail", err.Error())
 	}
 	if status.Verdict != "step_failed" {
 		t.Fatalf("RetryMigration() verdict = %q, want step_failed", status.Verdict)
@@ -1731,6 +1814,21 @@ func parseMigrationJournalEntries(t *testing.T, data []byte) []migrationJournalE
 		t.Fatalf("Scan(journal) error = %v", err)
 	}
 	return entries
+}
+
+func buildRuntimeFixtureRows(count int) string {
+	if count <= 0 {
+		return ""
+	}
+	var b strings.Builder
+	for i := 1; i <= count; i++ {
+		b.WriteString("{\"key\":\"history/")
+		b.WriteString(strconv.Itoa(i))
+		b.WriteString("\",\"value\":{\"count\":")
+		b.WriteString(strconv.Itoa(i))
+		b.WriteString("}}\n")
+	}
+	return b.String()
 }
 
 func hasMigrationJournalEvent(entries []migrationJournalEntry, event string) bool {

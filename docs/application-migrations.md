@@ -86,6 +86,10 @@ of replaying the entire migration range on every retry.
 - If a declared fixture file cannot be read at execution time, retry stops
 	with `ErrMigrationFixtureUnavailable`, marks `verdict = step_failed`, and
 	emits `step_failed_fixture_unavailable` journal entries.
+- Runtime fixture reads now enforce the same 4096-record ceiling used by
+	Gate 4 package verification; oversized fixture files fail retry with
+	`ErrMigrationFixtureMismatch` before step commit and emit
+	`step_failed_fixture_mismatch` journal entries.
 - When fixture declarations are present in `manifest.toml`, retry now also
 	requires a `[[migrate.fixture]]` entry for each pending step. Missing
 	per-step fixture metadata fails retry with `ErrMigrationFixtureUnavailable`
@@ -145,6 +149,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`
 - `TestVerifyTapIgnoresCommentedDisallowedLoadStatements`
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
+- `TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
 - `TestExecuteCommandAppsMigrateUsageIncludesLogs`
