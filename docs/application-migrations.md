@@ -159,6 +159,12 @@ of replaying the entire migration range on every retry.
 	commits, retry fails with `ErrMigrationRuntimeTimeout`, keeps checkpoint
 	progress at the last committed step, marks `verdict = step_failed`, and
 	emits a `step_failed_timeout` journal entry with the configured budget.
+- The deterministic fixture execution subset now treats
+	`migrate.env.abort(reason)` calls as first-class executor aborts. Runtime
+	retry fails the current step with `ErrMigrationAborted`, keeps checkpoint
+	progress at the last committed step, marks `verdict = step_failed`, and
+	emits `step_failed_aborted` journal evidence with the script-provided
+	reason.
 - Retry now carries `[migrate].checkpoint_every` into the fixture-backed
 	execution scaffold. When deterministic fixture transforms touch records,
 	runtime treats each transformed fixture row as a synthetic store effect and
@@ -225,6 +231,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRoot`
 - `TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRootViaSymlink`
 - `TestRuntimeRetryMigrationFailsWhenMaxRuntimeExceeded`
+- `TestRuntimeRetryMigrationAbortCallFailsCurrentStep`
 - `TestRuntimeRetryMigrationEmitsCheckpointEveryForFixtureEffects`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
@@ -232,4 +239,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes a small deterministic `migrate(record)` fixture subset before expected-output comparison, retry enforces the configured max-runtime budget around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, retry emits checkpoint evidence for fixture-backed synthetic effects at `[migrate].checkpoint_every`, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes a small deterministic `migrate(record)` fixture subset before expected-output comparison, retry honors `migrate.env.abort(reason)` in that subset, retry enforces the configured max-runtime budget around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, retry emits checkpoint evidence for fixture-backed synthetic effects at `[migrate].checkpoint_every`, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).

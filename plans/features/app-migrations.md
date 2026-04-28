@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Added first-class `migrate.env.abort(reason)`
+  handling to the runtime fixture execution scaffold in
+  `terminal_server/internal/appruntime/runtime.go`. Abort calls
+  now fail the current step with `ErrMigrationAborted`, preserve
+  checkpoint progress, mark `verdict = step_failed`, and emit
+  `step_failed_aborted` journal evidence with the script-provided
+  reason instead of being reported as an unsupported fixture
+  statement. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAbortCallFailsCurrentStep`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Wired `[migrate].checkpoint_every` into the
   runtime migration retry scaffold in
   `terminal_server/internal/appruntime/runtime.go`. Fixture-backed

@@ -70,6 +70,8 @@ var (
 	ErrMigrationDryRunFailed = errors.New("migration dry-run gate failed")
 	// ErrMigrationRuntimeTimeout indicates migration execution exceeded its configured runtime budget.
 	ErrMigrationRuntimeTimeout = errors.New("migration runtime timeout elapsed")
+	// ErrMigrationAborted indicates migration code requested an executor abort.
+	ErrMigrationAborted = errors.New("migration aborted by script")
 )
 
 const defaultMigrationDrainTimeout = 90 * time.Second
@@ -89,6 +91,8 @@ var migrateRecordDeletePattern = regexp.MustCompile(`^\s*del\s+record\["([^"]+)"
 var migrateRecordValuePattern = regexp.MustCompile(`^record\["([^"]+)"\]$`)
 
 var migrateRecordLowerPattern = regexp.MustCompile(`^lower\(\s*record\["([^"]+)"\]\s*\)$`)
+
+var migrateAbortPattern = regexp.MustCompile(`^abort\(\s*("(?:\\.|[^"\\])*")\s*\)$`)
 
 var allowedMigrationModules = map[string]struct{}{
 	"store":         {},
@@ -596,6 +600,17 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 			state.Verdict = "step_failed"
 			state.LastStep = step.Number
 			switch {
+			case errors.Is(fixtureErr, ErrMigrationAborted):
+				state.LastError = fixtureErr.Error()
+				r.migrations[name] = state
+				appendMigrationJournalEntry(pkg, state, "step_failed_aborted", map[string]any{
+					"step_id":      step.Number,
+					"from_version": step.FromVersion,
+					"to_version":   step.ToVersion,
+					"script":       step.ScriptName,
+					"error":        fixtureErr.Error(),
+				})
+				return statusFromState(pkg, state), fixtureErr
 			case errors.Is(fixtureErr, ErrMigrationFixtureUnavailable):
 				state.LastError = fmt.Sprintf("step %d fixture unavailable: %s", step.Number, step.ScriptName)
 				r.migrations[name] = state
@@ -1266,6 +1281,9 @@ func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSourc
 	}
 	actualRecords, effectCount, err := executeRuntimeMigrationFixture(scriptSource, seedRecords)
 	if err != nil {
+		if errors.Is(err, ErrMigrationAborted) {
+			return 0, err
+		}
 		return 0, fmt.Errorf("%w: step %04d fixture execution failed: %v", ErrMigrationFixtureMismatch, step.Number, err)
 	}
 
@@ -1295,6 +1313,7 @@ type runtimeMigrationFixtureTransform struct {
 	Source      string
 	Operation   string
 	Value       any
+	Reason      string
 }
 
 func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]string) (map[string]string, int, error) {
@@ -1308,6 +1327,12 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 			out[key] = value
 		}
 		return out, 0, nil
+	}
+
+	for _, transform := range transforms {
+		if transform.Operation == "abort" {
+			return nil, 0, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
+		}
 	}
 
 	out := make(map[string]string, len(seedRecords))
@@ -1330,6 +1355,8 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 				record[transform.Destination] = transform.Value
 			case "delete":
 				delete(record, transform.Destination)
+			case "abort":
+				return nil, 0, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
 			default:
 				return nil, 0, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
 			}
@@ -1349,6 +1376,17 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 	for lineNumber, line := range lines {
 		line = strings.TrimSpace(stripTALLineComment(line))
 		if line == "" || strings.HasPrefix(line, "def ") || line == "pass" || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "return ") {
+			continue
+		}
+		if match := migrateAbortPattern.FindStringSubmatch(line); match != nil {
+			var reason string
+			if err := json.Unmarshal([]byte(match[1]), &reason); err != nil {
+				return nil, fmt.Errorf("line %d: invalid abort reason: %w", lineNumber+1, err)
+			}
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Operation: "abort",
+				Reason:    reason,
+			})
 			continue
 		}
 		if match := migrateRecordDeletePattern.FindStringSubmatch(line); match != nil {
