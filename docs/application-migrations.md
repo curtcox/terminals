@@ -84,9 +84,10 @@ of replaying the entire migration range on every retry.
 	subset for `migrate(record)` scripts before comparing actual output to the
 	expected envelopes. The subset supports field copy, string lowercasing,
 	string trimming, `lower(trim(record["field"]))`, JSON literal assignment,
-	and field deletion. Mismatches stop retry with `ErrMigrationFixtureMismatch`,
-	mark `verdict = step_failed`, and emit `step_failed_fixture_mismatch`
-	entries.
+	field deletion, and no-op structured `log` calls through loaded
+	`debug`/`info`/`warn`/`error` aliases. Mismatches stop retry with
+	`ErrMigrationFixtureMismatch`, mark `verdict = step_failed`, and emit
+	`step_failed_fixture_mismatch` entries.
 	Value mismatches now include the first divergent key plus canonical
 	expected/actual JSON bytes in the journal error evidence.
 - If a declared fixture file cannot be read at execution time, retry stops
@@ -236,6 +237,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapIgnoresCommentedDisallowedLoadStatements`
 - `TestRuntimeRetryMigrationAppliesFixtureTransforms`
 - `TestRuntimeRetryMigrationAppliesTrimFixtureTransforms`
+- `TestRuntimeRetryMigrationAllowsLogCallsInFixtureTransforms`
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordNotCanonical`

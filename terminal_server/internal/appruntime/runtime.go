@@ -104,6 +104,10 @@ var migrateArtifactSelfLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']ar
 
 var migrateLoadAliasPattern = regexp.MustCompile(`\bpatch\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
 
+var migrateLogLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']log["']\s*,(?P<args>[^)]*)\)`)
+
+var migrateLogAliasPattern = regexp.MustCompile(`\b(?:debug|info|warn|error)\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
 var migrateCallPattern = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*$`)
 
 var migrateStringArgPattern = regexp.MustCompile(`^\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`)
@@ -1335,6 +1339,22 @@ func artifactSelfPatchAliases(scriptSource []byte) map[string]struct{} {
 	return aliases
 }
 
+func migrationLogAliases(scriptSource []byte) map[string]struct{} {
+	aliases := make(map[string]struct{})
+	for _, match := range migrateLogLoadPattern.FindAllSubmatch(scriptSource, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		for _, aliasMatch := range migrateLogAliasPattern.FindAllSubmatch(match[1], -1) {
+			if len(aliasMatch) < 2 {
+				continue
+			}
+			aliases[string(aliasMatch[1])] = struct{}{}
+		}
+	}
+	return aliases
+}
+
 func migrationStringArgument(args string) string {
 	match := migrateStringArgPattern.FindStringSubmatch(args)
 	if match == nil {
@@ -1493,6 +1513,7 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigrationFixtureTransform, error) {
 	lines := strings.Split(string(scriptSource), "\n")
 	transforms := make([]runtimeMigrationFixtureTransform, 0)
+	logAliases := migrationLogAliases(scriptSource)
 	for lineNumber, line := range lines {
 		line = strings.TrimSpace(stripTALLineComment(line))
 		if line == "" || strings.HasPrefix(line, "def ") || line == "pass" || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "return ") {
@@ -1523,6 +1544,11 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 			}
 			transforms = append(transforms, transform)
 			continue
+		}
+		if match := migrateCallPattern.FindStringSubmatch(line); match != nil {
+			if _, ok := logAliases[match[1]]; ok {
+				continue
+			}
 		}
 		return nil, fmt.Errorf("line %d uses unsupported fixture migration statement %q", lineNumber+1, line)
 	}

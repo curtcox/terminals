@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Extended the runtime fixture-backed deterministic
+  migration subset in `terminal_server/internal/appruntime/runtime.go`
+  to treat structured `log` calls as no-op execution statements when
+  they are reached through aliases loaded from the allowed `log`
+  migration module. This lets Gate 4 fixture replay accept the
+  worked-example pattern of transforming records and emitting
+  `info(...)` without granting side effects outside the migration log
+  surface. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAllowsLogCallsInFixtureTransforms`) and
+  documented the expanded subset in `docs/application-migrations.md`.
+
 - 2026-04-28: Hardened runtime host-layer validation for
   `artifact.self.patch(...)` migration effects that omit
   ownership evidence. Retry now rejects patch calls without
