@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Hardened runtime host-layer validation for
+  `artifact.self.patch(...)` migration effects that omit
+  ownership evidence. Retry now rejects patch calls without
+  `owner_app_id` before step start with
+  `ErrMigrationArtifactOwnership`, marks the step failed, and
+  emits `step_failed_host_rejected` journal evidence instead of
+  allowing an unverifiable artifact patch through the migration
+  scaffold. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationRejectsArtifactPatchWithoutOwnerAppID`)
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Extended the runtime fixture-backed deterministic
   migration subset in `terminal_server/internal/appruntime/runtime.go`
   to support `trim(record["field"])` and

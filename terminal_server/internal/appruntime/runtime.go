@@ -1310,7 +1310,7 @@ func validateRuntimeMigrationHostEffects(pkg Package, scriptSource []byte) error
 		artifactID := migrationStringArgument(match[2])
 		ownerAppID := migrationKeywordStringArgument(migrateOwnerAppIDPattern, match[2])
 		if ownerAppID == "" {
-			continue
+			return fmt.Errorf("%w: artifact %q patch missing owner_app_id at line %d", ErrMigrationArtifactOwnership, artifactID, lineNumber+1)
 		}
 		if ownerAppID != appID {
 			return fmt.Errorf("%w: artifact %q owner_app_id %q does not match app_id %q at line %d", ErrMigrationArtifactOwnership, artifactID, ownerAppID, appID, lineNumber+1)
