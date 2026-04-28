@@ -74,11 +74,19 @@ var (
 	ErrMigrationAborted = errors.New("migration aborted by script")
 	// ErrMigrationArtifactOwnership indicates a migration attempted to patch an artifact outside its lineage.
 	ErrMigrationArtifactOwnership = errors.New("migration artifact ownership mismatch")
+	// ErrMigrationResourceLimit indicates a migration exceeded an executor hard cap.
+	ErrMigrationResourceLimit = errors.New("migration resource limit exceeded")
 )
 
 const defaultMigrationDrainTimeout = 90 * time.Second
 
 const runtimeMigrationFixtureMaxRows = 4096
+
+const (
+	migrationMaxWriteVolumeBytes = 100 * 1024 * 1024
+	migrationMaxStoreOps         = 1_000_000
+	migrationMaxArtifactPatches  = 10_000
+)
 
 var migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
 
@@ -613,6 +621,19 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		if hostErr := validateRuntimeMigrationHostEffects(pkg, scriptSource); hostErr != nil {
 			state.Verdict = "step_failed"
 			state.LastStep = step.Number
+			r.migrations[name] = state
+			if errors.Is(hostErr, ErrMigrationResourceLimit) {
+				state.LastError = fmt.Sprintf("step %d resource limit exceeded: %s", step.Number, step.ScriptName)
+				r.migrations[name] = state
+				appendMigrationJournalEntry(pkg, state, "step_failed_resource_limit", map[string]any{
+					"step_id":      step.Number,
+					"from_version": step.FromVersion,
+					"to_version":   step.ToVersion,
+					"script":       step.ScriptName,
+					"error":        hostErr.Error(),
+				})
+				return statusFromState(pkg, state), hostErr
+			}
 			state.LastError = fmt.Sprintf("step %d host effect rejected: %s", step.Number, step.ScriptName)
 			r.migrations[name] = state
 			appendMigrationJournalEntry(pkg, state, "step_failed_host_rejected", map[string]any{
@@ -638,7 +659,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, stepStartedAt); timedOut {
 			return timeoutStatus, ErrMigrationRuntimeTimeout
 		}
-		effectCount, fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step, scriptSource)
+		stats, fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step, scriptSource)
 		if fixtureErr != nil {
 			state.Verdict = "step_failed"
 			state.LastStep = step.Number
@@ -647,6 +668,17 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 				state.LastError = fixtureErr.Error()
 				r.migrations[name] = state
 				appendMigrationJournalEntry(pkg, state, "step_failed_aborted", map[string]any{
+					"step_id":      step.Number,
+					"from_version": step.FromVersion,
+					"to_version":   step.ToVersion,
+					"script":       step.ScriptName,
+					"error":        fixtureErr.Error(),
+				})
+				return statusFromState(pkg, state), fixtureErr
+			case errors.Is(fixtureErr, ErrMigrationResourceLimit):
+				state.LastError = fmt.Sprintf("step %d resource limit exceeded: %s", step.Number, step.ScriptName)
+				r.migrations[name] = state
+				appendMigrationJournalEntry(pkg, state, "step_failed_resource_limit", map[string]any{
 					"step_id":      step.Number,
 					"from_version": step.FromVersion,
 					"to_version":   step.ToVersion,
@@ -678,7 +710,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 				return statusFromState(pkg, state), fixtureErr
 			}
 		}
-		appendMigrationCheckpointEntries(pkg, state, step, effectCount)
+		appendMigrationCheckpointEntries(pkg, state, step, stats.StoreOps)
 		state.StepsCompleted = step.Number
 		state.LastStep = step.Number
 		appendMigrationJournalEntry(pkg, state, "step_committed", map[string]any{
@@ -1303,6 +1335,7 @@ func validateRuntimeMigrationHostEffects(pkg Package, scriptSource []byte) error
 	if len(patchAliases) == 0 {
 		return nil
 	}
+	patchCount := 0
 	lines := strings.Split(string(scriptSource), "\n")
 	for lineNumber, line := range lines {
 		line = strings.TrimSpace(stripTALLineComment(line))
@@ -1315,6 +1348,10 @@ func validateRuntimeMigrationHostEffects(pkg Package, scriptSource []byte) error
 		}
 		if _, ok := patchAliases[match[1]]; !ok {
 			continue
+		}
+		patchCount++
+		if patchCount > migrationMaxArtifactPatches {
+			return fmt.Errorf("%w: artifact.self.patch count exceeds hard cap (%d > %d)", ErrMigrationResourceLimit, patchCount, migrationMaxArtifactPatches)
 		}
 		appID := strings.TrimSpace(pkg.Manifest.AppID)
 		if appID == "" {
@@ -1399,50 +1436,73 @@ type runtimeMigrationFixture struct {
 	ExpectedPath string
 }
 
-func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSource []byte) (int, error) {
+type runtimeMigrationResourceStats struct {
+	StoreOps              int
+	WriteVolumeBytes      int64
+	ArtifactPatchAttempts int
+}
+
+type runtimeMigrationResourceLimits struct {
+	MaxStoreOps              int
+	MaxWriteVolumeBytes      int64
+	MaxArtifactPatchAttempts int
+}
+
+func defaultRuntimeMigrationResourceLimits() runtimeMigrationResourceLimits {
+	return runtimeMigrationResourceLimits{
+		MaxStoreOps:              migrationMaxStoreOps,
+		MaxWriteVolumeBytes:      migrationMaxWriteVolumeBytes,
+		MaxArtifactPatchAttempts: migrationMaxArtifactPatches,
+	}
+}
+
+func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSource []byte) (runtimeMigrationResourceStats, error) {
 	fixture, err := findRuntimeMigrationFixture(root, step)
 	if err != nil {
-		return 0, err
+		return runtimeMigrationResourceStats{}, err
 	}
 	if fixture == nil {
-		return 0, nil
+		return runtimeMigrationResourceStats{}, nil
 	}
 
 	seedRecords, err := readRuntimeFixtureRecords(root, fixture.SeedPath)
 	if err != nil {
-		return 0, err
+		return runtimeMigrationResourceStats{}, err
 	}
 	expectedRecords, err := readRuntimeFixtureRecords(root, fixture.ExpectedPath)
 	if err != nil {
-		return 0, err
+		return runtimeMigrationResourceStats{}, err
 	}
-	actualRecords, effectCount, err := executeRuntimeMigrationFixture(scriptSource, seedRecords)
+	actualRecords, stats, err := executeRuntimeMigrationFixture(scriptSource, seedRecords)
 	if err != nil {
 		if errors.Is(err, ErrMigrationAborted) {
-			return 0, err
+			return runtimeMigrationResourceStats{}, err
 		}
-		return 0, fmt.Errorf("%w: step %04d fixture execution failed: %v", ErrMigrationFixtureMismatch, step.Number, err)
+		return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d fixture execution failed: %v", ErrMigrationFixtureMismatch, step.Number, err)
+	}
+	if err := validateRuntimeMigrationResourceLimits(stats, defaultRuntimeMigrationResourceLimits()); err != nil {
+		return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d: %v", ErrMigrationResourceLimit, step.Number, err)
 	}
 
 	if len(actualRecords) != len(expectedRecords) {
-		return 0, fmt.Errorf("%w: step %04d key count mismatch (actual=%d expected=%d)", ErrMigrationFixtureMismatch, step.Number, len(actualRecords), len(expectedRecords))
+		return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d key count mismatch (actual=%d expected=%d)", ErrMigrationFixtureMismatch, step.Number, len(actualRecords), len(expectedRecords))
 	}
 	for key, actualValue := range actualRecords {
 		expectedValue, ok := expectedRecords[key]
 		if !ok {
-			return 0, fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
+			return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
 		if expectedValue != actualValue {
-			return 0, fmt.Errorf("%w: step %04d value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step.Number, key, expectedValue, actualValue)
+			return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step.Number, key, expectedValue, actualValue)
 		}
 	}
 	for key := range expectedRecords {
 		if _, ok := actualRecords[key]; !ok {
-			return 0, fmt.Errorf("%w: step %04d expected contains extra key %q", ErrMigrationFixtureMismatch, step.Number, key)
+			return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d expected contains extra key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
 	}
 
-	return effectCount, nil
+	return stats, nil
 }
 
 type runtimeMigrationFixtureTransform struct {
@@ -1455,30 +1515,31 @@ type runtimeMigrationFixtureTransform struct {
 	Reason      string
 }
 
-func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]string) (map[string]string, int, error) {
+func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]string) (map[string]string, runtimeMigrationResourceStats, error) {
 	transforms, err := parseRuntimeMigrationFixtureTransforms(scriptSource)
 	if err != nil {
-		return nil, 0, err
+		return nil, runtimeMigrationResourceStats{}, err
 	}
 	if len(transforms) == 0 {
 		out := make(map[string]string, len(seedRecords))
 		for key, value := range seedRecords {
 			out[key] = value
 		}
-		return out, 0, nil
+		return out, runtimeMigrationResourceStats{}, nil
 	}
 
 	for _, transform := range transforms {
 		if transform.Operation == "abort" {
-			return nil, 0, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
+			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
 		}
 	}
 
 	out := make(map[string]string, len(seedRecords))
+	var writeVolume int64
 	for key, rawValue := range seedRecords {
 		var record map[string]any
 		if err := json.Unmarshal([]byte(rawValue), &record); err != nil {
-			return nil, 0, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
+			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
 		}
 		for _, transform := range transforms {
 			switch transform.Operation {
@@ -1487,19 +1548,19 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 			case "lower":
 				value, ok := runtimeMigrationFixtureStringValue(record, transform)
 				if !ok {
-					return nil, 0, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
+					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
 				}
 				record[transform.Destination] = strings.ToLower(value)
 			case "trim":
 				value, ok := runtimeMigrationFixtureStringValue(record, transform)
 				if !ok {
-					return nil, 0, fmt.Errorf("record key %q field %q is not a string for trim()", key, transform.Source)
+					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for trim()", key, transform.Source)
 				}
 				record[transform.Destination] = strings.TrimSpace(value)
 			case "lower_trim":
 				value, ok := runtimeMigrationFixtureStringValue(record, transform)
 				if !ok {
-					return nil, 0, fmt.Errorf("record key %q field %q is not a string for lower(trim())", key, transform.Source)
+					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for lower(trim())", key, transform.Source)
 				}
 				record[transform.Destination] = strings.ToLower(strings.TrimSpace(value))
 			case "literal":
@@ -1507,18 +1568,32 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 			case "delete":
 				delete(record, transform.Destination)
 			case "abort":
-				return nil, 0, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
+				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
 			default:
-				return nil, 0, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
+				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
 			}
 		}
 		canonical, err := json.Marshal(record)
 		if err != nil {
-			return nil, 0, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
+			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
 		}
 		out[key] = string(canonical)
+		writeVolume += int64(len(canonical))
 	}
-	return out, len(seedRecords), nil
+	return out, runtimeMigrationResourceStats{StoreOps: len(seedRecords), WriteVolumeBytes: writeVolume}, nil
+}
+
+func validateRuntimeMigrationResourceLimits(stats runtimeMigrationResourceStats, limits runtimeMigrationResourceLimits) error {
+	if limits.MaxStoreOps > 0 && stats.StoreOps > limits.MaxStoreOps {
+		return fmt.Errorf("store ops exceed hard cap (%d > %d)", stats.StoreOps, limits.MaxStoreOps)
+	}
+	if limits.MaxWriteVolumeBytes > 0 && stats.WriteVolumeBytes > limits.MaxWriteVolumeBytes {
+		return fmt.Errorf("write volume exceeds hard cap (%d > %d bytes)", stats.WriteVolumeBytes, limits.MaxWriteVolumeBytes)
+	}
+	if limits.MaxArtifactPatchAttempts > 0 && stats.ArtifactPatchAttempts > limits.MaxArtifactPatchAttempts {
+		return fmt.Errorf("artifact patch attempts exceed hard cap (%d > %d)", stats.ArtifactPatchAttempts, limits.MaxArtifactPatchAttempts)
+	}
+	return nil
 }
 
 func runtimeMigrationFixtureValue(record map[string]any, transform runtimeMigrationFixtureTransform) any {

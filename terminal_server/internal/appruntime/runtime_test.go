@@ -1880,6 +1880,98 @@ def migrate():
 	}
 }
 
+func TestRuntimeRetryMigrationRejectsArtifactPatchHardCap(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_artifact_patch_limit")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	appID := "app:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	manifest := fmt.Sprintf("name = \"migrate_artifact_patch_limit\"\napp_id = %q\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n", appID)
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+
+	var script strings.Builder
+	script.WriteString("load(\"artifact.self\", patch = \"patch\")\n\ndef migrate():\n")
+	for i := 0; i <= migrationMaxArtifactPatches; i++ {
+		fmt.Fprintf(&script, "    patch(\"artifact-%d\", owner_app_id = %q)\n", i, appID)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(script.String()), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_artifact_patch_limit")
+	if !errors.Is(err, ErrMigrationResourceLimit) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationResourceLimit", err)
+	}
+	if status.Verdict != "step_failed" {
+		t.Fatalf("RetryMigration() verdict = %q, want step_failed", status.Verdict)
+	}
+	if status.StepsCompleted != 0 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+	}
+	if !strings.Contains(status.LastError, "resource limit exceeded") {
+		t.Fatalf("RetryMigration() last_error = %q, want resource limit message", status.LastError)
+	}
+
+	journalPath := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+	journalBytes, readErr := os.ReadFile(journalPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(journal) error = %v", readErr)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalErrorContaining(entries, "step_failed_resource_limit", "artifact.self.patch count exceeds hard cap") {
+		t.Fatalf("migration journal missing artifact patch cap evidence: %+v", entries)
+	}
+}
+
+func TestRuntimeMigrationResourceLimitValidation(t *testing.T) {
+	limits := runtimeMigrationResourceLimits{
+		MaxStoreOps:              2,
+		MaxWriteVolumeBytes:      10,
+		MaxArtifactPatchAttempts: 1,
+	}
+	cases := []struct {
+		name  string
+		stats runtimeMigrationResourceStats
+		want  string
+	}{
+		{
+			name:  "store op cap",
+			stats: runtimeMigrationResourceStats{StoreOps: 3},
+			want:  "store ops exceed hard cap",
+		},
+		{
+			name:  "write volume cap",
+			stats: runtimeMigrationResourceStats{WriteVolumeBytes: 11},
+			want:  "write volume exceeds hard cap",
+		},
+		{
+			name:  "artifact patch cap",
+			stats: runtimeMigrationResourceStats{ArtifactPatchAttempts: 2},
+			want:  "artifact patch attempts exceed hard cap",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateRuntimeMigrationResourceLimits(tc.stats, limits)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("validateRuntimeMigrationResourceLimits() error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestRuntimeRetryMigrationIgnoresCommentedLoadStatements(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_comment_load")

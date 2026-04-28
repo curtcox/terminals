@@ -21,6 +21,22 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Added runtime migration hard-cap enforcement for
+  the current execution scaffold in
+  `terminal_server/internal/appruntime/runtime.go`.
+  Fixture-backed store effects now track synthetic store-op count
+  and write volume against the plan's per-step 1,000,000-op and
+  100 MB hard caps, while declared `artifact.self.patch(...)`
+  calls are counted against the 10,000-patch cap before step
+  execution starts. Cap violations now fail the current step with
+  `ErrMigrationResourceLimit`, preserve checkpoint progress, and
+  emit `step_failed_resource_limit` journal evidence. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationRejectsArtifactPatchHardCap`,
+  `TestRuntimeMigrationResourceLimitValidation`) and documented the
+  behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Expanded the runtime fixture-backed deterministic
   migration subset in `terminal_server/internal/appruntime/runtime.go`
   to support `record.get("field", "default")` defaults in direct
