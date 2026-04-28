@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Baseline-aware migration retries now start from the
+  installed-version boundary after reload in
+  `terminal_server/internal/appruntime/runtime.go`.
+  `newMigrationState` now computes initial `steps_completed` from the
+  previously installed package version when available, so upgrades that
+  carry historical edges (for example `0001_1_to_2.tal` and
+  `0002_2_to_3.tal`) resume at the pending edge instead of replaying
+  already-applied steps. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeReloadMigrationStateStartsFromInstalledVersion`) and
+  documented behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Wired Gate 4 migration replay enforcement into local
   `term` app-runtime flows in `terminal_server/cmd/term/main.go`.
   Added `newAppRuntime()` to enable

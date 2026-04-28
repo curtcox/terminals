@@ -584,6 +584,73 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	}
 }
 
+func TestRuntimeReloadMigrationStateStartsFromInstalledVersion(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_reload")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifestV2 := "name = \"migrate_reload\"\nversion = \"2\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifestV2), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v2) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 2) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	manifestV3 := "name = \"migrate_reload\"\nversion = \"3\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifestV3), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v3) error = %v", err)
+	}
+
+	if _, changed, err := runtime.ReloadPackage(context.Background(), "migrate_reload"); err != nil || !changed {
+		t.Fatalf("ReloadPackage() error=%v changed=%v, want changed reload", err, changed)
+	}
+
+	status, err := runtime.GetMigrationStatus("migrate_reload")
+	if err != nil {
+		t.Fatalf("GetMigrationStatus() error = %v", err)
+	}
+	if status.StepsPlanned != 2 || status.StepsCompleted != 1 {
+		t.Fatalf("status steps = %d/%d, want 1/2", status.StepsCompleted, status.StepsPlanned)
+	}
+
+	status, err = runtime.RetryMigration("migrate_reload")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() verdict = %q, want ok", status.Verdict)
+	}
+	if status.StepsCompleted != 2 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 2", status.StepsCompleted)
+	}
+
+	journalFile := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+	journalBytes, err := os.ReadFile(journalFile)
+	if err != nil {
+		t.Fatalf("ReadFile(journal) error = %v", err)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalEventForStep(entries, "step_started", 2) || !hasMigrationJournalEventForStep(entries, "step_committed", 2) {
+		t.Fatalf("migration journal missing step 2 lifecycle events: %+v", entries)
+	}
+	if hasMigrationJournalEventForStep(entries, "step_started", 1) || hasMigrationJournalEventForStep(entries, "step_committed", 1) {
+		t.Fatalf("migration journal unexpectedly ran step 1 after reload baseline: %+v", entries)
+	}
+}
+
 func TestRuntimeRetryMigrationWithFixtureExpectedMatch(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_fixture_match")

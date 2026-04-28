@@ -114,6 +114,11 @@ of replaying the entire migration range on every retry.
 	persist as `verdict = running` snapshots in the journal; restart replay
 	normalizes them to `verdict = step_failed` with interruption context so
 	operators can retry from the last committed checkpoint.
+- Reload-time migration state now baselines `steps_completed` from the
+	installed package version before retrying. Upgrades that include historical
+	migration scripts (for example `0001_1_to_2.tal` and `0002_2_to_3.tal` while
+	reloading from version `2` to `3`) now start retry at the pending boundary
+	instead of replaying earlier edges.
 - Runtime now exposes a reusable dry-run harness,
 	`DryRunMigrationJournalReplay`, which executes crash-injection replay checks
 	against every declared journal boundary (`retry_started`, plus
@@ -170,6 +175,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapAcceptsMigrateFixtureAtRecordLimit`
 - `TestRuntimeRetryMigrationRequiresDrainReadiness`
 - `TestRuntimeMigrationLifecycleWithSteps`
+- `TestRuntimeReloadMigrationStateStartsFromInstalledVersion`
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
 - `TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes`

@@ -328,7 +328,7 @@ func (r *Runtime) LoadPackage(ctx context.Context, root string) (Package, error)
 	r.nextRevision++
 	r.packages[pkg.Manifest.Name] = pkg
 	r.history[pkg.Manifest.Name] = append(r.history[pkg.Manifest.Name], pkg)
-	r.migrations[pkg.Manifest.Name] = newMigrationState(pkg)
+	r.migrations[pkg.Manifest.Name] = newMigrationState(pkg, "")
 	return pkg, nil
 }
 
@@ -377,7 +377,7 @@ func (r *Runtime) ReloadPackage(_ context.Context, name string) (Package, bool, 
 	r.nextRevision++
 	r.packages[name] = next
 	r.history[name] = append(r.history[name], next)
-	r.migrations[name] = newMigrationState(next)
+	r.migrations[name] = newMigrationState(next, current.Manifest.Version)
 	return next, true, nil
 }
 
@@ -412,7 +412,7 @@ func (r *Runtime) RollbackPackage(name string, options ...RollbackOptions) (Pack
 	r.history[name] = history
 	previous = history[len(history)-1]
 	r.packages[name] = previous
-	r.migrations[name] = newMigrationState(previous)
+	r.migrations[name] = newMigrationState(previous, "")
 	return previous, nil
 }
 
@@ -953,21 +953,35 @@ func (r *Runtime) requireMigrationStateLocked(name string) (Package, migrationSt
 	}
 	state, ok := r.migrations[name]
 	if !ok {
-		state = newMigrationState(pkg)
+		state = newMigrationState(pkg, "")
 		r.migrations[name] = state
 	}
 	return pkg, state, nil
 }
 
-func newMigrationState(pkg Package) migrationState {
+func newMigrationState(pkg Package, installedVersion string) migrationState {
 	steps, plan, planErr := loadMigrationPlan(pkg.RootPath)
-	requiresDrain := migrationPlanRequiresDrainFromStep(plan, 1)
+	stepsCompleted := 0
+	if planErr == nil {
+		if completed, completedErr := migrationStepsCompletedForInstalledVersion(plan, installedVersion, pkg.Manifest.Version); completedErr != nil {
+			planErr = completedErr
+		} else {
+			stepsCompleted = completed
+		}
+	}
+	nextStep := stepsCompleted + 1
+	requiresDrain := migrationPlanRequiresDrainFromStep(plan, nextStep)
+	verdict := "idle"
+	lastStep := stepsCompleted
+	if steps > 0 && stepsCompleted >= steps {
+		verdict = "ok"
+	}
 	state := migrationState{
 		StepsPlanned:   steps,
-		StepsCompleted: 0,
+		StepsCompleted: stepsCompleted,
 		StepPlan:       plan,
-		LastStep:       0,
-		Verdict:        "idle",
+		LastStep:       lastStep,
+		Verdict:        verdict,
 		ExecutorReady:  steps > 0 && planErr == nil,
 		RequiresDrain:  requiresDrain,
 		DrainReady:     !requiresDrain,
@@ -985,6 +999,30 @@ func newMigrationState(pkg Package) migrationState {
 		}
 	}
 	return state
+}
+
+func migrationStepsCompletedForInstalledVersion(plan []migrationPlanStep, installedVersion string, targetVersion string) (int, error) {
+	fromVersion := strings.TrimSpace(installedVersion)
+	if fromVersion == "" || len(plan) == 0 {
+		return 0, nil
+	}
+	if fromVersion == strings.TrimSpace(targetVersion) {
+		return len(plan), nil
+	}
+	for _, step := range plan {
+		if step.FromVersion == fromVersion {
+			if step.Number <= 1 {
+				return 0, nil
+			}
+			return step.Number - 1, nil
+		}
+	}
+	for _, step := range plan {
+		if step.ToVersion == fromVersion {
+			return step.Number, nil
+		}
+	}
+	return 0, fmt.Errorf("migration plan does not include installed version %q", fromVersion)
 }
 
 func replayMigrationStateFromJournal(pkg Package, state migrationState) migrationState {
