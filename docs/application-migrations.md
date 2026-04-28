@@ -17,6 +17,7 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - When a step declares `compatibility = "incompatible"`, it cannot also declare `drain_policy = "none"`.
 - Migration fixture NDJSON files are bounded to at most 4096 records per file to keep Gate 4 synthetic-store input sizes predictable.
 - Migration seed fixture records are validated against each fixture's declared `prior_record_schema`; invalid seed rows now fail package verification with record-level diagnostics.
+- Migration expected fixture records are validated against the target step record schema when a unique `[[storage.store_schema]]` entry exists for the step `to` version; invalid expected rows now fail package verification with record-level diagnostics.
 - Migration fixture metadata now enforces step-edge consistency: `[[migrate.fixture]].prior_version` must match the corresponding migration script `from` version (`migrate/<step>_<from>_to_<to>.tal`).
 
 ## Implemented runtime migration guard

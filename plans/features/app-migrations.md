@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added Gate 1 expected-fixture target schema validation
+  in `terminal_server/internal/apppackage/tap.go`. When a migration
+  fixture step's target version resolves to exactly one declared
+  `[[storage.store_schema]]` entry, `VerifyTap` now validates each
+  `expected` NDJSON record's `value` against that target record
+  schema and rejects schema-invalid expected fixtures with explicit
+  diagnostics. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsMigrateFixtureExpectedSchemaMismatch`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Hardened migration replay recovery for interrupted runs
   in `terminal_server/internal/appruntime/runtime.go`.
   Journal replay now normalizes stale `verdict = running` state

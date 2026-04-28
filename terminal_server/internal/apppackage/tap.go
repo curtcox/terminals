@@ -592,6 +592,13 @@ type manifestMigrationFixture struct {
 	Expected          string `toml:"expected"`
 }
 
+type parsedMigrationStep struct {
+	stepNumber int
+	stepName   string
+	from       string
+	to         string
+}
+
 type migrationFixtureRecord struct {
 	Key   string
 	Value map[string]any
@@ -632,19 +639,12 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		return fmt.Errorf("%w: %v", ErrInvalidManifest, err)
 	}
 
-	type parsedStep struct {
-		stepNumber int
-		stepName   string
-		from       string
-		to         string
-	}
-
 	availableFiles := make(map[string]struct{}, len(files))
 	for _, rel := range files {
 		availableFiles[rel] = struct{}{}
 	}
 
-	migrationFiles := make([]parsedStep, 0)
+	migrationFiles := make([]parsedMigrationStep, 0)
 	for _, rel := range files {
 		if !strings.HasPrefix(rel, "migrate/") {
 			continue
@@ -674,7 +674,7 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		if err != nil || stepNumber <= 0 {
 			return fmt.Errorf("%w: migration script %s has invalid step number", ErrInvalidManifest, rel)
 		}
-		migrationFiles = append(migrationFiles, parsedStep{stepNumber: stepNumber, stepName: strings.TrimSuffix(name, ".tal"), from: match[2], to: match[3]})
+		migrationFiles = append(migrationFiles, parsedMigrationStep{stepNumber: stepNumber, stepName: strings.TrimSuffix(name, ".tal"), from: match[2], to: match[3]})
 	}
 
 	declaredSteps := manifest.Migrate.DeclaredSteps
@@ -733,10 +733,16 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 	}
 
 	stepNames := make(map[string]struct{}, len(migrationFiles))
-	stepByName := make(map[string]parsedStep, len(migrationFiles))
+	stepByName := make(map[string]parsedMigrationStep, len(migrationFiles))
 	for _, step := range migrationFiles {
 		stepNames[step.stepName] = struct{}{}
 		stepByName[step.stepName] = step
+	}
+
+	storeSchemaByVersion := make(map[string][]manifestStoreSchema, len(manifest.Storage.StoreSchema))
+	for _, schema := range manifest.Storage.StoreSchema {
+		version := strings.TrimSpace(schema.Version)
+		storeSchemaByVersion[version] = append(storeSchemaByVersion[version], schema)
 	}
 
 	fixtureByStep := make(map[string]struct{}, len(manifest.Migrate.Fixture))
@@ -776,8 +782,18 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		if err := validateMigrationFixtureSeedSchema(fixture, seedRecords, migrationSources[fixture.PriorRecordSchema]); err != nil {
 			return err
 		}
-		if _, err := validateMigrationFixtureNDJSON(fixture.Expected, migrationSources[fixture.Expected]); err != nil {
+		expectedRecords, err := validateMigrationFixtureNDJSON(fixture.Expected, migrationSources[fixture.Expected])
+		if err != nil {
 			return err
+		}
+		targetSchemaPath, targetSchemaPayload, shouldValidateExpected, err := resolveFixtureExpectedSchema(fixture, stepByName, storeSchemaByVersion, migrationSources)
+		if err != nil {
+			return err
+		}
+		if shouldValidateExpected {
+			if err := validateMigrationFixtureValueSchema(fixture.Expected, targetSchemaPath, expectedRecords, targetSchemaPayload); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -856,25 +872,61 @@ func validateMigrationFixtureSeedSchema(fixture manifestMigrationFixture, record
 	if schemaPayload == nil {
 		return fmt.Errorf("%w: migration fixture %s prior schema %s missing from archive payload", ErrInvalidManifest, fixture.Seed, fixture.PriorRecordSchema)
 	}
+	return validateMigrationFixtureValueSchema(fixture.Seed, fixture.PriorRecordSchema, records, schemaPayload)
+}
+
+func validateMigrationFixtureValueSchema(fixturePath string, schemaPath string, records []migrationFixtureRecord, schemaPayload []byte) error {
+	if schemaPayload == nil {
+		return fmt.Errorf("%w: migration fixture %s schema %s missing from archive payload", ErrInvalidManifest, fixturePath, schemaPath)
+	}
 	compiler := jsonschema.NewCompiler()
-	schemaURL := "memory://" + fixture.PriorRecordSchema
+	schemaURL := "memory://" + schemaPath
 	var schemaDoc any
 	if err := json.Unmarshal(schemaPayload, &schemaDoc); err != nil {
-		return fmt.Errorf("%w: migration schema %s is invalid JSON: %v", ErrInvalidManifest, fixture.PriorRecordSchema, err)
+		return fmt.Errorf("%w: migration schema %s is invalid JSON: %v", ErrInvalidManifest, schemaPath, err)
 	}
 	if err := compiler.AddResource(schemaURL, schemaDoc); err != nil {
-		return fmt.Errorf("%w: migration schema %s is invalid: %v", ErrInvalidManifest, fixture.PriorRecordSchema, err)
+		return fmt.Errorf("%w: migration schema %s is invalid: %v", ErrInvalidManifest, schemaPath, err)
 	}
 	schema, err := compiler.Compile(schemaURL)
 	if err != nil {
-		return fmt.Errorf("%w: migration schema %s is invalid: %v", ErrInvalidManifest, fixture.PriorRecordSchema, err)
+		return fmt.Errorf("%w: migration schema %s is invalid: %v", ErrInvalidManifest, schemaPath, err)
 	}
 	for _, record := range records {
 		if err := schema.Validate(record.Value); err != nil {
-			return fmt.Errorf("%w: migration fixture %s line %d key %q violates prior schema %s: %v", ErrInvalidManifest, fixture.Seed, record.Line, record.Key, fixture.PriorRecordSchema, err)
+			return fmt.Errorf("%w: migration fixture %s line %d key %q violates schema %s: %v", ErrInvalidManifest, fixturePath, record.Line, record.Key, schemaPath, err)
 		}
 	}
 	return nil
+}
+
+func resolveFixtureExpectedSchema(
+	fixture manifestMigrationFixture,
+	stepByName map[string]parsedMigrationStep,
+	storeSchemaByVersion map[string][]manifestStoreSchema,
+	migrationSources map[string][]byte,
+) (schemaPath string, schemaPayload []byte, shouldValidate bool, err error) {
+	step, ok := stepByName[fixture.Step]
+	if !ok {
+		return "", nil, false, ErrInvalidManifest
+	}
+
+	candidateSchemas := storeSchemaByVersion[strings.TrimSpace(step.to)]
+	if len(candidateSchemas) == 0 {
+		// Expected schema validation is optional until every package declares
+		// per-target-version record schemas for migration fixtures.
+		return "", nil, false, nil
+	}
+	if len(candidateSchemas) > 1 {
+		return "", nil, false, fmt.Errorf("%w: migrate.fixture %s expected schema is ambiguous for target version %q", ErrInvalidManifest, fixture.Step, step.to)
+	}
+
+	schemaPath = strings.TrimSpace(candidateSchemas[0].RecordSchema)
+	schemaPayload = migrationSources[schemaPath]
+	if schemaPayload == nil {
+		return "", nil, false, fmt.Errorf("%w: migrate.fixture %s expected schema %s missing from archive payload", ErrInvalidManifest, fixture.Step, schemaPath)
+	}
+	return schemaPath, schemaPayload, true, nil
 }
 
 func parseCanonicalFixtureRecord(line []byte) ([]byte, string, map[string]any, error) {
