@@ -84,6 +84,8 @@ of replaying the entire migration range on every retry.
 	matching plus canonicalized JSON value equality (identity-output dry-run
 	scaffold). Mismatches stop retry with `ErrMigrationFixtureMismatch`, mark
 	`verdict = step_failed`, and emit `step_failed_fixture_mismatch` entries.
+	Value mismatches now include the first divergent key plus canonical
+	expected/actual JSON bytes in the journal error evidence.
 - If a declared fixture file cannot be read at execution time, retry stops
 	with `ErrMigrationFixtureUnavailable`, marks `verdict = step_failed`, and
 	emits `step_failed_fixture_unavailable` journal entries.

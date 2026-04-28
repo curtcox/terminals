@@ -792,6 +792,9 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	if !hasMigrationJournalEvent(entries, "step_failed_fixture_mismatch") {
 		t.Fatalf("migration journal missing step_failed_fixture_mismatch event: %+v", entries)
 	}
+	if !hasMigrationJournalErrorContaining(entries, "step_failed_fixture_mismatch", "expected={\"a\":3,\"z\":1} actual={\"a\":2,\"z\":1}") {
+		t.Fatalf("migration journal missing canonical expected/actual mismatch evidence: %+v", entries)
+	}
 }
 
 func TestRuntimeRetryMigrationFailsWhenFixtureRecordNotCanonical(t *testing.T) {
@@ -2313,6 +2316,7 @@ type migrationJournalEntry struct {
 	FromVersion string `json:"from_version"`
 	ToVersion   string `json:"to_version"`
 	Script      string `json:"script"`
+	Error       string `json:"error"`
 }
 
 func parseMigrationJournalEntries(t *testing.T, data []byte) []migrationJournalEntry {
@@ -2354,6 +2358,15 @@ func buildRuntimeFixtureRows(count int) string {
 func hasMigrationJournalEvent(entries []migrationJournalEntry, event string) bool {
 	for _, entry := range entries {
 		if entry.Event == event {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMigrationJournalErrorContaining(entries []migrationJournalEntry, event string, want string) bool {
+	for _, entry := range entries {
+		if entry.Event == event && strings.Contains(entry.Error, want) {
 			return true
 		}
 	}

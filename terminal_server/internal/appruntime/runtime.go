@@ -1195,7 +1195,7 @@ func verifyMigrationFixtureStep(root string, step migrationPlanStep) error {
 			return fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
 		if expectedValue != seedValue {
-			return fmt.Errorf("%w: step %04d value mismatch for key %q", ErrMigrationFixtureMismatch, step.Number, key)
+			return fmt.Errorf("%w: step %04d value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step.Number, key, expectedValue, seedValue)
 		}
 	}
 	for key := range expectedRecords {

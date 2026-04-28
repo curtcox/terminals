@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Tightened runtime Gate 4 fixture mismatch evidence in
+  `terminal_server/internal/appruntime/runtime.go`. Fixture value
+  mismatches now report the first divergent key with canonical
+  `expected` and `actual` JSON bytes in the
+  `step_failed_fixture_mismatch` journal entry, making dry-run
+  failures actionable for package authors. Added regression coverage
+  in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenFixtureExpectedMismatch`) and
+  documented the evidence shape in `docs/application-migrations.md`.
+
 - 2026-04-28: Added positive-value manifest limit validation for
   `migrate.max_runtime_seconds` and `migrate.checkpoint_every`
   in both Gate 1 package verification
