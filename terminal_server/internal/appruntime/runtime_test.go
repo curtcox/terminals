@@ -1572,6 +1572,57 @@ func TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid(t *testing.T) {
 	}
 }
 
+func TestRuntimeRetryMigrationRejectsArtifactPatchForDifferentLineage(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_artifact_owner")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_artifact_owner\"\napp_id = \"app:sha256:1111111111111111111111111111111111111111111111111111111111111111\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	script := `load("artifact.self", patch = "patch")
+
+def migrate():
+    patch("artifact-1", owner_app_id = "app:sha256:2222222222222222222222222222222222222222222222222222222222222222", owner_manifest_name = "migrate_artifact_owner")
+`
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(script), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_artifact_owner")
+	if !errors.Is(err, ErrMigrationArtifactOwnership) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationArtifactOwnership", err)
+	}
+	if status.Verdict != "step_failed" {
+		t.Fatalf("RetryMigration() verdict = %q, want step_failed", status.Verdict)
+	}
+	if status.StepsCompleted != 0 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+	}
+	if !strings.Contains(status.LastError, "host effect rejected") {
+		t.Fatalf("RetryMigration() last_error = %q, want host rejection message", status.LastError)
+	}
+	journalPath := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+	journalBytes, readErr := os.ReadFile(journalPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(journal) error = %v", readErr)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalErrorContaining(entries, "step_failed_host_rejected", "owner_app_id \"app:sha256:2222222222222222222222222222222222222222222222222222222222222222\" does not match app_id \"app:sha256:1111111111111111111111111111111111111111111111111111111111111111\"") {
+		t.Fatalf("migration journal missing artifact owner mismatch evidence: %+v", entries)
+	}
+}
+
 func TestRuntimeRetryMigrationIgnoresCommentedLoadStatements(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_comment_load")

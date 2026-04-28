@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Added runtime host-layer lineage validation for
+  declared `artifact.self.patch(...)` migration effects in
+  `terminal_server/internal/appruntime/runtime.go`. Retry now
+  rejects patch calls whose script-provided `owner_app_id` differs
+  from the migrating package `app_id`, including the same manifest
+  name under a different lineage, marks the step failed, and emits
+  `step_failed_host_rejected` journal evidence with the structured
+  ownership error. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationRejectsArtifactPatchForDifferentLineage`)
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Added first-class `migrate.env.abort(reason)`
   handling to the runtime fixture execution scaffold in
   `terminal_server/internal/appruntime/runtime.go`. Abort calls

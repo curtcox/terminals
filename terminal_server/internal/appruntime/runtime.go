@@ -72,6 +72,8 @@ var (
 	ErrMigrationRuntimeTimeout = errors.New("migration runtime timeout elapsed")
 	// ErrMigrationAborted indicates migration code requested an executor abort.
 	ErrMigrationAborted = errors.New("migration aborted by script")
+	// ErrMigrationArtifactOwnership indicates a migration attempted to patch an artifact outside its lineage.
+	ErrMigrationArtifactOwnership = errors.New("migration artifact ownership mismatch")
 )
 
 const defaultMigrationDrainTimeout = 90 * time.Second
@@ -93,6 +95,16 @@ var migrateRecordValuePattern = regexp.MustCompile(`^record\["([^"]+)"\]$`)
 var migrateRecordLowerPattern = regexp.MustCompile(`^lower\(\s*record\["([^"]+)"\]\s*\)$`)
 
 var migrateAbortPattern = regexp.MustCompile(`^abort\(\s*("(?:\\.|[^"\\])*")\s*\)$`)
+
+var migrateArtifactSelfLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']artifact\.self["']\s*,(?P<args>[^)]*)\)`)
+
+var migrateLoadAliasPattern = regexp.MustCompile(`\bpatch\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
+var migrateCallPattern = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*$`)
+
+var migrateStringArgPattern = regexp.MustCompile(`^\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`)
+
+var migrateOwnerAppIDPattern = regexp.MustCompile(`\bowner_app_id\s*=\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`)
 
 var allowedMigrationModules = map[string]struct{}{
 	"store":         {},
@@ -580,6 +592,20 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 				"error":        scriptErr.Error(),
 			})
 			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepInvalid, step.Number, step.ScriptName, scriptErr)
+		}
+		if hostErr := validateRuntimeMigrationHostEffects(pkg, scriptSource); hostErr != nil {
+			state.Verdict = "step_failed"
+			state.LastStep = step.Number
+			state.LastError = fmt.Sprintf("step %d host effect rejected: %s", step.Number, step.ScriptName)
+			r.migrations[name] = state
+			appendMigrationJournalEntry(pkg, state, "step_failed_host_rejected", map[string]any{
+				"step_id":      step.Number,
+				"from_version": step.FromVersion,
+				"to_version":   step.ToVersion,
+				"script":       step.ScriptName,
+				"error":        hostErr.Error(),
+			})
+			return statusFromState(pkg, state), hostErr
 		}
 		state.LastStep = step.Number
 		appendMigrationJournalEntry(pkg, state, "step_started", map[string]any{
@@ -1253,6 +1279,84 @@ func validateRuntimeMigrationScript(payload []byte) error {
 		}
 	}
 	return nil
+}
+
+func validateRuntimeMigrationHostEffects(pkg Package, scriptSource []byte) error {
+	patchAliases := artifactSelfPatchAliases(scriptSource)
+	if len(patchAliases) == 0 {
+		return nil
+	}
+	lines := strings.Split(string(scriptSource), "\n")
+	for lineNumber, line := range lines {
+		line = strings.TrimSpace(stripTALLineComment(line))
+		if line == "" || strings.HasPrefix(line, "def ") || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "return ") || line == "pass" {
+			continue
+		}
+		match := migrateCallPattern.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		if _, ok := patchAliases[match[1]]; !ok {
+			continue
+		}
+		appID := strings.TrimSpace(pkg.Manifest.AppID)
+		if appID == "" {
+			return fmt.Errorf("%w: artifact.self.patch requires manifest app_id at line %d", ErrMigrationArtifactOwnership, lineNumber+1)
+		}
+		artifactID := migrationStringArgument(match[2])
+		ownerAppID := migrationKeywordStringArgument(migrateOwnerAppIDPattern, match[2])
+		if ownerAppID == "" {
+			continue
+		}
+		if ownerAppID != appID {
+			return fmt.Errorf("%w: artifact %q owner_app_id %q does not match app_id %q at line %d", ErrMigrationArtifactOwnership, artifactID, ownerAppID, appID, lineNumber+1)
+		}
+	}
+	return nil
+}
+
+func artifactSelfPatchAliases(scriptSource []byte) map[string]struct{} {
+	aliases := make(map[string]struct{})
+	for _, match := range migrateArtifactSelfLoadPattern.FindAllSubmatch(scriptSource, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		for _, aliasMatch := range migrateLoadAliasPattern.FindAllSubmatch(match[1], -1) {
+			if len(aliasMatch) < 2 {
+				continue
+			}
+			aliases[string(aliasMatch[1])] = struct{}{}
+		}
+	}
+	return aliases
+}
+
+func migrationStringArgument(args string) string {
+	match := migrateStringArgPattern.FindStringSubmatch(args)
+	if match == nil {
+		return ""
+	}
+	return decodeTALStringLiteral(match[1])
+}
+
+func migrationKeywordStringArgument(pattern *regexp.Regexp, args string) string {
+	match := pattern.FindStringSubmatch(args)
+	if match == nil {
+		return ""
+	}
+	return decodeTALStringLiteral(match[1])
+}
+
+func decodeTALStringLiteral(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "'") && strings.HasSuffix(raw, "'") {
+		raw = `"` + strings.ReplaceAll(strings.Trim(raw, "'"), `"`, `\"`) + `"`
+	}
+	var value string
+	if err := json.Unmarshal([]byte(raw), &value); err != nil {
+		return ""
+	}
+	return value
 }
 
 type runtimeMigrationFixture struct {
