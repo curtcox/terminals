@@ -784,6 +784,74 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	}
 }
 
+func TestRuntimeRetryMigrationAppliesTrimFixtureTransforms(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_fixture_trim")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(appDir, "tests", "migrate_fixtures"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(tests/migrate_fixtures) error = %v", err)
+	}
+	manifest := `name = "migrate_fixture_trim"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "none"
+
+[[migrate.fixture]]
+step = "0001"
+prior_version = "1"
+seed = "tests/migrate_fixtures/history_seed.ndjson"
+expected = "tests/migrate_fixtures/history_expected.ndjson"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	migrateScript := `def migrate(record):
+  record["label_trimmed"] = trim(record["label"])
+  record["label_normalized"] = lower(trim(record["label"]))
+  return record
+`
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(migrateScript), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+	seed := "{\"key\":\"history/a\",\"value\":{\"label\":\"  Dishwasher Done  \"}}\n"
+	expected := "{\"key\":\"history/a\",\"value\":{\"label\":\"  Dishwasher Done  \",\"label_normalized\":\"dishwasher done\",\"label_trimmed\":\"Dishwasher Done\"}}\n"
+	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_seed.ndjson"), []byte(seed), 0o644); err != nil {
+		t.Fatalf("WriteFile(seed fixture) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_expected.ndjson"), []byte(expected), 0o644); err != nil {
+		t.Fatalf("WriteFile(expected fixture) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_fixture_trim")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() verdict = %q, want ok", status.Verdict)
+	}
+	if status.StepsCompleted != 1 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 1", status.StepsCompleted)
+	}
+}
+
 func TestRuntimeRetryMigrationEmitsCheckpointEveryForFixtureEffects(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_checkpoint_every")

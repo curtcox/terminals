@@ -83,9 +83,10 @@ of replaying the entire migration range on every retry.
 	the pending step, runtime executes the current deterministic fixture
 	subset for `migrate(record)` scripts before comparing actual output to the
 	expected envelopes. The subset supports field copy, string lowercasing,
-	JSON literal assignment, and field deletion. Mismatches stop retry with
-	`ErrMigrationFixtureMismatch`, mark `verdict = step_failed`, and emit
-	`step_failed_fixture_mismatch` entries.
+	string trimming, `lower(trim(record["field"]))`, JSON literal assignment,
+	and field deletion. Mismatches stop retry with `ErrMigrationFixtureMismatch`,
+	mark `verdict = step_failed`, and emit `step_failed_fixture_mismatch`
+	entries.
 	Value mismatches now include the first divergent key plus canonical
 	expected/actual JSON bytes in the journal error evidence.
 - If a declared fixture file cannot be read at execution time, retry stops
@@ -232,6 +233,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`
 - `TestVerifyTapIgnoresCommentedDisallowedLoadStatements`
 - `TestRuntimeRetryMigrationAppliesFixtureTransforms`
+- `TestRuntimeRetryMigrationAppliesTrimFixtureTransforms`
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordNotCanonical`

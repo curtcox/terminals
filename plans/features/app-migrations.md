@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Extended the runtime fixture-backed deterministic
+  migration subset in `terminal_server/internal/appruntime/runtime.go`
+  to support `trim(record["field"])` and
+  `lower(trim(record["field"]))` assignments. This lets Gate 4
+  fixture replay cover the label-normalization pattern used by the
+  worked example while still rejecting unsupported statements
+  explicitly. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesTrimFixtureTransforms`) and
+  documented the expanded subset in `docs/application-migrations.md`.
+
 - 2026-04-28: Added runtime host-layer lineage validation for
   declared `artifact.self.patch(...)` migration effects in
   `terminal_server/internal/appruntime/runtime.go`. Retry now

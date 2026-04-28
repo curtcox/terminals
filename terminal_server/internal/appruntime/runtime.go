@@ -94,6 +94,10 @@ var migrateRecordValuePattern = regexp.MustCompile(`^record\["([^"]+)"\]$`)
 
 var migrateRecordLowerPattern = regexp.MustCompile(`^lower\(\s*record\["([^"]+)"\]\s*\)$`)
 
+var migrateRecordTrimPattern = regexp.MustCompile(`^trim\(\s*record\["([^"]+)"\]\s*\)$`)
+
+var migrateRecordLowerTrimPattern = regexp.MustCompile(`^lower\(\s*trim\(\s*record\["([^"]+)"\]\s*\)\s*\)$`)
+
 var migrateAbortPattern = regexp.MustCompile(`^abort\(\s*("(?:\\.|[^"\\])*")\s*\)$`)
 
 var migrateArtifactSelfLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']artifact\.self["']\s*,(?P<args>[^)]*)\)`)
@@ -1455,6 +1459,18 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 					return nil, 0, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
 				}
 				record[transform.Destination] = strings.ToLower(value)
+			case "trim":
+				value, ok := record[transform.Source].(string)
+				if !ok {
+					return nil, 0, fmt.Errorf("record key %q field %q is not a string for trim()", key, transform.Source)
+				}
+				record[transform.Destination] = strings.TrimSpace(value)
+			case "lower_trim":
+				value, ok := record[transform.Source].(string)
+				if !ok {
+					return nil, 0, fmt.Errorf("record key %q field %q is not a string for lower(trim())", key, transform.Source)
+				}
+				record[transform.Destination] = strings.ToLower(strings.TrimSpace(value))
 			case "literal":
 				record[transform.Destination] = transform.Value
 			case "delete":
@@ -1515,11 +1531,25 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 
 func parseRuntimeMigrationFixtureAssignment(destination string, expression string) (runtimeMigrationFixtureTransform, error) {
 	expression = strings.TrimSpace(expression)
+	if match := migrateRecordLowerTrimPattern.FindStringSubmatch(expression); match != nil {
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Operation:   "lower_trim",
+		}, nil
+	}
 	if match := migrateRecordLowerPattern.FindStringSubmatch(expression); match != nil {
 		return runtimeMigrationFixtureTransform{
 			Destination: destination,
 			Source:      match[1],
 			Operation:   "lower",
+		}, nil
+	}
+	if match := migrateRecordTrimPattern.FindStringSubmatch(expression); match != nil {
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Operation:   "trim",
 		}, nil
 	}
 	if match := migrateRecordValuePattern.FindStringSubmatch(expression); match != nil {
