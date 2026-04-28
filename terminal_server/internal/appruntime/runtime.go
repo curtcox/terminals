@@ -3,6 +3,7 @@ package appruntime
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -979,53 +980,96 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 
 func readRuntimeFixtureRecords(root string, relPath string) (map[string]string, error) {
 	fullPath := filepath.Join(root, filepath.FromSlash(relPath))
-	file, err := os.Open(filepath.Clean(fullPath))
+	payload, err := os.ReadFile(filepath.Clean(fullPath))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %v", ErrMigrationFixtureUnavailable, relPath, err)
 	}
-	defer func() {
-		_ = file.Close()
-	}()
+	if bytes.Contains(payload, []byte{'\r'}) {
+		return nil, fmt.Errorf("%w: %s must use LF line endings", ErrMigrationFixtureMismatch, relPath)
+	}
+	if len(payload) == 0 || payload[len(payload)-1] != '\n' {
+		return nil, fmt.Errorf("%w: %s must end with trailing LF", ErrMigrationFixtureMismatch, relPath)
+	}
 
-	scanner := bufio.NewScanner(file)
+	lines := bytes.Split(payload, []byte{'\n'})
+	recordCount := len(lines) - 1
+	if recordCount > runtimeMigrationFixtureMaxRows {
+		return nil, fmt.Errorf("%w: %s exceeds maximum records (%d)", ErrMigrationFixtureMismatch, relPath, runtimeMigrationFixtureMaxRows)
+	}
+
 	records := make(map[string]string)
-	line := 0
-	recordCount := 0
-	for scanner.Scan() {
-		line++
-		payload := strings.TrimSpace(scanner.Text())
-		if payload == "" {
-			continue
+	previousKey := ""
+	for i := 0; i < len(lines)-1; i++ {
+		lineNumber := i + 1
+		line := lines[i]
+		if len(line) == 0 {
+			return nil, fmt.Errorf("%w: %s line %d is blank", ErrMigrationFixtureMismatch, relPath, lineNumber)
 		}
-		recordCount++
-		if recordCount > runtimeMigrationFixtureMaxRows {
-			return nil, fmt.Errorf("%w: %s exceeds maximum records (%d)", ErrMigrationFixtureMismatch, relPath, runtimeMigrationFixtureMaxRows)
+
+		key, canonicalEnvelope, canonicalValue, parseErr := parseRuntimeFixtureRecord(line)
+		if parseErr != nil {
+			return nil, fmt.Errorf("%w: %s line %d: %v", ErrMigrationFixtureMismatch, relPath, lineNumber, parseErr)
 		}
-		var envelope struct {
-			Key   string          `json:"key"`
-			Value json.RawMessage `json:"value"`
+		if !bytes.Equal(line, canonicalEnvelope) {
+			return nil, fmt.Errorf("%w: %s line %d is not canonical JSON", ErrMigrationFixtureMismatch, relPath, lineNumber)
 		}
-		if err := json.Unmarshal([]byte(payload), &envelope); err != nil {
-			return nil, fmt.Errorf("%w: %s line %d parse error: %v", ErrMigrationFixtureMismatch, relPath, line, err)
-		}
-		key := strings.TrimSpace(envelope.Key)
-		if key == "" {
-			return nil, fmt.Errorf("%w: %s line %d missing key", ErrMigrationFixtureMismatch, relPath, line)
+		if previousKey != "" && strings.Compare(previousKey, key) >= 0 {
+			return nil, fmt.Errorf("%w: %s line %d is out of key order", ErrMigrationFixtureMismatch, relPath, lineNumber)
 		}
 		if _, exists := records[key]; exists {
 			return nil, fmt.Errorf("%w: %s duplicate key %q", ErrMigrationFixtureMismatch, relPath, key)
 		}
-		canonical, err := canonicalJSONValue(envelope.Value)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %s line %d invalid value: %v", ErrMigrationFixtureMismatch, relPath, line, err)
-		}
-		records[key] = canonical
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("%w: %s: %v", ErrMigrationFixtureUnavailable, relPath, err)
+
+		records[key] = canonicalValue
+		previousKey = key
 	}
 
 	return records, nil
+}
+
+func parseRuntimeFixtureRecord(line []byte) (key string, canonicalEnvelope []byte, canonicalValue string, err error) {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(line, &envelope); err != nil {
+		return "", nil, "", errors.New("parse error")
+	}
+	if len(envelope) != 2 {
+		return "", nil, "", errors.New("fixture record must contain exactly key and value fields")
+	}
+
+	rawKey, ok := envelope["key"]
+	if !ok {
+		return "", nil, "", errors.New("fixture record missing key field")
+	}
+	rawValue, ok := envelope["value"]
+	if !ok {
+		return "", nil, "", errors.New("fixture record missing value field")
+	}
+
+	if err := json.Unmarshal(rawKey, &key); err != nil {
+		return "", nil, "", errors.New("fixture key must be a string")
+	}
+	if strings.TrimSpace(key) == "" {
+		return "", nil, "", errors.New("fixture record missing key")
+	}
+
+	var value map[string]any
+	if err := json.Unmarshal(rawValue, &value); err != nil {
+		return "", nil, "", errors.New("fixture value must be an object")
+	}
+
+	canonicalEnvelope, err = json.Marshal(map[string]any{
+		"key":   key,
+		"value": value,
+	})
+	if err != nil {
+		return "", nil, "", errors.New("failed to canonicalize fixture record")
+	}
+
+	canonicalValue, err = canonicalJSONValue(rawValue)
+	if err != nil {
+		return "", nil, "", fmt.Errorf("invalid value: %w", err)
+	}
+	return key, canonicalEnvelope, canonicalValue, nil
 }
 
 func canonicalJSONValue(raw json.RawMessage) (string, error) {

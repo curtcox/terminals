@@ -21,6 +21,19 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Hardened execution-time fixture canonicality checks in
+  `terminal_server/internal/appruntime/runtime.go`.
+  `readRuntimeFixtureRecords` now enforces LF-only NDJSON, trailing
+  newline, non-blank rows, strict `key`/`value` envelopes, and
+  ascending key order before comparing fixture expected output.
+  Non-canonical fixture edits now fail retry with
+  `ErrMigrationFixtureMismatch` and preserve
+  `step_failed_fixture_mismatch` journaling semantics. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenFixtureRecordNotCanonical`) and
+  documented behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Expanded migration crash-injection replay coverage in
   `terminal_server/internal/appruntime/runtime_test.go`.
   `TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`
