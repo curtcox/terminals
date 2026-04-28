@@ -57,6 +57,10 @@ var (
 	ErrMigrationStepUnavailable = errors.New("migration step script unavailable")
 	// ErrMigrationStepInvalid indicates a migration step script is present but invalid for execution.
 	ErrMigrationStepInvalid = errors.New("migration step script invalid")
+	// ErrMigrationFixtureUnavailable indicates a migration fixture file could not be read at execution time.
+	ErrMigrationFixtureUnavailable = errors.New("migration fixture file unavailable")
+	// ErrMigrationFixtureMismatch indicates migration fixture expected output diverged from actual output.
+	ErrMigrationFixtureMismatch = errors.New("migration fixture expected output mismatch")
 	// ErrMigrationInterrupted indicates a migration run was interrupted before committing.
 	ErrMigrationInterrupted = errors.New("migration execution interrupted before commit")
 )
@@ -509,6 +513,34 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 			"to_version":   step.ToVersion,
 			"script":       step.ScriptName,
 		})
+		if fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step); fixtureErr != nil {
+			state.Verdict = "step_failed"
+			state.LastStep = step.Number
+			switch {
+			case errors.Is(fixtureErr, ErrMigrationFixtureUnavailable):
+				state.LastError = fmt.Sprintf("step %d fixture unavailable: %s", step.Number, step.ScriptName)
+				r.migrations[name] = state
+				appendMigrationJournalEntry(pkg, state, "step_failed_fixture_unavailable", map[string]any{
+					"step_id":      step.Number,
+					"from_version": step.FromVersion,
+					"to_version":   step.ToVersion,
+					"script":       step.ScriptName,
+					"error":        fixtureErr.Error(),
+				})
+				return statusFromState(pkg, state), fixtureErr
+			default:
+				state.LastError = fmt.Sprintf("step %d fixture mismatch: %s", step.Number, step.ScriptName)
+				r.migrations[name] = state
+				appendMigrationJournalEntry(pkg, state, "step_failed_fixture_mismatch", map[string]any{
+					"step_id":      step.Number,
+					"from_version": step.FromVersion,
+					"to_version":   step.ToVersion,
+					"script":       step.ScriptName,
+					"error":        fixtureErr.Error(),
+				})
+				return statusFromState(pkg, state), fixtureErr
+			}
+		}
 		state.StepsCompleted = step.Number
 		state.LastStep = step.Number
 		appendMigrationJournalEntry(pkg, state, "step_committed", map[string]any{
@@ -825,11 +857,167 @@ func validateRuntimeMigrationScript(payload []byte) error {
 	return nil
 }
 
+type runtimeMigrationFixture struct {
+	Step         int
+	PriorVersion string
+	SeedPath     string
+	ExpectedPath string
+}
+
+func verifyMigrationFixtureStep(root string, step migrationPlanStep) error {
+	fixture, err := findRuntimeMigrationFixture(root, step)
+	if err != nil {
+		return err
+	}
+	if fixture == nil {
+		return nil
+	}
+
+	seedRecords, err := readRuntimeFixtureRecords(root, fixture.SeedPath)
+	if err != nil {
+		return err
+	}
+	expectedRecords, err := readRuntimeFixtureRecords(root, fixture.ExpectedPath)
+	if err != nil {
+		return err
+	}
+
+	if len(seedRecords) != len(expectedRecords) {
+		return fmt.Errorf("%w: step %04d key count mismatch (seed=%d expected=%d)", ErrMigrationFixtureMismatch, step.Number, len(seedRecords), len(expectedRecords))
+	}
+	for key, seedValue := range seedRecords {
+		expectedValue, ok := expectedRecords[key]
+		if !ok {
+			return fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
+		}
+		if expectedValue != seedValue {
+			return fmt.Errorf("%w: step %04d value mismatch for key %q", ErrMigrationFixtureMismatch, step.Number, key)
+		}
+	}
+	for key := range expectedRecords {
+		if _, ok := seedRecords[key]; !ok {
+			return fmt.Errorf("%w: step %04d expected contains extra key %q", ErrMigrationFixtureMismatch, step.Number, key)
+		}
+	}
+
+	return nil
+}
+
+func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeMigrationFixture, error) {
+	manifestPath := filepath.Join(root, "manifest.toml")
+	var manifest runtimeMigrationManifest
+	if _, err := toml.DecodeFile(manifestPath, &manifest); err != nil {
+		return nil, nil
+	}
+
+	var match *runtimeMigrationFixture
+	for _, fixture := range manifest.Migrate.Fixture {
+		stepIDRaw := strings.TrimSpace(fixture.Step)
+		if stepIDRaw == "" {
+			continue
+		}
+		stepID, err := strconv.Atoi(stepIDRaw)
+		if err != nil {
+			return nil, fmt.Errorf("%w: migrate.fixture step %q is not numeric", ErrMigrationFixtureMismatch, fixture.Step)
+		}
+		if stepID != step.Number {
+			continue
+		}
+		priorVersion := strings.TrimSpace(fixture.PriorVersion)
+		if priorVersion != "" && priorVersion != step.FromVersion {
+			return nil, fmt.Errorf("%w: migrate.fixture step %q prior_version %q does not match step from-version %q", ErrMigrationFixtureMismatch, fixture.Step, priorVersion, step.FromVersion)
+		}
+		if match != nil {
+			return nil, fmt.Errorf("%w: duplicate migrate.fixture entries for step %04d", ErrMigrationFixtureMismatch, step.Number)
+		}
+		seedPath := strings.TrimSpace(fixture.Seed)
+		expectedPath := strings.TrimSpace(fixture.Expected)
+		if seedPath == "" || expectedPath == "" {
+			return nil, fmt.Errorf("%w: migrate.fixture step %q must declare seed and expected files", ErrMigrationFixtureMismatch, fixture.Step)
+		}
+		match = &runtimeMigrationFixture{
+			Step:         stepID,
+			PriorVersion: priorVersion,
+			SeedPath:     seedPath,
+			ExpectedPath: expectedPath,
+		}
+	}
+
+	return match, nil
+}
+
+func readRuntimeFixtureRecords(root string, relPath string) (map[string]string, error) {
+	fullPath := filepath.Join(root, filepath.FromSlash(relPath))
+	file, err := os.Open(filepath.Clean(fullPath))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s: %v", ErrMigrationFixtureUnavailable, relPath, err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	records := make(map[string]string)
+	line := 0
+	for scanner.Scan() {
+		line++
+		payload := strings.TrimSpace(scanner.Text())
+		if payload == "" {
+			continue
+		}
+		var envelope struct {
+			Key   string          `json:"key"`
+			Value json.RawMessage `json:"value"`
+		}
+		if err := json.Unmarshal([]byte(payload), &envelope); err != nil {
+			return nil, fmt.Errorf("%w: %s line %d parse error: %v", ErrMigrationFixtureMismatch, relPath, line, err)
+		}
+		key := strings.TrimSpace(envelope.Key)
+		if key == "" {
+			return nil, fmt.Errorf("%w: %s line %d missing key", ErrMigrationFixtureMismatch, relPath, line)
+		}
+		if _, exists := records[key]; exists {
+			return nil, fmt.Errorf("%w: %s duplicate key %q", ErrMigrationFixtureMismatch, relPath, key)
+		}
+		canonical, err := canonicalJSONValue(envelope.Value)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s line %d invalid value: %v", ErrMigrationFixtureMismatch, relPath, line, err)
+		}
+		records[key] = canonical
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("%w: %s: %v", ErrMigrationFixtureUnavailable, relPath, err)
+	}
+
+	return records, nil
+}
+
+func canonicalJSONValue(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 {
+		return "", errors.New("empty json value")
+	}
+	var decoded any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return "", err
+	}
+	canonical, err := json.Marshal(decoded)
+	if err != nil {
+		return "", err
+	}
+	return string(canonical), nil
+}
+
 type runtimeMigrationManifest struct {
 	Migrate struct {
 		DeclaredSteps       int `toml:"declared_steps"`
 		DrainTimeoutSeconds int `toml:"drain_timeout_seconds"`
-		Step                []struct {
+		Fixture             []struct {
+			Step         string `toml:"step"`
+			PriorVersion string `toml:"prior_version"`
+			Seed         string `toml:"seed"`
+			Expected     string `toml:"expected"`
+		} `toml:"fixture"`
+		Step []struct {
 			From          string `toml:"from"`
 			To            string `toml:"to"`
 			Compatibility string `toml:"compatibility"`

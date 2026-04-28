@@ -21,6 +21,21 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added runtime migration fixture expected-output
+  comparison guard in `terminal_server/internal/appruntime/runtime.go`.
+  `RetryMigration` now checks declared `[[migrate.fixture]]` entries
+  for each pending step and compares fixture seed/expected envelopes
+  with key-set equality plus canonical JSON value equality before
+  marking a step committed. Divergence now fails retry with
+  `ErrMigrationFixtureMismatch`, sets `verdict = step_failed`, and
+  appends `step_failed_fixture_mismatch` journal metadata. Missing
+  fixture files now fail with `ErrMigrationFixtureUnavailable` and
+  `step_failed_fixture_unavailable` journal metadata. Added regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationWithFixtureExpectedMatch`,
+  `TestRuntimeRetryMigrationFailsWhenFixtureExpectedMismatch`) and
+  documented behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Added execution-time migration script integrity
   enforcement in `terminal_server/internal/appruntime/runtime.go`.
   `RetryMigration` now validates each pending step script contains a
