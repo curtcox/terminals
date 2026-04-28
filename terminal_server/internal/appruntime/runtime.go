@@ -98,6 +98,8 @@ var migrateRecordAssignmentPattern = regexp.MustCompile(`^\s*record\["([^"]+)"\]
 
 var migrateRecordDeletePattern = regexp.MustCompile(`^\s*del\s+record\["([^"]+)"\]\s*$`)
 
+var migrateRecordSkipIfPresentPattern = regexp.MustCompile(`^\s*if\s+["']([^"']+)["']\s+in\s+record\s*:\s*continue\s*$`)
+
 var migrateRecordValuePattern = regexp.MustCompile(`^record\["([^"]+)"\]$`)
 
 var migrateRecordGetValuePattern = regexp.MustCompile(`^record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)$`)
@@ -1585,8 +1587,16 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 		if err := json.Unmarshal([]byte(rawValue), &record); err != nil {
 			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
 		}
+		skipRemainingTransforms := false
 		for _, transform := range transforms {
+			if skipRemainingTransforms {
+				break
+			}
 			switch transform.Operation {
+			case "skip_if_present":
+				if _, ok := record[transform.Source]; ok {
+					skipRemainingTransforms = true
+				}
 			case "copy":
 				record[transform.Destination] = runtimeMigrationFixtureValue(record, transform)
 			case "lower":
@@ -1678,6 +1688,13 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 			transforms = append(transforms, runtimeMigrationFixtureTransform{
 				Destination: match[1],
 				Operation:   "delete",
+			})
+			continue
+		}
+		if match := migrateRecordSkipIfPresentPattern.FindStringSubmatch(line); match != nil {
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Source:    match[1],
+				Operation: "skip_if_present",
 			})
 			continue
 		}

@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Extended the runtime fixture-backed deterministic
+  migration subset in `terminal_server/internal/appruntime/runtime.go`
+  to support idempotent `if "field" in record: continue` guards.
+  Gate 4 fixture replay can now prove the worked-example pattern
+  where already-migrated rows are left untouched while missing rows
+  receive normalized defaults. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesIdempotentFixtureGuard`) and
+  documented the expanded subset in `docs/application-migrations.md`.
+
 - 2026-04-28: Extended Gate 4 migration crash-replay coverage to
   include fixture-backed `checkpoint_committed` journal boundaries.
   Runtime checkpoint journaling in
