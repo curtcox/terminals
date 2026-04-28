@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Enforced migration fixture version-edge consistency
+  in `terminal_server/internal/apppackage/tap.go`.
+  `VerifyTap` now requires each `[[migrate.fixture]].prior_version`
+  to match the referenced migration step's `from` version derived
+  from `migrate/<step>_<from>_to_<to>.tal`, preventing fixture
+  metadata drift from the declared step edge. Added regression
+  coverage in `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsMigrateFixturePriorVersionMismatch`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Hardened runtime migration step execution planning in
   `terminal_server/internal/appruntime/runtime.go`. Retry now
   builds a deterministic step plan from `migrate/*.tal`

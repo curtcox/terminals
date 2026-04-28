@@ -733,8 +733,10 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 	}
 
 	stepNames := make(map[string]struct{}, len(migrationFiles))
+	stepByName := make(map[string]parsedStep, len(migrationFiles))
 	for _, step := range migrationFiles {
 		stepNames[step.stepName] = struct{}{}
+		stepByName[step.stepName] = step
 	}
 
 	fixtureByStep := make(map[string]struct{}, len(manifest.Migrate.Fixture))
@@ -748,6 +750,11 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		}
 		if _, ok := stepNames[fixture.Step]; !ok {
 			return ErrInvalidManifest
+		}
+		if step, ok := stepByName[fixture.Step]; ok {
+			if fixture.PriorVersion != step.from {
+				return fmt.Errorf("%w: migrate.fixture %s prior_version %q does not match step from-version %q", ErrInvalidManifest, fixture.Step, fixture.PriorVersion, step.from)
+			}
 		}
 		if _, ok := fixtureByStep[fixture.Step]; ok {
 			return ErrInvalidManifest
