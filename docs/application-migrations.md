@@ -34,6 +34,9 @@ migration control actions:
 	migration step so operators can see step-by-step progression.
 - Blocked retries emit explicit events (`retry_blocked_reconcile_pending` and
 	`retry_blocked_drain_timeout`) with current verdict/step context.
+- Retry reconciliation guard now treats `verdict = reconcile_pending` as
+	blocking even if pending-record details are temporarily unavailable, so
+	operators must reconcile before retry can proceed.
 - `AbortMigration` writes `aborted` entries including the selected target
 	(`checkpoint` or `baseline`).
 - `ReconcileMigration` writes `reconcile_record` entries with `record_id` and

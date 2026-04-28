@@ -664,10 +664,37 @@ func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	if _, err := runtime.RetryMigration("migrate_reconcile"); !errors.Is(err, ErrMigrationReconcilePending) {
 		t.Fatalf("RetryMigration() error = %v, want ErrMigrationReconcilePending", err)
 	}
+
+	runtime.mu.Lock()
+	state = runtime.migrations["migrate_reconcile"]
+	state.PendingRecords = nil
+	state.Verdict = "reconcile_pending"
+	runtime.migrations["migrate_reconcile"] = state
+	runtime.mu.Unlock()
+
+	status, err := runtime.RetryMigration("migrate_reconcile")
+	if !errors.Is(err, ErrMigrationReconcilePending) {
+		t.Fatalf("RetryMigration() with reconcile_pending verdict only error = %v, want ErrMigrationReconcilePending", err)
+	}
+	if status.Verdict != "reconcile_pending" {
+		t.Fatalf("RetryMigration() with reconcile_pending verdict only verdict = %q, want reconcile_pending", status.Verdict)
+	}
+	if status.LastError != ErrMigrationReconcilePending.Error() {
+		t.Fatalf("RetryMigration() with reconcile_pending verdict only last_error = %q, want %q", status.LastError, ErrMigrationReconcilePending.Error())
+	}
+
 	if _, err := runtime.ReconcileMigration("migrate_reconcile", "rec-1", "bad_resolution"); !errors.Is(err, ErrMigrationResolutionInvalid) {
 		t.Fatalf("ReconcileMigration() invalid resolution error = %v, want ErrMigrationResolutionInvalid", err)
 	}
-	status, err := runtime.ReconcileMigration("migrate_reconcile", "rec-1", "force_rewind")
+
+	runtime.mu.Lock()
+	state = runtime.migrations["migrate_reconcile"]
+	state.PendingRecords = map[string]string{"rec-1": "force_rewind"}
+	state.Verdict = "reconcile_pending"
+	runtime.migrations["migrate_reconcile"] = state
+	runtime.mu.Unlock()
+
+	status, err = runtime.ReconcileMigration("migrate_reconcile", "rec-1", "force_rewind")
 	if err != nil {
 		t.Fatalf("ReconcileMigration() error = %v", err)
 	}

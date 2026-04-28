@@ -374,7 +374,8 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	if !state.ExecutorReady {
 		return statusFromState(pkg, state), nil
 	}
-	if state.Verdict == "reconcile_pending" && len(state.PendingRecords) > 0 {
+	if state.Verdict == "reconcile_pending" || len(state.PendingRecords) > 0 {
+		state.Verdict = "reconcile_pending"
 		state.LastError = ErrMigrationReconcilePending.Error()
 		r.migrations[name] = state
 		appendMigrationJournalEntry(pkg, state, "retry_blocked_reconcile_pending", nil)

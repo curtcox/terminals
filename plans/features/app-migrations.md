@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Tightened runtime reconciliation guard semantics in
+  `terminal_server/internal/appruntime/runtime.go` so
+  `RetryMigration` now blocks whenever migration status is
+  `reconcile_pending` (even if pending-record detail is
+  temporarily absent), matching abort/rollback guard behavior and
+  preventing retries from bypassing reconciliation-required state.
+  Added regression assertions in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeReconcileMigrationPendingRecords`) for the
+  verdict-only reconcile-pending edge case, and documented the
+  operator-visible behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Aligned checkpoint abort semantics with design intent in
   `terminal_server/internal/appruntime/runtime.go`. `AbortMigration`
   now returns `verdict = step_failed` for checkpoint-target aborts,
