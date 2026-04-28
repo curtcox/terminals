@@ -74,6 +74,9 @@ of replaying the entire migration range on every retry.
 	`ErrMigrationStepInvalid`, preserves checkpoint progress, marks
 	`verdict = step_failed`, and emits `step_failed_invalid_script` journal
 	metadata for the failed step.
+	Commented example text (for example `# load("bus", ...)`) is ignored when
+	parsing module imports so documentation comments do not trigger false
+	disallowed-module failures.
 - Retry now validates declared migration fixture expected output before
 	committing each step. When `[[migrate.fixture]]` declares a fixture for
 	the pending step, runtime compares seed vs expected envelopes using key-set
@@ -139,6 +142,8 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
+- `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`
+- `TestVerifyTapIgnoresCommentedDisallowedLoadStatements`
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`

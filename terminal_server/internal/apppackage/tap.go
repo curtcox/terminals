@@ -90,7 +90,7 @@ var allowedTopLevelDirs = map[string]struct{}{
 
 var (
 	migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
-	migrateLoadPattern     = regexp.MustCompile(`(?m)load\(\s*["']([^"']+)["']`)
+	migrateLoadPattern     = regexp.MustCompile(`(?m)^\s*load\(\s*["']([^"']+)["']`)
 )
 
 var allowedMigrationModules = map[string]struct{}{

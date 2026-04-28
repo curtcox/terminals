@@ -939,6 +939,41 @@ func TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid(t *testing.T) {
 	}
 }
 
+func TestRuntimeRetryMigrationIgnoresCommentedLoadStatements(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_comment_load")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_comment_load\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	script := "# load(\"bus\", emit = \"emit\")\nload(\"store\", get = \"get\")\n\ndef migrate():\n    pass\n"
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(script), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_comment_load")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() verdict = %q, want ok", status.Verdict)
+	}
+	if status.StepsCompleted != 1 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 1", status.StepsCompleted)
+	}
+}
+
 func TestRuntimeMigrationJournalPathUsesAppID(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_identity")

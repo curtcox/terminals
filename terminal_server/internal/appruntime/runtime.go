@@ -69,7 +69,7 @@ const defaultMigrationDrainTimeout = 90 * time.Second
 
 var migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
 
-var migrateLoadPattern = regexp.MustCompile(`(?m)load\(\s*["']([^"']+)["']`)
+var migrateLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']([^"']+)["']`)
 
 var migrateEntryPointPattern = regexp.MustCompile(`(?m)^\s*def\s+migrate\s*\(`)
 

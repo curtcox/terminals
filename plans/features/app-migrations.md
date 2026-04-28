@@ -21,6 +21,19 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Hardened migration module-load parsing to ignore
+  commented `load(...)` text while still enforcing disallowed
+  module imports in real statements. Updated
+  `terminal_server/internal/apppackage/tap.go` and
+  `terminal_server/internal/appruntime/runtime.go` to anchor
+  migration `load(...)` scanning at statement starts, preventing
+  false disallowed-module failures from comment examples in
+  migration scripts. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapIgnoresCommentedDisallowedLoadStatements`) and
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`).
+
 - 2026-04-27: Hardened runtime fixture declaration enforcement in
   `terminal_server/internal/appruntime/runtime.go`.
   `RetryMigration` now treats missing `[[migrate.fixture]]` metadata
