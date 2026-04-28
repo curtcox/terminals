@@ -1395,8 +1395,10 @@ func canonicalJSONValue(raw json.RawMessage) (string, error) {
 
 type runtimeMigrationManifest struct {
 	Migrate struct {
-		DeclaredSteps       int `toml:"declared_steps"`
-		DrainTimeoutSeconds int `toml:"drain_timeout_seconds"`
+		DeclaredSteps       int  `toml:"declared_steps"`
+		DrainTimeoutSeconds int  `toml:"drain_timeout_seconds"`
+		MaxRuntimeSeconds   *int `toml:"max_runtime_seconds"`
+		CheckpointEvery     *int `toml:"checkpoint_every"`
 		Fixture             []struct {
 			Step         string `toml:"step"`
 			PriorVersion string `toml:"prior_version"`
@@ -1452,19 +1454,27 @@ func loadMigrationPlan(root string) (int, []migrationPlanStep, error) {
 
 	manifestPath := filepath.Join(root, "manifest.toml")
 	var manifest runtimeMigrationManifest
-	if _, err := toml.DecodeFile(manifestPath, &manifest); err == nil && len(manifest.Migrate.Step) > 0 {
-		if manifest.Migrate.DeclaredSteps > 0 && manifest.Migrate.DeclaredSteps != len(manifest.Migrate.Step) {
-			return len(matches), nil, fmt.Errorf("%w: migrate.declared_steps (%d) does not match migrate.step entries (%d)", ErrInvalidManifest, manifest.Migrate.DeclaredSteps, len(manifest.Migrate.Step))
+	if _, err := toml.DecodeFile(manifestPath, &manifest); err == nil {
+		if manifest.Migrate.MaxRuntimeSeconds != nil && *manifest.Migrate.MaxRuntimeSeconds <= 0 {
+			return len(matches), nil, fmt.Errorf("%w: migrate.max_runtime_seconds must be a positive integer", ErrInvalidManifest)
 		}
-		if len(manifest.Migrate.Step) != len(steps) {
-			return len(matches), nil, fmt.Errorf("%w: migrate.step entries (%d) do not match migrate scripts (%d)", ErrInvalidManifest, len(manifest.Migrate.Step), len(steps))
+		if manifest.Migrate.CheckpointEvery != nil && *manifest.Migrate.CheckpointEvery <= 0 {
+			return len(matches), nil, fmt.Errorf("%w: migrate.checkpoint_every must be a positive integer", ErrInvalidManifest)
 		}
-		for i := range steps {
-			manifestStep := manifest.Migrate.Step[i]
-			steps[i].RequiresDrain = strings.EqualFold(strings.TrimSpace(manifestStep.Compatibility), "incompatible") && strings.EqualFold(strings.TrimSpace(manifestStep.DrainPolicy), "drain")
-			if strings.TrimSpace(manifestStep.From) != "" && strings.TrimSpace(manifestStep.To) != "" {
-				if strings.TrimSpace(manifestStep.From) != steps[i].FromVersion || strings.TrimSpace(manifestStep.To) != steps[i].ToVersion {
-					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d from/to does not match script %s", ErrInvalidManifest, i+1, steps[i].ScriptName)
+		if len(manifest.Migrate.Step) > 0 {
+			if manifest.Migrate.DeclaredSteps > 0 && manifest.Migrate.DeclaredSteps != len(manifest.Migrate.Step) {
+				return len(matches), nil, fmt.Errorf("%w: migrate.declared_steps (%d) does not match migrate.step entries (%d)", ErrInvalidManifest, manifest.Migrate.DeclaredSteps, len(manifest.Migrate.Step))
+			}
+			if len(manifest.Migrate.Step) != len(steps) {
+				return len(matches), nil, fmt.Errorf("%w: migrate.step entries (%d) do not match migrate scripts (%d)", ErrInvalidManifest, len(manifest.Migrate.Step), len(steps))
+			}
+			for i := range steps {
+				manifestStep := manifest.Migrate.Step[i]
+				steps[i].RequiresDrain = strings.EqualFold(strings.TrimSpace(manifestStep.Compatibility), "incompatible") && strings.EqualFold(strings.TrimSpace(manifestStep.DrainPolicy), "drain")
+				if strings.TrimSpace(manifestStep.From) != "" && strings.TrimSpace(manifestStep.To) != "" {
+					if strings.TrimSpace(manifestStep.From) != steps[i].FromVersion || strings.TrimSpace(manifestStep.To) != steps[i].ToVersion {
+						return len(matches), nil, fmt.Errorf("%w: migrate.step %04d from/to does not match script %s", ErrInvalidManifest, i+1, steps[i].ScriptName)
+					}
 				}
 			}
 		}

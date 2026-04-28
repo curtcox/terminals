@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -2129,6 +2130,75 @@ func TestRuntimeMigrationInvalidStepPlanDisablesExecutor(t *testing.T) {
 	}
 	if status.Verdict != "idle" {
 		t.Fatalf("RetryMigration() verdict = %q, want idle", status.Verdict)
+	}
+}
+
+func TestRuntimeMigrationInvalidLimitsDisableExecutor(t *testing.T) {
+	testCases := []struct {
+		name          string
+		manifestField string
+		manifestValue string
+		wantMessage   string
+	}{
+		{
+			name:          "max runtime seconds",
+			manifestField: "max_runtime_seconds",
+			manifestValue: "0",
+			wantMessage:   "migrate.max_runtime_seconds must be a positive integer",
+		},
+		{
+			name:          "checkpoint every",
+			manifestField: "checkpoint_every",
+			manifestValue: "-1",
+			wantMessage:   "migrate.checkpoint_every must be a positive integer",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			appDir := filepath.Join(tempDir, "migrate_invalid_limits")
+			if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+				t.Fatalf("MkdirAll() error = %v", err)
+			}
+			manifest := fmt.Sprintf("name = \"migrate_invalid_limits\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n\n[migrate]\ndeclared_steps = 1\n%s = %s\n", tc.manifestField, tc.manifestValue)
+			if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+				t.Fatalf("WriteFile(manifest) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(main) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(migrate) error = %v", err)
+			}
+
+			runtime := NewRuntime()
+			if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+				t.Fatalf("LoadPackage() error = %v", err)
+			}
+
+			status, err := runtime.GetMigrationStatus("migrate_invalid_limits")
+			if err != nil {
+				t.Fatalf("GetMigrationStatus() error = %v", err)
+			}
+			if status.ExecutorReady {
+				t.Fatalf("ExecutorReady = true, want false")
+			}
+			if !strings.Contains(status.LastError, tc.wantMessage) {
+				t.Fatalf("LastError = %q, want contains %q", status.LastError, tc.wantMessage)
+			}
+
+			status, err = runtime.RetryMigration("migrate_invalid_limits")
+			if err != nil {
+				t.Fatalf("RetryMigration() error = %v", err)
+			}
+			if status.ExecutorReady {
+				t.Fatalf("RetryMigration() ExecutorReady = true, want false")
+			}
+			if status.StepsCompleted != 0 {
+				t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+			}
+		})
 	}
 }
 

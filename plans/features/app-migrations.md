@@ -21,6 +21,20 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Added positive-value manifest limit validation for
+  `migrate.max_runtime_seconds` and `migrate.checkpoint_every`
+  in both Gate 1 package verification
+  (`terminal_server/internal/apppackage/tap.go`) and runtime
+  migration plan parsing (`terminal_server/internal/appruntime/runtime.go`).
+  Non-positive values now fail with explicit diagnostics and leave
+  runtime migration status with `executor_ready = false` for
+  operator visibility. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsMigrateNonPositiveMaxRuntimeSeconds`,
+  `TestVerifyTapRejectsMigrateNonPositiveCheckpointEvery`) and
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationInvalidLimitsDisableExecutor`).
+
 - 2026-04-28: Baseline-aware migration retries now start from the
   installed-version boundary after reload in
   `terminal_server/internal/appruntime/runtime.go`.
@@ -549,8 +563,9 @@ who may authorize a migration).
   Admin + REPL tests now cover the non-stubbed API path and command
   output for migration retry.
 - Remaining work in this plan includes the full executor lifecycle
-  from this design (step execution against fixtures, crash-injection
-  replay at journal boundaries, and expected-output comparisons).
+  from this design (actual TAL step execution against synthetic
+  fixture-backed stores plus per-step timeout/checkpoint/hard-cap
+  enforcement semantics).
 
 ## Problem
 
