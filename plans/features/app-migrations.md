@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Persisted drain-guard blocked timing across process
+  restart in `terminal_server/internal/appruntime/runtime.go`.
+  `RetryMigration` now records `blocked_since` on
+  `retry_blocked_drain_pending` journal entries, and migration state
+  replay restores `DrainBlockedAt` from the journal so timeout windows
+  continue across runtime restart instead of resetting. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeDrainPendingBlockedAtReplaysFromJournal`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Implemented drain-timeout orchestration in
   `terminal_server/internal/appruntime/runtime.go` so
   incompatible `drain` migrations no longer abort immediately.

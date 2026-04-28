@@ -402,6 +402,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 			r.migrations[name] = state
 			appendMigrationJournalEntry(pkg, state, "retry_blocked_drain_pending", map[string]any{
 				"timeout_seconds": int(timeout.Seconds()),
+				"blocked_since":   state.DrainBlockedAt.Format(time.RFC3339Nano),
 			})
 			return statusFromState(pkg, state), ErrMigrationDrainPending
 		}
@@ -631,6 +632,11 @@ func replayMigrationStateFromJournal(pkg Package, state migrationState) migratio
 		} else if state.Verdict == "ok" || state.Verdict == "running" || state.Verdict == "idle" {
 			state.LastError = ""
 		}
+		if blockedSince, ok := migrationJournalTime(entry["blocked_since"]); ok {
+			state.DrainBlockedAt = blockedSince
+		} else if state.Verdict == "ok" || state.Verdict == "running" || state.Verdict == "idle" {
+			state.DrainBlockedAt = time.Time{}
+		}
 	}
 
 	if state.StepsCompleted < 0 {
@@ -670,6 +676,18 @@ func migrationJournalString(raw any) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
+}
+
+func migrationJournalTime(raw any) (time.Time, bool) {
+	value := migrationJournalString(raw)
+	if value == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed.UTC(), true
 }
 
 type runtimeMigrationManifest struct {

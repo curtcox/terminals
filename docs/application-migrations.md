@@ -36,7 +36,8 @@ migration control actions:
 	successful runs, and emits `step_started`/`step_committed` entries for each
 	migration step so operators can see step-by-step progression.
 - Blocked retries emit explicit events (`retry_blocked_reconcile_pending` and
-	`retry_blocked_drain_timeout`) with current verdict/step context.
+	`retry_blocked_drain_pending` / `retry_blocked_drain_timeout`) with current
+	verdict/step context and `blocked_since` timing metadata.
 - Retry reconciliation guard now treats `verdict = reconcile_pending` as
 	blocking even if pending-record details are temporarily unavailable, so
 	operators must reconcile before retry can proceed.
@@ -57,7 +58,9 @@ These entries are written to the status-provided `journal_path` consumed by
 On package load, runtime now replays existing migration journal entries for the
 current revision so `apps migrate status` resumes the last known
 `verdict`/`steps_completed`/`last_step`/`last_error` instead of resetting to an
-empty state after process restart.
+empty state after process restart. Drain-guard retries also replay
+`blocked_since` so timeout windows continue across restart instead of resetting
+to a fresh pending window.
 
 Invalid layouts are rejected as `ErrInvalidManifest`.
 
@@ -74,6 +77,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapAcceptsMigrateFixtureAtRecordLimit`
 - `TestRuntimeRetryMigrationRequiresDrainReadiness`
 - `TestRuntimeMigrationLifecycleWithSteps`
+- `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
 
 ## Not yet implemented

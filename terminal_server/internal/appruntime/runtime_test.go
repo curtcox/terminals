@@ -692,6 +692,68 @@ drain_policy = "drain"
 	}
 }
 
+func TestRuntimeDrainPendingBlockedAtReplaysFromJournal(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_drain_replay")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := `name = "migrate_drain_replay"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+drain_timeout_seconds = 60
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "incompatible"
+drain_policy = "drain"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	if _, err := runtime.RetryMigration("migrate_drain_replay"); !errors.Is(err, ErrMigrationDrainPending) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationDrainPending", err)
+	}
+
+	runtime.mu.RLock()
+	firstBlocked := runtime.migrations["migrate_drain_replay"].DrainBlockedAt
+	runtime.mu.RUnlock()
+	if firstBlocked.IsZero() {
+		t.Fatalf("initial drain blocked timestamp is zero")
+	}
+
+	restarted := NewRuntime()
+	if _, err := restarted.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() after restart error = %v", err)
+	}
+
+	restarted.mu.RLock()
+	replayedBlocked := restarted.migrations["migrate_drain_replay"].DrainBlockedAt
+	restarted.mu.RUnlock()
+	if replayedBlocked.IsZero() {
+		t.Fatalf("replayed drain blocked timestamp is zero")
+	}
+	if !replayedBlocked.Equal(firstBlocked) {
+		t.Fatalf("replayed drain blocked timestamp = %s, want %s", replayedBlocked.Format(time.RFC3339Nano), firstBlocked.Format(time.RFC3339Nano))
+	}
+}
+
 func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_reconcile")
