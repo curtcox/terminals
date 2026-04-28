@@ -67,6 +67,13 @@ of replaying the entire migration range on every retry.
 	`ErrMigrationStepUnavailable`, preserves completed checkpoint progress, marks
 	`verdict = step_failed`, and emits `step_failed_unavailable` journal metadata
 	for the failed step.
+- Retry now also validates pending migration script content at execution time:
+	every step script must include a `migrate()` entrypoint and may only
+	load migration-safe modules (`store`, `artifact.self`, `log`,
+	`migrate.env`). A script that fails these checks stops retry with
+	`ErrMigrationStepInvalid`, preserves checkpoint progress, marks
+	`verdict = step_failed`, and emits `step_failed_invalid_script` journal
+	metadata for the failed step.
 - Invalid runtime migration step plans (for example malformed script filenames,
 	numbering gaps, or manifest `[[migrate.step]]` / script-count mismatches) now
 	leave migration status with `executor_ready = false` and a specific
@@ -112,6 +119,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeReconcileMigrationPendingRecords`
 - `TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes`
 - `TestRuntimeMigrationJournalPathUsesAppID`
+- `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
 - `TestExecuteCommandAppsMigrateUsageIncludesLogs`

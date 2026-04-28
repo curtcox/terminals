@@ -21,6 +21,20 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added execution-time migration script integrity
+  enforcement in `terminal_server/internal/appruntime/runtime.go`.
+  `RetryMigration` now validates each pending step script contains a
+  `migrate()` entrypoint and only loads allowed migration modules
+  (`store`, `artifact.self`, `log`, `migrate.env`) before step
+  lifecycle progression. Invalid scripts now fail with
+  `ErrMigrationStepInvalid`, preserve completed checkpoint progress,
+  set `verdict = step_failed`, and append `step_failed_invalid_script`
+  entries with per-step metadata to the migration journal. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Added Gate 1 expected-fixture target schema validation
   in `terminal_server/internal/apppackage/tap.go`. When a migration
   fixture step's target version resolves to exactly one declared

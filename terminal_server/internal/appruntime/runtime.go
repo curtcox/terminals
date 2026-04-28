@@ -55,6 +55,8 @@ var (
 	ErrMigrationDrainPending = errors.New("migration drain is pending")
 	// ErrMigrationStepUnavailable indicates a migration step script could not be read at execution time.
 	ErrMigrationStepUnavailable = errors.New("migration step script unavailable")
+	// ErrMigrationStepInvalid indicates a migration step script is present but invalid for execution.
+	ErrMigrationStepInvalid = errors.New("migration step script invalid")
 	// ErrMigrationInterrupted indicates a migration run was interrupted before committing.
 	ErrMigrationInterrupted = errors.New("migration execution interrupted before commit")
 )
@@ -62,6 +64,17 @@ var (
 const defaultMigrationDrainTimeout = 90 * time.Second
 
 var migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
+
+var migrateLoadPattern = regexp.MustCompile(`(?m)load\(\s*["']([^"']+)["']`)
+
+var migrateEntryPointPattern = regexp.MustCompile(`(?m)^\s*def\s+migrate\s*\(`)
+
+var allowedMigrationModules = map[string]struct{}{
+	"store":         {},
+	"artifact.self": {},
+	"log":           {},
+	"migrate.env":   {},
+}
 
 const (
 	// MigrationAbortToCheckpoint aborts the current step and rewinds to the last checkpoint.
@@ -460,6 +473,35 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 			})
 			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepUnavailable, step.Number, step.ScriptName, statErr)
 		}
+		scriptSource, readErr := os.ReadFile(stepPath)
+		if readErr != nil {
+			state.Verdict = "step_failed"
+			state.LastStep = step.Number
+			state.LastError = fmt.Sprintf("step %d script unavailable: %s", step.Number, step.ScriptName)
+			r.migrations[name] = state
+			appendMigrationJournalEntry(pkg, state, "step_failed_unavailable", map[string]any{
+				"step_id":      step.Number,
+				"from_version": step.FromVersion,
+				"to_version":   step.ToVersion,
+				"script":       step.ScriptName,
+				"error":        readErr.Error(),
+			})
+			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepUnavailable, step.Number, step.ScriptName, readErr)
+		}
+		if scriptErr := validateRuntimeMigrationScript(scriptSource); scriptErr != nil {
+			state.Verdict = "step_failed"
+			state.LastStep = step.Number
+			state.LastError = fmt.Sprintf("step %d script invalid: %s", step.Number, step.ScriptName)
+			r.migrations[name] = state
+			appendMigrationJournalEntry(pkg, state, "step_failed_invalid_script", map[string]any{
+				"step_id":      step.Number,
+				"from_version": step.FromVersion,
+				"to_version":   step.ToVersion,
+				"script":       step.ScriptName,
+				"error":        scriptErr.Error(),
+			})
+			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepInvalid, step.Number, step.ScriptName, scriptErr)
+		}
 		state.LastStep = step.Number
 		appendMigrationJournalEntry(pkg, state, "step_started", map[string]any{
 			"step_id":      step.Number,
@@ -761,6 +803,26 @@ func migrationJournalTime(raw any) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return parsed.UTC(), true
+}
+
+func validateRuntimeMigrationScript(payload []byte) error {
+	trimmed := strings.TrimSpace(string(payload))
+	if trimmed == "" {
+		return errors.New("script is empty")
+	}
+	if !migrateEntryPointPattern.Match(payload) {
+		return errors.New("missing migrate() entrypoint")
+	}
+	for _, match := range migrateLoadPattern.FindAllSubmatch(payload, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		module := strings.TrimSpace(string(match[1]))
+		if _, ok := allowedMigrationModules[module]; !ok {
+			return fmt.Errorf("loads disallowed module %q", module)
+		}
+	}
+	return nil
 }
 
 type runtimeMigrationManifest struct {

@@ -644,6 +644,71 @@ func TestRuntimeRetryMigrationFailsWhenPendingScriptUnavailable(t *testing.T) {
 	}
 }
 
+func TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_invalid_step")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_invalid_step\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 2) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	if _, err := runtime.RetryMigration("migrate_invalid_step"); err != nil {
+		t.Fatalf("RetryMigration() initial run error = %v", err)
+	}
+	if _, err := runtime.AbortMigration("migrate_invalid_step", MigrationAbortToCheckpoint); err != nil {
+		t.Fatalf("AbortMigration() error = %v", err)
+	}
+
+	invalid := "load(\"bus\", emit = \"emit\")\n\ndef migrate():\n    pass\n"
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte(invalid), 0o644); err != nil {
+		t.Fatalf("WriteFile(invalid migrate 2) error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_invalid_step")
+	if !errors.Is(err, ErrMigrationStepInvalid) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationStepInvalid", err)
+	}
+	if status.Verdict != "step_failed" {
+		t.Fatalf("RetryMigration() verdict = %q, want step_failed", status.Verdict)
+	}
+	if status.StepsCompleted != 1 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 1", status.StepsCompleted)
+	}
+	if status.LastStep != 2 {
+		t.Fatalf("RetryMigration() last_step = %d, want 2", status.LastStep)
+	}
+	if !strings.Contains(status.LastError, "script invalid") {
+		t.Fatalf("RetryMigration() last_error = %q, want script invalid message", status.LastError)
+	}
+
+	journalPath := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+	journalBytes, readErr := os.ReadFile(journalPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(journal) error = %v", readErr)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationStepMetadata(entries, "step_failed_invalid_script", 2, "2", "3", "0002_2_to_3.tal") {
+		t.Fatalf("migration journal missing step_failed_invalid_script metadata for step 2: %+v", entries)
+	}
+}
+
 func TestRuntimeMigrationJournalPathUsesAppID(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_identity")
