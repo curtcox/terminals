@@ -21,6 +21,19 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Added a reusable migration crash-replay dry-run harness in
+  `terminal_server/internal/appruntime/runtime.go` via
+  `DryRunMigrationJournalReplay`.
+  The harness now runs boundary interruption checks across
+  `retry_started` plus each planned step's
+  `step_started`/`step_committed` events in isolated package copies,
+  then verifies replay normalization (`step_failed`) and resumed
+  completion (`ok`). Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeDryRunMigrationJournalReplayExercisesAllBoundaries` and
+  `TestRuntimeDryRunMigrationJournalReplayReturnsEmptyWhenNoSteps`) and
+  documented scope/limits in `docs/application-migrations.md`.
+
 - 2026-04-28: Hardened execution-time migration fixture root checks
   against symlink traversal in
   `terminal_server/internal/appruntime/runtime.go`.

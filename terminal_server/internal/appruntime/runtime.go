@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -198,6 +200,20 @@ type MigrationStatus struct {
 	ReconciliationPath string
 	ExecutorReady      bool
 	PendingRecords     []MigrationReconciliationRecord
+}
+
+// MigrationDryRunBoundary identifies one interruption point in migration replay validation.
+type MigrationDryRunBoundary struct {
+	Event string
+	Step  int
+}
+
+// MigrationDryRunResult captures replay and resumed status for one crash boundary.
+type MigrationDryRunResult struct {
+	Boundary    MigrationDryRunBoundary
+	Replay      MigrationStatus
+	Final       MigrationStatus
+	Interrupted MigrationStatus
 }
 
 // MigrationReconciliationRecord describes one unresolved migration reconciliation item.
@@ -617,6 +633,190 @@ func (r *Runtime) SetMigrationDrainReady(name string, ready bool) error {
 	}
 	r.migrations[name] = state
 	return nil
+}
+
+// DryRunMigrationJournalReplay runs crash-injection replay checks at each migration journal boundary.
+//
+// The harness executes each boundary in isolation by copying the package tree,
+// injecting one interruption (`retry_started`, `step_started`, `step_committed`),
+// reloading runtime state from journal, and asserting retry reaches `verdict = ok`.
+func (r *Runtime) DryRunMigrationJournalReplay(name string) ([]MigrationDryRunResult, error) {
+	r.mu.RLock()
+	pkg, ok := r.packages[name]
+	kernelAPIVersion := r.kernelAPIVersion
+	r.mu.RUnlock()
+	if !ok {
+		return nil, ErrPackageNotFound
+	}
+
+	_, plan, err := loadMigrationPlan(pkg.RootPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(plan) == 0 {
+		return []MigrationDryRunResult{}, nil
+	}
+
+	boundaries := migrationJournalDryRunBoundaries(plan)
+	results := make([]MigrationDryRunResult, 0, len(boundaries))
+	for _, boundary := range boundaries {
+		result, runErr := dryRunMigrationBoundary(pkg, kernelAPIVersion, name, boundary)
+		if runErr != nil {
+			return nil, runErr
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+func dryRunMigrationBoundary(pkg Package, kernelAPIVersion string, name string, boundary MigrationDryRunBoundary) (MigrationDryRunResult, error) {
+	workRoot, err := os.MkdirTemp("", "migration-dryrun-*")
+	if err != nil {
+		return MigrationDryRunResult{}, fmt.Errorf("create migration dry-run root: %w", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(workRoot)
+	}()
+
+	copyRoot := filepath.Join(workRoot, "pkg")
+	if err := copyDirTree(pkg.RootPath, copyRoot); err != nil {
+		return MigrationDryRunResult{}, fmt.Errorf("copy migration dry-run package: %w", err)
+	}
+
+	isolated := NewRuntimeWithKernelAPI(kernelAPIVersion)
+	loadedPkg, err := isolated.LoadPackage(context.Background(), copyRoot)
+	if err != nil {
+		return MigrationDryRunResult{}, fmt.Errorf("load dry-run package: %w", err)
+	}
+	resolvedName := loadedPkg.Manifest.Name
+	if strings.TrimSpace(name) != "" {
+		resolvedName = name
+	}
+	if err := isolated.SetMigrationDrainReady(resolvedName, true); err != nil {
+		return MigrationDryRunResult{}, fmt.Errorf("set dry-run drain readiness: %w", err)
+	}
+
+	crashInjected := false
+	isolated.migrationHook = func(event string, step int) error {
+		if crashInjected {
+			return nil
+		}
+		if event == boundary.Event && step == boundary.Step {
+			crashInjected = true
+			return errors.New("injected dry-run crash")
+		}
+		return nil
+	}
+
+	interrupted, err := isolated.RetryMigration(resolvedName)
+	if !errors.Is(err, ErrMigrationInterrupted) {
+		return MigrationDryRunResult{}, fmt.Errorf("dry-run boundary %s/%d did not interrupt: %w", boundary.Event, boundary.Step, err)
+	}
+
+	restarted := NewRuntimeWithKernelAPI(kernelAPIVersion)
+	if _, err := restarted.LoadPackage(context.Background(), copyRoot); err != nil {
+		return MigrationDryRunResult{}, fmt.Errorf("reload dry-run package: %w", err)
+	}
+	if err := restarted.SetMigrationDrainReady(resolvedName, true); err != nil {
+		return MigrationDryRunResult{}, fmt.Errorf("set replay drain readiness: %w", err)
+	}
+
+	replay, err := restarted.GetMigrationStatus(resolvedName)
+	if err != nil {
+		return MigrationDryRunResult{}, fmt.Errorf("read replay status: %w", err)
+	}
+	if replay.Verdict != "step_failed" {
+		return MigrationDryRunResult{}, fmt.Errorf("dry-run replay verdict = %q, want step_failed", replay.Verdict)
+	}
+
+	final, err := restarted.RetryMigration(resolvedName)
+	if err != nil {
+		return MigrationDryRunResult{}, fmt.Errorf("resume replayed migration: %w", err)
+	}
+	if final.Verdict != "ok" {
+		return MigrationDryRunResult{}, fmt.Errorf("dry-run final verdict = %q, want ok", final.Verdict)
+	}
+
+	return MigrationDryRunResult{
+		Boundary:    boundary,
+		Replay:      replay,
+		Final:       final,
+		Interrupted: interrupted,
+	}, nil
+}
+
+func migrationJournalDryRunBoundaries(plan []migrationPlanStep) []MigrationDryRunBoundary {
+	boundaries := make([]MigrationDryRunBoundary, 0, 1+(len(plan)*2))
+	boundaries = append(boundaries, MigrationDryRunBoundary{Event: "retry_started", Step: 0})
+	for _, step := range plan {
+		boundaries = append(boundaries,
+			MigrationDryRunBoundary{Event: "step_started", Step: step.Number},
+			MigrationDryRunBoundary{Event: "step_committed", Step: step.Number},
+		)
+	}
+	return boundaries
+}
+
+func copyDirTree(src, dst string) error {
+	cleanSrc := filepath.Clean(src)
+	cleanDst := filepath.Clean(dst)
+	return filepath.WalkDir(cleanSrc, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		rel, err := filepath.Rel(cleanSrc, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(cleanDst, rel)
+
+		if d.IsDir() {
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			return os.MkdirAll(target, info.Mode().Perm())
+		}
+
+		if d.Type()&fs.ModeSymlink != 0 {
+			linkTarget, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(linkTarget, target)
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+
+		in, err := os.Open(filepath.Clean(path))
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = in.Close()
+		}()
+
+		out, err := os.OpenFile(filepath.Clean(target), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode().Perm())
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = out.Close()
+		}()
+
+		if _, err := io.Copy(out, in); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // AbortMigration aborts an in-flight app migration run.

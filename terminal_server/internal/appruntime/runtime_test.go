@@ -1635,6 +1635,94 @@ func TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries(t *testin
 	}
 }
 
+func TestRuntimeDryRunMigrationJournalReplayExercisesAllBoundaries(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_dryrun_harness")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_dryrun_harness\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 2) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	results, err := runtime.DryRunMigrationJournalReplay("migrate_dryrun_harness")
+	if err != nil {
+		t.Fatalf("DryRunMigrationJournalReplay() error = %v", err)
+	}
+
+	wantBoundaries := []MigrationDryRunBoundary{
+		{Event: "retry_started", Step: 0},
+		{Event: "step_started", Step: 1},
+		{Event: "step_committed", Step: 1},
+		{Event: "step_started", Step: 2},
+		{Event: "step_committed", Step: 2},
+	}
+	if len(results) != len(wantBoundaries) {
+		t.Fatalf("DryRunMigrationJournalReplay() boundaries = %d, want %d", len(results), len(wantBoundaries))
+	}
+
+	for i, result := range results {
+		if result.Boundary != wantBoundaries[i] {
+			t.Fatalf("DryRunMigrationJournalReplay() boundary[%d] = %+v, want %+v", i, result.Boundary, wantBoundaries[i])
+		}
+		if result.Interrupted.Verdict != "running" {
+			t.Fatalf("DryRunMigrationJournalReplay() interrupted[%d] verdict = %q, want running", i, result.Interrupted.Verdict)
+		}
+		if result.Replay.Verdict != "step_failed" {
+			t.Fatalf("DryRunMigrationJournalReplay() replay[%d] verdict = %q, want step_failed", i, result.Replay.Verdict)
+		}
+		if result.Final.Verdict != "ok" {
+			t.Fatalf("DryRunMigrationJournalReplay() final[%d] verdict = %q, want ok", i, result.Final.Verdict)
+		}
+		if result.Final.StepsCompleted != 2 {
+			t.Fatalf("DryRunMigrationJournalReplay() final[%d] steps_completed = %d, want 2", i, result.Final.StepsCompleted)
+		}
+	}
+}
+
+func TestRuntimeDryRunMigrationJournalReplayReturnsEmptyWhenNoSteps(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_dryrun_empty")
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_dryrun_empty\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	results, err := runtime.DryRunMigrationJournalReplay("migrate_dryrun_empty")
+	if err != nil {
+		t.Fatalf("DryRunMigrationJournalReplay() error = %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("DryRunMigrationJournalReplay() result count = %d, want 0", len(results))
+	}
+}
+
 func TestRuntimeRetryMigrationRequiresDrainReadiness(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_drain_guard")
