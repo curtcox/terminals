@@ -420,8 +420,8 @@ func TestRuntimeMigrationStatusAndActions(t *testing.T) {
 		t.Fatalf("AbortMigration() verdict = %q, want idle", status.Verdict)
 	}
 
-	if _, err := runtime.ReconcileMigration("migrate_stub", "rec-1", "accept_current"); !errors.Is(err, ErrMigrationExecutorUnavailable) {
-		t.Fatalf("ReconcileMigration() error = %v, want ErrMigrationExecutorUnavailable", err)
+	if _, err := runtime.ReconcileMigration("migrate_stub", "rec-1", "accept_current"); !errors.Is(err, ErrMigrationReconcilePending) {
+		t.Fatalf("ReconcileMigration() error = %v, want ErrMigrationReconcilePending", err)
 	}
 }
 

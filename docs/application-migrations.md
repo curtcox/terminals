@@ -45,6 +45,9 @@ migration control actions:
 	(`checkpoint` or `baseline`).
 - `ReconcileMigration` writes `reconcile_record` entries with `record_id` and
 	selected `resolution`.
+- Reconcile operations now report `ErrMigrationReconcilePending` when no
+	pending records exist, including apps with no runnable migration steps,
+	so operators see one consistent "nothing to reconcile yet" response.
 - Checkpoint abort now leaves migration state at `verdict = "step_failed"`
 	with `last_step` pinned to the failed step and checkpoint progress preserved
 	for `apps migrate retry`; baseline abort remains `verdict = "aborted"`.

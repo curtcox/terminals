@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Normalized migration reconcile semantics for apps
+  without runnable migration steps. `ReconcileMigration` in
+  `terminal_server/internal/appruntime/runtime.go` now returns
+  `ErrMigrationReconcilePending` ("nothing to reconcile") instead
+  of the stale `ErrMigrationExecutorUnavailable` sentinel. Removed
+  the corresponding unsupported-action branch in
+  `terminal_server/internal/admin/server.go`, and updated runtime
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationStatusAndActions`).
+
 - 2026-04-27: Persisted drain-guard blocked timing across process
   restart in `terminal_server/internal/appruntime/runtime.go`.
   `RetryMigration` now records `blocked_since` on

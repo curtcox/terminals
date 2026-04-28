@@ -36,8 +36,6 @@ var (
 	ErrPackageNotFound = errors.New("app package not found")
 	// ErrNoPriorVersion indicates rollback was requested but no prior version exists.
 	ErrNoPriorVersion = errors.New("no prior app package version")
-	// ErrMigrationExecutorUnavailable indicates migration actions are not wired yet.
-	ErrMigrationExecutorUnavailable = errors.New("migration executor unavailable")
 	// ErrMigrationReconcilePending indicates migration records must be reconciled first.
 	ErrMigrationReconcilePending = errors.New("migration reconciliation is pending")
 	// ErrMigrationRecordNotFound indicates a reconciliation record ID is unknown.
@@ -530,9 +528,6 @@ func (r *Runtime) ReconcileMigration(name, recordID, resolution string) (Migrati
 	pkg, state, err := r.requireMigrationStateLocked(name)
 	if err != nil {
 		return MigrationStatus{}, err
-	}
-	if !state.ExecutorReady {
-		return statusFromState(pkg, state), ErrMigrationExecutorUnavailable
 	}
 	if !isAllowedMigrationResolution(resolution) {
 		return statusFromState(pkg, state), fmt.Errorf("%w: %s", ErrMigrationResolutionInvalid, resolution)

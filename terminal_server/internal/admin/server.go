@@ -2724,16 +2724,6 @@ func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Requ
 		return
 	}
 	if err != nil {
-		if errors.Is(err, appruntime.ErrMigrationExecutorUnavailable) {
-			h.writeJSON(w, http.StatusConflict, map[string]any{
-				"status":    "unsupported",
-				"action":    action,
-				"app":       name,
-				"error":     err.Error(),
-				"migration": mapMigrationStatus(status),
-			})
-			return
-		}
 		h.writeMigrationError(w, err)
 		return
 	}
