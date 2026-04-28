@@ -92,11 +92,19 @@ var migrateRecordDeletePattern = regexp.MustCompile(`^\s*del\s+record\["([^"]+)"
 
 var migrateRecordValuePattern = regexp.MustCompile(`^record\["([^"]+)"\]$`)
 
+var migrateRecordGetValuePattern = regexp.MustCompile(`^record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)$`)
+
 var migrateRecordLowerPattern = regexp.MustCompile(`^lower\(\s*record\["([^"]+)"\]\s*\)$`)
+
+var migrateRecordLowerGetPattern = regexp.MustCompile(`^lower\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)$`)
 
 var migrateRecordTrimPattern = regexp.MustCompile(`^trim\(\s*record\["([^"]+)"\]\s*\)$`)
 
+var migrateRecordTrimGetPattern = regexp.MustCompile(`^trim\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)$`)
+
 var migrateRecordLowerTrimPattern = regexp.MustCompile(`^lower\(\s*trim\(\s*record\["([^"]+)"\]\s*\)\s*\)$`)
+
+var migrateRecordLowerTrimGetPattern = regexp.MustCompile(`^lower\(\s*trim\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)\s*\)$`)
 
 var migrateAbortPattern = regexp.MustCompile(`^abort\(\s*("(?:\\.|[^"\\])*")\s*\)$`)
 
@@ -1440,6 +1448,8 @@ func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSourc
 type runtimeMigrationFixtureTransform struct {
 	Destination string
 	Source      string
+	Default     any
+	HasDefault  bool
 	Operation   string
 	Value       any
 	Reason      string
@@ -1473,21 +1483,21 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 		for _, transform := range transforms {
 			switch transform.Operation {
 			case "copy":
-				record[transform.Destination] = record[transform.Source]
+				record[transform.Destination] = runtimeMigrationFixtureValue(record, transform)
 			case "lower":
-				value, ok := record[transform.Source].(string)
+				value, ok := runtimeMigrationFixtureStringValue(record, transform)
 				if !ok {
 					return nil, 0, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
 				}
 				record[transform.Destination] = strings.ToLower(value)
 			case "trim":
-				value, ok := record[transform.Source].(string)
+				value, ok := runtimeMigrationFixtureStringValue(record, transform)
 				if !ok {
 					return nil, 0, fmt.Errorf("record key %q field %q is not a string for trim()", key, transform.Source)
 				}
 				record[transform.Destination] = strings.TrimSpace(value)
 			case "lower_trim":
-				value, ok := record[transform.Source].(string)
+				value, ok := runtimeMigrationFixtureStringValue(record, transform)
 				if !ok {
 					return nil, 0, fmt.Errorf("record key %q field %q is not a string for lower(trim())", key, transform.Source)
 				}
@@ -1509,6 +1519,20 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 		out[key] = string(canonical)
 	}
 	return out, len(seedRecords), nil
+}
+
+func runtimeMigrationFixtureValue(record map[string]any, transform runtimeMigrationFixtureTransform) any {
+	value, ok := record[transform.Source]
+	if !ok && transform.HasDefault {
+		return transform.Default
+	}
+	return value
+}
+
+func runtimeMigrationFixtureStringValue(record map[string]any, transform runtimeMigrationFixtureTransform) (string, bool) {
+	value := runtimeMigrationFixtureValue(record, transform)
+	text, ok := value.(string)
+	return text, ok
 }
 
 func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigrationFixtureTransform, error) {
@@ -1558,11 +1582,37 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 
 func parseRuntimeMigrationFixtureAssignment(destination string, expression string) (runtimeMigrationFixtureTransform, error) {
 	expression = strings.TrimSpace(expression)
+	if match := migrateRecordLowerTrimGetPattern.FindStringSubmatch(expression); match != nil {
+		defaultValue, err := decodeMigrationDefaultLiteral(match[2])
+		if err != nil {
+			return runtimeMigrationFixtureTransform{}, err
+		}
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Default:     defaultValue,
+			HasDefault:  true,
+			Operation:   "lower_trim",
+		}, nil
+	}
 	if match := migrateRecordLowerTrimPattern.FindStringSubmatch(expression); match != nil {
 		return runtimeMigrationFixtureTransform{
 			Destination: destination,
 			Source:      match[1],
 			Operation:   "lower_trim",
+		}, nil
+	}
+	if match := migrateRecordLowerGetPattern.FindStringSubmatch(expression); match != nil {
+		defaultValue, err := decodeMigrationDefaultLiteral(match[2])
+		if err != nil {
+			return runtimeMigrationFixtureTransform{}, err
+		}
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Default:     defaultValue,
+			HasDefault:  true,
+			Operation:   "lower",
 		}, nil
 	}
 	if match := migrateRecordLowerPattern.FindStringSubmatch(expression); match != nil {
@@ -1572,11 +1622,37 @@ func parseRuntimeMigrationFixtureAssignment(destination string, expression strin
 			Operation:   "lower",
 		}, nil
 	}
+	if match := migrateRecordTrimGetPattern.FindStringSubmatch(expression); match != nil {
+		defaultValue, err := decodeMigrationDefaultLiteral(match[2])
+		if err != nil {
+			return runtimeMigrationFixtureTransform{}, err
+		}
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Default:     defaultValue,
+			HasDefault:  true,
+			Operation:   "trim",
+		}, nil
+	}
 	if match := migrateRecordTrimPattern.FindStringSubmatch(expression); match != nil {
 		return runtimeMigrationFixtureTransform{
 			Destination: destination,
 			Source:      match[1],
 			Operation:   "trim",
+		}, nil
+	}
+	if match := migrateRecordGetValuePattern.FindStringSubmatch(expression); match != nil {
+		defaultValue, err := decodeMigrationDefaultLiteral(match[2])
+		if err != nil {
+			return runtimeMigrationFixtureTransform{}, err
+		}
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Default:     defaultValue,
+			HasDefault:  true,
+			Operation:   "copy",
 		}, nil
 	}
 	if match := migrateRecordValuePattern.FindStringSubmatch(expression); match != nil {
@@ -1596,6 +1672,14 @@ func parseRuntimeMigrationFixtureAssignment(destination string, expression strin
 		Operation:   "literal",
 		Value:       value,
 	}, nil
+}
+
+func decodeMigrationDefaultLiteral(raw string) (any, error) {
+	value := decodeTALStringLiteral(raw)
+	if value == "" && strings.TrimSpace(raw) != `""` && strings.TrimSpace(raw) != "''" {
+		return nil, fmt.Errorf("invalid record.get default literal %q", raw)
+	}
+	return value, nil
 }
 
 func stripTALLineComment(line string) string {

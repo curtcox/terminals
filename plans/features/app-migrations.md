@@ -21,6 +21,19 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Expanded the runtime fixture-backed deterministic
+  migration subset in `terminal_server/internal/appruntime/runtime.go`
+  to support `record.get("field", "default")` defaults in direct
+  assignment, `trim(...)`, `lower(...)`, and
+  `lower(trim(...))` fixture transforms. This lets Gate 4 fixture
+  replay cover idempotent/default-read normalization patterns from
+  the worked example without broadening the runtime into a general
+  TAL interpreter. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesRecordGetFixtureTransforms`) and
+  documented the expanded subset in
+  `docs/application-migrations.md`.
+
 - 2026-04-28: Aligned runtime migration timeout enforcement with
   the plan's per-step budget semantics in
   `terminal_server/internal/appruntime/runtime.go`.
