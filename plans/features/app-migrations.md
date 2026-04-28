@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added operator-surface drain-readiness controls
+  across admin API and REPL. `terminal_server/internal/admin/server.go`
+  now serves `/admin/api/apps/migrate/drain-ready` and wires
+  `action=drain-ready` to runtime `SetMigrationDrainReady` with
+  refreshed status payloads. `terminal_server/internal/repl/repl.go`
+  now includes `apps migrate drain-ready <app> <true|false>` in
+  command metadata, usage, and execution flow. Added regression
+  coverage in `terminal_server/internal/admin/server_test.go`
+  and `terminal_server/internal/repl/repl_test.go`, and documented
+  the command in `docs/repl/commands/app.md` and
+  `docs/application-migrations.md`.
+
 - 2026-04-27: Keyed runtime migration journals by lineage identity
   when available. `terminal_server/internal/appruntime/runtime.go`
   now parses optional `app_id` from `manifest.toml`, validates

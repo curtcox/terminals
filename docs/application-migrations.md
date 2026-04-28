@@ -24,7 +24,7 @@ The runtime migration control path in [terminal_server/internal/appruntime/runti
 - If any `[[migrate.step]]` declares `compatibility = "incompatible"` and `drain_policy = "drain"`, `RetryMigration` refuses to run until drain readiness is explicitly marked.
 - Blocked retries first return `ErrMigrationDrainPending` and set `verdict = "drain_pending"` while drain is still within its timeout window.
 - Drain timeout uses `[migrate].drain_timeout_seconds` (default 90s). Once that window elapses, `RetryMigration` returns `ErrMigrationDrainTimeout`, marks `verdict = "aborted"`, and preserves the current checkpoint (no step advancement while drain is unsafe).
-- Operators/orchestrators can mark readiness through `SetMigrationDrainReady`, after which retry proceeds normally.
+- Operators/orchestrators can mark readiness through runtime (`SetMigrationDrainReady`), admin API (`/admin/api/apps/migrate/drain-ready`), or REPL (`apps migrate drain-ready <app> <true|false>`), after which retry proceeds normally.
 
 ## Implemented migration runtime journaling
 

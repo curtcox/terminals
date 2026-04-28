@@ -226,6 +226,7 @@ func NewHandler(
 	mux.HandleFunc("/admin/api/apps/migrate/logs", h.handleAppMigrationLogs)
 	mux.HandleFunc("/admin/api/apps/migrate/retry", h.handleAppMigrationRetry)
 	mux.HandleFunc("/admin/api/apps/migrate/abort", h.handleAppMigrationAbort)
+	mux.HandleFunc("/admin/api/apps/migrate/drain-ready", h.handleAppMigrationDrainReady)
 	mux.HandleFunc("/admin/api/apps/migrate/reconcile", h.handleAppMigrationReconcile)
 	mux.HandleFunc("/admin/api/trust/keys", h.handleTrustKeys)
 	mux.HandleFunc("/admin/api/trust/keys/confirm", h.handleTrustKeyConfirm)
@@ -2674,6 +2675,10 @@ func (h *Handler) handleAppMigrationAbort(w http.ResponseWriter, req *http.Reque
 	h.handleAppMigrationAction(w, req, "abort")
 }
 
+func (h *Handler) handleAppMigrationDrainReady(w http.ResponseWriter, req *http.Request) {
+	h.handleAppMigrationAction(w, req, "drain-ready")
+}
+
 func (h *Handler) handleAppMigrationReconcile(w http.ResponseWriter, req *http.Request) {
 	h.handleAppMigrationAction(w, req, "reconcile")
 }
@@ -2704,6 +2709,7 @@ func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Requ
 		status appruntime.MigrationStatus
 		err    error
 		target string
+		ready  bool
 	)
 	switch action {
 	case "retry":
@@ -2711,6 +2717,21 @@ func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Requ
 	case "abort":
 		target = strings.TrimSpace(req.FormValue("to"))
 		status, err = h.appRuntime.AbortMigration(name, target)
+	case "drain-ready":
+		readyRaw := strings.TrimSpace(req.FormValue("ready"))
+		if readyRaw == "" {
+			h.writeJSONError(w, http.StatusBadRequest, "ready is required")
+			return
+		}
+		ready, err = strconv.ParseBool(readyRaw)
+		if err != nil {
+			h.writeJSONError(w, http.StatusBadRequest, "ready must be true or false")
+			return
+		}
+		err = h.appRuntime.SetMigrationDrainReady(name, ready)
+		if err == nil {
+			status, err = h.appRuntime.GetMigrationStatus(name)
+		}
 	case "reconcile":
 		recordID := strings.TrimSpace(req.FormValue("record_id"))
 		resolution := strings.TrimSpace(req.FormValue("resolution"))
@@ -2739,6 +2760,9 @@ func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Requ
 			target = appruntime.MigrationAbortToCheckpoint
 		}
 		response["to"] = target
+	}
+	if action == "drain-ready" {
+		response["ready"] = ready
 	}
 	h.writeJSON(w, http.StatusOK, response)
 }

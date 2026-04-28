@@ -113,6 +113,13 @@ func TestCommandSpecsExposeOperationalAndDiscouragedFlags(t *testing.T) {
 	if appsMigrateAbort.Classification != CommandClassificationCriticalMutating {
 		t.Fatalf("apps migrate abort classification = %q, want %q", appsMigrateAbort.Classification, CommandClassificationCriticalMutating)
 	}
+	appsMigrateDrainReady, ok := DescribeCommand("apps migrate drain-ready")
+	if !ok {
+		t.Fatalf("DescribeCommand(apps migrate drain-ready) not found")
+	}
+	if appsMigrateDrainReady.Classification != CommandClassificationCriticalMutating {
+		t.Fatalf("apps migrate drain-ready classification = %q, want %q", appsMigrateDrainReady.Classification, CommandClassificationCriticalMutating)
+	}
 }
 
 func TestExecuteCommandDocsMarkdownMode(t *testing.T) {
@@ -380,6 +387,39 @@ func TestAppsMigrateAbortUsesAdminAPIToTarget(t *testing.T) {
 	}
 }
 
+func TestAppsMigrateDrainReadyUsesAdminAPI(t *testing.T) {
+	var capturedReady string
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.Method == http.MethodPost && req.URL.Path == "/admin/api/apps/migrate/drain-ready":
+			if err := req.ParseForm(); err != nil {
+				t.Fatalf("ParseForm() error = %v", err)
+			}
+			capturedReady = req.Form.Get("ready")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok","action":"drain-ready","app":"sound_watch","ready":true,"migration":{"app":"sound_watch","verdict":"idle"}}`))
+		default:
+			http.NotFound(w, req)
+		}
+	}))
+	defer admin.Close()
+
+	in := strings.NewReader("apps migrate drain-ready sound_watch true\nexit\n")
+	var out bytes.Buffer
+
+	err := Run(context.Background(), in, &out, Options{Prompt: "repl>", AdminBaseURL: admin.URL})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if capturedReady != "true" {
+		t.Fatalf("apps migrate drain-ready ready = %q, want true", capturedReady)
+	}
+	text := out.String()
+	if !strings.Contains(text, "OK  app=sound_watch action=drain-ready ready=true status=ok") {
+		t.Fatalf("missing apps migrate drain-ready output: %q", text)
+	}
+}
+
 func TestAppsMigrateReconcileUsesAdminAPI(t *testing.T) {
 	var (
 		capturedRecordID   string
@@ -425,8 +465,8 @@ func TestExecuteCommandAppsMigrateUsageIncludesLogs(t *testing.T) {
 	if err == nil {
 		t.Fatalf("ExecuteCommand(apps migrate) error = nil, want usage error")
 	}
-	if !strings.Contains(err.Error(), "usage: apps migrate <status|logs|retry|abort|reconcile>") {
-		t.Fatalf("ExecuteCommand(apps migrate) error = %q, want usage including logs", err.Error())
+	if !strings.Contains(err.Error(), "usage: apps migrate <status|logs|retry|abort|drain-ready|reconcile>") {
+		t.Fatalf("ExecuteCommand(apps migrate) error = %q, want usage including drain-ready", err.Error())
 	}
 }
 

@@ -508,6 +508,27 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 		t.Fatalf("migrate retry last_error = %v, want empty", retryMigration["last_error"])
 	}
 
+	drainReadyReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/migrate/drain-ready", strings.NewReader(url.Values{"app": {"sound_watch"}, "ready": {"true"}}.Encode()))
+	drainReadyReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	drainReadyW := httptest.NewRecorder()
+	h.ServeHTTP(drainReadyW, drainReadyReq)
+	if drainReadyW.Code != http.StatusOK {
+		t.Fatalf("migrate drain-ready code = %d, want 200 body=%s", drainReadyW.Code, drainReadyW.Body.String())
+	}
+	var drainReadyBody map[string]any
+	if err := json.Unmarshal(drainReadyW.Body.Bytes(), &drainReadyBody); err != nil {
+		t.Fatalf("decode migrate drain-ready: %v", err)
+	}
+	if drainReadyBody["status"] != "ok" {
+		t.Fatalf("migrate drain-ready status = %v, want ok", drainReadyBody["status"])
+	}
+	if fmt.Sprint(drainReadyBody["action"]) != "drain-ready" {
+		t.Fatalf("migrate drain-ready action = %v, want drain-ready", drainReadyBody["action"])
+	}
+	if fmt.Sprint(drainReadyBody["ready"]) != "true" {
+		t.Fatalf("migrate drain-ready ready = %v, want true", drainReadyBody["ready"])
+	}
+
 	abortReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/migrate/abort", strings.NewReader(url.Values{"app": {"sound_watch"}, "to": {"baseline"}}.Encode()))
 	abortReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	abortW := httptest.NewRecorder()

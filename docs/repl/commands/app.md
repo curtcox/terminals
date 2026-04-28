@@ -8,6 +8,7 @@
 - `apps migrate logs <app> [--step <n>] [--json]`
 - `apps migrate retry <app> [--json]`
 - `apps migrate abort <app> [--to <checkpoint|baseline>] [--json]`
+- `apps migrate drain-ready <app> <true|false> [--json]`
 - `apps migrate reconcile <app> <record-id> <resolution> [--json]`
 
 `apps migrate status` reports the migration verdict, step progress, `last_step`,
@@ -21,3 +22,6 @@ and verdict context.
 
 `app rollback` defaults to `--archive-data`. `--keep-data` is refused when the
 rollback span has no `migrate/downgrade/*.tal` reverse steps.
+
+`apps migrate drain-ready` marks drain prerequisites as satisfied (or not)
+before running `apps migrate retry` for incompatible drain-policy migrations.

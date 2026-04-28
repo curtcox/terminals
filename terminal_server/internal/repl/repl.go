@@ -167,6 +167,7 @@ func replCommandSpecs() []commandSpec {
 		{Name: "apps migrate logs", Usage: "apps migrate logs <app> [--step <n>] [--json]", Summary: "Tail structured migration logs for one app", Classification: commandOperational, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate retry", Usage: "apps migrate retry <app> [--json]", Summary: "Retry app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate abort", Usage: "apps migrate abort <app> [--to <checkpoint|baseline>] [--json]", Summary: "Abort in-flight app migration execution", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
+		{Name: "apps migrate drain-ready", Usage: "apps migrate drain-ready <app> <true|false> [--json]", Summary: "Mark whether drain prerequisites are satisfied", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps migrate reconcile", Usage: "apps migrate reconcile <app> <record-id> <resolution> [--json]", Summary: "Resolve one migration reconciliation record", Classification: commandCriticalMutating, RelatedDocs: []string{"repl/commands/app"}},
 		{Name: "apps keys ls", Usage: "apps keys ls [--json]", Summary: "List trust-store keys", Classification: commandReadOnly},
 		{Name: "apps keys show", Usage: "apps keys show <key-id> [--json]", Summary: "Show one trust key", Classification: commandReadOnly},
@@ -2419,7 +2420,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 		switch sub {
 		case "migrate":
 			if len(args) < 2 {
-				return errors.New("usage: apps migrate <status|logs|retry|abort|reconcile>")
+				return errors.New("usage: apps migrate <status|logs|retry|abort|drain-ready|reconcile>")
 			}
 			migrateSub := strings.TrimSpace(args[1])
 			switch migrateSub {
@@ -2536,6 +2537,31 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 					return err
 				}
 				_, err = fmt.Fprintf(s.out, "OK  app=%s action=%s status=%s\n", appName, migrateSub, toString(body["status"]))
+				return err
+			case "drain-ready":
+				plain := nonFlagArgs(args[2:])
+				if len(plain) < 2 {
+					return errors.New("usage: apps migrate drain-ready <app> <true|false>")
+				}
+				appName := strings.TrimSpace(plain[0])
+				if appName == "" {
+					return errors.New("usage: apps migrate drain-ready <app> <true|false>")
+				}
+				ready, err := strconv.ParseBool(strings.TrimSpace(plain[1]))
+				if err != nil {
+					return errors.New("usage: apps migrate drain-ready <app> <true|false>")
+				}
+				body, err := s.postFormJSON(ctx, "/admin/api/apps/migrate/drain-ready", url.Values{
+					"app":   {appName},
+					"ready": {strconv.FormatBool(ready)},
+				})
+				if err != nil {
+					return err
+				}
+				if jsonOut {
+					return writeJSON(s.out, body)
+				}
+				_, err = fmt.Fprintf(s.out, "OK  app=%s action=drain-ready ready=%t status=%s\n", appName, ready, toString(body["status"]))
 				return err
 			case "reconcile":
 				plain := nonFlagArgs(args[2:])
