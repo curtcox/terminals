@@ -1822,6 +1822,49 @@ func TestRuntimeLoadPackageRejectsMigrationWhenDryRunGateFails(t *testing.T) {
 	}
 }
 
+func TestRuntimeLoadPackageRejectsDrainPolicyWithoutIncompatibleDuringDryRunGate(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_dryrun_drain_policy")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := `name = "migrate_dryrun_drain_policy"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "drain"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	runtime.SetMigrationDryRunGateEnabled(true)
+	_, err := runtime.LoadPackage(context.Background(), appDir)
+	if !errors.Is(err, ErrMigrationDryRunFailed) {
+		t.Fatalf("LoadPackage() error = %v, want ErrMigrationDryRunFailed", err)
+	}
+	if !strings.Contains(err.Error(), "drain_policy=drain without compatibility=incompatible") {
+		t.Fatalf("LoadPackage() error = %q, want drain compatibility detail", err.Error())
+	}
+	if _, ok := runtime.GetPackage("migrate_dryrun_drain_policy"); ok {
+		t.Fatalf("GetPackage() ok = true, want false")
+	}
+}
+
 func TestRuntimeRetryMigrationRequiresDrainReadiness(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_drain_guard")

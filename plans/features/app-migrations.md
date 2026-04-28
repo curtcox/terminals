@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Added Gate 4 dry-run plan validation for drain
+  declarations in `terminal_server/internal/appruntime/runtime.go`.
+  Load-time dry-run enforcement now rejects migration steps that
+  declare `drain_policy = "drain"` without
+  `compatibility = "incompatible"`, returning
+  `ErrMigrationDryRunFailed` before registration. Added regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeLoadPackageRejectsDrainPolicyWithoutIncompatibleDuringDryRunGate`)
+  and documented the Gate 4 block in `docs/application-migrations.md`.
+
 - 2026-04-28: Tightened runtime Gate 4 fixture mismatch evidence in
   `terminal_server/internal/appruntime/runtime.go`. Fixture value
   mismatches now report the first divergent key with canonical

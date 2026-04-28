@@ -282,6 +282,8 @@ type migrationPlanStep struct {
 	FromVersion   string
 	ToVersion     string
 	ScriptName    string
+	Compatibility string
+	DrainPolicy   string
 	RequiresDrain bool
 }
 
@@ -692,6 +694,9 @@ func (r *Runtime) dryRunMigrationJournalReplayForPackage(pkg Package, name strin
 	if len(plan) == 0 {
 		return []MigrationDryRunResult{}, nil
 	}
+	if err := validateMigrationDryRunPlan(plan); err != nil {
+		return nil, err
+	}
 
 	boundaries := migrationJournalDryRunBoundaries(plan)
 	results := make([]MigrationDryRunResult, 0, len(boundaries))
@@ -704,6 +709,16 @@ func (r *Runtime) dryRunMigrationJournalReplayForPackage(pkg Package, name strin
 	}
 
 	return results, nil
+}
+
+func validateMigrationDryRunPlan(plan []migrationPlanStep) error {
+	for _, step := range plan {
+		if strings.EqualFold(strings.TrimSpace(step.DrainPolicy), "drain") &&
+			!strings.EqualFold(strings.TrimSpace(step.Compatibility), "incompatible") {
+			return fmt.Errorf("%w: migrate.step %04d declares drain_policy=drain without compatibility=incompatible", ErrInvalidManifest, step.Number)
+		}
+	}
+	return nil
 }
 
 func dryRunMigrationBoundary(pkg Package, kernelAPIVersion string, name string, boundary MigrationDryRunBoundary) (MigrationDryRunResult, error) {
@@ -1470,7 +1485,9 @@ func loadMigrationPlan(root string) (int, []migrationPlanStep, error) {
 			}
 			for i := range steps {
 				manifestStep := manifest.Migrate.Step[i]
-				steps[i].RequiresDrain = strings.EqualFold(strings.TrimSpace(manifestStep.Compatibility), "incompatible") && strings.EqualFold(strings.TrimSpace(manifestStep.DrainPolicy), "drain")
+				steps[i].Compatibility = strings.TrimSpace(manifestStep.Compatibility)
+				steps[i].DrainPolicy = strings.TrimSpace(manifestStep.DrainPolicy)
+				steps[i].RequiresDrain = strings.EqualFold(steps[i].Compatibility, "incompatible") && strings.EqualFold(steps[i].DrainPolicy, "drain")
 				if strings.TrimSpace(manifestStep.From) != "" && strings.TrimSpace(manifestStep.To) != "" {
 					if strings.TrimSpace(manifestStep.From) != steps[i].FromVersion || strings.TrimSpace(manifestStep.To) != steps[i].ToVersion {
 						return len(matches), nil, fmt.Errorf("%w: migrate.step %04d from/to does not match script %s", ErrInvalidManifest, i+1, steps[i].ScriptName)
