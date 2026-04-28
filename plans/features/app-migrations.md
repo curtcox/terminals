@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Added a deterministic execution subset for runtime
+  migration fixture dry-runs in
+  `terminal_server/internal/appruntime/runtime.go`. Fixture-backed
+  `migrate(record)` scripts can now prove real seeded-record
+  transformations before step commit, covering field copy,
+  `lower(record["field"])`, JSON literal assignment, and field
+  deletion while leaving unsupported statements as explicit
+  `ErrMigrationFixtureMismatch` failures. Added regression coverage
+  in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesFixtureTransforms`) and
+  documented the shipped subset in `docs/application-migrations.md`.
+
 - 2026-04-28: Enforced `[migrate].max_runtime_seconds` during
   runtime migration retry in
   `terminal_server/internal/appruntime/runtime.go`. Retry now tracks

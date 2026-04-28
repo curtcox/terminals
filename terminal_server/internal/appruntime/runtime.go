@@ -82,6 +82,14 @@ var migrateLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']([^"']+)["']`)
 
 var migrateEntryPointPattern = regexp.MustCompile(`(?m)^\s*def\s+migrate\s*\(`)
 
+var migrateRecordAssignmentPattern = regexp.MustCompile(`^\s*record\["([^"]+)"\]\s*=\s*(.+?)\s*$`)
+
+var migrateRecordDeletePattern = regexp.MustCompile(`^\s*del\s+record\["([^"]+)"\]\s*$`)
+
+var migrateRecordValuePattern = regexp.MustCompile(`^record\["([^"]+)"\]$`)
+
+var migrateRecordLowerPattern = regexp.MustCompile(`^lower\(\s*record\["([^"]+)"\]\s*\)$`)
+
 var allowedMigrationModules = map[string]struct{}{
 	"store":         {},
 	"artifact.self": {},
@@ -582,7 +590,7 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, startedAt); timedOut {
 			return timeoutStatus, ErrMigrationRuntimeTimeout
 		}
-		if fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step); fixtureErr != nil {
+		if fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step, scriptSource); fixtureErr != nil {
 			state.Verdict = "step_failed"
 			state.LastStep = step.Number
 			switch {
@@ -1216,7 +1224,7 @@ type runtimeMigrationFixture struct {
 	ExpectedPath string
 }
 
-func verifyMigrationFixtureStep(root string, step migrationPlanStep) error {
+func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSource []byte) error {
 	fixture, err := findRuntimeMigrationFixture(root, step)
 	if err != nil {
 		return err
@@ -1233,26 +1241,162 @@ func verifyMigrationFixtureStep(root string, step migrationPlanStep) error {
 	if err != nil {
 		return err
 	}
-
-	if len(seedRecords) != len(expectedRecords) {
-		return fmt.Errorf("%w: step %04d key count mismatch (seed=%d expected=%d)", ErrMigrationFixtureMismatch, step.Number, len(seedRecords), len(expectedRecords))
+	actualRecords, err := executeRuntimeMigrationFixture(scriptSource, seedRecords)
+	if err != nil {
+		return fmt.Errorf("%w: step %04d fixture execution failed: %v", ErrMigrationFixtureMismatch, step.Number, err)
 	}
-	for key, seedValue := range seedRecords {
+
+	if len(actualRecords) != len(expectedRecords) {
+		return fmt.Errorf("%w: step %04d key count mismatch (actual=%d expected=%d)", ErrMigrationFixtureMismatch, step.Number, len(actualRecords), len(expectedRecords))
+	}
+	for key, actualValue := range actualRecords {
 		expectedValue, ok := expectedRecords[key]
 		if !ok {
 			return fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
-		if expectedValue != seedValue {
-			return fmt.Errorf("%w: step %04d value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step.Number, key, expectedValue, seedValue)
+		if expectedValue != actualValue {
+			return fmt.Errorf("%w: step %04d value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step.Number, key, expectedValue, actualValue)
 		}
 	}
 	for key := range expectedRecords {
-		if _, ok := seedRecords[key]; !ok {
+		if _, ok := actualRecords[key]; !ok {
 			return fmt.Errorf("%w: step %04d expected contains extra key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
 	}
 
 	return nil
+}
+
+type runtimeMigrationFixtureTransform struct {
+	Destination string
+	Source      string
+	Operation   string
+	Value       any
+}
+
+func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]string) (map[string]string, error) {
+	transforms, err := parseRuntimeMigrationFixtureTransforms(scriptSource)
+	if err != nil {
+		return nil, err
+	}
+	if len(transforms) == 0 {
+		out := make(map[string]string, len(seedRecords))
+		for key, value := range seedRecords {
+			out[key] = value
+		}
+		return out, nil
+	}
+
+	out := make(map[string]string, len(seedRecords))
+	for key, rawValue := range seedRecords {
+		var record map[string]any
+		if err := json.Unmarshal([]byte(rawValue), &record); err != nil {
+			return nil, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
+		}
+		for _, transform := range transforms {
+			switch transform.Operation {
+			case "copy":
+				record[transform.Destination] = record[transform.Source]
+			case "lower":
+				value, ok := record[transform.Source].(string)
+				if !ok {
+					return nil, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
+				}
+				record[transform.Destination] = strings.ToLower(value)
+			case "literal":
+				record[transform.Destination] = transform.Value
+			case "delete":
+				delete(record, transform.Destination)
+			default:
+				return nil, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
+			}
+		}
+		canonical, err := json.Marshal(record)
+		if err != nil {
+			return nil, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
+		}
+		out[key] = string(canonical)
+	}
+	return out, nil
+}
+
+func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigrationFixtureTransform, error) {
+	lines := strings.Split(string(scriptSource), "\n")
+	transforms := make([]runtimeMigrationFixtureTransform, 0)
+	for lineNumber, line := range lines {
+		line = strings.TrimSpace(stripTALLineComment(line))
+		if line == "" || strings.HasPrefix(line, "def ") || line == "pass" || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "return ") {
+			continue
+		}
+		if match := migrateRecordDeletePattern.FindStringSubmatch(line); match != nil {
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Destination: match[1],
+				Operation:   "delete",
+			})
+			continue
+		}
+		if match := migrateRecordAssignmentPattern.FindStringSubmatch(line); match != nil {
+			transform, err := parseRuntimeMigrationFixtureAssignment(match[1], match[2])
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", lineNumber+1, err)
+			}
+			transforms = append(transforms, transform)
+			continue
+		}
+		return nil, fmt.Errorf("line %d uses unsupported fixture migration statement %q", lineNumber+1, line)
+	}
+	return transforms, nil
+}
+
+func parseRuntimeMigrationFixtureAssignment(destination string, expression string) (runtimeMigrationFixtureTransform, error) {
+	expression = strings.TrimSpace(expression)
+	if match := migrateRecordLowerPattern.FindStringSubmatch(expression); match != nil {
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Operation:   "lower",
+		}, nil
+	}
+	if match := migrateRecordValuePattern.FindStringSubmatch(expression); match != nil {
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Source:      match[1],
+			Operation:   "copy",
+		}, nil
+	}
+
+	var value any
+	if err := json.Unmarshal([]byte(expression), &value); err != nil {
+		return runtimeMigrationFixtureTransform{}, fmt.Errorf("unsupported assignment expression %q", expression)
+	}
+	return runtimeMigrationFixtureTransform{
+		Destination: destination,
+		Operation:   "literal",
+		Value:       value,
+	}, nil
+}
+
+func stripTALLineComment(line string) string {
+	inString := false
+	escaped := false
+	for i, r := range line {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if r == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if r == '"' {
+			inString = !inString
+			continue
+		}
+		if r == '#' && !inString {
+			return line[:i]
+		}
+	}
+	return line
 }
 
 func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeMigrationFixture, error) {

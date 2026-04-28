@@ -80,10 +80,12 @@ of replaying the entire migration range on every retry.
 	disallowed-module failures.
 - Retry now validates declared migration fixture expected output before
 	committing each step. When `[[migrate.fixture]]` declares a fixture for
-	the pending step, runtime compares seed vs expected envelopes using key-set
-	matching plus canonicalized JSON value equality (identity-output dry-run
-	scaffold). Mismatches stop retry with `ErrMigrationFixtureMismatch`, mark
-	`verdict = step_failed`, and emit `step_failed_fixture_mismatch` entries.
+	the pending step, runtime executes the current deterministic fixture
+	subset for `migrate(record)` scripts before comparing actual output to the
+	expected envelopes. The subset supports field copy, string lowercasing,
+	JSON literal assignment, and field deletion. Mismatches stop retry with
+	`ErrMigrationFixtureMismatch`, mark `verdict = step_failed`, and emit
+	`step_failed_fixture_mismatch` entries.
 	Value mismatches now include the first divergent key plus canonical
 	expected/actual JSON bytes in the journal error evidence.
 - If a declared fixture file cannot be read at execution time, retry stops
@@ -205,6 +207,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
 - `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`
 - `TestVerifyTapIgnoresCommentedDisallowedLoadStatements`
+- `TestRuntimeRetryMigrationAppliesFixtureTransforms`
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordNotCanonical`
@@ -217,4 +220,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle (actual step execution over synthetic seeded stores). Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry enforces declared fixture expected-output equality for identity dry-run comparison, retry enforces the configured max-runtime budget around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes a small deterministic `migrate(record)` fixture subset before expected-output comparison, retry enforces the configured max-runtime budget around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
