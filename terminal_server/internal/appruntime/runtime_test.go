@@ -555,6 +555,61 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	}
 }
 
+func TestRuntimeMigrationStateReplaysFromJournal(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_replay")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_replay\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 1) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0002_2_to_3.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate 2) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	if _, err := runtime.RetryMigration("migrate_replay"); err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if _, err := runtime.AbortMigration("migrate_replay", MigrationAbortToCheckpoint); err != nil {
+		t.Fatalf("AbortMigration() error = %v", err)
+	}
+
+	restarted := NewRuntime()
+	if _, err := restarted.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() after restart error = %v", err)
+	}
+
+	status, err := restarted.GetMigrationStatus("migrate_replay")
+	if err != nil {
+		t.Fatalf("GetMigrationStatus() after restart error = %v", err)
+	}
+	if status.Verdict != "step_failed" {
+		t.Fatalf("GetMigrationStatus() verdict = %q, want step_failed", status.Verdict)
+	}
+	if status.StepsCompleted != 1 {
+		t.Fatalf("GetMigrationStatus() steps_completed = %d, want 1", status.StepsCompleted)
+	}
+	if status.LastStep != 2 {
+		t.Fatalf("GetMigrationStatus() last_step = %d, want 2", status.LastStep)
+	}
+	if status.LastError != "step 2 aborted by operator" {
+		t.Fatalf("GetMigrationStatus() last_error = %q, want %q", status.LastError, "step 2 aborted by operator")
+	}
+}
+
 func TestRuntimeRetryMigrationRequiresDrainReadiness(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_drain_guard")

@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Added migration journal replay in
+  `terminal_server/internal/appruntime/runtime.go` so package load now
+  restores migration status fields (`verdict`, `steps_completed`,
+  `last_step`, `last_error`) from existing NDJSON entries for the
+  current revision journal. Journal events now include `last_error`
+  to preserve blocked/aborted context across process restart. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationStateReplaysFromJournal`) and documented
+  replay behavior in `docs/application-migrations.md`.
+
 - 2026-04-27: Added explicit Gate 1 migration path diagnostics in
   `terminal_server/internal/apppackage/tap.go` for invalid nested
   `migrate/` layouts and malformed migration filenames. `VerifyTap`
@@ -224,8 +235,8 @@ who may authorize a migration).
   Admin + REPL tests now cover the non-stubbed API path and command
   output for migration retry.
 - Remaining work in this plan includes full executor lifecycle,
-  drain-policy orchestration, artifact/store journal replay,
-  and end-to-end rollback/reconcile semantics from this design.
+  drain-policy orchestration, and end-to-end rollback/reconcile
+  semantics from this design.
 
 ## Problem
 

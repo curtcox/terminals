@@ -53,6 +53,11 @@ of replaying the entire migration range on every retry.
 These entries are written to the status-provided `journal_path` consumed by
 `/admin/api/apps/migrate/logs` and `apps migrate logs`.
 
+On package load, runtime now replays existing migration journal entries for the
+current revision so `apps migrate status` resumes the last known
+`verdict`/`steps_completed`/`last_step`/`last_error` instead of resetting to an
+empty state after process restart.
+
 Invalid layouts are rejected as `ErrInvalidManifest`.
 
 ## Test coverage
@@ -72,4 +77,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor or drain policy orchestration. The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, and rollback now enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor or drain policy orchestration. The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart. Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).

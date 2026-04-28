@@ -551,8 +551,88 @@ func newMigrationState(pkg Package) migrationState {
 	}
 	if steps > 0 {
 		state.JournalPath = migrationJournalPath(pkg)
+		state = replayMigrationStateFromJournal(pkg, state)
 	}
 	return state
+}
+
+func replayMigrationStateFromJournal(pkg Package, state migrationState) migrationState {
+	if strings.TrimSpace(state.JournalPath) == "" {
+		return state
+	}
+
+	absolutePath := filepath.Join(pkg.RootPath, filepath.FromSlash(state.JournalPath))
+	file, err := os.Open(filepath.Clean(absolutePath))
+	if err != nil {
+		return state
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		if stepsCompleted, ok := migrationJournalInt(entry["steps_completed"]); ok {
+			state.StepsCompleted = stepsCompleted
+		}
+		if step, ok := migrationJournalInt(entry["step"]); ok {
+			state.LastStep = step
+		}
+		if verdict := migrationJournalString(entry["verdict"]); verdict != "" {
+			state.Verdict = verdict
+		}
+		if lastError := migrationJournalString(entry["last_error"]); lastError != "" {
+			state.LastError = lastError
+		} else if state.Verdict == "ok" || state.Verdict == "running" || state.Verdict == "idle" {
+			state.LastError = ""
+		}
+	}
+
+	if state.StepsCompleted < 0 {
+		state.StepsCompleted = 0
+	}
+	if state.StepsCompleted > state.StepsPlanned {
+		state.StepsCompleted = state.StepsPlanned
+	}
+	if state.LastStep < 0 {
+		state.LastStep = 0
+	}
+	if state.LastStep > state.StepsPlanned {
+		state.LastStep = state.StepsPlanned
+	}
+
+	return state
+}
+
+func migrationJournalInt(raw any) (int, bool) {
+	switch v := raw.(type) {
+	case float64:
+		return int(v), true
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	default:
+		return 0, false
+	}
+}
+
+func migrationJournalString(raw any) string {
+	value, ok := raw.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 type runtimeMigrationManifest struct {
@@ -624,6 +704,7 @@ func appendMigrationJournalEntry(pkg Package, state migrationState, event string
 		"steps_completed": state.StepsCompleted,
 		"steps_planned":   state.StepsPlanned,
 		"verdict":         state.Verdict,
+		"last_error":      state.LastError,
 	}
 	for key, value := range fields {
 		entry[key] = value
