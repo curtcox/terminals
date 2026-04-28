@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-27: Improved runtime migration retry lifecycle in
+  `terminal_server/internal/appruntime/runtime.go` so retries now
+  resume from the first incomplete step instead of replaying all
+  steps. `RetryMigration` now emits per-step journal events
+  (`step_started`/`step_committed`) between
+  `retry_started`/`retry_committed`, giving operators and tests a
+  concrete step-level execution trace. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationLifecycleWithSteps`) asserting per-step
+  journal events and second-retry resume behavior after
+  checkpoint-target abort.
+
 - 2026-04-27: Runtime migration actions now emit structured
   journal NDJSON entries directly from
   `terminal_server/internal/appruntime/runtime.go` so operator

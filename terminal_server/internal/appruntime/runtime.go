@@ -388,15 +388,29 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		return statusFromState(pkg, state), ErrMigrationDrainTimeout
 	}
 
+	nextStep := state.StepsCompleted + 1
+	if nextStep < 1 {
+		nextStep = 1
+	}
+
 	state.Verdict = "running"
 	state.LastError = ""
-	appendMigrationJournalEntry(pkg, state, "retry_started", nil)
-	state.StepsCompleted = state.StepsPlanned
+	appendMigrationJournalEntry(pkg, state, "retry_started", map[string]any{"from_step": nextStep})
+	for step := nextStep; step <= state.StepsPlanned; step++ {
+		state.LastStep = step
+		appendMigrationJournalEntry(pkg, state, "step_started", map[string]any{"step_id": step})
+		state.StepsCompleted = step
+		state.LastStep = step
+		appendMigrationJournalEntry(pkg, state, "step_committed", map[string]any{"step_id": step})
+	}
+	if state.StepsCompleted > state.StepsPlanned {
+		state.StepsCompleted = state.StepsPlanned
+	}
 	state.LastStep = state.StepsCompleted
 	state.Verdict = "ok"
 	state.JournalPath = migrationJournalPath(pkg)
 	r.migrations[name] = state
-	appendMigrationJournalEntry(pkg, state, "retry_committed", nil)
+	appendMigrationJournalEntry(pkg, state, "retry_committed", map[string]any{"from_step": nextStep, "to_step": state.StepsCompleted})
 	return statusFromState(pkg, state), nil
 }
 

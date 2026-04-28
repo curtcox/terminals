@@ -1,7 +1,9 @@
 package appruntime
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -483,9 +485,15 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(journal) error = %v", err)
 	}
-	journalText := string(journalBytes)
-	if !strings.Contains(journalText, `"event":"retry_started"`) || !strings.Contains(journalText, `"event":"retry_committed"`) {
-		t.Fatalf("migration journal missing retry events: %q", journalText)
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalEvent(entries, "retry_started") || !hasMigrationJournalEvent(entries, "retry_committed") {
+		t.Fatalf("migration journal missing retry events: %+v", entries)
+	}
+	if !hasMigrationJournalEventForStep(entries, "step_started", 1) || !hasMigrationJournalEventForStep(entries, "step_committed", 1) {
+		t.Fatalf("migration journal missing step 1 lifecycle events: %+v", entries)
+	}
+	if !hasMigrationJournalEventForStep(entries, "step_started", 2) || !hasMigrationJournalEventForStep(entries, "step_committed", 2) {
+		t.Fatalf("migration journal missing step 2 lifecycle events: %+v", entries)
 	}
 
 	status, err = runtime.AbortMigration("migrate_live", MigrationAbortToCheckpoint)
@@ -527,9 +535,16 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(journal after abort) error = %v", err)
 	}
-	journalText = string(journalBytes)
+	journalText := string(journalBytes)
 	if !strings.Contains(journalText, `"event":"aborted"`) || !strings.Contains(journalText, `"target":"baseline"`) {
 		t.Fatalf("migration journal missing abort baseline entry: %q", journalText)
+	}
+	entries = parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalEventSequence(entries, []string{"retry_started", "step_started", "step_committed", "retry_committed"}) {
+		t.Fatalf("missing second retry event sequence in journal: %+v", entries)
+	}
+	if !hasMigrationJournalEventForStep(entries, "step_started", 2) || !hasMigrationJournalEventForStep(entries, "step_committed", 2) {
+		t.Fatalf("second retry did not resume step 2 lifecycle events: %+v", entries)
 	}
 
 	if _, err := runtime.AbortMigration("migrate_live", "invalid_target"); !errors.Is(err, ErrMigrationAbortTargetInvalid) {
@@ -799,4 +814,65 @@ func TestRuntimeDefinitionActivationPinnedToRevision(t *testing.T) {
 	if got := second.ID(); got != "app:pinning:watch:d1:r2" {
 		t.Fatalf("second activation id = %q, want app:pinning:watch:d1:r2", got)
 	}
+}
+
+type migrationJournalEntry struct {
+	Event string `json:"event"`
+	Step  int    `json:"step"`
+}
+
+func parseMigrationJournalEntries(t *testing.T, data []byte) []migrationJournalEntry {
+	t.Helper()
+	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+	entries := make([]migrationJournalEntry, 0)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var entry migrationJournalEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatalf("Unmarshal(journal line %q) error = %v", line, err)
+		}
+		entries = append(entries, entry)
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("Scan(journal) error = %v", err)
+	}
+	return entries
+}
+
+func hasMigrationJournalEvent(entries []migrationJournalEntry, event string) bool {
+	for _, entry := range entries {
+		if entry.Event == event {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMigrationJournalEventForStep(entries []migrationJournalEntry, event string, step int) bool {
+	for _, entry := range entries {
+		if entry.Event == event && entry.Step == step {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMigrationJournalEventSequence(entries []migrationJournalEntry, sequence []string) bool {
+	if len(sequence) == 0 {
+		return true
+	}
+	index := 0
+	for _, entry := range entries {
+		if entry.Event != sequence[index] {
+			continue
+		}
+		index++
+		if index == len(sequence) {
+			return true
+		}
+	}
+	return false
 }

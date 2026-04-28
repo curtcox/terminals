@@ -30,13 +30,17 @@ The runtime now emits structured NDJSON migration journal entries directly from
 migration control actions:
 
 - `RetryMigration` writes `retry_started` and `retry_committed` entries on
-	successful runs.
+	successful runs, and emits `step_started`/`step_committed` entries for each
+	migration step so operators can see step-by-step progression.
 - Blocked retries emit explicit events (`retry_blocked_reconcile_pending` and
 	`retry_blocked_drain_timeout`) with current verdict/step context.
 - `AbortMigration` writes `aborted` entries including the selected target
 	(`checkpoint` or `baseline`).
 - `ReconcileMigration` writes `reconcile_record` entries with `record_id` and
 	selected `resolution`.
+
+Retry now resumes at the first incomplete step (`steps_completed + 1`) instead
+of replaying the entire migration range on every retry.
 
 These entries are written to the status-provided `journal_path` consumed by
 `/admin/api/apps/migrate/logs` and `apps migrate logs`.
