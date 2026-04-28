@@ -120,7 +120,7 @@ func main() {
 	uiHost := ui.NewMemoryHost()
 	observationStore := observation.NewStore(4096)
 	worldModel := world.NewModel()
-	appRuntime := appruntime.NewRuntime()
+	appRuntime := newServerAppRuntime()
 	loadAppPackages(ctx, appRuntime)
 	registerAppScenarioDefinitions(scenarioEngine, appRuntime)
 	telephonyBridge, err := buildTelephonyBridge(ctx, cfg.SIP)
@@ -878,6 +878,12 @@ func loadAppPackages(ctx context.Context, runtime *appruntime.Runtime) {
 		}
 		logger.Info("loaded app package", "event", "appruntime.package.loaded", "package", entry.Name())
 	}
+}
+
+func newServerAppRuntime() *appruntime.Runtime {
+	runtime := appruntime.NewRuntime()
+	runtime.SetMigrationDryRunGateEnabled(true)
+	return runtime
 }
 
 type worldModelAdapter struct {

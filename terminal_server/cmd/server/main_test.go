@@ -3,14 +3,18 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/curtcox/terminals/terminal_server/internal/appruntime"
 	"github.com/curtcox/terminals/terminal_server/internal/mcpadapter"
 )
 
@@ -234,5 +238,29 @@ func TestRegisterAckMetadataDefaultsUnknownBuildInfo(t *testing.T) {
 	}
 	if got := metadata[registerMetadataServerBuildDateKey]; got != "unknown" {
 		t.Fatalf("server build date metadata = %q, want unknown", got)
+	}
+}
+
+func TestNewServerAppRuntimeEnablesMigrationDryRunGate(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_dryrun_gate_fail")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_dryrun_gate_fail\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def not_migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := newServerAppRuntime()
+	_, err := runtime.LoadPackage(context.Background(), appDir)
+	if !errors.Is(err, appruntime.ErrMigrationDryRunFailed) {
+		t.Fatalf("LoadPackage() error = %v, want ErrMigrationDryRunFailed", err)
 	}
 }

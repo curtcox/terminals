@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Wired Gate 4 load-time migration replay enforcement
+  into the server startup install path by default in
+  `terminal_server/cmd/server/main.go`.
+  Added `newServerAppRuntime()` to enable
+  `SetMigrationDryRunGateEnabled(true)` before package discovery/load,
+  and added regression coverage in
+  `terminal_server/cmd/server/main_test.go`
+  (`TestNewServerAppRuntimeEnablesMigrationDryRunGate`) to confirm
+  migration-bearing packages with invalid execution-time scripts fail load
+  with `ErrMigrationDryRunFailed` under server runtime defaults.
+
 - 2026-04-28: Added optional Gate 4 load-time migration replay enforcement
   in `terminal_server/internal/appruntime/runtime.go`.
   Runtime now exposes `SetMigrationDryRunGateEnabled(true)`;
