@@ -757,6 +757,9 @@ func validateMigrationDryRunPlan(plan []migrationPlanStep) error {
 			!strings.EqualFold(strings.TrimSpace(step.Compatibility), "incompatible") {
 			return fmt.Errorf("%w: migrate.step %04d declares drain_policy=drain without compatibility=incompatible", ErrInvalidManifest, step.Number)
 		}
+		if strings.EqualFold(strings.TrimSpace(step.DrainPolicy), "multi_version") {
+			return fmt.Errorf("%w: migrate.step %04d declares drain_policy=multi_version but read-adapter dry-run validation is not implemented", ErrInvalidManifest, step.Number)
+		}
 	}
 	return nil
 }

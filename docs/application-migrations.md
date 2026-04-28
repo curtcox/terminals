@@ -139,6 +139,9 @@ of replaying the entire migration range on every retry.
 	`drain_policy = "drain"` without `compatibility = "incompatible"`, so drain
 	dry-runs only cover migrations that actually require the drained execution
 	path.
+- Until read-adapter replay exists, the Gate 4 load-time check also rejects
+	`drain_policy = "multi_version"` steps instead of allowing them through
+	without proving the required backward-read contract.
 - The `term` CLI now creates app runtimes with Gate 4 enabled by default for
 	`app check`, `app load`, `app test`, local `app reload` fallback, and
 	`sim run`, so local operator/developer flows reject migration-bearing
@@ -203,6 +206,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeDryRunMigrationJournalReplayExercisesAllBoundaries`
 - `TestRuntimeDryRunMigrationJournalReplayReturnsEmptyWhenNoSteps`
 - `TestRuntimeLoadPackageRejectsMigrationWhenDryRunGateFails`
+- `TestRuntimeLoadPackageRejectsMultiVersionWithoutReadAdapterDuringDryRunGate`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
 - `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`

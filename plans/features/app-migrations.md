@@ -21,6 +21,15 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Made Gate 4 load-time dry-run enforcement
+  conservatively block `drain_policy = "multi_version"` migration
+  steps until read-adapter replay validation exists. This prevents
+  packages from passing the dry-run gate without proving the
+  backward-read contract required by the plan. Added regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeLoadPackageRejectsMultiVersionWithoutReadAdapterDuringDryRunGate`)
+  and documented the current block in `docs/application-migrations.md`.
+
 - 2026-04-28: Added a deterministic execution subset for runtime
   migration fixture dry-runs in
   `terminal_server/internal/appruntime/runtime.go`. Fixture-backed
