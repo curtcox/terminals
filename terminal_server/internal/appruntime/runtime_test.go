@@ -2248,6 +2248,61 @@ func TestRuntimeMigrationInvalidLimitsDisableExecutor(t *testing.T) {
 	}
 }
 
+func TestRuntimeRetryMigrationFailsWhenMaxRuntimeExceeded(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_runtime_timeout")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_runtime_timeout\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n\n[migrate]\ndeclared_steps = 1\nmax_runtime_seconds = 1\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+	runtime.migrationHook = func(event string, step int) error {
+		if event == "step_started" && step == 1 {
+			time.Sleep(1100 * time.Millisecond)
+		}
+		return nil
+	}
+
+	status, err := runtime.RetryMigration("migrate_runtime_timeout")
+	if !errors.Is(err, ErrMigrationRuntimeTimeout) {
+		t.Fatalf("RetryMigration() error = %v, want ErrMigrationRuntimeTimeout", err)
+	}
+	if status.Verdict != "step_failed" {
+		t.Fatalf("RetryMigration() verdict = %q, want step_failed", status.Verdict)
+	}
+	if status.StepsCompleted != 0 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+	}
+	if status.LastStep != 1 {
+		t.Fatalf("RetryMigration() last_step = %d, want 1", status.LastStep)
+	}
+	if status.LastError != ErrMigrationRuntimeTimeout.Error() {
+		t.Fatalf("RetryMigration() last_error = %q, want %q", status.LastError, ErrMigrationRuntimeTimeout.Error())
+	}
+
+	journalBytes, err := os.ReadFile(filepath.Join(appDir, filepath.FromSlash(status.JournalPath)))
+	if err != nil {
+		t.Fatalf("ReadFile(journal) error = %v", err)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalErrorContaining(entries, "step_failed_timeout", ErrMigrationRuntimeTimeout.Error()) {
+		t.Fatalf("migration journal missing step_failed_timeout entry: %+v", entries)
+	}
+}
+
 func TestRuntimeDefinitionsUsesExportsAndNameFallback(t *testing.T) {
 	tempDir := t.TempDir()
 

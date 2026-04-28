@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-28: Enforced `[migrate].max_runtime_seconds` during
+  runtime migration retry in
+  `terminal_server/internal/appruntime/runtime.go`. Retry now tracks
+  the run budget around the current execution scaffold, fails with
+  `ErrMigrationRuntimeTimeout` when the budget elapses, preserves
+  committed checkpoint progress, marks `verdict = step_failed`, and
+  emits `step_failed_timeout` journal evidence with the configured
+  budget. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenMaxRuntimeExceeded`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-28: Added Gate 4 dry-run plan validation for drain
   declarations in `terminal_server/internal/appruntime/runtime.go`.
   Load-time dry-run enforcement now rejects migration steps that

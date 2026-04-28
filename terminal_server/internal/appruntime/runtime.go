@@ -68,6 +68,8 @@ var (
 	ErrMigrationInterrupted = errors.New("migration execution interrupted before commit")
 	// ErrMigrationDryRunFailed indicates Gate 4 replay checks failed while loading a package.
 	ErrMigrationDryRunFailed = errors.New("migration dry-run gate failed")
+	// ErrMigrationRuntimeTimeout indicates migration execution exceeded its configured runtime budget.
+	ErrMigrationRuntimeTimeout = errors.New("migration runtime timeout elapsed")
 )
 
 const defaultMigrationDrainTimeout = 90 * time.Second
@@ -274,6 +276,7 @@ type migrationState struct {
 	DrainReady         bool
 	DrainTimeout       time.Duration
 	DrainBlockedAt     time.Time
+	MaxRuntime         time.Duration
 	PendingRecords     map[string]string
 }
 
@@ -511,10 +514,14 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	state.Verdict = "running"
 	state.LastError = ""
 	state.DrainBlockedAt = time.Time{}
+	startedAt := time.Now()
 	appendMigrationJournalEntry(pkg, state, "retry_started", map[string]any{"from_step": nextStep})
 	state, err = r.maybeInterruptMigrationLocked(name, state, "retry_started")
 	if err != nil {
 		return statusFromState(pkg, state), err
+	}
+	if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, 0, startedAt); timedOut {
+		return timeoutStatus, ErrMigrationRuntimeTimeout
 	}
 	for _, step := range migrationPlanPendingSteps(state.StepPlan, nextStep) {
 		stepPath := filepath.Join(pkg.RootPath, "migrate", step.ScriptName)
@@ -572,6 +579,9 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		if err != nil {
 			return statusFromState(pkg, state), err
 		}
+		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, startedAt); timedOut {
+			return timeoutStatus, ErrMigrationRuntimeTimeout
+		}
 		if fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step); fixtureErr != nil {
 			state.Verdict = "step_failed"
 			state.LastStep = step.Number
@@ -612,6 +622,9 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		if err != nil {
 			return statusFromState(pkg, state), err
 		}
+		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, startedAt); timedOut {
+			return timeoutStatus, ErrMigrationRuntimeTimeout
+		}
 	}
 	if state.StepsCompleted > state.StepsPlanned {
 		state.StepsCompleted = state.StepsPlanned
@@ -626,6 +639,25 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	r.migrations[name] = state
 	appendMigrationJournalEntry(pkg, state, "retry_committed", map[string]any{"from_step": nextStep, "to_step": state.StepsCompleted})
 	return statusFromState(pkg, state), nil
+}
+
+func (r *Runtime) maybeFailMigrationRuntimeTimeoutLocked(name string, pkg Package, state migrationState, step int, startedAt time.Time) (bool, MigrationStatus) {
+	if state.MaxRuntime <= 0 || time.Since(startedAt) <= state.MaxRuntime {
+		return false, MigrationStatus{}
+	}
+	if step <= 0 {
+		step = state.LastStep
+	}
+	state.Verdict = "step_failed"
+	state.LastStep = step
+	state.LastError = ErrMigrationRuntimeTimeout.Error()
+	r.migrations[name] = state
+	appendMigrationJournalEntry(pkg, state, "step_failed_timeout", map[string]any{
+		"step_id":             step,
+		"max_runtime_seconds": int(state.MaxRuntime.Seconds()),
+		"error":               ErrMigrationRuntimeTimeout.Error(),
+	})
+	return true, statusFromState(pkg, state)
 }
 
 func (r *Runtime) maybeInterruptMigrationLocked(name string, state migrationState, event string) (migrationState, error) {
@@ -1001,6 +1033,7 @@ func newMigrationState(pkg Package, installedVersion string) migrationState {
 		RequiresDrain:  requiresDrain,
 		DrainReady:     !requiresDrain,
 		DrainTimeout:   packageDrainTimeout(rootOrFallbackPath(pkg)),
+		MaxRuntime:     packageMigrationMaxRuntime(rootOrFallbackPath(pkg)),
 	}
 	if planErr != nil {
 		state.LastError = planErr.Error()
@@ -1540,6 +1573,17 @@ func packageDrainTimeout(root string) time.Duration {
 		return defaultMigrationDrainTimeout
 	}
 	return time.Duration(manifest.Migrate.DrainTimeoutSeconds) * time.Second
+}
+
+func packageMigrationMaxRuntime(root string) time.Duration {
+	var manifest runtimeMigrationManifest
+	if _, err := toml.DecodeFile(filepath.Join(root, "manifest.toml"), &manifest); err != nil {
+		return 0
+	}
+	if manifest.Migrate.MaxRuntimeSeconds == nil || *manifest.Migrate.MaxRuntimeSeconds <= 0 {
+		return 0
+	}
+	return time.Duration(*manifest.Migrate.MaxRuntimeSeconds) * time.Second
 }
 
 func countDowngradeMigrationSteps(root string) int {
