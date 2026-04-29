@@ -264,12 +264,12 @@ of replaying the entire migration range on every retry.
 	`ErrMigrationResourceLimit`, keep checkpoint progress at the last committed
 	step, and emit `step_failed_resource_limit` journal evidence.
 - Retry now carries `[migrate].checkpoint_every` into the fixture-backed
-	execution scaffold. When deterministic fixture transforms touch records,
-	runtime treats each transformed fixture row as a synthetic store effect and
+	execution scaffold. When deterministic fixture transforms change records,
+	runtime treats each changed fixture row as a synthetic store effect and
 	emits `checkpoint_committed` journal evidence at the configured effect
-	cadence before committing the step. Packages without fixture-backed effects
-	continue to produce no checkpoint entries until the full durable store
-	executor lands.
+	cadence before committing the step. Rows skipped by an idempotency guard are
+	not counted as writes. Packages without fixture-backed effects continue to
+	produce no checkpoint entries until the full durable store executor lands.
 - The Gate 4 crash-replay harness now treats fixture-backed
 	`checkpoint_committed` entries as interruptible journal boundaries. Dry-run
 	replay only injects this boundary for steps whose fixture execution actually
@@ -347,6 +347,8 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationAppliesTrimFixtureTransforms`
 - `TestRuntimeRetryMigrationAppliesRecordGetFixtureTransforms`
 - `TestRuntimeRetryMigrationAppliesIdempotentFixtureGuard`
+	(covers that idempotently skipped fixture rows do not count as synthetic
+	store effects for checkpoint evidence)
 - `TestRuntimeRetryMigrationAppliesPagedStoreFixtureTransforms`
 - `TestRuntimeRetryMigrationAllowsLogCallsInFixtureTransforms`
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`

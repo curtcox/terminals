@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Tightened fixture-backed synthetic store-effect
+  accounting for direct `migrate(record)` dry-run execution in
+  `terminal_server/internal/appruntime/runtime.go`. Runtime now
+  counts only fixture rows whose canonical value changes as
+  synthetic store writes for checkpoint evidence and resource
+  accounting, so rows skipped by idempotency guards no longer
+  inflate `[migrate].checkpoint_every` boundaries. Added regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesIdempotentFixtureGuard`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Added operator-visible drain state to migration
   status surfaces. Runtime `MigrationStatus`, the admin API payload,
   and human-readable `apps migrate status` now report whether a

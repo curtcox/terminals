@@ -1992,6 +1992,7 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 
 	out := make(map[string]string, len(seedRecords))
 	var writeVolume int64
+	storeOps := 0
 	for key, rawValue := range seedRecords {
 		var record map[string]any
 		if err := json.Unmarshal([]byte(rawValue), &record); err != nil {
@@ -2041,10 +2042,14 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 		if err != nil {
 			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
 		}
-		out[key] = string(canonical)
-		writeVolume += int64(len(canonical))
+		canonicalValue := string(canonical)
+		out[key] = canonicalValue
+		if canonicalValue != rawValue {
+			storeOps++
+			writeVolume += int64(len(canonical))
+		}
 	}
-	stats.StoreOps = len(seedRecords)
+	stats.StoreOps = storeOps
 	stats.WriteVolumeBytes = writeVolume
 	return out, stats, nil
 }

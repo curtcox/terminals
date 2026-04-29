@@ -1153,6 +1153,7 @@ language = "tal/1"
 
 [migrate]
 declared_steps = 1
+checkpoint_every = 1
 
 [[migrate.step]]
 from = "1"
@@ -1203,6 +1204,17 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	}
 	if status.StepsCompleted != 1 {
 		t.Fatalf("RetryMigration() steps_completed = %d, want 1", status.StepsCompleted)
+	}
+	journalBytes, err := os.ReadFile(filepath.Join(appDir, filepath.FromSlash(status.JournalPath)))
+	if err != nil {
+		t.Fatalf("ReadFile(journal) error = %v", err)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationCheckpointMetadata(entries, 1, 1, 1) {
+		t.Fatalf("migration journal missing checkpoint evidence for changed fixture row: %+v", entries)
+	}
+	if hasMigrationCheckpointMetadata(entries, 1, 2, 1) {
+		t.Fatalf("migration journal counted idempotently skipped fixture row as a store effect: %+v", entries)
 	}
 }
 
