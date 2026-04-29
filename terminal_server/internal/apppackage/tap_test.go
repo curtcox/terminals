@@ -628,6 +628,96 @@ expected = "tests/migrate_fixtures/history_v2_expected.ndjson"
 	}
 }
 
+func TestVerifyTapRequiresReadAdapterForMultiVersionMigration(t *testing.T) {
+	manifest := strings.TrimSpace(`
+name = "kitchen_timer"
+version = "2"
+
+[[storage.store_schema]]
+store = "history"
+version = "2"
+record_schema = "tests/schemas/history_v2.json"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "multi_version"
+
+[[migrate.fixture]]
+step = "0001_1_to_2"
+prior_version = "1"
+prior_record_schema = "tests/schemas/history_v1.json"
+seed = "tests/migrate_fixtures/history_v1_seed.ndjson"
+expected = "tests/migrate_fixtures/history_v2_expected.ndjson"
+`)
+
+	tap := makeTapForTest(t, []tapEntry{
+		{name: "kitchen_timer/main.tal", body: "def on_start(): pass"},
+		{name: "kitchen_timer/manifest.toml", body: manifest},
+		{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v1_seed.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v2_expected.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/schemas/history_v1.json", body: `{"type":"object"}`},
+		{name: "kitchen_timer/tests/schemas/history_v2.json", body: `{"type":"object"}`},
+	})
+
+	_, err := VerifyTap(tap)
+	if !errors.Is(err, ErrInvalidManifest) {
+		t.Fatalf("expected invalid manifest for missing read_adapter, got %v", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "must declare read_adapter") {
+		t.Fatalf("expected read_adapter diagnostic, got %v", err)
+	}
+}
+
+func TestVerifyTapAcceptsMultiVersionReadAdapter(t *testing.T) {
+	manifest := strings.TrimSpace(`
+name = "kitchen_timer"
+version = "2"
+
+[[storage.store_schema]]
+store = "history"
+version = "2"
+record_schema = "tests/schemas/history_v2.json"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "multi_version"
+
+[[migrate.fixture]]
+step = "0001_1_to_2"
+prior_version = "1"
+prior_record_schema = "tests/schemas/history_v1.json"
+seed = "tests/migrate_fixtures/history_v1_seed.ndjson"
+expected = "tests/migrate_fixtures/history_v2_expected.ndjson"
+read_adapter = "tests/migrate_fixtures/read_v2_as_v1.tal"
+`)
+
+	tap := makeTapForTest(t, []tapEntry{
+		{name: "kitchen_timer/main.tal", body: "def on_start(): pass"},
+		{name: "kitchen_timer/manifest.toml", body: manifest},
+		{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v1_seed.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/migrate_fixtures/history_v2_expected.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+		{name: "kitchen_timer/tests/migrate_fixtures/read_v2_as_v1.tal", body: "def read(record):\n    return record\n"},
+		{name: "kitchen_timer/tests/schemas/history_v1.json", body: `{"type":"object"}`},
+		{name: "kitchen_timer/tests/schemas/history_v2.json", body: `{"type":"object"}`},
+	})
+
+	if _, err := VerifyTap(tap); err != nil {
+		t.Fatalf("expected multi_version read_adapter to verify, got %v", err)
+	}
+}
+
 func TestVerifyTapIgnoresCommentedDisallowedLoadStatements(t *testing.T) {
 	manifest := strings.TrimSpace(`
 name = "kitchen_timer"

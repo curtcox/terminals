@@ -19,7 +19,20 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - Migration seed fixture records are validated against each fixture's declared `prior_record_schema`; invalid seed rows now fail package verification with record-level diagnostics.
 - Migration expected fixture records are validated against the target step record schema when a unique `[[storage.store_schema]]` entry exists for the step `to` version; invalid expected rows now fail package verification with record-level diagnostics.
 - Migration fixture metadata now enforces step-edge consistency: `[[migrate.fixture]].prior_version` must match the corresponding migration script `from` version (`migrate/<step>_<from>_to_<to>.tal`).
+- `multi_version` migration fixtures must declare a `read_adapter` script. The package verifier checks that the adapter file is present, non-empty, exposes `read(record)`, and only loads migration-safe modules.
 - When declared, `[migrate].drain_timeout_seconds`, `[migrate].max_runtime_seconds`, and `[migrate].checkpoint_every` must be positive integers; non-positive values now fail Gate 1 with explicit diagnostics.
+
+For `multi_version`, the fixture declaration adds the adapter path:
+
+```toml
+[[migrate.fixture]]
+step = "0001_1_to_2"
+prior_version = "1"
+prior_record_schema = "schemas/history_v1.json"
+seed = "tests/migrate_fixtures/history_v1_seed.ndjson"
+expected = "tests/migrate_fixtures/history_v2_expected.ndjson"
+read_adapter = "tests/migrate_fixtures/read_v2_as_v1.tal"
+```
 
 ## Implemented runtime migration guard
 
@@ -161,9 +174,12 @@ of replaying the entire migration range on every retry.
 	`drain_policy = "drain"` without `compatibility = "incompatible"`, so drain
 	dry-runs only cover migrations that actually require the drained execution
 	path.
-- Until read-adapter replay exists, the Gate 4 load-time check also rejects
-	`drain_policy = "multi_version"` steps instead of allowing them through
-	without proving the required backward-read contract.
+- Gate 4 now supports fixture-backed `multi_version` read-adapter replay. Each
+	`multi_version` step must declare `read_adapter`; runtime executes the
+	adapter's `read(record)` deterministic subset against the migrated
+	`expected` fixture records and verifies the adapted records match the
+	prior-version `seed` records before the package can load under the dry-run
+	gate.
 - The `term` CLI now creates app runtimes with Gate 4 enabled by default for
 	`app check`, `app load`, `app test`, local `app reload` fallback, and
 	`sim run`, so local operator/developer flows reject migration-bearing
@@ -258,6 +274,8 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapAcceptsMigrateIncompatibleWithDrain`
 - `TestVerifyTapRejectsMigrateFixtureTooManyRecords`
 - `TestVerifyTapAcceptsMigrateFixtureAtRecordLimit`
+- `TestVerifyTapRequiresReadAdapterForMultiVersionMigration`
+- `TestVerifyTapAcceptsMultiVersionReadAdapter`
 - `TestRuntimeRetryMigrationRequiresDrainReadiness`
 - `TestRuntimeMigrationLifecycleWithSteps`
 - `TestRuntimeAbortBaselineEntersReconcilePendingWhenArtifactInverseFails`
@@ -272,6 +290,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeDryRunMigrationJournalReplayReturnsEmptyWhenNoSteps`
 - `TestRuntimeLoadPackageRejectsMigrationWhenDryRunGateFails`
 - `TestRuntimeLoadPackageRejectsMultiVersionWithoutReadAdapterDuringDryRunGate`
+- `TestRuntimeLoadPackageValidatesMultiVersionReadAdapterDuringDryRunGate`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
 - `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`
@@ -303,4 +322,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes small deterministic fixture subsets for `migrate(record)` scripts and the worked-example paged `store` loop before expected-output comparison, retry honors `migrate.env.abort(reason)` in that subset, retry enforces the configured max-runtime budget and hard resource caps around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, retry emits checkpoint evidence for fixture-backed synthetic effects at `[migrate].checkpoint_every`, baseline abort preserves unresolved artifact inverse failures as `reconcile_pending`, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization and reconciliation records). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes small deterministic fixture subsets for `migrate(record)` scripts and the worked-example paged `store` loop before expected-output comparison, `multi_version` steps must prove a fixture-backed `read_adapter` can recover the prior fixture shape from migrated records, retry honors `migrate.env.abort(reason)` in that subset, retry enforces the configured max-runtime budget and hard resource caps around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, retry emits checkpoint evidence for fixture-backed synthetic effects at `[migrate].checkpoint_every`, baseline abort preserves unresolved artifact inverse failures as `reconcile_pending`, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization and reconciliation records). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).

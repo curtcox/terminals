@@ -21,6 +21,20 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added fixture-backed `multi_version` read-adapter
+  replay for Gate 4 migration dry-runs. Multi-version fixtures
+  now declare a `read_adapter`; package verification requires the
+  adapter file to exist, expose `read(record)`, and only load
+  migration-safe modules, while runtime dry-run replay executes
+  the adapter against migrated fixture output and verifies the
+  adapted records match the prior-version seed shape. Added
+  regression coverage in `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRequiresReadAdapterForMultiVersionMigration`,
+  `TestVerifyTapAcceptsMultiVersionReadAdapter`) and
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeLoadPackageValidatesMultiVersionReadAdapterDuringDryRunGate`),
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Tightened migration manifest limit validation for
   `[migrate].drain_timeout_seconds` in both package verification
   and runtime migration plan parsing. Explicit non-positive drain
@@ -1033,6 +1047,7 @@ prior_version     = "1"
 prior_record_schema = "schemas/history_v1.json"
 seed              = "tests/migrate_fixtures/history_v1_seed.ndjson"
 expected          = "tests/migrate_fixtures/history_v2_expected.ndjson"
+read_adapter      = "tests/migrate_fixtures/read_v2_as_v1.tal" # required for multi_version
 ```
 
 Rules:
@@ -1047,6 +1062,10 @@ Rules:
   the package and travel in the `.tap` under `tests/`.
 - A package that declares `migrate/*.tal` without
   corresponding `[[migrate.fixture]]` entries fails at Gate 1.
+- A `multi_version` step's fixture must also declare
+  `read_adapter`, a TAL script with `read(record)` that maps
+  migrated fixture records back to the prior-version shape for
+  Gate 4 replay.
 - The fixtures are capped at 4096 records per step (operator
   policy can raise) so Gate 4 runs bounded.
 

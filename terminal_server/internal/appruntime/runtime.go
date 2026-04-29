@@ -94,6 +94,8 @@ var migrateLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']([^"']+)["']`)
 
 var migrateEntryPointPattern = regexp.MustCompile(`(?m)^\s*def\s+migrate\s*\(`)
 
+var migrateReadAdapterEntryPointPattern = regexp.MustCompile(`(?m)^\s*def\s+read\s*\(\s*record\s*\)`)
+
 var migrateRecordAssignmentPattern = regexp.MustCompile(`^\s*record\["([^"]+)"\]\s*=\s*(.+?)\s*$`)
 
 var migrateRecordDeletePattern = regexp.MustCompile(`^\s*del\s+record\["([^"]+)"\]\s*$`)
@@ -887,7 +889,7 @@ func (r *Runtime) dryRunMigrationJournalReplayForPackage(pkg Package, name strin
 	if len(plan) == 0 {
 		return []MigrationDryRunResult{}, nil
 	}
-	if err := validateMigrationDryRunPlan(plan); err != nil {
+	if err := validateMigrationDryRunPlan(pkg.RootPath, plan); err != nil {
 		return nil, err
 	}
 
@@ -907,14 +909,20 @@ func (r *Runtime) dryRunMigrationJournalReplayForPackage(pkg Package, name strin
 	return results, nil
 }
 
-func validateMigrationDryRunPlan(plan []migrationPlanStep) error {
+func validateMigrationDryRunPlan(root string, plan []migrationPlanStep) error {
 	for _, step := range plan {
 		if strings.EqualFold(strings.TrimSpace(step.DrainPolicy), "drain") &&
 			!strings.EqualFold(strings.TrimSpace(step.Compatibility), "incompatible") {
 			return fmt.Errorf("%w: migrate.step %04d declares drain_policy=drain without compatibility=incompatible", ErrInvalidManifest, step.Number)
 		}
 		if strings.EqualFold(strings.TrimSpace(step.DrainPolicy), "multi_version") {
-			return fmt.Errorf("%w: migrate.step %04d declares drain_policy=multi_version but read-adapter dry-run validation is not implemented", ErrInvalidManifest, step.Number)
+			fixture, err := findRuntimeMigrationFixture(root, step)
+			if err != nil {
+				return err
+			}
+			if fixture == nil || strings.TrimSpace(fixture.ReadAdapterPath) == "" {
+				return fmt.Errorf("%w: migrate.step %04d declares drain_policy=multi_version without migrate.fixture read_adapter", ErrInvalidManifest, step.Number)
+			}
 		}
 	}
 	return nil
@@ -1749,10 +1757,11 @@ func decodeTALStringLiteral(raw string) string {
 }
 
 type runtimeMigrationFixture struct {
-	Step         int
-	PriorVersion string
-	SeedPath     string
-	ExpectedPath string
+	Step            int
+	PriorVersion    string
+	SeedPath        string
+	ExpectedPath    string
+	ReadAdapterPath string
 }
 
 type runtimeMigrationResourceStats struct {
@@ -1825,8 +1834,80 @@ func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSourc
 			return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d expected contains extra key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
 	}
+	if strings.EqualFold(strings.TrimSpace(step.DrainPolicy), "multi_version") {
+		if err := verifyMigrationReadAdapterStep(root, step, fixture, expectedRecords, seedRecords); err != nil {
+			return runtimeMigrationResourceStats{}, err
+		}
+	}
 
 	return stats, nil
+}
+
+func verifyMigrationReadAdapterStep(root string, step migrationPlanStep, fixture *runtimeMigrationFixture, migratedRecords map[string]string, priorRecords map[string]string) error {
+	adapterPath := strings.TrimSpace(fixture.ReadAdapterPath)
+	if adapterPath == "" {
+		return fmt.Errorf("%w: step %04d multi_version fixture must declare read_adapter", ErrMigrationFixtureUnavailable, step.Number)
+	}
+	fullPath, resolveErr := resolveRuntimeFixturePath(root, adapterPath)
+	if resolveErr != nil {
+		return resolveErr
+	}
+	adapterSource, err := os.ReadFile(fullPath)
+	if err != nil {
+		return fmt.Errorf("%w: %s: %v", ErrMigrationFixtureUnavailable, adapterPath, err)
+	}
+	if err := validateRuntimeMigrationReadAdapter(adapterSource); err != nil {
+		return fmt.Errorf("%w: step %04d read_adapter %s invalid: %v", ErrMigrationFixtureMismatch, step.Number, adapterPath, err)
+	}
+	adapterRecords, _, err := executeRuntimeMigrationFixture(adapterSource, migratedRecords)
+	if err != nil {
+		return fmt.Errorf("%w: step %04d read_adapter %s execution failed: %v", ErrMigrationFixtureMismatch, step.Number, adapterPath, err)
+	}
+	if err := compareRuntimeFixtureRecords(adapterRecords, priorRecords, step.Number, "read_adapter"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateRuntimeMigrationReadAdapter(payload []byte) error {
+	trimmed := strings.TrimSpace(string(payload))
+	if trimmed == "" {
+		return errors.New("script is empty")
+	}
+	if !migrateReadAdapterEntryPointPattern.Match(payload) {
+		return errors.New("missing read(record) entrypoint")
+	}
+	for _, match := range migrateLoadPattern.FindAllSubmatch(payload, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		module := strings.TrimSpace(string(match[1]))
+		if _, ok := allowedMigrationModules[module]; !ok {
+			return fmt.Errorf("loads disallowed module %q", module)
+		}
+	}
+	return nil
+}
+
+func compareRuntimeFixtureRecords(actualRecords map[string]string, expectedRecords map[string]string, step int, label string) error {
+	if len(actualRecords) != len(expectedRecords) {
+		return fmt.Errorf("%w: step %04d %s key count mismatch (actual=%d expected=%d)", ErrMigrationFixtureMismatch, step, label, len(actualRecords), len(expectedRecords))
+	}
+	for key, actualValue := range actualRecords {
+		expectedValue, ok := expectedRecords[key]
+		if !ok {
+			return fmt.Errorf("%w: step %04d %s expected missing key %q", ErrMigrationFixtureMismatch, step, label, key)
+		}
+		if expectedValue != actualValue {
+			return fmt.Errorf("%w: step %04d %s value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step, label, key, expectedValue, actualValue)
+		}
+	}
+	for key := range expectedRecords {
+		if _, ok := actualRecords[key]; !ok {
+			return fmt.Errorf("%w: step %04d %s expected contains extra key %q", ErrMigrationFixtureMismatch, step, label, key)
+		}
+	}
+	return nil
 }
 
 type runtimeMigrationFixtureTransform struct {
@@ -2415,10 +2496,11 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 			return nil, fmt.Errorf("%w: migrate.fixture step %q must declare seed and expected files", ErrMigrationFixtureMismatch, fixture.Step)
 		}
 		match = &runtimeMigrationFixture{
-			Step:         stepID,
-			PriorVersion: priorVersion,
-			SeedPath:     seedPath,
-			ExpectedPath: expectedPath,
+			Step:            stepID,
+			PriorVersion:    priorVersion,
+			SeedPath:        seedPath,
+			ExpectedPath:    expectedPath,
+			ReadAdapterPath: strings.TrimSpace(fixture.ReadAdapter),
 		}
 	}
 	if match == nil && hasFixtureDeclarations {
@@ -2578,6 +2660,7 @@ type runtimeMigrationManifest struct {
 			PriorVersion string `toml:"prior_version"`
 			Seed         string `toml:"seed"`
 			Expected     string `toml:"expected"`
+			ReadAdapter  string `toml:"read_adapter"`
 		} `toml:"fixture"`
 		Step []struct {
 			From          string `toml:"from"`

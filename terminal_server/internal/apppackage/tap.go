@@ -91,6 +91,7 @@ var allowedTopLevelDirs = map[string]struct{}{
 var (
 	migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
 	migrateLoadPattern     = regexp.MustCompile(`(?m)^\s*load\(\s*["']([^"']+)["']`)
+	migrateReadPattern     = regexp.MustCompile(`(?m)^\s*def\s+read\s*\(\s*record\s*\)`)
 )
 
 var allowedMigrationModules = map[string]struct{}{
@@ -593,6 +594,7 @@ type manifestMigrationFixture struct {
 	PriorRecordSchema string `toml:"prior_record_schema"`
 	Seed              string `toml:"seed"`
 	Expected          string `toml:"expected"`
+	ReadAdapter       string `toml:"read_adapter"`
 }
 
 type parsedMigrationStep struct {
@@ -778,6 +780,13 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 			return ErrInvalidManifest
 		}
 		fixtureByStep[fixture.Step] = struct{}{}
+		readAdapter := strings.TrimSpace(fixture.ReadAdapter)
+		if step, ok := stepByName[fixture.Step]; ok {
+			manifestStep := manifest.Migrate.Step[step.stepNumber-1]
+			if manifestStep.DrainPolicy == "multi_version" && readAdapter == "" {
+				return fmt.Errorf("%w: migrate.fixture %s must declare read_adapter for multi_version migration", ErrInvalidManifest, fixture.Step)
+			}
+		}
 		if _, ok := availableFiles[fixture.PriorRecordSchema]; !ok {
 			return ErrInvalidManifest
 		}
@@ -786,6 +795,15 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		}
 		if _, ok := availableFiles[fixture.Expected]; !ok {
 			return ErrInvalidManifest
+		}
+		if readAdapter != "" {
+			source, ok := migrationSources[readAdapter]
+			if !ok {
+				return fmt.Errorf("%w: migrate.fixture %s read_adapter %q missing from archive", ErrInvalidManifest, fixture.Step, readAdapter)
+			}
+			if err := validateMigrationReadAdapterSource(readAdapter, source); err != nil {
+				return err
+			}
 		}
 		seedRecords, err := validateMigrationFixtureNDJSON(fixture.Seed, migrationSources[fixture.Seed])
 		if err != nil {
@@ -939,6 +957,25 @@ func resolveFixtureExpectedSchema(
 		return "", nil, false, fmt.Errorf("%w: migrate.fixture %s expected schema %s missing from archive payload", ErrInvalidManifest, fixture.Step, schemaPath)
 	}
 	return schemaPath, schemaPayload, true, nil
+}
+
+func validateMigrationReadAdapterSource(path string, payload []byte) error {
+	if len(bytes.TrimSpace(payload)) == 0 {
+		return fmt.Errorf("%w: migration read_adapter %s is empty", ErrInvalidManifest, path)
+	}
+	if !migrateReadPattern.Match(payload) {
+		return fmt.Errorf("%w: migration read_adapter %s missing read(record) entrypoint", ErrInvalidManifest, path)
+	}
+	for _, match := range migrateLoadPattern.FindAllSubmatch(payload, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		module := strings.TrimSpace(string(match[1]))
+		if _, allowed := allowedMigrationModules[module]; !allowed {
+			return fmt.Errorf("%w: migration read_adapter %s loads disallowed module %q", ErrInvalidManifest, path, module)
+		}
+	}
+	return nil
 }
 
 func parseCanonicalFixtureRecord(line []byte) ([]byte, string, map[string]any, error) {

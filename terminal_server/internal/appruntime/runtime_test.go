@@ -3060,11 +3060,71 @@ drain_policy = "multi_version"
 	if !errors.Is(err, ErrMigrationDryRunFailed) {
 		t.Fatalf("LoadPackage() error = %v, want ErrMigrationDryRunFailed", err)
 	}
-	if !strings.Contains(err.Error(), "read-adapter dry-run validation is not implemented") {
+	if !strings.Contains(err.Error(), "without migrate.fixture read_adapter") {
 		t.Fatalf("LoadPackage() error = %q, want read-adapter validation detail", err.Error())
 	}
 	if _, ok := runtime.GetPackage("migrate_dryrun_multi_version"); ok {
 		t.Fatalf("GetPackage() ok = true, want false")
+	}
+}
+
+func TestRuntimeLoadPackageValidatesMultiVersionReadAdapterDuringDryRunGate(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_dryrun_multi_version_adapter")
+	fixtureDir := filepath.Join(appDir, "tests", "migrate_fixtures")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	if err := os.MkdirAll(fixtureDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(fixtures) error = %v", err)
+	}
+	manifest := `name = "migrate_dryrun_multi_version_adapter"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "multi_version"
+
+[[migrate.fixture]]
+step = "1"
+prior_version = "1"
+seed = "tests/migrate_fixtures/history_seed.ndjson"
+expected = "tests/migrate_fixtures/history_expected.ndjson"
+read_adapter = "tests/migrate_fixtures/read_v2_as_v1.tal"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	migrateScript := "def migrate(record):\n    record[\"label_normalized\"] = lower(trim(record[\"label\"]))\n"
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(migrateScript), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+	seed := "{\"key\":\"history/1\",\"value\":{\"label\":\" Tea \"}}\n"
+	expected := "{\"key\":\"history/1\",\"value\":{\"label\":\" Tea \",\"label_normalized\":\"tea\"}}\n"
+	if err := os.WriteFile(filepath.Join(fixtureDir, "history_seed.ndjson"), []byte(seed), 0o644); err != nil {
+		t.Fatalf("WriteFile(seed) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fixtureDir, "history_expected.ndjson"), []byte(expected), 0o644); err != nil {
+		t.Fatalf("WriteFile(expected) error = %v", err)
+	}
+	readAdapter := "def read(record):\n    del record[\"label_normalized\"]\n"
+	if err := os.WriteFile(filepath.Join(fixtureDir, "read_v2_as_v1.tal"), []byte(readAdapter), 0o644); err != nil {
+		t.Fatalf("WriteFile(read_adapter) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	runtime.SetMigrationDryRunGateEnabled(true)
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
 	}
 }
 
