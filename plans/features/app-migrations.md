@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Hardened Gate 4 `multi_version` read-adapter
+  path diagnostics and regression coverage. Runtime dry-run
+  replay already resolves `read_adapter` paths through the same
+  package-root and symlink guard used for seed/expected fixture
+  files; errors now identify the failing read-adapter path, and
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeLoadPackageRejectsMultiVersionReadAdapterEscapingRootDuringDryRunGate`)
+  pins that packages cannot point adapters outside the package
+  payload. Documented the behavior in
+  `docs/application-migrations.md`.
+
 - 2026-04-29: Tightened rollback reverse-step validation for
   `migrate/downgrade/*.tal`. Gate 1 package verification now
   requires downgrade scripts to use the same

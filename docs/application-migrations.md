@@ -183,7 +183,9 @@ of replaying the entire migration range on every retry.
 	adapter's `read(record)` deterministic subset against the migrated
 	`expected` fixture records and verifies the adapted records match the
 	prior-version `seed` records before the package can load under the dry-run
-	gate.
+	gate. Runtime resolves read-adapter paths with the same package-root and
+	symlink checks used for seed and expected fixture files, so adapters cannot
+	escape the package payload during dry-run replay.
 - The `term` CLI now creates app runtimes with Gate 4 enabled by default for
 	`app check`, `app load`, `app test`, local `app reload` fallback, and
 	`sim run`, so local operator/developer flows reject migration-bearing
@@ -295,6 +297,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeLoadPackageRejectsMigrationWhenDryRunGateFails`
 - `TestRuntimeLoadPackageRejectsMultiVersionWithoutReadAdapterDuringDryRunGate`
 - `TestRuntimeLoadPackageValidatesMultiVersionReadAdapterDuringDryRunGate`
+- `TestRuntimeLoadPackageRejectsMultiVersionReadAdapterEscapingRootDuringDryRunGate`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`
 - `TestRuntimeRetryMigrationIgnoresCommentedLoadStatements`

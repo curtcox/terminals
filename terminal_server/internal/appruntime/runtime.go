@@ -1850,7 +1850,7 @@ func verifyMigrationReadAdapterStep(root string, step migrationPlanStep, fixture
 	}
 	fullPath, resolveErr := resolveRuntimeFixturePath(root, adapterPath)
 	if resolveErr != nil {
-		return resolveErr
+		return fmt.Errorf("step %04d read_adapter %s: %w", step.Number, adapterPath, resolveErr)
 	}
 	adapterSource, err := os.ReadFile(fullPath)
 	if err != nil {
