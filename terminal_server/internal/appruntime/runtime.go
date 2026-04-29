@@ -1117,8 +1117,21 @@ func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error) {
 	state.Verdict = "aborted"
 	state.LastError = "aborted by operator"
 	if target == MigrationAbortToBaseline {
+		pending := migrationArtifactInverseFailuresFromJournal(pkg, state)
 		state.StepsCompleted = 0
 		state.LastStep = 0
+		if len(pending) > 0 {
+			state.Verdict = "reconcile_pending"
+			state.LastError = ErrMigrationReconcilePending.Error()
+			state.PendingRecords = pending
+			state.ReconciliationPath = migrationReconciliationPath(pkg)
+			r.migrations[name] = state
+			appendMigrationJournalEntry(pkg, state, "reconcile_pending", map[string]any{
+				"target":          target,
+				"pending_records": pending,
+			})
+			return statusFromState(pkg, state), ErrMigrationReconcilePending
+		}
 		state.LastError = "aborted to baseline by operator"
 	} else {
 		failedStep := state.StepsCompleted
@@ -1305,6 +1318,49 @@ func replayMigrationStateFromJournal(pkg Package, state migrationState) migratio
 		} else if state.Verdict == "ok" || state.Verdict == "running" || state.Verdict == "idle" {
 			state.DrainBlockedAt = time.Time{}
 		}
+		switch lastEvent {
+		case "artifact_inverse_failed":
+			if state.PendingRecords == nil {
+				state.PendingRecords = map[string]string{}
+			}
+			recordID := migrationJournalString(entry["record_id"])
+			if recordID == "" {
+				recordID = migrationJournalString(entry["artifact_id"])
+			}
+			if recordID != "" {
+				resolution := migrationJournalString(entry["recommended_resolution"])
+				if resolution == "" {
+					resolution = "manual"
+				}
+				state.PendingRecords[recordID] = resolution
+				state.Verdict = "reconcile_pending"
+				state.LastError = ErrMigrationReconcilePending.Error()
+				if state.ReconciliationPath == "" {
+					state.ReconciliationPath = migrationReconciliationPath(pkg)
+				}
+			}
+		case "reconcile_pending":
+			pending := migrationPendingRecordsFromJournalValue(entry["pending_records"])
+			if len(pending) > 0 {
+				state.PendingRecords = pending
+				state.Verdict = "reconcile_pending"
+				state.LastError = ErrMigrationReconcilePending.Error()
+				if state.ReconciliationPath == "" {
+					state.ReconciliationPath = migrationReconciliationPath(pkg)
+				}
+			}
+		case "reconcile_record":
+			recordID := migrationJournalString(entry["record_id"])
+			if recordID != "" && len(state.PendingRecords) > 0 {
+				delete(state.PendingRecords, recordID)
+				if len(state.PendingRecords) == 0 {
+					state.ReconciliationPath = ""
+				}
+			}
+		case "retry_committed", "aborted":
+			state.PendingRecords = nil
+			state.ReconciliationPath = ""
+		}
 	}
 
 	if state.StepsCompleted < 0 {
@@ -1337,6 +1393,81 @@ func replayMigrationStateFromJournal(pkg Package, state migrationState) migratio
 	}
 
 	return state
+}
+
+func migrationArtifactInverseFailuresFromJournal(pkg Package, state migrationState) map[string]string {
+	if strings.TrimSpace(state.JournalPath) == "" {
+		return nil
+	}
+	absolutePath := filepath.Join(pkg.RootPath, filepath.FromSlash(state.JournalPath))
+	file, err := os.Open(filepath.Clean(absolutePath))
+	if err != nil {
+		return nil
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	pending := map[string]string{}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		switch migrationJournalString(entry["event"]) {
+		case "artifact_inverse_failed":
+			recordID := migrationJournalString(entry["record_id"])
+			if recordID == "" {
+				recordID = migrationJournalString(entry["artifact_id"])
+			}
+			if recordID == "" {
+				continue
+			}
+			resolution := migrationJournalString(entry["recommended_resolution"])
+			if resolution == "" {
+				resolution = "manual"
+			}
+			pending[recordID] = resolution
+		case "reconcile_record":
+			if recordID := migrationJournalString(entry["record_id"]); recordID != "" {
+				delete(pending, recordID)
+			}
+		case "retry_committed", "aborted":
+			pending = map[string]string{}
+		}
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	return pending
+}
+
+func migrationPendingRecordsFromJournalValue(raw any) map[string]string {
+	values, ok := raw.(map[string]any)
+	if !ok || len(values) == 0 {
+		return nil
+	}
+	pending := make(map[string]string, len(values))
+	for recordID, resolutionRaw := range values {
+		recordID = strings.TrimSpace(recordID)
+		if recordID == "" {
+			continue
+		}
+		resolution := migrationJournalString(resolutionRaw)
+		if resolution == "" {
+			resolution = "manual"
+		}
+		pending[recordID] = resolution
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	return pending
 }
 
 func migrationJournalInt(raw any) (int, bool) {
@@ -2535,6 +2666,10 @@ func countDowngradeMigrationSteps(root string) int {
 
 func migrationJournalPath(pkg Package) string {
 	return filepath.ToSlash(filepath.Join("apps", migrationIdentity(pkg.Manifest), "migrate", fmt.Sprintf("r%d", pkg.Revision), "journal.ndjson"))
+}
+
+func migrationReconciliationPath(pkg Package) string {
+	return filepath.ToSlash(filepath.Join("apps", migrationIdentity(pkg.Manifest), "migrate", fmt.Sprintf("r%d", pkg.Revision), "reconcile.json"))
 }
 
 func migrationIdentity(manifest Manifest) string {

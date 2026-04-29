@@ -585,6 +585,72 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 	}
 }
 
+func TestRuntimeAbortBaselineEntersReconcilePendingWhenArtifactInverseFails(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_inverse_fail")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := "name = \"migrate_inverse_fail\"\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n"
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+	if _, err := runtime.RetryMigration("migrate_inverse_fail"); err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+
+	pkg, ok := runtime.GetPackage("migrate_inverse_fail")
+	if !ok {
+		t.Fatalf("GetPackage() ok = false, want true")
+	}
+	state := runtime.migrations["migrate_inverse_fail"]
+	appendMigrationJournalEntry(pkg, state, "artifact_inverse_failed", map[string]any{
+		"record_id":              "artifact:history-photo",
+		"recommended_resolution": "manual",
+		"error":                  "artifact current revision is not a descendant of journaled patch",
+	})
+
+	status, err := runtime.AbortMigration("migrate_inverse_fail", MigrationAbortToBaseline)
+	if !errors.Is(err, ErrMigrationReconcilePending) {
+		t.Fatalf("AbortMigration(to baseline) error = %v, want ErrMigrationReconcilePending", err)
+	}
+	if status.Verdict != "reconcile_pending" {
+		t.Fatalf("AbortMigration(to baseline) verdict = %q, want reconcile_pending", status.Verdict)
+	}
+	if status.StepsCompleted != 0 || status.LastStep != 0 {
+		t.Fatalf("AbortMigration(to baseline) step state = %d/%d, want 0/0", status.StepsCompleted, status.LastStep)
+	}
+	if status.ReconciliationPath == "" {
+		t.Fatalf("AbortMigration(to baseline) reconciliation_path empty")
+	}
+	if len(status.PendingRecords) != 1 || status.PendingRecords[0].RecordID != "artifact:history-photo" || status.PendingRecords[0].RecommendedResolution != "manual" {
+		t.Fatalf("AbortMigration(to baseline) pending_records = %+v, want artifact:history-photo/manual", status.PendingRecords)
+	}
+
+	restarted := NewRuntime()
+	if _, err := restarted.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() after restart error = %v", err)
+	}
+	status, err = restarted.GetMigrationStatus("migrate_inverse_fail")
+	if err != nil {
+		t.Fatalf("GetMigrationStatus() after restart error = %v", err)
+	}
+	if status.Verdict != "reconcile_pending" || len(status.PendingRecords) != 1 {
+		t.Fatalf("GetMigrationStatus() after restart = verdict %q pending %+v, want reconcile_pending with one record", status.Verdict, status.PendingRecords)
+	}
+}
+
 func TestRuntimeReloadMigrationStateStartsFromInstalledVersion(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_reload")

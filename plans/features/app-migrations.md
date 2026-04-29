@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added runtime baseline-abort reconciliation handling in
+  `terminal_server/internal/appruntime/runtime.go`. `AbortMigration`
+  now scans migration journal evidence for unresolved
+  `artifact_inverse_failed` entries before reporting a baseline abort
+  as complete; if any remain, it rewinds step progress to baseline,
+  returns `ErrMigrationReconcilePending`, preserves sorted pending
+  reconciliation records/status, emits `reconcile_pending` journal
+  evidence, and replays that state after restart. Added regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeAbortBaselineEntersReconcilePendingWhenArtifactInverseFails`)
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Extended the runtime fixture-backed deterministic
   migration subset in `terminal_server/internal/appruntime/runtime.go`
   to support loaded `store.delete` aliases in the worked-example

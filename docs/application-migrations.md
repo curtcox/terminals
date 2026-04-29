@@ -47,6 +47,11 @@ migration control actions:
 	operators must reconcile before retry can proceed.
 - `AbortMigration` writes `aborted` entries including the selected target
 	(`checkpoint` or `baseline`).
+- Baseline abort now scans migration journal evidence for unresolved
+	`artifact_inverse_failed` entries. If any inverse failure remains unresolved,
+	the runtime returns `ErrMigrationReconcilePending`, rewinds step progress to
+	baseline, preserves pending records and `reconciliation_path`, emits a
+	`reconcile_pending` journal entry, and replays that state across restart.
 - `ReconcileMigration` writes `reconcile_record` entries with `record_id` and
 	selected `resolution`.
 - Reconcile operations now report `ErrMigrationReconcilePending` when no
@@ -242,6 +247,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapAcceptsMigrateFixtureAtRecordLimit`
 - `TestRuntimeRetryMigrationRequiresDrainReadiness`
 - `TestRuntimeMigrationLifecycleWithSteps`
+- `TestRuntimeAbortBaselineEntersReconcilePendingWhenArtifactInverseFails`
 - `TestRuntimeReloadMigrationStateStartsFromInstalledVersion`
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
@@ -282,4 +288,4 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 
 ## Not yet implemented
 
-This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes small deterministic fixture subsets for `migrate(record)` scripts and the worked-example paged `store` loop before expected-output comparison, retry honors `migrate.env.abort(reason)` in that subset, retry enforces the configured max-runtime budget and hard resource caps around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, retry emits checkpoint evidence for fixture-backed synthetic effects at `[migrate].checkpoint_every`, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
+This does not yet implement the full migration executor lifecycle for durable stores and artifact patches. Runtime now enforces Gate 4 replay as a blocking load-time gate in both server startup defaults (via `newServerAppRuntime` in `terminal_server/cmd/server/main.go`) and `term` local app-runtime flows (`terminal_server/cmd/term/main.go`). The `term apps migrate *` operational APIs now call runtime-backed status/retry/abort/reconcile state transitions, migration modules are restricted at package verification time, retry executes small deterministic fixture subsets for `migrate(record)` scripts and the worked-example paged `store` loop before expected-output comparison, retry honors `migrate.env.abort(reason)` in that subset, retry enforces the configured max-runtime budget and hard resource caps around the current execution scaffold, runtime replay now has journal-boundary crash-injection coverage, retry emits checkpoint evidence for fixture-backed synthetic effects at `[migrate].checkpoint_every`, baseline abort preserves unresolved artifact inverse failures as `reconcile_pending`, rollback enforces data-mode policy (`--keep-data` requires `migrate/downgrade/*.tal`; default mode is archive), and migration status now replays from journal state across restart (including interrupted-run normalization and reconciliation records). Remaining executor work is tracked in [plans/features/app-migrations.md](../plans/features/app-migrations.md).
