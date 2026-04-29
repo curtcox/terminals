@@ -2784,20 +2784,28 @@ func mapMigrationStatus(status appruntime.MigrationStatus) map[string]any {
 			"recommended_resolution": record.RecommendedResolution,
 		})
 	}
+	drainBlockedSince := ""
+	if !status.DrainBlockedAt.IsZero() {
+		drainBlockedSince = status.DrainBlockedAt.UTC().Format(time.RFC3339Nano)
+	}
 
 	return map[string]any{
-		"app":                 status.App,
-		"version":             status.Version,
-		"revision":            status.Revision,
-		"steps_planned":       status.StepsPlanned,
-		"steps_completed":     status.StepsCompleted,
-		"last_step":           status.LastStep,
-		"verdict":             status.Verdict,
-		"last_error":          status.LastError,
-		"journal_path":        status.JournalPath,
-		"reconciliation_path": status.ReconciliationPath,
-		"executor_ready":      status.ExecutorReady,
-		"pending_records":     pending,
+		"app":                   status.App,
+		"version":               status.Version,
+		"revision":              status.Revision,
+		"steps_planned":         status.StepsPlanned,
+		"steps_completed":       status.StepsCompleted,
+		"last_step":             status.LastStep,
+		"verdict":               status.Verdict,
+		"last_error":            status.LastError,
+		"journal_path":          status.JournalPath,
+		"reconciliation_path":   status.ReconciliationPath,
+		"executor_ready":        status.ExecutorReady,
+		"requires_drain":        status.RequiresDrain,
+		"drain_ready":           status.DrainReady,
+		"drain_timeout_seconds": int(status.DrainTimeout.Seconds()),
+		"drain_blocked_since":   drainBlockedSince,
+		"pending_records":       pending,
 	}
 }
 

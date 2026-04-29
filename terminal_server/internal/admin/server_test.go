@@ -445,6 +445,18 @@ func TestAppsEndpointsListReloadAndRollback(t *testing.T) {
 	if fmt.Sprint(migration["last_step"]) != "0" {
 		t.Fatalf("migration last_step = %v, want 0", migration["last_step"])
 	}
+	if fmt.Sprint(migration["requires_drain"]) != "false" {
+		t.Fatalf("migration requires_drain = %v, want false", migration["requires_drain"])
+	}
+	if fmt.Sprint(migration["drain_ready"]) != "true" {
+		t.Fatalf("migration drain_ready = %v, want true", migration["drain_ready"])
+	}
+	if fmt.Sprint(migration["drain_timeout_seconds"]) != "90" {
+		t.Fatalf("migration drain_timeout_seconds = %v, want 90", migration["drain_timeout_seconds"])
+	}
+	if fmt.Sprint(migration["drain_blocked_since"]) != "" {
+		t.Fatalf("migration drain_blocked_since = %v, want empty", migration["drain_blocked_since"])
+	}
 	pendingRecords, _ := migration["pending_records"].([]any)
 	if len(pendingRecords) != 0 {
 		t.Fatalf("migration pending_records len = %d, want 0", len(pendingRecords))

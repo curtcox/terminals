@@ -276,7 +276,7 @@ func TestAppsMigrateStatusUsesAdminAPI(t *testing.T) {
 		switch {
 		case req.Method == http.MethodGet && req.URL.Path == "/admin/api/apps/migrate/status":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"status":"ok","migration":{"app":"sound_watch","verdict":"reconcile_pending","steps_planned":3,"steps_completed":1,"last_step":1,"last_error":"migration reconciliation is pending","pending_records":[{"record_id":"rec-9","recommended_resolution":"manual"},{"record_id":"rec-2","recommended_resolution":"force_rewind"}],"reconciliation_path":"apps/sound_watch/migrate/r2/reconcile.json","executor_ready":true}}`))
+			_, _ = w.Write([]byte(`{"status":"ok","migration":{"app":"sound_watch","verdict":"reconcile_pending","steps_planned":3,"steps_completed":1,"last_step":1,"last_error":"migration reconciliation is pending","pending_records":[{"record_id":"rec-9","recommended_resolution":"manual"},{"record_id":"rec-2","recommended_resolution":"force_rewind"}],"reconciliation_path":"apps/sound_watch/migrate/r2/reconcile.json","executor_ready":true,"requires_drain":true,"drain_ready":false,"drain_timeout_seconds":120,"drain_blocked_since":"2026-04-29T12:00:00Z"}}`))
 		default:
 			http.NotFound(w, req)
 		}
@@ -291,7 +291,7 @@ func TestAppsMigrateStatusUsesAdminAPI(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 	text := out.String()
-	if !strings.Contains(text, "OK  app=sound_watch verdict=reconcile_pending steps=1/3 last_step=1 pending_records=rec-2:force_rewind,rec-9:manual reconciliation_path=apps/sound_watch/migrate/r2/reconcile.json last_error=\"migration reconciliation is pending\" executor_ready=true") {
+	if !strings.Contains(text, "OK  app=sound_watch verdict=reconcile_pending steps=1/3 last_step=1 pending_records=rec-2:force_rewind,rec-9:manual reconciliation_path=apps/sound_watch/migrate/r2/reconcile.json last_error=\"migration reconciliation is pending\" executor_ready=true requires_drain=true drain_ready=false drain_timeout_seconds=120 drain_blocked_since=2026-04-29T12:00:00Z") {
 		t.Fatalf("missing apps migrate status output: %q", text)
 	}
 }

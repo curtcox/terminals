@@ -280,6 +280,10 @@ type MigrationStatus struct {
 	JournalPath        string
 	ReconciliationPath string
 	ExecutorReady      bool
+	RequiresDrain      bool
+	DrainReady         bool
+	DrainTimeout       time.Duration
+	DrainBlockedAt     time.Time
 	PendingRecords     []MigrationReconciliationRecord
 }
 
@@ -3004,6 +3008,10 @@ func statusFromState(pkg Package, state migrationState) MigrationStatus {
 		JournalPath:        state.JournalPath,
 		ReconciliationPath: state.ReconciliationPath,
 		ExecutorReady:      state.ExecutorReady,
+		RequiresDrain:      state.RequiresDrain,
+		DrainReady:         state.DrainReady,
+		DrainTimeout:       state.DrainTimeout,
+		DrainBlockedAt:     state.DrainBlockedAt,
 		PendingRecords:     records,
 	}
 }

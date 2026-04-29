@@ -21,6 +21,21 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added operator-visible drain state to migration
+  status surfaces. Runtime `MigrationStatus`, the admin API payload,
+  and human-readable `apps migrate status` now report whether a
+  pending step requires drain, whether drain readiness is approved,
+  the configured drain timeout, and the current blocked-since
+  timestamp while drain is pending. Tightened regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationRequiresDrainReadiness`) and
+  `terminal_server/internal/repl/repl_test.go`
+  (`TestAppsMigrateStatusUsesAdminAPI`), added admin API assertions,
+  and documented the behavior in `docs/application-migrations.md`.
+  Also pinned reconciliation journal replay after the final
+  `reconcile_record` in
+  `TestRuntimeReconcileMigrationPendingRecords`.
+
 - 2026-04-29: Hardened runtime migration manifest policy parsing in
   `terminal_server/internal/appruntime/runtime.go`. Runtime migration
   plan parsing now mirrors Gate 1 validation for

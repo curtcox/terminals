@@ -3418,6 +3418,15 @@ drain_policy = "drain"
 	if status.StepsCompleted != 0 {
 		t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
 	}
+	if !status.RequiresDrain || status.DrainReady {
+		t.Fatalf("RetryMigration() drain status requires_drain=%v drain_ready=%v, want true/false", status.RequiresDrain, status.DrainReady)
+	}
+	if status.DrainTimeout != 2*time.Second {
+		t.Fatalf("RetryMigration() drain_timeout = %s, want 2s", status.DrainTimeout)
+	}
+	if status.DrainBlockedAt.IsZero() {
+		t.Fatalf("RetryMigration() drain_blocked_at is zero")
+	}
 
 	runtime.mu.Lock()
 	state := runtime.migrations["migrate_drain_guard"]
@@ -3435,6 +3444,9 @@ drain_policy = "drain"
 	if status.LastError != ErrMigrationDrainTimeout.Error() {
 		t.Fatalf("RetryMigration() last_error = %q, want %q", status.LastError, ErrMigrationDrainTimeout.Error())
 	}
+	if !status.RequiresDrain || status.DrainReady {
+		t.Fatalf("RetryMigration() timeout drain status requires_drain=%v drain_ready=%v, want true/false", status.RequiresDrain, status.DrainReady)
+	}
 
 	if err := runtime.SetMigrationDrainReady("migrate_drain_guard", true); err != nil {
 		t.Fatalf("SetMigrationDrainReady() error = %v", err)
@@ -3449,6 +3461,9 @@ drain_policy = "drain"
 	}
 	if status.StepsCompleted != 1 {
 		t.Fatalf("RetryMigration() after drain ready steps_completed = %d, want 1", status.StepsCompleted)
+	}
+	if status.RequiresDrain || !status.DrainReady {
+		t.Fatalf("RetryMigration() after drain ready drain status requires_drain=%v drain_ready=%v, want false/true", status.RequiresDrain, status.DrainReady)
 	}
 }
 
@@ -3649,6 +3664,10 @@ func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	state.PendingRecords = map[string]string{"rec-1": "force_rewind"}
 	state.Verdict = "reconcile_pending"
 	runtime.migrations["migrate_reconcile"] = state
+	pkg := runtime.packages["migrate_reconcile"]
+	appendMigrationJournalEntry(pkg, state, "reconcile_pending", map[string]any{
+		"pending_records": state.PendingRecords,
+	})
 	runtime.mu.Unlock()
 
 	status, err = runtime.ReconcileMigration("migrate_reconcile", "rec-1", "force_rewind")
@@ -3675,6 +3694,27 @@ func TestRuntimeReconcileMigrationPendingRecords(t *testing.T) {
 	reconcileJournalText := string(reconcileJournalBytes)
 	if !strings.Contains(reconcileJournalText, `"event":"reconcile_record"`) || !strings.Contains(reconcileJournalText, `"record_id":"rec-1"`) {
 		t.Fatalf("migration journal missing reconcile entry: %q", reconcileJournalText)
+	}
+
+	restarted := NewRuntime()
+	if _, err := restarted.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() after reconcile journal replay error = %v", err)
+	}
+	status, err = restarted.GetMigrationStatus("migrate_reconcile")
+	if err != nil {
+		t.Fatalf("GetMigrationStatus() after reconcile journal replay error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("GetMigrationStatus() after reconcile journal replay verdict = %q, want ok", status.Verdict)
+	}
+	if status.LastError != "" {
+		t.Fatalf("GetMigrationStatus() after reconcile journal replay last_error = %q, want empty", status.LastError)
+	}
+	if status.ReconciliationPath != "" {
+		t.Fatalf("GetMigrationStatus() after reconcile journal replay reconciliation_path = %q, want empty", status.ReconciliationPath)
+	}
+	if len(status.PendingRecords) != 0 {
+		t.Fatalf("GetMigrationStatus() after reconcile journal replay pending_records = %d, want 0", len(status.PendingRecords))
 	}
 
 	runtime.mu.Lock()

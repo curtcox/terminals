@@ -2444,7 +2444,7 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				recordSummary := migrationPendingRecordSummary(migration)
 				_, err = fmt.Fprintf(
 					s.out,
-					"OK  app=%s verdict=%s steps=%v/%v last_step=%v pending_records=%s reconciliation_path=%s last_error=%q executor_ready=%v\n",
+					"OK  app=%s verdict=%s steps=%v/%v last_step=%v pending_records=%s reconciliation_path=%s last_error=%q executor_ready=%v requires_drain=%v drain_ready=%v drain_timeout_seconds=%v drain_blocked_since=%s\n",
 					appName,
 					toString(migration["verdict"]),
 					migration["steps_completed"],
@@ -2454,6 +2454,10 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 					emptyAsNone(toString(migration["reconciliation_path"])),
 					toString(migration["last_error"]),
 					migration["executor_ready"],
+					migration["requires_drain"],
+					migration["drain_ready"],
+					migration["drain_timeout_seconds"],
+					emptyAsNone(toString(migration["drain_blocked_since"])),
 				)
 				return err
 			case "logs":

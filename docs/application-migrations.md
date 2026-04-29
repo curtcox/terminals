@@ -63,6 +63,11 @@ migration control actions:
 	emit `drain_ready_changed` entries. Journal replay restores the latest
 	ready/not-ready value so an operator-approved drain does not regress to
 	`drain_pending` after a process restart.
+- Migration status now exposes drain control-plane fields through runtime,
+	admin API, and human-readable REPL output: whether the pending step still
+	requires a drain, whether drain readiness is approved, the configured drain
+	timeout in seconds, and the current `drain_pending` blocked-since timestamp
+	when one exists.
 - Retry reconciliation guard now treats `verdict = reconcile_pending` as
 	blocking even if pending-record details are temporarily unavailable, so
 	operators must reconcile before retry can proceed.
@@ -323,6 +328,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
 - `TestRuntimeDrainReadyReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
+	(covers replaying a fully resolved reconciliation journal back to `ok`)
 - `TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes`
 - `TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`
 	(covers retry/step journal-boundary interruption replay across first and
