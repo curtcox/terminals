@@ -2139,9 +2139,12 @@ func executeRuntimeMigrationStoreFixture(scriptSource []byte, seedRecords map[st
 		if err != nil {
 			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
 		}
-		out[key] = string(canonical)
-		stats.StoreOps++
-		stats.WriteVolumeBytes += int64(len(canonical))
+		canonicalValue := string(canonical)
+		if canonicalValue != out[key] {
+			out[key] = canonicalValue
+			stats.StoreOps++
+			stats.WriteVolumeBytes += int64(len(canonical))
+		}
 	}
 	return out, stats, nil
 }

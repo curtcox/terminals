@@ -138,8 +138,9 @@ of replaying the entire migration range on every retry.
 	`rec[...]` assignment transforms including `_normalize(rec.get(...))`,
 	`put(key, rec)`, `delete(key)`, no-op loaded `checkpoint` calls, and no-op
 	structured log calls. Fixture replay applies the transform only to matching
-	keys and counts successful `put`/`delete` calls as synthetic store effects
-	for checkpoint evidence and hard-cap accounting.
+	keys and counts changed `put` results plus successful `delete` calls as
+	synthetic store effects for checkpoint evidence and hard-cap accounting.
+	Unchanged `put` calls do not inflate checkpoint cadence or resource limits.
 	Value mismatches now include the first divergent key plus canonical
 	expected/actual JSON bytes in the journal error evidence.
 - If a declared fixture file cannot be read at execution time, retry stops
@@ -370,6 +371,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 	(covers that idempotently skipped fixture rows do not count as synthetic
 	store effects for checkpoint evidence)
 - `TestRuntimeRetryMigrationAppliesPagedStoreFixtureTransforms`
+- `TestRuntimeRetryMigrationDoesNotCheckpointUnchangedStorePut`
 - `TestRuntimeRetryMigrationAllowsLogCallsInFixtureTransforms`
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`

@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Aligned paged `store` loop fixture accounting with the
+  direct `migrate(record)` fixture path in
+  `terminal_server/internal/appruntime/runtime.go`. Store-loop dry-run
+  replay now counts only changed `put` results plus successful deletes
+  as synthetic store effects for checkpoint evidence and resource caps,
+  so no-op idempotent writes do not inflate `[migrate].checkpoint_every`
+  boundaries. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationDoesNotCheckpointUnchangedStorePut`) and
+  documented the boundary in `docs/application-migrations.md`.
+
 - 2026-04-29: Aligned direct `abort(...)` reason parsing in the
   runtime migration fixture subset with loaded abort aliases and the
   existing accepted TAL string literal surfaces. Direct abort calls now
