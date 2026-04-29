@@ -191,6 +191,11 @@ of replaying the entire migration range on every retry.
 	from patching artifacts without host-checkable lineage evidence or patching
 	artifacts owned by another lineage, including lineages that share the same
 	manifest name.
+	Accepted patch declarations now emit `artifact_patch_planned` journal
+	evidence with artifact ID, owner app ID, effect sequence, step, version
+	edge, and script metadata before the step commits. This is declaration
+	evidence for the current scaffold; durable artifact patch execution still
+	belongs to the remaining executor work.
 - Runtime retry now enforces the plan's hard migration resource caps in the
 	current execution scaffold. Fixture-backed store effects are counted against
 	the 1,000,000 store-op and 100 MB write-volume per-step caps, and declared
@@ -279,6 +284,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationAbortCallFailsCurrentStep`
 - `TestRuntimeRetryMigrationRejectsArtifactPatchForDifferentLineage`
 - `TestRuntimeRetryMigrationRejectsArtifactPatchWithoutOwnerAppID`
+- `TestRuntimeRetryMigrationJournalsAcceptedArtifactPatchDeclarations`
 - `TestRuntimeRetryMigrationRejectsArtifactPatchHardCap`
 - `TestRuntimeMigrationResourceLimitValidation`
 - `TestRuntimeRetryMigrationEmitsCheckpointEveryForFixtureEffects`

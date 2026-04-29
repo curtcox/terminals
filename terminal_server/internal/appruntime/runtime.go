@@ -638,7 +638,8 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 			})
 			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepInvalid, step.Number, step.ScriptName, scriptErr)
 		}
-		if hostErr := validateRuntimeMigrationHostEffects(pkg, scriptSource); hostErr != nil {
+		hostEffects, hostErr := collectRuntimeMigrationHostEffects(pkg, scriptSource)
+		if hostErr != nil {
 			state.Verdict = "step_failed"
 			state.LastStep = step.Number
 			r.migrations[name] = state
@@ -675,6 +676,17 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		state, err = r.maybeInterruptMigrationLocked(name, state, "step_started")
 		if err != nil {
 			return statusFromState(pkg, state), err
+		}
+		for _, effect := range hostEffects.ArtifactPatches {
+			appendMigrationJournalEntry(pkg, state, "artifact_patch_planned", map[string]any{
+				"step_id":         step.Number,
+				"from_version":    step.FromVersion,
+				"to_version":      step.ToVersion,
+				"script":          step.ScriptName,
+				"artifact_id":     effect.ArtifactID,
+				"owner_app_id":    effect.OwnerAppID,
+				"effect_sequence": effect.Sequence,
+			})
 		}
 		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, stepStartedAt); timedOut {
 			return timeoutStatus, ErrMigrationRuntimeTimeout
@@ -1525,10 +1537,21 @@ func validateRuntimeMigrationScript(payload []byte) error {
 	return nil
 }
 
-func validateRuntimeMigrationHostEffects(pkg Package, scriptSource []byte) error {
+type runtimeMigrationHostEffects struct {
+	ArtifactPatches []runtimeMigrationArtifactPatchEffect
+}
+
+type runtimeMigrationArtifactPatchEffect struct {
+	ArtifactID string
+	OwnerAppID string
+	Sequence   int
+}
+
+func collectRuntimeMigrationHostEffects(pkg Package, scriptSource []byte) (runtimeMigrationHostEffects, error) {
+	var effects runtimeMigrationHostEffects
 	patchAliases := artifactSelfPatchAliases(scriptSource)
 	if len(patchAliases) == 0 {
-		return nil
+		return effects, nil
 	}
 	patchCount := 0
 	lines := strings.Split(string(scriptSource), "\n")
@@ -1546,22 +1569,27 @@ func validateRuntimeMigrationHostEffects(pkg Package, scriptSource []byte) error
 		}
 		patchCount++
 		if patchCount > migrationMaxArtifactPatches {
-			return fmt.Errorf("%w: artifact.self.patch count exceeds hard cap (%d > %d)", ErrMigrationResourceLimit, patchCount, migrationMaxArtifactPatches)
+			return effects, fmt.Errorf("%w: artifact.self.patch count exceeds hard cap (%d > %d)", ErrMigrationResourceLimit, patchCount, migrationMaxArtifactPatches)
 		}
 		appID := strings.TrimSpace(pkg.Manifest.AppID)
 		if appID == "" {
-			return fmt.Errorf("%w: artifact.self.patch requires manifest app_id at line %d", ErrMigrationArtifactOwnership, lineNumber+1)
+			return effects, fmt.Errorf("%w: artifact.self.patch requires manifest app_id at line %d", ErrMigrationArtifactOwnership, lineNumber+1)
 		}
 		artifactID := migrationStringArgument(match[2])
 		ownerAppID := migrationKeywordStringArgument(migrateOwnerAppIDPattern, match[2])
 		if ownerAppID == "" {
-			return fmt.Errorf("%w: artifact %q patch missing owner_app_id at line %d", ErrMigrationArtifactOwnership, artifactID, lineNumber+1)
+			return effects, fmt.Errorf("%w: artifact %q patch missing owner_app_id at line %d", ErrMigrationArtifactOwnership, artifactID, lineNumber+1)
 		}
 		if ownerAppID != appID {
-			return fmt.Errorf("%w: artifact %q owner_app_id %q does not match app_id %q at line %d", ErrMigrationArtifactOwnership, artifactID, ownerAppID, appID, lineNumber+1)
+			return effects, fmt.Errorf("%w: artifact %q owner_app_id %q does not match app_id %q at line %d", ErrMigrationArtifactOwnership, artifactID, ownerAppID, appID, lineNumber+1)
 		}
+		effects.ArtifactPatches = append(effects.ArtifactPatches, runtimeMigrationArtifactPatchEffect{
+			ArtifactID: artifactID,
+			OwnerAppID: ownerAppID,
+			Sequence:   patchCount,
+		})
 	}
-	return nil
+	return effects, nil
 }
 
 func artifactSelfPatchAliases(scriptSource []byte) map[string]struct{} {

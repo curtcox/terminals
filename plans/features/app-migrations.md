@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added accepted `artifact.self.patch(...)` declaration
+  journaling in `terminal_server/internal/appruntime/runtime.go`.
+  Runtime retry now parses lineage-validated patch calls into host
+  effect evidence and emits `artifact_patch_planned` journal entries
+  with artifact ID, owner app ID, effect sequence, step, version edge,
+  and script metadata before committing the step. Added regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationJournalsAcceptedArtifactPatchDeclarations`)
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Added runtime baseline-abort reconciliation handling in
   `terminal_server/internal/appruntime/runtime.go`. `AbortMigration`
   now scans migration journal evidence for unresolved

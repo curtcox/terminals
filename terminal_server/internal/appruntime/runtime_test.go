@@ -2208,6 +2208,57 @@ def migrate():
 	}
 }
 
+func TestRuntimeRetryMigrationJournalsAcceptedArtifactPatchDeclarations(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_artifact_patch_journal")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	appID := "app:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	manifest := fmt.Sprintf("name = \"migrate_artifact_patch_journal\"\napp_id = %q\nversion = \"1.0.0\"\nlanguage = \"tal/1\"\n", appID)
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	script := fmt.Sprintf(`load("artifact.self", patch = "patch")
+
+def migrate():
+    patch("artifact-1", owner_app_id = %q)
+    patch("artifact-2", owner_app_id = %q)
+`, appID, appID)
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(script), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_artifact_patch_journal")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() verdict = %q, want ok", status.Verdict)
+	}
+
+	journalPath := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+	journalBytes, readErr := os.ReadFile(journalPath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(journal) error = %v", readErr)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalArtifactPatch(entries, "artifact-1", appID, 1) {
+		t.Fatalf("migration journal missing first artifact patch evidence: %+v", entries)
+	}
+	if !hasMigrationJournalArtifactPatch(entries, "artifact-2", appID, 2) {
+		t.Fatalf("migration journal missing second artifact patch evidence: %+v", entries)
+	}
+}
+
 func TestRuntimeRetryMigrationRejectsArtifactPatchHardCap(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_artifact_patch_limit")
@@ -3513,6 +3564,8 @@ type migrationJournalEntry struct {
 	ToVersion       string `json:"to_version"`
 	Script          string `json:"script"`
 	Error           string `json:"error"`
+	ArtifactID      string `json:"artifact_id"`
+	OwnerAppID      string `json:"owner_app_id"`
 	EffectSequence  int    `json:"effect_sequence"`
 	CheckpointEvery int    `json:"checkpoint_every"`
 }
@@ -3565,6 +3618,18 @@ func hasMigrationJournalEvent(entries []migrationJournalEntry, event string) boo
 func hasMigrationJournalErrorContaining(entries []migrationJournalEntry, event string, want string) bool {
 	for _, entry := range entries {
 		if entry.Event == event && strings.Contains(entry.Error, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMigrationJournalArtifactPatch(entries []migrationJournalEntry, artifactID string, ownerAppID string, sequence int) bool {
+	for _, entry := range entries {
+		if entry.Event == "artifact_patch_planned" &&
+			entry.ArtifactID == artifactID &&
+			entry.OwnerAppID == ownerAppID &&
+			entry.EffectSequence == sequence {
 			return true
 		}
 	}
