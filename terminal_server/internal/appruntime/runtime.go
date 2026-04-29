@@ -2539,22 +2539,27 @@ func decodeMigrationDefaultLiteral(raw string) (any, error) {
 }
 
 func stripTALLineComment(line string) string {
-	inString := false
+	var quote rune
 	escaped := false
 	for i, r := range line {
 		if escaped {
 			escaped = false
 			continue
 		}
-		if r == '\\' && inString {
+		if r == '\\' && quote != 0 {
 			escaped = true
 			continue
 		}
-		if r == '"' {
-			inString = !inString
+		if r == '"' || r == '\'' {
+			switch quote {
+			case 0:
+				quote = r
+			case r:
+				quote = 0
+			}
 			continue
 		}
-		if r == '#' && !inString {
+		if r == '#' && quote == 0 {
 			return line[:i]
 		}
 	}

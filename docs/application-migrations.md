@@ -127,6 +127,10 @@ of replaying the entire migration range on every retry.
 	`debug`/`info`/`warn`/`error` aliases. Mismatches stop retry with
 	`ErrMigrationFixtureMismatch`, mark `verdict = step_failed`, and emit
 	`step_failed_fixture_mismatch` entries.
+	The parser preserves `#` characters inside both double-quoted and
+	single-quoted TAL string literals before stripping line comments, so
+	accepted single-quoted log messages and `record.get(...)` defaults can
+	include hash-prefixed labels without being truncated as comments.
 	The deterministic fixture subset also supports the worked-example paged
 	`store` loop shape: loaded `list_keys`/`get`/`put`/`delete` aliases, a literal
 	`prefix` scan, `rec = get(key)`, idempotent presence guards,
@@ -357,6 +361,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationAppliesFixtureTransforms`
 - `TestRuntimeRetryMigrationAppliesTrimFixtureTransforms`
 - `TestRuntimeRetryMigrationAppliesRecordGetFixtureTransforms`
+- `TestRuntimeRetryMigrationPreservesHashInSingleQuotedStrings`
 - `TestRuntimeRetryMigrationAppliesIdempotentFixtureGuard`
 	(covers that idempotently skipped fixture rows do not count as synthetic
 	store effects for checkpoint evidence)

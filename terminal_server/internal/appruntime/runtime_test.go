@@ -1489,6 +1489,80 @@ def migrate(record):
 	}
 }
 
+func TestRuntimeRetryMigrationPreservesHashInSingleQuotedStrings(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_fixture_single_quote_hash")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(appDir, "tests", "migrate_fixtures"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(tests/migrate_fixtures) error = %v", err)
+	}
+	manifest := `name = "migrate_fixture_single_quote_hash"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "none"
+
+[[migrate.fixture]]
+step = "0001"
+prior_version = "1"
+seed = "tests/migrate_fixtures/history_seed.ndjson"
+expected = "tests/migrate_fixtures/history_expected.ndjson"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	migrateScript := `load("log", info = "info")
+
+def migrate(record):
+  record["tag"] = record.get("tag", '#kitchen')
+  info('history tagged #kitchen', records = 1)
+  return record
+`
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(migrateScript), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+	seed := "{\"key\":\"history/a\",\"value\":{\"label\":\"Tea\"}}\n"
+	expected := "{\"key\":\"history/a\",\"value\":{\"label\":\"Tea\",\"tag\":\"#kitchen\"}}\n"
+	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_seed.ndjson"), []byte(seed), 0o644); err != nil {
+		t.Fatalf("WriteFile(seed fixture) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_expected.ndjson"), []byte(expected), 0o644); err != nil {
+		t.Fatalf("WriteFile(expected fixture) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_fixture_single_quote_hash")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() verdict = %q, want ok", status.Verdict)
+	}
+	journalBytes, err := os.ReadFile(filepath.Join(appDir, filepath.FromSlash(status.JournalPath)))
+	if err != nil {
+		t.Fatalf("ReadFile(journal) error = %v", err)
+	}
+	if !strings.Contains(string(journalBytes), `"message":"history tagged #kitchen"`) {
+		t.Fatalf("migration journal missing single-quoted log message with hash: %q", string(journalBytes))
+	}
+}
+
 func TestRuntimeRetryMigrationEmitsCheckpointEveryForFixtureEffects(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_checkpoint_every")

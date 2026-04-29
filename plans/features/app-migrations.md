@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Hardened TAL line-comment stripping in the
+  runtime migration fixture parser. The deterministic migration
+  subset now preserves `#` characters inside single-quoted string
+  literals, matching the existing double-quoted handling and the
+  accepted single-quoted literal surfaces for migration log calls
+  and `record.get(...)` defaults. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationPreservesHashInSingleQuotedStrings`)
+  and documented the parser boundary in
+  `docs/application-migrations.md`.
+
 - 2026-04-29: Expanded fixture-backed `record.get(...)`
   default handling again in the runtime migration subset. Direct
   `migrate(record)` scripts now accept structured JSON defaults
