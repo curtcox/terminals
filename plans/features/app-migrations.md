@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: github-copilot
 validation: none
-last-reviewed: 2026-04-28
+last-reviewed: 2026-04-29
 ---
 
 # Application Migrations
@@ -20,6 +20,17 @@ Referenced by [application-distribution.md](application-distribution.md)
 who may authorize a migration).
 
 ## Implementation Progress
+
+- 2026-04-29: Extended the runtime fixture-backed deterministic
+  migration subset in `terminal_server/internal/appruntime/runtime.go`
+  to support loaded `store.delete` aliases in the worked-example
+  paged store-loop shape. Fixture replay now accepts `delete(key)`,
+  removes matching fixture records from expected output, and counts
+  successful deletes as synthetic store effects for checkpoint
+  evidence and hard-cap accounting. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesStoreDeleteFixtureEffects`) and
+  documented the expanded subset in `docs/application-migrations.md`.
 
 - 2026-04-28: Extended the runtime fixture-backed deterministic
   migration subset in `terminal_server/internal/appruntime/runtime.go`

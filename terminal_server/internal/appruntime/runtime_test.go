@@ -1090,6 +1090,98 @@ def _normalize(label):
 	}
 }
 
+func TestRuntimeRetryMigrationAppliesStoreDeleteFixtureEffects(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_fixture_store_delete")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(appDir, "tests", "migrate_fixtures"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(tests/migrate_fixtures) error = %v", err)
+	}
+	manifest := `name = "migrate_fixture_store_delete"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+checkpoint_every = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "none"
+
+[[migrate.fixture]]
+step = "0001"
+prior_version = "1"
+seed = "tests/migrate_fixtures/history_seed.ndjson"
+expected = "tests/migrate_fixtures/history_expected.ndjson"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	migrateScript := `load("store", list_keys = "list_keys", delete = "delete")
+load("migrate.env", checkpoint = "checkpoint")
+
+def migrate():
+    cursor = None
+    while True:
+        page = list_keys(prefix = "history/expired/", after = cursor, limit = 500)
+        if len(page) == 0: break
+        for key in page:
+            delete(key)
+        cursor = page[-1]
+        checkpoint(cursor = cursor)
+`
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(migrateScript), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+	seed := strings.Join([]string{
+		"{\"key\":\"history/active/a\",\"value\":{\"label\":\"Keep\"}}",
+		"{\"key\":\"history/expired/a\",\"value\":{\"label\":\"Remove A\"}}",
+		"{\"key\":\"history/expired/b\",\"value\":{\"label\":\"Remove B\"}}",
+		"{\"key\":\"settings/theme\",\"value\":{\"label\":\"Dark\"}}",
+		"",
+	}, "\n")
+	expected := strings.Join([]string{
+		"{\"key\":\"history/active/a\",\"value\":{\"label\":\"Keep\"}}",
+		"{\"key\":\"settings/theme\",\"value\":{\"label\":\"Dark\"}}",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_seed.ndjson"), []byte(seed), 0o644); err != nil {
+		t.Fatalf("WriteFile(seed fixture) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_expected.ndjson"), []byte(expected), 0o644); err != nil {
+		t.Fatalf("WriteFile(expected fixture) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	status, err := runtime.RetryMigration("migrate_fixture_store_delete")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.Verdict != "ok" {
+		t.Fatalf("RetryMigration() verdict = %q, want ok", status.Verdict)
+	}
+	journalBytes, err := os.ReadFile(filepath.Join(appDir, filepath.FromSlash(status.JournalPath)))
+	if err != nil {
+		t.Fatalf("ReadFile(journal) error = %v", err)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationCheckpointMetadata(entries, 1, 1, 1) || !hasMigrationCheckpointMetadata(entries, 1, 2, 1) {
+		t.Fatalf("migration journal missing delete checkpoint evidence: %+v", entries)
+	}
+}
+
 func TestRuntimeRetryMigrationAllowsLogCallsInFixtureTransforms(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_fixture_log")

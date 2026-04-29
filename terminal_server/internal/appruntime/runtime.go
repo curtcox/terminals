@@ -138,6 +138,8 @@ var migrateStoreGetAliasPattern = regexp.MustCompile(`\bget\s*=\s*["']([A-Za-z_]
 
 var migrateStorePutAliasPattern = regexp.MustCompile(`\bput\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
 
+var migrateStoreDeleteAliasPattern = regexp.MustCompile(`\bdelete\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
 var migrateEnvLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']migrate\.env["']\s*,(?P<args>[^)]*)\)`)
 
 var migrateEnvCheckpointAliasPattern = regexp.MustCompile(`\bcheckpoint\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
@@ -1467,6 +1469,7 @@ type runtimeMigrationStoreAliases struct {
 	ListKeys map[string]struct{}
 	Get      map[string]struct{}
 	Put      map[string]struct{}
+	Delete   map[string]struct{}
 }
 
 func migrationStoreAliases(scriptSource []byte) runtimeMigrationStoreAliases {
@@ -1474,6 +1477,7 @@ func migrationStoreAliases(scriptSource []byte) runtimeMigrationStoreAliases {
 		ListKeys: make(map[string]struct{}),
 		Get:      make(map[string]struct{}),
 		Put:      make(map[string]struct{}),
+		Delete:   make(map[string]struct{}),
 	}
 	for _, match := range migrateStoreLoadPattern.FindAllSubmatch(scriptSource, -1) {
 		if len(match) < 2 {
@@ -1492,6 +1496,11 @@ func migrationStoreAliases(scriptSource []byte) runtimeMigrationStoreAliases {
 		for _, aliasMatch := range migrateStorePutAliasPattern.FindAllSubmatch(match[1], -1) {
 			if len(aliasMatch) >= 2 {
 				aliases.Put[string(aliasMatch[1])] = struct{}{}
+			}
+		}
+		for _, aliasMatch := range migrateStoreDeleteAliasPattern.FindAllSubmatch(match[1], -1) {
+			if len(aliasMatch) >= 2 {
+				aliases.Delete[string(aliasMatch[1])] = struct{}{}
 			}
 		}
 	}
@@ -1773,6 +1782,10 @@ func executeRuntimeMigrationStoreFixture(scriptSource []byte, seedRecords map[st
 				record[transform.Destination] = transform.Value
 			case "delete":
 				delete(record, transform.Destination)
+			case "delete_record":
+				delete(out, key)
+				stats.StoreOps++
+				skipPut = true
 			case "abort":
 				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
 			default:
@@ -1874,7 +1887,7 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 
 func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrationStoreFixturePlan, error) {
 	storeAliases := migrationStoreAliases(scriptSource)
-	if len(storeAliases.ListKeys) == 0 || len(storeAliases.Get) == 0 || len(storeAliases.Put) == 0 {
+	if len(storeAliases.ListKeys) == 0 || (len(storeAliases.Get) == 0 && len(storeAliases.Delete) == 0) || (len(storeAliases.Put) == 0 && len(storeAliases.Delete) == 0) {
 		return nil, nil
 	}
 	checkpointAliases := migrationCheckpointAliases(scriptSource)
@@ -1884,6 +1897,7 @@ func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrati
 	prefix := ""
 	sawGet := false
 	sawPut := false
+	sawDelete := false
 	for lineNumber, rawLine := range lines {
 		line := strings.TrimSpace(stripTALLineComment(rawLine))
 		if line == "" || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "def ") || line == "pass" {
@@ -1908,6 +1922,13 @@ func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrati
 		}
 		if migrationStorePutStatement(line, storeAliases.Put) {
 			sawPut = true
+			continue
+		}
+		if migrationStoreDeleteStatement(line, storeAliases.Delete) {
+			sawDelete = true
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Operation: "delete_record",
+			})
 			continue
 		}
 		if match := migrateAbortPattern.FindStringSubmatch(line); match != nil {
@@ -1957,8 +1978,11 @@ func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrati
 	if prefix == "" {
 		return nil, errors.New("store fixture migration missing list_keys prefix")
 	}
-	if !sawGet || !sawPut {
-		return nil, errors.New("store fixture migration must get and put records")
+	if !sawGet && !sawDelete {
+		return nil, errors.New("store fixture migration must get records or delete keys")
+	}
+	if !sawPut && !sawDelete {
+		return nil, errors.New("store fixture migration must put records or delete keys")
 	}
 	return &runtimeMigrationStoreFixturePlan{
 		Prefix:     prefix,
@@ -1989,6 +2013,15 @@ func migrationStoreGetStatement(line string, aliases map[string]struct{}) bool {
 
 func migrationStorePutStatement(line string, aliases map[string]struct{}) bool {
 	match := regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*key\s*,\s*[A-Za-z_][A-Za-z0-9_]*\s*\)$`).FindStringSubmatch(line)
+	if match == nil {
+		return false
+	}
+	_, ok := aliases[match[1]]
+	return ok
+}
+
+func migrationStoreDeleteStatement(line string, aliases map[string]struct{}) bool {
+	match := regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*key\s*\)$`).FindStringSubmatch(line)
 	if match == nil {
 		return false
 	}
