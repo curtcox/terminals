@@ -170,6 +170,11 @@ of replaying the entire migration range on every retry.
 	migration scripts (for example `0001_1_to_2.tal` and `0002_2_to_3.tal` while
 	reloading from version `2` to `3`) now start retry at the pending boundary
 	instead of replaying earlier edges.
+- Rollback data-mode policy is explicit and non-mutating on rejection:
+	`--keep-data` requires a valid `migrate/downgrade/*.tal` reverse step, while
+	`--archive-data` remains allowed without reverse steps. A failed keep-data
+	rollback leaves package history untouched so operators can immediately retry
+	the rollback with archive-data.
 - Reload across author-key rotation keeps migration state anchored to the
 	stable `app_id` lineage while still using the installed package version to
 	compute the pending version window. A rotated package that keeps the same

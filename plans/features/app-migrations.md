@@ -21,6 +21,15 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added explicit rollback data-mode regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRollbackKeepDataRequiresDowngradeSteps`).
+  A rollback across a version with no reverse migration now has
+  pinned evidence that `--keep-data` fails without mutating package
+  history, and a follow-up `--archive-data` rollback succeeds.
+  Documented the operator-visible behavior in
+  `docs/application-migrations.md`.
+
 - 2026-04-29: Hardened execution-time migration fixture key
   validation in `terminal_server/internal/appruntime/runtime.go`.
   Runtime retry now mirrors the Gate 1 fixture envelope checks for

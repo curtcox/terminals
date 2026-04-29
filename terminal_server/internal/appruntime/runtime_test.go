@@ -354,6 +354,17 @@ func TestRuntimeRollbackKeepDataRequiresDowngradeSteps(t *testing.T) {
 	if _, err := runtime.RollbackPackage("rollback_keep_data", RollbackOptions{DataMode: RollbackDataModeKeepData}); !errors.Is(err, ErrRollbackKeepDataRequiresDowngrade) {
 		t.Fatalf("RollbackPackage(keep_data) error = %v, want ErrRollbackKeepDataRequiresDowngrade", err)
 	}
+
+	rolledBack, err := runtime.RollbackPackage("rollback_keep_data", RollbackOptions{DataMode: RollbackDataModeArchiveData})
+	if err != nil {
+		t.Fatalf("RollbackPackage(archive_data) after keep_data rejection error = %v", err)
+	}
+	if rolledBack.Manifest.Version != "1.0.0" {
+		t.Fatalf("rolled back version = %q, want 1.0.0", rolledBack.Manifest.Version)
+	}
+	if len(runtime.ListPackageHistory("rollback_keep_data")) != 1 {
+		t.Fatalf("history length after archive_data rollback = %d, want 1", len(runtime.ListPackageHistory("rollback_keep_data")))
+	}
 }
 
 func TestRuntimeRollbackKeepDataAllowedWithDowngradeSteps(t *testing.T) {
