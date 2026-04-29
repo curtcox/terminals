@@ -1629,6 +1629,9 @@ func collectRuntimeMigrationHostEffects(pkg Package, scriptSource []byte) (runti
 			return effects, fmt.Errorf("%w: artifact.self.patch requires manifest app_id at line %d", ErrMigrationArtifactOwnership, lineNumber+1)
 		}
 		artifactID := migrationStringArgument(match[2])
+		if artifactID == "" {
+			return effects, fmt.Errorf("%w: artifact.self.patch missing artifact_id at line %d", ErrMigrationArtifactOwnership, lineNumber+1)
+		}
 		ownerAppID := migrationKeywordStringArgument(migrateOwnerAppIDPattern, match[2])
 		if ownerAppID == "" {
 			return effects, fmt.Errorf("%w: artifact %q patch missing owner_app_id at line %d", ErrMigrationArtifactOwnership, artifactID, lineNumber+1)

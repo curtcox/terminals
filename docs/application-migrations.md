@@ -247,14 +247,15 @@ of replaying the entire migration range on every retry.
 	emits `step_failed_aborted` journal evidence with the script-provided
 	reason.
 - Runtime retry now validates declared `artifact.self.patch(...)` host effects
-	against the migrating package lineage using `owner_app_id` evidence from the
-	script. Patch calls that omit `owner_app_id`, or whose
-	`owner_app_id` differs from the package `app_id`, fail before step start
-	with `ErrMigrationArtifactOwnership`, mark `verdict = step_failed`, and
-	emit `step_failed_host_rejected` journal evidence. This prevents packages
-	from patching artifacts without host-checkable lineage evidence or patching
-	artifacts owned by another lineage, including lineages that share the same
-	manifest name.
+	against the migrating package lineage using explicit artifact ID and
+	`owner_app_id` evidence from the script. Patch calls that omit a literal,
+	non-empty artifact ID, omit `owner_app_id`, or whose `owner_app_id` differs
+	from the package `app_id`, fail before step start with
+	`ErrMigrationArtifactOwnership`, mark `verdict = step_failed`, and emit
+	`step_failed_host_rejected` journal evidence. This prevents packages from
+	patching artifacts without host-checkable artifact and lineage evidence or
+	patching artifacts owned by another lineage, including lineages that share
+	the same manifest name.
 	Accepted patch declarations now emit `artifact_patch_planned` journal
 	evidence with artifact ID, owner app ID, effect sequence, step, version
 	edge, and script metadata before the step commits. This is declaration
@@ -367,6 +368,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationAbortCallFailsCurrentStep`
 - `TestRuntimeRetryMigrationRejectsArtifactPatchForDifferentLineage`
 - `TestRuntimeRetryMigrationRejectsArtifactPatchWithoutOwnerAppID`
+- `TestRuntimeRetryMigrationRejectsArtifactPatchWithoutArtifactID`
 - `TestRuntimeRetryMigrationJournalsAcceptedArtifactPatchDeclarations`
 - `TestRuntimeRetryMigrationRejectsArtifactPatchHardCap`
 - `TestRuntimeMigrationResourceLimitValidation`

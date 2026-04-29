@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Hardened artifact patch host-effect collection in
+  `terminal_server/internal/appruntime/runtime.go`. Runtime retry
+  now rejects `artifact.self.patch(...)` declarations whose first
+  argument is not an explicit, non-empty artifact ID literal before
+  journaling patch evidence, failing the step with
+  `ErrMigrationArtifactOwnership` and `step_failed_host_rejected`
+  evidence rather than accepting an empty artifact identifier. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationRejectsArtifactPatchWithoutArtifactID`)
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Tightened migration step policy requirements in
   `terminal_server/internal/apppackage/tap.go` and runtime plan
   parsing in `terminal_server/internal/appruntime/runtime.go`.
