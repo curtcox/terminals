@@ -21,6 +21,20 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Tightened migration step policy requirements in
+  `terminal_server/internal/apppackage/tap.go` and runtime plan
+  parsing in `terminal_server/internal/appruntime/runtime.go`.
+  Gate 1 now rejects `[[migrate.step]]` entries that omit
+  `compatibility` or `drain_policy` instead of allowing an
+  implicit execution policy, and runtime status leaves the
+  executor disabled with the same specific diagnostics if package
+  contents drift after verification. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsMigrateStepMissingPolicy`) and
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationInvalidManifestPolicyDisablesExecutor`),
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Tightened fixture-backed synthetic store-effect
   accounting for direct `migrate(record)` dry-run execution in
   `terminal_server/internal/appruntime/runtime.go`. Runtime now

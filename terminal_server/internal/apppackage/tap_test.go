@@ -174,10 +174,14 @@ declared_steps = 2
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.step]]
 from = "2"
 to = "3"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -212,6 +216,69 @@ expected = "tests/migrate_fixtures/history_v3_expected.ndjson"
 	}
 }
 
+func TestVerifyTapRejectsMigrateStepMissingPolicy(t *testing.T) {
+	testCases := []struct {
+		name        string
+		stepPolicy  string
+		wantMessage string
+	}{
+		{
+			name:        "missing compatibility",
+			stepPolicy:  `drain_policy = "none"`,
+			wantMessage: "migrate.step 0001 must declare compatibility",
+		},
+		{
+			name:        "missing drain policy",
+			stepPolicy:  `compatibility = "compatible"`,
+			wantMessage: "migrate.step 0001 must declare drain_policy",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			manifest := strings.TrimSpace(fmt.Sprintf(`
+name = "kitchen_timer"
+version = "2"
+
+[[storage.store_schema]]
+store = "history"
+version = "2"
+record_schema = "tests/schemas/history_v2.json"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+%s
+
+[[migrate.fixture]]
+step = "0001_1_to_2"
+prior_version = "1"
+prior_record_schema = "tests/schemas/history_v1.json"
+seed = "tests/migrate_fixtures/history_v1_seed.ndjson"
+expected = "tests/migrate_fixtures/history_v2_expected.ndjson"
+`, tc.stepPolicy))
+
+			tap := makeTapForTest(t, []tapEntry{
+				{name: "kitchen_timer/main.tal", body: "def on_start(): pass"},
+				{name: "kitchen_timer/manifest.toml", body: manifest},
+				{name: "kitchen_timer/migrate/0001_1_to_2.tal", body: "def migrate(): pass"},
+				{name: "kitchen_timer/tests/migrate_fixtures/history_v1_seed.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+				{name: "kitchen_timer/tests/migrate_fixtures/history_v2_expected.ndjson", body: "{\"key\":\"k1\",\"value\":{}}\n"},
+				{name: "kitchen_timer/tests/schemas/history_v1.json", body: `{"type":"object"}`},
+				{name: "kitchen_timer/tests/schemas/history_v2.json", body: `{"type":"object"}`},
+			})
+
+			_, err := VerifyTap(tap)
+			if !errors.Is(err, ErrInvalidManifest) || !strings.Contains(err.Error(), tc.wantMessage) {
+				t.Fatalf("VerifyTap() error = %v, want ErrInvalidManifest containing %q", err, tc.wantMessage)
+			}
+		})
+	}
+}
+
 func TestVerifyTapRejectsMigrateStepNumberingGap(t *testing.T) {
 	manifest := strings.TrimSpace(`
 name = "kitchen_timer"
@@ -223,10 +290,14 @@ declared_steps = 2
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.step]]
 from = "2"
 to = "3"
+compatibility = "compatible"
+drain_policy = "none"
 `)
 
 	tap := makeTapForTest(t, []tapEntry{
@@ -256,6 +327,8 @@ declared_steps = 2
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 `)
 
 	tap := makeTapForTest(t, []tapEntry{
@@ -286,6 +359,8 @@ max_runtime_seconds = 0
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -331,6 +406,8 @@ checkpoint_every = -1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -376,6 +453,8 @@ drain_timeout_seconds = 0
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -487,6 +566,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 `)
 
 	tap := makeTapForTest(t, []tapEntry{
@@ -516,6 +597,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -560,6 +643,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -604,6 +689,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -734,6 +821,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -774,6 +863,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -815,6 +906,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -860,6 +953,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -905,6 +1000,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -949,6 +1046,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -993,6 +1092,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -1037,6 +1138,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -1081,6 +1184,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -1125,6 +1230,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -1169,6 +1276,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -1213,6 +1322,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"
@@ -1258,6 +1369,8 @@ declared_steps = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.fixture]]
 step = "0001_1_to_2"

@@ -2834,6 +2834,12 @@ func loadMigrationPlan(root string) (int, []migrationPlanStep, error) {
 				manifestStep := manifest.Migrate.Step[i]
 				steps[i].Compatibility = strings.TrimSpace(manifestStep.Compatibility)
 				steps[i].DrainPolicy = strings.TrimSpace(manifestStep.DrainPolicy)
+				if steps[i].Compatibility == "" {
+					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d must declare compatibility", ErrInvalidManifest, i+1)
+				}
+				if steps[i].DrainPolicy == "" {
+					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d must declare drain_policy", ErrInvalidManifest, i+1)
+				}
 				if steps[i].Compatibility != "" && steps[i].Compatibility != "compatible" && steps[i].Compatibility != "incompatible" {
 					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d has invalid compatibility %q", ErrInvalidManifest, i+1, steps[i].Compatibility)
 				}

@@ -721,6 +721,12 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		if strings.TrimSpace(manifestStep.From) == "" || strings.TrimSpace(manifestStep.To) == "" {
 			return ErrInvalidManifest
 		}
+		if strings.TrimSpace(manifestStep.Compatibility) == "" {
+			return fmt.Errorf("%w: migrate.step %04d must declare compatibility", ErrInvalidManifest, i+1)
+		}
+		if strings.TrimSpace(manifestStep.DrainPolicy) == "" {
+			return fmt.Errorf("%w: migrate.step %04d must declare drain_policy", ErrInvalidManifest, i+1)
+		}
 		if manifestStep.Compatibility != "" && manifestStep.Compatibility != "compatible" && manifestStep.Compatibility != "incompatible" {
 			return ErrInvalidManifest
 		}

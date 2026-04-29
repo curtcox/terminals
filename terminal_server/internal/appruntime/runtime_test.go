@@ -3898,6 +3898,18 @@ func TestRuntimeMigrationInvalidManifestPolicyDisablesExecutor(t *testing.T) {
 			drainPolicy:   "none",
 			wantMessage:   "migrate.step 0001 declares compatibility=incompatible with drain_policy=none",
 		},
+		{
+			name:          "missing compatibility",
+			compatibility: "",
+			drainPolicy:   "none",
+			wantMessage:   "migrate.step 0001 must declare compatibility",
+		},
+		{
+			name:          "missing drain policy",
+			compatibility: "compatible",
+			drainPolicy:   "",
+			wantMessage:   "migrate.step 0001 must declare drain_policy",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -4032,10 +4044,14 @@ max_runtime_seconds = 1
 [[migrate.step]]
 from = "1"
 to = "2"
+compatibility = "compatible"
+drain_policy = "none"
 
 [[migrate.step]]
 from = "2"
 to = "3"
+compatibility = "compatible"
+drain_policy = "none"
 `
 	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
 		t.Fatalf("WriteFile(manifest) error = %v", err)

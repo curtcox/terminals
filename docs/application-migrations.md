@@ -13,6 +13,9 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - Reverse migration scripts under `migrate/downgrade/*.tal` are allowed for rollback flows, but must remain single-level files (nested downgrade folders are rejected) and match `<step>_<from>_to_<to>.tal`.
 - Step numbers must be contiguous and start at `1` (no gaps).
 - Each sorted migration file must match the corresponding manifest step `from`/`to` values.
+- Each `[[migrate.step]]` must explicitly declare both `compatibility` and
+	`drain_policy`; missing policy fields are rejected instead of defaulting to a
+	live-data behavior.
 - Invalid migration script paths now return specific diagnostics, including nested path violations under `migrate/` / `migrate/downgrade/` and malformed forward or downgrade step filenames that do not match `<step>_<from>_to_<to>.tal`.
 - When a step declares `compatibility = "incompatible"`, it cannot also declare `drain_policy = "none"`.
 - Migration fixture NDJSON files are bounded to at most 4096 records per file to keep Gate 4 synthetic-store input sizes predictable.
@@ -227,7 +230,8 @@ of replaying the entire migration range on every retry.
 	keep retry from executing.
 - Runtime migration plan parsing also mirrors Gate 1 policy validation for
 	`[[migrate.step]].compatibility`, `drain_policy`, and the
-	`incompatible + none` combination. If package contents drift after
+	`incompatible + none` combination. Missing `compatibility` or `drain_policy`
+	fields are treated as policy errors as well. If package contents drift after
 	verification, migration status remains visible but `executor_ready = false`
 	with the specific policy error.
 - Retry now enforces `[migrate].max_runtime_seconds` as a per-step execution
@@ -314,6 +318,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapRejectsMigrateDeclaredStepMismatch`
 - `TestVerifyTapRejectsMigrateNonPositiveDrainTimeoutSeconds`
 - `TestVerifyTapRejectsMigrateIncompatibleWithoutDrain`
+- `TestVerifyTapRejectsMigrateStepMissingPolicy`
 - `TestVerifyTapAcceptsMigrateIncompatibleWithDrain`
 - `TestVerifyTapRejectsMigrateFixtureTooManyRecords`
 - `TestVerifyTapAcceptsMigrateFixtureAtRecordLimit`
