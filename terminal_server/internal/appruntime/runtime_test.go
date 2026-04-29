@@ -1110,13 +1110,14 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
   record["retry_count"] = record.get("retry_count", 0)
   record["archived"] = record.get("archived", false)
   record["last_seen"] = record.get("last_seen", null)
+  record["metadata"] = record.get("metadata", {"source":"migration","tags":["default"]})
   return record
 `
 	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(migrateScript), 0o644); err != nil {
 		t.Fatalf("WriteFile(migrate) error = %v", err)
 	}
 	seed := "{\"key\":\"history/a\",\"value\":{\"label\":\"  Dishwasher Done  \"}}\n"
-	expected := "{\"key\":\"history/a\",\"value\":{\"archived\":false,\"fallback_label\":\"untitled\",\"label\":\"  Dishwasher Done  \",\"label_normalized\":\"dishwasher done\",\"last_seen\":null,\"retry_count\":0}}\n"
+	expected := "{\"key\":\"history/a\",\"value\":{\"archived\":false,\"fallback_label\":\"untitled\",\"label\":\"  Dishwasher Done  \",\"label_normalized\":\"dishwasher done\",\"last_seen\":null,\"metadata\":{\"source\":\"migration\",\"tags\":[\"default\"]},\"retry_count\":0}}\n"
 	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_seed.ndjson"), []byte(seed), 0o644); err != nil {
 		t.Fatalf("WriteFile(seed fixture) error = %v", err)
 	}

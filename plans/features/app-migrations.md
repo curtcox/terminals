@@ -22,6 +22,18 @@ who may authorize a migration).
 ## Implementation Progress
 
 - 2026-04-29: Expanded fixture-backed `record.get(...)`
+  default handling again in the runtime migration subset. Direct
+  `migrate(record)` scripts now accept structured JSON defaults
+  (`object` and `array`) in addition to scalar defaults when
+  replaying fixtures, matching the subset's existing JSON literal
+  assignment support for common schema-fill migrations. Updated
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesRecordGetFixtureTransforms`)
+  and documented the expanded subset in
+  `docs/application-migrations.md`.
+
+- 2026-04-29: Expanded fixture-backed `record.get(...)`
   default handling in the runtime migration subset. Direct
   `migrate(record)` scripts now accept JSON scalar defaults
   (`number`, `bool`, and `null`) in addition to string defaults
