@@ -854,7 +854,7 @@ func (r *Runtime) maybeInterruptMigrationLocked(name string, state migrationStat
 func (r *Runtime) SetMigrationDrainReady(name string, ready bool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	_, state, err := r.requireMigrationStateLocked(name)
+	pkg, state, err := r.requireMigrationStateLocked(name)
 	if err != nil {
 		return err
 	}
@@ -873,6 +873,7 @@ func (r *Runtime) SetMigrationDrainReady(name string, ready bool) error {
 		state.DrainBlockedAt = time.Time{}
 	}
 	r.migrations[name] = state
+	appendMigrationJournalEntry(pkg, state, "drain_ready_changed", map[string]any{"ready": ready})
 	return nil
 }
 
@@ -1357,6 +1358,13 @@ func replayMigrationStateFromJournal(pkg Package, state migrationState) migratio
 			state.DrainBlockedAt = time.Time{}
 		}
 		switch lastEvent {
+		case "drain_ready_changed":
+			if ready, ok := migrationJournalBool(entry["ready"]); ok {
+				state.DrainReady = ready
+				if ready {
+					state.DrainBlockedAt = time.Time{}
+				}
+			}
 		case "artifact_inverse_failed":
 			if state.PendingRecords == nil {
 				state.PendingRecords = map[string]string{}
@@ -1529,6 +1537,21 @@ func migrationJournalString(raw any) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
+}
+
+func migrationJournalBool(raw any) (bool, bool) {
+	switch v := raw.(type) {
+	case bool:
+		return v, true
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(v))
+		if err != nil {
+			return false, false
+		}
+		return parsed, true
+	default:
+		return false, false
+	}
 }
 
 func migrationJournalTime(raw any) (time.Time, bool) {

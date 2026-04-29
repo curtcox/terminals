@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Persisted migration drain-readiness decisions in
+  `terminal_server/internal/appruntime/runtime.go`. Runtime
+  `SetMigrationDrainReady` now appends `drain_ready_changed`
+  journal evidence, and migration journal replay restores the
+  latest ready/not-ready value so an operator-approved drain does
+  not regress to `drain_pending` after process restart. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeDrainReadyReplaysFromJournal`) and documented the
+  behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Added explicit rollback data-mode regression
   coverage in `terminal_server/internal/appruntime/runtime_test.go`
   (`TestRuntimeRollbackKeepDataRequiresDowngradeSteps`).

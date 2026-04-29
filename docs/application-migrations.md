@@ -59,6 +59,10 @@ migration control actions:
 - Blocked retries emit explicit events (`retry_blocked_reconcile_pending` and
 	`retry_blocked_drain_pending` / `retry_blocked_drain_timeout`) with current
 	verdict/step context and `blocked_since` timing metadata.
+- Drain-readiness changes made through runtime/admin/REPL control surfaces now
+	emit `drain_ready_changed` entries. Journal replay restores the latest
+	ready/not-ready value so an operator-approved drain does not regress to
+	`drain_pending` after a process restart.
 - Retry reconciliation guard now treats `verdict = reconcile_pending` as
 	blocking even if pending-record details are temporarily unavailable, so
 	operators must reconcile before retry can proceed.
@@ -312,6 +316,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeAbortBaselineEntersReconcilePendingWhenArtifactInverseFails`
 - `TestRuntimeReloadMigrationStateStartsFromInstalledVersion`
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
+- `TestRuntimeDrainReadyReplaysFromJournal`
 - `TestRuntimeReconcileMigrationPendingRecords`
 - `TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes`
 - `TestRuntimeRetryMigrationCrashInjectionReplaysAtJournalBoundaries`
