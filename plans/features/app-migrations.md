@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Aligned direct literal assignment parsing in the
+  runtime migration fixture subset with the existing accepted TAL
+  string literal surfaces. Direct `migrate(record)` scripts now
+  accept single-quoted string assignments such as
+  `record["source"] = 'fixture#migration'`, preserving `#`
+  characters inside the literal instead of treating the expression
+  as unsupported JSON. Updated regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesRecordGetFixtureTransforms`)
+  and documented the parser boundary in
+  `docs/application-migrations.md`.
+
 - 2026-04-29: Hardened TAL line-comment stripping in the
   runtime migration fixture parser. The deterministic migration
   subset now preserves `#` characters inside single-quoted string

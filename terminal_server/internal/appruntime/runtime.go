@@ -2511,6 +2511,18 @@ func parseRuntimeMigrationFixtureAssignment(destination string, expression strin
 		}, nil
 	}
 
+	if strings.HasPrefix(expression, "'") {
+		value := decodeTALStringLiteral(expression)
+		if value == "" && expression != "''" {
+			return runtimeMigrationFixtureTransform{}, fmt.Errorf("unsupported assignment expression %q", expression)
+		}
+		return runtimeMigrationFixtureTransform{
+			Destination: destination,
+			Operation:   "literal",
+			Value:       value,
+		}, nil
+	}
+
 	var value any
 	if err := json.Unmarshal([]byte(expression), &value); err != nil {
 		return runtimeMigrationFixtureTransform{}, fmt.Errorf("unsupported assignment expression %q", expression)
