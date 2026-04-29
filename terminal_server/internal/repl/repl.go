@@ -2444,13 +2444,14 @@ func (s *state) evalControlPlane(ctx context.Context, group string, args []strin
 				recordSummary := migrationPendingRecordSummary(migration)
 				_, err = fmt.Fprintf(
 					s.out,
-					"OK  app=%s verdict=%s steps=%v/%v last_step=%v pending_records=%s last_error=%q executor_ready=%v\n",
+					"OK  app=%s verdict=%s steps=%v/%v last_step=%v pending_records=%s reconciliation_path=%s last_error=%q executor_ready=%v\n",
 					appName,
 					toString(migration["verdict"]),
 					migration["steps_completed"],
 					migration["steps_planned"],
 					migration["last_step"],
 					recordSummary,
+					emptyAsNone(toString(migration["reconciliation_path"])),
 					toString(migration["last_error"]),
 					migration["executor_ready"],
 				)
@@ -4058,6 +4059,10 @@ func migrationPendingRecordSummary(migration map[string]any) string {
 		if recordID == "" {
 			continue
 		}
+		resolution := strings.TrimSpace(toString(record["recommended_resolution"]))
+		if resolution != "" {
+			recordID += ":" + resolution
+		}
 		ids = append(ids, recordID)
 	}
 	if len(ids) == 0 {
@@ -4065,6 +4070,13 @@ func migrationPendingRecordSummary(migration map[string]any) string {
 	}
 	sort.Strings(ids)
 	return strings.Join(ids, ",")
+}
+
+func emptyAsNone(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "none"
+	}
+	return value
 }
 
 func printTable(out io.Writer, headers []string, rows [][]string) error {

@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Tightened the human-readable migration operator
+  status surface in `terminal_server/internal/repl/repl.go`.
+  `apps migrate status` now prints sorted pending reconciliation
+  records as `record_id:recommended_resolution` and includes
+  `reconciliation_path`, so the plain-text command carries the
+  same reconciliation detail needed for follow-up operator action
+  as the admin API payload. Updated regression coverage in
+  `terminal_server/internal/repl/repl_test.go`
+  (`TestAppsMigrateStatusUsesAdminAPI`) and documented the
+  behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Tightened checkpoint abort semantics for
   in-flight migration steps in
   `terminal_server/internal/appruntime/runtime.go`. Operator

@@ -256,6 +256,12 @@ rotation. Packages that omit `app_id` keep the existing manifest-name fallback.
 These entries are written to the status-provided `journal_path` consumed by
 `/admin/api/apps/migrate/logs` and `apps migrate logs`.
 
+Human-readable `apps migrate status` output now includes `last_step`,
+`last_error`, sorted pending records as
+`record_id:recommended_resolution`, and `reconciliation_path` so an operator
+has the record IDs, suggested resolution policy, and durable reconcile file
+needed before invoking `apps migrate reconcile`.
+
 On package load, runtime now replays existing migration journal entries for the
 current revision so `apps migrate status` resumes the last known
 `verdict`/`steps_completed`/`last_step`/`last_error` instead of resetting to an
@@ -330,6 +336,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeReloadMigrationAfterKeyRotationUsesAppIDAndPendingVersionWindow`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
+- `TestAppsMigrateStatusUsesAdminAPI`
 - `TestExecuteCommandAppsMigrateUsageIncludesLogs`
 
 ## Not yet implemented
