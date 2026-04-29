@@ -581,6 +581,31 @@ func TestRuntimeMigrationLifecycleWithSteps(t *testing.T) {
 		t.Fatalf("AbortMigration() last_error = %q, want %q", status.LastError, "step 2 aborted by operator")
 	}
 
+	runtime.mu.Lock()
+	state := runtime.migrations["migrate_live"]
+	state.Verdict = "running"
+	state.StepsCompleted = 1
+	state.LastStep = 2
+	runtime.migrations["migrate_live"] = state
+	runtime.mu.Unlock()
+
+	status, err = runtime.AbortMigration("migrate_live", MigrationAbortToCheckpoint)
+	if err != nil {
+		t.Fatalf("AbortMigration(in-flight step) error = %v", err)
+	}
+	if status.Verdict != "step_failed" {
+		t.Fatalf("AbortMigration(in-flight step) verdict = %q, want step_failed", status.Verdict)
+	}
+	if status.StepsCompleted != 1 {
+		t.Fatalf("AbortMigration(in-flight step) steps_completed = %d, want 1", status.StepsCompleted)
+	}
+	if status.LastStep != 2 {
+		t.Fatalf("AbortMigration(in-flight step) last_step = %d, want 2", status.LastStep)
+	}
+	if status.LastError != "step 2 aborted by operator" {
+		t.Fatalf("AbortMigration(in-flight step) last_error = %q, want %q", status.LastError, "step 2 aborted by operator")
+	}
+
 	status, err = runtime.RetryMigration("migrate_live")
 	if err != nil {
 		t.Fatalf("RetryMigration() second run error = %v", err)

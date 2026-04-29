@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Tightened checkpoint abort semantics for
+  in-flight migration steps in
+  `terminal_server/internal/appruntime/runtime.go`. Operator
+  checkpoint aborts now preserve already-committed step progress
+  when `last_step` points at an uncommitted in-flight step,
+  while retaining the existing completed-state rewind behavior
+  for aborting after a terminal commit. Added regression coverage
+  in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationLifecycleWithSteps`) and documented the
+  behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Hardened Gate 4 `multi_version` read-adapter
   path diagnostics and regression coverage. Runtime dry-run
   replay already resolves `read_adapter` paths through the same

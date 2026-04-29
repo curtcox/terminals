@@ -1156,11 +1156,11 @@ func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error) {
 		}
 		state.LastError = "aborted to baseline by operator"
 	} else {
-		failedStep := state.StepsCompleted
+		failedStep := state.LastStep
 		if failedStep < 1 {
-			failedStep = 1
+			failedStep = state.StepsCompleted + 1
 		}
-		if state.StepsCompleted > 0 {
+		if failedStep <= state.StepsCompleted && state.StepsCompleted > 0 {
 			state.StepsCompleted--
 		}
 		if state.StepsCompleted < 0 {

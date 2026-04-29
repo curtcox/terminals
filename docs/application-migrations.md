@@ -73,6 +73,9 @@ migration control actions:
 - Checkpoint abort now leaves migration state at `verdict = "step_failed"`
 	with `last_step` pinned to the failed step and checkpoint progress preserved
 	for `apps migrate retry`; baseline abort remains `verdict = "aborted"`.
+	If the abort targets an in-flight step, previously committed steps remain
+	committed; aborting an already-committed terminal state rewinds the most
+	recent completed step for retry.
 
 Retry now resumes at the first incomplete step (`steps_completed + 1`) instead
 of replaying the entire migration range on every retry.
@@ -284,6 +287,8 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapAcceptsMultiVersionReadAdapter`
 - `TestRuntimeRetryMigrationRequiresDrainReadiness`
 - `TestRuntimeMigrationLifecycleWithSteps`
+	(covers checkpoint aborts for both completed-state rewind and in-flight
+	step preservation)
 - `TestRuntimeAbortBaselineEntersReconcilePendingWhenArtifactInverseFails`
 - `TestRuntimeReloadMigrationStateStartsFromInstalledVersion`
 - `TestRuntimeDrainPendingBlockedAtReplaysFromJournal`
