@@ -10,10 +10,10 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - If no `migrate/*.tal` files exist, migration declarations must be absent (`declared_steps = 0` and no `[[migrate.step]]`).
 - If migration files exist, `[migrate].declared_steps`, `[[migrate.step]]` count, and migration file count must match.
 - Migration files must be one level under `migrate/` and match `<step>_<from>_to_<to>.tal`.
-- Reverse migration scripts under `migrate/downgrade/*.tal` are allowed for rollback flows, but must remain single-level files (nested downgrade folders are rejected).
+- Reverse migration scripts under `migrate/downgrade/*.tal` are allowed for rollback flows, but must remain single-level files (nested downgrade folders are rejected) and match `<step>_<from>_to_<to>.tal`.
 - Step numbers must be contiguous and start at `1` (no gaps).
 - Each sorted migration file must match the corresponding manifest step `from`/`to` values.
-- Invalid migration script paths now return specific diagnostics, including nested path violations under `migrate/` / `migrate/downgrade/` and malformed step filenames that do not match `<step>_<from>_to_<to>.tal`.
+- Invalid migration script paths now return specific diagnostics, including nested path violations under `migrate/` / `migrate/downgrade/` and malformed forward or downgrade step filenames that do not match `<step>_<from>_to_<to>.tal`.
 - When a step declares `compatibility = "incompatible"`, it cannot also declare `drain_policy = "none"`.
 - Migration fixture NDJSON files are bounded to at most 4096 records per file to keep Gate 4 synthetic-store input sizes predictable.
 - Migration seed fixture records are validated against each fixture's declared `prior_record_schema`; invalid seed rows now fail package verification with record-level diagnostics.

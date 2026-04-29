@@ -21,6 +21,19 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Tightened rollback reverse-step validation for
+  `migrate/downgrade/*.tal`. Gate 1 package verification now
+  requires downgrade scripts to use the same
+  `<step>_<from>_to_<to>.tal` edge filename shape as forward
+  migrations, and runtime `--keep-data` rollback only treats
+  valid downgrade edge filenames as reverse-step evidence.
+  Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsMalformedMigrateDowngradeFilename`) and
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRollbackKeepDataRejectsMalformedDowngradeStep`),
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Aligned runtime fixture lookup with Gate 1 package
   fixture identifiers. Runtime dry-run and retry fixture matching now
   accepts canonical `[[migrate.fixture]].step` values in

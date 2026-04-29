@@ -2822,7 +2822,13 @@ func countDowngradeMigrationSteps(root string) int {
 	if err != nil {
 		return 0
 	}
-	return len(matches)
+	valid := 0
+	for _, match := range matches {
+		if migrateStepFilePattern.MatchString(filepath.Base(match)) {
+			valid++
+		}
+	}
+	return valid
 }
 
 func migrationJournalPath(pkg Package) string {
