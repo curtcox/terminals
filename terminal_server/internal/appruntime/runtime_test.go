@@ -3092,7 +3092,7 @@ compatibility = "compatible"
 drain_policy = "multi_version"
 
 [[migrate.fixture]]
-step = "1"
+step = "0001_1_to_2"
 prior_version = "1"
 seed = "tests/migrate_fixtures/history_seed.ndjson"
 expected = "tests/migrate_fixtures/history_expected.ndjson"

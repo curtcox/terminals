@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Aligned runtime fixture lookup with Gate 1 package
+  fixture identifiers. Runtime dry-run and retry fixture matching now
+  accepts canonical `[[migrate.fixture]].step` values in
+  `<step>_<from>_to_<to>` form (for example `0001_1_to_2`), matching
+  package verification and docs, while retaining numeric step IDs such
+  as `0001` as a local compatibility fallback. Updated
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeLoadPackageValidatesMultiVersionReadAdapterDuringDryRunGate`)
+  to exercise the canonical package-format identifier and documented
+  the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Added fixture-backed `multi_version` read-adapter
   replay for Gate 4 migration dry-runs. Multi-version fixtures
   now declare a `read_adapter`; package verification requires the

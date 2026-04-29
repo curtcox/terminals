@@ -144,6 +144,10 @@ of replaying the entire migration range on every retry.
 	requires a `[[migrate.fixture]]` entry for each pending step. Missing
 	per-step fixture metadata fails retry with `ErrMigrationFixtureUnavailable`
 	and emits `step_failed_fixture_unavailable` journal entries.
+	Runtime fixture lookup accepts the package-format step identifier
+	(`<step>_<from>_to_<to>`, for example `0001_1_to_2`) used by Gate 1
+	verification, with numeric identifiers such as `0001` retained as a local
+	compatibility fallback.
 - Runtime retry now supports crash-injection testing at journal boundaries
 	(`retry_started`, `step_started`, `step_committed`). Injected interruptions
 	persist as `verdict = running` snapshots in the journal; restart replay

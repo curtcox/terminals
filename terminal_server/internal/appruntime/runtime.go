@@ -2476,11 +2476,8 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 		if stepIDRaw == "" {
 			continue
 		}
-		stepID, err := strconv.Atoi(stepIDRaw)
-		if err != nil {
-			return nil, fmt.Errorf("%w: migrate.fixture step %q is not numeric", ErrMigrationFixtureMismatch, fixture.Step)
-		}
-		if stepID != step.Number {
+		stepID, ok := runtimeMigrationFixtureStepMatches(stepIDRaw, step)
+		if !ok {
 			continue
 		}
 		priorVersion := strings.TrimSpace(fixture.PriorVersion)
@@ -2508,6 +2505,17 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 	}
 
 	return match, nil
+}
+
+func runtimeMigrationFixtureStepMatches(stepIDRaw string, step migrationPlanStep) (int, bool) {
+	if stepID, err := strconv.Atoi(stepIDRaw); err == nil {
+		return stepID, stepID == step.Number
+	}
+	stepName := strings.TrimSuffix(step.ScriptName, ".tal")
+	if stepIDRaw == stepName {
+		return step.Number, true
+	}
+	return 0, false
 }
 
 func readRuntimeFixtureRecords(root string, relPath string) (map[string]string, error) {
