@@ -220,6 +220,11 @@ of replaying the entire migration range on every retry.
 	`[migrate].checkpoint_every`; invalid
 	limits set `executor_ready = false` with a field-specific `last_error` and
 	keep retry from executing.
+- Runtime migration plan parsing also mirrors Gate 1 policy validation for
+	`[[migrate.step]].compatibility`, `drain_policy`, and the
+	`incompatible + none` combination. If package contents drift after
+	verification, migration status remains visible but `executor_ready = false`
+	with the specific policy error.
 - Retry now enforces `[migrate].max_runtime_seconds` as a per-step execution
 	budget. If the budget elapses before the current step commits, retry fails
 	with `ErrMigrationRuntimeTimeout`, keeps checkpoint progress at the last

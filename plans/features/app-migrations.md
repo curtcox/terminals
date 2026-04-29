@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Hardened runtime migration manifest policy parsing in
+  `terminal_server/internal/appruntime/runtime.go`. Runtime migration
+  plan parsing now mirrors Gate 1 validation for
+  `[[migrate.step]].compatibility`, `drain_policy`, and the
+  `incompatible + none` combination, leaving `executor_ready = false`
+  with a specific `last_error` if package contents drift after
+  verification. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationInvalidManifestPolicyDisablesExecutor`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Persisted migration drain-readiness decisions in
   `terminal_server/internal/appruntime/runtime.go`. Runtime
   `SetMigrationDrainReady` now appends `drain_ready_changed`

@@ -2825,6 +2825,15 @@ func loadMigrationPlan(root string) (int, []migrationPlanStep, error) {
 				manifestStep := manifest.Migrate.Step[i]
 				steps[i].Compatibility = strings.TrimSpace(manifestStep.Compatibility)
 				steps[i].DrainPolicy = strings.TrimSpace(manifestStep.DrainPolicy)
+				if steps[i].Compatibility != "" && steps[i].Compatibility != "compatible" && steps[i].Compatibility != "incompatible" {
+					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d has invalid compatibility %q", ErrInvalidManifest, i+1, steps[i].Compatibility)
+				}
+				if steps[i].DrainPolicy != "" && steps[i].DrainPolicy != "none" && steps[i].DrainPolicy != "drain" && steps[i].DrainPolicy != "multi_version" {
+					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d has invalid drain_policy %q", ErrInvalidManifest, i+1, steps[i].DrainPolicy)
+				}
+				if steps[i].Compatibility == "incompatible" && steps[i].DrainPolicy == "none" {
+					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d declares compatibility=incompatible with drain_policy=none", ErrInvalidManifest, i+1)
+				}
 				steps[i].RequiresDrain = strings.EqualFold(steps[i].Compatibility, "incompatible") && strings.EqualFold(steps[i].DrainPolicy, "drain")
 				if strings.TrimSpace(manifestStep.From) != "" && strings.TrimSpace(manifestStep.To) != "" {
 					if strings.TrimSpace(manifestStep.From) != steps[i].FromVersion || strings.TrimSpace(manifestStep.To) != steps[i].ToVersion {

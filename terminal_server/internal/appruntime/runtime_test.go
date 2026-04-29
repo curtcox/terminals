@@ -3821,6 +3821,93 @@ func TestRuntimeMigrationInvalidLimitsDisableExecutor(t *testing.T) {
 	}
 }
 
+func TestRuntimeMigrationInvalidManifestPolicyDisablesExecutor(t *testing.T) {
+	testCases := []struct {
+		name          string
+		compatibility string
+		drainPolicy   string
+		wantMessage   string
+	}{
+		{
+			name:          "unknown compatibility",
+			compatibility: "sometimes",
+			drainPolicy:   "none",
+			wantMessage:   `migrate.step 0001 has invalid compatibility "sometimes"`,
+		},
+		{
+			name:          "unknown drain policy",
+			compatibility: "compatible",
+			drainPolicy:   "eventually",
+			wantMessage:   `migrate.step 0001 has invalid drain_policy "eventually"`,
+		},
+		{
+			name:          "incompatible without drain",
+			compatibility: "incompatible",
+			drainPolicy:   "none",
+			wantMessage:   "migrate.step 0001 declares compatibility=incompatible with drain_policy=none",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			appDir := filepath.Join(tempDir, "migrate_invalid_manifest_policy")
+			if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+				t.Fatalf("MkdirAll() error = %v", err)
+			}
+			manifest := fmt.Sprintf(`name = "migrate_invalid_manifest_policy"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = %q
+drain_policy = %q
+`, tc.compatibility, tc.drainPolicy)
+			if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+				t.Fatalf("WriteFile(manifest) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(main) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(migrate) error = %v", err)
+			}
+
+			runtime := NewRuntime()
+			if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+				t.Fatalf("LoadPackage() error = %v", err)
+			}
+
+			status, err := runtime.GetMigrationStatus("migrate_invalid_manifest_policy")
+			if err != nil {
+				t.Fatalf("GetMigrationStatus() error = %v", err)
+			}
+			if status.ExecutorReady {
+				t.Fatalf("ExecutorReady = true, want false")
+			}
+			if !strings.Contains(status.LastError, tc.wantMessage) {
+				t.Fatalf("LastError = %q, want contains %q", status.LastError, tc.wantMessage)
+			}
+
+			status, err = runtime.RetryMigration("migrate_invalid_manifest_policy")
+			if err != nil {
+				t.Fatalf("RetryMigration() error = %v", err)
+			}
+			if status.ExecutorReady {
+				t.Fatalf("RetryMigration() ExecutorReady = true, want false")
+			}
+			if status.StepsCompleted != 0 {
+				t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+			}
+		})
+	}
+}
+
 func TestRuntimeRetryMigrationFailsWhenMaxRuntimeExceeded(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_runtime_timeout")
