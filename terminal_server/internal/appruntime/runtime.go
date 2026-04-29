@@ -127,7 +127,7 @@ var migrateRecordNormalizeGetPattern = regexp.MustCompile(`^_normalize\(\s*recor
 
 var migrateRecordNormalizePattern = regexp.MustCompile(`^_normalize\(\s*record\["([^"]+)"\]\s*\)$`)
 
-var migrateAbortPattern = regexp.MustCompile(`^abort\(\s*("(?:\\.|[^"\\])*")\s*\)$`)
+var migrateAbortPattern = regexp.MustCompile(`^abort\(\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)$`)
 
 var migrateArtifactSelfLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']artifact\.self["']\s*,(?P<args>[^)]*)\)`)
 
@@ -1754,9 +1754,9 @@ func migrationAbortAliases(scriptSource []byte) map[string]struct{} {
 
 func migrationAbortCall(line string, aliases map[string]struct{}) (string, bool, error) {
 	if match := migrateAbortPattern.FindStringSubmatch(line); match != nil {
-		var reason string
-		if err := json.Unmarshal([]byte(match[1]), &reason); err != nil {
-			return "", true, err
+		reason := decodeTALStringLiteral(match[1])
+		if reason == "" && strings.TrimSpace(match[1]) != `""` && strings.TrimSpace(match[1]) != "''" {
+			return "", true, fmt.Errorf("invalid abort reason literal %q", match[1])
 		}
 		return reason, true, nil
 	}

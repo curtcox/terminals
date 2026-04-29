@@ -21,6 +21,16 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Aligned direct `abort(...)` reason parsing in the
+  runtime migration fixture subset with loaded abort aliases and the
+  existing accepted TAL string literal surfaces. Direct abort calls now
+  accept single-quoted reasons such as
+  `abort('unsafe # record shape')`, preserving `#` characters inside the
+  literal instead of treating them as line comments. Updated regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationFixtureParsesAbortAliases`) and documented the
+  parser boundary in `docs/application-migrations.md`.
+
 - 2026-04-29: Aligned direct literal assignment parsing in the
   runtime migration fixture subset with the existing accepted TAL
   string literal surfaces. Direct `migrate(record)` scripts now

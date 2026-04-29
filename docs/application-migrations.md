@@ -255,7 +255,10 @@ of replaying the entire migration range on every retry.
 	retry fails the current step with `ErrMigrationAborted`, keeps checkpoint
 	progress at the last committed step, marks `verdict = step_failed`, and
 	emits `step_failed_aborted` journal evidence with the script-provided
-	reason.
+	reason. Direct `abort(...)` fixture calls and loaded abort aliases both
+	accept double-quoted and single-quoted TAL string literals, preserving
+	`#` characters inside the quoted reason instead of treating them as line
+	comments.
 - Runtime retry now validates declared `artifact.self.patch(...)` host effects
 	against the migrating package lineage using explicit artifact ID and
 	`owner_app_id` evidence from the script. Patch calls that omit a literal,

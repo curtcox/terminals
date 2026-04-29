@@ -1724,8 +1724,17 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 }
 
 func TestRuntimeMigrationFixtureParsesAbortAliases(t *testing.T) {
+	directScript := []byte("def migrate(record):\n    abort('unsafe # record shape')\n")
+	transforms, err := parseRuntimeMigrationFixtureTransforms(directScript)
+	if err != nil {
+		t.Fatalf("parseRuntimeMigrationFixtureTransforms(direct) error = %v", err)
+	}
+	if len(transforms) != 1 || transforms[0].Operation != "abort" || transforms[0].Reason != "unsafe # record shape" {
+		t.Fatalf("parseRuntimeMigrationFixtureTransforms(direct) = %+v, want single-quoted abort transform", transforms)
+	}
+
 	recordScript := []byte("load(\"migrate.env\", abort = \"stop_now\")\ndef migrate(record):\n    stop_now(\"bad record\")\n")
-	transforms, err := parseRuntimeMigrationFixtureTransforms(recordScript)
+	transforms, err = parseRuntimeMigrationFixtureTransforms(recordScript)
 	if err != nil {
 		t.Fatalf("parseRuntimeMigrationFixtureTransforms() error = %v", err)
 	}
