@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added explicit runtime regression coverage for
+  key-rotation upgrade semantics in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeReloadMigrationAfterKeyRotationUsesAppIDAndPendingVersionWindow`).
+  Reloaded packages that keep the same lineage `app_id` but change
+  author-key metadata now preserve app-ID-scoped migration journal
+  paths while computing pending migration work from the installed
+  package version, so a version `2` to `3` upgrade runs only the
+  `2 -> 3` step rather than replaying `1 -> 2`. Documented the
+  behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Aligned runtime fixture execution for
   `migrate.env.abort(reason)` with the migration module alias
   contract in `terminal_server/internal/appruntime/runtime.go`.

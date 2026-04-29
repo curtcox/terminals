@@ -141,6 +141,11 @@ of replaying the entire migration range on every retry.
 	migration scripts (for example `0001_1_to_2.tal` and `0002_2_to_3.tal` while
 	reloading from version `2` to `3`) now start retry at the pending boundary
 	instead of replaying earlier edges.
+- Reload across author-key rotation keeps migration state anchored to the
+	stable `app_id` lineage while still using the installed package version to
+	compute the pending version window. A rotated package that keeps the same
+	`app_id` and upgrades from version `2` to `3` runs only the `2 -> 3` step;
+	the migration journal remains under `apps/<app_id>/migrate/...`.
 - Runtime now exposes a reusable dry-run harness,
 	`DryRunMigrationJournalReplay`, which executes crash-injection replay checks
 	against every declared journal boundary (`retry_started`, plus
@@ -289,6 +294,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationRejectsArtifactPatchHardCap`
 - `TestRuntimeMigrationResourceLimitValidation`
 - `TestRuntimeRetryMigrationEmitsCheckpointEveryForFixtureEffects`
+- `TestRuntimeReloadMigrationAfterKeyRotationUsesAppIDAndPendingVersionWindow`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
 - `TestExecuteCommandAppsMigrateUsageIncludesLogs`
