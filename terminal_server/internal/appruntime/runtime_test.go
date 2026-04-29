@@ -1295,6 +1295,9 @@ def _normalize(label):
 	if !hasMigrationCheckpointMetadata(entries, 1, 1, 1) {
 		t.Fatalf("migration journal missing checkpoint_every evidence: %+v", entries)
 	}
+	if !hasMigrationLogEntry(entries, 1, "info", "history.migrated", `"history.migrated", records = count`) {
+		t.Fatalf("migration journal missing fixture log evidence: %+v", entries)
+	}
 }
 
 func TestRuntimeRetryMigrationAppliesStoreDeleteFixtureEffects(t *testing.T) {
@@ -3867,6 +3870,9 @@ type migrationJournalEntry struct {
 	ToVersion       string `json:"to_version"`
 	Script          string `json:"script"`
 	Error           string `json:"error"`
+	Level           string `json:"level"`
+	Message         string `json:"message"`
+	Arguments       string `json:"arguments"`
 	ArtifactID      string `json:"artifact_id"`
 	OwnerAppID      string `json:"owner_app_id"`
 	EffectSequence  int    `json:"effect_sequence"`
@@ -3983,6 +3989,18 @@ func hasMigrationCheckpointMetadata(entries []migrationJournalEntry, step int, e
 			continue
 		}
 		if entry.EffectSequence == effectSequence && entry.CheckpointEvery == checkpointEvery {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMigrationLogEntry(entries []migrationJournalEntry, step int, level string, message string, arguments string) bool {
+	for _, entry := range entries {
+		if entry.Event != "migration_log" || entry.Step != step {
+			continue
+		}
+		if entry.Level == level && entry.Message == message && entry.Arguments == arguments {
 			return true
 		}
 	}

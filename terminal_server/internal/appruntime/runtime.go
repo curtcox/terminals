@@ -130,7 +130,7 @@ var migrateLoadAliasPattern = regexp.MustCompile(`\bpatch\s*=\s*["']([A-Za-z_][A
 
 var migrateLogLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']log["']\s*,(?P<args>[^)]*)\)`)
 
-var migrateLogAliasPattern = regexp.MustCompile(`\b(?:debug|info|warn|error)\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+var migrateLogAliasPattern = regexp.MustCompile(`\b(debug|info|warn|error)\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
 
 var migrateStoreLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']store["']\s*,(?P<args>[^)]*)\)`)
 
@@ -745,6 +745,17 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 				})
 				return statusFromState(pkg, state), fixtureErr
 			}
+		}
+		for _, logEntry := range stats.Logs {
+			appendMigrationJournalEntry(pkg, state, "migration_log", map[string]any{
+				"step_id":      step.Number,
+				"from_version": step.FromVersion,
+				"to_version":   step.ToVersion,
+				"script":       step.ScriptName,
+				"level":        logEntry.Level,
+				"message":      logEntry.Message,
+				"arguments":    logEntry.Arguments,
+			})
 		}
 		state, err = r.appendMigrationCheckpointEntriesLocked(name, pkg, state, step, stats.StoreOps)
 		if err != nil {
@@ -1618,17 +1629,17 @@ func artifactSelfPatchAliases(scriptSource []byte) map[string]struct{} {
 	return aliases
 }
 
-func migrationLogAliases(scriptSource []byte) map[string]struct{} {
-	aliases := make(map[string]struct{})
+func migrationLogAliases(scriptSource []byte) map[string]string {
+	aliases := make(map[string]string)
 	for _, match := range migrateLogLoadPattern.FindAllSubmatch(scriptSource, -1) {
 		if len(match) < 2 {
 			continue
 		}
 		for _, aliasMatch := range migrateLogAliasPattern.FindAllSubmatch(match[1], -1) {
-			if len(aliasMatch) < 2 {
+			if len(aliasMatch) < 3 {
 				continue
 			}
-			aliases[string(aliasMatch[1])] = struct{}{}
+			aliases[string(aliasMatch[2])] = string(aliasMatch[1])
 		}
 	}
 	return aliases
@@ -1768,6 +1779,13 @@ type runtimeMigrationResourceStats struct {
 	StoreOps              int
 	WriteVolumeBytes      int64
 	ArtifactPatchAttempts int
+	Logs                  []runtimeMigrationLogEntry
+}
+
+type runtimeMigrationLogEntry struct {
+	Level     string
+	Message   string
+	Arguments string
 }
 
 type runtimeMigrationResourceLimits struct {
@@ -1921,16 +1939,17 @@ type runtimeMigrationFixtureTransform struct {
 }
 
 func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]string) (map[string]string, runtimeMigrationResourceStats, error) {
+	stats := runtimeMigrationResourceStats{Logs: collectRuntimeMigrationLogs(scriptSource)}
 	transforms, err := parseRuntimeMigrationFixtureTransforms(scriptSource)
 	if err != nil {
-		return executeRuntimeMigrationStoreFixture(scriptSource, seedRecords, err)
+		return executeRuntimeMigrationStoreFixture(scriptSource, seedRecords, err, stats.Logs)
 	}
 	if len(transforms) == 0 {
 		out := make(map[string]string, len(seedRecords))
 		for key, value := range seedRecords {
 			out[key] = value
 		}
-		return out, runtimeMigrationResourceStats{}, nil
+		return out, stats, nil
 	}
 
 	for _, transform := range transforms {
@@ -1993,10 +2012,12 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 		out[key] = string(canonical)
 		writeVolume += int64(len(canonical))
 	}
-	return out, runtimeMigrationResourceStats{StoreOps: len(seedRecords), WriteVolumeBytes: writeVolume}, nil
+	stats.StoreOps = len(seedRecords)
+	stats.WriteVolumeBytes = writeVolume
+	return out, stats, nil
 }
 
-func executeRuntimeMigrationStoreFixture(scriptSource []byte, seedRecords map[string]string, recordModeErr error) (map[string]string, runtimeMigrationResourceStats, error) {
+func executeRuntimeMigrationStoreFixture(scriptSource []byte, seedRecords map[string]string, recordModeErr error, logs []runtimeMigrationLogEntry) (map[string]string, runtimeMigrationResourceStats, error) {
 	plan, err := parseRuntimeMigrationStoreFixturePlan(scriptSource)
 	if err != nil {
 		if recordModeErr != nil {
@@ -2021,7 +2042,7 @@ func executeRuntimeMigrationStoreFixture(scriptSource []byte, seedRecords map[st
 	}
 	sort.Strings(keys)
 
-	var stats runtimeMigrationResourceStats
+	stats := runtimeMigrationResourceStats{Logs: logs}
 	for _, key := range keys {
 		var record map[string]any
 		if err := json.Unmarshal([]byte(out[key]), &record); err != nil {
@@ -2083,6 +2104,36 @@ func executeRuntimeMigrationStoreFixture(scriptSource []byte, seedRecords map[st
 		stats.WriteVolumeBytes += int64(len(canonical))
 	}
 	return out, stats, nil
+}
+
+func collectRuntimeMigrationLogs(scriptSource []byte) []runtimeMigrationLogEntry {
+	logAliases := migrationLogAliases(scriptSource)
+	if len(logAliases) == 0 {
+		return nil
+	}
+	lines := strings.Split(string(scriptSource), "\n")
+	logs := make([]runtimeMigrationLogEntry, 0)
+	for _, rawLine := range lines {
+		line := strings.TrimSpace(stripTALLineComment(rawLine))
+		match := migrateCallPattern.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		level, ok := logAliases[match[1]]
+		if !ok {
+			continue
+		}
+		message := migrationStringArgument(match[2])
+		if message == "" {
+			continue
+		}
+		logs = append(logs, runtimeMigrationLogEntry{
+			Level:     level,
+			Message:   message,
+			Arguments: strings.TrimSpace(match[2]),
+		})
+	}
+	return logs
 }
 
 func validateRuntimeMigrationResourceLimits(stats runtimeMigrationResourceStats, limits runtimeMigrationResourceLimits) error {

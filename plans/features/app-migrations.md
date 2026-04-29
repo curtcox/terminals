@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added operator-visible journaling for
+  fixture-backed migration `log.*(...)` calls in
+  `terminal_server/internal/appruntime/runtime.go`. Runtime
+  retry now parses accepted `log` aliases, records
+  `migration_log` journal entries with level, message, raw
+  arguments, and step/version metadata, and keeps those entries
+  available through existing `apps migrate logs` surfaces. Added
+  regression coverage to
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesPagedStoreFixtureTransforms`)
+  and documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Tightened the human-readable migration operator
   status surface in `terminal_server/internal/repl/repl.go`.
   `apps migrate status` now prints sorted pending reconciliation

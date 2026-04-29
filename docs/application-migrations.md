@@ -52,6 +52,10 @@ migration control actions:
 - `RetryMigration` writes `retry_started` and `retry_committed` entries on
 	successful runs, and emits `step_started`/`step_committed` entries for each
 	migration step so operators can see step-by-step progression.
+- Fixture-backed migration execution now journals accepted `log.*(...)` calls
+	as `migration_log` entries with level, message, raw arguments, and step
+	metadata, so `apps migrate logs` surfaces TAL migration log intent instead
+	of silently treating those calls as no-ops.
 - Blocked retries emit explicit events (`retry_blocked_reconcile_pending` and
 	`retry_blocked_drain_pending` / `retry_blocked_drain_timeout`) with current
 	verdict/step context and `blocked_since` timing metadata.
