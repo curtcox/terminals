@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -608,6 +609,97 @@ func TestAppsRollbackRejectsKeepDataWithoutDowngradeSteps(t *testing.T) {
 	}
 	if !strings.Contains(rollbackW.Body.String(), appruntime.ErrRollbackKeepDataRequiresDowngrade.Error()) {
 		t.Fatalf("rollback body missing keep-data downgrade error: %s", rollbackW.Body.String())
+	}
+}
+
+func TestAppsRollbackBlockedByReconcilePendingReturnsMigrationStatus(t *testing.T) {
+	appRoot := createTestAppPackage(t, "sound_watch_pending", "1.0.0")
+	appRuntime := appruntime.NewRuntime()
+	if _, err := appRuntime.LoadPackage(context.Background(), appRoot); err != nil {
+		t.Fatalf("LoadPackage(v1) error = %v", err)
+	}
+
+	time.Sleep(5 * time.Millisecond)
+	if err := os.MkdirAll(filepath.Join(appRoot, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appRoot, "migrate", "0001_1.0.0_to_1.1.0.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migration step) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appRoot, "manifest.toml"), []byte(
+		"name = \"sound_watch_pending\"\nversion = \"1.1.0\"\nlanguage = \"tal/1\"\nexports = [\"watch\"]\n\n[migrate]\ndeclared_steps = 1\n\n[[migrate.step]]\nfrom = \"1.0.0\"\nto = \"1.1.0\"\ncompatibility = \"compatible\"\ndrain_policy = \"none\"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest v2) error = %v", err)
+	}
+	if _, changed, err := appRuntime.ReloadPackage(context.Background(), "sound_watch_pending"); err != nil || !changed {
+		t.Fatalf("ReloadPackage(v2) = (%v, %v), want changed true no error", err, changed)
+	}
+	status, err := appRuntime.RetryMigration("sound_watch_pending")
+	if err != nil {
+		t.Fatalf("RetryMigration() error = %v", err)
+	}
+	if status.JournalPath == "" {
+		t.Fatalf("RetryMigration() journal_path empty")
+	}
+	journalFile := filepath.Join(appRoot, filepath.FromSlash(status.JournalPath))
+	if err := os.MkdirAll(filepath.Dir(journalFile), 0o755); err != nil {
+		t.Fatalf("MkdirAll(journal dir) error = %v", err)
+	}
+	journalEntry := `{"event":"artifact_inverse_failed","record_id":"artifact:photo-frame","recommended_resolution":"manual"}` + "\n"
+	file, err := os.OpenFile(filepath.Clean(journalFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatalf("OpenFile(journal) error = %v", err)
+	}
+	if _, err := file.WriteString(journalEntry); err != nil {
+		_ = file.Close()
+		t.Fatalf("WriteString(journal) error = %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("Close(journal) error = %v", err)
+	}
+	if status, err := appRuntime.AbortMigration("sound_watch_pending", appruntime.MigrationAbortToBaseline); !errors.Is(err, appruntime.ErrMigrationReconcilePending) {
+		journal, _ := os.ReadFile(journalFile)
+		t.Fatalf("AbortMigration(to baseline) = (%+v, %v), want ErrMigrationReconcilePending; journal=%s", status, err, string(journal))
+	}
+
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "kitchen-1", DeviceName: "Kitchen"})
+	control := transport.NewControlService("HomeServer", devices)
+	engine := scenario.NewEngine()
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+
+	h := NewHandler(control, runtime, nil, nil, appRuntime, func() {}, devices, config.Config{MDNSName: "HomeServer"}, nil, nil)
+
+	rollbackReq := httptest.NewRequest(http.MethodPost, "/admin/api/apps/rollback", strings.NewReader(url.Values{
+		"app": {"sound_watch_pending"},
+	}.Encode()))
+	rollbackReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rollbackW := httptest.NewRecorder()
+	h.ServeHTTP(rollbackW, rollbackReq)
+	if rollbackW.Code != http.StatusConflict {
+		t.Fatalf("rollback status = %d, want 409 body=%s", rollbackW.Code, rollbackW.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rollbackW.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode rollback body: %v", err)
+	}
+	if body["status"] != "blocked" || body["error"] != appruntime.ErrMigrationReconcilePending.Error() {
+		t.Fatalf("rollback body status/error = %v/%v, want blocked/%q", body["status"], body["error"], appruntime.ErrMigrationReconcilePending.Error())
+	}
+	migration, _ := body["migration"].(map[string]any)
+	if fmt.Sprint(migration["verdict"]) != "reconcile_pending" {
+		t.Fatalf("rollback migration verdict = %v, want reconcile_pending", migration["verdict"])
+	}
+	pendingRecords, _ := migration["pending_records"].([]any)
+	if len(pendingRecords) != 1 {
+		t.Fatalf("pending_records len = %d, want 1", len(pendingRecords))
+	}
+	pending, _ := pendingRecords[0].(map[string]any)
+	if fmt.Sprint(pending["record_id"]) != "artifact:photo-frame" || fmt.Sprint(pending["recommended_resolution"]) != "manual" {
+		t.Fatalf("pending record = %+v, want artifact:photo-frame/manual", pending)
 	}
 }
 

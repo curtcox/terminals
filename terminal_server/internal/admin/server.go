@@ -2494,6 +2494,20 @@ func (h *Handler) handleRollbackApp(w http.ResponseWriter, req *http.Request) {
 	}
 	pkg, err := h.appRuntime.RollbackPackage(name, appruntime.RollbackOptions{DataMode: mode})
 	if err != nil {
+		if errors.Is(err, appruntime.ErrMigrationReconcilePending) {
+			status, statusErr := h.appRuntime.GetMigrationStatus(name)
+			if statusErr == nil {
+				h.writeJSON(w, http.StatusConflict, map[string]any{
+					"status":    "blocked",
+					"action":    "rollback",
+					"app":       name,
+					"error":     err.Error(),
+					"data_mode": normalizeRollbackDataMode(mode),
+					"migration": mapMigrationStatus(status),
+				})
+				return
+			}
+		}
 		h.writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}

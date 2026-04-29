@@ -21,6 +21,15 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added operator-visible rollback blocking details for
+  migrations in `reconcile_pending`. The admin rollback endpoint now
+  returns HTTP 409 with the current migration status payload, including
+  pending reconciliation records and `reconciliation_path`, when runtime
+  rejects rollback with `ErrMigrationReconcilePending`. Added regression
+  coverage in `terminal_server/internal/admin/server_test.go`
+  (`TestAppsRollbackBlockedByReconcilePendingReturnsMigrationStatus`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Hardened artifact patch host-effect collection in
   `terminal_server/internal/appruntime/runtime.go`. Runtime retry
   now rejects `artifact.self.patch(...)` declarations whose first

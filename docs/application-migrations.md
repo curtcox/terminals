@@ -187,6 +187,11 @@ of replaying the entire migration range on every retry.
 	`--archive-data` remains allowed without reverse steps. A failed keep-data
 	rollback leaves package history untouched so operators can immediately retry
 	the rollback with archive-data.
+- Rollback is also blocked while the current migration is
+	`reconcile_pending`. The admin rollback API returns HTTP 409 with the current
+	migration status payload, including pending reconciliation records and
+	`reconciliation_path`, so operators have the same follow-up context available
+	from `apps migrate status`.
 - Reload across author-key rotation keeps migration state anchored to the
 	stable `app_id` lineage while still using the installed package version to
 	compute the pending version window. A rotated package that keeps the same
@@ -374,6 +379,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeMigrationResourceLimitValidation`
 - `TestRuntimeRetryMigrationEmitsCheckpointEveryForFixtureEffects`
 - `TestRuntimeReloadMigrationAfterKeyRotationUsesAppIDAndPendingVersionWindow`
+- `TestAppsRollbackBlockedByReconcilePendingReturnsMigrationStatus`
 - `TestAppsMigrateLogsUsesAdminAPIStepFilter`
 - `TestAppsMigrateReconcileUsesAdminAPI`
 - `TestAppsMigrateStatusUsesAdminAPI`
