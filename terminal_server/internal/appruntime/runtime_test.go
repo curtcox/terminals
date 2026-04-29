@@ -1929,6 +1929,9 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	if !hasMigrationJournalErrorContaining(entries, "step_failed_fixture_mismatch", "expected={\"a\":3,\"z\":1} actual={\"a\":2,\"z\":1}") {
 		t.Fatalf("migration journal missing canonical expected/actual mismatch evidence: %+v", entries)
 	}
+	if !hasMigrationJournalErrorContaining(entries, "step_failed_fixture_mismatch", "first_diff_byte=5 expected_byte=0x33 actual_byte=0x32") {
+		t.Fatalf("migration journal missing byte-level mismatch evidence: %+v", entries)
+	}
 }
 
 func TestRuntimeRetryMigrationFailsWhenFixtureRecordNotCanonical(t *testing.T) {

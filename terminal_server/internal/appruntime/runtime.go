@@ -1879,7 +1879,7 @@ func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSourc
 			return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
 		}
 		if expectedValue != actualValue {
-			return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step.Number, key, expectedValue, actualValue)
+			return runtimeMigrationResourceStats{}, runtimeFixtureValueMismatchError(step.Number, "", key, expectedValue, actualValue)
 		}
 	}
 	for key := range expectedRecords {
@@ -1952,7 +1952,7 @@ func compareRuntimeFixtureRecords(actualRecords map[string]string, expectedRecor
 			return fmt.Errorf("%w: step %04d %s expected missing key %q", ErrMigrationFixtureMismatch, step, label, key)
 		}
 		if expectedValue != actualValue {
-			return fmt.Errorf("%w: step %04d %s value mismatch for key %q: expected=%s actual=%s", ErrMigrationFixtureMismatch, step, label, key, expectedValue, actualValue)
+			return runtimeFixtureValueMismatchError(step, label, key, expectedValue, actualValue)
 		}
 	}
 	for key := range expectedRecords {
@@ -1961,6 +1961,52 @@ func compareRuntimeFixtureRecords(actualRecords map[string]string, expectedRecor
 		}
 	}
 	return nil
+}
+
+func runtimeFixtureValueMismatchError(step int, label string, key string, expectedValue string, actualValue string) error {
+	prefix := fmt.Sprintf("step %04d", step)
+	if label != "" {
+		prefix += " " + label
+	}
+	diff := firstFixtureValueDiff(expectedValue, actualValue)
+	return fmt.Errorf("%w: %s value mismatch for key %q: expected=%s actual=%s first_diff_byte=%d expected_byte=%s actual_byte=%s", ErrMigrationFixtureMismatch, prefix, key, expectedValue, actualValue, diff.Offset, diff.ExpectedByte, diff.ActualByte)
+}
+
+type runtimeFixtureValueDiff struct {
+	Offset       int
+	ExpectedByte string
+	ActualByte   string
+}
+
+func firstFixtureValueDiff(expectedValue string, actualValue string) runtimeFixtureValueDiff {
+	minLen := len(expectedValue)
+	if len(actualValue) < minLen {
+		minLen = len(actualValue)
+	}
+	for i := 0; i < minLen; i++ {
+		if expectedValue[i] != actualValue[i] {
+			return runtimeFixtureValueDiff{
+				Offset:       i,
+				ExpectedByte: fmt.Sprintf("0x%02x", expectedValue[i]),
+				ActualByte:   fmt.Sprintf("0x%02x", actualValue[i]),
+			}
+		}
+	}
+	if len(expectedValue) != len(actualValue) {
+		diff := runtimeFixtureValueDiff{Offset: minLen}
+		if len(expectedValue) > minLen {
+			diff.ExpectedByte = fmt.Sprintf("0x%02x", expectedValue[minLen])
+		} else {
+			diff.ExpectedByte = "<eof>"
+		}
+		if len(actualValue) > minLen {
+			diff.ActualByte = fmt.Sprintf("0x%02x", actualValue[minLen])
+		} else {
+			diff.ActualByte = "<eof>"
+		}
+		return diff
+	}
+	return runtimeFixtureValueDiff{Offset: -1, ExpectedByte: "<none>", ActualByte: "<none>"}
 }
 
 type runtimeMigrationFixtureTransform struct {

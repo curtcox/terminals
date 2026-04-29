@@ -127,7 +127,8 @@ of replaying the entire migration range on every retry.
 	`log` calls through loaded
 	`debug`/`info`/`warn`/`error` aliases. Mismatches stop retry with
 	`ErrMigrationFixtureMismatch`, mark `verdict = step_failed`, and emit
-	`step_failed_fixture_mismatch` entries.
+	`step_failed_fixture_mismatch` entries with canonical expected/actual
+	JSON plus the first differing byte offset and byte values.
 	The parser preserves `#` characters inside both double-quoted and
 	single-quoted TAL string literals before stripping line comments, so
 	accepted single-quoted log messages and `record.get(...)` defaults can

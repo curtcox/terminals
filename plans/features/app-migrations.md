@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Added byte-level fixture mismatch evidence to
+  runtime migration dry-run comparisons in
+  `terminal_server/internal/appruntime/runtime.go`. Value
+  mismatches now include canonical expected/actual JSON plus
+  the first differing byte offset and byte values in
+  `step_failed_fixture_mismatch` journal evidence, matching the
+  Gate 4 comparison contract. Updated regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenFixtureExpectedMismatch`)
+  and documented the evidence shape in
+  `docs/application-migrations.md`.
+
 - 2026-04-29: Aligned paged `store` loop fixture accounting with the
   direct `migrate(record)` fixture path in
   `terminal_server/internal/appruntime/runtime.go`. Store-loop dry-run
