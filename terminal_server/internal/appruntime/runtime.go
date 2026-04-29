@@ -144,6 +144,8 @@ var migrateEnvLoadPattern = regexp.MustCompile(`(?m)^\s*load\(\s*["']migrate\.en
 
 var migrateEnvCheckpointAliasPattern = regexp.MustCompile(`\bcheckpoint\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
 
+var migrateEnvAbortAliasPattern = regexp.MustCompile(`\babort\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
 var migrateCallPattern = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*$`)
 
 var migrateStringArgPattern = regexp.MustCompile(`^\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')`)
@@ -1681,6 +1683,43 @@ func migrationCheckpointAliases(scriptSource []byte) map[string]struct{} {
 	return aliases
 }
 
+func migrationAbortAliases(scriptSource []byte) map[string]struct{} {
+	aliases := make(map[string]struct{})
+	for _, match := range migrateEnvLoadPattern.FindAllSubmatch(scriptSource, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		for _, aliasMatch := range migrateEnvAbortAliasPattern.FindAllSubmatch(match[1], -1) {
+			if len(aliasMatch) >= 2 {
+				aliases[string(aliasMatch[1])] = struct{}{}
+			}
+		}
+	}
+	return aliases
+}
+
+func migrationAbortCall(line string, aliases map[string]struct{}) (string, bool, error) {
+	if match := migrateAbortPattern.FindStringSubmatch(line); match != nil {
+		var reason string
+		if err := json.Unmarshal([]byte(match[1]), &reason); err != nil {
+			return "", true, err
+		}
+		return reason, true, nil
+	}
+	match := migrateCallPattern.FindStringSubmatch(line)
+	if match == nil {
+		return "", false, nil
+	}
+	if _, ok := aliases[match[1]]; !ok {
+		return "", false, nil
+	}
+	reasonLiteral := migrationStringArgument(match[2])
+	if reasonLiteral == "" {
+		return "", true, errors.New("missing abort reason")
+	}
+	return reasonLiteral, true, nil
+}
+
 func migrationStringArgument(args string) string {
 	match := migrateStringArgPattern.FindStringSubmatch(args)
 	if match == nil {
@@ -1995,15 +2034,15 @@ func runtimeMigrationFixtureStringValue(record map[string]any, transform runtime
 func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigrationFixtureTransform, error) {
 	lines := strings.Split(string(scriptSource), "\n")
 	transforms := make([]runtimeMigrationFixtureTransform, 0)
+	abortAliases := migrationAbortAliases(scriptSource)
 	logAliases := migrationLogAliases(scriptSource)
 	for lineNumber, line := range lines {
 		line = strings.TrimSpace(stripTALLineComment(line))
 		if line == "" || strings.HasPrefix(line, "def ") || line == "pass" || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "return ") {
 			continue
 		}
-		if match := migrateAbortPattern.FindStringSubmatch(line); match != nil {
-			var reason string
-			if err := json.Unmarshal([]byte(match[1]), &reason); err != nil {
+		if reason, ok, err := migrationAbortCall(line, abortAliases); ok {
+			if err != nil {
 				return nil, fmt.Errorf("line %d: invalid abort reason: %w", lineNumber+1, err)
 			}
 			transforms = append(transforms, runtimeMigrationFixtureTransform{
@@ -2049,6 +2088,7 @@ func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrati
 	if len(storeAliases.ListKeys) == 0 || (len(storeAliases.Get) == 0 && len(storeAliases.Delete) == 0) || (len(storeAliases.Put) == 0 && len(storeAliases.Delete) == 0) {
 		return nil, nil
 	}
+	abortAliases := migrationAbortAliases(scriptSource)
 	checkpointAliases := migrationCheckpointAliases(scriptSource)
 	logAliases := migrationLogAliases(scriptSource)
 	lines := strings.Split(string(scriptSource), "\n")
@@ -2090,9 +2130,8 @@ func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrati
 			})
 			continue
 		}
-		if match := migrateAbortPattern.FindStringSubmatch(line); match != nil {
-			var reason string
-			if err := json.Unmarshal([]byte(match[1]), &reason); err != nil {
+		if reason, ok, err := migrationAbortCall(line, abortAliases); ok {
+			if err != nil {
 				return nil, fmt.Errorf("line %d: invalid abort reason: %w", lineNumber+1, err)
 			}
 			transforms = append(transforms, runtimeMigrationFixtureTransform{

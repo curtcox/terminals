@@ -177,7 +177,8 @@ of replaying the entire migration range on every retry.
 	committed step, marks `verdict = step_failed`, and emits a
 	`step_failed_timeout` journal entry with the configured budget.
 - The deterministic fixture execution subset now treats
-	`migrate.env.abort(reason)` calls as first-class executor aborts. Runtime
+	`migrate.env.abort(reason)` calls, including calls through loaded aliases,
+	as first-class executor aborts. Runtime
 	retry fails the current step with `ErrMigrationAborted`, keeps checkpoint
 	progress at the last committed step, marks `verdict = step_failed`, and
 	emits `step_failed_aborted` journal evidence with the script-provided

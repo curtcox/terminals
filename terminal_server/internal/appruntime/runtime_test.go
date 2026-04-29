@@ -1433,7 +1433,7 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile(main) error = %v", err)
 	}
-	script := "load(\"migrate.env\", abort = \"abort\")\ndef migrate(record):\n    abort(\"unsafe history shape\")\n"
+	script := "load(\"migrate.env\", abort = \"halt\")\ndef migrate(record):\n    halt(\"unsafe history shape\")\n"
 	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(script), 0o644); err != nil {
 		t.Fatalf("WriteFile(migrate) error = %v", err)
 	}
@@ -1474,6 +1474,40 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	entries := parseMigrationJournalEntries(t, journalBytes)
 	if !hasMigrationJournalErrorContaining(entries, "step_failed_aborted", "unsafe history shape") {
 		t.Fatalf("migration journal missing step_failed_aborted entry: %+v", entries)
+	}
+}
+
+func TestRuntimeMigrationFixtureParsesAbortAliases(t *testing.T) {
+	recordScript := []byte("load(\"migrate.env\", abort = \"stop_now\")\ndef migrate(record):\n    stop_now(\"bad record\")\n")
+	transforms, err := parseRuntimeMigrationFixtureTransforms(recordScript)
+	if err != nil {
+		t.Fatalf("parseRuntimeMigrationFixtureTransforms() error = %v", err)
+	}
+	if len(transforms) != 1 || transforms[0].Operation != "abort" || transforms[0].Reason != "bad record" {
+		t.Fatalf("parseRuntimeMigrationFixtureTransforms() = %+v, want abort transform", transforms)
+	}
+
+	storeScript := []byte(`load("store", list_keys = "keys", get = "read", put = "write")
+load("migrate.env", checkpoint = "save", abort = "fail")
+
+def migrate():
+    cursor = None
+    while True:
+        page = keys(prefix = "history/", after = cursor, limit = 500)
+        if len(page) == 0: break
+        for key in page:
+            rec = read(key)
+            fail("unsafe store shape")
+            write(key, rec)
+        cursor = page[-1]
+        save(cursor = cursor)
+`)
+	plan, err := parseRuntimeMigrationStoreFixturePlan(storeScript)
+	if err != nil {
+		t.Fatalf("parseRuntimeMigrationStoreFixturePlan() error = %v", err)
+	}
+	if plan == nil || len(plan.Transforms) != 1 || plan.Transforms[0].Operation != "abort" || plan.Transforms[0].Reason != "unsafe store shape" {
+		t.Fatalf("parseRuntimeMigrationStoreFixturePlan() = %+v, want aliased abort transform", plan)
 	}
 }
 

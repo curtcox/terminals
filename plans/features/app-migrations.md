@@ -21,6 +21,19 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Aligned runtime fixture execution for
+  `migrate.env.abort(reason)` with the migration module alias
+  contract in `terminal_server/internal/appruntime/runtime.go`.
+  Fixture replay now recognizes abort calls through any loaded
+  `abort = "<alias>"` binding in both direct `migrate(record)`
+  scripts and the worked-example paged store-loop subset, failing
+  the current step with `ErrMigrationAborted` and preserving
+  `step_failed_aborted` evidence. Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAbortCallFailsCurrentStep`,
+  `TestRuntimeMigrationFixtureParsesAbortAliases`) and documented
+  the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Added accepted `artifact.self.patch(...)` declaration
   journaling in `terminal_server/internal/appruntime/runtime.go`.
   Runtime retry now parses lineage-validated patch calls into host
