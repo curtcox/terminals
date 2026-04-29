@@ -1107,13 +1107,16 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	migrateScript := `def migrate(record):
   record["label_normalized"] = lower(trim(record.get("label", "")))
   record["fallback_label"] = record.get("missing_label", "untitled")
+  record["retry_count"] = record.get("retry_count", 0)
+  record["archived"] = record.get("archived", false)
+  record["last_seen"] = record.get("last_seen", null)
   return record
 `
 	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(migrateScript), 0o644); err != nil {
 		t.Fatalf("WriteFile(migrate) error = %v", err)
 	}
 	seed := "{\"key\":\"history/a\",\"value\":{\"label\":\"  Dishwasher Done  \"}}\n"
-	expected := "{\"key\":\"history/a\",\"value\":{\"fallback_label\":\"untitled\",\"label\":\"  Dishwasher Done  \",\"label_normalized\":\"dishwasher done\"}}\n"
+	expected := "{\"key\":\"history/a\",\"value\":{\"archived\":false,\"fallback_label\":\"untitled\",\"label\":\"  Dishwasher Done  \",\"label_normalized\":\"dishwasher done\",\"last_seen\":null,\"retry_count\":0}}\n"
 	if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_seed.ndjson"), []byte(seed), 0o644); err != nil {
 		t.Fatalf("WriteFile(seed fixture) error = %v", err)
 	}

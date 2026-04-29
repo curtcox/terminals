@@ -121,7 +121,8 @@ of replaying the entire migration range on every retry.
 	subset for `migrate(record)` scripts before comparing actual output to the
 	expected envelopes. The subset supports field copy, string lowercasing,
 	string trimming, `lower(trim(record["field"]))`, `record.get("field",
-	"default")` defaults in those same assignment forms, JSON literal
+	default)` string/number/bool/null defaults in those same assignment forms,
+	JSON literal
 	assignment, field deletion, idempotent `if "field" in record: continue`
 	guards, and no-op structured `log` calls through loaded
 	`debug`/`info`/`warn`/`error` aliases. Mismatches stop retry with

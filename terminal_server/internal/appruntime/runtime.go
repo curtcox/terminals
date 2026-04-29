@@ -109,21 +109,21 @@ var migrateRecordSkipIfPresentPattern = regexp.MustCompile(`^\s*if\s+["']([^"']+
 
 var migrateRecordValuePattern = regexp.MustCompile(`^record\["([^"]+)"\]$`)
 
-var migrateRecordGetValuePattern = regexp.MustCompile(`^record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)$`)
+var migrateRecordGetValuePattern = regexp.MustCompile(`^record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)\s*\)$`)
 
 var migrateRecordLowerPattern = regexp.MustCompile(`^lower\(\s*record\["([^"]+)"\]\s*\)$`)
 
-var migrateRecordLowerGetPattern = regexp.MustCompile(`^lower\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)$`)
+var migrateRecordLowerGetPattern = regexp.MustCompile(`^lower\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)\s*\)\s*\)$`)
 
 var migrateRecordTrimPattern = regexp.MustCompile(`^trim\(\s*record\["([^"]+)"\]\s*\)$`)
 
-var migrateRecordTrimGetPattern = regexp.MustCompile(`^trim\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)$`)
+var migrateRecordTrimGetPattern = regexp.MustCompile(`^trim\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)\s*\)\s*\)$`)
 
 var migrateRecordLowerTrimPattern = regexp.MustCompile(`^lower\(\s*trim\(\s*record\["([^"]+)"\]\s*\)\s*\)$`)
 
-var migrateRecordLowerTrimGetPattern = regexp.MustCompile(`^lower\(\s*trim\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)\s*\)$`)
+var migrateRecordLowerTrimGetPattern = regexp.MustCompile(`^lower\(\s*trim\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)\s*\)\s*\)\s*\)$`)
 
-var migrateRecordNormalizeGetPattern = regexp.MustCompile(`^_normalize\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*\)\s*\)$`)
+var migrateRecordNormalizeGetPattern = regexp.MustCompile(`^_normalize\(\s*record\.get\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)\s*\)\s*\)$`)
 
 var migrateRecordNormalizePattern = regexp.MustCompile(`^_normalize\(\s*record\["([^"]+)"\]\s*\)$`)
 
@@ -2523,8 +2523,16 @@ func parseRuntimeMigrationFixtureAssignment(destination string, expression strin
 }
 
 func decodeMigrationDefaultLiteral(raw string) (any, error) {
-	value := decodeTALStringLiteral(raw)
-	if value == "" && strings.TrimSpace(raw) != `""` && strings.TrimSpace(raw) != "''" {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, `"`) || strings.HasPrefix(raw, `'`) {
+		value := decodeTALStringLiteral(raw)
+		if value == "" && raw != `""` && raw != "''" {
+			return nil, fmt.Errorf("invalid record.get default literal %q", raw)
+		}
+		return value, nil
+	}
+	var value any
+	if err := json.Unmarshal([]byte(raw), &value); err != nil {
 		return nil, fmt.Errorf("invalid record.get default literal %q", raw)
 	}
 	return value, nil

@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Expanded fixture-backed `record.get(...)`
+  default handling in the runtime migration subset. Direct
+  `migrate(record)` scripts now accept JSON scalar defaults
+  (`number`, `bool`, and `null`) in addition to string defaults
+  when replaying fixtures, so common schema-fill migrations can
+  be verified without reporting an unsupported assignment.
+  Added regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesRecordGetFixtureTransforms`)
+  and documented the expanded subset in
+  `docs/application-migrations.md`.
+
 - 2026-04-29: Added operator-visible rollback blocking details for
   migrations in `reconcile_pending`. The admin rollback endpoint now
   returns HTTP 409 with the current migration status payload, including
