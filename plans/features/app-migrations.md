@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Hardened execution-time migration fixture key
+  validation in `terminal_server/internal/appruntime/runtime.go`.
+  Runtime retry now mirrors the Gate 1 fixture envelope checks for
+  keys by rejecting non-UTF-8, non-NFC, empty, or >256-byte fixture
+  keys after package load, failing the step with
+  `ErrMigrationFixtureMismatch` before commit and preserving
+  `step_failed_fixture_mismatch` journal evidence. Added regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationFailsWhenFixtureKeyInvalid`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-29: Added operator-visible journaling for
   fixture-backed migration `log.*(...)` calls in
   `terminal_server/internal/appruntime/runtime.go`. Runtime

@@ -138,6 +138,11 @@ of replaying the entire migration range on every retry.
 	order). Non-canonical fixture mutations now fail retry with
 	`ErrMigrationFixtureMismatch` before step commit and emit
 	`step_failed_fixture_mismatch` journal entries.
+- Runtime fixture reads also re-check key constraints at execution time:
+	keys must be valid UTF-8, NFC-normalized, and 1..256 bytes. Post-load
+	fixture mutations that violate those constraints fail retry with
+	`ErrMigrationFixtureMismatch` before step commit and emit
+	`step_failed_fixture_mismatch` journal entries.
 - Runtime fixture reads now reject fixture paths that escape the loaded
 	package root (for example `../outside_seed.ndjson`). Escape attempts fail
 	retry with `ErrMigrationFixtureMismatch` before step commit and emit
@@ -326,6 +331,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeRetryMigrationFailsWhenFixtureDeclarationMissingForPendingStep`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded`
 - `TestRuntimeRetryMigrationFailsWhenFixtureRecordNotCanonical`
+- `TestRuntimeRetryMigrationFailsWhenFixtureKeyInvalid`
 - `TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRoot`
 - `TestRuntimeRetryMigrationFailsWhenFixturePathEscapesRootViaSymlink`
 - `TestRuntimeRetryMigrationFailsWhenMaxRuntimeExceeded`

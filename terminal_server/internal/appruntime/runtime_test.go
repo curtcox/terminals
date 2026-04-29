@@ -1816,6 +1816,109 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 	}
 }
 
+func TestRuntimeRetryMigrationFailsWhenFixtureKeyInvalid(t *testing.T) {
+	cases := []struct {
+		name       string
+		key        string
+		wantDetail string
+	}{
+		{
+			name:       "non_nfc",
+			key:        "history/cafe\u0301",
+			wantDetail: "fixture key must be NFC normalized",
+		},
+		{
+			name:       "too_long",
+			key:        "history/" + strings.Repeat("x", runtimeMigrationFixtureMaxKeyBytes),
+			wantDetail: "fixture key byte length must be 1..256",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			appName := "migrate_fixture_key_" + tc.name
+			appDir := filepath.Join(tempDir, appName)
+			if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+				t.Fatalf("MkdirAll(migrate) error = %v", err)
+			}
+			if err := os.MkdirAll(filepath.Join(appDir, "tests", "migrate_fixtures"), 0o755); err != nil {
+				t.Fatalf("MkdirAll(tests/migrate_fixtures) error = %v", err)
+			}
+			manifest := fmt.Sprintf(`name = %q
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "none"
+
+[[migrate.fixture]]
+step = "0001"
+prior_version = "1"
+seed = "tests/migrate_fixtures/history_seed.ndjson"
+expected = "tests/migrate_fixtures/history_expected.ndjson"
+`, appName)
+			if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+				t.Fatalf("WriteFile(manifest) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(main) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+				t.Fatalf("WriteFile(migrate) error = %v", err)
+			}
+			fixture := fmt.Sprintf("{\"key\":%q,\"value\":{}}\n", tc.key)
+			if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_seed.ndjson"), []byte(fixture), 0o644); err != nil {
+				t.Fatalf("WriteFile(seed fixture) error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(appDir, "tests", "migrate_fixtures", "history_expected.ndjson"), []byte(fixture), 0o644); err != nil {
+				t.Fatalf("WriteFile(expected fixture) error = %v", err)
+			}
+
+			runtime := NewRuntime()
+			if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+				t.Fatalf("LoadPackage() error = %v", err)
+			}
+
+			status, err := runtime.RetryMigration(appName)
+			if !errors.Is(err, ErrMigrationFixtureMismatch) {
+				t.Fatalf("RetryMigration() error = %v, want ErrMigrationFixtureMismatch", err)
+			}
+			if !strings.Contains(err.Error(), tc.wantDetail) {
+				t.Fatalf("RetryMigration() error = %q, want %q", err.Error(), tc.wantDetail)
+			}
+			if status.Verdict != "step_failed" {
+				t.Fatalf("RetryMigration() verdict = %q, want step_failed", status.Verdict)
+			}
+			if status.StepsCompleted != 0 {
+				t.Fatalf("RetryMigration() steps_completed = %d, want 0", status.StepsCompleted)
+			}
+			if status.LastStep != 1 {
+				t.Fatalf("RetryMigration() last_step = %d, want 1", status.LastStep)
+			}
+			if !strings.Contains(status.LastError, "fixture mismatch") {
+				t.Fatalf("RetryMigration() last_error = %q, want fixture mismatch message", status.LastError)
+			}
+
+			journalPath := filepath.Join(appDir, filepath.FromSlash(status.JournalPath))
+			journalBytes, readErr := os.ReadFile(journalPath)
+			if readErr != nil {
+				t.Fatalf("ReadFile(journal) error = %v", readErr)
+			}
+			entries := parseMigrationJournalEntries(t, journalBytes)
+			if !hasMigrationJournalEvent(entries, "step_failed_fixture_mismatch") {
+				t.Fatalf("migration journal missing step_failed_fixture_mismatch event: %+v", entries)
+			}
+		})
+	}
+}
+
 func TestRuntimeRetryMigrationFailsWhenFixtureRecordLimitExceeded(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_fixture_limit")

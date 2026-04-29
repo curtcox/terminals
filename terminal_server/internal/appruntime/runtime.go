@@ -18,8 +18,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/BurntSushi/toml"
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -80,7 +82,10 @@ var (
 
 const defaultMigrationDrainTimeout = 90 * time.Second
 
-const runtimeMigrationFixtureMaxRows = 4096
+const (
+	runtimeMigrationFixtureMaxRows     = 4096
+	runtimeMigrationFixtureMaxKeyBytes = 256
+)
 
 const (
 	migrationMaxWriteVolumeBytes = 100 * 1024 * 1024
@@ -2669,8 +2674,14 @@ func parseRuntimeFixtureRecord(line []byte) (key string, canonicalEnvelope []byt
 	if err := json.Unmarshal(rawKey, &key); err != nil {
 		return "", nil, "", errors.New("fixture key must be a string")
 	}
-	if strings.TrimSpace(key) == "" {
-		return "", nil, "", errors.New("fixture record missing key")
+	if !utf8.ValidString(key) {
+		return "", nil, "", errors.New("fixture key must be valid UTF-8")
+	}
+	if !norm.NFC.IsNormalString(key) {
+		return "", nil, "", errors.New("fixture key must be NFC normalized")
+	}
+	if len([]byte(key)) == 0 || len([]byte(key)) > runtimeMigrationFixtureMaxKeyBytes {
+		return "", nil, "", fmt.Errorf("fixture key byte length must be 1..%d", runtimeMigrationFixtureMaxKeyBytes)
 	}
 
 	var value map[string]any
