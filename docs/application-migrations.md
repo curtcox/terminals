@@ -19,7 +19,7 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - Migration seed fixture records are validated against each fixture's declared `prior_record_schema`; invalid seed rows now fail package verification with record-level diagnostics.
 - Migration expected fixture records are validated against the target step record schema when a unique `[[storage.store_schema]]` entry exists for the step `to` version; invalid expected rows now fail package verification with record-level diagnostics.
 - Migration fixture metadata now enforces step-edge consistency: `[[migrate.fixture]].prior_version` must match the corresponding migration script `from` version (`migrate/<step>_<from>_to_<to>.tal`).
-- When declared, `[migrate].max_runtime_seconds` and `[migrate].checkpoint_every` must be positive integers; non-positive values now fail Gate 1 with explicit diagnostics.
+- When declared, `[migrate].drain_timeout_seconds`, `[migrate].max_runtime_seconds`, and `[migrate].checkpoint_every` must be positive integers; non-positive values now fail Gate 1 with explicit diagnostics.
 
 ## Implemented runtime migration guard
 
@@ -173,7 +173,8 @@ of replaying the entire migration range on every retry.
 	leave migration status with `executor_ready = false` and a specific
 	`last_error`, preventing retries from running against ambiguous step plans.
 - Runtime migration plan parsing now applies the same positive-value guard for
-	`[migrate].max_runtime_seconds` and `[migrate].checkpoint_every`; invalid
+	`[migrate].drain_timeout_seconds`, `[migrate].max_runtime_seconds`, and
+	`[migrate].checkpoint_every`; invalid
 	limits set `executor_ready = false` with a field-specific `last_error` and
 	keep retry from executing.
 - Retry now enforces `[migrate].max_runtime_seconds` as a per-step execution
@@ -252,6 +253,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapAcceptsCanonicalMigrateStepLayout`
 - `TestVerifyTapRejectsMigrateStepNumberingGap`
 - `TestVerifyTapRejectsMigrateDeclaredStepMismatch`
+- `TestVerifyTapRejectsMigrateNonPositiveDrainTimeoutSeconds`
 - `TestVerifyTapRejectsMigrateIncompatibleWithoutDrain`
 - `TestVerifyTapAcceptsMigrateIncompatibleWithDrain`
 - `TestVerifyTapRejectsMigrateFixtureTooManyRecords`

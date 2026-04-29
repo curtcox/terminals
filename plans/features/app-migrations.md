@@ -21,6 +21,18 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-29: Tightened migration manifest limit validation for
+  `[migrate].drain_timeout_seconds` in both package verification
+  and runtime migration plan parsing. Explicit non-positive drain
+  timeouts now fail Gate 1 with a specific diagnostic or leave the
+  runtime executor disabled with the same `last_error`, instead of
+  silently falling back to the default timeout. Added regression
+  coverage in `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsMigrateNonPositiveDrainTimeoutSeconds`)
+  and `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeMigrationInvalidLimitsDisableExecutor`), and
+  documented the guard in `docs/application-migrations.md`.
+
 - 2026-04-29: Added explicit runtime regression coverage for
   key-rotation upgrade semantics in
   `terminal_server/internal/appruntime/runtime_test.go`

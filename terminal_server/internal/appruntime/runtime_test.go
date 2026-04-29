@@ -3401,6 +3401,12 @@ func TestRuntimeMigrationInvalidLimitsDisableExecutor(t *testing.T) {
 			manifestValue: "-1",
 			wantMessage:   "migrate.checkpoint_every must be a positive integer",
 		},
+		{
+			name:          "drain timeout seconds",
+			manifestField: "drain_timeout_seconds",
+			manifestValue: "0",
+			wantMessage:   "migrate.drain_timeout_seconds must be a positive integer",
+		},
 	}
 
 	for _, tc := range testCases {

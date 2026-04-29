@@ -572,11 +572,12 @@ type manifestStoreSchema struct {
 }
 
 type manifestMigrationConfig struct {
-	DeclaredSteps     int                        `toml:"declared_steps"`
-	MaxRuntimeSeconds *int                       `toml:"max_runtime_seconds"`
-	CheckpointEvery   *int                       `toml:"checkpoint_every"`
-	Step              []manifestMigrationStep    `toml:"step"`
-	Fixture           []manifestMigrationFixture `toml:"fixture"`
+	DeclaredSteps       int                        `toml:"declared_steps"`
+	DrainTimeoutSeconds *int                       `toml:"drain_timeout_seconds"`
+	MaxRuntimeSeconds   *int                       `toml:"max_runtime_seconds"`
+	CheckpointEvery     *int                       `toml:"checkpoint_every"`
+	Step                []manifestMigrationStep    `toml:"step"`
+	Fixture             []manifestMigrationFixture `toml:"fixture"`
 }
 
 type manifestMigrationStep struct {
@@ -690,6 +691,9 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 
 	if declaredSteps <= 0 || declaredSteps != declaredManifestSteps || declaredSteps != len(migrationFiles) {
 		return ErrInvalidManifest
+	}
+	if manifest.Migrate.DrainTimeoutSeconds != nil && *manifest.Migrate.DrainTimeoutSeconds <= 0 {
+		return fmt.Errorf("%w: migrate.drain_timeout_seconds must be a positive integer", ErrInvalidManifest)
 	}
 	if manifest.Migrate.MaxRuntimeSeconds != nil && *manifest.Migrate.MaxRuntimeSeconds <= 0 {
 		return fmt.Errorf("%w: migrate.max_runtime_seconds must be a positive integer", ErrInvalidManifest)

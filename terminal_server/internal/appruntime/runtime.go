@@ -2570,9 +2570,9 @@ func canonicalJSONValue(raw json.RawMessage) (string, error) {
 type runtimeMigrationManifest struct {
 	Migrate struct {
 		DeclaredSteps       int  `toml:"declared_steps"`
-		DrainTimeoutSeconds int  `toml:"drain_timeout_seconds"`
 		MaxRuntimeSeconds   *int `toml:"max_runtime_seconds"`
 		CheckpointEvery     *int `toml:"checkpoint_every"`
+		DrainTimeoutSeconds *int `toml:"drain_timeout_seconds"`
 		Fixture             []struct {
 			Step         string `toml:"step"`
 			PriorVersion string `toml:"prior_version"`
@@ -2629,6 +2629,9 @@ func loadMigrationPlan(root string) (int, []migrationPlanStep, error) {
 	manifestPath := filepath.Join(root, "manifest.toml")
 	var manifest runtimeMigrationManifest
 	if _, err := toml.DecodeFile(manifestPath, &manifest); err == nil {
+		if manifest.Migrate.DrainTimeoutSeconds != nil && *manifest.Migrate.DrainTimeoutSeconds <= 0 {
+			return len(matches), nil, fmt.Errorf("%w: migrate.drain_timeout_seconds must be a positive integer", ErrInvalidManifest)
+		}
 		if manifest.Migrate.MaxRuntimeSeconds != nil && *manifest.Migrate.MaxRuntimeSeconds <= 0 {
 			return len(matches), nil, fmt.Errorf("%w: migrate.max_runtime_seconds must be a positive integer", ErrInvalidManifest)
 		}
@@ -2695,10 +2698,10 @@ func packageDrainTimeout(root string) time.Duration {
 	if _, err := toml.DecodeFile(manifestPath, &manifest); err != nil {
 		return defaultMigrationDrainTimeout
 	}
-	if manifest.Migrate.DrainTimeoutSeconds <= 0 {
+	if manifest.Migrate.DrainTimeoutSeconds == nil {
 		return defaultMigrationDrainTimeout
 	}
-	return time.Duration(manifest.Migrate.DrainTimeoutSeconds) * time.Second
+	return time.Duration(*manifest.Migrate.DrainTimeoutSeconds) * time.Second
 }
 
 func packageMigrationMaxRuntime(root string) time.Duration {
