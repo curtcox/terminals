@@ -101,6 +101,8 @@ var migrateEntryPointPattern = regexp.MustCompile(`(?m)^\s*def\s+migrate\s*\(`)
 
 var migrateReadAdapterEntryPointPattern = regexp.MustCompile(`(?m)^\s*def\s+read\s*\(\s*record\s*\)`)
 
+var migrateReadAdapterIdentityReturnPattern = regexp.MustCompile(`^\s*return\s+record\s*$`)
+
 var migrateRecordAssignmentPattern = regexp.MustCompile(`^\s*record\["([^"]+)"\]\s*=\s*(.+?)\s*$`)
 
 var migrateRecordDeletePattern = regexp.MustCompile(`^\s*del\s+record\["([^"]+)"\]\s*$`)
@@ -1939,6 +1941,15 @@ func validateRuntimeMigrationReadAdapter(payload []byte) error {
 		module := strings.TrimSpace(string(match[1]))
 		if _, ok := allowedMigrationModules[module]; !ok {
 			return fmt.Errorf("loads disallowed module %q", module)
+		}
+	}
+	for lineNumber, rawLine := range strings.Split(string(payload), "\n") {
+		line := strings.TrimSpace(stripTALLineComment(rawLine))
+		if !strings.HasPrefix(line, "return") {
+			continue
+		}
+		if !migrateReadAdapterIdentityReturnPattern.MatchString(line) {
+			return fmt.Errorf("line %d uses unsupported read_adapter return expression %q", lineNumber+1, line)
 		}
 	}
 	return nil

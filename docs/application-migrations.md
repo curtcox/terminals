@@ -22,7 +22,7 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - Migration seed fixture records are validated against each fixture's declared `prior_record_schema`; invalid seed rows now fail package verification with record-level diagnostics.
 - Migration expected fixture records are validated against the target step record schema when a unique `[[storage.store_schema]]` entry exists for the step `to` version; invalid expected rows now fail package verification with record-level diagnostics.
 - Migration fixture metadata now enforces step-edge consistency: `[[migrate.fixture]].prior_version` must match the corresponding migration script `from` version (`migrate/<step>_<from>_to_<to>.tal`).
-- `multi_version` migration fixtures must declare a `read_adapter` script. The package verifier checks that the adapter file is present, non-empty, exposes `read(record)`, and only loads migration-safe modules.
+- `multi_version` migration fixtures must declare a `read_adapter` script. The package verifier checks that the adapter file is present, non-empty, exposes `read(record)`, only loads migration-safe modules, and does not use unsupported `return` expressions. In the current deterministic subset, read adapters mutate `record` in place or explicitly `return record`; other return values are rejected instead of being treated as identity.
 - When declared, `[migrate].drain_timeout_seconds`, `[migrate].max_runtime_seconds`, and `[migrate].checkpoint_every` must be positive integers; non-positive values now fail Gate 1 with explicit diagnostics.
 
 For `multi_version`, the fixture declaration adds the adapter path:
@@ -228,7 +228,9 @@ of replaying the entire migration range on every retry.
 	prior-version `seed` records before the package can load under the dry-run
 	gate. Runtime resolves read-adapter paths with the same package-root and
 	symlink checks used for seed and expected fixture files, so adapters cannot
-	escape the package payload during dry-run replay.
+	escape the package payload during dry-run replay. The current read-adapter
+	subset rejects unsupported `return` expressions (for example `return {}`)
+	instead of silently treating them as identity transforms.
 - The `term` CLI now creates app runtimes with Gate 4 enabled by default for
 	`app check`, `app load`, `app test`, local `app reload` fallback, and
 	`sim run`, so local operator/developer flows reject migration-bearing
@@ -361,6 +363,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestRuntimeLoadPackageRejectsMigrationWhenDryRunGateFails`
 - `TestRuntimeLoadPackageRejectsMultiVersionWithoutReadAdapterDuringDryRunGate`
 - `TestRuntimeLoadPackageValidatesMultiVersionReadAdapterDuringDryRunGate`
+- `TestRuntimeLoadPackageRejectsUnsupportedReadAdapterReturnDuringDryRunGate`
 - `TestRuntimeLoadPackageRejectsMultiVersionReadAdapterEscapingRootDuringDryRunGate`
 - `TestRuntimeMigrationJournalPathUsesAppID`
 - `TestRuntimeRetryMigrationFailsWhenPendingScriptInvalid`

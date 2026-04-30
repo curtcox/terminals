@@ -3550,6 +3550,67 @@ read_adapter = "tests/migrate_fixtures/read_v2_as_v1.tal"
 	}
 }
 
+func TestRuntimeLoadPackageRejectsUnsupportedReadAdapterReturnDuringDryRunGate(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_dryrun_multi_version_adapter_return")
+	fixtureDir := filepath.Join(appDir, "tests", "migrate_fixtures")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(migrate) error = %v", err)
+	}
+	if err := os.MkdirAll(fixtureDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(fixtures) error = %v", err)
+	}
+	manifest := `name = "migrate_dryrun_multi_version_adapter_return"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "compatible"
+drain_policy = "multi_version"
+
+[[migrate.fixture]]
+step = "0001_1_to_2"
+prior_version = "1"
+seed = "tests/migrate_fixtures/history_seed.ndjson"
+expected = "tests/migrate_fixtures/history_expected.ndjson"
+read_adapter = "tests/migrate_fixtures/read_v2_as_v1.tal"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	migrateScript := "def migrate(record):\n    return record\n"
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte(migrateScript), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+	fixture := "{\"key\":\"history/1\",\"value\":{\"label\":\"Tea\"}}\n"
+	if err := os.WriteFile(filepath.Join(fixtureDir, "history_seed.ndjson"), []byte(fixture), 0o644); err != nil {
+		t.Fatalf("WriteFile(seed) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fixtureDir, "history_expected.ndjson"), []byte(fixture), 0o644); err != nil {
+		t.Fatalf("WriteFile(expected) error = %v", err)
+	}
+	readAdapter := "def read(record):\n    return {}\n"
+	if err := os.WriteFile(filepath.Join(fixtureDir, "read_v2_as_v1.tal"), []byte(readAdapter), 0o644); err != nil {
+		t.Fatalf("WriteFile(read_adapter) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	runtime.SetMigrationDryRunGateEnabled(true)
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err == nil {
+		t.Fatalf("expected LoadPackage() to reject unsupported read_adapter return")
+	} else if !strings.Contains(err.Error(), "unsupported read_adapter return expression") {
+		t.Fatalf("LoadPackage() error = %q, want unsupported read_adapter return expression", err.Error())
+	}
+}
+
 func TestRuntimeLoadPackageRejectsMultiVersionReadAdapterEscapingRootDuringDryRunGate(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_dryrun_multi_version_adapter_escape")

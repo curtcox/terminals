@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-30: Hardened `multi_version` read-adapter validation in
+  `terminal_server/internal/appruntime/runtime.go`. Gate 4 runtime
+  dry-run replay now rejects unsupported `return` expressions in
+  read adapters (for example `return {}`) instead of letting the
+  shared fixture parser ignore them as identity transforms. Added
+  regression coverage in
+  `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeLoadPackageRejectsUnsupportedReadAdapterReturnDuringDryRunGate`)
+  and documented the deterministic read-adapter subset in
+  `docs/application-migrations.md`.
+
 - 2026-04-30: Aligned deterministic migration fixture parsing with
   the documented worked-example TAL control-flow style in
   `terminal_server/internal/appruntime/runtime.go`. Runtime dry-run
