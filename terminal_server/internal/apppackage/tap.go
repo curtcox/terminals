@@ -89,9 +89,10 @@ var allowedTopLevelDirs = map[string]struct{}{
 }
 
 var (
-	migrateStepFilePattern = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
-	migrateLoadPattern     = regexp.MustCompile(`(?m)^\s*load\(\s*["']([^"']+)["']`)
-	migrateReadPattern     = regexp.MustCompile(`(?m)^\s*def\s+read\s*\(\s*record\s*\)`)
+	migrateStepFilePattern                  = regexp.MustCompile(`^(\d+)_([^/]+)_to_([^/]+)\.tal$`)
+	migrateLoadPattern                      = regexp.MustCompile(`(?m)^\s*load\(\s*["']([^"']+)["']`)
+	migrateReadPattern                      = regexp.MustCompile(`(?m)^\s*def\s+read\s*\(\s*record\s*\)`)
+	migrateReadAdapterIdentityReturnPattern = regexp.MustCompile(`^\s*return\s+record\s*$`)
 )
 
 var allowedMigrationModules = map[string]struct{}{
@@ -986,7 +987,44 @@ func validateMigrationReadAdapterSource(path string, payload []byte) error {
 			return fmt.Errorf("%w: migration read_adapter %s loads disallowed module %q", ErrInvalidManifest, path, module)
 		}
 	}
+	for lineNumber, rawLine := range strings.Split(string(payload), "\n") {
+		line := strings.TrimSpace(stripTALLineComment(rawLine))
+		if !strings.HasPrefix(line, "return") {
+			continue
+		}
+		if !migrateReadAdapterIdentityReturnPattern.MatchString(line) {
+			return fmt.Errorf("%w: migration read_adapter %s line %d uses unsupported read_adapter return expression %q", ErrInvalidManifest, path, lineNumber+1, line)
+		}
+	}
 	return nil
+}
+
+func stripTALLineComment(line string) string {
+	var quote rune
+	escaped := false
+	for i, r := range line {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if r == '\\' && quote != 0 {
+			escaped = true
+			continue
+		}
+		if r == '"' || r == '\'' {
+			switch quote {
+			case 0:
+				quote = r
+			case r:
+				quote = 0
+			}
+			continue
+		}
+		if r == '#' && quote == 0 {
+			return line[:i]
+		}
+	}
+	return line
 }
 
 func parseCanonicalFixtureRecord(line []byte) ([]byte, string, map[string]any, error) {

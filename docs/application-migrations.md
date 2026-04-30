@@ -344,6 +344,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapAcceptsMigrateFixtureAtRecordLimit`
 - `TestVerifyTapRequiresReadAdapterForMultiVersionMigration`
 - `TestVerifyTapAcceptsMultiVersionReadAdapter`
+- `TestVerifyTapRejectsUnsupportedReadAdapterReturn`
 - `TestRuntimeRetryMigrationRequiresDrainReadiness`
 - `TestRuntimeMigrationLifecycleWithSteps`
 	(covers checkpoint aborts for both completed-state rewind and in-flight

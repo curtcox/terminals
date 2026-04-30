@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-30: Aligned Gate 1 `.tap` verification with runtime
+  read-adapter validation in
+  `terminal_server/internal/apppackage/tap.go`. Multi-version
+  `read_adapter` scripts now reject unsupported `return`
+  expressions such as `return {}` during package verification,
+  preserving quoted `#` characters while stripping TAL line comments
+  before inspecting return statements. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsUnsupportedReadAdapterReturn`) and recorded
+  the evidence in `docs/application-migrations.md`.
+
 - 2026-04-30: Hardened `multi_version` read-adapter validation in
   `terminal_server/internal/appruntime/runtime.go`. Gate 4 runtime
   dry-run replay now rejects unsupported `return` expressions in
