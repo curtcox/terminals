@@ -123,7 +123,8 @@ of replaying the entire migration range on every retry.
 	string trimming, `lower(trim(record["field"]))`, `record.get("field",
 	default)` JSON literal defaults in those same assignment forms, JSON literal
 	assignment, direct single-quoted string assignment, field deletion,
-	idempotent `if "field" in record: continue` guards, and no-op structured
+	idempotent guards written either as `if "field" in record: continue` or as
+	a multiline `if "field" in record:` followed by `continue`, and no-op structured
 	`log` calls through loaded
 	`debug`/`info`/`warn`/`error` aliases. Mismatches stop retry with
 	`ErrMigrationFixtureMismatch`, mark `verdict = step_failed`, and emit
@@ -135,7 +136,8 @@ of replaying the entire migration range on every retry.
 	include hash-prefixed labels without being truncated as comments.
 	The deterministic fixture subset also supports the worked-example paged
 	`store` loop shape: loaded `list_keys`/`get`/`put`/`delete` aliases, a literal
-	`prefix` scan, `rec = get(key)`, idempotent presence guards,
+	`prefix` scan, one-line or multiline empty-page `break`, `rec = get(key)`,
+	idempotent one-line or multiline presence guards,
 	`rec[...]` assignment transforms including `_normalize(rec.get(...))`,
 	`put(key, rec)`, `delete(key)`, no-op loaded `checkpoint` calls, and no-op
 	structured log calls. Fixture replay applies the transform only to matching

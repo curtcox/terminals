@@ -107,6 +107,8 @@ var migrateRecordDeletePattern = regexp.MustCompile(`^\s*del\s+record\["([^"]+)"
 
 var migrateRecordSkipIfPresentPattern = regexp.MustCompile(`^\s*if\s+["']([^"']+)["']\s+in\s+record\s*:\s*continue\s*$`)
 
+var migrateRecordSkipIfPresentBlockPattern = regexp.MustCompile(`^\s*if\s+["']([^"']+)["']\s+in\s+record\s*:\s*$`)
+
 var migrateRecordValuePattern = regexp.MustCompile(`^record\["([^"]+)"\]$`)
 
 var migrateRecordGetValuePattern = regexp.MustCompile(`^record\.get\(\s*"([^"]+)"\s*,\s*(.+)\s*\)$`)
@@ -2259,7 +2261,7 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 	logAliases := migrationLogAliases(scriptSource)
 	for lineNumber, line := range lines {
 		line = strings.TrimSpace(stripTALLineComment(line))
-		if line == "" || strings.HasPrefix(line, "def ") || line == "pass" || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "return ") {
+		if line == "" || strings.HasPrefix(line, "def ") || line == "pass" || line == "continue" || strings.HasPrefix(line, "load(") || strings.HasPrefix(line, "return ") {
 			continue
 		}
 		if reason, ok, err := migrationAbortCall(line, abortAliases); ok {
@@ -2280,6 +2282,13 @@ func parseRuntimeMigrationFixtureTransforms(scriptSource []byte) ([]runtimeMigra
 			continue
 		}
 		if match := migrateRecordSkipIfPresentPattern.FindStringSubmatch(line); match != nil {
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Source:    match[1],
+				Operation: "skip_if_present",
+			})
+			continue
+		}
+		if match := migrateRecordSkipIfPresentBlockPattern.FindStringSubmatch(line); match != nil {
 			transforms = append(transforms, runtimeMigrationFixtureTransform{
 				Source:    match[1],
 				Operation: "skip_if_present",
@@ -2326,7 +2335,8 @@ func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrati
 		if line == "cursor = None" || line == "count = 0" || line == "while True:" ||
 			line == "if len(page) == 0: break" || line == "for key in page:" ||
 			line == "count += 1" || line == "cursor = page[-1]" ||
-			line == "return label.strip().lower()" {
+			line == "return label.strip().lower()" ||
+			line == "if len(page) == 0:" || line == "break" || line == "continue" {
 			continue
 		}
 		if parsedPrefix, ok := migrationStoreListKeysPrefix(line, storeAliases.ListKeys); ok {
@@ -2370,6 +2380,13 @@ func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrati
 			continue
 		}
 		if match := migrateRecordSkipIfPresentPattern.FindStringSubmatch(recordLine); match != nil {
+			transforms = append(transforms, runtimeMigrationFixtureTransform{
+				Source:    match[1],
+				Operation: "skip_if_present",
+			})
+			continue
+		}
+		if match := migrateRecordSkipIfPresentBlockPattern.FindStringSubmatch(recordLine); match != nil {
 			transforms = append(transforms, runtimeMigrationFixtureTransform{
 				Source:    match[1],
 				Operation: "skip_if_present",

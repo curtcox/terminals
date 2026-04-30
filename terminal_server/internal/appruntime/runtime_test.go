@@ -1179,7 +1179,8 @@ expected = "tests/migrate_fixtures/history_expected.ndjson"
 		t.Fatalf("WriteFile(main) error = %v", err)
 	}
 	migrateScript := `def migrate(record):
-  if "label_normalized" in record: continue
+  if "label_normalized" in record:
+    continue
   record["label_normalized"] = lower(trim(record.get("label", "")))
   return record
 `
@@ -1267,10 +1268,12 @@ def migrate():
     count = 0
     while True:
         page = list_keys(prefix = "history/", after = cursor, limit = 500)
-        if len(page) == 0: break
+        if len(page) == 0:
+            break
         for key in page:
             rec = get(key)
-            if "label_normalized" in rec: continue
+            if "label_normalized" in rec:
+                continue
             rec["label_normalized"] = _normalize(rec.get("label", ""))
             put(key, rec)
             count += 1

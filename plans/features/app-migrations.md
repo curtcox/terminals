@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: github-copilot
 validation: none
-last-reviewed: 2026-04-29
+last-reviewed: 2026-04-30
 ---
 
 # Application Migrations
@@ -20,6 +20,19 @@ Referenced by [application-distribution.md](application-distribution.md)
 who may authorize a migration).
 
 ## Implementation Progress
+
+- 2026-04-30: Aligned deterministic migration fixture parsing with
+  the documented worked-example TAL control-flow style in
+  `terminal_server/internal/appruntime/runtime.go`. Runtime dry-run
+  replay now accepts multiline idempotency guards
+  (`if "field" in record:` followed by `continue`) for direct
+  `migrate(record)` scripts and multiline empty-page `break` plus
+  `rec` presence guards in paged `store` loops. Updated regression
+  coverage in `terminal_server/internal/appruntime/runtime_test.go`
+  (`TestRuntimeRetryMigrationAppliesIdempotentFixtureGuard` and
+  `TestRuntimeRetryMigrationAppliesPagedStoreFixtureTransforms`) and
+  documented the accepted control-flow shape in
+  `docs/application-migrations.md`.
 
 - 2026-04-29: Added byte-level fixture mismatch evidence to
   runtime migration dry-run comparisons in
