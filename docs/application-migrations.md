@@ -21,6 +21,10 @@ The .tap package verifier in [terminal_server/internal/apppackage/tap.go](../ter
 - Migration fixture NDJSON files are bounded to at most 4096 records per file to keep Gate 4 synthetic-store input sizes predictable.
 - Migration seed fixture records are validated against each fixture's declared `prior_record_schema`; invalid seed rows now fail package verification with record-level diagnostics.
 - Migration expected fixture records are validated against the target step record schema when a unique `[[storage.store_schema]]` entry exists for the step `to` version; invalid expected rows now fail package verification with record-level diagnostics.
+- Incompatible migrations must declare an unambiguous target-version
+	`[[storage.store_schema]]` for the step's `to` version. Gate 1 rejects
+	incompatible steps whose expected fixture output cannot be validated against
+	the new record schema.
 - Migration fixture metadata now enforces step-edge consistency: `[[migrate.fixture]].prior_version` must match the corresponding migration script `from` version (`migrate/<step>_<from>_to_<to>.tal`).
 - `multi_version` migration fixtures must declare a `read_adapter` script. The package verifier checks that the adapter file is present, non-empty, exposes `read(record)`, only loads migration-safe modules, and does not use unsupported `return` expressions. In the current deterministic subset, read adapters mutate `record` in place or explicitly `return record`; other return values are rejected instead of being treated as identity.
 - When declared, `[migrate].drain_timeout_seconds`, `[migrate].max_runtime_seconds`, and `[migrate].checkpoint_every` must be positive integers; non-positive values now fail Gate 1 with explicit diagnostics.
@@ -338,6 +342,7 @@ Validation coverage lives in [terminal_server/internal/apppackage/tap_test.go](.
 - `TestVerifyTapRejectsMigrateDeclaredStepMismatch`
 - `TestVerifyTapRejectsMigrateNonPositiveDrainTimeoutSeconds`
 - `TestVerifyTapRejectsMigrateIncompatibleWithoutDrain`
+- `TestVerifyTapRejectsIncompatibleMigrationWithoutTargetSchema`
 - `TestVerifyTapRejectsMigrateStepMissingPolicy`
 - `TestVerifyTapAcceptsMigrateIncompatibleWithDrain`
 - `TestVerifyTapRejectsMigrateFixtureTooManyRecords`

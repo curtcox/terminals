@@ -21,6 +21,17 @@ who may authorize a migration).
 
 ## Implementation Progress
 
+- 2026-04-30: Tightened Gate 1 fixture schema enforcement for
+  incompatible durable-data migrations in
+  `terminal_server/internal/apppackage/tap.go`. Package verification
+  now rejects an incompatible step when its `expected` fixture cannot
+  be validated against an unambiguous target-version
+  `[[storage.store_schema]]`, instead of treating the missing target
+  schema as optional. Added regression coverage in
+  `terminal_server/internal/apppackage/tap_test.go`
+  (`TestVerifyTapRejectsIncompatibleMigrationWithoutTargetSchema`) and
+  documented the behavior in `docs/application-migrations.md`.
+
 - 2026-04-30: Aligned Gate 1 `.tap` verification with runtime
   read-adapter validation in
   `terminal_server/internal/apppackage/tap.go`. Multi-version

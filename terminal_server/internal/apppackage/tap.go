@@ -828,7 +828,8 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		if err != nil {
 			return err
 		}
-		targetSchemaPath, targetSchemaPayload, shouldValidateExpected, err := resolveFixtureExpectedSchema(fixture, stepByName, storeSchemaByVersion, migrationSources)
+		manifestStep := manifest.Migrate.Step[stepByName[fixture.Step].stepNumber-1]
+		targetSchemaPath, targetSchemaPayload, shouldValidateExpected, err := resolveFixtureExpectedSchema(fixture, manifestStep, stepByName, storeSchemaByVersion, migrationSources)
 		if err != nil {
 			return err
 		}
@@ -944,6 +945,7 @@ func validateMigrationFixtureValueSchema(fixturePath string, schemaPath string, 
 
 func resolveFixtureExpectedSchema(
 	fixture manifestMigrationFixture,
+	manifestStep manifestMigrationStep,
 	stepByName map[string]parsedMigrationStep,
 	storeSchemaByVersion map[string][]manifestStoreSchema,
 	migrationSources map[string][]byte,
@@ -955,6 +957,9 @@ func resolveFixtureExpectedSchema(
 
 	candidateSchemas := storeSchemaByVersion[strings.TrimSpace(step.to)]
 	if len(candidateSchemas) == 0 {
+		if manifestStep.Compatibility == "incompatible" {
+			return "", nil, false, fmt.Errorf("%w: migrate.fixture %s expected schema is required for incompatible target version %q", ErrInvalidManifest, fixture.Step, step.to)
+		}
 		// Expected schema validation is optional until every package declares
 		// per-target-version record schemas for migration fixtures.
 		return "", nil, false, nil
