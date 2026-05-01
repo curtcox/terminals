@@ -283,7 +283,7 @@ Legend per cell:
 - E18: [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L842), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L862)
 - E19: [`terminal_client/lib/edge/host.dart`](../../terminal_client/lib/edge/host.dart#L5), [`terminal_client/lib/edge/bundle_store.dart`](../../terminal_client/lib/edge/bundle_store.dart#L3), [`terminal_client/lib/edge/artifact_export.dart`](../../terminal_client/lib/edge/artifact_export.dart#L4)
 - E20: [`terminal_client/pubspec.yaml`](../../terminal_client/pubspec.yaml#L9)
-- E21: [`plans/protocol.md`](../features/protocol.md#L63), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L2455), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L881)
+- E21: [`plans/protocol.md`](../features/protocol/plan.md#L63), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L2455), [`terminal_client/lib/main.dart`](../../terminal_client/lib/main.dart#L881)
 
 ---
 

@@ -17,7 +17,7 @@ The completed work from this phase is now documented in:
 - [io-abstraction.md](../features/io-abstraction/plan.md)
 - [scenario-engine.md](../features/scenario-engine.md)
 - [server-driven-ui.md](../features/server-driven-ui.md)
-- [protocol.md](../features/protocol.md)
+- [protocol.md](../features/protocol/plan.md)
 - [docs/usecase-validation-matrix.md](../../docs/usecase-validation-matrix.md)
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.

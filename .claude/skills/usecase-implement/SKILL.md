@@ -31,7 +31,7 @@ Re-read the target row in [usecases.md](../../../usecases.md) and the relevant p
 - [plans/use-case-flows.md](../../../plans/features/use-case-flows.md) — end-to-end flow for each planned scenario; start here.
 - [plans/scenario-engine.md](../../../plans/features/scenario-engine.md) — scenario definitions, activations, triggers, preemption.
 - [plans/application-runtime.md](../../../plans/features/application-runtime.md) — session lifecycle and orchestration.
-- [plans/protocol.md](../../../plans/features/protocol.md) — gRPC + WebRTC + data channel shapes.
+- [plans/protocol.md](../../../plans/features/protocol/plan.md) — gRPC + WebRTC + data channel shapes.
 - [plans/server-driven-ui.md](../../../plans/features/server-driven-ui.md) — UI primitive set.
 
 ### 2. Write the failing test first (red)

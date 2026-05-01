@@ -58,7 +58,7 @@ None of this requires updating the client app. The Flutter client is a generic t
 
 - [plans/architecture-client.md](plans/features/architecture-client.md) — Flutter client: capability declaration, module layout, platform support.
 - [plans/architecture-server.md](plans/features/architecture-server.md) — Go server: module layout and responsibilities.
-- [plans/protocol.md](plans/features/protocol.md) — gRPC control plane, WebRTC media plane, data channels.
+- [plans/protocol.md](plans/features/protocol/plan.md) — gRPC control plane, WebRTC media plane, data channels.
 - [plans/discovery.md](plans/features/discovery.md) — mDNS, manual connect, connection lifecycle, trust model.
 - [plans/io-abstraction.md](plans/features/io-abstraction/plan.md) — IO categories, resources and claims, media-plan topology graph compiled by the router.
 - [plans/placement.md](plans/features/placement.md) — Zones, roles, and the placement engine that turns semantic targets into concrete devices.

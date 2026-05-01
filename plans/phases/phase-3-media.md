@@ -13,7 +13,7 @@ Status: Completed and drained on 2026-04-25.
 
 The completed work from this plan is now documented in:
 
-- [plans/features/protocol.md](../features/protocol.md)
+- [plans/features/protocol.md](../features/protocol/plan.md)
 - [plans/features/io-abstraction.md](../features/io-abstraction/plan.md)
 - [plans/features/application-runtime.md](../features/application-runtime.md)
 - [plans/features/technology.md](../features/technology.md)

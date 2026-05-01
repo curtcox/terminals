@@ -15,7 +15,7 @@ The completed work from this plan is now documented in:
 - [docs/server.md](../../docs/server.md)
 - [docs/client-web.md](../../docs/client-web.md)
 - [plans/features/transport-multiplexing.md](../features/transport-multiplexing.md)
-- [plans/features/protocol.md](../features/protocol.md)
+- [plans/features/protocol.md](../features/protocol/plan.md)
 
 There are no remaining active tasks in this phase plan. Future transport work
 should be tracked in focused feature plans rather than reopening this completed

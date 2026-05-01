@@ -209,7 +209,7 @@ The IO Router is the only component that knows the runtime topology of streams. 
 
 ## Related Plans
 
-- [protocol.md](../protocol.md) — transport-level handshake, capability updates, and WebRTC signaling.
+- [protocol.md](../protocol/plan.md) — transport-level handshake, capability updates, and WebRTC signaling.
 - [architecture-server.md](../architecture-server.md) — router, claim manager, and media-planner module layout.
 - [scenario-engine.md](../scenario-engine.md) — how activations use claims and media plans.
 - [placement.md](../placement.md) — resolving device targets before building plans.

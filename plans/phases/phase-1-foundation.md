@@ -13,7 +13,7 @@ Status: Completed and drained on 2026-04-25.
 
 The durable behavior from this phase is documented in:
 
-- [Protocol Design](../features/protocol.md)
+- [Protocol Design](../features/protocol/plan.md)
 - [Server-Driven UI](../features/server-driven-ui.md)
 - [Client Architecture](../features/architecture-client.md)
 - [Server Architecture](../features/architecture-server.md)
@@ -31,7 +31,7 @@ Establish the core client-server communication and prove the architecture.
 
 ## Deliverables
 
-- [x] **Proto definitions**: Define the gRPC protobuf schemas for control messages, capability lifecycle messages, and UI descriptors. The control plane must include an explicit handshake, an initial capability snapshot, and runtime capability delta messages. See [protocol.md](../features/protocol.md) and [server-driven-ui.md](../features/server-driven-ui.md).
+- [x] **Proto definitions**: Define the gRPC protobuf schemas for control messages, capability lifecycle messages, and UI descriptors. The control plane must include an explicit handshake, an initial capability snapshot, and runtime capability delta messages. See [protocol.md](../features/protocol/plan.md) and [server-driven-ui.md](../features/server-driven-ui.md).
 - [x] **Buf codegen**: `buf generate` produces Go and Dart bindings; CI verifies generated code is up to date.
 - [x] **Server skeleton**: Go project with gRPC server, device manager, mDNS advertisement, and an in-memory capability registry keyed by device and endpoint. See [architecture-server.md](../features/architecture-server.md) and [discovery.md](../features/discovery.md).
 - [x] **Client skeleton**: Flutter app with mDNS discovery, manual connect fallback, gRPC connection, capability discovery, and capability reporting. On initial connect the client sends a full snapshot. See [architecture-client.md](../features/architecture-client.md).
@@ -47,7 +47,7 @@ Client connects to server, sends a capability snapshot, sends capability deltas 
 
 ## Related Plans
 
-- [protocol.md](../features/protocol.md) — gRPC + WebRTC contract.
+- [protocol.md](../features/protocol/plan.md) — gRPC + WebRTC contract.
 - [capability-lifecycle.md](../features/capability-lifecycle.md) — Handshake, snapshots, deltas, and acknowledgements.
 - [discovery.md](../features/discovery.md) — mDNS + manual connect.
 - [server-driven-ui.md](../features/server-driven-ui.md) — UI primitive set.

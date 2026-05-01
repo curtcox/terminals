@@ -543,7 +543,7 @@ authoritative home is elsewhere in the masterplan:
 
 - **I1, I2, I3, I11** — device discovery, connection lifecycle,
   capability handshake, reconnect/restore. Covered by
-  [discovery.md](../discovery.md), [protocol.md](../protocol.md), and
+  [discovery.md](../discovery.md), [protocol.md](../protocol/plan.md), and
   [transport-multiplexing.md](../transport-multiplexing.md), not by
   typed scenario capabilities.
 - **I8** — CI / `make all-check` build-quality gate. Covered by
@@ -770,7 +770,7 @@ seeded simulation fixture.
   [search-and-memory.md](../search-and-memory.md),
   [bug-reporting.md](../bug-reporting.md) — Layer 2 domain
   plans.
-- [discovery.md](../discovery.md), [protocol.md](../protocol.md),
+- [discovery.md](../discovery.md), [protocol.md](../protocol/plan.md),
   [transport-multiplexing.md](../transport-multiplexing.md),
   [ci.md](../ci.md) — homes for the infrastructure/tooling use cases
   explicitly excluded from the REPL-closure clause.

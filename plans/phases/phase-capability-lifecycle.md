@@ -14,7 +14,7 @@ Status: Completed and drained on 2026-04-25.
 The completed work from this phase is now documented in:
 
 - [plans/features/capability-lifecycle.md](../features/capability-lifecycle.md)
-- [plans/features/protocol.md](../features/protocol.md)
+- [plans/features/protocol.md](../features/protocol/plan.md)
 - [plans/features/io-abstraction.md](../features/io-abstraction/plan.md)
 - [plans/features/architecture-client.md](../features/architecture-client.md)
 - [plans/features/architecture-server.md](../features/architecture-server.md)
