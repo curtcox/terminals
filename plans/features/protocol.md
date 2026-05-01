@@ -4,7 +4,7 @@ kind: plan
 status: shipped-validated
 owner: copilot
 validation: manual
-last-reviewed: 2026-04-26
+last-reviewed: 2026-05-01
 ---
 
 # Protocol Design
@@ -264,7 +264,16 @@ Proto files live in `api/terminals/` and are split by concern:
 
 Codegen is driven by Buf (`buf.yaml`, `buf.gen.yaml`). Go and Dart bindings are generated into the server and client trees respectively; CI verifies generated code is committed and up to date.
 
-## Progress (2026-04-26)
+
+## Related Plans
+
+- [architecture-client.md](architecture-client.md) — Client-side protocol use.
+- [architecture-server.md](architecture-server.md) — Server-side protocol use.
+- [server-driven-ui.md](server-driven-ui.md) — `SetUI` descriptor format.
+- [io-abstraction.md](io-abstraction.md) — resource model and stream semantics.
+
+
+## Implementation Progress (2026-04-26)
 
 - Added explicit capability invalidation payloads to control-plane acknowledgements in `CapabilityAck.invalidations` (`api/terminals/control/v1/control.proto`).
 - Wired server transport capability ack generation to include deterministic lost-resource invalidations (resource + reason) when snapshots/deltas remove claimable resources.
@@ -280,9 +289,3 @@ Codegen is driven by Buf (`buf.yaml`, `buf.gen.yaml`). Go and Dart bindings are 
 
 Any future compatibility-window cleanup (for example fully removing deprecated proto request fields) should be tracked as a separate follow-on task, not under this completed protocol design plan.
 
-## Related Plans
-
-- [architecture-client.md](architecture-client.md) — Client-side protocol use.
-- [architecture-server.md](architecture-server.md) — Server-side protocol use.
-- [server-driven-ui.md](server-driven-ui.md) — `SetUI` descriptor format.
-- [io-abstraction.md](io-abstraction.md) — resource model and stream semantics.

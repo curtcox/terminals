@@ -4,7 +4,7 @@ kind: plan
 status: shipped-validated
 owner: copilot
 validation: manual
-last-reviewed: 2026-04-26
+last-reviewed: 2026-05-01
 ---
 
 # IO Abstraction Layer
@@ -13,26 +13,6 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for overall system conte
 
 Every IO capability maps to a uniform interface on both client and server.
 
-## Progress (2026-04-26)
-
-Shipped and validated via repository gates (`make all-check`) after endpoint-scoped
-claim/planner wiring and regression coverage updates.
-
-- Implemented endpoint-scoped resource compilation in `terminal_server/internal/transport/control_stream.go`.
-    Capability snapshots now compile concrete endpoint resources alongside legacy aliases:
-    - `display.<id>.main`, `display.<id>.overlay`
-    - `audio_out.<id>`
-    - `audio_in.<id>.capture`, `audio_in.<id>.analyze`
-    - `camera.<id>.capture`, `camera.<id>.analyze`
-- Added transport tests in `terminal_server/internal/transport/control_stream_test.go` for endpoint resource derivation and endpoint-claim invalidation on capability loss.
-- Wired endpoint-scoped resources through scenario claim recipes in `terminal_server/internal/scenario/builtin.go`:
-    - PA + announcement now claim endpoint resources (`audio_in.<id>.capture`, `audio_out.<id>`) with legacy fallback aliases when endpoint metadata is absent.
-    - Voice assistant and audio monitor now claim endpoint analyze/output/display resources where available.
-    - Media-plan nodes now carry optional `resource` args to preserve resolved endpoint intent.
-- Updated media planner compilation in `terminal_server/internal/io/media_plan.go` to infer stream kind from endpoint-scoped node resources when supplied (`audio_in.*.capture -> audio_out.*`, `camera.*.capture -> display.*.main`).
-- Added regression coverage:
-    - `terminal_server/internal/scenario/runtime_test.go` validates PA claims endpoint-scoped resources from capability snapshots.
-    - `terminal_server/internal/io/media_plan_test.go` validates resource-arg stream-kind inference.
 
 ## IO Categories
 
@@ -233,3 +213,26 @@ The IO Router is the only component that knows the runtime topology of streams. 
 - [architecture-server.md](architecture-server.md) — router, claim manager, and media-planner module layout.
 - [scenario-engine.md](scenario-engine.md) — how activations use claims and media plans.
 - [placement.md](placement.md) — resolving device targets before building plans.
+
+
+## Implementation Progress (2026-04-26)
+
+Shipped and validated via repository gates (`make all-check`) after endpoint-scoped
+claim/planner wiring and regression coverage updates.
+
+- Implemented endpoint-scoped resource compilation in `terminal_server/internal/transport/control_stream.go`.
+    Capability snapshots now compile concrete endpoint resources alongside legacy aliases:
+    - `display.<id>.main`, `display.<id>.overlay`
+    - `audio_out.<id>`
+    - `audio_in.<id>.capture`, `audio_in.<id>.analyze`
+    - `camera.<id>.capture`, `camera.<id>.analyze`
+- Added transport tests in `terminal_server/internal/transport/control_stream_test.go` for endpoint resource derivation and endpoint-claim invalidation on capability loss.
+- Wired endpoint-scoped resources through scenario claim recipes in `terminal_server/internal/scenario/builtin.go`:
+    - PA + announcement now claim endpoint resources (`audio_in.<id>.capture`, `audio_out.<id>`) with legacy fallback aliases when endpoint metadata is absent.
+    - Voice assistant and audio monitor now claim endpoint analyze/output/display resources where available.
+    - Media-plan nodes now carry optional `resource` args to preserve resolved endpoint intent.
+- Updated media planner compilation in `terminal_server/internal/io/media_plan.go` to infer stream kind from endpoint-scoped node resources when supplied (`audio_in.*.capture -> audio_out.*`, `camera.*.capture -> display.*.main`).
+- Added regression coverage:
+    - `terminal_server/internal/scenario/runtime_test.go` validates PA claims endpoint-scoped resources from capability snapshots.
+    - `terminal_server/internal/io/media_plan_test.go` validates resource-arg stream-kind inference.
+

@@ -714,15 +714,6 @@ Invariants:
 - Session lifecycle events, command execution, and LLM proposals/approvals/rejections are all logged in structured form.
 - API credentials for AI providers live in server config only and are never exposed to the REPL or to the LLM.
 
-## Progress Notes
-
-- 2026-04-27: Added REPL pending-proposal lifecycle commands (`ai run`, `ai approve`, `ai reject`) that capture `proposed_command` metadata from `ai ask` / `ai gen` responses, execute approved commands through the typed REPL surface, and clear rejected proposals; updated REPL AI command docs and tests.
-- 2026-04-27: Added automated P3 validation (`TestUseCaseP3AIAssistanceAskGenerateAndMutatingGateMetadata`) and wired `make usecase-validate USECASE=P3` plus matrix coverage for AI ask/gen command paths and mutating approval-gate metadata.
-- 2026-04-27: Added typed `ai ask` / `ai gen` request paths across `replai`, admin APIs, and REPL command dispatch with session-thread/history persistence; REPL now supports direct question and generation turns over the configured provider/model selection.
-- 2026-04-27: Added typed AI thread history/reset APIs (`ai history`, `ai reset`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests so thread state can be inspected and cleared per session.
-- 2026-04-27: Added typed session context and approval-policy APIs (`ai context*`, `ai policy*`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests. `ai ask` / `ai gen` streaming and approval-loop execution remain in progress.
-- 2026-04-27: Added automated P4 validation (`TestUseCaseP4StickyAISelectionSurvivesDetachReattach`) and wired `make usecase-validate USECASE=P4` plus matrix coverage for sticky provider/model selection across detach/reattach.
-
 ## Implementation Phases
 
 ### Phase A — session substrate
@@ -798,3 +789,12 @@ Invariants:
 - [scenario-engine.md](scenario-engine.md) — activation model, lifecycle, claims, suspend/resume
 - [application-runtime.md](application-runtime.md) — TAR/TAL runtime, `pty` host module, terminal-first development loop
 - [agent-delegation.md](agent-delegation.md) — exposing the REPL command surface to Claude Code / Codex desktop apps via MCP
+
+## Implementation Progress (2026-04-27)
+
+- 2026-04-27: Added REPL pending-proposal lifecycle commands (`ai run`, `ai approve`, `ai reject`) that capture `proposed_command` metadata from `ai ask` / `ai gen` responses, execute approved commands through the typed REPL surface, and clear rejected proposals; updated REPL AI command docs and tests.
+- 2026-04-27: Added automated P3 validation (`TestUseCaseP3AIAssistanceAskGenerateAndMutatingGateMetadata`) and wired `make usecase-validate USECASE=P3` plus matrix coverage for AI ask/gen command paths and mutating approval-gate metadata.
+- 2026-04-27: Added typed `ai ask` / `ai gen` request paths across `replai`, admin APIs, and REPL command dispatch with session-thread/history persistence; REPL now supports direct question and generation turns over the configured provider/model selection.
+- 2026-04-27: Added typed AI thread history/reset APIs (`ai history`, `ai reset`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests so thread state can be inspected and cleared per session.
+- 2026-04-27: Added typed session context and approval-policy APIs (`ai context*`, `ai policy*`) across `replsession`, `replai`, admin endpoints, REPL command dispatch, and docs/tests. `ai ask` / `ai gen` streaming and approval-loop execution remain in progress.
+- 2026-04-27: Added automated P4 validation (`TestUseCaseP4StickyAISelectionSurvivesDetachReattach`) and wired `make usecase-validate USECASE=P4` plus matrix coverage for sticky provider/model selection across detach/reattach.
