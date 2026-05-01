@@ -3,8 +3,8 @@ title: "Bug Reporting Multimodal Expansion"
 kind: plan
 status: shipped-validated
 owner: copilot
-validation: automated:B1
-last-reviewed: 2026-04-26
+validation: automated:B1,B2,B5
+last-reviewed: 2026-05-01
 ---
 
 # Bug Reporting Multimodal Expansion

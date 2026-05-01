@@ -3,8 +3,8 @@ title: "REPL Capability Plan"
 kind: plan
 status: superseded
 owner: copilot
-validation: none
-last-reviewed: 2026-04-27
+validation: automated:AA6
+last-reviewed: 2026-05-01
 ---
 
 # REPL Capability Plan

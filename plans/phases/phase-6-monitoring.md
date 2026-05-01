@@ -3,8 +3,8 @@ title: "Phase 6 — Monitoring and Alerts"
 kind: plan
 status: superseded
 owner: copilot
-validation: none
-last-reviewed: 2026-04-25
+validation: automated:M1,M2,M3,M4
+last-reviewed: 2026-05-01
 ---
 
 # Phase 6 — Monitoring and Alerts

@@ -3,8 +3,8 @@ title: "Bug Reporting and Diagnostics"
 kind: plan
 status: superseded
 owner: copilot
-validation: automated:B4
-last-reviewed: 2026-04-26
+validation: automated:B3,B4
+last-reviewed: 2026-05-01
 ---
 
 # Bug Reporting and Diagnostics

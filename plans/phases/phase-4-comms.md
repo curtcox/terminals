@@ -3,8 +3,8 @@ title: "Phase 4 — Intercom and Calls"
 kind: plan
 status: superseded
 owner: copilot
-validation: none
-last-reviewed: 2026-04-25
+validation: automated:C1,C3,C5
+last-reviewed: 2026-05-01
 ---
 
 # Phase 4 — Intercom and Calls

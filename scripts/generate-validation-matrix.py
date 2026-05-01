@@ -3,7 +3,9 @@
 
 Walks usecases.md to extract every use-case ID (rows whose first column matches
 ^[A-Z]+\\d+$) and the family heading it sits under. Walks plans/ recursively for
-plans whose YAML frontmatter declares ``validation: automated:<ID>``. Writes
+plans whose YAML frontmatter declares ``validation: automated:<ID>`` (or a
+comma-separated list ``automated:<ID1>,<ID2>,...`` for plans that span multiple
+use cases). Writes
 docs/usecase-validation-matrix.md with two sections:
 
 - "Automated IDs": IDs declared automated by some plan, joined to the
@@ -30,7 +32,7 @@ USECASE_VALIDATE_SH = REPO / "scripts" / "usecase-validate.sh"
 
 ID_RE = re.compile(r"^[A-Z]+\d+$")
 HEADING_RE = re.compile(r"^(#{2,4})\s+(.*)$")
-AUTOMATED_RE = re.compile(r"^automated:([A-Za-z0-9]+)$")
+AUTOMATED_RE = re.compile(r"^automated:([A-Za-z0-9]+(?:,[A-Za-z0-9]+)*)$")
 ALL_IDS_RE = re.compile(r"^all_ids=\(([^)]*)\)\s*$")
 
 COVERAGE_DEPTH_LEGEND = [
@@ -132,14 +134,14 @@ def collect_plan_validations() -> tuple[dict[str, list[dict]], list[str]]:
             m = AUTOMATED_RE.match(validation)
             if not m:
                 continue
-            uid = m.group(1)
             rel = path.relative_to(REPO).as_posix()
             entry = {
                 "path": rel,
                 "title": fm.get("title", rel),
                 "status": fm.get("status", "?"),
             }
-            by_id.setdefault(uid, []).append(entry)
+            for uid in m.group(1).split(","):
+                by_id.setdefault(uid, []).append(entry)
     return by_id, errors
 
 

@@ -3,8 +3,8 @@ title: "REPL Plan"
 kind: plan
 status: superseded
 owner: copilot
-validation: automated:P2
-last-reviewed: 2026-04-27
+validation: automated:P2,P3,P4
+last-reviewed: 2026-05-01
 ---
 
 # REPL Plan

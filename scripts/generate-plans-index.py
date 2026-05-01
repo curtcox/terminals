@@ -187,7 +187,7 @@ def write_index(plans, errors):
         "**Incidents (`kind: incident`):** " + ", ".join(f"`{s}`" for s in VALID_INCIDENT_STATUSES)
     )
     lines.append("")
-    lines.append("**Validation:** `none`, `manual`, or `automated:<usecase-id>` (see `docs/usecase-validation-matrix.md`).")
+    lines.append("**Validation:** `none`, `manual`, `automated:<usecase-id>`, or `automated:<id1>,<id2>,...` for plans that cover multiple use cases (see `docs/usecase-validation-matrix.md`).")
     lines.append("")
 
     OUT.write_text("\n".join(lines))

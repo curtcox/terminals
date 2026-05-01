@@ -3,8 +3,8 @@ title: "Phase 3 — Media Streams"
 kind: plan
 status: superseded
 owner: copilot
-validation: none
-last-reviewed: 2026-04-25
+validation: automated:D1,S1,S2,S3
+last-reviewed: 2026-05-01
 ---
 
 # Phase 3 — Media Streams
