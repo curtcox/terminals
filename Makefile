@@ -11,7 +11,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-coverage \
 	proto-lint proto-breaking proto-generate \
-	skills-validate development-docs-test server-test-network-probe-test plans-index pick-next-work \
+	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix pick-next-work \
 	all-lint all-test all-check stop-server stop-server-test run-server run-client-web \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
 	ui-inspect-test
@@ -124,6 +124,9 @@ development-docs-test:
 plans-index:
 	python3 ./scripts/generate-plans-index.py
 
+validation-matrix:
+	python3 ./scripts/generate-validation-matrix.py
+
 pick-next-work:
 	@python3 ./scripts/pick-next-work.py
 
@@ -131,7 +134,7 @@ all-lint: server-lint client-lint proto-lint
 
 all-test: server-test client-test
 
-all-check: all-lint all-test proto-breaking client-build-all development-docs-test
+all-check: all-lint all-test proto-breaking client-build-all development-docs-test validation-matrix
 
 stop-server:
 	./scripts/stop-server.sh
