@@ -131,7 +131,7 @@ plans most actively worked on).
 
 **Where:**
 
-- [`plans/features/app-migrations.md`](../features/app-migrations.md) — 98KB,
+- [`plans/features/app-migrations.md`](../features/app-migrations/plan.md) — 98KB,
   100 dated bullets in `## Implementation Progress`. Status `building`.
 - [`plans/features/repl-and-shell.md`](../features/repl-and-shell.md) — 33KB,
   6 dated entries.

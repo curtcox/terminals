@@ -17,7 +17,7 @@ substrate). Depends on [package-format.md](package-format.md)
 (canonical `.tap`, signed statements, `verify_package`
 pipeline), [signing-and-trust.md](signing-and-trust.md) (keys,
 trust store, installer key, `app_id` lineage, revocation,
-rotation, policy schema), and [app-migrations.md](app-migrations.md)
+rotation, policy schema), and [app-migrations.md](app-migrations/plan.md)
 (migration executor, drain, reconciliation). Related:
 [scenario-engine.md](scenario-engine.md),
 [shared-artifacts.md](shared-artifacts.md),
@@ -62,7 +62,7 @@ stays focused on orchestration:
   revocation, the installer key, the verdict-log hash chain,
   the `critical_mutating` operation tier, and the v1 policy
   schema.
-- [app-migrations.md](app-migrations.md) owns the migration
+- [app-migrations.md](app-migrations/plan.md) owns the migration
   executor, drain semantics, the `reconcile_pending` state,
   and the artifact-patch boundary.
 
@@ -90,7 +90,7 @@ contracts.
    migrate live activations to a new version — runtime already
    specifies that existing activations stay pinned to the
    version that created them. Incompatible migrations require
-   drain first, per [app-migrations.md](app-migrations.md) §3.1.
+   drain first, per [app-migrations.md](app-migrations/plan.md) §3.1.
 6. **Installed apps can be re-vetted.** Trust state, policies,
    installed-app topology, and terminal capabilities all
    change; the server re-vets installs on material changes, not
@@ -294,7 +294,7 @@ Rules:
   receiving server refuses to install a lower version over a
   higher one without explicit `--allow-downgrade`.
 - A major bump in `version` MAY require a durable-data
-  migration (see [app-migrations.md](app-migrations.md)). The
+  migration (see [app-migrations.md](app-migrations/plan.md)). The
   manifest declares migrations and their compatibility /
   drain_policy; the executor enforces them.
 - `requires_kernel_api` is a hard gate. If the installing
@@ -324,7 +324,7 @@ Every persisted envelope this plan references carries a
 | `verdict-log/1`   | [signing-and-trust.md](signing-and-trust.md) §6.4 | Verdict-log ndjson entries.               |
 | `verdict/1`       | this plan §5.8                             | Per-install verdict bundle JSON file.          |
 | `install-tx/1`    | this plan §6.a.5                           | Install transaction journal entries.            |
-| `drain-intent/1`  | [app-migrations.md](app-migrations.md) §3.1.1 | Drain journal entries (§6.5).              |
+| `drain-intent/1`  | [app-migrations.md](app-migrations/plan.md) §3.1.1 | Drain journal entries (§6.5).              |
 
 v1 readers reject unknown schema strings at parse time, and
 reject unknown fields within a known schema. v1 writers only
@@ -688,7 +688,7 @@ Purely static checks on the parsed manifest from Gate 0:
 - Every file referenced by the manifest exists in the
   canonical tar.
 - Migration steps (if any) pass
-  [app-migrations.md](app-migrations.md) §2 structural checks,
+  [app-migrations.md](app-migrations/plan.md) §2 structural checks,
   including the `incompatible + none` hard-fail.
 
 ### 5.2 Gate 2 — Package-format extended checks
@@ -750,7 +750,7 @@ tractable. Checks:
   tests are `warn`, not `block`, by default.
 - Packages shipping `migrate/` pass the Gate 4 migration
   dry-run harness specified in
-  [app-migrations.md](app-migrations.md) §6. A dry-run failure
+  [app-migrations.md](app-migrations/plan.md) §6. A dry-run failure
   is `block`.
 
 #### 5.4.1 Declarative match grammar
@@ -1442,14 +1442,14 @@ matches an existing install:
    verdicts for `v_old` do not short-circuit — policy or
    models may have moved.
 2. On pass, enter the install transaction's drain phase if
-   [app-migrations.md](app-migrations.md) §3.1 requires it.
+   [app-migrations.md](app-migrations/plan.md) §3.1 requires it.
    Drain intents are persisted to
    `apps/<app_id>/drain/intents.ndjson` and fsynced before
    signaling scenario engine. Drain is idempotent: re-entering
    drain for the same `tx_id` is a no-op; a crash mid-drain
    resumes by reading the journal.
 3. Run durable-data migrations per
-   [app-migrations.md](app-migrations.md). For `drain`
+   [app-migrations.md](app-migrations/plan.md). For `drain`
    migrations, activations are stopped first. For
    `multi_version` migrations, activations continue and the
    executor runs adapters. For `compatible + none`
@@ -1476,7 +1476,7 @@ per-app, not the default.
 `term apps rollback <app>` installs the most recent previous
 version retained in `archive/`. Rollback *is* an install and
 runs the full pipeline again. If the previous version lacks a
-reverse migration (see [app-migrations.md](app-migrations.md)
+reverse migration (see [app-migrations.md](app-migrations/plan.md)
 §5), the operator must choose `--archive-data` or `--purge`.
 Rollback is refused while the current version is in
 `reconcile_pending`.
@@ -1526,7 +1526,7 @@ agreeing that the app will not run until trust is promoted.
 `term apps drain <app>` and any migration-required drain (§6.1)
 share the following semantics. The drain always terminates
 activations; no activation crosses a version boundary (see
-[app-migrations.md](app-migrations.md) §3.1.1).
+[app-migrations.md](app-migrations/plan.md) §3.1.1).
 
 1. Scenario engine stops accepting new activations for the
    `app_id`.

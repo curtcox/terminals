@@ -123,7 +123,7 @@ def collect_plan_validations() -> tuple[dict[str, list[dict]], list[str]]:
         for n in names:
             if not n.endswith(".md"):
                 continue
-            if n in ("INDEX.md", "README.md"):
+            if n in ("INDEX.md", "README.md", "progress.md"):
                 continue
             path = Path(root) / n
             text = path.read_text()

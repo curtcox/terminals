@@ -14,7 +14,7 @@ Depends on [package-format.md](package-format.md) (canonical
 signed statements) and is referenced by
 [application-distribution.md](application-distribution.md)
 (vetting pipeline, install transaction) and
-[app-migrations.md](app-migrations.md) (migration authority).
+[app-migrations.md](app-migrations/plan.md) (migration authority).
 Distinct from [identity-and-audience.md](identity-and-audience.md),
 which describes *people and audiences* for application logic, not
 *signing keys* for the application supply chain.

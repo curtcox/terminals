@@ -184,7 +184,7 @@ Every `.tap` MAY contain any subset of:
 - `<name>/models/**/*`
 - `<name>/assets/**/*`
 - `<name>/migrate/**/*.tal` (see
-  [app-migrations.md](app-migrations.md))
+  [app-migrations.md](app-migrations/plan.md))
 
 No other top-level directories are permitted. Unknown top-level
 entries cause rejection in §3.

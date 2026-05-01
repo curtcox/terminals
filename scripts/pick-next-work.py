@@ -53,7 +53,7 @@ def collect():
     plans = []
     for root, _, names in os.walk(PLANS):
         for n in names:
-            if not n.endswith(".md") or n in ("INDEX.md", "README.md"):
+            if not n.endswith(".md") or n in ("INDEX.md", "README.md", "progress.md"):
                 continue
             path = Path(root) / n
             text = path.read_text()
