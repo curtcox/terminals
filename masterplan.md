@@ -68,7 +68,7 @@ None of this requires updating the client app. The Flutter client is a generic t
 - [plans/application-runtime.md](plans/features/application-runtime.md) — Runtime model for app/session lifecycles and server orchestration.
 - [plans/edge-execution.md](plans/features/edge-execution.md) — Edge execution model and on-device/off-device execution boundaries.
 - [plans/observation-plane.md](plans/features/observation-plane.md) — Telemetry, sensing signals, and observation pipeline.
-- [plans/world-model-calibration.md](plans/features/world-model-calibration.md) — World-model calibration strategy and feedback loops.
+- [plans/world-model-calibration.md](plans/features/world-model-calibration/plan.md) — World-model calibration strategy and feedback loops.
 - [plans/sensing-use-case-flows.md](plans/features/sensing-use-case-flows.md) — End-to-end sensing-centric use-case flows.
 - [plans/bug-reporting.md](plans/features/bug-reporting.md) — Modality-agnostic, cross-device bug reporting with full client/subject context capture.
 - [plans/repl-and-shell.md](plans/features/repl-and-shell.md) — Server-side REPL: session model, typed command registry, in-REPL LLM assistance.

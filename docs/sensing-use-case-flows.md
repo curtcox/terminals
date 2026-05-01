@@ -170,5 +170,5 @@ calibration version.
 
 - [observation-plane.md](observation-plane.md)
 - [edge-execution-runtime.md](edge-execution-runtime.md)
-- [../plans/features/world-model-calibration.md](../plans/features/world-model-calibration.md)
+- [../plans/features/world-model-calibration.md](../plans/features/world-model-calibration/plan.md)
 - [application-runtime.md](application-runtime.md)

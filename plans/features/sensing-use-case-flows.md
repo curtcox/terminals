@@ -19,7 +19,7 @@ Related durable references:
 
 - [observation-plane.md](observation-plane.md)
 - [edge-execution.md](edge-execution.md)
-- [world-model-calibration.md](world-model-calibration.md)
+- [world-model-calibration.md](world-model-calibration/plan.md)
 - [application-runtime.md](application-runtime.md)
 - [../phases/phase-6b-edge-sensing.md](../phases/phase-6b-edge-sensing.md)
 

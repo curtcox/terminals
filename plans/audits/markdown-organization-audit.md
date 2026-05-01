@@ -138,7 +138,7 @@ plans most actively worked on).
 - [`plans/features/io-abstraction.md`](../features/io-abstraction/plan.md),
   [`plans/features/package-format.md`](../features/package-format/plan.md),
   [`plans/features/protocol.md`](../features/protocol.md),
-  [`plans/features/world-model-calibration.md`](../features/world-model-calibration.md)
+  [`plans/features/world-model-calibration.md`](../features/world-model-calibration/plan.md)
   — all carry inline progress logs.
 
 **Evidence:**

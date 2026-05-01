@@ -8,7 +8,7 @@ last-reviewed: 2026-05-01
 ---
 
 # World Model and Calibration
-See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context. The existing [placement plan](placement.md) already gives devices zones and roles. This document extends that world model so the system can localize sounds, people, objects, radios, and terminals.
+See [masterplan.md](../../archive/masterplan-duplicate.md) for overall system context. The existing [placement plan](../placement.md) already gives devices zones and roles. This document extends that world model so the system can localize sounds, people, objects, radios, and terminals.
 
 
 ## Design Principle
@@ -131,7 +131,7 @@ The server compares observed BLE/Wi-Fi fingerprints against previous baselines f
 No one method is required. Verification confidence improves as more methods agree.
 
 ## Placement Queries Extended
-Keep the existing [placement engine](placement.md) APIs, but add queries for people, objects, and location confidence.
+Keep the existing [placement engine](../placement.md) APIs, but add queries for people, objects, and location confidence.
 
 ```go
 type EntityQuery struct {
@@ -175,26 +175,12 @@ Any derived location must preserve:
 This is required for trust and debugging. "The system thinks the sound came from the hallway" must be explainable.
 
 ## Related Plans
-- [placement.md](placement.md) — Base semantic placement model.
-- [edge-execution.md](edge-execution.md) — Edge capability fields for timing and geometry.
-- [observation-plane.md](observation-plane.md) — `LocationEstimate` and observation provenance.
-- [sensing-use-case-flows.md](sensing-use-case-flows.md) — Flows that depend on spatial confidence.
+- [placement.md](../placement.md) — Base semantic placement model.
+- [edge-execution.md](../edge-execution.md) — Edge capability fields for timing and geometry.
+- [observation-plane.md](../observation-plane.md) — `LocationEstimate` and observation provenance.
+- [sensing-use-case-flows.md](../sensing-use-case-flows.md) — Flows that depend on spatial confidence.
 
 
-## Implementation Progress (2026-04-26)
+## Implementation Progress
 
-Implemented an initial world-model observation query path in the server runtime:
-
-- Added `RecentObservations(zone, kind, since)` to the world-model interface and adapter wiring.
-- Wired the media planner observation sink to store observations in the world model.
-- Added filtering tests for world-model observation history queries.
-- Enriched `DeviceGeometry` with optional sensor calibration fields (`MicArray`, `CameraIntrinsics`, `CameraExtrinsics`, `RadioBias`) for localization-heavy scenarios.
-- Added per-device `CalibrationHistory(deviceID, limit)` backed by `VerifyDevice` events so admin surfaces can render verification timelines.
-- Added world-model tests covering geometry retention and bounded calibration history queries.
-- Added admin calibration APIs:
-    - `GET /admin/api/world/calibration` to inspect terminal geometry and verification history.
-    - `POST /admin/api/world/verify` to execute verification updates and return fresh state.
-- Added admin endpoint tests for calibration listing and verification workflow behavior.
-
-This plan is now shipped and validated for the current server-side scope.
-
+The dated implementation log lives in [`progress.md`](progress.md) (append-only).
