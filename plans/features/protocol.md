@@ -270,7 +270,7 @@ Codegen is driven by Buf (`buf.yaml`, `buf.gen.yaml`). Go and Dart bindings are 
 - [architecture-client.md](architecture-client.md) — Client-side protocol use.
 - [architecture-server.md](architecture-server.md) — Server-side protocol use.
 - [server-driven-ui.md](server-driven-ui.md) — `SetUI` descriptor format.
-- [io-abstraction.md](io-abstraction.md) — resource model and stream semantics.
+- [io-abstraction.md](io-abstraction/plan.md) — resource model and stream semantics.
 
 
 ## Implementation Progress (2026-04-26)

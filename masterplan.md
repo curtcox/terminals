@@ -60,7 +60,7 @@ None of this requires updating the client app. The Flutter client is a generic t
 - [plans/architecture-server.md](plans/features/architecture-server.md) — Go server: module layout and responsibilities.
 - [plans/protocol.md](plans/features/protocol.md) — gRPC control plane, WebRTC media plane, data channels.
 - [plans/discovery.md](plans/features/discovery.md) — mDNS, manual connect, connection lifecycle, trust model.
-- [plans/io-abstraction.md](plans/features/io-abstraction.md) — IO categories, resources and claims, media-plan topology graph compiled by the router.
+- [plans/io-abstraction.md](plans/features/io-abstraction/plan.md) — IO categories, resources and claims, media-plan topology graph compiled by the router.
 - [plans/placement.md](plans/features/placement.md) — Zones, roles, and the placement engine that turns semantic targets into concrete devices.
 - [plans/server-driven-ui.md](plans/features/server-driven-ui.md) — Fixed primitive component set, descriptor format, update/patch/animate.
 - [plans/scenario-engine.md](plans/features/scenario-engine.md) — Scenario definitions vs activations, intent/event triggers, claim-driven preemption, scenario recipes.
@@ -111,12 +111,12 @@ Each phase is a standalone checklist with explicit prerequisites. Execute in ord
 
 5. **Activations are the unit of execution**. A scenario definition is a singleton; a scenario *activation* is a live instance with its own ID, claims, targets, and resume snapshot. Multiple timers, terminal sessions, or calls coexist cleanly. See [plans/scenario-engine.md](plans/features/scenario-engine.md).
 
-6. **Resource-level preemption via claims**. Activations claim specific resources (main screen, overlay, speaker, mic, camera, PTY) rather than whole devices. Higher-priority claims suspend lower ones; releases resume the suspended activation with exactly the claims it had. PA can take speakers without hiding the photo frame; a voice reply can overlay without replacing the terminal. See [plans/io-abstraction.md](plans/features/io-abstraction.md#resource-claims).
+6. **Resource-level preemption via claims**. Activations claim specific resources (main screen, overlay, speaker, mic, camera, PTY) rather than whole devices. Higher-priority claims suspend lower ones; releases resume the suspended activation with exactly the claims it had. PA can take speakers without hiding the photo frame; a voice reply can overlay without replacing the terminal. See [plans/io-abstraction.md](plans/features/io-abstraction/plan.md#resource-claims).
 
 7. **Semantic placement**. A placement engine turns "kitchen", "nearest screen", "all cameras" into concrete device sets. Scenarios never target raw device IDs; zones and roles are server-assigned metadata. See [plans/placement.md](plans/features/placement.md).
 
 8. **Typed intents and events**. Voice, UI actions, schedules, webhooks, classifier events, and automation agents all produce the same `Intent`/`Event` records on one bus. One matcher handles every trigger source. See [plans/scenario-engine.md](plans/features/scenario-engine.md#triggers-intents-and-events).
 
-9. **Declarative media topology**. Scenarios hand the IO router a `MediaPlan` — a small graph of sources, sinks, mixers, forks, analyzers, recorders — and the router compiles it to concrete transport messages. No stream-kind magic strings. See [plans/io-abstraction.md](plans/features/io-abstraction.md#media-topology-plans-not-connects).
+9. **Declarative media topology**. Scenarios hand the IO router a `MediaPlan` — a small graph of sources, sinks, mixers, forks, analyzers, recorders — and the router compiles it to concrete transport messages. No stream-kind magic strings. See [plans/io-abstraction.md](plans/features/io-abstraction/plan.md#media-topology-plans-not-connects).
 
 10. **Trusted LAN, no auth**. For a home network, mDNS discovery + direct connection with no authentication keeps things simple. If this assumption changes, TLS mutual auth can be added at the transport layer without protocol changes.

@@ -16,7 +16,7 @@ The completed work from this phase is now documented in:
 - [use-case-flows.md](../features/use-case-flows.md)
 - [technology.md](../features/technology.md)
 - [scenario-engine.md](../features/scenario-engine.md)
-- [io-abstraction.md](../features/io-abstraction.md)
+- [io-abstraction.md](../features/io-abstraction/plan.md)
 - [server-driven-ui.md](../features/server-driven-ui.md)
 - [docs/usecase-validation-matrix.md](../../docs/usecase-validation-matrix.md)
 

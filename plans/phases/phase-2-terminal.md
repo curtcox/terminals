@@ -45,5 +45,5 @@ Use a Chromebook or laptop as a functional text terminal into the Mac mini.
 
 - [scenario-engine.md](../features/scenario-engine.md) — Definition/activation split this fits into.
 - [use-case-flows.md](../features/use-case-flows.md#text-terminal) — Flow detail.
-- [io-abstraction.md](../features/io-abstraction.md) — Keyboard category.
+- [io-abstraction.md](../features/io-abstraction/plan.md) — Keyboard category.
 - [phase-3-media.md](phase-3-media.md) — Next phase.

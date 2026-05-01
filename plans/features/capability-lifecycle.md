@@ -18,7 +18,7 @@ The completed work from this plan is now documented in:
 - [`docs/server.md`](../../docs/server.md)
 - [`docs/event-taxonomy.md`](../../docs/event-taxonomy.md)
 - [`plans/features/protocol.md`](protocol.md)
-- [`plans/features/io-abstraction.md`](io-abstraction.md)
+- [`plans/features/io-abstraction.md`](io-abstraction/plan.md)
 
 Implementation evidence for the completed capability lifecycle behavior is
 captured in:

@@ -21,7 +21,7 @@ Related durable references:
 - [../../docs/usecase-validation-matrix.md](../../docs/usecase-validation-matrix.md)
 - [scenario-engine.md](scenario-engine.md)
 - [application-runtime.md](application-runtime.md)
-- [io-abstraction.md](io-abstraction.md)
+- [io-abstraction.md](io-abstraction/plan.md)
 - [../phases/phase-5-voice.md](../phases/phase-5-voice.md)
 
 Future baseline scenario-flow updates should be made in the active feature

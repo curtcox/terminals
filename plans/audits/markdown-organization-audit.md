@@ -135,7 +135,7 @@ plans most actively worked on).
   100 dated bullets in `## Implementation Progress`. Status `building`.
 - [`plans/features/repl-and-shell.md`](../features/repl-and-shell.md) — 33KB,
   6 dated entries.
-- [`plans/features/io-abstraction.md`](../features/io-abstraction.md),
+- [`plans/features/io-abstraction.md`](../features/io-abstraction/plan.md),
   [`plans/features/package-format.md`](../features/package-format/plan.md),
   [`plans/features/protocol.md`](../features/protocol.md),
   [`plans/features/world-model-calibration.md`](../features/world-model-calibration.md)

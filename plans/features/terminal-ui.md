@@ -19,7 +19,7 @@ Load-bearing precedents this plan leans on:
 - [server-driven-ui.md](server-driven-ui.md) — closed set of
   `ui.v1` primitives and `SetUI` / `UpdateUI` / `TransitionUI`. Adding
   a new primitive to satisfy a scenario is forbidden.
-- [io-abstraction.md](io-abstraction.md) — display resources
+- [io-abstraction.md](io-abstraction/plan.md) — display resources
   (`display.<id>.main` exclusive, `display.<id>.overlay` shared) and
   the claim manager that arbitrates them.
 - [bug-reporting.md](bug-reporting.md) — server-composed
@@ -301,7 +301,7 @@ attribute when resolving each incoming event's destination while an
 overlay claim is active on the same display. Scenarios set the
 attribute at activation-start; there is no `ConnectRequest` /
 `ConnectResponse` carrier for it, and it is not part of
-[io-abstraction.md](io-abstraction.md)'s public `Claim` struct.
+[io-abstraction.md](io-abstraction/plan.md)'s public `Claim` struct.
 
 ## Idle Content Rendering
 
@@ -333,7 +333,7 @@ truth for its own hardware access.
      "field absent," and a single round-trip test pins it.
   3. Disables local wake-word detection.
 - The server's claim manager observes the delta and, per
-  [io-abstraction.md](io-abstraction.md), **invalidates** any claim on
+  [io-abstraction.md](io-abstraction/plan.md), **invalidates** any claim on
   the disappeared resources. Activations relying on mic/camera
   suspend per the existing invalidation path.
 - On exiting privacy mode, the reverse: client re-emits the

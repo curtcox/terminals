@@ -154,4 +154,4 @@ Flow:
 - [Sensing and Edge Observation Use Case Flows](sensing-use-case-flows.md)
 - [Scenario Engine Plan](../plans/features/scenario-engine.md)
 - [Application Runtime](application-runtime.md)
-- [IO Abstraction Plan](../plans/features/io-abstraction.md)
+- [IO Abstraction Plan](../plans/features/io-abstraction/plan.md)

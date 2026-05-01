@@ -14,7 +14,7 @@ Status: Completed and drained on 2026-04-25.
 The completed work from this phase is now documented in:
 
 - [use-case-flows.md](../features/use-case-flows.md)
-- [io-abstraction.md](../features/io-abstraction.md)
+- [io-abstraction.md](../features/io-abstraction/plan.md)
 - [scenario-engine.md](../features/scenario-engine.md)
 - [server-driven-ui.md](../features/server-driven-ui.md)
 - [protocol.md](../features/protocol.md)

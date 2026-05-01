@@ -15,7 +15,7 @@ The completed work from this phase is now documented in:
 
 - [use-case-flows.md](../features/use-case-flows.md)
 - [scenario-engine.md](../features/scenario-engine.md)
-- [io-abstraction.md](../features/io-abstraction.md)
+- [io-abstraction.md](../features/io-abstraction/plan.md)
 - [placement.md](../features/placement.md)
 - [technology.md](../features/technology.md)
 - [docs/server.md](../../docs/server.md)
