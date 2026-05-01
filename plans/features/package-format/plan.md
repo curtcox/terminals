@@ -4,21 +4,21 @@ kind: plan
 status: shipped-validated
 owner: copilot
 validation: manual
-last-reviewed: 2026-04-26
+last-reviewed: 2026-05-01
 ---
 
 # Package Format
 
-See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
-Extends [application-runtime.md](application-runtime.md) (on-disk
+See [masterplan.md](../../archive/masterplan-duplicate.md) for overall system context.
+Extends [application-runtime.md](../application-runtime.md) (on-disk
 package layout). Referenced by
-[application-distribution.md](application-distribution.md) (how
+[application-distribution.md](../application-distribution.md) (how
 packages move between servers) and
-[signing-and-trust.md](signing-and-trust.md) (who may sign what).
+[signing-and-trust.md](../signing-and-trust.md) (who may sign what).
 
 ## Problem
 
-[application-runtime.md](application-runtime.md) specifies a
+[application-runtime.md](../application-runtime.md) specifies a
 package as a *directory on disk*. Distribution needs a *file* that
 can move between servers and be reasoned about cryptographically.
 The file format has to make three things unambiguous:
@@ -61,7 +61,7 @@ flagged as blockers in review; this document fixes them.
 - No transport format. `.tap` / `.tap.sig` travel over whatever
   `PackageSource` carries them (see distribution plan).
 - No trust policy — that lives in
-  [signing-and-trust.md](signing-and-trust.md). This document
+  [signing-and-trust.md](../signing-and-trust.md). This document
   specifies what can be verified *about* a statement, not
   whether to accept it.
 
@@ -184,7 +184,7 @@ Every `.tap` MAY contain any subset of:
 - `<name>/models/**/*`
 - `<name>/assets/**/*`
 - `<name>/migrate/**/*.tal` (see
-  [app-migrations.md](app-migrations/plan.md))
+  [app-migrations.md](../app-migrations/plan.md))
 
 No other top-level directories are permitted. Unknown top-level
 entries cause rejection in §3.
@@ -253,7 +253,7 @@ Schema:
 | 1   | `package_id`         | bstr   | Raw 32-byte sha256 of the **canonical tar** (§1.1). |
 | 2   | `role`               | tstr   | `"author"`, `"voucher"`, `"publisher"`.       |
 | 3   | `key_id`             | tstr   | `"ed25519:…"` in v1.                          |
-| 4   | `created_unix`       | uint   | Signer-asserted. Advisory; §3.5 binds authoritative time to server-observed receipt per [signing-and-trust.md](signing-and-trust.md). |
+| 4   | `created_unix`       | uint   | Signer-asserted. Advisory; §3.5 binds authoritative time to server-observed receipt per [signing-and-trust.md](../signing-and-trust.md). |
 | 5   | `manifest_name`      | tstr   | From the package's manifest.                  |
 | 6   | `manifest_version`   | tstr   | From the package's manifest.                  |
 | 7   | `scope`              | map    | Role-specific; see §2.3.                      |
@@ -315,7 +315,7 @@ laundered into a full-tier install.
 `expires_unix`, when present, is advisory — trust policy decides
 if an expired vouch still counts. A vouch without
 `expires_unix` is bounded by the voucher's ceiling in
-[signing-and-trust.md](signing-and-trust.md) §2.
+[signing-and-trust.md](../signing-and-trust.md) §2.
 
 **`role = "publisher"`**
 
@@ -335,7 +335,7 @@ Statements are appended to `.tap.sig` as vouchers arrive.
 **Statement order is not authority-bearing.** A previous draft
 claimed statement-reordering would fail verification; that was
 wrong — only the per-statement signature is bound. Trust policy
-(§9 crosswalk in [signing-and-trust.md](signing-and-trust.md))
+(§9 crosswalk in [signing-and-trust.md](../signing-and-trust.md))
 consumes the unordered set and may weight statements by
 server-observed receipt time recorded in the trust log.
 
@@ -362,7 +362,7 @@ For a `.tap` + `.tap.sig` pair to reach any policy gate at all,
 - No statement is rejected under §2.3 scope rules.
 
 Trust decisions — which keys, which roles, which scopes — are
-deferred to [signing-and-trust.md](signing-and-trust.md).
+deferred to [signing-and-trust.md](../signing-and-trust.md).
 
 ---
 
@@ -543,68 +543,6 @@ limits, error codes) do not bump the schema.
   `key_id` prefix set. Until then, non-`ed25519:` prefixes are
   rejected at Gate 0.
 
-## Implementation Progress (2026-04-26)
+## Implementation Progress
 
-This plan moved to `building` with an initial shipped slice in server code:
-
-- Added `terminal_server/internal/apppackage` with deterministic `.tap` build
-  and pre-trust `.tap` verification APIs.
-- Implemented canonical tar validation guards for sorted archive paths,
-  duplicate/case-colliding paths, path traversal rejection, required
-  `manifest.toml` and `main.tal`, and top-level directory allow-list.
-- Implemented package identity as `sha256` over decompressed canonical tar
-  bytes (`package_id`), aligning pre-trust identity with this plan.
-- Added unit tests in `terminal_server/internal/apppackage/tap_test.go` for
-  deterministic builds and representative rejection paths.
-
-Remaining work includes full `.tap.sig` statement verification, strict zstd
-frame flag enforcement, and comprehensive golden-vector coverage described in
- this plan.
-
-Additional shipped slice in this cycle:
-
-- Added `VerifyPackage(tapBytes, sigBytes)` pre-trust API that validates
-  canonical tar structure, parses manifest identity, and verifies
-  `tap-sig/1` statement bundles against the computed package hash.
-- Implemented statement-level checks for required fields, schema/package
-  binding, author-presence minimum acceptance, duplicate
-  `(key_id, package_id, nonce)` rejection, and role-specific scope shaping
-  (`author`, `voucher`, `publisher`) with unknown authority-bearing keys
-  rejected.
-- Added deterministic CBOR statement encoding and Ed25519 verification for
-  statement signatures, with bundle/parser quotas for v1 boundaries.
-- Expanded `terminal_server/internal/apppackage/tap_test.go` with
-  `VerifyPackage` success and rejection coverage (unknown voucher scope key,
-  missing author statement, duplicate nonce triple).
-
-Additional shipped slice in this cycle:
-
-- Added strict canonical zstd frame validation in pre-trust verification:
-  rejects skippable/non-zstd magic, enforces content-size flag present,
-  rejects checksum/dictionary-id flags, enforces max window log/size, and
-  rejects trailing bytes or concatenated extra frames before decompression.
-- Expanded `terminal_server/internal/apppackage/tap_test.go` with explicit
-  frame-layer rejection tests for checksum flag, dictionary-id flag, missing
-  content-size flag, trailing bytes, multi-frame payloads, skippable frame
-  magic, and oversized window descriptors.
-
-Additional shipped slice in this cycle:
-
-- Expanded `.tap.sig` rejection-path coverage in
-  `terminal_server/internal/apppackage/tap_test.go` for malformed TOML,
-  schema mismatch, bundle `package_id` mismatch, missing statement `nonce`,
-  statement manifest mismatch, corrupted Ed25519 signature rejection,
-  oversized bundle rejection, and statement-count quota enforcement.
-- Added reusable signed-statement test helper(s) to reduce duplication while
-  keeping canonical CBOR signing behavior under test.
-
-Additional shipped slice in this cycle:
-
-- Added zstd encoder parity validation in
-  `terminal_server/internal/apppackage/tap_test.go` that compares
-  `BuildTapFromDir` and pinned `zstd -19 --no-check --format=zstd
-  --single-thread` CLI re-encoding against the same canonical tar bytes,
-  asserting both verify and produce the same `package_id`.
-- Documented current package-format runtime coverage in
-  `docs/application-runtime.md` to reflect canonical tar, signature-bundle
-  pre-trust checks, and encoder parity testing.
+The dated implementation log lives in [`progress.md`](progress.md) (append-only).

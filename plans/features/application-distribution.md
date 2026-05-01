@@ -13,7 +13,7 @@ See [masterplan.md](../archive/masterplan-duplicate.md) for overall system conte
 Extends [application-runtime.md](application-runtime.md) (TAR/TAL
 package format and lifecycle) and
 [repl-capability-plan.md](repl-capability/plan.md) (authoring
-substrate). Depends on [package-format.md](package-format.md)
+substrate). Depends on [package-format.md](package-format/plan.md)
 (canonical `.tap`, signed statements, `verify_package`
 pipeline), [signing-and-trust.md](signing-and-trust.md) (keys,
 trust store, installer key, `app_id` lineage, revocation,
@@ -54,7 +54,7 @@ This plan covers the end-to-end supply chain:
 Three sibling plans own the load-bearing mechanics so this plan
 stays focused on orchestration:
 
-- [package-format.md](package-format.md) owns the `.tap` + signed
+- [package-format.md](package-format/plan.md) owns the `.tap` + signed
   statement wire format and the `verify_package` pre-trust
   pipeline.
 - [signing-and-trust.md](signing-and-trust.md) owns keys,
@@ -85,7 +85,7 @@ contracts.
    in a hash-chained, installer-signed verdict log.
 4. **Signed statements, not signed hashes.** Authority over a
    package is always tied to a fully-qualified signed statement
-   per [package-format.md](package-format.md).
+   per [package-format.md](package-format/plan.md).
 5. **Activation version pinning is preserved.** Upgrades never
    migrate live activations to a new version — runtime already
    specifies that existing activations stay pinned to the
@@ -258,7 +258,7 @@ pipeline can.
 
 Package file format, signature bundle, canonicalization, and
 signed-statement schema are all specified in
-[package-format.md](package-format.md). This plan references
+[package-format.md](package-format/plan.md). This plan references
 that format but does not restate it.
 
 Summary:
@@ -318,7 +318,7 @@ Every persisted envelope this plan references carries a
 
 | Schema            | Owned by                                   | Purpose                                         |
 |-------------------|--------------------------------------------|-------------------------------------------------|
-| `tap-sig/1`       | [package-format.md](package-format.md) §2  | Signature bundle outer TOML.                    |
+| `tap-sig/1`       | [package-format.md](package-format/plan.md) §2  | Signature bundle outer TOML.                    |
 | `rotation-stmt/1` | [signing-and-trust.md](signing-and-trust.md) §4.1 | Pair-signed rotation statements (CBOR).  |
 | `policy/1`        | [signing-and-trust.md](signing-and-trust.md) §8   | Trust / vetting policy file.              |
 | `verdict-log/1`   | [signing-and-trust.md](signing-and-trust.md) §6.4 | Verdict-log ndjson entries.               |
@@ -543,10 +543,10 @@ Rules:
   configurable per peer source and surfaced through the error
   enum rather than transport-level signals.
 - `SignatureBundle.toml` is the raw bundle; the client does not
-  trust it until [package-format.md](package-format.md)
+  trust it until [package-format.md](package-format/plan.md)
   verification (Gate 0) passes. Parse quotas (1 MiB file, 64
   statements, 8 KiB strings, depth 16) from
-  [package-format.md](package-format.md) §3 apply.
+  [package-format.md](package-format/plan.md) §3 apply.
 
 ### 4.3 Peer catalog MITM defense
 
@@ -648,7 +648,7 @@ verdict set → install transaction (§6.a)
 ### 5.0 Gate 0 — Canonical format (pre-trust)
 
 Runs the `verify_package` procedure from
-[package-format.md](package-format.md) §3 over the raw staged
+[package-format.md](package-format/plan.md) §3 over the raw staged
 bytes. No trust policy, no manifest reader, and no reviewer
 runs before this gate completes. Specifically:
 
@@ -1749,7 +1749,7 @@ Using [docs/tal-example-kitchen-timer.md](../../docs/tal-example-kitchen-timer.m
 2. **Publish on Server A.**
    - `term app pack kitchen_timer` →
      `kitchen_timer-0.1.0.tap` (canonical per
-     [package-format.md](package-format.md)).
+     [package-format.md](package-format/plan.md)).
    - `term app sign kitchen_timer --role=author` →
      `kitchen_timer-0.1.0.tap.sig` with the operator's author
      key. The package's `app_id` is established at first author

@@ -136,7 +136,7 @@ plans most actively worked on).
 - [`plans/features/repl-and-shell.md`](../features/repl-and-shell.md) — 33KB,
   6 dated entries.
 - [`plans/features/io-abstraction.md`](../features/io-abstraction.md),
-  [`plans/features/package-format.md`](../features/package-format.md),
+  [`plans/features/package-format.md`](../features/package-format/plan.md),
   [`plans/features/protocol.md`](../features/protocol.md),
   [`plans/features/world-model-calibration.md`](../features/world-model-calibration.md)
   — all carry inline progress logs.

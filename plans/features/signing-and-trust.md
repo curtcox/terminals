@@ -10,7 +10,7 @@ last-reviewed: 2026-04-27
 # Signing and Trust
 
 See [masterplan.md](../archive/masterplan-duplicate.md) for overall system context.
-Depends on [package-format.md](package-format.md) (canonical
+Depends on [package-format.md](package-format/plan.md) (canonical
 signed statements) and is referenced by
 [application-distribution.md](application-distribution.md)
 (vetting pipeline, install transaction) and
@@ -71,7 +71,7 @@ This document fixes:
   describes machine authority, not HR.
 - No algorithm agility in v1. All signatures are Ed25519;
   adding another algorithm requires a statement-schema bump
-  (see [package-format.md](package-format.md) §2.2).
+  (see [package-format.md](package-format/plan.md) §2.2).
 
 ---
 
@@ -712,7 +712,7 @@ A crosswalk for readers of the distribution plan; it does not
 re-specify gates.
 
 - **Gate 0 (pre-trust)** uses only
-  [package-format.md](package-format.md) rules. No trust store
+  [package-format.md](package-format/plan.md) rules. No trust store
   is consulted.
 - **Gate 3 (author / voucher policy)** consults the trust
   store and §8 policy.
