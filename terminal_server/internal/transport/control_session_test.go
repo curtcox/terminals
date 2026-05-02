@@ -822,10 +822,20 @@ func TestSessionRunRelaysWebRTCSignalsAcrossDeviceSessions(t *testing.T) {
 	stream1.recvCh <- ClientMessage{Register: &RegisterRequest{DeviceID: "d1", DeviceName: "Kitchen"}}
 	stream2.recvCh <- ClientMessage{Register: &RegisterRequest{DeviceID: "d2", DeviceName: "Hall"}}
 
-	for i := 0; i < 2; i++ {
-		<-stream1.sentCh
-		<-stream2.sentCh
+	// Drain register-time replays from each session (RegisterAck, SetUI,
+	// and any StartStream/RouteStream replays for already-connected routes)
+	// until both sides go quiet.
+	drainQuiescent := func(ch <-chan ServerMessage) {
+		for {
+			select {
+			case <-ch:
+			case <-time.After(150 * time.Millisecond):
+				return
+			}
+		}
 	}
+	drainQuiescent(stream1.sentCh)
+	drainQuiescent(stream2.sentCh)
 
 	stream1.recvCh <- ClientMessage{
 		WebRTCSignal: &WebRTCSignalRequest{

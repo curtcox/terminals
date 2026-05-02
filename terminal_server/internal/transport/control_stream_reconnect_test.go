@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
@@ -41,10 +42,10 @@ func TestGeneratedSessionUI_RECON_1(t *testing.T) {
 						DeviceId:   "device-1",
 						Generation: 1,
 						Capabilities: &capabilitiesv1.DeviceCapabilities{
-							DeviceId: "device-1",
-							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+							DeviceId:   "device-1",
+							Identity:   &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
 							Microphone: &capabilitiesv1.AudioInputCapability{},
-							Camera: &capabilitiesv1.CameraCapability{},
+							Camera:     &capabilitiesv1.CameraCapability{},
 						},
 					},
 				},
@@ -63,9 +64,10 @@ func TestGeneratedSessionUI_RECON_1(t *testing.T) {
 				Payload: &controlv1.ConnectRequest_Input{
 					Input: &iov1.InputEvent{
 						DeviceId: "device-1",
-						Event: &iov1.InputEvent_Action{
-							Action: &iov1.ActionEvent{
-								Action: "corner.open",
+						Payload: &iov1.InputEvent_UiAction{
+							UiAction: &iov1.UIAction{
+								ComponentId: "act:device-1/__affordance.corner__",
+								Action:      "corner.open",
 							},
 						},
 					},
@@ -78,8 +80,12 @@ func TestGeneratedSessionUI_RECON_1(t *testing.T) {
 		t.Fatalf("RunProtoSession() error = %v", err)
 	}
 
-	// Verify the scenario started and overlay opened in stream1
+	// Verify the scenario started and overlay opened in stream1.
+	// The overlay UpdateUI's component id is the canonical scoped form
+	// "act:<owner>/" + ui.GlobalOverlayComponentID; match by suffix so the
+	// assertion is robust to the active owner.
 	var sawScenarioStart, sawOverlay bool
+	overlaySuffix := "/" + ui.GlobalOverlayComponentID
 	for _, sent := range stream1.sent {
 		resp, ok := sent.(*controlv1.ConnectResponse)
 		if !ok {
@@ -88,7 +94,9 @@ func TestGeneratedSessionUI_RECON_1(t *testing.T) {
 		if resp.GetCommandResult() != nil && resp.GetCommandResult().GetScenarioStart() == "intercom" {
 			sawScenarioStart = true
 		}
-		if update := resp.GetUpdateUi(); update != nil && update.ComponentId == "global.overlay" && update.Node != nil && len(update.Node.Children) > 0 {
+		if update := resp.GetUpdateUi(); update != nil &&
+			(update.ComponentId == ui.GlobalOverlayComponentID || strings.HasSuffix(update.ComponentId, overlaySuffix)) &&
+			update.Node != nil && len(update.Node.Children) > 0 {
 			sawOverlay = true
 		}
 	}
@@ -109,10 +117,10 @@ func TestGeneratedSessionUI_RECON_1(t *testing.T) {
 						DeviceId:   "device-1",
 						Generation: 2,
 						Capabilities: &capabilitiesv1.DeviceCapabilities{
-							DeviceId: "device-1",
-							Identity: &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
+							DeviceId:   "device-1",
+							Identity:   &capabilitiesv1.DeviceIdentity{DeviceName: "Kitchen"},
 							Microphone: &capabilitiesv1.AudioInputCapability{},
-							Camera: &capabilitiesv1.CameraCapability{},
+							Camera:     &capabilitiesv1.CameraCapability{},
 						},
 					},
 				},
@@ -134,7 +142,9 @@ func TestGeneratedSessionUI_RECON_1(t *testing.T) {
 		if ui := resp.GetSetUi(); ui != nil {
 			sawReplaySetUI = true
 		}
-		if update := resp.GetUpdateUi(); update != nil && update.ComponentId == "global.overlay" && update.Node != nil && len(update.Node.Children) > 0 {
+		if update := resp.GetUpdateUi(); update != nil &&
+			(update.ComponentId == ui.GlobalOverlayComponentID || strings.HasSuffix(update.ComponentId, "/"+ui.GlobalOverlayComponentID)) &&
+			update.Node != nil && len(update.Node.Children) > 0 {
 			sawReplayOverlay = true
 		}
 		if start := resp.GetStartStream(); start != nil {
@@ -193,9 +203,10 @@ func TestGeneratedSessionMidFlightOverlayIdempotent(t *testing.T) {
 				Payload: &controlv1.ConnectRequest_Input{
 					Input: &iov1.InputEvent{
 						DeviceId: "device-1",
-						Event: &iov1.InputEvent_Action{
-							Action: &iov1.ActionEvent{
-								Action: "corner.open",
+						Payload: &iov1.InputEvent_UiAction{
+							UiAction: &iov1.UIAction{
+								ComponentId: "act:device-1/__affordance.corner__",
+								Action:      "corner.open",
 							},
 						},
 					},
@@ -205,9 +216,10 @@ func TestGeneratedSessionMidFlightOverlayIdempotent(t *testing.T) {
 				Payload: &controlv1.ConnectRequest_Input{
 					Input: &iov1.InputEvent{
 						DeviceId: "device-1",
-						Event: &iov1.InputEvent_Action{
-							Action: &iov1.ActionEvent{
-								Action: "corner.open",
+						Payload: &iov1.InputEvent_UiAction{
+							UiAction: &iov1.UIAction{
+								ComponentId: "act:device-1/__affordance.corner__",
+								Action:      "corner.open",
 							},
 						},
 					},
@@ -226,7 +238,8 @@ func TestGeneratedSessionMidFlightOverlayIdempotent(t *testing.T) {
 		if !ok {
 			continue
 		}
-		if update := resp.GetUpdateUi(); update != nil && update.ComponentId == "global.overlay" {
+		if update := resp.GetUpdateUi(); update != nil &&
+			(update.ComponentId == ui.GlobalOverlayComponentID || strings.HasSuffix(update.ComponentId, "/"+ui.GlobalOverlayComponentID)) {
 			overlayCount++
 		}
 	}

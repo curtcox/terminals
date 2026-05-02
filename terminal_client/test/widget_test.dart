@@ -2786,6 +2786,65 @@ void main() {
     expect(find.text('PA from device-1'), findsOneWidget);
   });
 
+  testWidgets('renders corner affordance and emits scoped corner.open UIAction',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = _FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+      ),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    // The scoped id matches the canonical form the server-side
+    // withCornerAffordance wrapper assigns. The test reads the value back
+    // from the emitted descriptor rather than hardcoding a bare logical id.
+    const scopedCornerId = 'act:device-1/__affordance.corner__';
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'terminal_root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = scopedCornerId
+                ..button = (uiv1.ButtonWidget()
+                  ..label = 'Menu'
+                  ..action = 'corner.open'),
+            ))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Menu'), findsOneWidget);
+
+    await tester.tap(find.text('Menu'));
+    await tester.pumpAndSettle();
+
+    final actions = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasUiAction())
+        .map((request) => request.input.uiAction)
+        .toList();
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == scopedCornerId &&
+            action.action == 'corner.open',
+      ),
+      isTrue,
+      reason:
+          'expected UIAction with scoped corner componentId and corner.open action',
+    );
+  });
+
   testWidgets('wires gesture area tap to UIAction',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));

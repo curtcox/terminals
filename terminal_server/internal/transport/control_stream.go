@@ -436,6 +436,11 @@ type StreamHandler struct {
 	sensorsByDevice         map[string]sensorSnapshot
 	voiceAudioBuffers       map[string][]byte
 	suspendedClaimsByDevice map[string][]iorouter.Claim
+	// routeReplayByDevice stashes the route set last observed for a device
+	// at HandleDisconnect time, so a subsequent reconnect can replay
+	// StartStream/RouteStream messages even though the live router state
+	// was torn down on disconnect.
+	routeReplayByDevice map[string][]iorouter.Route
 
 	deviceAudio    DeviceAudioPublisher
 	recording      recording.Manager
@@ -549,6 +554,7 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 		sensorsByDevice:         map[string]sensorSnapshot{},
 		voiceAudioBuffers:       map[string][]byte{},
 		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
+		routeReplayByDevice:     map[string][]iorouter.Route{},
 		recording:               recording.NoopManager{},
 		uiOwners:                newUIActionOwnershipTracker(),
 		wakeWordDedupe:          newWakeWordDedupeStage(0, ""),
@@ -597,6 +603,7 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 		sensorsByDevice:         map[string]sensorSnapshot{},
 		voiceAudioBuffers:       map[string][]byte{},
 		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
+		routeReplayByDevice:     map[string][]iorouter.Route{},
 		recording:               recording.NoopManager{},
 		uiOwners:                newUIActionOwnershipTracker(),
 		wakeWordDedupe:          newWakeWordDedupeStage(0, ""),
@@ -765,7 +772,11 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 					},
 				})
 			}
-			for _, route := range h.routeSnapshotForDevice(deviceID) {
+			replayRoutes := h.routeSnapshotForDevice(deviceID)
+			if len(replayRoutes) == 0 {
+				replayRoutes = h.routeReplaySnapshotForDevice(deviceID)
+			}
+			for _, route := range replayRoutes {
 				routeID := routeStreamID(route)
 				out = append(out, ServerMessage{
 					StartStream: &StartStreamResponse{
@@ -1716,28 +1727,6 @@ func hasBugReportAffordance(node ui.Descriptor) bool {
 		}
 	}
 	return false
-}
-
-func withCornerAffordance(root ui.Descriptor, ownerID string) ui.Descriptor {
-	cornerID := scopedAffordanceID(ownerID, cornerAffordanceLogicalID)
-	if hasNodeID(root, cornerID) {
-		return root
-	}
-	button := ui.New("button", map[string]string{
-		"id":         cornerID,
-		"label":      "Menu",
-		"action":     "corner.open",
-		"corner":     defaultCornerPlacement,
-		"visible":    "true",
-		"min_hit_dp": "44",
-	})
-	if root.Type == "stack" {
-		root.Children = append(root.Children, button)
-		return root
-	}
-	return ui.New("stack", map[string]string{
-		"id": "corner_affordance_root",
-	}, root, button)
 }
 
 func scopedAffordanceID(ownerID, logicalID string) string {
@@ -4961,10 +4950,37 @@ func (h *StreamHandler) disconnectRoutesForDevice(deviceID string) {
 	}
 
 	routes := routeIO.RoutesForDevice(deviceID)
+	if len(routes) > 0 {
+		snapshot := make([]iorouter.Route, len(routes))
+		copy(snapshot, routes)
+		key := strings.TrimSpace(deviceID)
+		h.mu.Lock()
+		h.routeReplayByDevice[key] = snapshot
+		h.mu.Unlock()
+	}
 	for _, route := range routes {
 		_ = routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
 		h.unregisterMediaStream(routeStreamID(route))
 	}
+}
+
+// routeReplaySnapshotForDevice returns the route set captured at the most
+// recent disconnect for deviceID, or nil if none was captured. Reconnect
+// replay uses this when the live router has no remaining routes.
+func (h *StreamHandler) routeReplaySnapshotForDevice(deviceID string) []iorouter.Route {
+	key := strings.TrimSpace(deviceID)
+	if key == "" {
+		return nil
+	}
+	h.mu.Lock()
+	snapshot := h.routeReplayByDevice[key]
+	h.mu.Unlock()
+	if len(snapshot) == 0 {
+		return nil
+	}
+	out := make([]iorouter.Route, len(snapshot))
+	copy(out, snapshot)
+	return out
 }
 
 func (h *StreamHandler) appendCommandEventLocked(ev CommandEvent) {
