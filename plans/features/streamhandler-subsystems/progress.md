@@ -45,3 +45,34 @@ Notes:
 - No production changes; tests only.
 - No pre-existing surprises surfaced. Worth flagging for Phase 6: bug-report intake errors currently fall through to `ErrorCodeUnknown` because `errorCodeFor` has no specific mapping for arbitrary intake errors — intentional today, but `DiagnosticsIntake` should keep that mapping unless a follow-up explicitly adds a code.
 - Skipped writing a separate "reconnect with previous UI but no route replay" test — `TestGeneratedSessionUI_RECON_1` already exercises both replay paths, and the SetUI-only sub-path is not high-risk for the upcoming Phase 2 (CapabilityLifecycle) extraction (UI replay stays in `StreamHandler` per the plan).
+
+## 2026-05-02 — Phase 2 (PR 3: extract CapabilityLifecycle)
+
+Status: complete
+
+Changes:
+- Added `terminal_server/internal/transport/capability_lifecycle.go` with `CapabilityLifecycle` struct, `NewCapabilityLifecycle(*ControlService)`, and a single `CapabilityResult` shape exposing `Messages`, `BeforeCaps`, `AfterCaps`, `AfterDeviceName`, `IsInitialBaseline`, `HadPriorDevice`, and a `RegisterAck` pointer (same pointer as the one in `Messages`) so callers can attach an initial UI descriptor without rebuilding the ack.
+- Methods: `HandleHello` returns `[]ServerMessage`; `HandleRegister` returns the raw `RegisterResponse` (UI replay stays in `StreamHandler`); `HandleSnapshot`/`HandleDelta` return `CapabilityResult`; `HandleUpdateCapabilities` covers the deprecated `Capability` message and returns no ack on success.
+- The implicit-Hello-on-snapshot-for-unknown-device fallback (previously inlined in `HandleMessage`) moved into `HandleSnapshot` to keep the lifecycle responsible for its own compatibility behavior.
+- `capabilityInvalidations` (package-level helper) is reused unchanged. `handleCapabilityChangeEffects` and the suspended-claim helpers stay on `StreamHandler` per the plan's "scenario capability-change effects" boundary.
+- Wired `capabilityLifecycle` into `newStreamHandler` so both public constructors initialize it; added a field-grouping comment on `StreamHandler`.
+- Rewrote the Hello / CapabilitySnap / CapabilityDelta / Register / Capability branches in `HandleMessage` (control_stream.go) to delegate to the new collaborator. UI replay, overlay replay, route replay, and the `handleCapabilityChangeEffects` call sequence remain in `StreamHandler` and now drive off `result.HadPriorDevice`, `result.IsInitialBaseline`, `result.AfterDeviceName`, `result.RegisterAck`, and `result.BeforeCaps`/`AfterCaps`. The previous `before.Generation == 0 || hasUI` predicate translates to `!result.HadPriorDevice || hasUI` — same boolean.
+- Removed the now-unused `internal/device` import from `control_stream.go`.
+- Added `capability_lifecycle_test.go` with 9 focused tests: HelloAck shape, RegisterAck shape, initial-baseline detection, second-snapshot is-not-baseline, delta updates capabilities, stale-generation error preserves `errors.Is(err, device.ErrStaleGeneration)`, malformed-device-id error, deprecated-Capability path, and capability invalidations on resource loss.
+
+Validation:
+- `cd terminal_server && go build ./...` — pass.
+- `cd terminal_server && go test ./internal/transport -run 'HandleHello|HandleRegister|HandleSnapshot|HandleDelta|HandleUpdate' -count=1 -v` — all new tests pass.
+- `cd terminal_server && go test ./internal/transport -count=1` — pass (9.1s). The Phase 0 characterization tests (`TestHandleMessageBugReportIntakeErrorPropagates`, `TestHandleMessageCommandValidationErrorsReturnSingleErrorResponse`, `TestHandleMessageCommandRecordsValidationErrorInRecentEvents`) and reconnect tests pass without modification — load-bearing signal that snapshot/delta/register/UI-replay/route-replay behavior did not drift.
+- `cd terminal_server && go test ./...` — pass.
+- `cd terminal_server && go test -race ./...` — pass (transport 10.2s).
+
+Judgment calls:
+- **`CapabilityResult` shape**: kept the higher-level result (per the plan's lean) so `StreamHandler` still owns UI replay and the `handleCapabilityChangeEffects` call. Added `AfterDeviceName` and `HadPriorDevice` to the documented shape because both are needed by the existing UI-replay logic and adding them keeps the predicate translation a one-liner. `RegisterAck` is exposed as a direct pointer (aliased into `Messages`) so the snapshot path can mutate `Initial` without re-walking the message slice.
+- **No interface on the seam.** Concrete `*CapabilityLifecycle` is wired in. The single test seam needed (a `*ControlService` constructed against `device.NewManager()`) is already easy to set up.
+- **Register stays partially in `StreamHandler`.** The Register path's UI replay reads `resp.Initial` (built by `control.Register`) rather than rebuilding it, and the lifecycle returns `RegisterResponse` directly. Wrapping it in `CapabilityResult` would have forced fake before/after caps, so the asymmetry with Snapshot is intentional.
+
+Notes:
+- No protobuf changes. No client changes. `control_stream.go` is now ~5000 lines (capability lifecycle code moved out, but characterization tests and the new file are in separate files).
+- `handleCapabilityChangeEffects`, `rememberSuspendedClaims`, `restoreSuspendedClaims`, and the package-level `capabilityInvalidations`/`capabilityResources`/`emitCapabilityEvents`/`shouldDisconnectRouteForLostResources` helpers stay in `control_stream.go`. They straddle UI/route replay and scenario IO; per the plan, scenario capability-change effects are not owned by `CapabilityLifecycle`.
+- Stopping after this PR. Awaiting confirmation before starting PR 4 (Phase 3: extract `RouteReplayStore`).

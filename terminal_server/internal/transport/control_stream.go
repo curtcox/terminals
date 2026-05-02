@@ -15,7 +15,6 @@ import (
 	"time"
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
-	"github.com/curtcox/terminals/terminal_server/internal/device"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
@@ -452,6 +451,9 @@ type StreamHandler struct {
 	identityService   IdentityService
 	menuAppPolicy     MenuAppPolicy
 	menuOverlayPolicy overlayInputPolicyConfig
+
+	// capability lifecycle collaborator (hello/register/snapshot/delta).
+	capabilityLifecycle *CapabilityLifecycle
 }
 
 type mediaStreamState struct {
@@ -580,6 +582,7 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 		menuOverlayPolicy: defaultOverlayInputPolicy(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
+	handler.capabilityLifecycle = NewCapabilityLifecycle(control)
 	return handler
 }
 
@@ -696,55 +699,32 @@ func (h *StreamHandler) ReplSessions() *replsession.Service {
 func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([]ServerMessage, error) {
 	switch {
 	case msg.Hello != nil:
-		resp, err := h.control.Hello(ctx, *msg.Hello)
+		out, err := h.capabilityLifecycle.HandleHello(ctx, *msg.Hello)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
-		return []ServerMessage{{HelloAck: &resp}}, nil
+		return out, nil
 	case msg.CapabilitySnap != nil:
 		h.metrics.capabilityReceived.Add(1)
-		before, _ := h.control.devices.Get(msg.CapabilitySnap.DeviceID)
-		ack, err := h.control.ApplyCapabilitySnapshot(ctx, msg.CapabilitySnap.DeviceID, msg.CapabilitySnap.Generation, msg.CapabilitySnap.Capabilities)
-		if err != nil && errors.Is(err, device.ErrDeviceNotFound) {
-			_, helloErr := h.control.Hello(ctx, HelloRequest{
-				DeviceID:      msg.CapabilitySnap.DeviceID,
-				DeviceName:    msg.CapabilitySnap.Capabilities["device_name"],
-				DeviceType:    msg.CapabilitySnap.Capabilities["device_type"],
-				Platform:      msg.CapabilitySnap.Capabilities["platform"],
-				ClientVersion: "",
-			})
-			if helloErr != nil {
-				h.metrics.protocolErrors.Add(1)
-				return []ServerMessage{{ErrorCode: errorCodeFor(helloErr), Error: helloErr.Error()}}, helloErr
-			}
-			ack, err = h.control.ApplyCapabilitySnapshot(ctx, msg.CapabilitySnap.DeviceID, msg.CapabilitySnap.Generation, msg.CapabilitySnap.Capabilities)
-		}
+		result, err := h.capabilityLifecycle.HandleSnapshot(ctx, *msg.CapabilitySnap)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
-		after, _ := h.control.devices.Get(msg.CapabilitySnap.DeviceID)
-		ack.Invalidations = capabilityInvalidations(before.Capabilities, after.Capabilities)
-		out := []ServerMessage{{CapabilityAck: &ack}}
-		registerAck := &RegisterResponse{
-			ServerID: h.control.serverID,
-			Message:  "registered",
-			Metadata: cloneStringMap(h.control.metadata),
-		}
-		out = append(out, ServerMessage{RegisterAck: registerAck})
-		deviceID := msg.CapabilitySnap.DeviceID
+		out := result.Messages
+		deviceID := result.DeviceID
 		h.mu.Lock()
 		storedUI, hasUI := h.lastSetUIByDevice[deviceID]
 		_, hasOverlay := h.menuOverlayByDevice[deviceID]
 		h.mu.Unlock()
 
-		if before.Generation == 0 || hasUI {
+		if !result.HadPriorDevice || hasUI {
 			if hasUI {
 				out = append(out, ServerMessage{SetUI: &storedUI})
 			} else {
-				initial := ui.HelloWorld(after.DeviceName)
-				registerAck.Initial = initial
+				initial := ui.HelloWorld(result.AfterDeviceName)
+				result.RegisterAck.Initial = initial
 				out = append(out, ServerMessage{SetUI: &initial})
 				h.rememberSetUI(deviceID, out)
 			}
@@ -783,9 +763,8 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 				})
 			}
 		}
-		isInitialSnapshotBaseline := before.Generation == 0 && len(before.Capabilities) == 0
-		if !isInitialSnapshotBaseline {
-			effects := h.handleCapabilityChangeEffects(ctx, msg.CapabilitySnap.DeviceID, before.Capabilities, after.Capabilities)
+		if !result.IsInitialBaseline {
+			effects := h.handleCapabilityChangeEffects(ctx, deviceID, result.BeforeCaps, result.AfterCaps)
 			if len(effects) > 0 {
 				out = append(out, effects...)
 			}
@@ -793,23 +772,20 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		return out, nil
 	case msg.CapabilityDelta != nil:
 		h.metrics.capabilityReceived.Add(1)
-		before, _ := h.control.devices.Get(msg.CapabilityDelta.DeviceID)
-		ack, err := h.control.ApplyCapabilityDelta(ctx, msg.CapabilityDelta.DeviceID, msg.CapabilityDelta.Generation, msg.CapabilityDelta.Capabilities)
+		result, err := h.capabilityLifecycle.HandleDelta(ctx, *msg.CapabilityDelta)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
-		after, _ := h.control.devices.Get(msg.CapabilityDelta.DeviceID)
-		ack.Invalidations = capabilityInvalidations(before.Capabilities, after.Capabilities)
-		out := []ServerMessage{{CapabilityAck: &ack}}
-		effects := h.handleCapabilityChangeEffects(ctx, msg.CapabilityDelta.DeviceID, before.Capabilities, after.Capabilities)
+		out := result.Messages
+		effects := h.handleCapabilityChangeEffects(ctx, result.DeviceID, result.BeforeCaps, result.AfterCaps)
 		if len(effects) > 0 {
 			out = append(out, effects...)
 		}
 		return out, nil
 	case msg.Register != nil:
 		h.metrics.registerReceived.Add(1)
-		resp, err := h.control.Register(ctx, *msg.Register)
+		resp, err := h.capabilityLifecycle.HandleRegister(ctx, *msg.Register)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
@@ -862,7 +838,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		return out, nil
 	case msg.Capability != nil:
 		h.metrics.capabilityReceived.Add(1)
-		err := h.control.UpdateCapabilities(ctx, msg.Capability.DeviceID, msg.Capability.Capabilities)
+		err := h.capabilityLifecycle.HandleUpdateCapabilities(ctx, *msg.Capability)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
