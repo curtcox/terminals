@@ -742,11 +742,51 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			Metadata: cloneStringMap(h.control.metadata),
 		}
 		out = append(out, ServerMessage{RegisterAck: registerAck})
-		if before.Generation == 0 {
-			initial := ui.HelloWorld(after.DeviceName)
-			registerAck.Initial = initial
-			out = append(out, ServerMessage{SetUI: &initial})
-			h.rememberSetUI(msg.CapabilitySnap.DeviceID, out)
+		deviceID := msg.CapabilitySnap.DeviceID
+		h.mu.Lock()
+		storedUI, hasUI := h.lastSetUIByDevice[deviceID]
+		_, hasOverlay := h.menuOverlayByDevice[deviceID]
+		h.mu.Unlock()
+
+		if before.Generation == 0 || hasUI {
+			if hasUI {
+				out = append(out, ServerMessage{SetUI: &storedUI})
+			} else {
+				initial := ui.HelloWorld(after.DeviceName)
+				registerAck.Initial = initial
+				out = append(out, ServerMessage{SetUI: &initial})
+				h.rememberSetUI(deviceID, out)
+			}
+			if hasOverlay {
+				out = append(out, ServerMessage{
+					UpdateUI: &UIUpdate{
+						ComponentID: ui.GlobalOverlayComponentID,
+						Node:        h.menuOverlayDescriptor(deviceID),
+					},
+				})
+			}
+			for _, route := range h.routeSnapshotForDevice(deviceID) {
+				routeID := routeStreamID(route)
+				out = append(out, ServerMessage{
+					StartStream: &StartStreamResponse{
+						StreamID:       routeID,
+						Kind:           route.StreamKind,
+						SourceDeviceID: route.SourceID,
+						TargetDeviceID: route.TargetID,
+						Metadata: map[string]string{
+							"origin":      "route_delta",
+							"webrtc_mode": "server_managed",
+						},
+					},
+				}, ServerMessage{
+					RouteStream: &RouteStreamResponse{
+						StreamID:       routeID,
+						SourceDeviceID: route.SourceID,
+						TargetDeviceID: route.TargetID,
+						Kind:           route.StreamKind,
+					},
+				})
+			}
 		}
 		isInitialSnapshotBaseline := before.Generation == 0 && len(before.Capabilities) == 0
 		if !isInitialSnapshotBaseline {
@@ -779,11 +819,51 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
+		deviceID := msg.Register.DeviceID
+		h.mu.Lock()
+		storedUI, hasUI := h.lastSetUIByDevice[deviceID]
+		_, hasOverlay := h.menuOverlayByDevice[deviceID]
+		h.mu.Unlock()
+
 		out := []ServerMessage{
 			{RegisterAck: &resp},
-			{SetUI: &resp.Initial},
 		}
-		h.rememberSetUI(msg.Register.DeviceID, out)
+		if hasUI {
+			out = append(out, ServerMessage{SetUI: &storedUI})
+		} else {
+			out = append(out, ServerMessage{SetUI: &resp.Initial})
+			h.rememberSetUI(deviceID, out)
+		}
+		if hasOverlay {
+			out = append(out, ServerMessage{
+				UpdateUI: &UIUpdate{
+					ComponentID: ui.GlobalOverlayComponentID,
+					Node:        h.menuOverlayDescriptor(deviceID),
+				},
+			})
+		}
+		for _, route := range h.routeSnapshotForDevice(deviceID) {
+			routeID := routeStreamID(route)
+			out = append(out, ServerMessage{
+				StartStream: &StartStreamResponse{
+					StreamID:       routeID,
+					Kind:           route.StreamKind,
+					SourceDeviceID: route.SourceID,
+					TargetDeviceID: route.TargetID,
+					Metadata: map[string]string{
+						"origin":      "route_delta",
+						"webrtc_mode": "server_managed",
+					},
+				},
+			}, ServerMessage{
+				RouteStream: &RouteStreamResponse{
+					StreamID:       routeID,
+					SourceDeviceID: route.SourceID,
+					TargetDeviceID: route.TargetID,
+					Kind:           route.StreamKind,
+				},
+			})
+		}
 		return out, nil
 	case msg.Capability != nil:
 		h.metrics.capabilityReceived.Add(1)
@@ -3463,6 +3543,17 @@ func (h *StreamHandler) openMenuOverlay(ctx context.Context, deviceID string) ([
 		return nil, true, nil
 	}
 	activationID := menuOverlayActivationID(deviceID)
+	h.mu.Lock()
+	_, alreadyOpen := h.menuOverlayByDevice[deviceID]
+	h.mu.Unlock()
+	if alreadyOpen {
+		return []ServerMessage{{
+			UpdateUI: &UIUpdate{
+				ComponentID: ui.GlobalOverlayComponentID,
+				Node:        h.menuOverlayDescriptor(deviceID),
+			},
+		}}, true, nil
+	}
 	policy := h.overlayPolicyForOpen()
 	if err := h.requestMenuOverlayClaim(ctx, deviceID, activationID); err != nil {
 		return nil, true, err
