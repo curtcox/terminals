@@ -1,10 +1,10 @@
 ---
 title: "Terminal UI"
 kind: plan
-status: planned
-owner: unowned
+status: building
+owner: github-copilot
 validation: none
-last-reviewed: 2026-04-25
+last-reviewed: 2026-05-02
 ---
 
 # Terminal UI

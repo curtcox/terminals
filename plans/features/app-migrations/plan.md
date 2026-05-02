@@ -1,10 +1,10 @@
 ---
 title: "Application Migrations"
 kind: plan
-status: building
+status: shipped-validated
 owner: github-copilot
-validation: none
-last-reviewed: 2026-05-01
+validation: automated
+last-reviewed: 2026-05-02
 ---
 
 # Application Migrations
