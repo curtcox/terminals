@@ -3770,6 +3770,81 @@ drain_policy = "drain"
 	}
 }
 
+func TestRuntimeRetryMigrationDrainTimeoutAbortsWithoutRunningStep(t *testing.T) {
+	tempDir := t.TempDir()
+	appDir := filepath.Join(tempDir, "migrate_drain_timeout_evidence")
+	if err := os.MkdirAll(filepath.Join(appDir, "migrate"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	manifest := `name = "migrate_drain_timeout_evidence"
+version = "1.0.0"
+language = "tal/1"
+
+[migrate]
+declared_steps = 1
+drain_timeout_seconds = 2
+
+[[migrate.step]]
+from = "1"
+to = "2"
+compatibility = "incompatible"
+drain_policy = "drain"
+`
+	if err := os.WriteFile(filepath.Join(appDir, "manifest.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("WriteFile(manifest) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "main.tal"), []byte("def on_start(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(main) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, "migrate", "0001_1_to_2.tal"), []byte("def migrate(): pass\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(migrate) error = %v", err)
+	}
+
+	runtime := NewRuntime()
+	if _, err := runtime.LoadPackage(context.Background(), appDir); err != nil {
+		t.Fatalf("LoadPackage() error = %v", err)
+	}
+
+	pendingStatus, err := runtime.RetryMigration("migrate_drain_timeout_evidence")
+	if !errors.Is(err, ErrMigrationDrainPending) {
+		t.Fatalf("first RetryMigration() error = %v, want ErrMigrationDrainPending", err)
+	}
+
+	runtime.mu.Lock()
+	state := runtime.migrations["migrate_drain_timeout_evidence"]
+	state.DrainBlockedAt = time.Now().Add(-3 * time.Second)
+	runtime.migrations["migrate_drain_timeout_evidence"] = state
+	runtime.mu.Unlock()
+
+	timeoutStatus, err := runtime.RetryMigration("migrate_drain_timeout_evidence")
+	if !errors.Is(err, ErrMigrationDrainTimeout) {
+		t.Fatalf("second RetryMigration() error = %v, want ErrMigrationDrainTimeout", err)
+	}
+	if timeoutStatus.Verdict != "aborted" {
+		t.Fatalf("RetryMigration() verdict = %q, want aborted", timeoutStatus.Verdict)
+	}
+	if timeoutStatus.StepsCompleted != 0 {
+		t.Fatalf("RetryMigration() steps_completed = %d, want 0", timeoutStatus.StepsCompleted)
+	}
+
+	journalBytes, err := os.ReadFile(filepath.Join(appDir, filepath.FromSlash(pendingStatus.JournalPath)))
+	if err != nil {
+		t.Fatalf("ReadFile(journal) error = %v", err)
+	}
+	entries := parseMigrationJournalEntries(t, journalBytes)
+	if !hasMigrationJournalEvent(entries, "retry_blocked_drain_pending") {
+		t.Fatalf("journal missing retry_blocked_drain_pending entry: %+v", entries)
+	}
+	if !hasMigrationJournalEvent(entries, "retry_blocked_drain_timeout") {
+		t.Fatalf("journal missing retry_blocked_drain_timeout entry: %+v", entries)
+	}
+	for _, forbidden := range []string{"retry_started", "step_started", "step_committed", "retry_committed"} {
+		if hasMigrationJournalEvent(entries, forbidden) {
+			t.Fatalf("journal contains %q after drain-timeout abort; migration body must not run while drain is unsatisfied: %+v", forbidden, entries)
+		}
+	}
+}
+
 func TestRuntimeDrainPendingBlockedAtReplaysFromJournal(t *testing.T) {
 	tempDir := t.TempDir()
 	appDir := filepath.Join(tempDir, "migrate_drain_replay")
