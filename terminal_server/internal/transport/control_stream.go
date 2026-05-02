@@ -435,11 +435,10 @@ type StreamHandler struct {
 	sensorsByDevice         map[string]sensorSnapshot
 	voiceAudioBuffers       map[string][]byte
 	suspendedClaimsByDevice map[string][]iorouter.Claim
-	// routeReplayByDevice stashes the route set last observed for a device
-	// at HandleDisconnect time, so a subsequent reconnect can replay
-	// StartStream/RouteStream messages even though the live router state
-	// was torn down on disconnect.
-	routeReplayByDevice map[string][]iorouter.Route
+	// routeReplay captures route sets at disconnect so subsequent reconnects
+	// can replay StartStream/RouteStream messages even though the live
+	// router state was torn down on disconnect.
+	routeReplay *RouteReplayStore
 
 	deviceAudio    DeviceAudioPublisher
 	recording      recording.Manager
@@ -572,7 +571,7 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 		sensorsByDevice:         map[string]sensorSnapshot{},
 		voiceAudioBuffers:       map[string][]byte{},
 		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
-		routeReplayByDevice:     map[string][]iorouter.Route{},
+		routeReplay:             NewRouteReplayStore(),
 
 		// diagnostics / collaborators with default impls
 		recording:         recording.NoopManager{},
@@ -736,32 +735,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 					},
 				})
 			}
-			replayRoutes := h.routeSnapshotForDevice(deviceID)
-			if len(replayRoutes) == 0 {
-				replayRoutes = h.routeReplaySnapshotForDevice(deviceID)
-			}
-			for _, route := range replayRoutes {
-				routeID := routeStreamID(route)
-				out = append(out, ServerMessage{
-					StartStream: &StartStreamResponse{
-						StreamID:       routeID,
-						Kind:           route.StreamKind,
-						SourceDeviceID: route.SourceID,
-						TargetDeviceID: route.TargetID,
-						Metadata: map[string]string{
-							"origin":      "route_delta",
-							"webrtc_mode": "server_managed",
-						},
-					},
-				}, ServerMessage{
-					RouteStream: &RouteStreamResponse{
-						StreamID:       routeID,
-						SourceDeviceID: route.SourceID,
-						TargetDeviceID: route.TargetID,
-						Kind:           route.StreamKind,
-					},
-				})
-			}
+			out = append(out, h.routeReplay.MessagesForDevice(deviceID, h.routeSnapshotForDevice(deviceID), true)...)
 		}
 		if !result.IsInitialBaseline {
 			effects := h.handleCapabilityChangeEffects(ctx, deviceID, result.BeforeCaps, result.AfterCaps)
@@ -813,28 +787,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 				},
 			})
 		}
-		for _, route := range h.routeSnapshotForDevice(deviceID) {
-			routeID := routeStreamID(route)
-			out = append(out, ServerMessage{
-				StartStream: &StartStreamResponse{
-					StreamID:       routeID,
-					Kind:           route.StreamKind,
-					SourceDeviceID: route.SourceID,
-					TargetDeviceID: route.TargetID,
-					Metadata: map[string]string{
-						"origin":      "route_delta",
-						"webrtc_mode": "server_managed",
-					},
-				},
-			}, ServerMessage{
-				RouteStream: &RouteStreamResponse{
-					StreamID:       routeID,
-					SourceDeviceID: route.SourceID,
-					TargetDeviceID: route.TargetID,
-					Kind:           route.StreamKind,
-				},
-			})
-		}
+		out = append(out, h.routeReplay.MessagesForDevice(deviceID, h.routeSnapshotForDevice(deviceID), false)...)
 		return out, nil
 	case msg.Capability != nil:
 		h.metrics.capabilityReceived.Add(1)
@@ -4910,37 +4863,11 @@ func (h *StreamHandler) disconnectRoutesForDevice(deviceID string) {
 	}
 
 	routes := routeIO.RoutesForDevice(deviceID)
-	if len(routes) > 0 {
-		snapshot := make([]iorouter.Route, len(routes))
-		copy(snapshot, routes)
-		key := strings.TrimSpace(deviceID)
-		h.mu.Lock()
-		h.routeReplayByDevice[key] = snapshot
-		h.mu.Unlock()
-	}
+	h.routeReplay.Capture(deviceID, routes)
 	for _, route := range routes {
 		_ = routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
 		h.unregisterMediaStream(routeStreamID(route))
 	}
-}
-
-// routeReplaySnapshotForDevice returns the route set captured at the most
-// recent disconnect for deviceID, or nil if none was captured. Reconnect
-// replay uses this when the live router has no remaining routes.
-func (h *StreamHandler) routeReplaySnapshotForDevice(deviceID string) []iorouter.Route {
-	key := strings.TrimSpace(deviceID)
-	if key == "" {
-		return nil
-	}
-	h.mu.Lock()
-	snapshot := h.routeReplayByDevice[key]
-	h.mu.Unlock()
-	if len(snapshot) == 0 {
-		return nil
-	}
-	out := make([]iorouter.Route, len(snapshot))
-	copy(out, snapshot)
-	return out
 }
 
 func (h *StreamHandler) appendCommandEventLocked(ev CommandEvent) {

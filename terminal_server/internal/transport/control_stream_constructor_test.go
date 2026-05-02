@@ -101,8 +101,8 @@ func TestStreamHandlerConstructorsInitializeFields(t *testing.T) {
 			if h.suspendedClaimsByDevice == nil {
 				t.Error("suspendedClaimsByDevice not initialized")
 			}
-			if h.routeReplayByDevice == nil {
-				t.Error("routeReplayByDevice not initialized")
+			if h.routeReplay == nil {
+				t.Error("routeReplay store not initialized")
 			}
 			if h.recording == nil {
 				t.Error("recording manager not initialized (expected NoopManager)")

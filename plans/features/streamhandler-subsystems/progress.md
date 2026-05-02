@@ -76,3 +76,36 @@ Notes:
 - No protobuf changes. No client changes. `control_stream.go` is now ~5000 lines (capability lifecycle code moved out, but characterization tests and the new file are in separate files).
 - `handleCapabilityChangeEffects`, `rememberSuspendedClaims`, `restoreSuspendedClaims`, and the package-level `capabilityInvalidations`/`capabilityResources`/`emitCapabilityEvents`/`shouldDisconnectRouteForLostResources` helpers stay in `control_stream.go`. They straddle UI/route replay and scenario IO; per the plan, scenario capability-change effects are not owned by `CapabilityLifecycle`.
 - Stopping after this PR. Awaiting confirmation before starting PR 4 (Phase 3: extract `RouteReplayStore`).
+
+## 2026-05-02 — Phase 3 (PR 4: extract RouteReplayStore)
+
+Status: complete
+
+Changes:
+- Added `terminal_server/internal/transport/route_replay.go` with concrete `RouteReplayStore` (own `sync.Mutex`, own `map[string][]iorouter.Route`). API: `NewRouteReplayStore`, `Capture(deviceID, routes)`, `Snapshot(deviceID)`, `Clear(deviceID)`, `MessagesForDevice(deviceID, liveRoutes, useCapturedFallback)`. Both Capture and Snapshot copy the slice so internal state cannot be mutated through the boundary.
+- Removed `routeReplayByDevice map[string][]iorouter.Route` field and the `routeReplaySnapshotForDevice` method from `StreamHandler`. Replaced with `routeReplay *RouteReplayStore` initialized in `newStreamHandler`.
+- `disconnectRoutesForDevice` now calls `h.routeReplay.Capture(deviceID, routes)` instead of writing directly under `h.mu`.
+- The CapabilitySnap branch (was ~lines 759–788) and the Register branch (was ~lines 840–865) of `HandleMessage` previously each had a duplicated 16-line StartStream/RouteStream construction loop. Both are now single-line calls into `h.routeReplay.MessagesForDevice(deviceID, h.routeSnapshotForDevice(deviceID), useFallback)` — `useFallback=true` for Snap (preserves the captured-replay-on-empty-live behavior), `useFallback=false` for Register (preserves the Register branch's live-only behavior).
+- Updated `control_stream_constructor_test.go` to assert `h.routeReplay != nil` instead of the old map field.
+- Added `route_replay_test.go` with 9 focused tests: live-preferred-over-captured, fallback-when-live-empty, no-fallback-returns-nil, metadata-matches-route-delta (origin=route_delta, webrtc_mode=server_managed, matching StartStream/RouteStream IDs), per-device isolation, scoped Clear, Snapshot returns copy, Capture copies input, empty-deviceID is no-op, plus a concurrent Capture+read race test across multiple devices.
+
+Validation:
+- `cd terminal_server && go test ./internal/transport -count=1` — pass (9.2s).
+- `cd terminal_server && go test ./...` — pass.
+- `cd terminal_server && go test -race ./internal/transport -count=1` — pass (10.2s).
+- `cd terminal_server && go test -race ./...` — pass.
+- `cd terminal_server && go build ./...` — pass.
+- `TestGeneratedSessionUI_RECON_1` (the load-bearing reconnect characterization) and Phase 0 characterization tests pass unmodified — confirms behavior preservation across both Snap and Register replay paths.
+
+Judgment calls:
+- **`MessagesForDevice` returns `[]ServerMessage`, not `[]iorouter.Route`.** The plan-suggested target. Eliminates a 16-line duplicated StartStream/RouteStream loop in both `HandleMessage` branches and lets the store own the routeID + metadata construction. The Snap-vs-Register asymmetry (Snap uses captured-replay fallback, Register only uses live routes) is preserved via the `useCapturedFallback` boolean parameter rather than two separate methods — the predicate is small enough that a flag stays clearer than e.g. `MessagesForDeviceWithFallback`. Ties the store to the `ServerMessage` type, which is fine for now (Phase 10 is not on the table); if a future move to a non-transport package is needed, swapping back to a route-returning shape is a localized change.
+- **Capture takes the live route slice and copies internally.** Caller (`disconnectRoutesForDevice`) no longer needs to allocate a snapshot. Reduces a couple lines at the call site and keeps the copy responsibility with the type that owns the storage.
+- **Did not wire `Clear` into a call site.** Per the plan, the method is exposed for a future caller (e.g. on session reset). Today nothing clears the replay; preserving that behavior. A focused test pins `Clear`'s scoping so a future caller can rely on it.
+
+Notes:
+- No protobuf changes. No client changes. No behavior changes intended; characterization tests confirm.
+- `routeSnapshotForDevice` (the live-router read) stays in `StreamHandler` — it depends on `h.runtime.Env.IO` and is shared with command-handling paths well beyond the replay seam.
+- `control_stream.go` dropped to 4898 lines (down ~30 from the reconcile loop dedupe, plus the `routeReplaySnapshotForDevice` method). The capture-side write path moved entirely; the read-side now goes through the store.
+- `internal/transport` test count went up by 9 (one new test file). Suite still passes under `-race`.
+- Stopping after this PR. Awaiting confirmation before starting PR 5 (Phase 4: extract `UISessionState`).
+
