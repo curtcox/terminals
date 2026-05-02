@@ -9,7 +9,7 @@ last-reviewed: 2026-04-26
 
 # Collaborative Sessions Plan
 
-See `application-runtime.md`, `repl-and-shell.md`, and `repl-capability-closure.md` for the broader runtime and REPL context.
+See `application-runtime.md`, `repl-and-shell/plan.md`, and `repl-capability-closure.md` for the broader runtime and REPL context.
 
 ## Design Principle
 

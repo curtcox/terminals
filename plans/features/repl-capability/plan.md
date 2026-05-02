@@ -26,7 +26,7 @@ There are no remaining active tasks in this umbrella plan. Future REPL
 cross-capability work should be scoped in targeted plans under `plans/features/`.
 
 See [masterplan.md](../../../masterplan.md) for overall system context.
-Extends [repl-and-shell.md](../repl-and-shell.md) (base REPL) and
+Extends [repl-and-shell/plan.md](../repl-and-shell/plan.md) (base REPL) and
 [application-runtime.md](../application-runtime.md) (TAR/TAL runtime).
 Supersedes the earlier `repl-authoring-capabilities.md` and
 `Capability-plans.md` by merging their content into a single plan.
@@ -513,7 +513,7 @@ Revised base documents that Layer 2 touches directly:
 - [application-runtime.md](../application-runtime.md) — adds the
   `identity`, `session`, `message`, `artifact`, `search`, `memory`
   TAL host modules and their permission model.
-- [repl-and-shell.md](../repl-and-shell.md) — adds the corresponding
+- [repl-and-shell/plan.md](../repl-and-shell/plan.md) — adds the corresponding
   REPL groups alongside the existing
   `devices`/`activations`/`claims`/`ui`/`flow`/`observe`/`presence`/
   `world`/`scheduler`/`app`/`logs`/`telephony`/`ai`/`docs` set.
@@ -598,7 +598,7 @@ the typed service.
   broadcast` adds no new primitives. The closed UI contract is
   unchanged; what changes is who can compose primitives (now: the
   REPL, not only hand-written Go).
-- **[repl-and-shell.md](../repl-and-shell.md)** — this document adds
+- **[repl-and-shell/plan.md](../repl-and-shell/plan.md)** — this document adds
   command groups alongside the existing set. Classification
   metadata, approval pipeline, streaming dispatch, and AI tool-use
   mediation all apply to the new groups exactly as to the existing
@@ -752,7 +752,7 @@ seeded simulation fixture.
 
 ## Related Plans
 
-- [repl-and-shell.md](../repl-and-shell.md) — base REPL: sessions,
+- [repl-and-shell/plan.md](../repl-and-shell/plan.md) — base REPL: sessions,
   classification, approval pipeline, AI assistance.
 - [application-runtime.md](../application-runtime.md) — TAR/TAL
   durable authoring; uses the same typed services this plan

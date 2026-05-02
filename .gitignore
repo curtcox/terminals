@@ -40,3 +40,4 @@ logs/
 .bin/
 .home/
 .sdk/
+__pycache__/

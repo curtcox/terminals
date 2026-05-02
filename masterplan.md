@@ -71,7 +71,7 @@ None of this requires updating the client app. The Flutter client is a generic t
 - [plans/world-model-calibration.md](plans/features/world-model-calibration/plan.md) — World-model calibration strategy and feedback loops.
 - [plans/sensing-use-case-flows.md](plans/features/sensing-use-case-flows.md) — End-to-end sensing-centric use-case flows.
 - [plans/bug-reporting.md](plans/features/bug-reporting.md) — Modality-agnostic, cross-device bug reporting with full client/subject context capture.
-- [plans/repl-and-shell.md](plans/features/repl-and-shell.md) — Server-side REPL: session model, typed command registry, in-REPL LLM assistance.
+- [plans/repl-and-shell/plan.md](plans/features/repl-and-shell/plan.md) — Server-side REPL: session model, typed command registry, in-REPL LLM assistance.
 - [plans/agent-delegation.md](plans/features/agent-delegation.md) — Expose the REPL command surface to Claude Code / Codex desktop apps via MCP so users can delegate the same work without a server restart.
 
 ### Tooling
@@ -97,7 +97,7 @@ Each phase is a standalone checklist with explicit prerequisites. Execute in ord
 ### Adjacent docs
 
 - [usecases.md](usecases.md) — User-story-format use cases (planned + architecture-enabled).
-- [next.md](next.md) — The single task currently being worked on, per `CLAUDE.md` convention.
+- "What should I work on next?" — run `make next` (no static `next.md` file; the answer is computed from plan frontmatter and use-case sources).
 
 ## Key Design Decisions
 

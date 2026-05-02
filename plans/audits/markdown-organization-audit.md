@@ -1,7 +1,7 @@
 ---
 title: "Markdown Organization and Automation Audit"
 kind: audit
-status: open
+status: resolved
 owner: unowned
 validation: none
 last-reviewed: 2026-05-01
@@ -36,6 +36,11 @@ lists prerequisites and is independently shippable.
 ## Findings
 
 ### F1 — `docs/usecase-validation-matrix.md` is hand-maintained but every fact already exists in machine-readable form
+
+**Resolved (2026-05-01):** `scripts/generate-validation-matrix.py` is the
+sole source of truth and is wired into `make all-check` via the
+`validation-matrix` target. Drift checks (a) and (b) from the action list
+fail the build on broken refs.
 
 **Severity:** high (drift compounds every time a use case is added or a plan
 ships).
@@ -77,6 +82,13 @@ catching it. There is no test today that joins the two sources.
 ---
 
 ### F2 — `usecases.md` is a 222-line monolith that should be one file per family
+
+**Resolved (2026-05-01):** Split into `usecases/<family>.md` (14 files,
+verbatim tables, frontmatter `family` + `ids`). New
+`scripts/generate-usecases-index.py` writes `usecases/INDEX.md`
+(`make usecases-index`, also part of `make all-check`).
+`scripts/generate-validation-matrix.py` now walks `usecases/*.md`. The old
+`usecases.md` was reduced to a thin pointer for backwards-compatible links.
 
 **Severity:** medium (slows agent and human lookup; blocks frontmatter-based
 automation).
@@ -125,6 +137,13 @@ data and consumer simultaneously.
 ---
 
 ### F3 — Progress logs are devouring the plans they live in
+
+**Resolved (2026-05-01):** Every plan that carried an inline progress log
+is now a folder of `plan.md` + `progress.md`: `app-migrations`,
+`io-abstraction`, `package-format`, `protocol`, `world-model-calibration`,
+`repl-capability`, and `repl-and-shell`. `pick-next-work.py` and
+`generate-plans-index.py` already skip `progress.md` (no plan-kind
+frontmatter) and pick up `plan.md` via their existing recursive walk.
 
 **Severity:** high (single biggest readability problem; affects the
 plans most actively worked on).
@@ -188,6 +207,11 @@ auto-generated [`plans/INDEX.md`](../INDEX.md).
 ---
 
 ### F5 — `next.md` is a hand-edited dangling pointer
+
+**Resolved (2026-05-01):** `next.md` was deleted. The "what's next?" answer
+is now computed on demand via `make next` (S2 below). The `masterplan.md`
+"Adjacent docs" entry that referenced `next.md` was replaced with a pointer
+to `make next`.
 
 **Severity:** low.
 
@@ -266,6 +290,10 @@ These deliver on the user's stated goals: **record completed work** and
 
 ### S1 — `/log-progress` skill
 
+**Resolved (2026-05-01):** `.claude/skills/log-progress/SKILL.md` is in
+place and listed in `SKILLS.md`. The skill's procedure mirrors the
+proposed behavior below.
+
 **Goal:** standardize how completed work is recorded so progress logs stay
 machine-readable and `last-reviewed` stays accurate.
 
@@ -287,6 +315,12 @@ must be deterministic and gated.
 ---
 
 ### S2 — `/next` skill (or `make next`)
+
+**Resolved (2026-05-01):** `scripts/next.py` wraps `pick-next-work.py` and
+adds the three drift signals (un-validated planned IDs, open
+audits/incidents, stale `building` plans). Wired as `make next`. The
+`/next` skill (`.claude/skills/next/SKILL.md`) is documented in
+`SKILLS.md`.
 
 **Goal:** one canonical answer to "what should I work on?" replacing
 `next.md`.
@@ -365,5 +399,33 @@ This audit is `resolved` when:
 - A `/next` skill (or `make next`) exists and `next.md` is either
   auto-written or removed (S2 + F5).
 
-The remaining findings (F2, F4, F6, F7, F8, S3, S4) can be resolved as
-follow-ups without blocking closure.
+The remaining findings (F4, F6, F7, F8, S3, S4) can be resolved as
+follow-ups without blocking closure. (F2 was originally listed here but
+shipped before closure.)
+
+## Progress
+
+### 2026-05-01 — closure
+
+- F1 shipped: `scripts/generate-validation-matrix.py` is the sole source
+  of truth, wired into `all-check`. Drift checks fail the build on broken
+  refs.
+- F3 shipped across all plans that carried inline progress logs:
+  `app-migrations`, `io-abstraction`, `package-format`, `protocol`,
+  `world-model-calibration`, `repl-capability`, and `repl-and-shell`.
+- F2 shipped: `usecases.md` split into 14 `usecases/<family>.md` files
+  with frontmatter (`family`, `ids`); new
+  `scripts/generate-usecases-index.py` produces `usecases/INDEX.md`
+  (`make usecases-index`, also part of `make all-check`); the
+  validation-matrix generator now walks `usecases/*.md`.
+- F5 shipped: `next.md` deleted; `masterplan.md` updated to point at
+  `make next`.
+- S1 shipped: `.claude/skills/log-progress/SKILL.md` documented in
+  `SKILLS.md`.
+- S2 shipped: `scripts/next.py` + `make next` + `.claude/skills/next/`
+  surface the priority pick plus three drift signals (un-validated IDs,
+  open audits/incidents, stale `building` plans).
+- Closure criteria met → status flipped to `resolved`. Remaining findings
+  (F4 masterplan plan-list dedupe, F6 docs/README auto-gen, F7 AGENTS.md
+  sync, F8 SKILLS.md auto-gen, S3 `make orphans`, S4 frontmatter lint
+  extension) tracked as low-severity follow-ups.
