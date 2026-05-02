@@ -1,7 +1,7 @@
 ---
 id: streamhandler-subsystems
 title: Split StreamHandler into Focused Server Subsystems
-status: proposed
+status: building
 owner: server architecture
 created: 2026-05-02
 last-reviewed: 2026-05-02

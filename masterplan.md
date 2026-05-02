@@ -73,6 +73,7 @@ None of this requires updating the client app. The Flutter client is a generic t
 - [plans/bug-reporting.md](plans/features/bug-reporting.md) — Modality-agnostic, cross-device bug reporting with full client/subject context capture.
 - [plans/repl-and-shell/plan.md](plans/features/repl-and-shell/plan.md) — Server-side REPL: session model, typed command registry, in-REPL LLM assistance.
 - [plans/agent-delegation.md](plans/features/agent-delegation.md) — Expose the REPL command surface to Claude Code / Codex desktop apps via MCP so users can delegate the same work without a server restart.
+- [plans/streamhandler-subsystems.md](plans/features/streamhandler-subsystems/plan.md) — Refactor the server control stream handler into focused, testable subsystems.
 
 ### Tooling
 

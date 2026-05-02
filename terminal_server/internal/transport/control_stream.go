@@ -529,37 +529,55 @@ type CommandEvent struct {
 
 // NewStreamHandler creates a handler for control stream messages.
 func NewStreamHandler(control *ControlService) *StreamHandler {
+	return newStreamHandler(control, nil)
+}
+
+// newStreamHandler centralizes StreamHandler initialization. Both public
+// constructors delegate here so field defaults stay in one place.
+func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
 	handler := &StreamHandler{
-		control:                 control,
-		metrics:                 &Metrics{},
-		seen:                    map[string]ServerMessage{},
-		seenLimit:               1024,
-		recent:                  []CommandEvent{},
-		recentLimit:             200,
-		terminals:               terminal.NewManager(),
-		terminalReadDeadline:    defaultTerminalReadDeadline,
-		terminalReadInterval:    defaultTerminalReadInterval,
-		terminalUIInterval:      defaultTerminalUIInterval,
-		terminalReplAdminURL:    defaultTerminalReplAdminURL,
-		lastSetUIByDevice:       map[string]ui.Descriptor{},
-		lastUIHostEventByDev:    map[string]int{},
-		mainUIActivationByDev:   map[string]string{},
-		menuOverlayByDevice:     map[string]menuOverlayState{},
-		multiWindowResume:       map[string]multiWindowResumeState{},
-		photoFrameSlides:        defaultPhotoFrameSlides(),
-		photoFrameIndexByDev:    map[string]int{},
-		photoFrameLastByDev:     map[string]time.Time{},
-		photoFrameInterval:      defaultPhotoFrameInterval,
+		// transport dispatch / metrics
+		control:     control,
+		runtime:     runtime,
+		metrics:     &Metrics{},
+		seen:        map[string]ServerMessage{},
+		seenLimit:   1024,
+		recent:      []CommandEvent{},
+		recentLimit: 200,
+
+		// terminal / repl session support
+		terminals:            terminal.NewManager(),
+		terminalReadDeadline: defaultTerminalReadDeadline,
+		terminalReadInterval: defaultTerminalReadInterval,
+		terminalUIInterval:   defaultTerminalUIInterval,
+		terminalReplAdminURL: defaultTerminalReplAdminURL,
+
+		// UI session state
+		lastSetUIByDevice:     map[string]ui.Descriptor{},
+		lastUIHostEventByDev:  map[string]int{},
+		mainUIActivationByDev: map[string]string{},
+		menuOverlayByDevice:   map[string]menuOverlayState{},
+		multiWindowResume:     map[string]multiWindowResumeState{},
+
+		// photo-frame scenario defaults
+		photoFrameSlides:     defaultPhotoFrameSlides(),
+		photoFrameIndexByDev: map[string]int{},
+		photoFrameLastByDev:  map[string]time.Time{},
+		photoFrameInterval:   defaultPhotoFrameInterval,
+
+		// media control / route replay / voice
 		mediaStreams:            map[string]mediaStreamState{},
 		sensorsByDevice:         map[string]sensorSnapshot{},
 		voiceAudioBuffers:       map[string][]byte{},
 		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
 		routeReplayByDevice:     map[string][]iorouter.Route{},
-		recording:               recording.NoopManager{},
-		uiOwners:                newUIActionOwnershipTracker(),
-		wakeWordDedupe:          newWakeWordDedupeStage(0, ""),
-		menuAppPolicy:           allowAllMenuAppPolicy{},
-		menuOverlayPolicy:       defaultOverlayInputPolicy(),
+
+		// diagnostics / collaborators with default impls
+		recording:         recording.NoopManager{},
+		uiOwners:          newUIActionOwnershipTracker(),
+		wakeWordDedupe:    newWakeWordDedupeStage(0, ""),
+		menuAppPolicy:     allowAllMenuAppPolicy{},
+		menuOverlayPolicy: defaultOverlayInputPolicy(),
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	return handler
@@ -577,41 +595,7 @@ func (h *StreamHandler) SetDeviceAudioPublisher(pub DeviceAudioPublisher) {
 
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
 func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
-	handler := &StreamHandler{
-		control:                 control,
-		runtime:                 runtime,
-		metrics:                 &Metrics{},
-		seen:                    map[string]ServerMessage{},
-		seenLimit:               1024,
-		recent:                  []CommandEvent{},
-		recentLimit:             200,
-		terminals:               terminal.NewManager(),
-		terminalReadDeadline:    defaultTerminalReadDeadline,
-		terminalReadInterval:    defaultTerminalReadInterval,
-		terminalUIInterval:      defaultTerminalUIInterval,
-		terminalReplAdminURL:    defaultTerminalReplAdminURL,
-		lastSetUIByDevice:       map[string]ui.Descriptor{},
-		lastUIHostEventByDev:    map[string]int{},
-		mainUIActivationByDev:   map[string]string{},
-		menuOverlayByDevice:     map[string]menuOverlayState{},
-		multiWindowResume:       map[string]multiWindowResumeState{},
-		photoFrameSlides:        defaultPhotoFrameSlides(),
-		photoFrameIndexByDev:    map[string]int{},
-		photoFrameLastByDev:     map[string]time.Time{},
-		photoFrameInterval:      defaultPhotoFrameInterval,
-		mediaStreams:            map[string]mediaStreamState{},
-		sensorsByDevice:         map[string]sensorSnapshot{},
-		voiceAudioBuffers:       map[string][]byte{},
-		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
-		routeReplayByDevice:     map[string][]iorouter.Route{},
-		recording:               recording.NoopManager{},
-		uiOwners:                newUIActionOwnershipTracker(),
-		wakeWordDedupe:          newWakeWordDedupeStage(0, ""),
-		menuAppPolicy:           allowAllMenuAppPolicy{},
-		menuOverlayPolicy:       defaultOverlayInputPolicy(),
-	}
-	handler.replSessions = replsession.NewService(handler.terminals)
-	return handler
+	return newStreamHandler(control, runtime)
 }
 
 // SetRecordingManager wires stream recording lifecycle hooks used when routes
