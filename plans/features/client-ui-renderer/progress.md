@@ -2,6 +2,32 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by moving sensor telemetry control-request construction
+  out of `TerminalClientShell` and into
+  `terminal_client/lib/connection/control_session_controller.dart`.
+- Added focused controller coverage for telemetry generated from registered
+  battery capabilities and for skip cases when no generic telemetry signals are
+  available.
+- The shell still owns the timer/lifecycle loop and send counters, while the
+  protobuf envelope construction now lives with the other connection-session
+  request helpers.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed lib/connection/control_session_controller.dart lib/app/terminal_client_shell.dart test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 5 by moving generic renderer-action protobuf translation
   into `terminal_client/lib/connection/control_session_controller.dart`.
 - Added `buildUiActionInputRequest` so `ServerDrivenAction` values flow from

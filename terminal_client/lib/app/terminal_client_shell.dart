@@ -1338,24 +1338,11 @@ class _TerminalClientShellState extends State<TerminalClientShell>
   }
 
   ConnectRequest? _buildSensorTelemetryRequest() {
-    final capabilities = _capabilitySession.lastRegisteredCapabilities;
-    if (capabilities == null) {
-      return null;
-    }
-    final now = DateTime.now().toUtc();
-    final values = <String, double>{};
-    if (capabilities.hasBattery()) {
-      values['battery.level'] = capabilities.battery.level.toDouble();
-      values['battery.charging'] = capabilities.battery.charging ? 1.0 : 0.0;
-    }
-    if (values.isEmpty) {
-      return null;
-    }
-    return ConnectRequest()
-      ..sensor = (iov1.SensorData()
-        ..deviceId = _deviceId
-        ..unixMs = Int64(now.millisecondsSinceEpoch)
-        ..values.addAll(values));
+    return buildSensorTelemetryRequest(
+      deviceID: _deviceId,
+      capabilities: _capabilitySession.lastRegisteredCapabilities,
+      unixMs: DateTime.now().toUtc().millisecondsSinceEpoch,
+    );
   }
 
   void _sendSensorTelemetry() {

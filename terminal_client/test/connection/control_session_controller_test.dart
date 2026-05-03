@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/connection/control_session_controller.dart';
+import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
+    as capv1;
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/ui/server_driven_action.dart';
 
@@ -200,6 +202,45 @@ void main() {
 
     expect(request.input.deviceId, 'terminal-a');
     expect(request.input.key.text, 'hello');
+  });
+
+  test('builds sensor telemetry requests from registered capabilities', () {
+    final request = buildSensorTelemetryRequest(
+      deviceID: 'terminal-a',
+      capabilities: capv1.DeviceCapabilities()
+        ..battery = (capv1.BatteryCapability()
+          ..level = 0.82
+          ..charging = true),
+      unixMs: 12345,
+    );
+
+    expect(request, isNotNull);
+    expect(request!.sensor.deviceId, 'terminal-a');
+    expect(request.sensor.unixMs.toInt(), 12345);
+    expect(request.sensor.values['battery.level'], 0.82);
+    expect(request.sensor.values['battery.charging'], 1.0);
+  });
+
+  test('skips sensor telemetry when no generic signals are available', () {
+    expect(
+      buildSensorTelemetryRequest(
+        deviceID: 'terminal-a',
+        capabilities: capv1.DeviceCapabilities(),
+        unixMs: 12345,
+      ),
+      isNull,
+    );
+    expect(
+      buildSensorTelemetryRequest(
+        deviceID: '',
+        capabilities: capv1.DeviceCapabilities()
+          ..battery = (capv1.BatteryCapability()
+            ..level = 0.5
+            ..charging = false),
+        unixMs: 12345,
+      ),
+      isNull,
+    );
   });
 
   test('builds playback diagnostics requests', () {

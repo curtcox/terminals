@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:fixnum/fixnum.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
+import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
+    as capv1;
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/ui/server_driven_action.dart';
@@ -232,6 +235,29 @@ ConnectRequest buildKeyInputRequest({
     ..input = (iov1.InputEvent()
       ..deviceId = deviceID
       ..key = (iov1.KeyEvent()..text = text));
+}
+
+ConnectRequest? buildSensorTelemetryRequest({
+  required String deviceID,
+  required capv1.DeviceCapabilities? capabilities,
+  required int unixMs,
+}) {
+  if (deviceID.isEmpty || capabilities == null) {
+    return null;
+  }
+  final values = <String, double>{};
+  if (capabilities.hasBattery()) {
+    values['battery.level'] = capabilities.battery.level.toDouble();
+    values['battery.charging'] = capabilities.battery.charging ? 1.0 : 0.0;
+  }
+  if (values.isEmpty) {
+    return null;
+  }
+  return ConnectRequest()
+    ..sensor = (iov1.SensorData()
+      ..deviceId = deviceID
+      ..unixMs = Int64(unixMs)
+      ..values.addAll(values));
 }
 
 ConnectRequest buildPlaybackArtifactsQueryRequest(String requestID) {
