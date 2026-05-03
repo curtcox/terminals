@@ -19,3 +19,10 @@ parent: plans/features/protocol/plan.md
 - Re-ran repository validation gates (`make all-check`) and promoted this plan to shipped-validated status.
 
 Any future compatibility-window cleanup (for example fully removing deprecated proto request fields) should be tracked as a separate follow-on task, not under this completed protocol design plan.
+
+## Protocol Evolution Rules (2026-05-03)
+
+- Added the protocol evolution policy, extension registry, compatibility notes, and API contract checklist.
+- Inventoried current flexible protocol fields across control, UI, IO, capabilities, and diagnostics protos.
+- Added an advisory `proto-flex-check` static guardrail and initial `proto-contract-test` Make target.
+- Added PR checklist language for protocol-affecting changes.

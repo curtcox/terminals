@@ -16,6 +16,8 @@ The protocol has two layers:
 - a **control plane** (gRPC) for commands, state, registration, and capability lifecycle
 - a **media plane** (WebRTC) for real-time audio/video/data streams
 
+Protocol changes are governed by [docs/protocol-evolution.md](../../../docs/protocol-evolution.md), [docs/protocol-extension-registry.md](../../../docs/protocol-extension-registry.md), and [api/CONTRACTS.md](../../../api/CONTRACTS.md).
+
 ## Control Plane (gRPC)
 
 Bidirectional streaming RPCs over gRPC. The client maintains a persistent control stream to the server.

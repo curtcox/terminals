@@ -10,7 +10,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-boundary client-boundary-test client-coverage \
-	proto-lint proto-breaking proto-generate \
+	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-test \
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
 	all-lint all-test all-check stop-server stop-server-test run-server run-client-web \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
@@ -120,6 +120,13 @@ proto-breaking:
 
 proto-generate:
 	cd api && buf generate
+
+proto-flex-check:
+	python3 ./scripts/check-proto-flex-fields.py
+
+proto-contract-test:
+	$(MAKE) proto-lint
+	$(MAKE) proto-flex-check
 
 skills-validate:
 	./scripts/validate-skills.sh
