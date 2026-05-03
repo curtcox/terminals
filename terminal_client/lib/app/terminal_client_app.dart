@@ -20,7 +20,6 @@ import 'package:terminal_client/connection/endpoint_resolution.dart';
 import 'package:terminal_client/connection/reliability.dart';
 import 'package:terminal_client/connection/transport_diagnostics.dart';
 import 'package:terminal_client/diagnostics/bug_report_chrome.dart';
-import 'package:terminal_client/diagnostics/build_metadata.dart';
 import 'package:terminal_client/diagnostics/client_chrome.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/edge/artifact_export.dart';
@@ -85,8 +84,6 @@ const String _buildDate = String.fromEnvironment(
   'TERMINALS_BUILD_DATE',
   defaultValue: 'unknown',
 );
-const String _registerMetadataServerBuildShaKey = 'server_build_sha';
-const String _registerMetadataServerBuildDateKey = 'server_build_date';
 const String _bugReportActionPrefix = 'bug_report';
 const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
@@ -2160,71 +2157,42 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   void _applyDiagnosticsResponse(ConnectResponse response) {
-    if (!response.hasCommandResult()) {
-      return;
-    }
-    final result = response.commandResult;
-    if (result.data.isEmpty) {
-      return;
-    }
-
-    final requestID = result.requestId;
-    var diagnosticsTitle = '';
-    if (requestID.isNotEmpty && requestID == _pendingRuntimeStatusRequestID) {
-      diagnosticsTitle = 'runtime_status';
-    } else if (requestID.isNotEmpty &&
-        requestID == _pendingDeviceStatusRequestID) {
-      diagnosticsTitle = 'device_status';
-    } else if (requestID.isNotEmpty &&
-        requestID == _pendingScenarioRegistryRequestID) {
-      diagnosticsTitle = 'scenario_registry';
-    } else if (requestID.isNotEmpty &&
-        requestID == _pendingPlaybackArtifactsRequestID) {
-      diagnosticsTitle = 'list_playback_artifacts';
-    } else if (requestID.isNotEmpty &&
-        requestID == _pendingPlaybackMetadataRequestID) {
-      diagnosticsTitle = 'playback_metadata';
-    } else if (result.notification == 'System query: runtime_status') {
-      diagnosticsTitle = 'runtime_status';
-    } else if (result.notification == 'System query: device_status') {
-      diagnosticsTitle = 'device_status';
-    } else if (result.notification == 'System query: scenario_registry') {
-      diagnosticsTitle = 'scenario_registry';
-    } else if (result.notification == 'System query: list_playback_artifacts') {
-      diagnosticsTitle = 'list_playback_artifacts';
-    } else if (result.notification == 'Playback metadata ready') {
-      diagnosticsTitle = 'playback_metadata';
-    } else {
+    final diagnostics = commandDiagnosticsFromResponse(
+      response: response,
+      pendingRequestIDs: CommandDiagnosticsRequestIDs(
+        runtimeStatus: _pendingRuntimeStatusRequestID,
+        deviceStatus: _pendingDeviceStatusRequestID,
+        scenarioRegistry: _pendingScenarioRegistryRequestID,
+        playbackArtifacts: _pendingPlaybackArtifactsRequestID,
+        playbackMetadata: _pendingPlaybackMetadataRequestID,
+      ),
+    );
+    if (diagnostics == null) {
       return;
     }
 
-    final data = Map<String, String>.from(result.data);
-    _diagnosticsTitle = diagnosticsTitle;
-    _diagnosticsData = data;
-    if (diagnosticsTitle == 'list_playback_artifacts') {
-      final firstArtifactID = _firstPlaybackArtifactID(data);
+    _diagnosticsTitle = diagnostics.title;
+    _diagnosticsData = diagnostics.data;
+    if (diagnostics.title == 'list_playback_artifacts') {
+      final firstArtifactID = _firstPlaybackArtifactID(diagnostics.data);
       if (firstArtifactID.isNotEmpty) {
         _playbackArtifactIdController.text = firstArtifactID;
       }
-    } else if (diagnosticsTitle == 'scenario_registry') {
-      _refreshAvailableApplications(data);
+    } else if (diagnostics.title == 'scenario_registry') {
+      _refreshAvailableApplications(diagnostics.data);
     }
   }
 
   void _applyRegisterMetadata(ConnectResponse response) {
-    if (!response.hasRegisterAck()) {
+    final metadata = registerMetadataFromResponse(response);
+    if (metadata == null) {
       return;
     }
-    final metadata = Map<String, String>.from(response.registerAck.metadata);
-    _serverBuildSha = normalizeBuildValue(
-      metadata[_registerMetadataServerBuildShaKey] ?? '',
-    );
-    _serverBuildDate = normalizeBuildValue(
-      metadata[_registerMetadataServerBuildDateKey] ?? '',
-    );
-    if (metadata.isNotEmpty) {
+    _serverBuildSha = metadata.serverBuildSha;
+    _serverBuildDate = metadata.serverBuildDate;
+    if (metadata.hasDiagnosticsData) {
       _diagnosticsTitle = 'register_ack';
-      _diagnosticsData = metadata;
+      _diagnosticsData = metadata.metadata;
     }
   }
 
@@ -3989,19 +3957,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
   }
 
-  String? _bundleIDFromFlowPlan(iov1.FlowPlan? plan) {
-    if (plan == null) {
-      return null;
-    }
-    for (final node in plan.nodes) {
-      final bundleID = (node.args['bundle_id'] ?? '').trim();
-      if (bundleID.isNotEmpty) {
-        return bundleID;
-      }
-    }
-    return null;
-  }
-
   Future<void> _handleInstallBundle(iov1.InstallBundle request) async {
     final bundleID = request.bundleId.trim();
     if (bundleID.isEmpty) {
@@ -4055,7 +4010,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (flowID.isEmpty) {
       return;
     }
-    final bundleID = _bundleIDFromFlowPlan(request.plan);
+    final bundleID = bundleIDFromFlowPlan(request.plan);
     try {
       final host = await _edgeHostFuture;
       await host.startFlow(flowID, bundleId: bundleID);
@@ -4080,7 +4035,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (flowID.isEmpty) {
       return;
     }
-    final bundleID = _bundleIDFromFlowPlan(request.plan);
+    final bundleID = bundleIDFromFlowPlan(request.plan);
     try {
       final host = await _edgeHostFuture;
       await host.patchFlow(flowID, bundleId: bundleID);
@@ -4158,15 +4113,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   Future<void> _executePlayAudio(iov1.PlayAudio playAudio) async {
-    final source = switch (playAudio.whichSource()) {
-      iov1.PlayAudio_Source.pcmData => 'pcm_data',
-      iov1.PlayAudio_Source.url => 'url',
-      iov1.PlayAudio_Source.ttsText => 'tts_text',
-      iov1.PlayAudio_Source.notSet => 'not_set',
-    };
-    final bytes = playAudio.whichSource() == iov1.PlayAudio_Source.pcmData
-        ? playAudio.pcmData.length
-        : 0;
+    final source = playAudioSourceLabel(playAudio);
+    final bytes = playAudioPcmByteCount(playAudio);
     try {
       await _audioPlayback.play(playAudio);
       if (playAudio.whichSource() == iov1.PlayAudio_Source.pcmData &&

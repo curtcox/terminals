@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terminal_client/connection/control_response_dispatcher.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 
 void main() {
@@ -139,6 +140,147 @@ void main() {
       expect(identical(applyUpdateUi(currentRoot: root, update: update), root),
           isTrue);
       expect(applyUpdateUi(currentRoot: null, update: update), isNull);
+    });
+  });
+
+  group('commandDiagnosticsFromResponse', () {
+    test('classifies command diagnostics by pending request id', () {
+      final response = ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = 'device-123'
+          ..data['battery'] = '93');
+
+      final update = commandDiagnosticsFromResponse(
+        response: response,
+        pendingRequestIDs: const CommandDiagnosticsRequestIDs(
+          deviceStatus: 'device-123',
+        ),
+      );
+
+      expect(update, isNotNull);
+      expect(update!.title, 'device_status');
+      expect(update.data, <String, String>{'battery': '93'});
+    });
+
+    test('classifies known diagnostic notifications without request ids', () {
+      final cases = <String, String>{
+        'System query: runtime_status': 'runtime_status',
+        'System query: device_status': 'device_status',
+        'System query: scenario_registry': 'scenario_registry',
+        'System query: list_playback_artifacts': 'list_playback_artifacts',
+        'Playback metadata ready': 'playback_metadata',
+      };
+
+      for (final entry in cases.entries) {
+        final update = commandDiagnosticsFromResponse(
+          response: ConnectResponse()
+            ..commandResult = (CommandResult()
+              ..notification = entry.key
+              ..data['ok'] = 'true'),
+          pendingRequestIDs: const CommandDiagnosticsRequestIDs(),
+        );
+
+        expect(update?.title, entry.value);
+        expect(update?.data, <String, String>{'ok': 'true'});
+      }
+    });
+
+    test('ignores unrelated command results and empty diagnostic payloads', () {
+      expect(
+        commandDiagnosticsFromResponse(
+          response: ConnectResponse(),
+          pendingRequestIDs: const CommandDiagnosticsRequestIDs(),
+        ),
+        isNull,
+      );
+      expect(
+        commandDiagnosticsFromResponse(
+          response: ConnectResponse()
+            ..commandResult = (CommandResult()
+              ..notification = 'System query: runtime_status'),
+          pendingRequestIDs: const CommandDiagnosticsRequestIDs(),
+        ),
+        isNull,
+      );
+      expect(
+        commandDiagnosticsFromResponse(
+          response: ConnectResponse()
+            ..commandResult = (CommandResult()
+              ..notification = 'regular notification'
+              ..data['value'] = 'ignored'),
+          pendingRequestIDs: const CommandDiagnosticsRequestIDs(),
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('registerMetadataFromResponse', () {
+    test('extracts normalized server build metadata', () {
+      final update = registerMetadataFromResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..metadata[registerMetadataServerBuildShaKey] = ' abc123 '
+            ..metadata[registerMetadataServerBuildDateKey] = '2026-05-03'),
+      );
+
+      expect(update, isNotNull);
+      expect(update!.serverBuildSha, 'abc123');
+      expect(update.serverBuildDate, '2026-05-03');
+      expect(update.hasDiagnosticsData, isTrue);
+      expect(
+        update.metadata[registerMetadataServerBuildShaKey],
+        ' abc123 ',
+      );
+    });
+
+    test('returns unknown build values for empty register metadata', () {
+      final update = registerMetadataFromResponse(
+        ConnectResponse()..registerAck = RegisterAck(),
+      );
+
+      expect(update, isNotNull);
+      expect(update!.serverBuildSha, 'unknown');
+      expect(update.serverBuildDate, 'unknown');
+      expect(update.hasDiagnosticsData, isFalse);
+    });
+
+    test('ignores responses without register ack', () {
+      expect(registerMetadataFromResponse(ConnectResponse()), isNull);
+    });
+  });
+
+  group('media and edge response helpers', () {
+    test('bundleIDFromFlowPlan returns the first non-empty bundle id', () {
+      expect(bundleIDFromFlowPlan(null), isNull);
+      expect(bundleIDFromFlowPlan(iov1.FlowPlan()), isNull);
+      expect(
+        bundleIDFromFlowPlan(
+          iov1.FlowPlan()
+            ..nodes.addAll(<iov1.FlowNode>[
+              iov1.FlowNode()..args['bundle_id'] = '   ',
+              iov1.FlowNode()..args['bundle_id'] = ' bundle-a ',
+              iov1.FlowNode()..args['bundle_id'] = 'bundle-b',
+            ]),
+        ),
+        'bundle-a',
+      );
+    });
+
+    test('playAudio helpers preserve source label and pcm byte count', () {
+      expect(
+        playAudioSourceLabel(iov1.PlayAudio()..pcmData = <int>[1, 2, 3]),
+        'pcm_data',
+      );
+      expect(
+        playAudioPcmByteCount(iov1.PlayAudio()..pcmData = <int>[1, 2, 3]),
+        3,
+      );
+      expect(playAudioSourceLabel(iov1.PlayAudio()..url = 'https://x'), 'url');
+      expect(playAudioPcmByteCount(iov1.PlayAudio()..url = 'https://x'), 0);
+      expect(playAudioSourceLabel(iov1.PlayAudio()..ttsText = 'hello'),
+          'tts_text');
+      expect(playAudioSourceLabel(iov1.PlayAudio()), 'not_set');
     });
   });
 }

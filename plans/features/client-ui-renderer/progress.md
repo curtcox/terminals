@@ -2,6 +2,36 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by moving pure command-result diagnostics classification
+  into `terminal_client/lib/connection/control_response_dispatcher.dart`.
+- Moved register-ack metadata extraction and server build normalization into
+  the response dispatcher module.
+- Updated `TerminalClientApp` to consume typed dispatcher results while keeping
+  mutable app-shell state and side effects in place for the next controller
+  slices.
+- Moved pure flow-plan bundle ID extraction and play-audio source/byte labeling
+  into the response dispatcher module.
+- Expanded focused dispatcher tests for diagnostics request IDs, diagnostic
+  notification fallbacks, ignored command results, register metadata, flow-plan
+  bundle IDs, and play-audio labeling.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed lib/connection/control_response_dispatcher.dart test/connection/control_response_dispatcher_test.dart lib/app/terminal_client_app.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_response_dispatcher_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Started Phase 5 by creating
   `terminal_client/lib/connection/control_response_dispatcher.dart`.
 - Moved pure incoming-response status labeling out of
