@@ -15,7 +15,7 @@ import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart
     as diagv1;
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
-import 'package:terminal_client/main.dart';
+import 'package:terminal_client/app/terminal_client_app.dart';
 import 'package:terminal_client/media/playback.dart';
 import 'package:terminal_client/media/webrtc_engine.dart';
 
