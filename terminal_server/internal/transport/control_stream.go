@@ -75,50 +75,23 @@ func (h *StreamHandler) activeScenarioName(deviceID string) string {
 }
 
 func (h *StreamHandler) captureMultiWindowResume(deviceID, priorScenario string) {
-	deviceID = strings.TrimSpace(deviceID)
-	priorScenario = strings.TrimSpace(priorScenario)
-	if deviceID == "" || priorScenario == "multi_window" {
-		return
-	}
-
-	h.mu.Lock()
-	if _, exists := h.multiWindowResume[deviceID]; exists {
-		h.mu.Unlock()
-		return
-	}
-	storedUI, hasUI := h.lastSetUIByDevice[deviceID]
-	h.multiWindowResume[deviceID] = multiWindowResumeState{
-		PriorScenario: priorScenario,
-		PriorUI:       storedUI,
-		HasPriorUI:    hasUI,
-	}
-	h.mu.Unlock()
+	h.uiSession.CaptureMultiWindowResume(deviceID, priorScenario)
 }
 
 func (h *StreamHandler) restoreMultiWindowResume(deviceID string) (*ui.Descriptor, *UITransition, bool) {
-	deviceID = strings.TrimSpace(deviceID)
-	if deviceID == "" {
-		return nil, nil, false
-	}
-
-	h.mu.Lock()
-	state, exists := h.multiWindowResume[deviceID]
-	if exists {
-		delete(h.multiWindowResume, deviceID)
-	}
-	h.mu.Unlock()
-	if !exists {
+	priorScenario, priorUI, hasPriorUI, taken := h.uiSession.TakeMultiWindowResume(deviceID)
+	if !taken {
 		return nil, nil, false
 	}
 
 	var restoredUI *ui.Descriptor
-	if state.HasPriorUI {
-		copyUI := state.PriorUI
+	if hasPriorUI {
+		copyUI := priorUI
 		restoredUI = &copyUI
 	}
 
 	var restoredTransition *UITransition
-	if transition, ok := enterTransitionForScenario(state.PriorScenario); ok {
+	if transition, ok := enterTransitionForScenario(priorScenario); ok {
 		copyTransition := transition
 		restoredTransition = &copyTransition
 	}
@@ -415,21 +388,18 @@ type StreamHandler struct {
 	recent      []CommandEvent
 	recentLimit int
 
-	terminals             *terminal.Manager
-	replSessions          *replsession.Service
-	terminalReadDeadline  time.Duration
-	terminalReadInterval  time.Duration
-	terminalUIInterval    time.Duration
-	terminalReplAdminURL  string
-	lastSetUIByDevice     map[string]ui.Descriptor
-	lastUIHostEventByDev  map[string]int
-	mainUIActivationByDev map[string]string
-	menuOverlayByDevice   map[string]menuOverlayState
-	multiWindowResume     map[string]multiWindowResumeState
-	photoFrameSlides      []string
-	photoFrameIndexByDev  map[string]int
-	photoFrameLastByDev   map[string]time.Time
-	photoFrameInterval    time.Duration
+	terminals            *terminal.Manager
+	replSessions         *replsession.Service
+	terminalReadDeadline time.Duration
+	terminalReadInterval time.Duration
+	terminalUIInterval   time.Duration
+	terminalReplAdminURL string
+	uiSession            *UISessionState
+	menuOverlayByDevice  map[string]menuOverlayState
+	photoFrameSlides     []string
+	photoFrameIndexByDev map[string]int
+	photoFrameLastByDev  map[string]time.Time
+	photoFrameInterval   time.Duration
 
 	mediaStreams            map[string]mediaStreamState
 	sensorsByDevice         map[string]sensorSnapshot
@@ -554,11 +524,8 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 		terminalReplAdminURL: defaultTerminalReplAdminURL,
 
 		// UI session state
-		lastSetUIByDevice:     map[string]ui.Descriptor{},
-		lastUIHostEventByDev:  map[string]int{},
-		mainUIActivationByDev: map[string]string{},
-		menuOverlayByDevice:   map[string]menuOverlayState{},
-		multiWindowResume:     map[string]multiWindowResumeState{},
+		uiSession:           NewUISessionState(),
+		menuOverlayByDevice: map[string]menuOverlayState{},
 
 		// photo-frame scenario defaults
 		photoFrameSlides:     defaultPhotoFrameSlides(),
@@ -713,8 +680,8 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		}
 		out := result.Messages
 		deviceID := result.DeviceID
+		storedUI, hasUI := h.uiSession.LastSetUI(deviceID)
 		h.mu.Lock()
-		storedUI, hasUI := h.lastSetUIByDevice[deviceID]
 		_, hasOverlay := h.menuOverlayByDevice[deviceID]
 		h.mu.Unlock()
 
@@ -725,7 +692,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 				initial := ui.HelloWorld(result.AfterDeviceName)
 				result.RegisterAck.Initial = initial
 				out = append(out, ServerMessage{SetUI: &initial})
-				h.rememberSetUI(deviceID, out)
+				h.uiSession.RememberSetUI(deviceID, out)
 			}
 			if hasOverlay {
 				out = append(out, ServerMessage{
@@ -765,8 +732,8 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
 		deviceID := msg.Register.DeviceID
+		storedUI, hasUI := h.uiSession.LastSetUI(deviceID)
 		h.mu.Lock()
-		storedUI, hasUI := h.lastSetUIByDevice[deviceID]
 		_, hasOverlay := h.menuOverlayByDevice[deviceID]
 		h.mu.Unlock()
 
@@ -777,7 +744,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			out = append(out, ServerMessage{SetUI: &storedUI})
 		} else {
 			out = append(out, ServerMessage{SetUI: &resp.Initial})
-			h.rememberSetUI(deviceID, out)
+			h.uiSession.RememberSetUI(deviceID, out)
 		}
 		if hasOverlay {
 			out = append(out, ServerMessage{
@@ -821,7 +788,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			out = append(out, uiMessages...)
 		}
 		if len(out) > 0 {
-			h.rememberSetUI(msg.Heartbeat.DeviceID, out)
+			h.uiSession.RememberSetUI(msg.Heartbeat.DeviceID, out)
 			return out, nil
 		}
 		return nil, nil
@@ -914,7 +881,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
-		h.rememberSetUI(msg.Input.DeviceID, out)
+		h.uiSession.RememberSetUI(msg.Input.DeviceID, out)
 		return out, nil
 	case msg.Command != nil:
 		h.metrics.commandReceived.Add(1)
@@ -1006,7 +973,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		if len(uiMessages) > 0 {
 			postResponses = append(postResponses, uiMessages...)
 		}
-		h.rememberSetUI(msg.Command.DeviceID, postResponses)
+		h.uiSession.RememberSetUI(msg.Command.DeviceID, postResponses)
 		return postResponses, nil
 	case msg.BugReport != nil:
 		if h.bugReports == nil {
@@ -1694,10 +1661,7 @@ func (h *StreamHandler) uiHostEventCount() int {
 
 func (h *StreamHandler) uiHostMessagesForDevice(deviceID string) []ServerMessage {
 	count := h.uiHostEventCount()
-	h.mu.Lock()
-	beforeCount := h.lastUIHostEventByDev[strings.TrimSpace(deviceID)]
-	h.lastUIHostEventByDev[strings.TrimSpace(deviceID)] = count
-	h.mu.Unlock()
+	beforeCount := h.uiSession.UIHostBeforeCountAndAdvance(deviceID, count)
 	return h.uiHostMessagesSince(beforeCount, deviceID, true)
 }
 
@@ -1753,13 +1717,7 @@ func (h *StreamHandler) uiHostMessagesSince(beforeCount int, sessionDeviceID str
 		delivered[sessionDeviceID] = struct{}{}
 	}
 	if len(delivered) > 0 {
-		h.mu.Lock()
-		for deliveredDeviceID := range delivered {
-			if deliveredDeviceID != "" {
-				h.lastUIHostEventByDev[deliveredDeviceID] = len(events)
-			}
-		}
-		h.mu.Unlock()
+		h.uiSession.MarkUIHostDelivered(delivered, len(events))
 	}
 	return out
 }
@@ -3841,25 +3799,6 @@ func (h *StreamHandler) isRegisteredScenario(name string) bool {
 	return false
 }
 
-func (h *StreamHandler) rememberSetUI(deviceID string, responses []ServerMessage) {
-	deviceID = strings.TrimSpace(deviceID)
-	if deviceID == "" || len(responses) == 0 {
-		return
-	}
-
-	for _, response := range responses {
-		if response.SetUI == nil {
-			continue
-		}
-		if relayTarget := strings.TrimSpace(response.RelayToDeviceID); relayTarget != "" {
-			continue
-		}
-		h.mu.Lock()
-		h.lastSetUIByDevice[deviceID] = *response.SetUI
-		h.mu.Unlock()
-	}
-}
-
 func (h *StreamHandler) renderTerminalUIAction(deviceID, componentID, action, value string) (*UIUpdate, bool) {
 	if strings.TrimSpace(componentID) == "" {
 		return nil, false
@@ -3989,16 +3928,7 @@ func scopedActivationFromComponentIDs(componentIDs []string, fallback string) st
 }
 
 func (h *StreamHandler) swapMainUIActivation(deviceID, activationID string) string {
-	deviceID = strings.TrimSpace(deviceID)
-	activationID = strings.TrimSpace(activationID)
-	if deviceID == "" || activationID == "" {
-		return ""
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	prior := strings.TrimSpace(h.mainUIActivationByDev[deviceID])
-	h.mainUIActivationByDev[deviceID] = activationID
-	return prior
+	return h.uiSession.SwapMainUIActivation(deviceID, activationID)
 }
 
 func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
@@ -4842,9 +4772,7 @@ func (h *StreamHandler) NoteProtocolError() {
 
 // HandleDisconnect releases stream-scoped resources for a disconnected device.
 func (h *StreamHandler) HandleDisconnect(deviceID string) {
-	h.mu.Lock()
-	delete(h.mainUIActivationByDev, strings.TrimSpace(deviceID))
-	h.mu.Unlock()
+	h.uiSession.ForgetMainUIActivation(deviceID)
 	h.uiOwners.ForgetDevice(deviceID)
 	h.terminateTerminalForDevice(deviceID)
 	h.disconnectRoutesForDevice(deviceID)

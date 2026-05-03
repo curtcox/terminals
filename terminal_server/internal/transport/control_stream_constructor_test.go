@@ -62,20 +62,11 @@ func TestStreamHandlerConstructorsInitializeFields(t *testing.T) {
 			if h.terminalReplAdminURL == "" {
 				t.Error("terminalReplAdminURL not set")
 			}
-			if h.lastSetUIByDevice == nil {
-				t.Error("lastSetUIByDevice not initialized")
-			}
-			if h.lastUIHostEventByDev == nil {
-				t.Error("lastUIHostEventByDev not initialized")
-			}
-			if h.mainUIActivationByDev == nil {
-				t.Error("mainUIActivationByDev not initialized")
+			if h.uiSession == nil {
+				t.Error("uiSession state not initialized")
 			}
 			if h.menuOverlayByDevice == nil {
 				t.Error("menuOverlayByDevice not initialized")
-			}
-			if h.multiWindowResume == nil {
-				t.Error("multiWindowResume not initialized")
 			}
 			if h.photoFrameSlides == nil {
 				t.Error("photoFrameSlides not initialized")

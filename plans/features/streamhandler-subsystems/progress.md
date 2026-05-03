@@ -109,3 +109,42 @@ Notes:
 - `internal/transport` test count went up by 9 (one new test file). Suite still passes under `-race`.
 - Stopping after this PR. Awaiting confirmation before starting PR 5 (Phase 4: extract `UISessionState`).
 
+
+## 2026-05-02 — Phase 4 (PR 5: extract UISessionState)
+
+Status: complete
+
+Changes:
+- Added `terminal_server/internal/transport/ui_session_state.go` with `UISessionState` (own `sync.Mutex`, own per-device maps). API: `NewUISessionState`, `RememberSetUI(deviceID, []ServerMessage)`, `LastSetUI(deviceID) (ui.Descriptor, bool)`, `SwapMainUIActivation(deviceID, activationID) string`, `ForgetMainUIActivation(deviceID)`, `CaptureMultiWindowResume(deviceID, priorScenario)`, `TakeMultiWindowResume(deviceID) (priorScenario string, priorUI ui.Descriptor, hasPriorUI, taken bool)`, `UIHostBeforeCountAndAdvance(deviceID, totalCount) int`, `MarkUIHostDelivered(map[string]struct{}, totalCount)`.
+- Moved fields off `StreamHandler` and into the store: `lastSetUIByDevice`, `lastUIHostEventByDev`, `mainUIActivationByDev`, `multiWindowResume`. Replaced with a single `uiSession *UISessionState` field; constructor initializer collapses to one line.
+- Moved helper bodies into the store: `rememberSetUI` (now `RememberSetUI`, scans the outgoing slice for non-relayed `SetUI` and stores the most recent — same semantics, must be called with what is about to be sent), `swapMainUIActivation` (now a one-line passthrough to `SwapMainUIActivation`), `captureMultiWindowResume` (now a one-line passthrough; the atomic check-existing+read-lastUI+write-resume happens inside the store), the lookup half of `restoreMultiWindowResume` (now `TakeMultiWindowResume`; `restoreMultiWindowResume` retains the transition-shaping wrapper because it returns transport types and consults `enterTransitionForScenario`), the `lastUIHostEventByDev` read+advance pair in `uiHostMessagesForDevice`, the bulk `delivered` write at the end of `uiHostMessagesSince`, and the `delete(h.mainUIActivationByDev, ...)` line in `HandleDisconnect` (now `ForgetMainUIActivation`).
+- `HandleMessage`: the CapabilitySnap and Register branches both did `h.mu.Lock()` to read `lastSetUIByDevice` and `menuOverlayByDevice` together; that block is now split — the UI lookup goes through `h.uiSession.LastSetUI` (own lock) and only the overlay lookup remains under `h.mu`. The two-lock sequence is allowed because the overlay-and-UI reads were already independent observations, not transactional.
+- Updated `control_stream_constructor_test.go` to replace four field-presence assertions with one `h.uiSession != nil` assertion (matching the `routeReplay` pattern from PR 4); kept the `menuOverlayByDevice` assertion since that field stayed on `StreamHandler`.
+- Added `ui_session_state_test.go` with 13 focused tests covering: remember-then-recall, relayed-SetUI is not stored for sender, blank-deviceID is a no-op, last-SetUI-in-slice wins, swap returns prior, forget-then-swap returns empty, capture+take round-trip, capture skips `multi_window` scenario, first-capture wins on duplicate, before-count read+advance, mark-delivered bulk write, per-device isolation across all four maps, and a concurrent read/write race across all 7 mutating ops × 8 goroutines × 200 iterations.
+
+Validation:
+- `cd terminal_server && go test ./internal/transport -count=1` — pass (9.0s).
+- `cd terminal_server && go test ./...` — pass.
+- `cd terminal_server && go test -race ./internal/transport -count=1` — pass (10.2s).
+- `cd terminal_server && go test -race ./...` — pass.
+- `cd terminal_server && go build ./...` — pass.
+- `make server-lint` — only pre-existing warnings remain (`route_replay_test.go:153` unused-`t`, `control_stream_characterization_test.go:56` gofumpt). Confirmed pre-existing via `git stash`.
+- Behavior-preservation: `TestGeneratedSessionUI_RECON_1` (load-bearing reconnect), `control_stream_command_test.go`, `control_stream_characterization_test.go`, `control_stream_keytext_test.go`, `errors_test.go`, `capability_lifecycle_test.go`, `route_replay_test.go` all pass unmodified.
+
+Judgment calls:
+- **Left `menuOverlayByDevice` and `menuOverlayDescriptor` on `StreamHandler`.** Per the plan's escape hatch: overlay state is read by `isMenuOverlayOpen`, `overlayPolicyForDevice`, `shouldDropMainStreamWhileOverlayOpen`, `shouldDropMainInputWhileOverlayOpen`, `openMenuOverlay`, `closeMenuOverlay` — overlay-input policy logic dominates the call sites, and `menuOverlayDescriptor` walks `h.runtime.Engine.RegistrySnapshot()` plus a half-dozen scoped-component-id helpers that are tightly bound to `StreamHandler`'s renderer surface. Moving overlay state in this PR would either drag the policy/render logic with it (scope creep beyond Phase 4) or leave the policy half on `StreamHandler` reaching across the new boundary. The four maps that *did* move all share a common consumer (the reconnect/heartbeat replay path) and are not consulted by overlay-input policy. Defer overlay extraction to a later phase if the plan calls for it; otherwise it stays put.
+- **High-level API where transactions matter, accessor pairs where they don't.** `RememberSetUI` owns the scan-for-SetUI logic so call sites stay one-line. `CaptureMultiWindowResume` owns the read-existing+read-lastUI+write atomic so the helper isn't fragmented across the lock. `SwapMainUIActivation` returns the prior in one call (matches the existing helper's contract). On the read-and-advance side, `UIHostBeforeCountAndAdvance` is one atomic read+write per the existing `h.mu` block; `MarkUIHostDelivered` is the bulk-update half. `LastSetUI` and `ForgetMainUIActivation` are simple per-map accessors because their callers don't compose with anything else under the lock today.
+- **`TakeMultiWindowResume` returns four scalar values, not the unexported `multiWindowResumeState` struct.** Avoids `revive` complaining about an exported method returning an unexported type. The struct stays unexported because nothing outside `StreamHandler` and the store touches it.
+- **Order-of-operations in `RememberSetUI` preserves "remember what was sent."** Existing call sites pass the `out` slice that is about to be returned from `HandleMessage`; the loop walks that slice and stashes the last non-relayed SetUI. Identical to the prior implementation — no reordering relative to the wire.
+- **Forget-on-disconnect went through the store.** `HandleDisconnect` now calls `h.uiSession.ForgetMainUIActivation`; the old inline `delete` is gone. Other state (lastSetUI, multiWindowResume, lastUIHostEvent) is intentionally *not* cleared on disconnect to preserve the reconnect-replay behavior pinned by `TestGeneratedSessionUI_RECON_1`.
+
+Moved vs. stayed:
+- Moved (state): `lastSetUIByDevice`, `lastUIHostEventByDev`, `mainUIActivationByDev`, `multiWindowResume`.
+- Moved (behavior): `rememberSetUI` body; `swapMainUIActivation` body; `captureMultiWindowResume` body; the take-and-delete half of `restoreMultiWindowResume`; the read+advance block inside `uiHostMessagesForDevice`; the bulk-update tail of `uiHostMessagesSince`; the `mainUIActivationByDev` delete inside `HandleDisconnect`.
+- Stayed (state): `menuOverlayByDevice`, `menuOverlayPolicy`.
+- Stayed (behavior): `restoreMultiWindowResume` wrapper (transition shaping); `menuOverlayDescriptor` and the menu-overlay open/close/policy helpers; `uiHostMessagesSince` body (consults `h.runtime.Env.UI` — not state); `uiHostEventCount`; `handleCapabilityChangeEffects` (cross-subsystem; consults UI state via the new accessors but stays as orchestrator).
+
+Notes:
+- `control_stream.go` dropped from 4898 → 4826 lines.
+- `StreamHandler.mu` is no longer used to guard any of the moved maps. The fields it still guards are unrelated (overlay state, media streams, sensors, etc.).
+- Left the plan status `building`. Stopping after this PR. Awaiting confirmation before starting PR 6 (Phase 5: extract `CommandDispatcher` — characterization-pinned in PR 2).
