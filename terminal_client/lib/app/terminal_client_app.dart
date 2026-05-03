@@ -16,6 +16,7 @@ import 'package:terminal_client/connection/carrier_preference.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/connection/control_response_dispatcher.dart';
+import 'package:terminal_client/connection/control_session_controller.dart';
 import 'package:terminal_client/connection/endpoint_resolution.dart';
 import 'package:terminal_client/connection/reliability.dart';
 import 'package:terminal_client/connection/transport_diagnostics.dart';
@@ -382,63 +383,6 @@ const List<String> _bugTokenWords = <String>[
   'zone',
 ];
 
-Duration calculateReconnectDelay({
-  required int reconnectAttempt,
-  required Duration reconnectDelayBase,
-  required int reconnectDelayMaxSeconds,
-}) {
-  final scaledMs = reconnectDelayBase.inMilliseconds *
-      math.pow(2, reconnectAttempt - 1).toInt();
-  final maxMs = reconnectDelayMaxSeconds * 1000;
-  final delayMs = math.min(maxMs, math.max(1, scaledMs));
-  return Duration(milliseconds: delayMs);
-}
-
-class _CarrierAttemptDiagnostic {
-  const _CarrierAttemptDiagnostic({
-    required this.carrier,
-    required this.endpoint,
-    required this.stage,
-    required this.failureClass,
-    required this.error,
-    required this.elapsed,
-  });
-
-  final ControlCarrierKind carrier;
-  final String endpoint;
-  final String stage;
-  final String failureClass;
-  final String error;
-  final Duration elapsed;
-
-  String get carrierLabel {
-    switch (carrier) {
-      case ControlCarrierKind.grpc:
-        return 'gRPC';
-      case ControlCarrierKind.websocket:
-        return 'WebSocket';
-      case ControlCarrierKind.tcp:
-        return 'TCP';
-      case ControlCarrierKind.http:
-        return 'HTTP';
-    }
-  }
-}
-
-String _formatCarrierAttempt(_CarrierAttemptDiagnostic attempt) {
-  final elapsedMs = attempt.elapsed.inMilliseconds;
-  return '${attempt.carrierLabel} failed at ${attempt.stage} '
-      '[${attempt.failureClass}] (${attempt.endpoint}) '
-      'after ${elapsedMs}ms: ${attempt.error}';
-}
-
-class _ConnectionTarget {
-  const _ConnectionTarget({required this.host, required this.port});
-
-  final String host;
-  final int port;
-}
-
 class TerminalClientApp extends StatelessWidget {
   const TerminalClientApp({
     super.key,
@@ -653,8 +597,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   String _lastFlutterErrorStack = '';
   int _lastFlutterErrorUnixMs = 0;
   String _lastTransportDiagnostic = '';
-  final List<_CarrierAttemptDiagnostic> _carrierAttemptLog =
-      <_CarrierAttemptDiagnostic>[];
+  final List<CarrierAttemptDiagnostic> _carrierAttemptLog =
+      <CarrierAttemptDiagnostic>[];
   List<ControlCarrierKind> _activeCarrierCycle = <ControlCarrierKind>[];
   int _activeCarrierIndex = 0;
   ControlCarrierKind? _lastSuccessfulCarrier;
@@ -1118,7 +1062,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return parsed.port;
   }
 
-  _ConnectionTarget _targetForCarrier({
+  ConnectionTarget _targetForCarrier({
     required ControlCarrierKind carrier,
     required DiscoveredServer? server,
     required String fallbackHost,
@@ -1128,43 +1072,43 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       case ControlCarrierKind.grpc:
         final endpoint = _endpointForCarrier(carrier: carrier, server: server);
         if (endpoint.isEmpty) {
-          return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
+          return ConnectionTarget(host: fallbackHost, port: fallbackPort);
         }
         final parsed = Uri.tryParse('tcp://$endpoint');
         if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
-          return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
+          return ConnectionTarget(host: fallbackHost, port: fallbackPort);
         }
-        return _ConnectionTarget(host: parsed.host, port: parsed.port);
+        return ConnectionTarget(host: parsed.host, port: parsed.port);
       case ControlCarrierKind.websocket:
         final endpoint = _endpointForCarrier(carrier: carrier, server: server);
         if (endpoint.isEmpty) {
-          return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
+          return ConnectionTarget(host: fallbackHost, port: fallbackPort);
         }
         final parsed = Uri.tryParse(endpoint);
         if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
-          return _ConnectionTarget(host: fallbackHost, port: fallbackPort);
+          return ConnectionTarget(host: fallbackHost, port: fallbackPort);
         }
-        return _ConnectionTarget(host: parsed.host, port: parsed.port);
+        return ConnectionTarget(host: parsed.host, port: parsed.port);
       case ControlCarrierKind.tcp:
         final endpoint = _endpointForCarrier(carrier: carrier, server: server);
         if (endpoint.isEmpty) {
-          return _ConnectionTarget(host: fallbackHost, port: 50055);
+          return ConnectionTarget(host: fallbackHost, port: 50055);
         }
         final parsed = Uri.tryParse('tcp://$endpoint');
         if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
-          return _ConnectionTarget(host: fallbackHost, port: 50055);
+          return ConnectionTarget(host: fallbackHost, port: 50055);
         }
-        return _ConnectionTarget(host: parsed.host, port: parsed.port);
+        return ConnectionTarget(host: parsed.host, port: parsed.port);
       case ControlCarrierKind.http:
         final endpoint = _endpointForCarrier(carrier: carrier, server: server);
         if (endpoint.isEmpty) {
-          return _ConnectionTarget(host: fallbackHost, port: 50056);
+          return ConnectionTarget(host: fallbackHost, port: 50056);
         }
         final parsed = Uri.tryParse(endpoint);
         if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
-          return _ConnectionTarget(host: fallbackHost, port: 50056);
+          return ConnectionTarget(host: fallbackHost, port: 50056);
         }
-        return _ConnectionTarget(host: parsed.host, port: parsed.port);
+        return ConnectionTarget(host: parsed.host, port: parsed.port);
     }
   }
 
@@ -1183,7 +1127,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   String _carrierEndpointLabelForTarget({
     required ControlCarrierKind carrier,
-    required _ConnectionTarget target,
+    required ConnectionTarget target,
     required DiscoveredServer? server,
   }) {
     switch (carrier) {
@@ -1225,7 +1169,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
     final lines = <String>[];
     for (final attempt in _carrierAttemptLog) {
-      lines.add(_formatCarrierAttempt(attempt));
+      lines.add(formatCarrierAttempt(attempt));
     }
     return lines.join('\n');
   }
@@ -1500,7 +1444,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       fallbackHost: host,
       fallbackPort: port,
     );
-    final target = _ConnectionTarget(
+    final target = ConnectionTarget(
       host: resolveInitialControlHost(
         isWebRuntime: kIsWeb,
         configuredHost: rawTarget.host,
@@ -3029,7 +2973,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     final failureClass =
         classifyCarrierFailure(stage: stage, rawError: rawError);
     _carrierAttemptLog.add(
-      _CarrierAttemptDiagnostic(
+      CarrierAttemptDiagnostic(
         carrier: carrier,
         endpoint: endpoint,
         stage: stage,
@@ -3038,7 +2982,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         elapsed: elapsed,
       ),
     );
-    final attemptSummary = _formatCarrierAttempt(_carrierAttemptLog.last);
+    final attemptSummary = formatCarrierAttempt(_carrierAttemptLog.last);
     _lastTransportDiagnostic = attemptSummary;
     _recordClientLog(
       'warn',
@@ -3659,7 +3603,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return TransportDiagnosticsPanel(
       lastTransportDiagnostic: _lastTransportDiagnostic,
       recentAttempts: recentAttempts
-          .map((attempt) => _formatCarrierAttempt(attempt))
+          .map((attempt) => formatCarrierAttempt(attempt))
           .toList(),
     );
   }

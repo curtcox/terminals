@@ -2,6 +2,35 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by creating
+  `terminal_client/lib/connection/control_session_controller.dart` for the
+  first pure connection-session primitives.
+- Moved reconnect delay calculation, carrier attempt diagnostics formatting,
+  and resolved connection target data out of
+  `terminal_client/lib/app/terminal_client_app.dart`.
+- Added focused controller tests and removed the reconnect-delay unit check from
+  the broad widget test file.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format lib/app/terminal_client_app.dart lib/connection/control_session_controller.dart test/connection/control_session_controller_test.dart test/widget_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+```
+
+Notes:
+
+- The first focused test attempt hit sandboxed DNS for pub.dev advisories;
+  rerunning with approved network access passed.
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 4 by adding a stateful `CapabilitySession` abstraction for
   registered capability snapshots, generation numbers, accepted ack generation,
   and signature-based change detection.

@@ -2038,33 +2038,6 @@ void main() {
     );
   });
 
-  test('reconnect delay grows exponentially and caps at max', () {
-    expect(
-      calculateReconnectDelay(
-        reconnectAttempt: 1,
-        reconnectDelayBase: const Duration(milliseconds: 30),
-        reconnectDelayMaxSeconds: 1,
-      ),
-      const Duration(milliseconds: 30),
-    );
-    expect(
-      calculateReconnectDelay(
-        reconnectAttempt: 2,
-        reconnectDelayBase: const Duration(milliseconds: 30),
-        reconnectDelayMaxSeconds: 1,
-      ),
-      const Duration(milliseconds: 60),
-    );
-    expect(
-      calculateReconnectDelay(
-        reconnectAttempt: 10,
-        reconnectDelayBase: const Duration(milliseconds: 30),
-        reconnectDelayMaxSeconds: 1,
-      ),
-      const Duration(seconds: 1),
-    );
-  });
-
   testWidgets('applies update_ui patch to active server-driven UI', (
     WidgetTester tester,
   ) async {
