@@ -1,7 +1,7 @@
 ---
 title: "Client UI Renderer Refactor"
 kind: plan
-status: proposed
+status: completed
 owner: curtcox
 validation: automated
 last-reviewed: 2026-05-03
@@ -654,7 +654,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 3: Split Client Chrome from Server-Driven Content
 
-Status: in progress
+Status: completed
 
 Tasks:
 
@@ -689,7 +689,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 4: Split Capability Lifecycle
 
-Status: in progress
+Status: completed
 
 Tasks:
 
@@ -724,7 +724,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 5: Split Connection Session Controller
 
-Status: in progress
+Status: completed
 
 Tasks:
 
@@ -761,7 +761,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 6: Shrink `main.dart` and Stabilize Public Test Seams
 
-Status: in progress
+Status: completed
 
 Tasks:
 
@@ -791,7 +791,7 @@ cd terminal_client && dart format --set-exit-if-changed .
 
 ### Phase 7: Boundary Enforcement and Documentation
 
-Status: in progress
+Status: completed
 
 Tasks:
 

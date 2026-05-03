@@ -2,6 +2,32 @@
 
 ## 2026-05-03
 
+- Closed out the client UI renderer refactor plan after verifying the completed
+  module split: `main.dart` is now a thin entry point, the authoritative
+  server-driven renderer lives under `terminal_client/lib/ui/`, client chrome,
+  capabilities, diagnostics, and connection helpers have focused modules and
+  tests, and boundary documentation plus scenario/import scanning are in place.
+- Updated `plans/features/client-ui-renderer/plan.md` to mark the overall plan
+  and Phases 3 through 7 as completed.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+./scripts/test-check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed .
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  `flutter analyze` and `flutter test` completed successfully.
+- Full Flutter test result: 226 tests passed.
+
+## 2026-05-03
+
 - Continued Phase 5 by moving server-driven UI response derivation for
   `SetUI`, `UpdateUI`, and `TransitionUI` out of `TerminalClientShell` and
   into `terminal_client/lib/connection/control_response_dispatcher.dart`.
