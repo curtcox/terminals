@@ -2,6 +2,32 @@
 
 ## 2026-05-03
 
+- Started Phase 3 by extracting terminal-owned diagnostic chrome widgets from
+  `terminal_client/lib/app/terminal_client_app.dart` into
+  `terminal_client/lib/diagnostics/client_chrome.dart`.
+- Extracted bug-report affordance and receipt panel presentation into
+  `terminal_client/lib/diagnostics/bug_report_chrome.dart`.
+- Added focused widget tests for build metadata, connection phase, diagnostics,
+  transport status, bug-report button, and bug receipt presentation under
+  `terminal_client/test/diagnostics/`.
+- Kept connection lifecycle, screenshot capture, bug-report queueing, and
+  server action dispatch in the app shell for later Phase 5 work.
+
+Validation:
+
+```bash
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/diagnostics
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 2 by hardening `ServerDrivenRenderer` key generation for
   nodes without explicit IDs. Anonymous nodes now receive deterministic
   traversal-path keys instead of identity-hash-based keys.

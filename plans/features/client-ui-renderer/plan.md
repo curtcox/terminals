@@ -4,7 +4,7 @@ kind: plan
 status: proposed
 owner: curtcox
 validation: automated
-last-reviewed: 2026-05-02
+last-reviewed: 2026-05-03
 ---
 
 # Client UI Renderer Refactor
@@ -654,7 +654,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 3: Split Client Chrome from Server-Driven Content
 
-Status: not started
+Status: in progress
 
 Tasks:
 

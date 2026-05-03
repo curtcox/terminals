@@ -17,8 +17,9 @@ import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/connection/endpoint_resolution.dart';
 import 'package:terminal_client/connection/reliability.dart';
 import 'package:terminal_client/connection/transport_diagnostics.dart';
+import 'package:terminal_client/diagnostics/bug_report_chrome.dart';
 import 'package:terminal_client/diagnostics/build_metadata.dart';
-import 'package:terminal_client/diagnostics/diagnostic_clipboard.dart';
+import 'package:terminal_client/diagnostics/client_chrome.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/edge/artifact_export.dart';
 import 'package:terminal_client/edge/bundle_store.dart';
@@ -1427,95 +1428,44 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         _lastNotification.trim().isNotEmpty;
   }
 
+  BugReceiptChromeState get _bugReceiptChromeState {
+    switch (_bugReceiptState) {
+      case _BugReceiptState.none:
+        return BugReceiptChromeState.none;
+      case _BugReceiptState.waiting:
+        return BugReceiptChromeState.waiting;
+      case _BugReceiptState.received:
+        return BugReceiptChromeState.received;
+      case _BugReceiptState.error:
+        return BugReceiptChromeState.error;
+    }
+  }
+
   Widget _buildTransportStatusCard() {
-    final blockText = buildControlStreamClipboardText(
+    return ControlStreamStatusCard(
       status: _status,
       notification: _lastNotification,
       transportDiagnostics: _lastTransportDiagnostic,
-    );
-    return Material(
-      elevation: 4,
-      borderRadius: BorderRadius.circular(12),
-      color: Colors.white,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.blueGrey.shade200),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SelectableText(blockText, style: const TextStyle(fontSize: 12)),
-            if (_bugReceiptState != _BugReceiptState.none) ...[
-              const SizedBox(height: 8),
-              _buildBugReceiptPanel(),
-            ],
-          ],
-        ),
-      ),
+      bugReceiptState: _bugReceiptChromeState,
+      bugReceiptReportId: _bugReceiptReportId,
+      bugReceiptDetail: _bugReceiptDetail,
     );
   }
 
   Widget _buildMetadataFooter() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Flexible(
-              child: SelectableText(
-                buildMetadataLabel(buildDate: _buildDate, buildSha: _buildSha),
-                textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ClientMetadataFooter(
+      buildDate: _buildDate,
+      buildSha: _buildSha,
     );
   }
 
   Widget _buildBuildParityPanel() {
-    final clientLabel =
-        'Client ${buildMetadataLabel(buildDate: _buildDate, buildSha: _buildSha)}';
-    final serverLabel = buildServerBuildLine(
-      serverBuildDate: _serverBuildDate,
-      serverBuildSha: _serverBuildSha,
-      hasRegisterAck: _hasRegisterAck,
-    );
-    final parityLabel = buildVersionParityNote(
+    return BuildParityPanel(
       clientBuildDate: _buildDate,
       clientBuildSha: _buildSha,
       serverBuildDate: _serverBuildDate,
       serverBuildSha: _serverBuildSha,
-    );
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.blueGrey.shade200),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SelectableText(
-            'Client / Server Build',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          SelectableText(clientLabel, style: const TextStyle(fontSize: 12)),
-          SelectableText(serverLabel, style: const TextStyle(fontSize: 12)),
-          SelectableText(parityLabel, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
+      hasRegisterAck: _hasRegisterAck,
     );
   }
 
@@ -3540,11 +3490,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return RepaintBoundary(
         key: _bugReportScreenshotKey,
         child: Scaffold(
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: _showBugReportDialog,
-            icon: const Icon(Icons.bug_report_outlined),
-            label: const Text('Report Bug'),
-          ),
+          floatingActionButton:
+              BugReportButton(onPressed: _showBugReportDialog),
           bottomNavigationBar: _buildMetadataFooter(),
           body: SafeArea(
             child: Stack(
@@ -3570,11 +3517,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return RepaintBoundary(
       key: _bugReportScreenshotKey,
       child: Scaffold(
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _showBugReportDialog,
-          icon: const Icon(Icons.bug_report_outlined),
-          label: const Text('Report Bug'),
-        ),
+        floatingActionButton: BugReportButton(onPressed: _showBugReportDialog),
         bottomNavigationBar: _buildMetadataFooter(),
         body: Align(
           alignment: Alignment.topCenter,
@@ -3595,14 +3538,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                   Row(
                     children: [
                       if (kIsWeb)
-                        Chip(
-                          avatar: Icon(
-                            _isConnectionRegistered
-                                ? Icons.check_circle_outline
-                                : Icons.sync_outlined,
-                          ),
-                          label:
-                              Text(buildConnectionPhaseLabel(_connectionPhase)),
+                        ConnectionPhaseChip(
+                          phase: _connectionPhase,
+                          isRegistered: _isConnectionRegistered,
                         )
                       else
                         ElevatedButton(
@@ -3861,115 +3799,27 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   Widget _buildDiagnosticsPanel() {
-    final keys = _diagnosticsData.keys.toList()..sort();
-    final displayKeys = keys.take(16).toList();
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.blueGrey.shade200),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Diagnostics: $_diagnosticsTitle'),
-          if (displayKeys.isEmpty)
-            const Text('No diagnostics data yet')
-          else
-            ...displayKeys.map(
-              (key) => Text(
-                '$key=${_diagnosticsData[key]}',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-        ],
-      ),
+    return DiagnosticsPanel(
+      title: _diagnosticsTitle,
+      data: _diagnosticsData,
     );
   }
 
   Widget _buildBugReceiptPanel() {
-    late final Color borderColor;
-    late final Color backgroundColor;
-    late final IconData icon;
-    late final String title;
-    switch (_bugReceiptState) {
-      case _BugReceiptState.none:
-        return const SizedBox.shrink();
-      case _BugReceiptState.waiting:
-        borderColor = Colors.amber.shade400;
-        backgroundColor = Colors.amber.shade50;
-        icon = Icons.schedule_outlined;
-        title = 'Bug Report Receipt: Pending';
-        break;
-      case _BugReceiptState.received:
-        borderColor = Colors.green.shade400;
-        backgroundColor = Colors.green.shade50;
-        icon = Icons.verified_outlined;
-        title = 'Bug Report Receipt: Received';
-        break;
-      case _BugReceiptState.error:
-        borderColor = Colors.red.shade400;
-        backgroundColor = Colors.red.shade50;
-        icon = Icons.error_outline;
-        title = 'Bug Report Receipt: Error';
-        break;
-    }
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(8),
-        color: backgroundColor,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                if (_bugReceiptReportId.isNotEmpty)
-                  Text(
-                    'Receipt ID: $_bugReceiptReportId',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (_bugReceiptDetail.isNotEmpty)
-                  Text(_bugReceiptDetail, style: const TextStyle(fontSize: 12)),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return BugReceiptPanel(
+      state: _bugReceiptChromeState,
+      reportId: _bugReceiptReportId,
+      detail: _bugReceiptDetail,
     );
   }
 
   Widget _buildTransportDiagnosticsPanel() {
     final recentAttempts = _carrierAttemptLog.reversed.take(4).toList();
-    final blockText = buildTransportDiagnosticsClipboardText(
+    return TransportDiagnosticsPanel(
       lastTransportDiagnostic: _lastTransportDiagnostic,
       recentAttempts: recentAttempts
           .map((attempt) => _formatCarrierAttempt(attempt))
           .toList(),
-    );
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.blueGrey.shade200),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SelectableText(blockText, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
     );
   }
 
