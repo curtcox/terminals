@@ -75,7 +75,7 @@ func (statelessIntakeStub) File(_ context.Context, _ *diagnosticsv1.BugReport) (
 	return &diagnosticsv1.BugReportAck{ReportId: "r"}, nil
 }
 
-func TestDiagnosticsIntakeSetIntakeRaceWithHandle(t *testing.T) {
+func TestDiagnosticsIntakeSetIntakeRaceWithHandle(_ *testing.T) {
 	d := NewDiagnosticsIntake(statelessIntakeStub{})
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {

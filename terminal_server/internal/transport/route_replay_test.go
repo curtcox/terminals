@@ -150,7 +150,7 @@ func TestEmptyDeviceIDIsNoOp(t *testing.T) {
 
 // TestConcurrentCaptureAndRead exercises -race for concurrent writers and
 // readers across multiple devices.
-func TestConcurrentCaptureAndRead(t *testing.T) {
+func TestConcurrentCaptureAndRead(_ *testing.T) {
 	store := NewRouteReplayStore()
 	const goroutines = 16
 	const iterations = 100

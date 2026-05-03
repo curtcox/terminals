@@ -353,6 +353,10 @@ type BugReportIntake interface {
 	File(context.Context, *diagnosticsv1.BugReport) (*diagnosticsv1.BugReportAck, error)
 }
 
+type observationSink interface {
+	AddObservation(context.Context, iorouter.Observation)
+}
+
 // Actor is a resolved identity principal used by menu composition policy.
 type Actor struct {
 	Kind string
@@ -656,237 +660,303 @@ func (h *StreamHandler) ReplSessions() *replsession.Service {
 func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([]ServerMessage, error) {
 	switch {
 	case msg.Hello != nil:
-		out, err := h.capabilityLifecycle.HandleHello(ctx, *msg.Hello)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		return out, nil
+		return h.handleHelloMessage(ctx, msg.Hello)
 	case msg.CapabilitySnap != nil:
-		h.metrics.capabilityReceived.Add(1)
-		result, err := h.capabilityLifecycle.HandleSnapshot(ctx, *msg.CapabilitySnap)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		out := result.Messages
-		deviceID := result.DeviceID
-		storedUI, hasUI := h.uiSession.LastSetUI(deviceID)
-		h.mu.Lock()
-		_, hasOverlay := h.menuOverlayByDevice[deviceID]
-		h.mu.Unlock()
-
-		if !result.HadPriorDevice || hasUI {
-			if hasUI {
-				out = append(out, ServerMessage{SetUI: &storedUI})
-			} else {
-				initial := ui.HelloWorld(result.AfterDeviceName)
-				result.RegisterAck.Initial = initial
-				out = append(out, ServerMessage{SetUI: &initial})
-				h.uiSession.RememberSetUI(deviceID, out)
-			}
-			if hasOverlay {
-				out = append(out, ServerMessage{
-					UpdateUI: &UIUpdate{
-						ComponentID: ui.GlobalOverlayComponentID,
-						Node:        h.menuOverlayDescriptor(deviceID),
-					},
-				})
-			}
-			out = append(out, h.routeReplay.MessagesForDevice(deviceID, h.routeSnapshotForDevice(deviceID), true)...)
-		}
-		if !result.IsInitialBaseline {
-			effects := h.handleCapabilityChangeEffects(ctx, deviceID, result.BeforeCaps, result.AfterCaps)
-			if len(effects) > 0 {
-				out = append(out, effects...)
-			}
-		}
-		return out, nil
+		return h.handleCapabilitySnapshotMessage(ctx, msg.CapabilitySnap)
 	case msg.CapabilityDelta != nil:
-		h.metrics.capabilityReceived.Add(1)
-		result, err := h.capabilityLifecycle.HandleDelta(ctx, *msg.CapabilityDelta)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		out := result.Messages
-		effects := h.handleCapabilityChangeEffects(ctx, result.DeviceID, result.BeforeCaps, result.AfterCaps)
-		if len(effects) > 0 {
-			out = append(out, effects...)
-		}
-		return out, nil
+		return h.handleCapabilityDeltaMessage(ctx, msg.CapabilityDelta)
 	case msg.Register != nil:
-		h.metrics.registerReceived.Add(1)
-		resp, err := h.capabilityLifecycle.HandleRegister(ctx, *msg.Register)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		deviceID := msg.Register.DeviceID
-		storedUI, hasUI := h.uiSession.LastSetUI(deviceID)
-		h.mu.Lock()
-		_, hasOverlay := h.menuOverlayByDevice[deviceID]
-		h.mu.Unlock()
-
-		out := []ServerMessage{
-			{RegisterAck: &resp},
-		}
-		if hasUI {
-			out = append(out, ServerMessage{SetUI: &storedUI})
-		} else {
-			out = append(out, ServerMessage{SetUI: &resp.Initial})
-			h.uiSession.RememberSetUI(deviceID, out)
-		}
-		if hasOverlay {
-			out = append(out, ServerMessage{
-				UpdateUI: &UIUpdate{
-					ComponentID: ui.GlobalOverlayComponentID,
-					Node:        h.menuOverlayDescriptor(deviceID),
-				},
-			})
-		}
-		out = append(out, h.routeReplay.MessagesForDevice(deviceID, h.routeSnapshotForDevice(deviceID), false)...)
-		return out, nil
+		return h.handleRegisterMessage(ctx, msg.Register)
 	case msg.Capability != nil:
-		h.metrics.capabilityReceived.Add(1)
-		err := h.capabilityLifecycle.HandleUpdateCapabilities(ctx, *msg.Capability)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		return nil, nil
+		return h.handleCapabilityUpdateMessage(ctx, msg.Capability)
 	case msg.Heartbeat != nil:
-		h.metrics.heartbeatReceived.Add(1)
-		err := h.control.Heartbeat(ctx, msg.Heartbeat.DeviceID)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		out := make([]ServerMessage, 0, 2)
-		update, pollErr := h.pollTerminalOutput(msg.Heartbeat.DeviceID, false)
-		if pollErr != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(pollErr), Error: pollErr.Error()}}, pollErr
-		}
-		if update != nil {
-			out = append(out, *update)
-		}
-		if photoRotate := h.photoFrameHeartbeatUpdate(msg.Heartbeat.DeviceID); photoRotate != nil {
-			out = append(out, *photoRotate)
-		}
-		uiMessages := h.uiHostMessagesForDevice(msg.Heartbeat.DeviceID)
-		if len(uiMessages) > 0 {
-			out = append(out, uiMessages...)
-		}
-		if len(out) > 0 {
-			h.uiSession.RememberSetUI(msg.Heartbeat.DeviceID, out)
-			return out, nil
-		}
-		return nil, nil
+		return h.handleHeartbeatMessage(ctx, msg.Heartbeat)
 	case msg.Sensor != nil:
-		h.metrics.sensorReceived.Add(1)
-		beforeBroadcastEvents := h.broadcastEventCount()
-		h.recordSensorData(msg.Sensor)
-		if h.runtime != nil {
-			values := map[string]float64{}
-			for key, value := range msg.Sensor.Values {
-				values[key] = value
-			}
-			if err := h.runtime.ProcessSensorReading(ctx, scenario.SensorReading{
-				DeviceID: strings.TrimSpace(msg.Sensor.DeviceID),
-				UnixMS:   msg.Sensor.UnixMS,
-				Values:   values,
-			}); err != nil {
-				h.metrics.protocolErrors.Add(1)
-				return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-			}
-		}
-		out := h.broadcastNotificationsSince(beforeBroadcastEvents, msg.Sensor.DeviceID, true)
-		if len(out) == 0 {
-			return nil, nil
-		}
-		return out, nil
+		return h.handleSensorMessage(ctx, msg.Sensor)
 	case msg.Observation != nil:
-		if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Observe != nil {
-			if sink, ok := h.runtime.Env.Observe.(interface {
-				AddObservation(context.Context, iorouter.Observation)
-			}); ok {
-				sink.AddObservation(ctx, msg.Observation.Observation)
-			}
-		}
+		h.handleObservationMessage(ctx, msg.Observation)
 		return nil, nil
 	case msg.ArtifactReady != nil:
-		if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Observe != nil {
-			if sink, ok := h.runtime.Env.Observe.(interface {
-				AddObservation(context.Context, iorouter.Observation)
-			}); ok {
-				sink.AddObservation(ctx, iorouter.Observation{
-					Kind:       "artifact.available",
-					OccurredAt: time.Now().UTC(),
-					Evidence:   []iorouter.ArtifactRef{msg.ArtifactReady.Artifact},
-				})
-			}
-		}
+		h.handleArtifactReadyMessage(ctx, msg.ArtifactReady)
 		return nil, nil
 	case msg.FlowStats != nil:
-		eventlog.Emit(ctx, "io.flow.stats", slog.LevelInfo, "flow stats received",
-			slog.String("component", "io.flow"),
-			slog.String("flow_id", strings.TrimSpace(msg.FlowStats.FlowID)),
-			slog.Float64("cpu_pct", msg.FlowStats.CPUPct),
-			slog.Float64("mem_mb", msg.FlowStats.MemMB),
-			slog.Uint64("dropped_frames", msg.FlowStats.DroppedFrames),
-			slog.String("state", strings.TrimSpace(msg.FlowStats.State)),
-			slog.String("error", strings.TrimSpace(msg.FlowStats.Error)),
-		)
+		h.handleFlowStatsMessage(ctx, msg.FlowStats)
 		return nil, nil
 	case msg.ClockSample != nil:
-		eventlog.Emit(ctx, "io.flow.stats", slog.LevelDebug, "clock sample received",
-			slog.String("component", "io.flow"),
-			slog.String("device_id", strings.TrimSpace(msg.ClockSample.DeviceID)),
-			slog.Float64("error_ms", msg.ClockSample.ErrorMS),
-			slog.Int64("client_unix_ms", msg.ClockSample.ClientUnixMS),
-			slog.Int64("server_unix_ms", msg.ClockSample.ServerUnixMS),
-		)
+		h.handleClockSampleMessage(ctx, msg.ClockSample)
 		return nil, nil
 	case msg.StreamReady != nil:
-		h.metrics.streamReadyReceived.Add(1)
-		h.markStreamReady(msg.StreamReady.StreamID)
-		return nil, nil
+		return h.handleStreamReadyMessage(msg.StreamReady)
 	case msg.WebRTCSignal != nil:
-		h.metrics.webrtcSignalReceived.Add(1)
-		return h.handleWebRTCSignal(ctx, msg.WebRTCSignal, msg.SessionDeviceID), nil
+		return h.handleWebRTCSignalMessage(ctx, msg.WebRTCSignal, msg.SessionDeviceID)
 	case msg.VoiceAudio != nil:
-		h.metrics.voiceAudioReceived.Add(1)
-		if h.shouldDropMainStreamWhileOverlayOpen(strings.TrimSpace(msg.VoiceAudio.DeviceID), overlayStreamAudio) {
-			return nil, nil
-		}
-		out, err := h.handleVoiceAudio(ctx, msg.VoiceAudio)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		return out, nil
+		return h.handleVoiceAudioMessage(ctx, msg.VoiceAudio)
 	case msg.Input != nil:
-		out, err := h.handleInput(ctx, msg.Input)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		h.uiSession.RememberSetUI(msg.Input.DeviceID, out)
-		return out, nil
+		return h.handleInputMessage(ctx, msg.Input)
 	case msg.Command != nil:
 		return h.commandDispatcher.Dispatch(ctx, msg.Command)
 	case msg.BugReport != nil:
-		response, err := h.diagnostics.HandleBugReport(ctx, msg.BugReport)
-		if err != nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		return []ServerMessage{response}, nil
+		return h.handleBugReportMessage(ctx, msg.BugReport)
 	default:
-		h.metrics.protocolErrors.Add(1)
-		return []ServerMessage{{ErrorCode: errorCodeFor(ErrInvalidClientMessage), Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
+		return h.protocolError(ErrInvalidClientMessage)
 	}
+}
+
+func (h *StreamHandler) protocolError(err error) ([]ServerMessage, error) {
+	h.metrics.protocolErrors.Add(1)
+	return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
+}
+
+// Capability lifecycle dispatch stays in StreamHandler because reconnect UI,
+// overlay replay, route replay, and capability-change effects cross subsystem
+// boundaries even though capability persistence lives in CapabilityLifecycle.
+func (h *StreamHandler) handleHelloMessage(ctx context.Context, req *HelloRequest) ([]ServerMessage, error) {
+	out, err := h.capabilityLifecycle.HandleHello(ctx, *req)
+	if err != nil {
+		return h.protocolError(err)
+	}
+	return out, nil
+}
+
+func (h *StreamHandler) handleCapabilitySnapshotMessage(ctx context.Context, req *CapabilitySnapshotRequest) ([]ServerMessage, error) {
+	h.metrics.capabilityReceived.Add(1)
+	result, err := h.capabilityLifecycle.HandleSnapshot(ctx, *req)
+	if err != nil {
+		return h.protocolError(err)
+	}
+	out := result.Messages
+	deviceID := result.DeviceID
+	storedUI, hasUI := h.uiSession.LastSetUI(deviceID)
+	hasOverlay := h.hasMenuOverlay(deviceID)
+
+	if !result.HadPriorDevice || hasUI {
+		if hasUI {
+			out = append(out, ServerMessage{SetUI: &storedUI})
+		} else {
+			initial := ui.HelloWorld(result.AfterDeviceName)
+			result.RegisterAck.Initial = initial
+			out = append(out, ServerMessage{SetUI: &initial})
+			h.uiSession.RememberSetUI(deviceID, out)
+		}
+		out = h.appendOverlayReplay(out, deviceID, hasOverlay)
+		out = append(out, h.routeReplay.MessagesForDevice(deviceID, h.routeSnapshotForDevice(deviceID), true)...)
+	}
+	if !result.IsInitialBaseline {
+		effects := h.handleCapabilityChangeEffects(ctx, deviceID, result.BeforeCaps, result.AfterCaps)
+		if len(effects) > 0 {
+			out = append(out, effects...)
+		}
+	}
+	return out, nil
+}
+
+func (h *StreamHandler) handleCapabilityDeltaMessage(ctx context.Context, req *CapabilityDeltaRequest) ([]ServerMessage, error) {
+	h.metrics.capabilityReceived.Add(1)
+	result, err := h.capabilityLifecycle.HandleDelta(ctx, *req)
+	if err != nil {
+		return h.protocolError(err)
+	}
+	out := result.Messages
+	effects := h.handleCapabilityChangeEffects(ctx, result.DeviceID, result.BeforeCaps, result.AfterCaps)
+	if len(effects) > 0 {
+		out = append(out, effects...)
+	}
+	return out, nil
+}
+
+func (h *StreamHandler) handleRegisterMessage(ctx context.Context, req *RegisterRequest) ([]ServerMessage, error) {
+	h.metrics.registerReceived.Add(1)
+	resp, err := h.capabilityLifecycle.HandleRegister(ctx, *req)
+	if err != nil {
+		return h.protocolError(err)
+	}
+	deviceID := req.DeviceID
+	storedUI, hasUI := h.uiSession.LastSetUI(deviceID)
+	hasOverlay := h.hasMenuOverlay(deviceID)
+
+	out := []ServerMessage{{RegisterAck: &resp}}
+	if hasUI {
+		out = append(out, ServerMessage{SetUI: &storedUI})
+	} else {
+		out = append(out, ServerMessage{SetUI: &resp.Initial})
+		h.uiSession.RememberSetUI(deviceID, out)
+	}
+	out = h.appendOverlayReplay(out, deviceID, hasOverlay)
+	out = append(out, h.routeReplay.MessagesForDevice(deviceID, h.routeSnapshotForDevice(deviceID), false)...)
+	return out, nil
+}
+
+func (h *StreamHandler) handleCapabilityUpdateMessage(ctx context.Context, req *CapabilityUpdateRequest) ([]ServerMessage, error) {
+	h.metrics.capabilityReceived.Add(1)
+	if err := h.capabilityLifecycle.HandleUpdateCapabilities(ctx, *req); err != nil {
+		return h.protocolError(err)
+	}
+	return nil, nil
+}
+
+func (h *StreamHandler) hasMenuOverlay(deviceID string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, ok := h.menuOverlayByDevice[deviceID]
+	return ok
+}
+
+func (h *StreamHandler) appendOverlayReplay(out []ServerMessage, deviceID string, hasOverlay bool) []ServerMessage {
+	if !hasOverlay {
+		return out
+	}
+	return append(out, ServerMessage{
+		UpdateUI: &UIUpdate{
+			ComponentID: ui.GlobalOverlayComponentID,
+			Node:        h.menuOverlayDescriptor(deviceID),
+		},
+	})
+}
+
+// Heartbeat dispatch coordinates terminal polling, scenario UI host updates,
+// and lightweight scenario heartbeat work. The durable per-device UI snapshot
+// remains owned by UISessionState.
+func (h *StreamHandler) handleHeartbeatMessage(ctx context.Context, req *HeartbeatRequest) ([]ServerMessage, error) {
+	h.metrics.heartbeatReceived.Add(1)
+	if err := h.control.Heartbeat(ctx, req.DeviceID); err != nil {
+		return h.protocolError(err)
+	}
+	out := make([]ServerMessage, 0, 2)
+	update, pollErr := h.pollTerminalOutput(req.DeviceID, false)
+	if pollErr != nil {
+		return h.protocolError(pollErr)
+	}
+	if update != nil {
+		out = append(out, *update)
+	}
+	if photoRotate := h.photoFrameHeartbeatUpdate(req.DeviceID); photoRotate != nil {
+		out = append(out, *photoRotate)
+	}
+	uiMessages := h.uiHostMessagesForDevice(req.DeviceID)
+	if len(uiMessages) > 0 {
+		out = append(out, uiMessages...)
+	}
+	if len(out) > 0 {
+		h.uiSession.RememberSetUI(req.DeviceID, out)
+		return out, nil
+	}
+	return nil, nil
+}
+
+// Telemetry and observation dispatch stay intentionally thin: StreamHandler
+// translates transport messages into runtime sinks or event-log records, while
+// the runtime/observer owns downstream semantics.
+func (h *StreamHandler) handleSensorMessage(ctx context.Context, req *SensorDataRequest) ([]ServerMessage, error) {
+	h.metrics.sensorReceived.Add(1)
+	beforeBroadcastEvents := h.broadcastEventCount()
+	h.recordSensorData(req)
+	if h.runtime != nil {
+		values := map[string]float64{}
+		for key, value := range req.Values {
+			values[key] = value
+		}
+		if err := h.runtime.ProcessSensorReading(ctx, scenario.SensorReading{
+			DeviceID: strings.TrimSpace(req.DeviceID),
+			UnixMS:   req.UnixMS,
+			Values:   values,
+		}); err != nil {
+			return h.protocolError(err)
+		}
+	}
+	out := h.broadcastNotificationsSince(beforeBroadcastEvents, req.DeviceID, true)
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
+}
+
+func (h *StreamHandler) handleObservationMessage(ctx context.Context, req *ObservationRequest) {
+	if sink, ok := h.observationSink(); ok {
+		sink.AddObservation(ctx, req.Observation)
+	}
+}
+
+func (h *StreamHandler) handleArtifactReadyMessage(ctx context.Context, req *ArtifactAvailableRequest) {
+	if sink, ok := h.observationSink(); ok {
+		sink.AddObservation(ctx, iorouter.Observation{
+			Kind:       "artifact.available",
+			OccurredAt: time.Now().UTC(),
+			Evidence:   []iorouter.ArtifactRef{req.Artifact},
+		})
+	}
+}
+
+func (h *StreamHandler) observationSink() (observationSink, bool) {
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.Observe == nil {
+		return nil, false
+	}
+	sink, ok := h.runtime.Env.Observe.(observationSink)
+	return sink, ok
+}
+
+func (h *StreamHandler) handleFlowStatsMessage(ctx context.Context, req *FlowStatsRequest) {
+	eventlog.Emit(ctx, "io.flow.stats", slog.LevelInfo, "flow stats received",
+		slog.String("component", "io.flow"),
+		slog.String("flow_id", strings.TrimSpace(req.FlowID)),
+		slog.Float64("cpu_pct", req.CPUPct),
+		slog.Float64("mem_mb", req.MemMB),
+		slog.Uint64("dropped_frames", req.DroppedFrames),
+		slog.String("state", strings.TrimSpace(req.State)),
+		slog.String("error", strings.TrimSpace(req.Error)),
+	)
+}
+
+func (h *StreamHandler) handleClockSampleMessage(ctx context.Context, req *ClockSampleRequest) {
+	eventlog.Emit(ctx, "io.flow.stats", slog.LevelDebug, "clock sample received",
+		slog.String("component", "io.flow"),
+		slog.String("device_id", strings.TrimSpace(req.DeviceID)),
+		slog.Float64("error_ms", req.ErrorMS),
+		slog.Int64("client_unix_ms", req.ClientUnixMS),
+		slog.Int64("server_unix_ms", req.ServerUnixMS),
+	)
+}
+
+// Media, voice, and UI input dispatch routes transport events to the
+// collaborators that now own mutable media and voice state. StreamHandler keeps
+// protocol metrics, overlay admission policy, and wire error mapping.
+func (h *StreamHandler) handleStreamReadyMessage(req *StreamReadyRequest) ([]ServerMessage, error) {
+	h.metrics.streamReadyReceived.Add(1)
+	h.markStreamReady(req.StreamID)
+	return nil, nil
+}
+
+func (h *StreamHandler) handleWebRTCSignalMessage(ctx context.Context, req *WebRTCSignalRequest, sessionDeviceID string) ([]ServerMessage, error) {
+	h.metrics.webrtcSignalReceived.Add(1)
+	return h.handleWebRTCSignal(ctx, req, sessionDeviceID), nil
+}
+
+func (h *StreamHandler) handleVoiceAudioMessage(ctx context.Context, req *VoiceAudioRequest) ([]ServerMessage, error) {
+	h.metrics.voiceAudioReceived.Add(1)
+	if h.shouldDropMainStreamWhileOverlayOpen(strings.TrimSpace(req.DeviceID), overlayStreamAudio) {
+		return nil, nil
+	}
+	out, err := h.handleVoiceAudio(ctx, req)
+	if err != nil {
+		return h.protocolError(err)
+	}
+	return out, nil
+}
+
+func (h *StreamHandler) handleInputMessage(ctx context.Context, req *InputRequest) ([]ServerMessage, error) {
+	out, err := h.handleInput(ctx, req)
+	if err != nil {
+		return h.protocolError(err)
+	}
+	h.uiSession.RememberSetUI(req.DeviceID, out)
+	return out, nil
+}
+
+func (h *StreamHandler) handleBugReportMessage(ctx context.Context, report *diagnosticsv1.BugReport) ([]ServerMessage, error) {
+	response, err := h.diagnostics.HandleBugReport(ctx, report)
+	if err != nil {
+		return h.protocolError(err)
+	}
+	return []ServerMessage{response}, nil
 }
 
 func (h *StreamHandler) handleCapabilityChangeEffects(

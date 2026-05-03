@@ -21,6 +21,7 @@ type MediaControlState struct {
 	webrtc    WebRTCSignalEngine
 }
 
+// NewMediaControlState returns media state with no-op recording defaults.
 func NewMediaControlState() *MediaControlState {
 	return &MediaControlState{
 		streams:   map[string]mediaStreamState{},
@@ -28,6 +29,7 @@ func NewMediaControlState() *MediaControlState {
 	}
 }
 
+// SetRecordingManager replaces the recording lifecycle manager.
 func (m *MediaControlState) SetRecordingManager(mgr recording.Manager) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -38,18 +40,21 @@ func (m *MediaControlState) SetRecordingManager(mgr recording.Manager) {
 	m.recording = mgr
 }
 
+// SetWebRTCSignalEngine replaces the server-managed WebRTC signaling engine.
 func (m *MediaControlState) SetWebRTCSignalEngine(engine WebRTCSignalEngine) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.webrtc = engine
 }
 
+// CurrentRecordingManager returns the currently configured recording manager.
 func (m *MediaControlState) CurrentRecordingManager() recording.Manager {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.recording
 }
 
+// ServerManagedSignalEngine returns the WebRTC engine for a server-managed stream.
 func (m *MediaControlState) ServerManagedSignalEngine(streamID string) (WebRTCSignalEngine, bool) {
 	streamID = strings.TrimSpace(streamID)
 	if streamID == "" {
@@ -68,6 +73,7 @@ func (m *MediaControlState) ServerManagedSignalEngine(streamID string) (WebRTCSi
 	return m.webrtc, mode == "server_managed"
 }
 
+// PeerDeviceForStream returns the device at the other end of a stream.
 func (m *MediaControlState) PeerDeviceForStream(streamID, sourceDeviceID string) string {
 	streamID = strings.TrimSpace(streamID)
 	sourceDeviceID = strings.TrimSpace(sourceDeviceID)
@@ -87,6 +93,7 @@ func (m *MediaControlState) PeerDeviceForStream(streamID, sourceDeviceID string)
 	return ""
 }
 
+// RegisterStream records a media stream and starts recording hooks.
 func (m *MediaControlState) RegisterStream(start StartStreamResponse) {
 	streamID := strings.TrimSpace(start.StreamID)
 	if streamID == "" {
@@ -121,6 +128,7 @@ func (m *MediaControlState) RegisterStream(start StartStreamResponse) {
 	}
 }
 
+// UnregisterStream removes a media stream and stops recording/signaling hooks.
 func (m *MediaControlState) UnregisterStream(streamID string) {
 	streamID = strings.TrimSpace(streamID)
 	if streamID == "" {
@@ -140,6 +148,7 @@ func (m *MediaControlState) UnregisterStream(streamID string) {
 	}
 }
 
+// MarkStreamReady records that the client has established a media stream.
 func (m *MediaControlState) MarkStreamReady(streamID string) {
 	streamID = strings.TrimSpace(streamID)
 	if streamID == "" {
@@ -158,6 +167,7 @@ func (m *MediaControlState) MarkStreamReady(streamID string) {
 	m.mu.Unlock()
 }
 
+// MediaStreamStatusData returns status values for active media streams.
 func (m *MediaControlState) MediaStreamStatusData() map[string]string {
 	streams := m.streamSnapshot()
 
@@ -189,6 +199,7 @@ func (m *MediaControlState) MediaStreamStatusData() map[string]string {
 	}
 }
 
+// RecordingStatusData returns status values for active recordings.
 func (m *MediaControlState) RecordingStatusData() map[string]string {
 	recorder := m.CurrentRecordingManager()
 	activeReader, ok := recorder.(interface {
@@ -212,6 +223,7 @@ func (m *MediaControlState) RecordingStatusData() map[string]string {
 	}
 }
 
+// RecentRecordingEvents returns recent recorder events when the manager supports them.
 func (m *MediaControlState) RecentRecordingEvents(limit int) []recording.Event {
 	recorder := m.CurrentRecordingManager()
 	eventReader, ok := recorder.(interface {
@@ -223,6 +235,7 @@ func (m *MediaControlState) RecentRecordingEvents(limit int) []recording.Event {
 	return eventReader.RecentEvents(limit)
 }
 
+// ListPlaybackArtifacts returns sorted artifacts available for playback.
 func (m *MediaControlState) ListPlaybackArtifacts() []recording.Artifact {
 	recorder := m.CurrentRecordingManager()
 	lister, ok := recorder.(interface {
@@ -243,6 +256,7 @@ func (m *MediaControlState) ListPlaybackArtifacts() []recording.Artifact {
 	return out
 }
 
+// PlaybackMetadataForTarget returns playback metadata for a target device.
 func (m *MediaControlState) PlaybackMetadataForTarget(artifactID, targetDeviceID string) (recording.PlaybackMetadata, bool) {
 	recorder := m.CurrentRecordingManager()
 	provider, ok := recorder.(interface {

@@ -53,9 +53,9 @@ func TestHandleMessageBugReportIntakeErrorPropagates(t *testing.T) {
 // extracted in Phase 5.
 func TestHandleMessageCommandValidationErrorsReturnSingleErrorResponse(t *testing.T) {
 	cases := []struct {
-		name    string
-		req     *CommandRequest
-		wantErr error
+		name     string
+		req      *CommandRequest
+		wantErr  error
 		wantCode string
 	}{
 		{

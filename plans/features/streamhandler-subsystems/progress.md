@@ -305,3 +305,39 @@ Notes:
 - `control_stream.go` dropped from 4524 → 4374 lines. `media_control_state.go` is 277 lines and `media_control_state_test.go` is 114 lines.
 - No `.proto` changes, no `terminal_client/` changes, no package moves.
 - Plan status stays `building`. Next planned phase is Phase 9 (`HandleMessage` cleanup).
+
+## 2026-05-03 — Phase 9 (PR 10: simplify StreamHandler dispatch)
+
+Status: complete
+
+Changes:
+- Slimmed `StreamHandler.HandleMessage` down to a high-level transport dispatch switch: each branch now delegates to a focused helper for capability lifecycle, heartbeat, telemetry/observations, media/voice/input, or diagnostics.
+- Added `protocolError(err)` to centralize the repeated protocol-error metric increment and `ServerMessage{ErrorCode, Error}` assembly used by non-command branches.
+- Extracted the capability/reconnect replay orchestration into `handleCapabilitySnapshotMessage`, `handleCapabilityDeltaMessage`, `handleRegisterMessage`, and related helpers. Capability persistence still lives in `CapabilityLifecycle`; `StreamHandler` keeps the cross-subsystem replay/effect coordination.
+- Extracted telemetry and observation helpers, including a small package-local `observationSink` interface so observation/artifact-ready routing does not repeat runtime shape checks.
+- Extracted heartbeat, stream-ready, WebRTC signal, voice-audio, input, and bug-report wire handlers. The already-extracted collaborators still own their state; `StreamHandler` keeps metrics, overlay admission policy, and wire error mapping.
+- Cleaned up lint drift from earlier phases: added revive-required comments to exported `MediaControlState` / `VoicePipeline` methods, changed two intentionally-unused test `*testing.T` parameters to `_`, and let `golangci-lint --fix` apply the gofumpt alignment in `control_stream_characterization_test.go`.
+
+Validation:
+- `cd terminal_server && go test ./internal/transport -run 'TestStreamHandlerConstructors|TestHandleMessage|TestControlStream|TestMediaControlState|TestVoicePipeline' -count=1` — pass.
+- `cd terminal_server && go test ./internal/transport -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./... -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test -race ./... -count=1` — pass outside sandbox.
+- `GOCACHE=/tmp/terminals-go-build GOLANGCI_LINT_CACHE=/tmp/terminals-golangci-lint make server-lint` — pass.
+- Initial sandboxed full race run failed before exercising the new code because existing server tests need loopback listeners (`listen tcp 127.0.0.1:0` / `httptest`); rerunning outside the sandbox passed.
+
+Judgment calls:
+- **Kept helpers in `control_stream.go`.** This phase was about making dispatch readable, not adding new ownership seams. Moving helpers to new files would make navigation easier in isolation but would blur the boundary with the existing subsystem files.
+- **Kept command error handling inside `CommandDispatcher`.** The dispatcher already owns command metrics, dedupe, audit records, and command error response shape. Pulling that back into `HandleMessage` would undo the Phase 5 seam.
+- **Kept WebRTC signal errors unchanged.** `handleWebRTCSignal` currently returns only messages and swallows/logs engine errors through the existing response behavior. The new wrapper preserves that exact shape instead of inventing a new error path.
+- **Used a tiny `observationSink` interface.** This removes duplicated anonymous type assertions while keeping observation intake transport-local and runtime-agnostic.
+
+Moved vs. stayed:
+- Moved (within `control_stream.go` helpers): repeated branch bodies for hello/register/capability snapshot/delta/update, heartbeat, sensor, observation/artifact-ready, flow stats, clock samples, stream-ready, WebRTC signal, voice audio, input, and bug report.
+- Stayed (state): no new state moved in this phase.
+- Stayed (behavior): subsystem collaborators and all cross-subsystem orchestration remain under `StreamHandler`; no `.proto` changes, no `terminal_client/` changes, no package moves.
+
+Notes:
+- `control_stream.go` is now 4447 lines after dispatch cleanup and lint-formatting.
+- `make server-lint` is now clean; earlier Phase 8/7 revive comments and two test unused-parameter warnings were resolved as part of this finish pass.
+- Plan status remains `building`. The only remaining planned work is optional Phase 10 package moves; no package move is currently justified by this phase.

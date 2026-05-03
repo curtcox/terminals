@@ -23,6 +23,7 @@ type VoicePipeline struct {
 	deviceAudio DeviceAudioPublisher
 }
 
+// NewVoicePipeline returns a voice pipeline bound to handler.
 func NewVoicePipeline(handler *StreamHandler) *VoicePipeline {
 	return &VoicePipeline{
 		handler: handler,
@@ -30,6 +31,7 @@ func NewVoicePipeline(handler *StreamHandler) *VoicePipeline {
 	}
 }
 
+// SetDeviceAudioPublisher replaces the live mic-audio publisher.
 func (p *VoicePipeline) SetDeviceAudioPublisher(pub DeviceAudioPublisher) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
