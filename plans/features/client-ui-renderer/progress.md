@@ -2,6 +2,38 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by moving generic renderer-action protobuf translation
+  into `terminal_client/lib/connection/control_session_controller.dart`.
+- Added `buildUiActionInputRequest` so `ServerDrivenAction` values flow from
+  the renderer into `iov1.UIAction` outside the app shell.
+- Added `buildKeyInputRequest` for terminal key input request construction,
+  further reducing protobuf request assembly in
+  `terminal_client/lib/app/terminal_client_shell.dart`.
+- Preserved shell-owned local intercepts for privacy toggles and bug-report
+  actions before forwarding ordinary UI actions through the connection helper.
+- Added focused controller tests for UI action and key input request building.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed lib/connection/control_session_controller.dart lib/app/terminal_client_shell.dart test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+- An earlier mixed `test/diagnostics test/capabilities test/connection` attempt
+  was blocked by sandboxed DNS while pub tried to update package advisories
+  before running tests; the focused and full `test/connection` runs passed
+  afterward.
+
+## 2026-05-03
+
 - Continued Phase 5 by moving pure carrier target resolution, carrier label
   formatting, gRPC discovered-port parsing, and carrier endpoint display labels
   out of `TerminalClientShell` and into

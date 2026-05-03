@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/connection/control_session_controller.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/ui/server_driven_action.dart';
 
 void main() {
   test('reconnect delay grows exponentially and caps at max', () {
@@ -173,6 +174,32 @@ void main() {
     expect(request.command.action, CommandAction.COMMAND_ACTION_START);
     expect(request.command.kind, CommandKind.COMMAND_KIND_MANUAL);
     expect(request.command.intent, 'dashboard');
+  });
+
+  test('translates server-driven renderer actions into UIAction input', () {
+    final request = buildUiActionInputRequest(
+      deviceID: 'terminal-a',
+      action: const ServerDrivenAction(
+        componentId: 'volume',
+        action: 'change',
+        value: '0.75',
+      ),
+    );
+
+    expect(request.input.deviceId, 'terminal-a');
+    expect(request.input.uiAction.componentId, 'volume');
+    expect(request.input.uiAction.action, 'change');
+    expect(request.input.uiAction.value, '0.75');
+  });
+
+  test('builds key input requests outside the app shell', () {
+    final request = buildKeyInputRequest(
+      deviceID: 'terminal-a',
+      text: 'hello',
+    );
+
+    expect(request.input.deviceId, 'terminal-a');
+    expect(request.input.key.text, 'hello');
   });
 
   test('builds playback diagnostics requests', () {

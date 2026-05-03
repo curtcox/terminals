@@ -3094,11 +3094,7 @@ class _TerminalClientShellState extends State<TerminalClientShell>
   }
 
   Future<void> _handleServerDrivenAction(ServerDrivenAction action) async {
-    await _sendUiAction(
-      componentId: action.componentId,
-      action: action.action,
-      value: action.value,
-    );
+    await _sendUiAction(action);
   }
 
   ServerDrivenTextInputBinding? _textInputBindingForComponent(
@@ -3662,41 +3658,34 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     );
   }
 
-  Future<void> _sendUiAction({
-    required String componentId,
-    required String action,
-    required String value,
-  }) async {
+  Future<void> _sendUiAction(ServerDrivenAction action) async {
     if (_deviceId.isEmpty) {
       return;
     }
     _recordUiAction(
-      componentId: componentId,
-      action: action,
-      value: value,
+      componentId: action.componentId,
+      action: action.action,
+      value: action.value,
     );
-    if (action == 'privacy.toggle') {
+    if (action.action == 'privacy.toggle') {
       await _handlePrivacyToggleAction();
       return;
     }
-    if (action.startsWith(bugReportActionPrefix)) {
+    if (action.action.startsWith(bugReportActionPrefix)) {
       await _submitBugReportFromAction(
-        componentId: componentId,
-        action: action,
-        value: value,
+        componentId: action.componentId,
+        action: action.action,
+        value: action.value,
       );
       return;
     }
     unawaited(
       _sendWhenReady(
         operation: OutboundOperation.uiAction,
-        request: ConnectRequest()
-          ..input = (iov1.InputEvent()
-            ..deviceId = _deviceId
-            ..uiAction = (iov1.UIAction()
-              ..componentId = componentId
-              ..action = action
-              ..value = value)),
+        request: buildUiActionInputRequest(
+          deviceID: _deviceId,
+          action: action,
+        ),
       ),
     );
   }
@@ -3712,10 +3701,7 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     unawaited(
       _sendWhenReady(
         operation: OutboundOperation.keyEvent,
-        request: ConnectRequest()
-          ..input = (iov1.InputEvent()
-            ..deviceId = _deviceId
-            ..key = (iov1.KeyEvent()..text = text)),
+        request: buildKeyInputRequest(deviceID: _deviceId, text: text),
       ),
     );
   }

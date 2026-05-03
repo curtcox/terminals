@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
+import 'package:terminal_client/ui/server_driven_action.dart';
 
 Duration calculateReconnectDelay({
   required int reconnectAttempt,
@@ -207,6 +209,29 @@ ConnectRequest buildApplicationLaunchCommandRequest({
       ..action = CommandAction.COMMAND_ACTION_START
       ..kind = CommandKind.COMMAND_KIND_MANUAL
       ..intent = intent);
+}
+
+ConnectRequest buildUiActionInputRequest({
+  required String deviceID,
+  required ServerDrivenAction action,
+}) {
+  return ConnectRequest()
+    ..input = (iov1.InputEvent()
+      ..deviceId = deviceID
+      ..uiAction = (iov1.UIAction()
+        ..componentId = action.componentId
+        ..action = action.action
+        ..value = action.value));
+}
+
+ConnectRequest buildKeyInputRequest({
+  required String deviceID,
+  required String text,
+}) {
+  return ConnectRequest()
+    ..input = (iov1.InputEvent()
+      ..deviceId = deviceID
+      ..key = (iov1.KeyEvent()..text = text));
 }
 
 ConnectRequest buildPlaybackArtifactsQueryRequest(String requestID) {
