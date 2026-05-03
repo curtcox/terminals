@@ -791,7 +791,7 @@ cd terminal_client && dart format --set-exit-if-changed .
 
 ### Phase 7: Boundary Enforcement and Documentation
 
-Status: not started
+Status: in progress
 
 Tasks:
 

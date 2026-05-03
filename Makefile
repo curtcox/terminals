@@ -9,7 +9,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
-	client-test client-lint client-coverage \
+	client-test client-lint client-boundary client-coverage \
 	proto-lint proto-breaking proto-generate \
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
 	all-lint all-test all-check stop-server stop-server-test run-server run-client-web \
@@ -102,6 +102,9 @@ client-test:
 client-lint:
 	cd terminal_client && flutter analyze && dart format --set-exit-if-changed .
 
+client-boundary:
+	./scripts/check-client-boundary.sh
+
 client-coverage:
 	cd terminal_client && flutter test --coverage
 
@@ -136,7 +139,7 @@ pick-next-work:
 next:
 	@python3 ./scripts/next.py
 
-all-lint: server-lint client-lint proto-lint
+all-lint: server-lint client-lint client-boundary proto-lint
 
 all-test: server-test client-test
 

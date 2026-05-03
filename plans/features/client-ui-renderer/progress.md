@@ -2,6 +2,62 @@
 
 ## 2026-05-03
 
+- Started Phase 7 by adding `docs/client-boundary.md` with the allowed
+  client-owned behavior categories, prohibited scenario/application behavior,
+  and module boundary rules.
+- Added `scripts/check-client-boundary.sh` to scan production Flutter client
+  code for obvious scenario-name and package-ID leakage, excluding generated
+  protobuf output.
+- Wired the boundary scan into `make all-lint` through a new
+  `client-boundary` target.
+- Removed the remaining production client special case for the
+  `photo_frame_asset_base_url` register metadata key; register metadata remains
+  visible through the existing generic diagnostics data surface.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed lib/app/client_dependencies.dart lib/app/terminal_client_app.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
+- Continued Phase 6 by extracting public dependency seams and default app
+  factories from `terminal_client/lib/app/terminal_client_app.dart` into
+  `terminal_client/lib/app/client_dependencies.dart`.
+- Preserved existing test imports by re-exporting the dependency seam module
+  from `terminal_client/lib/app/terminal_client_app.dart`.
+- Kept connection/session behavior in the current app shell for the later
+  Phase 5 controller split.
+
+Validation:
+
+```bash
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed lib/app/client_dependencies.dart lib/app/terminal_client_app.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+- A first formatter attempt without the local `HOME` completed formatting but
+  failed while writing Flutter telemetry outside the workspace; rerunning with
+  the local environment passed.
+
+## 2026-05-03
+
 - Started Phase 3 by extracting terminal-owned diagnostic chrome widgets from
   `terminal_client/lib/app/terminal_client_app.dart` into
   `terminal_client/lib/diagnostics/client_chrome.dart`.

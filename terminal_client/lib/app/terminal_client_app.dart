@@ -6,9 +6,10 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:terminal_client/app/client_dependencies.dart';
 import 'package:terminal_client/capabilities/capability_session.dart';
 import 'package:terminal_client/capabilities/screen_metrics.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/capabilities/probe.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/carrier_preference.dart';
@@ -38,117 +39,10 @@ import 'package:terminal_client/media/webrtc_engine.dart';
 import 'package:terminal_client/ui/server_driven_action.dart';
 import 'package:terminal_client/ui/server_driven_node_key.dart';
 import 'package:terminal_client/ui/server_driven_renderer.dart';
-import 'package:terminal_client/util/alert_delivery.dart';
 import 'package:terminal_client/util/browser_host.dart' as browser_host;
 import 'package:terminal_client/util/speech.dart' as speech;
 
-typedef TerminalControlClientFactory = TerminalControlClient Function({
-  required String host,
-  required int port,
-});
-typedef CapabilityProbeFactory = CapabilityProbe Function();
-typedef ClientMediaEngineFactory = ClientMediaEngine Function({
-  required String localDeviceID,
-  required OutboundSignalCallback onSignal,
-});
-typedef AudioPlaybackFactory = AudioPlayback Function();
-typedef AlertDelivery = void Function({
-  required String title,
-  required String body,
-  required String level,
-});
-typedef UnixMsProvider = int Function();
-typedef BugReportScreenshotCapture = Future<List<int>> Function();
-typedef WakeWordDetectorFactory = WakeWordDetectorController Function();
-typedef MediaPermissionProbe = Future<void> Function({
-  required bool audio,
-  required bool video,
-});
-
-class WakeWordUtterance {
-  const WakeWordUtterance({
-    required this.audio,
-    required this.sampleRate,
-    required this.isFinal,
-  });
-
-  final List<int> audio;
-  final int sampleRate;
-  final bool isFinal;
-}
-
-abstract class WakeWordDetectorController {
-  Future<void> setEnabled(bool enabled);
-  void setOnUtterance(void Function(WakeWordUtterance utterance)? onUtterance);
-  Future<void> dispose();
-}
-
-class NoopWakeWordDetectorController implements WakeWordDetectorController {
-  @override
-  Future<void> setEnabled(bool enabled) async {}
-
-  @override
-  void setOnUtterance(
-      void Function(WakeWordUtterance utterance)? onUtterance) {}
-
-  @override
-  Future<void> dispose() async {}
-}
-
-int _systemNowUnixMs() => DateTime.now().toUtc().millisecondsSinceEpoch;
-
-CapabilityProbe _defaultCapabilityProbeFactory() {
-  final bindingType = WidgetsBinding.instance.runtimeType.toString();
-  if (bindingType.contains('TestWidgetsFlutterBinding')) {
-    return DefaultCapabilityProbe(
-      mediaDeviceInventoryProvider: () async => const <MediaDeviceDescriptor>[],
-    );
-  }
-  return DefaultCapabilityProbe();
-}
-
-AudioPlayback _defaultAudioPlaybackFactory() {
-  final bindingType = WidgetsBinding.instance.runtimeType.toString();
-  if (bindingType.contains('TestWidgetsFlutterBinding')) {
-    return NoopAudioPlayback();
-  }
-  return AudioPlayerPlayback();
-}
-
-final AlertDeliveryService _defaultAlertDeliveryService =
-    AlertDeliveryService();
-
-void _defaultAlertDelivery({
-  required String title,
-  required String body,
-  required String level,
-}) {
-  _defaultAlertDeliveryService.deliver(
-    title: title,
-    body: body,
-    level: level,
-  );
-}
-
-WakeWordDetectorController _defaultWakeWordDetectorFactory() {
-  return NoopWakeWordDetectorController();
-}
-
-Future<void> _defaultMediaPermissionProbe({
-  required bool audio,
-  required bool video,
-}) async {
-  final stream = await navigator.mediaDevices.getUserMedia(
-    <String, dynamic>{
-      'audio': audio,
-      'video': video,
-    },
-  );
-  for (final track in stream.getTracks()) {
-    track.stop();
-  }
-  await stream.dispose();
-}
+export 'package:terminal_client/app/client_dependencies.dart';
 
 const bool _e2eEmitEvents = bool.fromEnvironment(
   'TERMINALS_E2E_EMIT_EVENTS',
@@ -190,8 +84,6 @@ const String _buildDate = String.fromEnvironment(
   'TERMINALS_BUILD_DATE',
   defaultValue: 'unknown',
 );
-const String _registerMetadataPhotoFrameBaseURLKey =
-    'photo_frame_asset_base_url';
 const String _registerMetadataServerBuildShaKey = 'server_build_sha';
 const String _registerMetadataServerBuildDateKey = 'server_build_date';
 const String _bugReportActionPrefix = 'bug_report';
@@ -552,23 +444,23 @@ class _ConnectionTarget {
 class TerminalClientApp extends StatelessWidget {
   const TerminalClientApp({
     super.key,
-    this.clientFactory = createTerminalControlClient,
-    this.capabilityProbeFactory = _defaultCapabilityProbeFactory,
+    this.clientFactory = defaultTerminalControlClientFactory,
+    this.capabilityProbeFactory = defaultCapabilityProbeFactory,
     this.mediaEngineFactory = defaultClientMediaEngineFactory,
-    this.audioPlaybackFactory = _defaultAudioPlaybackFactory,
-    this.alertDelivery = _defaultAlertDelivery,
+    this.audioPlaybackFactory = defaultAudioPlaybackFactory,
+    this.alertDelivery = defaultAlertDelivery,
     this.heartbeatInterval = const Duration(seconds: 10),
     this.sensorTelemetryInterval = const Duration(seconds: 15),
     this.reconnectDelayBase = const Duration(seconds: 2),
     this.reconnectDelayMaxSeconds = 30,
-    this.nowUnixMsProvider = _systemNowUnixMs,
+    this.nowUnixMsProvider = defaultUnixMsProvider,
     this.autoConnectOnStartup = _autoConnectOnStartupDefault,
-    this.wakeWordDetectorFactory = _defaultWakeWordDetectorFactory,
+    this.wakeWordDetectorFactory = defaultWakeWordDetectorFactory,
     this.bugReportScreenshotCapture,
     this.screenMetricsProvider,
     this.screenMetricsChangeListenable,
     this.displayGeometryDebounceInterval = kDisplayGeometryDebounceInterval,
-    this.mediaPermissionProbe = _defaultMediaPermissionProbe,
+    this.mediaPermissionProbe = defaultMediaPermissionProbe,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -746,7 +638,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   String _pendingLaunchApplicationIntent = '';
   String _diagnosticsTitle = 'none';
   Map<String, String> _diagnosticsData = <String, String>{};
-  String _photoFrameAssetBaseURL = '';
   String _serverBuildSha = 'unknown';
   String _serverBuildDate = 'unknown';
   final List<diagv1.UiEventEntry> _recentUiEvents = <diagv1.UiEventEntry>[];
@@ -2333,12 +2224,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (metadata.isNotEmpty) {
       _diagnosticsTitle = 'register_ack';
       _diagnosticsData = metadata;
-      final photoBaseURL =
-          metadata[_registerMetadataPhotoFrameBaseURLKey]?.trim() ?? '';
-      if (photoBaseURL.isNotEmpty) {
-        _photoFrameAssetBaseURL = photoBaseURL;
-        _lastNotification = 'Photo frame asset base URL configured';
-      }
     }
   }
 
@@ -3676,9 +3561,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                     SelectableText(
                       'Play audio msgs: $_playAudioCount  Last play bytes: $_lastPlayAudioBytes  Last play target: $_lastPlayAudioDeviceID  Last play source: $_lastPlayAudioSource',
                     ),
-                  if (_photoFrameAssetBaseURL.isNotEmpty)
-                    SelectableText(
-                        'Photo frame assets: $_photoFrameAssetBaseURL'),
                   if (_lastNotification.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text('Notification: $_lastNotification'),
