@@ -85,7 +85,6 @@ const String _buildDate = String.fromEnvironment(
   'TERMINALS_BUILD_DATE',
   defaultValue: 'unknown',
 );
-const String _bugReportActionPrefix = 'bug_report';
 const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
@@ -102,286 +101,6 @@ const RetryPolicy _readinessPolicy = RetryPolicy(
   interval: Duration(milliseconds: 120),
   maxDuration: Duration(seconds: 20),
 );
-
-const List<String> _bugTokenWords = <String>[
-  'ace',
-  'actor',
-  'adapt',
-  'air',
-  'alert',
-  'anchor',
-  'angle',
-  'apple',
-  'artist',
-  'asset',
-  'audio',
-  'autumn',
-  'badge',
-  'balance',
-  'beam',
-  'berry',
-  'beyond',
-  'bicycle',
-  'bird',
-  'blossom',
-  'blue',
-  'board',
-  'book',
-  'breeze',
-  'bridge',
-  'bright',
-  'buffer',
-  'button',
-  'cable',
-  'calm',
-  'camera',
-  'canvas',
-  'captain',
-  'carbon',
-  'care',
-  'center',
-  'chapter',
-  'check',
-  'choice',
-  'circle',
-  'city',
-  'clarity',
-  'clock',
-  'cloud',
-  'coast',
-  'color',
-  'comfort',
-  'compass',
-  'control',
-  'copper',
-  'corner',
-  'cotton',
-  'craft',
-  'credit',
-  'crisp',
-  'current',
-  'cycle',
-  'daily',
-  'dawn',
-  'delta',
-  'design',
-  'detail',
-  'device',
-  'dialog',
-  'dock',
-  'domain',
-  'dream',
-  'drift',
-  'drive',
-  'echo',
-  'edge',
-  'ember',
-  'energy',
-  'engine',
-  'entry',
-  'equal',
-  'estate',
-  'evening',
-  'event',
-  'fabric',
-  'factor',
-  'field',
-  'filter',
-  'final',
-  'flame',
-  'flight',
-  'flower',
-  'focus',
-  'forest',
-  'frame',
-  'fresh',
-  'future',
-  'garden',
-  'gentle',
-  'glide',
-  'glow',
-  'gold',
-  'grain',
-  'graph',
-  'green',
-  'group',
-  'guide',
-  'habit',
-  'harbor',
-  'harmony',
-  'haven',
-  'hero',
-  'horizon',
-  'house',
-  'idea',
-  'image',
-  'index',
-  'island',
-  'item',
-  'jewel',
-  'journey',
-  'keeper',
-  'key',
-  'kind',
-  'kit',
-  'ladder',
-  'lake',
-  'launch',
-  'layer',
-  'leaf',
-  'legend',
-  'level',
-  'light',
-  'limit',
-  'linen',
-  'list',
-  'logic',
-  'lucky',
-  'lumen',
-  'maker',
-  'map',
-  'market',
-  'matrix',
-  'meadow',
-  'memory',
-  'metal',
-  'method',
-  'metric',
-  'midday',
-  'mind',
-  'mirror',
-  'model',
-  'moment',
-  'monsoon',
-  'morning',
-  'motion',
-  'mountain',
-  'music',
-  'native',
-  'nature',
-  'network',
-  'nexus',
-  'night',
-  'noble',
-  'north',
-  'note',
-  'novel',
-  'number',
-  'oak',
-  'object',
-  'ocean',
-  'offer',
-  'omega',
-  'onward',
-  'orbit',
-  'origin',
-  'output',
-  'packet',
-  'page',
-  'panel',
-  'paper',
-  'path',
-  'pearl',
-  'pencil',
-  'pepper',
-  'photo',
-  'pixel',
-  'planet',
-  'plate',
-  'point',
-  'portal',
-  'power',
-  'prairie',
-  'prime',
-  'pulse',
-  'quiet',
-  'rapid',
-  'reader',
-  'record',
-  'reef',
-  'render',
-  'report',
-  'ribbon',
-  'river',
-  'rocket',
-  'root',
-  'round',
-  'route',
-  'sail',
-  'sample',
-  'scale',
-  'scene',
-  'screen',
-  'script',
-  'sea',
-  'seed',
-  'shadow',
-  'signal',
-  'silver',
-  'simple',
-  'sky',
-  'smile',
-  'snow',
-  'solar',
-  'source',
-  'spark',
-  'spirit',
-  'spring',
-  'square',
-  'stable',
-  'stage',
-  'star',
-  'stone',
-  'storm',
-  'story',
-  'stream',
-  'street',
-  'studio',
-  'summer',
-  'sun',
-  'sunset',
-  'switch',
-  'table',
-  'target',
-  'task',
-  'tempo',
-  'text',
-  'thread',
-  'timber',
-  'today',
-  'token',
-  'tower',
-  'trace',
-  'track',
-  'travel',
-  'tree',
-  'trust',
-  'tunnel',
-  'union',
-  'unit',
-  'update',
-  'urban',
-  'value',
-  'vector',
-  'velvet',
-  'view',
-  'vivid',
-  'voice',
-  'wave',
-  'weather',
-  'window',
-  'winter',
-  'wisdom',
-  'wood',
-  'world',
-  'writer',
-  'yard',
-  'year',
-  'yield',
-  'young',
-  'zenith',
-  'zone',
-];
 
 class TerminalClientApp extends StatelessWidget {
   const TerminalClientApp({
@@ -604,11 +323,11 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   ControlCarrierKind? _lastSuccessfulCarrier;
   String _lastBugTokenWord = '';
   String _lastBugTokenCode = '';
-  _BugReceiptState _bugReceiptState = _BugReceiptState.none;
+  BugReceiptChromeState _bugReceiptState = BugReceiptChromeState.none;
   String _bugReceiptDetail = '';
   String _bugReceiptReportId = '';
-  final List<_QueuedBugReport> _queuedBugReports = <_QueuedBugReport>[];
-  final List<_PendingBugReport> _pendingBugReports = <_PendingBugReport>[];
+  final List<QueuedBugReport> _queuedBugReports = <QueuedBugReport>[];
+  final List<PendingBugReport> _pendingBugReports = <PendingBugReport>[];
   Timer? _bugReportAckTimer;
   bool _hasRegisterAck = false;
   FlutterExceptionHandler? _previousFlutterErrorHandler;
@@ -1174,30 +893,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     return lines.join('\n');
   }
 
-  String _sanitizeBugReportIdComponent(String raw) {
-    final normalized = raw
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+'), '')
-        .replaceAll(RegExp(r'-+$'), '');
-    if (normalized.isEmpty) {
-      return 'unknown';
-    }
-    return normalized;
-  }
-
-  String _buildLocalBugReportId({
-    required DateTime now,
-    required _BugIdentifier identifier,
-    required String subjectDeviceID,
-  }) {
-    final reporter = _sanitizeBugReportIdComponent(_deviceId);
-    final subject = _sanitizeBugReportIdComponent(subjectDeviceID);
-    final code = _sanitizeBugReportIdComponent(identifier.code);
-    return 'clientbug-${now.toUtc().millisecondsSinceEpoch}-$reporter-$subject-$code';
-  }
-
   String _bugTransportContextSuffix() {
     final diagnostic = _lastTransportDiagnostic.trim();
     if (diagnostic.isEmpty) {
@@ -1210,13 +905,13 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (_pendingBugReports.isEmpty) {
       return;
     }
-    final pending = List<_PendingBugReport>.from(_pendingBugReports);
+    final pending = List<PendingBugReport>.from(_pendingBugReports);
     _pendingBugReports.clear();
     _queuedBugReports.insertAll(
       0,
       pending
           .map(
-            (item) => _QueuedBugReport(
+            (item) => QueuedBugReport(
               bugReport: item.bugReport.deepCopy(),
               identifier: item.identifier,
               firstQueuedUnixMs: item.firstQueuedUnixMs,
@@ -1239,7 +934,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _status = 'Bug report retry pending';
       _lastNotification =
           'Retrying bug report after transport recovery (word: ${first.identifier.word}, code: ${first.identifier.code}).';
-      _bugReceiptState = _BugReceiptState.waiting;
+      _bugReceiptState = BugReceiptChromeState.waiting;
       _bugReceiptReportId = '';
       _bugReceiptDetail =
           'Still waiting for a positive server receipt for word ${first.identifier.word}, code ${first.identifier.code}. Last failure: $reason';
@@ -1247,23 +942,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   bool _shouldShowFullscreenStatusOverlay() {
-    return _bugReceiptState != _BugReceiptState.none ||
+    return _bugReceiptState != BugReceiptChromeState.none ||
         _lastTransportDiagnostic.trim().isNotEmpty ||
         _lastNotification.trim().isNotEmpty;
   }
 
-  BugReceiptChromeState get _bugReceiptChromeState {
-    switch (_bugReceiptState) {
-      case _BugReceiptState.none:
-        return BugReceiptChromeState.none;
-      case _BugReceiptState.waiting:
-        return BugReceiptChromeState.waiting;
-      case _BugReceiptState.received:
-        return BugReceiptChromeState.received;
-      case _BugReceiptState.error:
-        return BugReceiptChromeState.error;
-    }
-  }
+  BugReceiptChromeState get _bugReceiptChromeState => _bugReceiptState;
 
   Widget _buildTransportStatusCard() {
     return ControlStreamStatusCard(
@@ -2325,15 +2009,16 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     required diagv1.BugReportSource source,
     Map<String, String> sourceHints = const <String, String>{},
     List<String> tags = const <String>[],
-    _BugIdentifier? bugIdentifier,
+    BugIdentifier? bugIdentifier,
   }) async {
     final now = DateTime.now().toLocal();
-    final identifier = bugIdentifier ?? _buildBugIdentifier(now);
+    final identifier = bugIdentifier ?? buildBugIdentifier(now);
     final screenshotPng = await _captureBugReportScreenshot();
     final bugReport = diagv1.BugReport()
-      ..reportId = _buildLocalBugReportId(
+      ..reportId = buildLocalBugReportId(
         now: now,
         identifier: identifier,
+        reporterDeviceID: _deviceId,
         subjectDeviceID: subjectDeviceID,
       )
       ..reporterDeviceId = _deviceId
@@ -2385,7 +2070,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         _status = 'Bug report pending';
         _lastNotification =
             'Submitting bug report (word: ${identifier.word}, code: ${identifier.code}) and waiting for server ack...';
-        _bugReceiptState = _BugReceiptState.waiting;
+        _bugReceiptState = BugReceiptChromeState.waiting;
         _bugReceiptReportId = '';
         _bugReceiptDetail =
             'Waiting for server receipt for word ${identifier.word}, code ${identifier.code}.';
@@ -2394,7 +2079,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
 
     _queuedBugReports.add(
-      _QueuedBugReport(
+      QueuedBugReport(
         bugReport: bugReport.deepCopy(),
         identifier: identifier,
         firstQueuedUnixMs: firstQueuedUnixMs,
@@ -2417,7 +2102,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _status = 'Bug report queued';
       _lastNotification =
           'Bug report queued (word: ${identifier.word}, code: ${identifier.code}). Connecting and will send automatically.';
-      _bugReceiptState = _BugReceiptState.waiting;
+      _bugReceiptState = BugReceiptChromeState.waiting;
       _bugReceiptReportId = '';
       _bugReceiptDetail =
           'Queued and waiting for a positive server receipt for word ${identifier.word}, code ${identifier.code}.';
@@ -2428,8 +2113,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   Future<void> _showBugReportDialog() async {
     final descriptionController = TextEditingController();
     final tagsController = TextEditingController();
-    var draftIdentifier = _buildBugIdentifier(DateTime.now().toLocal());
-    final draft = await showDialog<_BugReportDraft>(
+    var draftIdentifier = buildBugIdentifier(DateTime.now().toLocal());
+    final draft = await showDialog<BugReportDraft>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -2485,7 +2170,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                                 OutlinedButton.icon(
                                   onPressed: () {
                                     setDialogState(() {
-                                      draftIdentifier = _buildBugIdentifier(
+                                      draftIdentifier = buildBugIdentifier(
                                         DateTime.now().toLocal(),
                                       );
                                     });
@@ -2528,7 +2213,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                 FilledButton(
                   onPressed: () {
                     Navigator.of(context).pop(
-                      _BugReportDraft(
+                      BugReportDraft(
                         description: descriptionController.text.trim(),
                         tags: tagsController.text
                             .split(',')
@@ -2622,25 +2307,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     }
   }
 
-  _BugIdentifier _buildBugIdentifier(DateTime nowLocal) {
-    final secondsFromMidnight =
-        nowLocal.hour * 3600 + nowLocal.minute * 60 + nowLocal.second;
-    final daySalt = nowLocal.year * 10000 + nowLocal.month * 100 + nowLocal.day;
-    final index =
-        ((secondsFromMidnight ~/ 17) + daySalt) % _bugTokenWords.length;
-    final word = _bugTokenWords[index];
-    final hh = nowLocal.hour.toString().padLeft(2, '0');
-    final mm = nowLocal.minute.toString().padLeft(2, '0');
-    final ss = nowLocal.second.toString().padLeft(2, '0');
-    final code = '$hh$mm$ss-$word';
-    return _BugIdentifier(
-      word: word,
-      code: code,
-      qrPayload: 'terminals-bug://$code',
-    );
-  }
-
-  void _announceBugIdentifier(_BugIdentifier identifier) {
+  void _announceBugIdentifier(BugIdentifier identifier) {
     speech.speakText(
         'Bug reference word ${identifier.word}. Code ${identifier.code}');
     if (!mounted) {
@@ -2683,7 +2350,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   void _handleBugReportAck(diagv1.BugReportAck ack) {
-    _PendingBugReport? pending;
+    PendingBugReport? pending;
     if (_pendingBugReports.isNotEmpty) {
       pending = _pendingBugReports.removeAt(0);
     }
@@ -2701,7 +2368,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       _lastNotification = tokenWord.isEmpty
           ? 'Bug report failed: no positive receipt from server.'
           : 'Bug report failed: no positive receipt from server (word: $tokenWord).';
-      _bugReceiptState = _BugReceiptState.error;
+      _bugReceiptState = BugReceiptChromeState.error;
       _bugReceiptReportId = '';
       _bugReceiptDetail = tokenWord.isEmpty
           ? 'No positive receipt was generated by the server.'
@@ -2717,7 +2384,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _lastNotification = tokenWord.isEmpty
         ? 'Bug report filed: $receiptID'
         : 'Bug report filed: $receiptID (word: $tokenWord)';
-    _bugReceiptState = _BugReceiptState.received;
+    _bugReceiptState = BugReceiptChromeState.received;
     _bugReceiptReportId = receiptID;
     final ackMessage = ack.message.trim();
     if (ackMessage == 'ack_replayed') {
@@ -2749,7 +2416,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _status = 'Bug report receipt error';
     _lastNotification =
         'Bug report failed: $reason (word: ${failed.identifier.word}, code: ${failed.identifier.code}).';
-    _bugReceiptState = _BugReceiptState.error;
+    _bugReceiptState = BugReceiptChromeState.error;
     _bugReceiptReportId = '';
     _bugReceiptDetail =
         'No positive receipt could be generated: $reason.${_bugTransportContextSuffix()}';
@@ -2769,7 +2436,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
 
   void _dispatchBugReport({
     required diagv1.BugReport bugReport,
-    required _BugIdentifier identifier,
+    required BugIdentifier identifier,
     required String subjectDeviceID,
     required int firstQueuedUnixMs,
     required int previousDispatchAttempts,
@@ -2783,7 +2450,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     );
     final nextAttempt = previousDispatchAttempts + 1;
     _pendingBugReports.add(
-      _PendingBugReport(
+      PendingBugReport(
         bugReport: bugReport.deepCopy(),
         identifier: identifier,
         firstQueuedUnixMs: firstQueuedUnixMs,
@@ -2807,7 +2474,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (_queuedBugReports.isEmpty) {
       return;
     }
-    final queued = List<_QueuedBugReport>.from(_queuedBugReports);
+    final queued = List<QueuedBugReport>.from(_queuedBugReports);
     _queuedBugReports.clear();
     for (final item in queued) {
       _dispatchBugReport(
@@ -2824,7 +2491,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         _status = 'Queued bug reports sent';
         _lastNotification =
             'Sent ${queued.length} queued bug report(s); waiting for server ack.';
-        _bugReceiptState = _BugReceiptState.waiting;
+        _bugReceiptState = BugReceiptChromeState.waiting;
         _bugReceiptReportId = '';
         _bugReceiptDetail = queued.length == 1
             ? 'Queued bug report sent. Waiting for positive server receipt.'
@@ -2852,7 +2519,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               _status = 'Bug report receipt error';
               _lastNotification =
                   'Bug report failed: no positive receipt from server (word: ${failed.identifier.word}, code: ${failed.identifier.code}).';
-              _bugReceiptState = _BugReceiptState.error;
+              _bugReceiptState = BugReceiptChromeState.error;
               _bugReceiptReportId = '';
               _bugReceiptDetail =
                   'No positive receipt was generated by the server for word ${failed.identifier.word}, code ${failed.identifier.code}.${_bugTransportContextSuffix()}';
@@ -2865,7 +2532,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           );
         }
       } else if (_queuedBugReports.isNotEmpty &&
-          _bugReceiptState == _BugReceiptState.waiting) {
+          _bugReceiptState == BugReceiptChromeState.waiting) {
         final firstQueued = _queuedBugReports.first;
         if (_bugReportAckRetryPolicy.hasTimedOut(
           Duration(milliseconds: nowUnixMs - firstQueued.firstQueuedUnixMs),
@@ -2877,7 +2544,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               _status = 'Bug report receipt error';
               _lastNotification =
                   'Bug report failed: no positive receipt while queued (word: ${firstQueued.identifier.word}, code: ${firstQueued.identifier.code}).';
-              _bugReceiptState = _BugReceiptState.error;
+              _bugReceiptState = BugReceiptChromeState.error;
               _bugReceiptReportId = '';
               _bugReceiptDetail =
                   'No positive receipt could be generated because the report remained queued for more than ${_bugReportAckRetryPolicy.maxDuration.inSeconds}s.${_bugTransportContextSuffix()}';
@@ -2892,7 +2559,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       }
       if (_pendingBugReports.isEmpty &&
           (_queuedBugReports.isEmpty ||
-              _bugReceiptState != _BugReceiptState.waiting)) {
+              _bugReceiptState != BugReceiptChromeState.waiting)) {
         _bugReportAckTimer?.cancel();
         _bugReportAckTimer = null;
       }
@@ -2915,7 +2582,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         _status = 'Bug report receipt error';
         _lastNotification =
             'Bug report failed: no positive receipt (word: ${failed.identifier.word}, code: ${failed.identifier.code}).';
-        _bugReceiptState = _BugReceiptState.error;
+        _bugReceiptState = BugReceiptChromeState.error;
         _bugReceiptReportId = '';
         _bugReceiptDetail = 'No positive receipt could be generated: $reason.';
       });
@@ -3451,7 +3118,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                     const SizedBox(height: 12),
                     Text('Notification: $_lastNotification'),
                   ],
-                  if (_bugReceiptState != _BugReceiptState.none) ...[
+                  if (_bugReceiptState != BugReceiptChromeState.none) ...[
                     const SizedBox(height: 12),
                     _buildBugReceiptPanel(),
                   ],
@@ -4191,7 +3858,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       await _handlePrivacyToggleAction();
       return;
     }
-    if (action.startsWith(_bugReportActionPrefix)) {
+    if (action.startsWith(bugReportActionPrefix)) {
       await _submitBugReportFromAction(
         componentId: componentId,
         action: action,
@@ -4335,65 +4002,4 @@ class _VideoSurfaceViewState extends State<_VideoSurfaceView> {
       objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
     );
   }
-}
-
-class _BugIdentifier {
-  const _BugIdentifier({
-    required this.word,
-    required this.code,
-    required this.qrPayload,
-  });
-
-  final String word;
-  final String code;
-  final String qrPayload;
-}
-
-enum _BugReceiptState {
-  none,
-  waiting,
-  received,
-  error,
-}
-
-class _BugReportDraft {
-  const _BugReportDraft({
-    required this.description,
-    required this.tags,
-    required this.identifier,
-  });
-
-  final String description;
-  final List<String> tags;
-  final _BugIdentifier identifier;
-}
-
-class _PendingBugReport {
-  const _PendingBugReport({
-    required this.bugReport,
-    required this.identifier,
-    required this.firstQueuedUnixMs,
-    required this.submittedUnixMs,
-    required this.dispatchAttempts,
-  });
-
-  final diagv1.BugReport bugReport;
-  final _BugIdentifier identifier;
-  final int firstQueuedUnixMs;
-  final int submittedUnixMs;
-  final int dispatchAttempts;
-}
-
-class _QueuedBugReport {
-  const _QueuedBugReport({
-    required this.bugReport,
-    required this.identifier,
-    required this.firstQueuedUnixMs,
-    required this.dispatchAttempts,
-  });
-
-  final diagv1.BugReport bugReport;
-  final _BugIdentifier identifier;
-  final int firstQueuedUnixMs;
-  final int dispatchAttempts;
 }

@@ -2,6 +2,36 @@
 
 ## 2026-05-03
 
+- Continued Phase 3 by moving bug-report action prefix, token vocabulary,
+  token/QR generation, local report ID sanitization, receipt state, and
+  queued/pending bug-report value types into
+  `terminal_client/lib/diagnostics/bug_report_chrome.dart`.
+- Updated the app shell to consume those diagnostics-owned types while keeping
+  screenshot capture, speech announcement, queue flushing, and transport side
+  effects local for later controller extraction.
+- Added focused bug-report chrome tests for deterministic token generation and
+  local report ID sanitization.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format lib/app/terminal_client_app.dart lib/diagnostics/bug_report_chrome.dart test/diagnostics/bug_report_chrome_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/diagnostics/bug_report_chrome_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/diagnostics
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+```
+
+Notes:
+
+- The first focused test attempt hit sandboxed DNS for pub.dev advisories;
+  rerunning with approved network access passed.
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 5 by moving synchronous media/control response derivation
   into `terminal_client/lib/connection/control_response_dispatcher.dart`.
 - Added a typed dispatcher update for stream-start acknowledgement IDs and

@@ -7,6 +7,35 @@ void main() {
     return MaterialApp(home: Scaffold(body: child));
   }
 
+  test('buildBugIdentifier derives deterministic word code and qr payload', () {
+    final identifier = buildBugIdentifier(
+      DateTime(2026, 5, 3, 1, 2, 3),
+      words: const <String>['alpha', 'beta', 'gamma'],
+    );
+
+    expect(identifier.word, 'alpha');
+    expect(identifier.code, '010203-alpha');
+    expect(identifier.qrPayload, 'terminals-bug://010203-alpha');
+  });
+
+  test('buildLocalBugReportId sanitizes report id components', () {
+    final reportId = buildLocalBugReportId(
+      now: DateTime.utc(2026, 5, 3, 12),
+      identifier: const BugIdentifier(
+        word: 'alpha',
+        code: '12:00 alpha',
+        qrPayload: 'ignored',
+      ),
+      reporterDeviceID: 'Flutter Client!',
+      subjectDeviceID: 'Kitchen Display #1',
+    );
+
+    expect(
+      reportId,
+      'clientbug-1777809600000-flutter-client-kitchen-display-1-12-00-alpha',
+    );
+  });
+
   testWidgets('renders bug report button and invokes callback', (tester) async {
     var pressed = false;
     await tester.pumpWidget(
