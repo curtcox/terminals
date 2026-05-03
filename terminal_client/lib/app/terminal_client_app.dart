@@ -9,9 +9,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/capabilities/probe.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:terminal_client/connection/carrier_preference.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
+import 'package:terminal_client/connection/endpoint_resolution.dart';
 import 'package:terminal_client/connection/reliability.dart';
+import 'package:terminal_client/connection/transport_diagnostics.dart';
 import 'package:terminal_client/diagnostics/build_metadata.dart';
 import 'package:terminal_client/diagnostics/diagnostic_clipboard.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
@@ -224,45 +227,6 @@ const RetryPolicy _readinessPolicy = RetryPolicy(
   interval: Duration(milliseconds: 120),
   maxDuration: Duration(seconds: 20),
 );
-
-const Set<String> _loopbackHosts = <String>{
-  'localhost',
-  '127.0.0.1',
-  '::1',
-};
-
-String resolveInitialControlHost({
-  required bool isWebRuntime,
-  required String configuredHost,
-  required String pageHost,
-}) {
-  final trimmedConfiguredHost = configuredHost.trim();
-  if (!isWebRuntime) {
-    return trimmedConfiguredHost;
-  }
-  final trimmedPageHost = pageHost.trim();
-  if (trimmedPageHost.isEmpty) {
-    return trimmedConfiguredHost;
-  }
-  if (trimmedConfiguredHost.isEmpty) {
-    return trimmedPageHost;
-  }
-  if (_loopbackHosts.contains(trimmedConfiguredHost.toLowerCase())) {
-    return trimmedPageHost;
-  }
-  return trimmedConfiguredHost;
-}
-
-String resolvePageHost({
-  required String browserLocationHost,
-  required String uriBaseHost,
-}) {
-  final fromLocation = browserLocationHost.trim();
-  if (fromLocation.isNotEmpty) {
-    return fromLocation;
-  }
-  return uriBaseHost.trim();
-}
 
 const List<String> _bugTokenWords = <String>[
   'ace',
@@ -556,197 +520,6 @@ Duration calculateReconnectDelay({
   return Duration(milliseconds: delayMs);
 }
 
-ControlCarrierKind? carrierKindFromPriorityName(String raw) {
-  switch (raw.trim().toLowerCase()) {
-    case 'grpc':
-      return ControlCarrierKind.grpc;
-    case 'websocket':
-    case 'ws':
-      return ControlCarrierKind.websocket;
-    case 'tcp':
-      return ControlCarrierKind.tcp;
-    case 'http':
-      return ControlCarrierKind.http;
-    default:
-      return null;
-  }
-}
-
-bool isCarrierSupportedOnRuntime(
-  ControlCarrierKind carrier, {
-  required bool isWebRuntime,
-}) {
-  if (isWebRuntime) {
-    return carrier == ControlCarrierKind.websocket;
-  }
-  return true;
-}
-
-List<ControlCarrierKind> buildCarrierPreference({
-  required bool isWebRuntime,
-  required List<String> serverPriority,
-  ControlCarrierKind? lastSuccessfulCarrier,
-}) {
-  final defaults = isWebRuntime
-      ? const <ControlCarrierKind>[ControlCarrierKind.websocket]
-      : const <ControlCarrierKind>[
-          ControlCarrierKind.grpc,
-          ControlCarrierKind.websocket,
-          ControlCarrierKind.tcp,
-          ControlCarrierKind.http,
-        ];
-  if (serverPriority.isEmpty) {
-    return defaults;
-  }
-
-  final ordered = <ControlCarrierKind>[];
-  for (final raw in serverPriority) {
-    final carrier = carrierKindFromPriorityName(raw);
-    if (carrier == null) {
-      continue;
-    }
-    if (isWebRuntime && carrier != ControlCarrierKind.websocket) {
-      continue;
-    }
-    if (!ordered.contains(carrier)) {
-      ordered.add(carrier);
-    }
-  }
-
-  final preferred = ordered.isEmpty ? defaults : ordered;
-  final filtered = preferred
-      .where(
-        (carrier) =>
-            isCarrierSupportedOnRuntime(carrier, isWebRuntime: isWebRuntime),
-      )
-      .toSet()
-      .toList(growable: true);
-  if (filtered.isEmpty) {
-    return defaults
-        .where(
-          (carrier) =>
-              isCarrierSupportedOnRuntime(carrier, isWebRuntime: isWebRuntime),
-        )
-        .toList(growable: false);
-  }
-  if (lastSuccessfulCarrier != null &&
-      filtered.contains(lastSuccessfulCarrier)) {
-    filtered
-      ..remove(lastSuccessfulCarrier)
-      ..insert(0, lastSuccessfulCarrier);
-  }
-  return filtered;
-}
-
-String resolvePreferredEndpoint({
-  required String manualEndpoint,
-  required String discoveredEndpoint,
-}) {
-  final manual = manualEndpoint.trim();
-  if (manual.isNotEmpty) {
-    return manual;
-  }
-  return discoveredEndpoint.trim();
-}
-
-String websocketPathFromEndpoint(String endpoint) {
-  final trimmed = endpoint.trim();
-  if (trimmed.isEmpty) {
-    return '/control';
-  }
-  final parsed = Uri.tryParse(trimmed);
-  if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
-    return '/control';
-  }
-  if (parsed.path.trim().isEmpty) {
-    return '/control';
-  }
-  return parsed.path;
-}
-
-String classifyCarrierFailure({
-  required String stage,
-  required String rawError,
-}) {
-  final lower = rawError.toLowerCase();
-  final trimmedStage = stage.trim().toLowerCase();
-
-  if (lower.contains('unsupported_protocol_version') ||
-      lower.contains('unsupported protocol version') ||
-      lower.contains('transport hello rejected protocol version')) {
-    return 'protocol_version';
-  }
-  if (lower.contains('unsupported_carrier') ||
-      lower.contains('not declared in transport hello')) {
-    return 'carrier_mismatch';
-  }
-  if (lower.contains('failed host lookup') ||
-      lower.contains('name or service not known') ||
-      lower.contains('nodename nor servname provided')) {
-    return 'dns';
-  }
-  if (lower.contains('connection refused')) {
-    return 'tcp_connect';
-  }
-  if (lower.contains('certificate') ||
-      lower.contains('tls') ||
-      lower.contains('ssl') ||
-      lower.contains('handshake')) {
-    return 'tls_or_handshake';
-  }
-  if (lower.contains('upgrade rejected') || lower.contains('http 403')) {
-    return 'upgrade_rejected';
-  }
-  if (lower.contains('timed out') || lower.contains('timeout')) {
-    return 'timeout';
-  }
-  if (trimmedStage == 'stream_closed' || lower.contains('stream closed')) {
-    return 'stream_closed';
-  }
-  if (trimmedStage == 'connect') {
-    return 'connect_error';
-  }
-  if (trimmedStage == 'stream') {
-    return 'stream_error';
-  }
-  return 'unknown';
-}
-
-class TransportErrorDiagnosis {
-  const TransportErrorDiagnosis({
-    required this.summary,
-    required this.guidance,
-    required this.grpcCode,
-    required this.grpcCodeName,
-    required this.rawError,
-  });
-
-  final String summary;
-  final String guidance;
-  final int? grpcCode;
-  final String grpcCodeName;
-  final String rawError;
-
-  bool get hasSummary => summary.isNotEmpty;
-
-  String statusText() {
-    if (hasSummary) {
-      return 'Stream error: $summary';
-    }
-    return 'Stream error: $rawError';
-  }
-
-  String notificationText() {
-    if (!hasSummary) {
-      return '';
-    }
-    if (guidance.isEmpty) {
-      return summary;
-    }
-    return '$summary $guidance';
-  }
-}
-
 class _CarrierAttemptDiagnostic {
   const _CarrierAttemptDiagnostic({
     required this.carrier,
@@ -790,68 +563,6 @@ class _ConnectionTarget {
 
   final String host;
   final int port;
-}
-
-TransportErrorDiagnosis diagnoseTransportError(
-  Object error, {
-  required bool isWeb,
-}) {
-  final raw = error.toString();
-  final lower = raw.toLowerCase();
-  final grpcCodeMatch =
-      RegExp(r'code:\s*([0-9]+)', caseSensitive: false).firstMatch(raw);
-  final grpcCode =
-      grpcCodeMatch == null ? null : int.tryParse(grpcCodeMatch.group(1) ?? '');
-  final grpcCodeNameMatch =
-      RegExp(r'codeName:\s*([A-Z_]+)', caseSensitive: false).firstMatch(raw);
-  final grpcCodeName = (grpcCodeNameMatch?.group(1) ?? '').trim().toUpperCase();
-  final isGrpcError = lower.contains('grpc error');
-  final isUnavailable = grpcCode == 14 ||
-      grpcCodeName == 'UNAVAILABLE' ||
-      lower.contains('unavailable');
-  final hasSocketConstructorFailure =
-      lower.contains('unsupported operation: socket constructor');
-
-  if (isGrpcError && isUnavailable && hasSocketConstructorFailure && isWeb) {
-    return TransportErrorDiagnosis(
-      summary: 'gRPC UNAVAILABLE (14)',
-      guidance:
-          'Browser runtime cannot open raw gRPC sockets. Configure gRPC-Web via an HTTP proxy (for example Envoy) or use a non-web client target.',
-      grpcCode: grpcCode,
-      grpcCodeName: grpcCodeName,
-      rawError: raw,
-    );
-  }
-
-  if (isGrpcError && isUnavailable) {
-    return TransportErrorDiagnosis(
-      summary: 'gRPC UNAVAILABLE (14)',
-      guidance:
-          'Server is unreachable or transport is unavailable. Verify host/port, server process, and network/proxy configuration.',
-      grpcCode: grpcCode,
-      grpcCodeName: grpcCodeName,
-      rawError: raw,
-    );
-  }
-
-  if (isGrpcError && grpcCode != null) {
-    final displayName = grpcCodeName.isEmpty ? '' : ' ($grpcCodeName)';
-    return TransportErrorDiagnosis(
-      summary: 'gRPC error $grpcCode$displayName',
-      guidance: 'Check server logs and client/server protocol compatibility.',
-      grpcCode: grpcCode,
-      grpcCodeName: grpcCodeName,
-      rawError: raw,
-    );
-  }
-
-  return TransportErrorDiagnosis(
-    summary: '',
-    guidance: '',
-    grpcCode: grpcCode,
-    grpcCodeName: grpcCodeName,
-    rawError: raw,
-  );
 }
 
 class TerminalClientApp extends StatelessWidget {

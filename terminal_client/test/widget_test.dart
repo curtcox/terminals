@@ -6,8 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:grpc/grpc.dart';
 import 'package:terminal_client/capabilities/probe.dart';
+import 'package:terminal_client/connection/carrier_preference.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
+import 'package:terminal_client/connection/endpoint_resolution.dart';
+import 'package:terminal_client/connection/transport_diagnostics.dart';
 import 'package:terminal_client/gen/terminals/capabilities/v1/capabilities.pb.dart'
     as capv1;
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
