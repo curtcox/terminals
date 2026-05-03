@@ -2,6 +2,32 @@
 
 ## 2026-05-03
 
+- Continued Phase 6 by splitting the stateful client shell out of
+  `terminal_client/lib/app/terminal_client_app.dart` into
+  `terminal_client/lib/app/terminal_client_shell.dart`.
+- Promoted the former private `_ControlStreamScaffold` to the public
+  `TerminalClientShell` while preserving the existing dependency injection
+  seams and behavior.
+- Reduced `terminal_client/lib/app/terminal_client_app.dart` to MaterialApp
+  wiring plus constructor seam forwarding.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format lib/app/terminal_client_app.dart lib/app/terminal_client_shell.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 3 by moving bug-report action prefix, token vocabulary,
   token/QR generation, local report ID sanitization, receipt state, and
   queued/pending bug-report value types into
