@@ -724,7 +724,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 5: Split Connection Session Controller
 
-Status: not started
+Status: in progress
 
 Tasks:
 

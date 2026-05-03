@@ -15,6 +15,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/carrier_preference.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
+import 'package:terminal_client/connection/control_response_dispatcher.dart';
 import 'package:terminal_client/connection/endpoint_resolution.dart';
 import 'package:terminal_client/connection/reliability.dart';
 import 'package:terminal_client/connection/transport_diagnostics.dart';
@@ -1579,7 +1580,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               _pendingHeartbeatUnixMs = 0;
             }
             _responses += 1;
-            final responseStatus = _statusFromResponse(response);
+            final responseStatus = statusFromConnectResponse(response);
             if (responseStatus.isNotEmpty) {
               _status = responseStatus;
               _lastConnectionStatus = responseStatus;
@@ -1596,7 +1597,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               );
             }
             if (response.hasUpdateUi()) {
-              final updatedRoot = _applyUpdateUi(
+              final updatedRoot = applyUpdateUi(
                 currentRoot: nextRoot,
                 update: response.updateUi,
               );
@@ -3916,64 +3917,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     );
   }
 
-  String _statusFromResponse(ConnectResponse response) {
-    if (response.hasError()) {
-      return 'Server error';
-    }
-    if (response.hasTransitionUi()) {
-      return 'UI transition';
-    }
-    if (response.hasStartStream()) {
-      return 'Stream started';
-    }
-    if (response.hasStopStream()) {
-      return 'Stream stopped';
-    }
-    if (response.hasRouteStream()) {
-      return 'Route updated';
-    }
-    if (response.hasWebrtcSignal()) {
-      return 'WebRTC signal';
-    }
-    if (response.hasPlayAudio()) {
-      return 'Play audio';
-    }
-    if (response.hasInstallBundle()) {
-      return 'Bundle install requested';
-    }
-    if (response.hasRemoveBundle()) {
-      return 'Bundle removal requested';
-    }
-    if (response.hasStartFlow()) {
-      return 'Flow start requested';
-    }
-    if (response.hasPatchFlow()) {
-      return 'Flow patch requested';
-    }
-    if (response.hasStopFlow()) {
-      return 'Flow stop requested';
-    }
-    if (response.hasRequestArtifact()) {
-      return 'Artifact requested';
-    }
-    if (response.hasBugReportAck()) {
-      return 'Bug report filed';
-    }
-    if (response.hasUpdateUi()) {
-      return 'UI patched';
-    }
-    if (response.hasRegisterAck()) {
-      return 'Registered';
-    }
-    if (response.hasCommandResult()) {
-      return 'Command response';
-    }
-    if (response.hasSetUi()) {
-      return 'UI updated';
-    }
-    return 'Connected';
-  }
-
   void _applyMediaControlResponse(ConnectResponse response) {
     if (response.hasStartStream()) {
       final start = response.startStream;
@@ -4363,59 +4306,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       ).animate(animation),
       child: child,
     );
-  }
-
-  uiv1.Node? _applyUpdateUi({
-    required uiv1.Node? currentRoot,
-    required uiv1.UpdateUI update,
-  }) {
-    if (!update.hasNode()) {
-      return currentRoot;
-    }
-    final targetID = update.componentId.trim();
-    final replacement = update.node.deepCopy();
-    if (targetID.isEmpty) {
-      return replacement;
-    }
-    if (currentRoot == null) {
-      return null;
-    }
-
-    final root = currentRoot.deepCopy();
-    if (serverDrivenNodeId(root) == targetID) {
-      return replacement;
-    }
-    final replaced = _replaceNodeByID(
-      current: root,
-      targetID: targetID,
-      replacement: replacement,
-    );
-    if (!replaced) {
-      return currentRoot;
-    }
-    return root;
-  }
-
-  bool _replaceNodeByID({
-    required uiv1.Node current,
-    required String targetID,
-    required uiv1.Node replacement,
-  }) {
-    for (var i = 0; i < current.children.length; i++) {
-      final child = current.children[i];
-      if (serverDrivenNodeId(child) == targetID) {
-        current.children[i] = replacement.deepCopy();
-        return true;
-      }
-      if (_replaceNodeByID(
-        current: child,
-        targetID: targetID,
-        replacement: replacement,
-      )) {
-        return true;
-      }
-    }
-    return false;
   }
 
   Future<void> _sendUiAction({

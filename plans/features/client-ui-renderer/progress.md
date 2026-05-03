@@ -2,6 +2,36 @@
 
 ## 2026-05-03
 
+- Started Phase 5 by creating
+  `terminal_client/lib/connection/control_response_dispatcher.dart`.
+- Moved pure incoming-response status labeling out of
+  `terminal_client/lib/app/terminal_client_app.dart`.
+- Moved `UpdateUI` tree patching out of the app shell so it can be tested
+  without pumping the full Flutter app.
+- Added focused dispatcher tests under
+  `terminal_client/test/connection/control_response_dispatcher_test.dart`.
+- Left media effects, register handling, notifications, and stream lifecycle in
+  the app shell for the next controller/dispatcher slices.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed lib/connection/control_response_dispatcher.dart test/connection/control_response_dispatcher_test.dart lib/app/terminal_client_app.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_response_dispatcher_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+```
+
+Notes:
+
+- The first focused test attempt hit sandboxed DNS for pub.dev advisories;
+  rerunning with approved network access passed.
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Started Phase 7 by adding `docs/client-boundary.md` with the allowed
   client-owned behavior categories, prohibited scenario/application behavior,
   and module boundary rules.
