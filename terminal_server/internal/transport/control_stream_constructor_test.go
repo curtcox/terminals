@@ -89,8 +89,8 @@ func TestStreamHandlerConstructorsInitializeFields(t *testing.T) {
 			if h.sensorsByDevice == nil {
 				t.Error("sensorsByDevice not initialized")
 			}
-			if h.voiceAudioBuffers == nil {
-				t.Error("voiceAudioBuffers not initialized")
+			if h.voicePipeline == nil {
+				t.Error("voicePipeline not initialized")
 			}
 			if h.suspendedClaimsByDevice == nil {
 				t.Error("suspendedClaimsByDevice not initialized")

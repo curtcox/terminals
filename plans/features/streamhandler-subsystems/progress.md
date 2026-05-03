@@ -229,3 +229,41 @@ Notes:
 - `control_stream.go` dropped from 4720 → 4712 lines (net 8-line shrink: the 11-line BugReport branch became 6 lines; the 22-line `handleBugReportUIAction` became 17; partly offset by the new collaborator file). `diagnostics_intake.go` is 49 lines.
 - Pre-existing lint warnings in `route_replay_test.go:153` and `control_stream_characterization_test.go:56` left alone — confirmed still pre-existing.
 - Plan status stays `building`. Stopping after this PR. Awaiting confirmation before starting PR 8 (Phase 7).
+
+## 2026-05-03 — Phase 7 (PR 8: extract VoicePipeline)
+
+Status: complete
+
+Changes:
+- Added `terminal_server/internal/transport/voice_pipeline.go` with `VoicePipeline`: `NewVoicePipeline(handler *StreamHandler) *VoicePipeline`, `SetDeviceAudioPublisher(DeviceAudioPublisher)`, and `HandleAudio(ctx, *VoiceAudioRequest) ([]ServerMessage, error)`.
+- Moved per-device voice audio buffers from `StreamHandler.voiceAudioBuffers` into `VoicePipeline.buffers`, guarded by the collaborator's own `sync.Mutex`.
+- Moved the live mic-audio publisher from `StreamHandler.deviceAudio` into `VoicePipeline.deviceAudio`; `StreamHandler.SetDeviceAudioPublisher` remains as the public compatibility method and now delegates to the pipeline.
+- Moved the raw voice-audio path body out of `control_stream.go`: buffering, publisher fan-out, recording chunk tap, STT transcript selection, wake-word detection/dedupe, runtime voice dispatch, response UI patching, TTS synthesis, `voiceAudioReader`, `readAudioPlayback`, and `recordVoiceAudioChunk` now live in `voice_pipeline.go`.
+- `StreamHandler.handleVoiceAudio` collapsed to `return h.voicePipeline.HandleAudio(ctx, va)`. The `HandleMessage` voice branch still owns transport metrics, overlay drop policy, and wire-format error mapping.
+- Updated `control_stream_constructor_test.go` to assert `h.voicePipeline != nil` instead of the removed `h.voiceAudioBuffers != nil`.
+- Added `voice_pipeline_test.go` with focused tests covering partial buffer accumulation, final-buffer clearing, defensive copying of buffered chunks, publisher fan-out for non-empty chunks only, and final-buffer clearing even when the downstream runtime is not configured.
+
+Validation:
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./internal/transport -run 'TestVoicePipeline|TestStreamHandlerConstructors|TestControlStreamVoiceAudio' -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./internal/transport -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./... -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test -race ./internal/transport -count=1` — pass.
+- Initial sandboxed `go test ./internal/transport -count=1` failed before compiling because Go could not open the default build cache under `~/Library/Caches/go-build`; rerunning with `GOCACHE=/tmp/terminals-go-build` fixed that.
+- Sandboxed full transport test also hit existing websocket tests that bind `127.0.0.1:0`; reran the package and full server suite outside the sandbox with approval.
+
+Judgment calls:
+- **VoicePipeline keeps a `*StreamHandler` back-reference for now.** The voice path still depends on runtime dispatch, broadcast lookup, device capability checks, wake-word dedupe, recording manager access, and UI response assembly. Passing all of those as callbacks would make this phase look cleaner on paper but add a noisy interface before the media extraction settles. The state ownership still moves: the mutable voice buffer and publisher are no longer on `StreamHandler`.
+- **Wake-word dedupe stayed on `StreamHandler`.** It is part of voice command admission, but existing tests directly override `handler.wakeWordDedupe` to exercise winner policies. Moving it now would force test rewrites or an extra setter that does not otherwise exist. The pipeline uses the existing field through the handler and the plan allowed moving it only if it was clearly part of the audio path.
+- **Recording manager stayed on `StreamHandler`.** Phase 8 owns media/recording extraction. The pipeline snapshots `h.recording` and calls the moved `recordVoiceAudioChunk` helper, preserving the prior behavior without pulling recording ownership forward.
+
+Moved vs. stayed:
+- Moved (state): `voiceAudioBuffers`, `deviceAudio`.
+- Moved (behavior): voice-audio buffer assembly/final clearing, live publisher fan-out, recording chunk write helper, STT transcript selection, wake-word gate/dedupe invocation, voice runtime invocation, response UI/TTS assembly, `voiceAudioReader`, and `readAudioPlayback`.
+- Stayed (state): `wakeWordDedupe`, `recording`.
+- Stayed (behavior): `HandleMessage` metrics/error mapping/overlay policy, `deviceAllowsVoiceAudio` capability policy, `latestBroadcastForDevice` broadcast selection, and broader runtime/scenario helpers.
+
+Notes:
+- `control_stream.go` dropped from 4712 → 4524 lines. `voice_pipeline.go` is 251 lines.
+- No `.proto` changes, no `terminal_client/` changes, no package moves.
+- Follow-up remains for bounded per-device voice buffers; this PR preserves the existing unbounded behavior intentionally.
+- Plan status stays `building`. Next planned phase is Phase 8 (`MediaControlState`).

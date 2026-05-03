@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"math"
 	"os"
@@ -403,18 +402,17 @@ type StreamHandler struct {
 
 	mediaStreams            map[string]mediaStreamState
 	sensorsByDevice         map[string]sensorSnapshot
-	voiceAudioBuffers       map[string][]byte
 	suspendedClaimsByDevice map[string][]iorouter.Claim
 	// routeReplay captures route sets at disconnect so subsequent reconnects
 	// can replay StartStream/RouteStream messages even though the live
 	// router state was torn down on disconnect.
 	routeReplay *RouteReplayStore
 
-	deviceAudio    DeviceAudioPublisher
 	recording      recording.Manager
 	webrtc         WebRTCSignalEngine
 	diagnostics    *DiagnosticsIntake
 	uiOwners       *uiActionOwnershipTracker
+	voicePipeline  *VoicePipeline
 	wakeWordDedupe *wakeWordDedupeStage
 
 	identityService   IdentityService
@@ -540,7 +538,6 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 		// media control / route replay / voice
 		mediaStreams:            map[string]mediaStreamState{},
 		sensorsByDevice:         map[string]sensorSnapshot{},
-		voiceAudioBuffers:       map[string][]byte{},
 		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
 		routeReplay:             NewRouteReplayStore(),
 
@@ -555,6 +552,7 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 	handler.capabilityLifecycle = NewCapabilityLifecycle(control)
 	handler.commandDispatcher = NewCommandDispatcher(handler, handler.handleCommand)
 	handler.diagnostics = NewDiagnosticsIntake(nil)
+	handler.voicePipeline = NewVoicePipeline(handler)
 	return handler
 }
 
@@ -563,9 +561,7 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 // mic stream in real time. Safe to call once before any control streams are
 // handled; subsequent calls replace the publisher.
 func (h *StreamHandler) SetDeviceAudioPublisher(pub DeviceAudioPublisher) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.deviceAudio = pub
+	h.voicePipeline.SetDeviceAudioPublisher(pub)
 }
 
 // NewStreamHandlerWithRuntime creates a handler with scenario runtime support.
@@ -3946,144 +3942,7 @@ func (h *StreamHandler) terminalReadSettings() (time.Duration, time.Duration) {
 // Runtime.HandleVoiceText, then synthesizes the resulting response via TTS and
 // returns it as a PlayAudio server message targeted at the source device.
 func (h *StreamHandler) handleVoiceAudio(ctx context.Context, va *VoiceAudioRequest) ([]ServerMessage, error) {
-	if va == nil {
-		return nil, ErrInvalidClientMessage
-	}
-	deviceID := strings.TrimSpace(va.DeviceID)
-	if deviceID == "" {
-		return nil, ErrInvalidClientMessage
-	}
-	if !h.deviceAllowsVoiceAudio(deviceID) {
-		return nil, nil
-	}
-
-	h.mu.Lock()
-	existing := h.voiceAudioBuffers[deviceID]
-	buf := make([]byte, 0, len(existing)+len(va.Audio))
-	buf = append(buf, existing...)
-	buf = append(buf, va.Audio...)
-	publisher := h.deviceAudio
-	recorder := h.recording
-	if !va.IsFinal {
-		h.voiceAudioBuffers[deviceID] = buf
-		h.mu.Unlock()
-		if publisher != nil && len(va.Audio) > 0 {
-			publisher.Publish(deviceID, va.Audio)
-		}
-		if len(va.Audio) > 0 {
-			h.recordVoiceAudioChunk(recorder, deviceID, va.Audio)
-		}
-		return nil, nil
-	}
-	delete(h.voiceAudioBuffers, deviceID)
-	h.mu.Unlock()
-
-	if publisher != nil && len(va.Audio) > 0 {
-		publisher.Publish(deviceID, va.Audio)
-	}
-	if len(va.Audio) > 0 {
-		h.recordVoiceAudioChunk(recorder, deviceID, va.Audio)
-	}
-
-	if h.runtime == nil || h.runtime.Env == nil {
-		return nil, errors.New("scenario runtime not configured")
-	}
-	if h.runtime.Env.STT == nil {
-		return nil, errors.New("speech-to-text backend not configured")
-	}
-
-	source := &voiceAudioReader{buf: buf}
-	transcripts, err := h.runtime.Env.STT.Transcribe(ctx, source)
-	if err != nil {
-		return nil, err
-	}
-	var spoken string
-	var spokenConfidence float64
-	for tr := range transcripts {
-		if tr.IsFinal && tr.Text != "" {
-			spoken = tr.Text
-			spokenConfidence = tr.Confidence
-		} else if spoken == "" && tr.Text != "" {
-			spoken = tr.Text
-			spokenConfidence = tr.Confidence
-		}
-	}
-	spoken = strings.TrimSpace(spoken)
-	if spoken == "" {
-		return nil, ErrMissingCommandText
-	}
-	if h.runtime.Env.WakeWord != nil {
-		detection, err := h.runtime.Env.WakeWord.Detect(ctx, spoken)
-		if err != nil {
-			return nil, err
-		}
-		if !detection.Detected {
-			return nil, nil
-		}
-		if normalized := strings.TrimSpace(detection.Command); normalized != "" {
-			spoken = normalized
-		}
-	}
-	if h.wakeWordDedupe != nil {
-		heardAt := time.Now().UTC()
-		if h.control != nil {
-			heardAt = h.control.now().UTC()
-		}
-		if !h.wakeWordDedupe.Allow(wakeWordCandidate{
-			DeviceID:   deviceID,
-			Spoken:     spoken,
-			HeardAt:    heardAt,
-			Confidence: spokenConfidence,
-		}) {
-			return nil, nil
-		}
-	}
-
-	beforeCount := h.broadcastEventCount()
-	scenarioName, err := h.runtime.HandleVoiceText(ctx, deviceID, spoken, h.control.now().UTC())
-	if err != nil {
-		return nil, err
-	}
-
-	out := []ServerMessage{
-		{ScenarioStart: scenarioName, Notification: "Scenario started: " + scenarioName},
-	}
-
-	responseText := h.latestBroadcastForDevice(deviceID, beforeCount)
-	if responseText == "" {
-		return out, nil
-	}
-	responseView := ui.VoiceAssistantResponsePatch(responseText)
-	out = append(out, ServerMessage{
-		UpdateUI: &UIUpdate{
-			ComponentID: ui.GlobalOverlayComponentID,
-			Node:        responseView,
-		},
-	})
-	if h.runtime.Env.TTS == nil {
-		return out, nil
-	}
-
-	playback, err := h.runtime.Env.TTS.Synthesize(ctx, responseText, scenario.TTSOptions{
-		Voice:  "default",
-		Format: "pcm16",
-	})
-	if err != nil {
-		return nil, err
-	}
-	audio, err := readAudioPlayback(playback)
-	if err != nil {
-		return nil, err
-	}
-
-	out = append(out, ServerMessage{
-		PlayAudio: &PlayAudioResponse{
-			DeviceID: deviceID,
-			Audio:    audio,
-			Format:   "pcm16",
-		},
-	})
-	return out, nil
+	return h.voicePipeline.HandleAudio(ctx, va)
 }
 
 func (h *StreamHandler) deviceAllowsVoiceAudio(deviceID string) bool {
@@ -4099,16 +3958,6 @@ func (h *StreamHandler) deviceAllowsVoiceAudio(deviceID string) bool {
 	}
 	return truthyCapability(current.Capabilities["microphone.present"]) ||
 		truthyCapability(current.Capabilities["microphone.endpoint_count"])
-}
-
-func (h *StreamHandler) recordVoiceAudioChunk(recorder recording.Manager, deviceID string, chunk []byte) {
-	writer, ok := recorder.(interface {
-		WriteDeviceAudio(deviceID string, chunk []byte) error
-	})
-	if !ok {
-		return
-	}
-	_ = writer.WriteDeviceAudio(deviceID, chunk)
 }
 
 // latestBroadcastForDevice returns the most recent broadcast message emitted
@@ -4146,43 +3995,6 @@ func (h *StreamHandler) latestBroadcastForDevice(deviceID string, beforeCount in
 		}
 	}
 	return fallback
-}
-
-// voiceAudioReader is a simple io.Reader over an accumulated voice buffer.
-type voiceAudioReader struct {
-	buf []byte
-	off int
-}
-
-// Read consumes bytes from the buffered voice audio.
-func (r *voiceAudioReader) Read(p []byte) (int, error) {
-	if r.off >= len(r.buf) {
-		return 0, io.EOF
-	}
-	n := copy(p, r.buf[r.off:])
-	r.off += n
-	return n, nil
-}
-
-// readAudioPlayback drains a scenario.AudioPlayback into a byte slice.
-func readAudioPlayback(playback scenario.AudioPlayback) ([]byte, error) {
-	if playback == nil {
-		return nil, nil
-	}
-	buf := make([]byte, 0, 256)
-	chunk := make([]byte, 256)
-	for {
-		n, err := playback.Read(chunk)
-		if n > 0 {
-			buf = append(buf, chunk[:n]...)
-		}
-		if err == io.EOF {
-			return buf, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
 }
 
 func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) (ServerMessage, error) {
