@@ -538,6 +538,25 @@ Notes:
 
 ## 2026-05-03
 
+- Continued Phase 7 by tightening `scripts/check-client-boundary.sh` beyond
+  scenario/package token scanning. It now also rejects imports from
+  `terminal_client/lib/ui/**` into client subsystems such as connection,
+  discovery, diagnostics, edge, media, platform utilities, and app shell code.
+- Added `scripts/test-check-client-boundary.sh` to exercise both failure modes:
+  renderer subsystem imports and scenario-token leakage.
+- Wired the boundary checker regression test into `make all-test` through a
+  new `client-boundary-test` target.
+- Updated `docs/client-boundary.md` to document the import-boundary scan.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+./scripts/test-check-client-boundary.sh
+```
+
+## 2026-05-03
+
 - Continued Phase 1 by extracting carrier preference helpers from
   `terminal_client/lib/app/terminal_client_app.dart` into
   `terminal_client/lib/connection/carrier_preference.dart`.

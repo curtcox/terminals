@@ -48,7 +48,14 @@ Run the boundary scan before client refactor PRs:
 ```
 
 The scan is intentionally lightweight. It catches obvious scenario-name and
-package-ID leakage in production client code. Tests and generated protobuf code
-are outside its scope; server-provided fixture strings belong in tests, not in
-production client behavior.
+package-ID leakage in production client code, and it verifies that
+`terminal_client/lib/ui/` does not import connection, discovery, diagnostics,
+edge, media, platform utility, or other client subsystem modules. Tests and
+generated protobuf code are outside its scope; server-provided fixture strings
+belong in tests, not in production client behavior.
 
+The checker has a focused regression test:
+
+```bash
+./scripts/test-check-client-boundary.sh
+```
