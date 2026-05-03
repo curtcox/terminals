@@ -423,6 +423,10 @@ type StreamHandler struct {
 
 	// capability lifecycle collaborator (hello/register/snapshot/delta).
 	capabilityLifecycle *CapabilityLifecycle
+
+	// command dispatch collaborator (validation orchestration / audit
+	// buffer / post-command fan-out / RememberSetUI).
+	commandDispatcher *CommandDispatcher
 }
 
 type mediaStreamState struct {
@@ -549,6 +553,7 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	handler.capabilityLifecycle = NewCapabilityLifecycle(control)
+	handler.commandDispatcher = NewCommandDispatcher(handler, handler.handleCommand)
 	return handler
 }
 
@@ -884,97 +889,7 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 		h.uiSession.RememberSetUI(msg.Input.DeviceID, out)
 		return out, nil
 	case msg.Command != nil:
-		h.metrics.commandReceived.Add(1)
-		priorActiveScenario := h.activeScenarioName(msg.Command.DeviceID)
-		if msg.Command.RequestID != "" {
-			h.mu.Lock()
-			if prior, ok := h.seen[msg.Command.RequestID]; ok {
-				if h.metrics != nil {
-					h.metrics.dedupeHits.Add(1)
-				}
-				h.appendCommandEventLocked(CommandEvent{
-					RequestID: msg.Command.RequestID,
-					DeviceID:  msg.Command.DeviceID,
-					Kind:      msg.Command.Kind,
-					Action:    defaultAction(msg.Command.Action),
-					Intent:    msg.Command.Intent,
-					Outcome:   "deduped",
-					WhenUnix:  h.control.now().UTC().UnixMilli(),
-				})
-				h.mu.Unlock()
-				return []ServerMessage{prior}, nil
-			}
-			h.mu.Unlock()
-		}
-		beforeRoutes := h.routeSnapshotForDevice(msg.Command.DeviceID)
-		beforeBroadcastEvents := h.broadcastEventCount()
-		beforeUIEvents := h.uiHostEventCount()
-		commandResult, err := h.handleCommand(ctx, msg.Command)
-		if err != nil {
-			h.metrics.commandErrors.Add(1)
-			h.mu.Lock()
-			h.appendCommandEventLocked(CommandEvent{
-				RequestID: msg.Command.RequestID,
-				DeviceID:  msg.Command.DeviceID,
-				Kind:      msg.Command.Kind,
-				Action:    defaultAction(msg.Command.Action),
-				Intent:    msg.Command.Intent,
-				Outcome:   "error:" + err.Error(),
-				WhenUnix:  h.control.now().UTC().UnixMilli(),
-			})
-			h.mu.Unlock()
-			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
-		}
-		h.mu.Lock()
-		h.appendCommandEventLocked(CommandEvent{
-			RequestID: msg.Command.RequestID,
-			DeviceID:  msg.Command.DeviceID,
-			Kind:      msg.Command.Kind,
-			Action:    defaultAction(msg.Command.Action),
-			Intent:    msg.Command.Intent,
-			Outcome:   commandOutcome(commandResult),
-			WhenUnix:  h.control.now().UTC().UnixMilli(),
-		})
-		h.mu.Unlock()
-		if commandResult.ScenarioStart == "multi_window" && defaultAction(msg.Command.Action) == CommandActionStart {
-			h.captureMultiWindowResume(msg.Command.DeviceID, priorActiveScenario)
-		}
-		if msg.Command.RequestID != "" {
-			commandResult.CommandAck = msg.Command.RequestID
-			h.mu.Lock()
-			h.seen[msg.Command.RequestID] = commandResult
-			h.seenOrder = append(h.seenOrder, msg.Command.RequestID)
-			if len(h.seenOrder) > h.seenLimit {
-				evict := h.seenOrder[0]
-				h.seenOrder = h.seenOrder[1:]
-				delete(h.seen, evict)
-			}
-			h.mu.Unlock()
-		}
-		postResponses := h.commandResponses(ctx, msg.Command, commandResult)
-		afterRoutes := h.routeSnapshotForDevice(msg.Command.DeviceID)
-		routeUpdates := h.routeUpdatesForCommand(msg.Command, commandResult, beforeRoutes, afterRoutes)
-		if len(routeUpdates) > 0 {
-			postResponses = append(postResponses, routeUpdates...)
-		}
-		paTransitions := h.paTransitionsForCommand(msg.Command, commandResult, beforeRoutes, afterRoutes)
-		if len(paTransitions) > 0 {
-			postResponses = append(postResponses, paTransitions...)
-		}
-		overlayClears := h.paOverlayClearsForCommand(msg.Command, commandResult, beforeRoutes)
-		if len(overlayClears) > 0 {
-			postResponses = append(postResponses, overlayClears...)
-		}
-		broadcastNotifications := h.broadcastNotificationsForCommand(msg.Command, commandResult, beforeBroadcastEvents)
-		if len(broadcastNotifications) > 0 {
-			postResponses = append(postResponses, broadcastNotifications...)
-		}
-		uiMessages := h.uiHostMessagesSince(beforeUIEvents, msg.Command.DeviceID, true)
-		if len(uiMessages) > 0 {
-			postResponses = append(postResponses, uiMessages...)
-		}
-		h.uiSession.RememberSetUI(msg.Command.DeviceID, postResponses)
-		return postResponses, nil
+		return h.commandDispatcher.Dispatch(ctx, msg.Command)
 	case msg.BugReport != nil:
 		if h.bugReports == nil {
 			h.metrics.protocolErrors.Add(1)
@@ -1720,20 +1635,6 @@ func (h *StreamHandler) uiHostMessagesSince(beforeCount int, sessionDeviceID str
 		h.uiSession.MarkUIHostDelivered(delivered, len(events))
 	}
 	return out
-}
-
-func (h *StreamHandler) broadcastNotificationsForCommand(
-	cmd *CommandRequest,
-	commandResult ServerMessage,
-	beforeCount int,
-) []ServerMessage {
-	if cmd == nil {
-		return nil
-	}
-	if commandResult.ScenarioStart == "" && commandResult.ScenarioStop == "" {
-		return nil
-	}
-	return h.broadcastNotificationsSince(beforeCount, cmd.DeviceID, false)
 }
 
 func (h *StreamHandler) broadcastNotificationsSince(
@@ -3685,7 +3586,7 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		if len(overlayClears) > 0 {
 			responses = append(responses, overlayClears...)
 		}
-		broadcastNotifications := h.broadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
+		broadcastNotifications := h.commandDispatcher.BroadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
 		if len(broadcastNotifications) > 0 {
 			responses = append(responses, broadcastNotifications...)
 		}
@@ -3727,7 +3628,7 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 	if len(overlayClears) > 0 {
 		responses = append(responses, overlayClears...)
 	}
-	broadcastNotifications := h.broadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
+	broadcastNotifications := h.commandDispatcher.BroadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
 	if len(broadcastNotifications) > 0 {
 		responses = append(responses, broadcastNotifications...)
 	}
@@ -4795,13 +4696,6 @@ func (h *StreamHandler) disconnectRoutesForDevice(deviceID string) {
 	for _, route := range routes {
 		_ = routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind)
 		h.unregisterMediaStream(routeStreamID(route))
-	}
-}
-
-func (h *StreamHandler) appendCommandEventLocked(ev CommandEvent) {
-	h.recent = append(h.recent, ev)
-	if len(h.recent) > h.recentLimit {
-		h.recent = h.recent[len(h.recent)-h.recentLimit:]
 	}
 }
 
