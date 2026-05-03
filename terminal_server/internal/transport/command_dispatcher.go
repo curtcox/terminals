@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"sync"
 )
 
 // CommandDispatcher orchestrates the per-command flow that follows
@@ -17,16 +18,16 @@ import (
 // constructor. Validation sentinels live at package scope and are
 // returned from the run-command callback unchanged.
 //
-// The audit buffer (h.recent / h.recentLimit) intentionally remains a
-// field on StreamHandler. Existing characterization tests
-// (TestHandleMessageRecentCommandsEviction,
-// TestHandleMessageCommandRecordsValidationErrorInRecentEvents) read
-// those fields directly and must stay green unmodified; the dispatcher
-// reads and writes them under h.mu, the same lock that already guards
-// the dedupe seen/seenOrder maps they share update sites with.
+// The dispatcher owns the recent-command audit buffer behind its own
+// mutex. The dedupe seen/seenOrder maps remain on StreamHandler because
+// they are transport response cache state, not audit history.
 type CommandDispatcher struct {
 	h          *StreamHandler
 	runCommand func(context.Context, *CommandRequest) (ServerMessage, error)
+
+	mu          sync.Mutex
+	recent      []CommandEvent
+	recentLimit int
 }
 
 // NewCommandDispatcher returns a dispatcher bound to h. The runCommand
@@ -34,8 +35,17 @@ type CommandDispatcher struct {
 // (StreamHandler.handleCommand) — keeping it as a callback lets the
 // dispatcher own the orchestration shape without owning the scenario
 // engine plumbing.
-func NewCommandDispatcher(h *StreamHandler, runCommand func(context.Context, *CommandRequest) (ServerMessage, error)) *CommandDispatcher {
-	return &CommandDispatcher{h: h, runCommand: runCommand}
+func NewCommandDispatcher(
+	h *StreamHandler,
+	runCommand func(context.Context, *CommandRequest) (ServerMessage, error),
+	recentLimit int,
+) *CommandDispatcher {
+	return &CommandDispatcher{
+		h:           h,
+		runCommand:  runCommand,
+		recent:      []CommandEvent{},
+		recentLimit: recentLimit,
+	}
 }
 
 // Dispatch handles a single Command message end-to-end and returns the
@@ -55,7 +65,7 @@ func (d *CommandDispatcher) Dispatch(ctx context.Context, cmd *CommandRequest) (
 			if h.metrics != nil {
 				h.metrics.dedupeHits.Add(1)
 			}
-			d.appendEventLocked(CommandEvent{
+			d.appendEvent(CommandEvent{
 				RequestID: cmd.RequestID,
 				DeviceID:  cmd.DeviceID,
 				Kind:      cmd.Kind,
@@ -75,8 +85,7 @@ func (d *CommandDispatcher) Dispatch(ctx context.Context, cmd *CommandRequest) (
 	commandResult, err := d.runCommand(ctx, cmd)
 	if err != nil {
 		h.metrics.commandErrors.Add(1)
-		h.mu.Lock()
-		d.appendEventLocked(CommandEvent{
+		d.appendEvent(CommandEvent{
 			RequestID: cmd.RequestID,
 			DeviceID:  cmd.DeviceID,
 			Kind:      cmd.Kind,
@@ -85,11 +94,9 @@ func (d *CommandDispatcher) Dispatch(ctx context.Context, cmd *CommandRequest) (
 			Outcome:   "error:" + err.Error(),
 			WhenUnix:  h.control.now().UTC().UnixMilli(),
 		})
-		h.mu.Unlock()
 		return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 	}
-	h.mu.Lock()
-	d.appendEventLocked(CommandEvent{
+	d.appendEvent(CommandEvent{
 		RequestID: cmd.RequestID,
 		DeviceID:  cmd.DeviceID,
 		Kind:      cmd.Kind,
@@ -98,7 +105,6 @@ func (d *CommandDispatcher) Dispatch(ctx context.Context, cmd *CommandRequest) (
 		Outcome:   commandOutcome(commandResult),
 		WhenUnix:  h.control.now().UTC().UnixMilli(),
 	})
-	h.mu.Unlock()
 	if commandResult.ScenarioStart == "multi_window" && defaultAction(cmd.Action) == CommandActionStart {
 		h.captureMultiWindowResume(cmd.DeviceID, priorActiveScenario)
 	}
@@ -158,12 +164,43 @@ func (d *CommandDispatcher) BroadcastNotificationsForCommand(
 	return d.h.broadcastNotificationsSince(beforeCount, cmd.DeviceID, false)
 }
 
-// appendEventLocked appends ev to the recent-command audit buffer and
-// trims it to recentLimit. The caller must hold h.mu.
-func (d *CommandDispatcher) appendEventLocked(ev CommandEvent) {
-	h := d.h
-	h.recent = append(h.recent, ev)
-	if len(h.recent) > h.recentLimit {
-		h.recent = h.recent[len(h.recent)-h.recentLimit:]
+// Recent returns a copy of the recent-command audit buffer.
+func (d *CommandDispatcher) Recent() []CommandEvent {
+	if d == nil {
+		return nil
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return append([]CommandEvent(nil), d.recent...)
+}
+
+// SetRecentLimit updates the audit buffer limit and trims existing
+// events if needed. Limits below 1 keep the buffer empty.
+func (d *CommandDispatcher) SetRecentLimit(limit int) {
+	if d == nil {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.recentLimit = limit
+	d.trimRecentLocked()
+}
+
+// appendEvent appends ev to the recent-command audit buffer and trims it
+// to recentLimit.
+func (d *CommandDispatcher) appendEvent(ev CommandEvent) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.recent = append(d.recent, ev)
+	d.trimRecentLocked()
+}
+
+func (d *CommandDispatcher) trimRecentLocked() {
+	if d.recentLimit < 1 {
+		d.recent = nil
+		return
+	}
+	if len(d.recent) > d.recentLimit {
+		d.recent = d.recent[len(d.recent)-d.recentLimit:]
 	}
 }

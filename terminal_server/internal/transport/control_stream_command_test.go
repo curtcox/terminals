@@ -4410,7 +4410,7 @@ func TestHandleMessageRecentCommandsEviction(t *testing.T) {
 		IO:      io.NewRouter(),
 	})
 	handler := NewStreamHandlerWithRuntime(control, runtime)
-	handler.recentLimit = 2
+	handler.commandDispatcher.SetRecentLimit(2)
 
 	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
 		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen"},
@@ -4425,11 +4425,12 @@ func TestHandleMessageRecentCommandsEviction(t *testing.T) {
 		Command: &CommandRequest{RequestID: "evict-3", Kind: "system", Intent: "server_status"},
 	})
 
-	if len(handler.recent) != 2 {
-		t.Fatalf("len(recent) = %d, want 2", len(handler.recent))
+	events := handler.commandDispatcher.Recent()
+	if len(events) != 2 {
+		t.Fatalf("len(recent) = %d, want 2", len(events))
 	}
-	if handler.recent[0].RequestID != "evict-2" || handler.recent[1].RequestID != "evict-3" {
-		t.Fatalf("unexpected recent eviction order: %+v", handler.recent)
+	if events[0].RequestID != "evict-2" || events[1].RequestID != "evict-3" {
+		t.Fatalf("unexpected recent eviction order: %+v", events)
 	}
 }
 

@@ -341,3 +341,23 @@ Notes:
 - `control_stream.go` is now 4447 lines after dispatch cleanup and lint-formatting.
 - `make server-lint` is now clean; earlier Phase 8/7 revive comments and two test unused-parameter warnings were resolved as part of this finish pass.
 - Plan status remains `building`. The only remaining planned work is optional Phase 10 package moves; no package move is currently justified by this phase.
+
+## 2026-05-03 — Post-Phase 9 Cleanup
+
+Status: complete
+
+Changes:
+- Moved the recent-command audit buffer (`recent`, `recentLimit`) out of `StreamHandler` and into `CommandDispatcher`, guarded by the dispatcher's own mutex.
+- Added `CommandDispatcher.Recent()` and `CommandDispatcher.SetRecentLimit()` so the system `recent_commands` query and focused tests no longer reach into `StreamHandler` for audit state.
+- Updated constructor, command dispatcher, characterization, and recent-command eviction tests to assert the collaborator-owned audit state.
+
+Validation:
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./internal/transport -run 'TestDispatcher|TestHandleMessageRecentCommandsEviction|TestHandleMessageCommandRecordsValidationErrorInRecentEvents|TestStreamHandlerConstructors|TestHandleMessageCommandValidationErrorsReturnSingleErrorResponse' -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./internal/transport -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./... -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test -race ./... -count=1` — pass.
+- `GOCACHE=/tmp/terminals-go-build GOLANGCI_LINT_CACHE=/tmp/terminals-golangci-lint make server-lint` — pass.
+
+Notes:
+- This closes the earlier Phase 5 judgment-call gap where audit storage stayed on `StreamHandler` for test compatibility. The dedupe response cache (`seen`, `seenOrder`, `seenLimit`) remains on `StreamHandler` because it is transport response cache state, not command audit history.
+- No `.proto` changes, no `terminal_client/` changes, and no package moves.

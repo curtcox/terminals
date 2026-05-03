@@ -381,15 +381,13 @@ func (allowAllMenuAppPolicy) VisibleApps(_ Actor, apps []string) []string {
 
 // StreamHandler processes control stream messages.
 type StreamHandler struct {
-	control     *ControlService
-	runtime     *scenario.Runtime
-	metrics     *Metrics
-	mu          sync.Mutex
-	seen        map[string]ServerMessage
-	seenOrder   []string
-	seenLimit   int
-	recent      []CommandEvent
-	recentLimit int
+	control   *ControlService
+	runtime   *scenario.Runtime
+	metrics   *Metrics
+	mu        sync.Mutex
+	seen      map[string]ServerMessage
+	seenOrder []string
+	seenLimit int
 
 	terminals            *terminal.Manager
 	replSessions         *replsession.Service
@@ -512,13 +510,11 @@ func NewStreamHandler(control *ControlService) *StreamHandler {
 func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *StreamHandler {
 	handler := &StreamHandler{
 		// transport dispatch / metrics
-		control:     control,
-		runtime:     runtime,
-		metrics:     &Metrics{},
-		seen:        map[string]ServerMessage{},
-		seenLimit:   1024,
-		recent:      []CommandEvent{},
-		recentLimit: 200,
+		control:   control,
+		runtime:   runtime,
+		metrics:   &Metrics{},
+		seen:      map[string]ServerMessage{},
+		seenLimit: 1024,
 
 		// terminal / repl session support
 		terminals:            terminal.NewManager(),
@@ -551,7 +547,7 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 	}
 	handler.replSessions = replsession.NewService(handler.terminals)
 	handler.capabilityLifecycle = NewCapabilityLifecycle(control)
-	handler.commandDispatcher = NewCommandDispatcher(handler, handler.handleCommand)
+	handler.commandDispatcher = NewCommandDispatcher(handler, handler.handleCommand, 200)
 	handler.diagnostics = NewDiagnosticsIntake(nil)
 	handler.voicePipeline = NewVoicePipeline(handler)
 	return handler
@@ -4230,10 +4226,7 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		}, nil
 	case SystemIntentRecentCommands:
 		data := map[string]string{}
-		h.mu.Lock()
-		events := make([]CommandEvent, len(h.recent))
-		copy(events, h.recent)
-		h.mu.Unlock()
+		events := h.commandDispatcher.Recent()
 		for i, ev := range events {
 			key := fmt.Sprintf("%03d", i)
 			data[key] = strings.Join([]string{

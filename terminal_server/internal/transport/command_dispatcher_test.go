@@ -139,12 +139,11 @@ func TestDispatcherAuditAppendOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dispatch err = %v", err)
 	}
-	handler.mu.Lock()
-	defer handler.mu.Unlock()
-	if len(handler.recent) == 0 {
+	events := handler.commandDispatcher.Recent()
+	if len(events) == 0 {
 		t.Fatal("expected recent audit entry on success")
 	}
-	last := handler.recent[len(handler.recent)-1]
+	last := events[len(events)-1]
 	if last.RequestID != "ok-1" {
 		t.Fatalf("RequestID = %q, want ok-1", last.RequestID)
 	}
@@ -171,12 +170,11 @@ func TestDispatcherAuditAppendOnError(t *testing.T) {
 	if !errors.Is(err, ErrInvalidCommandKind) {
 		t.Fatalf("err = %v, want %v", err, ErrInvalidCommandKind)
 	}
-	handler.mu.Lock()
-	defer handler.mu.Unlock()
-	if len(handler.recent) == 0 {
+	events := handler.commandDispatcher.Recent()
+	if len(events) == 0 {
 		t.Fatal("expected recent audit entry on error")
 	}
-	last := handler.recent[len(handler.recent)-1]
+	last := events[len(events)-1]
 	want := "error:" + ErrInvalidCommandKind.Error()
 	if last.Outcome != want {
 		t.Fatalf("Outcome = %q, want %q", last.Outcome, want)
@@ -187,7 +185,7 @@ func TestDispatcherAuditAppendOnError(t *testing.T) {
 // trimmed to recentLimit, preserving FIFO eviction order.
 func TestDispatcherAuditTrimAtRecentLimit(t *testing.T) {
 	handler := newDispatcherTestHandler(t)
-	handler.recentLimit = 2
+	handler.commandDispatcher.SetRecentLimit(2)
 
 	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
 		Command: &CommandRequest{RequestID: "trim-1", DeviceID: "device-1", Kind: "manual", Intent: "photo frame"},
@@ -199,13 +197,12 @@ func TestDispatcherAuditTrimAtRecentLimit(t *testing.T) {
 		Command: &CommandRequest{RequestID: "trim-3", Kind: "system", Intent: "server_status"},
 	})
 
-	handler.mu.Lock()
-	defer handler.mu.Unlock()
-	if len(handler.recent) != 2 {
-		t.Fatalf("len(recent) = %d, want 2", len(handler.recent))
+	events := handler.commandDispatcher.Recent()
+	if len(events) != 2 {
+		t.Fatalf("len(recent) = %d, want 2", len(events))
 	}
-	if handler.recent[0].RequestID != "trim-2" || handler.recent[1].RequestID != "trim-3" {
-		t.Fatalf("eviction order wrong: %+v", handler.recent)
+	if events[0].RequestID != "trim-2" || events[1].RequestID != "trim-3" {
+		t.Fatalf("eviction order wrong: %+v", events)
 	}
 }
 

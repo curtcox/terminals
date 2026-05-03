@@ -38,14 +38,15 @@ func TestStreamHandlerConstructorsInitializeFields(t *testing.T) {
 			if h.seenLimit == 0 {
 				t.Error("seenLimit not set")
 			}
-			if h.recent == nil {
-				t.Error("recent slice not initialized")
-			}
-			if h.recentLimit == 0 {
-				t.Error("recentLimit not set")
-			}
 			if h.commandDispatcher == nil {
 				t.Error("commandDispatcher not initialized")
+			} else {
+				if h.commandDispatcher.recent == nil {
+					t.Error("command dispatcher recent slice not initialized")
+				}
+				if h.commandDispatcher.recentLimit == 0 {
+					t.Error("command dispatcher recentLimit not set")
+				}
 			}
 			if h.terminals == nil {
 				t.Error("terminals manager not initialized")

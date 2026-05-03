@@ -177,9 +177,7 @@ func TestHandleMessageCommandRecordsValidationErrorInRecentEvents(t *testing.T) 
 		t.Fatalf("err = %v, want %v", err, ErrInvalidCommandKind)
 	}
 
-	handler.mu.Lock()
-	events := append([]CommandEvent(nil), handler.recent...)
-	handler.mu.Unlock()
+	events := handler.commandDispatcher.Recent()
 	if len(events) == 0 {
 		t.Fatalf("expected at least one recent command event")
 	}
