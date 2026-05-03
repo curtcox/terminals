@@ -69,30 +69,30 @@ class ServerDrivenRenderer extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _renderNode(context, root);
 
-  Widget _renderNode(BuildContext context, uiv1.Node node) {
+  Widget _renderNode(
+    BuildContext context,
+    uiv1.Node node, [
+    String path = 'root',
+  ]) {
     switch (node.whichWidget()) {
       case uiv1.Node_Widget.stack:
         return Container(
-          key: _key('stack', node),
+          key: _key('stack', node, path),
           color: parseHexColor(node.props['background']),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: node.children
-                .map((child) => _renderNode(context, child))
-                .toList(),
+            children: _renderChildren(context, node.children, path),
           ),
         );
       case uiv1.Node_Widget.row:
         return Row(
-          key: _key('row', node),
-          children: node.children
-              .map((child) => _renderNode(context, child))
-              .toList(),
+          key: _key('row', node, path),
+          children: _renderChildren(context, node.children, path),
         );
       case uiv1.Node_Widget.grid:
         final columns = node.grid.columns > 0 ? node.grid.columns : 1;
         return LayoutBuilder(
-          key: _key('grid', node),
+          key: _key('grid', node, path),
           builder: (context, constraints) {
             const spacing = 8.0;
             final maxWidth = constraints.maxWidth.isFinite
@@ -104,46 +104,52 @@ class ServerDrivenRenderer extends StatelessWidget {
             return Wrap(
               spacing: spacing,
               runSpacing: spacing,
-              children: node.children
-                  .map(
-                    (child) => SizedBox(
-                      width: itemWidth,
-                      child: _renderNode(context, child),
-                    ),
-                  )
-                  .toList(),
+              children: List<Widget>.generate(
+                node.children.length,
+                (index) => SizedBox(
+                  width: itemWidth,
+                  child: _renderNode(
+                    context,
+                    node.children[index],
+                    '$path.$index',
+                  ),
+                ),
+              ),
             );
           },
         );
       case uiv1.Node_Widget.scroll:
+        final isHorizontal =
+            node.scroll.direction.trim().toLowerCase() == 'horizontal';
         return SingleChildScrollView(
-          key: _key('scroll', node),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: node.children
-                .map((child) => _renderNode(context, child))
-                .toList(),
-          ),
+          key: _key('scroll', node, path),
+          scrollDirection: isHorizontal ? Axis.horizontal : Axis.vertical,
+          child: isHorizontal
+              ? Row(children: _renderChildren(context, node.children, path))
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _renderChildren(context, node.children, path),
+                ),
         );
       case uiv1.Node_Widget.padding:
         return Padding(
-          key: _key('padding', node),
+          key: _key('padding', node, path),
           padding: EdgeInsets.all(node.padding.all.toDouble()),
-          child: _renderNodeChildren(context, node.children),
+          child: _renderNodeChildren(context, node.children, path),
         );
       case uiv1.Node_Widget.center:
         return Center(
-          key: _key('center', node),
-          child: _renderNodeChildren(context, node.children),
+          key: _key('center', node, path),
+          child: _renderNodeChildren(context, node.children, path),
         );
       case uiv1.Node_Widget.expand:
         return Expanded(
-          key: _key('expand', node),
-          child: _renderNodeChildren(context, node.children),
+          key: _key('expand', node, path),
+          child: _renderNodeChildren(context, node.children, path),
         );
       case uiv1.Node_Widget.text:
         return Padding(
-          key: _key('text', node),
+          key: _key('text', node, path),
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: SelectableText(
             node.text.value,
@@ -154,14 +160,14 @@ class ServerDrivenRenderer extends StatelessWidget {
           ),
         );
       case uiv1.Node_Widget.textInput:
-        return _textInput(node);
+        return _textInput(node, path);
       case uiv1.Node_Widget.button:
         final componentId = serverDrivenNodeId(node);
         return Padding(
-          key: _key('button-padding', node),
+          key: _key('button-padding', node, path),
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: ElevatedButton(
-            key: _key('button', node),
+            key: _key('button', node, path),
             onPressed: () => onAction(
               ServerDrivenAction(
                 componentId: componentId.isNotEmpty ? componentId : 'button',
@@ -178,7 +184,7 @@ class ServerDrivenRenderer extends StatelessWidget {
         final max = node.slider.max > min ? node.slider.max : min + 1;
         final value = node.slider.value.clamp(min, max).toDouble();
         return Slider(
-          key: _key('slider', node),
+          key: _key('slider', node, path),
           value: value,
           min: min,
           max: max,
@@ -193,7 +199,7 @@ class ServerDrivenRenderer extends StatelessWidget {
       case uiv1.Node_Widget.toggle:
         final componentId = serverDrivenNodeId(node);
         return SwitchListTile(
-          key: _key('toggle', node),
+          key: _key('toggle', node, path),
           value: node.toggle.value,
           onChanged: (nextValue) => onAction(
             ServerDrivenAction(
@@ -204,16 +210,14 @@ class ServerDrivenRenderer extends StatelessWidget {
           ),
         );
       case uiv1.Node_Widget.dropdown:
-        return _dropdown(node);
+        return _dropdown(node, path);
       case uiv1.Node_Widget.gestureArea:
-        return _gestureArea(context, node);
+        return _gestureArea(context, node, path);
       case uiv1.Node_Widget.overlay:
         return Stack(
-          key: _key('overlay', node),
+          key: _key('overlay', node, path),
           fit: StackFit.loose,
-          children: node.children
-              .map((child) => _renderNode(context, child))
-              .toList(),
+          children: _renderChildren(context, node.children, path),
         );
       case uiv1.Node_Widget.videoSurface:
         final componentId = serverDrivenNodeId(node);
@@ -221,12 +225,12 @@ class ServerDrivenRenderer extends StatelessWidget {
         final builder = mediaSurfaceBuilder;
         if (builder != null) {
           return KeyedSubtree(
-            key: _key('video-surface', node),
+            key: _key('video-surface', node, path),
             child: builder(context, componentId, trackId),
           );
         }
         return _placeholderPrimitive(
-          key: _key('video-surface', node),
+          key: _key('video-surface', node, path),
           title: 'Video surface',
           detail: trackId,
         );
@@ -236,12 +240,12 @@ class ServerDrivenRenderer extends StatelessWidget {
         final builder = audioVisualizerBuilder;
         if (builder != null) {
           return KeyedSubtree(
-            key: _key('audio-visualizer', node),
+            key: _key('audio-visualizer', node, path),
             child: builder(context, componentId, streamId),
           );
         }
         return _placeholderPrimitive(
-          key: _key('audio-visualizer', node),
+          key: _key('audio-visualizer', node, path),
           title: 'Audio level',
           detail: streamId,
         );
@@ -253,43 +257,43 @@ class ServerDrivenRenderer extends StatelessWidget {
                 ? '${drawOps.substring(0, 64)}...'
                 : drawOps);
         return _placeholderPrimitive(
-          key: _key('canvas', node),
+          key: _key('canvas', node, path),
           title: 'Canvas',
           detail: drawOpsPreview,
         );
       case uiv1.Node_Widget.fullscreen:
         return _placeholderPrimitive(
-          key: _key('fullscreen', node),
+          key: _key('fullscreen', node, path),
           title:
               'Fullscreen ${node.fullscreen.enabled ? 'enabled' : 'disabled'}',
-          child: _renderNodeChildren(context, node.children),
+          child: _renderNodeChildren(context, node.children, path),
         );
       case uiv1.Node_Widget.keepAwake:
         return _placeholderPrimitive(
-          key: _key('keep-awake', node),
+          key: _key('keep-awake', node, path),
           title:
               'Keep awake ${node.keepAwake.enabled ? 'enabled' : 'disabled'}',
-          child: _renderNodeChildren(context, node.children),
+          child: _renderNodeChildren(context, node.children, path),
         );
       case uiv1.Node_Widget.brightness:
         final brightness = node.brightness.value.clamp(0.0, 1.0).toDouble();
         return _placeholderPrimitive(
-          key: _key('brightness', node),
+          key: _key('brightness', node, path),
           title: 'Brightness hint',
           detail: brightness.toStringAsFixed(2),
-          child: _renderNodeChildren(context, node.children),
+          child: _renderNodeChildren(context, node.children, path),
         );
       case uiv1.Node_Widget.image:
         final loader = imageLoader;
         if (loader != null) {
           return KeyedSubtree(
-            key: _key('image', node),
+            key: _key('image', node, path),
             child: loader(context, node.image.url),
           );
         }
         return Image.network(
           node.image.url,
-          key: _key('image', node),
+          key: _key('image', node, path),
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return const Icon(Icons.broken_image_outlined);
@@ -297,21 +301,21 @@ class ServerDrivenRenderer extends StatelessWidget {
         );
       case uiv1.Node_Widget.progress:
         return LinearProgressIndicator(
-          key: _key('progress', node),
+          key: _key('progress', node, path),
           value: node.progress.value.clamp(0.0, 1.0).toDouble(),
         );
       case uiv1.Node_Widget.notSet:
         break;
     }
-    return _fallback(node);
+    return _fallback(node, path);
   }
 
-  Widget _textInput(uiv1.Node node) {
+  Widget _textInput(uiv1.Node node, String path) {
     final componentId = serverDrivenNodeId(node);
     final binding = textInputBindingResolver?.call(componentId);
     final controller = binding?.controller;
     return TextField(
-      key: _key('text-input', node),
+      key: _key('text-input', node, path),
       controller: controller,
       focusNode: binding?.focusNode,
       decoration: InputDecoration(
@@ -337,14 +341,14 @@ class ServerDrivenRenderer extends StatelessWidget {
     );
   }
 
-  Widget _dropdown(uiv1.Node node) {
+  Widget _dropdown(uiv1.Node node, String path) {
     final componentId = serverDrivenNodeId(node);
     final options = node.dropdown.options;
     final selected = options.contains(node.dropdown.value)
         ? node.dropdown.value
         : (options.isNotEmpty ? options.first : null);
     return DropdownButton<String>(
-      key: _key('dropdown', node),
+      key: _key('dropdown', node, path),
       isExpanded: true,
       value: selected,
       hint: const Text('Select option'),
@@ -374,13 +378,13 @@ class ServerDrivenRenderer extends StatelessWidget {
     );
   }
 
-  Widget _gestureArea(BuildContext context, uiv1.Node node) {
+  Widget _gestureArea(BuildContext context, uiv1.Node node, String path) {
     final componentId = serverDrivenNodeId(node);
     final action =
         node.gestureArea.action.isNotEmpty ? node.gestureArea.action : 'tap';
-    final child = _renderNodeChildren(context, node.children);
+    final child = _renderNodeChildren(context, node.children, path);
     return GestureDetector(
-      key: _key('gesture', node),
+      key: _key('gesture', node, path),
       behavior: HitTestBehavior.opaque,
       onTap: () => onAction(
         ServerDrivenAction(
@@ -393,25 +397,40 @@ class ServerDrivenRenderer extends StatelessWidget {
     );
   }
 
-  Widget _renderNodeChildren(BuildContext context, List<uiv1.Node> children) {
+  List<Widget> _renderChildren(
+    BuildContext context,
+    List<uiv1.Node> children,
+    String parentPath,
+  ) {
+    return List<Widget>.generate(
+      children.length,
+      (index) => _renderNode(context, children[index], '$parentPath.$index'),
+    );
+  }
+
+  Widget _renderNodeChildren(
+    BuildContext context,
+    List<uiv1.Node> children,
+    String parentPath,
+  ) {
     if (children.isEmpty) {
       return const SizedBox.shrink();
     }
     if (children.length == 1) {
-      return _renderNode(context, children.first);
+      return _renderNode(context, children.first, '$parentPath.0');
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((child) => _renderNode(context, child)).toList(),
+      children: _renderChildren(context, children, parentPath),
     );
   }
 
-  Widget _fallback(uiv1.Node node) {
+  Widget _fallback(uiv1.Node node, String path) {
     if (!policy.showFallbackDiagnostics) {
       return const SizedBox.shrink();
     }
     return _placeholderPrimitive(
-      key: _key('unsupported', node),
+      key: _key('unsupported', node, path),
       title: 'Unsupported UI node',
     );
   }
@@ -447,10 +466,10 @@ class ServerDrivenRenderer extends StatelessWidget {
     );
   }
 
-  ValueKey<String> _key(String kind, uiv1.Node node) {
+  ValueKey<String> _key(String kind, uiv1.Node node, String path) {
     final id = serverDrivenNodeId(node);
     return ValueKey<String>(
-      id.isEmpty ? 'ui-$kind-${identityHashCode(node)}' : 'ui-$kind-$id',
+      id.isEmpty ? 'ui-$kind-$path' : 'ui-$kind-$id',
     );
   }
 }

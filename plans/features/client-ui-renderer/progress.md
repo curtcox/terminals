@@ -2,6 +2,30 @@
 
 ## 2026-05-03
 
+- Continued Phase 2 by hardening `ServerDrivenRenderer` key generation for
+  nodes without explicit IDs. Anonymous nodes now receive deterministic
+  traversal-path keys instead of identity-hash-based keys.
+- Updated scroll rendering to honor `ScrollWidget.direction = "horizontal"`.
+- Expanded focused renderer coverage in
+  `terminal_client/test/ui/server_driven_renderer_test.dart` across all current
+  `uiv1.Node` widget variants, including fallback policy behavior and generic
+  action emission for controls.
+
+Validation:
+
+```bash
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/ui/server_driven_renderer_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 4 by extracting screen metric types and display geometry
   helper functions from `terminal_client/lib/app/terminal_client_app.dart`
   into `terminal_client/lib/capabilities/screen_metrics.dart`.

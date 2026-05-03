@@ -547,7 +547,7 @@ Add or document these rules near the new renderer and in client boundary docs:
 
 ### Phase 0: Characterization and Safety Net
 
-Status: not started
+Status: completed
 
 Tasks:
 
@@ -572,7 +572,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 1: Move Pure Helpers Out of `main.dart`
 
-Status: not started
+Status: completed
 
 Tasks:
 
@@ -614,7 +614,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 2: Create the Server-Driven Renderer Module
 
-Status: not started
+Status: completed
 
 Tasks:
 
@@ -689,7 +689,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 4: Split Capability Lifecycle
 
-Status: not started
+Status: in progress
 
 Tasks:
 
@@ -761,7 +761,7 @@ cd terminal_client && flutter analyze
 
 ### Phase 6: Shrink `main.dart` and Stabilize Public Test Seams
 
-Status: not started
+Status: in progress
 
 Tasks:
 
