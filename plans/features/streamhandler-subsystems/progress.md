@@ -267,3 +267,41 @@ Notes:
 - No `.proto` changes, no `terminal_client/` changes, no package moves.
 - Follow-up remains for bounded per-device voice buffers; this PR preserves the existing unbounded behavior intentionally.
 - Plan status stays `building`. Next planned phase is Phase 8 (`MediaControlState`).
+
+## 2026-05-03 — Phase 8 (PR 9: extract MediaControlState)
+
+Status: complete
+
+Changes:
+- Added `terminal_server/internal/transport/media_control_state.go` with `MediaControlState`: `NewMediaControlState()`, `SetRecordingManager`, `SetWebRTCSignalEngine`, `RegisterStream`, `UnregisterStream`, `MarkStreamReady`, WebRTC peer/engine lookup, media/recording status helpers, recording event reads, playback artifact listing, and playback metadata lookup.
+- Moved media stream state from `StreamHandler.mediaStreams` into `MediaControlState.streams`, guarded by the collaborator's own `sync.Mutex`.
+- Moved recording manager state from `StreamHandler.recording` into `MediaControlState.recording`; `StreamHandler.SetRecordingManager` remains as the public compatibility method and now delegates to the collaborator.
+- Moved WebRTC signaling engine state from `StreamHandler.webrtc` into `MediaControlState.webrtc`; `StreamHandler.SetWebRTCSignalEngine` remains as the public compatibility method and now delegates to the collaborator.
+- Kept existing `StreamHandler` helper names (`registerMediaStream`, `unregisterMediaStream`, `markStreamReady`, `serverManagedSignalEngine`, `peerDeviceForStream`, `mediaStreamStatusData`, `recordingStatusData`, `listPlaybackArtifacts`, `playbackMetadataForTarget`) as thin delegates so command/reconnect/WebRTC call sites and tests keep their existing shape.
+- Updated `VoicePipeline`'s recording-manager access to use `h.mediaControl.CurrentRecordingManager()`.
+- Updated `control_stream_constructor_test.go` to assert `h.mediaControl != nil` instead of direct `mediaStreams` / `recording` fields.
+- Added `media_control_state_test.go` with focused tests for recorder start/stop hooks, ready-state accounting for unknown streams, defensive metadata copying for server-managed WebRTC, peer lookup, and engine stream removal.
+
+Validation:
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./internal/transport -run 'TestMediaControlState|TestStreamHandlerConstructors|TestHandleMessageWebRTCSignal|TestUnregisterMediaStream|TestControlStreamVoiceAudio' -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./internal/transport -count=1` — pass.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./... -count=1` — pass outside sandbox.
+- `cd terminal_server && GOCACHE=/tmp/terminals-go-build go test -race ./internal/transport -count=1` — pass outside sandbox.
+- Initial sandboxed `go test ./... -count=1` failed because several existing packages/tests need loopback listeners or host discovery (`cmd/server`, `internal/discovery`, `internal/mcpadapter`, `internal/repl`, and transport websocket tests); rerunning outside the sandbox passed.
+
+Judgment calls:
+- **Kept `mediaStreamState` as a package-local type.** It is still a transport-only data shape used by the new collaborator; moving it into the file would be cosmetic, and keeping the package-local type avoids churn for nearby helper tests.
+- **Left `StreamHandler` wrappers in place.** The plan's public-stability goal matters here: tests and command routing already call the helper names directly. The behavior moved, while the orchestration surface stayed stable.
+- **Recorder operations stay outside the collaborator mutex.** `RegisterStream` / `UnregisterStream` snapshot the recorder under lock, release the lock, then call `Start` / `Stop`. This preserves the previous non-blocking lock posture and avoids holding media state while recording backends do I/O.
+- **Route-message construction stayed in `StreamHandler`.** `routeUpdatesForCommand` still owns route-delta message fan-out and calls `registerMediaStream` / `unregisterMediaStream`; the new collaborator owns lifecycle state and hooks, not command policy.
+
+Moved vs. stayed:
+- Moved (state): `mediaStreams`, `recording`, `webrtc`.
+- Moved (behavior): media registration/unregistration storage, ready marking, media status assembly, recording status assembly, WebRTC server-managed lookup, stream peer lookup, recorder start/stop calls, WebRTC stream removal, recording event reads, playback artifact listing, playback metadata lookup.
+- Stayed (state): sensor snapshots, suspended claims, route replay, and wake-word dedupe.
+- Stayed (behavior): `HandleMessage` metrics/error handling, command route-delta construction and peer fan-out, route replay, disconnect orchestration, and system-intent response shaping.
+
+Notes:
+- `control_stream.go` dropped from 4524 → 4374 lines. `media_control_state.go` is 277 lines and `media_control_state_test.go` is 114 lines.
+- No `.proto` changes, no `terminal_client/` changes, no package moves.
+- Plan status stays `building`. Next planned phase is Phase 9 (`HandleMessage` cleanup).

@@ -400,7 +400,7 @@ type StreamHandler struct {
 	photoFrameLastByDev  map[string]time.Time
 	photoFrameInterval   time.Duration
 
-	mediaStreams            map[string]mediaStreamState
+	mediaControl            *MediaControlState
 	sensorsByDevice         map[string]sensorSnapshot
 	suspendedClaimsByDevice map[string][]iorouter.Claim
 	// routeReplay captures route sets at disconnect so subsequent reconnects
@@ -408,8 +408,6 @@ type StreamHandler struct {
 	// router state was torn down on disconnect.
 	routeReplay *RouteReplayStore
 
-	recording      recording.Manager
-	webrtc         WebRTCSignalEngine
 	diagnostics    *DiagnosticsIntake
 	uiOwners       *uiActionOwnershipTracker
 	voicePipeline  *VoicePipeline
@@ -536,13 +534,12 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 		photoFrameInterval:   defaultPhotoFrameInterval,
 
 		// media control / route replay / voice
-		mediaStreams:            map[string]mediaStreamState{},
+		mediaControl:            NewMediaControlState(),
 		sensorsByDevice:         map[string]sensorSnapshot{},
 		suspendedClaimsByDevice: map[string][]iorouter.Claim{},
 		routeReplay:             NewRouteReplayStore(),
 
 		// diagnostics / collaborators with default impls
-		recording:         recording.NoopManager{},
 		uiOwners:          newUIActionOwnershipTracker(),
 		wakeWordDedupe:    newWakeWordDedupeStage(0, ""),
 		menuAppPolicy:     allowAllMenuAppPolicy{},
@@ -572,21 +569,13 @@ func NewStreamHandlerWithRuntime(control *ControlService, runtime *scenario.Runt
 // SetRecordingManager wires stream recording lifecycle hooks used when routes
 // start and stop. Passing nil restores the no-op manager.
 func (h *StreamHandler) SetRecordingManager(mgr recording.Manager) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if mgr == nil {
-		h.recording = recording.NoopManager{}
-		return
-	}
-	h.recording = mgr
+	h.mediaControl.SetRecordingManager(mgr)
 }
 
 // SetWebRTCSignalEngine wires a server-side signaling engine used for streams
 // marked as server-managed. Passing nil disables server-managed signaling.
 func (h *StreamHandler) SetWebRTCSignalEngine(engine WebRTCSignalEngine) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.webrtc = engine
+	h.mediaControl.SetWebRTCSignalEngine(engine)
 }
 
 // SetBugReportIntake wires a persisted bug-report intake for control streams.
@@ -2449,21 +2438,10 @@ func (h *StreamHandler) handleWebRTCSignal(
 }
 
 func (h *StreamHandler) serverManagedSignalEngine(streamID string) (WebRTCSignalEngine, bool) {
-	streamID = strings.TrimSpace(streamID)
-	if streamID == "" {
+	if h.mediaControl == nil {
 		return nil, false
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.webrtc == nil {
-		return nil, false
-	}
-	state, ok := h.mediaStreams[streamID]
-	if !ok {
-		return nil, false
-	}
-	mode := strings.ToLower(strings.TrimSpace(state.Metadata["webrtc_mode"]))
-	return h.webrtc, mode == "server_managed"
+	return h.mediaControl.ServerManagedSignalEngine(streamID)
 }
 
 func (h *StreamHandler) peerDeviceForStream(streamID, sourceDeviceID string) string {
@@ -2480,122 +2458,38 @@ func (h *StreamHandler) peerDeviceForStream(streamID, sourceDeviceID string) str
 		}
 	}
 
-	h.mu.Lock()
-	state, ok := h.mediaStreams[streamID]
-	h.mu.Unlock()
-	if !ok {
+	if h.mediaControl == nil {
 		return ""
 	}
-	if sourceDeviceID == state.SourceDeviceID {
-		return state.TargetDeviceID
-	}
-	if sourceDeviceID == state.TargetDeviceID {
-		return state.SourceDeviceID
-	}
-	return ""
+	return h.mediaControl.PeerDeviceForStream(streamID, sourceDeviceID)
 }
 
 func (h *StreamHandler) registerMediaStream(start StartStreamResponse) {
-	streamID := strings.TrimSpace(start.StreamID)
-	if streamID == "" {
-		return
-	}
-	metadata := map[string]string{}
-	for k, v := range start.Metadata {
-		metadata[k] = v
-	}
-	h.mu.Lock()
-	h.mediaStreams[streamID] = mediaStreamState{
-		StreamID:       streamID,
-		Kind:           start.Kind,
-		SourceDeviceID: start.SourceDeviceID,
-		TargetDeviceID: start.TargetDeviceID,
-		Metadata:       metadata,
-		Ready:          false,
-	}
-	recorder := h.recording
-	h.mu.Unlock()
-	if recorder != nil {
-		_ = recorder.Start(context.Background(), recording.Stream{
-			StreamID:       streamID,
-			Kind:           start.Kind,
-			SourceDeviceID: start.SourceDeviceID,
-			TargetDeviceID: start.TargetDeviceID,
-			Metadata:       metadata,
-		})
+	if h.mediaControl != nil {
+		h.mediaControl.RegisterStream(start)
 	}
 }
 
 func (h *StreamHandler) unregisterMediaStream(streamID string) {
-	streamID = strings.TrimSpace(streamID)
-	if streamID == "" {
-		return
-	}
-	h.mu.Lock()
-	delete(h.mediaStreams, streamID)
-	recorder := h.recording
-	engine := h.webrtc
-	h.mu.Unlock()
-	if recorder != nil {
-		_ = recorder.Stop(context.Background(), streamID)
-	}
-	if engine != nil {
-		engine.RemoveStream(streamID)
+	if h.mediaControl != nil {
+		h.mediaControl.UnregisterStream(streamID)
 	}
 }
 
 func (h *StreamHandler) markStreamReady(streamID string) {
-	streamID = strings.TrimSpace(streamID)
-	if streamID == "" {
-		return
-	}
-	h.mu.Lock()
-	state, ok := h.mediaStreams[streamID]
-	if !ok {
-		state = mediaStreamState{
-			StreamID: streamID,
-			Kind:     "unknown",
-		}
-	}
-	state.Ready = true
-	h.mediaStreams[streamID] = state
-	h.mu.Unlock()
+	h.mediaControl.MarkStreamReady(streamID)
 }
 
 func (h *StreamHandler) mediaStreamStatusData() map[string]string {
-	h.mu.Lock()
-	streams := make([]mediaStreamState, 0, len(h.mediaStreams))
-	for _, state := range h.mediaStreams {
-		streams = append(streams, state)
-	}
-	h.mu.Unlock()
-
-	sort.Slice(streams, func(i, j int) bool {
-		return streams[i].StreamID < streams[j].StreamID
-	})
-
-	ready := 0
-	details := make([]string, 0, len(streams))
-	for _, state := range streams {
-		if state.Ready {
-			ready++
+	if h.mediaControl == nil {
+		return map[string]string{
+			"media_streams_active":  "0",
+			"media_streams_ready":   "0",
+			"media_streams_pending": "0",
+			"media_streams":         "",
 		}
-		details = append(details, fmt.Sprintf(
-			"%s|%s|%s->%s|ready=%t",
-			state.StreamID,
-			state.Kind,
-			state.SourceDeviceID,
-			state.TargetDeviceID,
-			state.Ready,
-		))
 	}
-
-	return map[string]string{
-		"media_streams_active":  strconv.Itoa(len(streams)),
-		"media_streams_ready":   strconv.Itoa(ready),
-		"media_streams_pending": strconv.Itoa(len(streams) - ready),
-		"media_streams":         strings.Join(details, ";"),
-	}
+	return h.mediaControl.MediaStreamStatusData()
 }
 
 func (h *StreamHandler) recordSensorData(sensor *SensorDataRequest) {
@@ -2686,28 +2580,13 @@ func (h *StreamHandler) sensorStatusData() map[string]string {
 }
 
 func (h *StreamHandler) recordingStatusData() map[string]string {
-	h.mu.Lock()
-	recorder := h.recording
-	h.mu.Unlock()
-	activeReader, ok := recorder.(interface {
-		Active() map[string]recording.Stream
-	})
-	if !ok {
+	if h.mediaControl == nil {
 		return map[string]string{
 			"recording_active_streams": "0",
 			"recording_stream_ids":     "",
 		}
 	}
-	active := activeReader.Active()
-	streamIDs := make([]string, 0, len(active))
-	for streamID := range active {
-		streamIDs = append(streamIDs, streamID)
-	}
-	sort.Strings(streamIDs)
-	return map[string]string{
-		"recording_active_streams": strconv.Itoa(len(streamIDs)),
-		"recording_stream_ids":     strings.Join(streamIDs, ","),
-	}
+	return h.mediaControl.RecordingStatusData()
 }
 
 func (h *StreamHandler) disconnectScenarioRoutes(deviceID, scenarioName string) {
@@ -4303,25 +4182,20 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 		}, nil
 	case SystemIntentRecordingEvents:
 		data := map[string]string{}
-		h.mu.Lock()
-		recorder := h.recording
-		h.mu.Unlock()
-		eventReader, ok := recorder.(interface {
-			RecentEvents(limit int) []recording.Event
-		})
-		if ok {
-			events := eventReader.RecentEvents(50)
-			for i, event := range events {
-				key := fmt.Sprintf("%03d", i)
-				data[key] = strings.Join([]string{
-					strconv.FormatInt(event.AtUnixMS, 10),
-					event.Action,
-					event.StreamID,
-					event.Kind,
-					event.SourceID,
-					event.TargetID,
-				}, "|")
-			}
+		var events []recording.Event
+		if h.mediaControl != nil {
+			events = h.mediaControl.RecentRecordingEvents(50)
+		}
+		for i, event := range events {
+			key := fmt.Sprintf("%03d", i)
+			data[key] = strings.Join([]string{
+				strconv.FormatInt(event.AtUnixMS, 10),
+				event.Action,
+				event.StreamID,
+				event.Kind,
+				event.SourceID,
+				event.TargetID,
+			}, "|")
 		}
 		return ServerMessage{
 			Notification: "System query: recording_events",
@@ -4420,38 +4294,17 @@ func pendingTimerRecordValue(record storage.ScheduleRecord) string {
 }
 
 func (h *StreamHandler) listPlaybackArtifacts() []recording.Artifact {
-	h.mu.Lock()
-	recorder := h.recording
-	h.mu.Unlock()
-	lister, ok := recorder.(interface {
-		ListPlayableArtifacts() []recording.Artifact
-	})
-	if !ok {
+	if h.mediaControl == nil {
 		return nil
 	}
-	artifacts := lister.ListPlayableArtifacts()
-	out := make([]recording.Artifact, len(artifacts))
-	copy(out, artifacts)
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].UpdatedUnixMS == out[j].UpdatedUnixMS {
-			return out[i].ArtifactID < out[j].ArtifactID
-		}
-		return out[i].UpdatedUnixMS > out[j].UpdatedUnixMS
-	})
-	return out
+	return h.mediaControl.ListPlaybackArtifacts()
 }
 
 func (h *StreamHandler) playbackMetadataForTarget(artifactID, targetDeviceID string) (map[string]string, bool) {
-	h.mu.Lock()
-	recorder := h.recording
-	h.mu.Unlock()
-	provider, ok := recorder.(interface {
-		PlaybackMetadata(artifactID, targetDeviceID string) (recording.PlaybackMetadata, bool)
-	})
-	if !ok {
+	if h.mediaControl == nil {
 		return nil, false
 	}
-	metadata, ok := provider.PlaybackMetadata(artifactID, targetDeviceID)
+	metadata, ok := h.mediaControl.PlaybackMetadataForTarget(artifactID, targetDeviceID)
 	if !ok {
 		return nil, false
 	}

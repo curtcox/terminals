@@ -83,8 +83,8 @@ func TestStreamHandlerConstructorsInitializeFields(t *testing.T) {
 			if h.photoFrameInterval == 0 {
 				t.Error("photoFrameInterval not set")
 			}
-			if h.mediaStreams == nil {
-				t.Error("mediaStreams not initialized")
+			if h.mediaControl == nil {
+				t.Error("mediaControl state not initialized")
 			}
 			if h.sensorsByDevice == nil {
 				t.Error("sensorsByDevice not initialized")
@@ -97,9 +97,6 @@ func TestStreamHandlerConstructorsInitializeFields(t *testing.T) {
 			}
 			if h.routeReplay == nil {
 				t.Error("routeReplay store not initialized")
-			}
-			if h.recording == nil {
-				t.Error("recording manager not initialized (expected NoopManager)")
 			}
 			if h.uiOwners == nil {
 				t.Error("uiOwners tracker not initialized")

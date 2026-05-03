@@ -208,9 +208,10 @@ func recordVoiceAudioChunk(recorder recording.Manager, deviceID string, chunk []
 }
 
 func (h *StreamHandler) currentRecordingManager() recording.Manager {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.recording
+	if h.mediaControl == nil {
+		return recording.NoopManager{}
+	}
+	return h.mediaControl.CurrentRecordingManager()
 }
 
 // voiceAudioReader is a simple io.Reader over an accumulated voice buffer.
