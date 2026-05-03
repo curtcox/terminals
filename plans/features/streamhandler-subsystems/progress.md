@@ -361,3 +361,23 @@ Validation:
 Notes:
 - This closes the earlier Phase 5 judgment-call gap where audit storage stayed on `StreamHandler` for test compatibility. The dedupe response cache (`seen`, `seenOrder`, `seenLimit`) remains on `StreamHandler` because it is transport response cache state, not command audit history.
 - No `.proto` changes, no `terminal_client/` changes, and no package moves.
+
+## 2026-05-03 — Closure
+
+Status: complete
+
+Changes:
+- Reviewed the completed Phase 0–9 implementation and the post-Phase 9 audit-state cleanup against the plan's Definition of Done.
+- Evaluated optional Phase 10 package moves and kept collaborators under `internal/transport`; the current dependencies are still transport-message-shaped, so moving them now would add interfaces without reducing coupling.
+- Marked the plan as `shipped-validated` with automated validation and updated the plan review date.
+
+Validation:
+- Prior phase log records passing `go test ./internal/transport -count=1`.
+- Prior phase log records passing `go test ./... -count=1`.
+- Prior phase log records passing `go test -race ./... -count=1`.
+- Prior phase log records passing `make server-lint`.
+
+Notes:
+- `StreamHandler` no longer owns capability lifecycle state, route replay state, UI replay/resume maps, recent command audit state, voice audio buffers, media stream state, or bug-report intake.
+- `HandleMessage` now reads as high-level dispatch, with focused subsystem tests covering the extracted collaborators.
+- No `.proto` changes and no Flutter client changes were required.

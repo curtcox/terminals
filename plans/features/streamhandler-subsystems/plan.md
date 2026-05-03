@@ -1,12 +1,14 @@
 ---
 id: streamhandler-subsystems
 title: Split StreamHandler into Focused Server Subsystems
-status: building
+kind: plan
+status: shipped-validated
 owner: server architecture
 created: 2026-05-02
-last-reviewed: 2026-05-02
+last-reviewed: 2026-05-03
 target-area: terminal_server/internal/transport
 source: audit-top-recommendation
+validation: automated
 ---
 
 # Split `StreamHandler` into Focused Server Subsystems
