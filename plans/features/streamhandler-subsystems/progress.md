@@ -192,3 +192,40 @@ Notes:
 - `control_stream.go` dropped from 4826 → 4720 lines (net 106-line shrink: the 92-line inline branch became one delegation, plus the moved `broadcastNotificationsForCommand` and `appendCommandEventLocked` bodies). `command_dispatcher.go` is 169 lines.
 - No `.proto` changes, no `terminal_client/` changes, no package moves — Phase 10 still on the table later.
 - Plan status stays `building`. Stopping after this PR. Awaiting confirmation before starting PR 7.
+
+## 2026-05-02 — Phase 6 (PR 7: extract DiagnosticsIntake)
+
+Status: complete
+
+Changes:
+- Added `terminal_server/internal/transport/diagnostics_intake.go` (49 lines) with `DiagnosticsIntake` collaborator: `NewDiagnosticsIntake(BugReportIntake) *DiagnosticsIntake`, `SetIntake(BugReportIntake)`, and `HandleBugReport(ctx, *diagnosticsv1.BugReport) (ServerMessage, error)`. Owns its own `sync.Mutex`. Returns `(ServerMessage{}, ErrBugReportIntakeUnavailable)` when intake is nil; propagates `intake.File` errors unchanged; returns `ServerMessage{BugReportAck: ack}` on success.
+- Replaced `bugReports BugReportIntake` field on `StreamHandler` with `diagnostics *DiagnosticsIntake`. Constructor wires `handler.diagnostics = NewDiagnosticsIntake(nil)` so the field is never nil and the mutex is safe to use before any `SetIntake` call.
+- `SetBugReportIntake` is now a one-line passthrough to `h.diagnostics.SetIntake(intake)` — kept as a back-compat shim per the plan so external wiring doesn't break.
+- `HandleMessage`'s `case msg.BugReport != nil` branch now delegates to `h.diagnostics.HandleBugReport`; the metric increment (`h.metrics.protocolErrors.Add(1)`) and the `[]ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}` wire-format wrapping for the error case stay on `StreamHandler` at the dispatch boundary, mirroring prior extractions.
+- `handleBugReportUIAction` (the menu-driven path at control_stream.go:2970) was refactored to also route through `h.diagnostics.HandleBugReport` so both the wire-level BugReport branch and the UI-action path share one nil-check and one error-mapping policy. The function still owns its own `[]ServerMessage` shape (ack + `Notification: "Bug report filed: " + ack.GetReportId()`), but the ack is unwrapped from the collaborator's `ServerMessage{BugReportAck: ack}` return.
+- Added `diagnostics_intake_test.go` with 5 focused tests: nil intake returns `ErrBugReportIntakeUnavailable` (and ack is nil); successful intake returns the ack inside `ServerMessage{BugReportAck: ...}`; intake error propagates unchanged via `errors.Is` against a sentinel; context cancellation propagates (stub blocks on `ctx.Done`); concurrent `SetIntake` + `HandleBugReport` race test passes under `-race` (uses a stateless stub so the race detector isolates the collaborator's lock, not the test's bookkeeping).
+- Updated `control_stream_constructor_test.go` to assert `h.diagnostics != nil`. Removed the pre-existing `bugReports` field-presence check is N/A — there was no such check before this PR.
+
+Validation:
+- `cd terminal_server && go test ./internal/transport -count=1` — pass (9.1s).
+- `cd terminal_server && go test ./...` — pass.
+- `cd terminal_server && go test -race ./internal/transport -count=1` — pass (10.2s).
+- `cd terminal_server && go build ./...` — pass.
+- Behavior-preservation: `TestHandleMessageBugReportRequiresIntake`, `TestHandleMessageBugReportReturnsAck`, `TestHandleMessageInputBugReportActionFilesReport`, `TestHandleMessageInputBugReportActionRespectsModalitySources`, `TestHandleMessageBugReportIntakeErrorPropagates` (the Phase 0 characterization test) all pass unmodified.
+
+Judgment calls:
+- **Mutex on the collaborator: yes.** Per the plan's leaning. `DiagnosticsIntake` owns a `sync.Mutex` and serializes the `intake` field across `SetIntake` and `HandleBugReport`. The pre-extraction code did `if h.bugReports == nil { ... } ack, err := h.bugReports.File(...)` outside `h.mu`, which was a mild data race against `SetBugReportIntake`. No test exercised that race, but the cost of fixing it (one mutex, one snapshot read) is trivial and matches the precedent set by `UISessionState` and `RouteReplayStore`. The mutex is held only across the field read, then released before calling `intake.File` — so the underlying intake (which can block on I/O) does not serialize against `SetIntake`.
+- **`handleBugReportUIAction` routed through the collaborator: yes.** The menu-driven path's response shape (ack + Notification) composed cleanly with `HandleBugReport`'s single-`ServerMessage` return — unwrap the ack from `ServerMessage{BugReportAck: ack}`, build the `Notification` from `ack.GetReportId()`. Both code paths now share one nil-check and one error-mapping policy. The `nil, err` return on intake error in `handleBugReportUIAction` matches prior behavior exactly (caller decides how to surface it; this path returns the error to the input handler which then maps it).
+- **`ErrBugReportIntakeUnavailable` stays in `control_stream.go`.** Same reasoning as PR 6's command sentinels: package-level vars are file-cosmetic; moving is shuffle work that doesn't strengthen the boundary.
+- **Constructor wiring with `NewDiagnosticsIntake(nil)`.** Mirrors `NewRouteReplayStore` / `NewUISessionState`. The field is never nil; `HandleBugReport` can safely lock its own mutex even before `SetIntake` is called.
+
+Moved vs. stayed:
+- Moved (state): the `bugReports BugReportIntake` field — now lives as `intake BugReportIntake` inside `DiagnosticsIntake`, guarded by a new `sync.Mutex` on the collaborator (not `h.mu`).
+- Moved (behavior): the nil-intake check, the `intake.File(ctx, report)` call, and the `ServerMessage{BugReportAck: ack}` assembly. The wire-level branch in `HandleMessage` and the menu-driven `handleBugReportUIAction` both delegate through it.
+- Stayed (state): nothing else — `DiagnosticsIntake` is pure leaf state (no back-reference to `StreamHandler`, unlike `CommandDispatcher`).
+- Stayed (behavior): metrics increment (`h.metrics.protocolErrors.Add(1)`) and the wire-format error wrapping in `HandleMessage`'s BugReport branch — same dispatch-boundary pattern PRs 4–6 used. `handleBugReportUIAction`'s response shape (ack + Notification) and `parseBugReportUIAction` (a pure parser) stay on `StreamHandler`. The UI-affordance helpers `decorateBugReportAffordance` / `withBugReportAffordance` / `hasBugReportAffordance` (control_stream.go:1476–1520) stayed — they render the report-button, they don't file reports. `SetBugReportIntake` stayed as a delegating compatibility method.
+
+Notes:
+- `control_stream.go` dropped from 4720 → 4712 lines (net 8-line shrink: the 11-line BugReport branch became 6 lines; the 22-line `handleBugReportUIAction` became 17; partly offset by the new collaborator file). `diagnostics_intake.go` is 49 lines.
+- Pre-existing lint warnings in `route_replay_test.go:153` and `control_stream_characterization_test.go:56` left alone — confirmed still pre-existing.
+- Plan status stays `building`. Stopping after this PR. Awaiting confirmation before starting PR 8 (Phase 7).

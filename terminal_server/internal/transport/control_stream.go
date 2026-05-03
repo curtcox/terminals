@@ -413,7 +413,7 @@ type StreamHandler struct {
 	deviceAudio    DeviceAudioPublisher
 	recording      recording.Manager
 	webrtc         WebRTCSignalEngine
-	bugReports     BugReportIntake
+	diagnostics    *DiagnosticsIntake
 	uiOwners       *uiActionOwnershipTracker
 	wakeWordDedupe *wakeWordDedupeStage
 
@@ -554,6 +554,7 @@ func newStreamHandler(control *ControlService, runtime *scenario.Runtime) *Strea
 	handler.replSessions = replsession.NewService(handler.terminals)
 	handler.capabilityLifecycle = NewCapabilityLifecycle(control)
 	handler.commandDispatcher = NewCommandDispatcher(handler, handler.handleCommand)
+	handler.diagnostics = NewDiagnosticsIntake(nil)
 	return handler
 }
 
@@ -593,10 +594,10 @@ func (h *StreamHandler) SetWebRTCSignalEngine(engine WebRTCSignalEngine) {
 }
 
 // SetBugReportIntake wires a persisted bug-report intake for control streams.
+// Delegates to the DiagnosticsIntake collaborator; kept as a passthrough so
+// existing callers continue to compile.
 func (h *StreamHandler) SetBugReportIntake(intake BugReportIntake) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.bugReports = intake
+	h.diagnostics.SetIntake(intake)
 }
 
 // SetIdentityService wires actor resolution used by menu composition.
@@ -891,16 +892,12 @@ func (h *StreamHandler) HandleMessage(ctx context.Context, msg ClientMessage) ([
 	case msg.Command != nil:
 		return h.commandDispatcher.Dispatch(ctx, msg.Command)
 	case msg.BugReport != nil:
-		if h.bugReports == nil {
-			h.metrics.protocolErrors.Add(1)
-			return []ServerMessage{{ErrorCode: errorCodeFor(ErrBugReportIntakeUnavailable), Error: ErrBugReportIntakeUnavailable.Error()}}, ErrBugReportIntakeUnavailable
-		}
-		ack, err := h.bugReports.File(ctx, msg.BugReport)
+		response, err := h.diagnostics.HandleBugReport(ctx, msg.BugReport)
 		if err != nil {
 			h.metrics.protocolErrors.Add(1)
 			return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 		}
-		return []ServerMessage{{BugReportAck: ack}}, nil
+		return []ServerMessage{response}, nil
 	default:
 		h.metrics.protocolErrors.Add(1)
 		return []ServerMessage{{ErrorCode: errorCodeFor(ErrInvalidClientMessage), Error: ErrInvalidClientMessage.Error()}}, ErrInvalidClientMessage
@@ -2968,9 +2965,6 @@ func requiresScopedUIActionComponent(action string) bool {
 }
 
 func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDeviceID, action, value string) ([]ServerMessage, error) {
-	if h.bugReports == nil {
-		return nil, ErrBugReportIntakeUnavailable
-	}
 	source, subjectDeviceID := parseBugReportUIAction(action, reporterDeviceID)
 	if subjectDeviceID == "" {
 		subjectDeviceID = strings.TrimSpace(value)
@@ -2978,7 +2972,7 @@ func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDev
 	if subjectDeviceID == "" {
 		subjectDeviceID = reporterDeviceID
 	}
-	ack, err := h.bugReports.File(ctx, &diagnosticsv1.BugReport{
+	ackMsg, err := h.diagnostics.HandleBugReport(ctx, &diagnosticsv1.BugReport{
 		ReporterDeviceId: reporterDeviceID,
 		SubjectDeviceId:  subjectDeviceID,
 		Source:           source,
@@ -2990,11 +2984,9 @@ func (h *StreamHandler) handleBugReportUIAction(ctx context.Context, reporterDev
 		return nil, err
 	}
 	return []ServerMessage{
+		ackMsg,
 		{
-			BugReportAck: ack,
-		},
-		{
-			Notification: "Bug report filed: " + ack.GetReportId(),
+			Notification: "Bug report filed: " + ackMsg.BugReportAck.GetReportId(),
 		},
 	}, nil
 }

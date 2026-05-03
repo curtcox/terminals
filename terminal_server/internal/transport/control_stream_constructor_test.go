@@ -110,6 +110,9 @@ func TestStreamHandlerConstructorsInitializeFields(t *testing.T) {
 			if h.menuAppPolicy == nil {
 				t.Error("menuAppPolicy not initialized (expected allowAllMenuAppPolicy)")
 			}
+			if h.diagnostics == nil {
+				t.Error("diagnostics intake not initialized")
+			}
 		})
 	}
 }
