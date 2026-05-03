@@ -117,12 +117,22 @@ func assertCapabilitySnapshot(t *testing.T, envelope *controlv1.WireEnvelope) {
 
 func assertRegisterAckMetadata(t *testing.T, envelope *controlv1.WireEnvelope) {
 	t.Helper()
-	metadata := envelope.GetServerMessage().GetRegisterAck().GetMetadata()
+	ack := envelope.GetServerMessage().GetRegisterAck()
+	metadata := ack.GetMetadata()
 	if metadata["server_build_sha"] != "abc1234" {
 		t.Fatalf("server_build_sha = %q", metadata["server_build_sha"])
 	}
 	if metadata["photo_frame_asset_base_url"] == "" {
 		t.Fatalf("asset base URL missing")
+	}
+	if got := ack.GetServerMetadata().GetBuild().GetSha(); got != "abc1234" {
+		t.Fatalf("server_metadata.build.sha = %q", got)
+	}
+	if got := ack.GetServerMetadata().GetBuild().GetDateRfc3339(); got != "2026-05-03T14:00:00Z" {
+		t.Fatalf("server_metadata.build.date_rfc3339 = %q", got)
+	}
+	if got := ack.GetServerMetadata().GetPhotoFrameAssetBaseUrl(); got == "" {
+		t.Fatalf("server_metadata.photo_frame_asset_base_url missing")
 	}
 }
 

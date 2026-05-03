@@ -237,6 +237,13 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					ServerId: msg.RegisterAck.ServerID,
 					Message:  msg.RegisterAck.Message,
 					Metadata: msg.RegisterAck.Metadata,
+					ServerMetadata: &controlv1.ServerMetadata{
+						Build: &controlv1.BuildMetadata{
+							Sha:         msg.RegisterAck.ServerMetadata.Build.SHA,
+							DateRfc3339: msg.RegisterAck.ServerMetadata.Build.DateRFC3339,
+						},
+						PhotoFrameAssetBaseUrl: msg.RegisterAck.ServerMetadata.PhotoFrameAssetBaseURL,
+					},
 				},
 			},
 		}

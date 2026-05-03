@@ -163,10 +163,21 @@ message RegisterDevice {
   terminals.capabilities.v1.DeviceCapabilities capabilities = 1;
 }
 
+message BuildMetadata {
+  string sha = 1;
+  string date_rfc3339 = 2;
+}
+
+message ServerMetadata {
+  BuildMetadata build = 1;
+  string photo_frame_asset_base_url = 2;
+}
+
 message RegisterAck {
   string server_id = 1;
   string message = 2;
   map<string, string> metadata = 3;
+  ServerMetadata server_metadata = 4;
 }
 
 message CapabilityUpdate {

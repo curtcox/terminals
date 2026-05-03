@@ -321,6 +321,24 @@ void main() {
   });
 
   group('registerMetadataFromResponse', () {
+    test('prefers typed server metadata build values when present', () {
+      final update = registerMetadataFromResponse(
+        ConnectResponse()
+          ..registerAck = (RegisterAck()
+            ..serverMetadata = (ServerMetadata()
+              ..build = (BuildMetadata()
+                ..sha = 'typed-sha'
+                ..dateRfc3339 = '2026-05-03T09:10:11Z'))
+            ..metadata[registerMetadataServerBuildShaKey] = 'legacy-sha'
+            ..metadata[registerMetadataServerBuildDateKey] = 'legacy-date'),
+      );
+
+      expect(update, isNotNull);
+      expect(update!.serverBuildSha, 'typed-sha');
+      expect(update.serverBuildDate, '2026-05-03T09:10:11Z');
+      expect(update.metadata[registerMetadataServerBuildShaKey], 'legacy-sha');
+    });
+
     test('extracts normalized server build metadata', () {
       final update = registerMetadataFromResponse(
         ConnectResponse()

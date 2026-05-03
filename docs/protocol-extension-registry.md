@@ -36,13 +36,13 @@ Allowed keys:
 
 Owner: transport/control  
 Classification: transitional_escape_hatch  
-Target state: add typed `ServerMetadata`; keep legacy map during compatibility window.  
+Target state: typed `ServerMetadata` is now emitted; keep legacy map during compatibility window.  
 Review date: 2026-06-15  
 Producer: server  
 Consumer: client diagnostics and media asset setup  
 Unknown behavior: clients ignore unknown keys.  
 Validation: known keys use the formats below; unknown keys are advisory only.  
-Tests: Go server emits registered keys; Dart client ignores unknown keys and prefers typed metadata once available.
+Tests: Go server emits registered keys plus typed metadata; client prefers typed `server_metadata.build` fields and falls back to map keys for older servers.
 
 Allowed keys:
 

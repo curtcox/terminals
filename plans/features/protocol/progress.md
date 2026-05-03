@@ -29,3 +29,11 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Added shared `WireEnvelope` golden fixtures under `api/testdata/envelopes/` for hello, capability snapshot, register ack metadata, set UI, start stream, flow plan, observation, unknown metadata, and deprecated register payloads.
 - Added Go and Dart protocol contract checks that decode the same binary fixtures and assert flexible-field compatibility behavior.
 - Expanded `proto-contract-test` to run proto lint, flex-field registry validation, Go fixture decoding, protocol-focused transport tests, and the Dart fixture decoder.
+
+## Protocol Evolution Rules (2026-05-03, Build Metadata Typing)
+
+- Added additive `BuildMetadata` and `ServerMetadata` messages to `api/terminals/control/v1/control.proto` and wired `RegisterAck.server_metadata` as typed metadata alongside legacy `metadata`.
+- Updated server transport register responses (`ControlService` + generated proto adapter) to emit typed build/photo-frame metadata while preserving compatibility map keys.
+- Updated Flutter register-ack parsing to prefer typed `server_metadata.build` values and fall back to legacy `metadata` keys.
+- Extended Go/Dart protocol contract assertions and `register_ack_metadata_v1` fixture content to validate both typed and legacy metadata behavior.
+- Ran `make proto-generate`, refreshed binary envelope fixtures via `go test ./internal/protocolcontract -run TestGoldenWireEnvelopeFixtures -update`, and re-ran Go transport/protocol-contract tests.

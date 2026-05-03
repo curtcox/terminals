@@ -1912,12 +1912,14 @@ class CapabilityAck extends $pb.GeneratedMessage {
     $core.String? deviceId,
     $fixnum.Int64? acceptedGeneration,
     $core.bool? snapshotApplied,
+    $core.Iterable<ResourceInvalidation>? invalidations,
   }) {
     final result = create();
     if (deviceId != null) result.deviceId = deviceId;
     if (acceptedGeneration != null)
       result.acceptedGeneration = acceptedGeneration;
     if (snapshotApplied != null) result.snapshotApplied = snapshotApplied;
+    if (invalidations != null) result.invalidations.addAll(invalidations);
     return result;
   }
 
@@ -1940,6 +1942,8 @@ class CapabilityAck extends $pb.GeneratedMessage {
         2, _omitFieldNames ? '' : 'acceptedGeneration', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOB(3, _omitFieldNames ? '' : 'snapshotApplied')
+    ..pPM<ResourceInvalidation>(4, _omitFieldNames ? '' : 'invalidations',
+        subBuilder: ResourceInvalidation.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1987,6 +1991,76 @@ class CapabilityAck extends $pb.GeneratedMessage {
   $core.bool hasSnapshotApplied() => $_has(2);
   @$pb.TagNumber(3)
   void clearSnapshotApplied() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<ResourceInvalidation> get invalidations => $_getList(3);
+}
+
+class ResourceInvalidation extends $pb.GeneratedMessage {
+  factory ResourceInvalidation({
+    $core.String? resource,
+    $core.String? reason,
+  }) {
+    final result = create();
+    if (resource != null) result.resource = resource;
+    if (reason != null) result.reason = reason;
+    return result;
+  }
+
+  ResourceInvalidation._();
+
+  factory ResourceInvalidation.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ResourceInvalidation.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ResourceInvalidation',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'resource')
+    ..aOS(2, _omitFieldNames ? '' : 'reason')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResourceInvalidation clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResourceInvalidation copyWith(void Function(ResourceInvalidation) updates) =>
+      super.copyWith((message) => updates(message as ResourceInvalidation))
+          as ResourceInvalidation;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ResourceInvalidation create() => ResourceInvalidation._();
+  @$core.override
+  ResourceInvalidation createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ResourceInvalidation getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ResourceInvalidation>(create);
+  static ResourceInvalidation? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get resource => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set resource($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasResource() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearResource() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get reason => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set reason($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasReason() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReason() => $_clearField(2);
 }
 
 class RegisterDevice extends $pb.GeneratedMessage {
@@ -2047,16 +2121,156 @@ class RegisterDevice extends $pb.GeneratedMessage {
   $3.DeviceCapabilities ensureCapabilities() => $_ensure(0);
 }
 
+class BuildMetadata extends $pb.GeneratedMessage {
+  factory BuildMetadata({
+    $core.String? sha,
+    $core.String? dateRfc3339,
+  }) {
+    final result = create();
+    if (sha != null) result.sha = sha;
+    if (dateRfc3339 != null) result.dateRfc3339 = dateRfc3339;
+    return result;
+  }
+
+  BuildMetadata._();
+
+  factory BuildMetadata.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BuildMetadata.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BuildMetadata',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'sha')
+    ..aOS(2, _omitFieldNames ? '' : 'dateRfc3339')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BuildMetadata clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BuildMetadata copyWith(void Function(BuildMetadata) updates) =>
+      super.copyWith((message) => updates(message as BuildMetadata))
+          as BuildMetadata;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BuildMetadata create() => BuildMetadata._();
+  @$core.override
+  BuildMetadata createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BuildMetadata getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BuildMetadata>(create);
+  static BuildMetadata? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sha => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sha($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSha() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSha() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get dateRfc3339 => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set dateRfc3339($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDateRfc3339() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDateRfc3339() => $_clearField(2);
+}
+
+class ServerMetadata extends $pb.GeneratedMessage {
+  factory ServerMetadata({
+    BuildMetadata? build,
+    $core.String? photoFrameAssetBaseUrl,
+  }) {
+    final result = create();
+    if (build != null) result.build = build;
+    if (photoFrameAssetBaseUrl != null)
+      result.photoFrameAssetBaseUrl = photoFrameAssetBaseUrl;
+    return result;
+  }
+
+  ServerMetadata._();
+
+  factory ServerMetadata.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ServerMetadata.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ServerMetadata',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOM<BuildMetadata>(1, _omitFieldNames ? '' : 'build',
+        subBuilder: BuildMetadata.create)
+    ..aOS(2, _omitFieldNames ? '' : 'photoFrameAssetBaseUrl')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ServerMetadata clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ServerMetadata copyWith(void Function(ServerMetadata) updates) =>
+      super.copyWith((message) => updates(message as ServerMetadata))
+          as ServerMetadata;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ServerMetadata create() => ServerMetadata._();
+  @$core.override
+  ServerMetadata createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ServerMetadata getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ServerMetadata>(create);
+  static ServerMetadata? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  BuildMetadata get build => $_getN(0);
+  @$pb.TagNumber(1)
+  set build(BuildMetadata value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuild() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuild() => $_clearField(1);
+  @$pb.TagNumber(1)
+  BuildMetadata ensureBuild() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get photoFrameAssetBaseUrl => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set photoFrameAssetBaseUrl($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPhotoFrameAssetBaseUrl() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPhotoFrameAssetBaseUrl() => $_clearField(2);
+}
+
 class RegisterAck extends $pb.GeneratedMessage {
   factory RegisterAck({
     $core.String? serverId,
     $core.String? message,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
+    ServerMetadata? serverMetadata,
   }) {
     final result = create();
     if (serverId != null) result.serverId = serverId;
     if (message != null) result.message = message;
     if (metadata != null) result.metadata.addEntries(metadata);
+    if (serverMetadata != null) result.serverMetadata = serverMetadata;
     return result;
   }
 
@@ -2081,6 +2295,8 @@ class RegisterAck extends $pb.GeneratedMessage {
         keyFieldType: $pb.PbFieldType.OS,
         valueFieldType: $pb.PbFieldType.OS,
         packageName: const $pb.PackageName('terminals.control.v1'))
+    ..aOM<ServerMetadata>(4, _omitFieldNames ? '' : 'serverMetadata',
+        subBuilder: ServerMetadata.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2122,6 +2338,17 @@ class RegisterAck extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(3)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(2);
+
+  @$pb.TagNumber(4)
+  ServerMetadata get serverMetadata => $_getN(3);
+  @$pb.TagNumber(4)
+  set serverMetadata(ServerMetadata value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasServerMetadata() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearServerMetadata() => $_clearField(4);
+  @$pb.TagNumber(4)
+  ServerMetadata ensureServerMetadata() => $_ensure(3);
 }
 
 class CapabilityUpdate extends $pb.GeneratedMessage {

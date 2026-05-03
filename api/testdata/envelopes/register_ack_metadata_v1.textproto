@@ -17,5 +17,12 @@ server_message: {
       key: "server_build_sha"
       value: "abc1234"
     }
+    server_metadata: {
+      build: {
+        sha: "abc1234"
+        date_rfc3339: "2026-05-03T14:00:00Z"
+      }
+      photo_frame_asset_base_url: "https://terminals.example/assets/"
+    }
   }
 }

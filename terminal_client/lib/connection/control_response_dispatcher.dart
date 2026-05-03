@@ -421,13 +421,24 @@ RegisterMetadataUpdate? registerMetadataFromResponse(ConnectResponse response) {
   if (!response.hasRegisterAck()) {
     return null;
   }
-  final metadata = Map<String, String>.from(response.registerAck.metadata);
+  final ack = response.registerAck;
+  final metadata = Map<String, String>.from(ack.metadata);
+  final typedServerMetadata = ack.hasServerMetadata() ? ack.serverMetadata : null;
+  final typedBuild = typedServerMetadata != null && typedServerMetadata.hasBuild()
+      ? typedServerMetadata.build
+      : null;
+  final typedBuildSha = typedBuild?.sha ?? '';
+  final typedBuildDate = typedBuild?.dateRfc3339 ?? '';
   return RegisterMetadataUpdate(
     serverBuildSha: normalizeBuildValue(
-      metadata[registerMetadataServerBuildShaKey] ?? '',
+      typedBuildSha.isNotEmpty
+          ? typedBuildSha
+          : (metadata[registerMetadataServerBuildShaKey] ?? ''),
     ),
     serverBuildDate: normalizeBuildValue(
-      metadata[registerMetadataServerBuildDateKey] ?? '',
+      typedBuildDate.isNotEmpty
+          ? typedBuildDate
+          : (metadata[registerMetadataServerBuildDateKey] ?? ''),
     ),
     metadata: metadata,
   );

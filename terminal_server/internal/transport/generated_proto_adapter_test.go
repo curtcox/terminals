@@ -1151,6 +1151,13 @@ func TestGeneratedProtoAdapterFromInternalRegisterAckMetadata(t *testing.T) {
 			Metadata: map[string]string{
 				"photo_frame_asset_base_url": "http://home.local:50052/photo-frame",
 			},
+			ServerMetadata: ServerMetadata{
+				Build: BuildMetadata{
+					SHA:         "abc1234",
+					DateRFC3339: "2026-05-03T09:10:11Z",
+				},
+				PhotoFrameAssetBaseURL: "http://home.local:50052/photo-frame",
+			},
 		},
 	})
 	if err != nil {
@@ -1167,5 +1174,14 @@ func TestGeneratedProtoAdapterFromInternalRegisterAckMetadata(t *testing.T) {
 	}
 	if got := ack.GetMetadata()["photo_frame_asset_base_url"]; got != "http://home.local:50052/photo-frame" {
 		t.Fatalf("register_ack metadata photo_frame_asset_base_url = %q, want configured value", got)
+	}
+	if got := ack.GetServerMetadata().GetBuild().GetSha(); got != "abc1234" {
+		t.Fatalf("register_ack server_metadata.build.sha = %q, want abc1234", got)
+	}
+	if got := ack.GetServerMetadata().GetBuild().GetDateRfc3339(); got != "2026-05-03T09:10:11Z" {
+		t.Fatalf("register_ack server_metadata.build.date_rfc3339 = %q, want 2026-05-03T09:10:11Z", got)
+	}
+	if got := ack.GetServerMetadata().GetPhotoFrameAssetBaseUrl(); got != "http://home.local:50052/photo-frame" {
+		t.Fatalf("register_ack server_metadata.photo_frame_asset_base_url = %q, want configured value", got)
 	}
 }

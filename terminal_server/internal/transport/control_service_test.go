@@ -14,6 +14,8 @@ func TestRegisterReturnsInitialUI(t *testing.T) {
 	s := NewControlService("srv-1", m)
 	s.SetRegisterMetadata(map[string]string{
 		"photo_frame_asset_base_url": "http://photos.example.test/photo-frame",
+		"server_build_sha":           "abc1234",
+		"server_build_date":          "2026-05-03T09:10:11Z",
 	})
 
 	resp, err := s.Register(context.Background(), RegisterRequest{
@@ -31,6 +33,15 @@ func TestRegisterReturnsInitialUI(t *testing.T) {
 	}
 	if got := resp.Metadata["photo_frame_asset_base_url"]; got != "http://photos.example.test/photo-frame" {
 		t.Fatalf("metadata photo_frame_asset_base_url = %q, want configured value", got)
+	}
+	if got := resp.ServerMetadata.Build.SHA; got != "abc1234" {
+		t.Fatalf("server metadata build sha = %q, want abc1234", got)
+	}
+	if got := resp.ServerMetadata.Build.DateRFC3339; got != "2026-05-03T09:10:11Z" {
+		t.Fatalf("server metadata build date = %q, want 2026-05-03T09:10:11Z", got)
+	}
+	if got := resp.ServerMetadata.PhotoFrameAssetBaseURL; got != "http://photos.example.test/photo-frame" {
+		t.Fatalf("server metadata photo frame asset base URL = %q, want configured value", got)
 	}
 }
 

@@ -855,6 +855,14 @@ const CapabilityAck$json = {
       '10': 'acceptedGeneration'
     },
     {'1': 'snapshot_applied', '3': 3, '4': 1, '5': 8, '10': 'snapshotApplied'},
+    {
+      '1': 'invalidations',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.control.v1.ResourceInvalidation',
+      '10': 'invalidations'
+    },
   ],
 };
 
@@ -862,7 +870,22 @@ const CapabilityAck$json = {
 final $typed_data.Uint8List capabilityAckDescriptor = $convert.base64Decode(
     'Cg1DYXBhYmlsaXR5QWNrEhsKCWRldmljZV9pZBgBIAEoCVIIZGV2aWNlSWQSLwoTYWNjZXB0ZW'
     'RfZ2VuZXJhdGlvbhgCIAEoBFISYWNjZXB0ZWRHZW5lcmF0aW9uEikKEHNuYXBzaG90X2FwcGxp'
-    'ZWQYAyABKAhSD3NuYXBzaG90QXBwbGllZA==');
+    'ZWQYAyABKAhSD3NuYXBzaG90QXBwbGllZBJQCg1pbnZhbGlkYXRpb25zGAQgAygLMioudGVybW'
+    'luYWxzLmNvbnRyb2wudjEuUmVzb3VyY2VJbnZhbGlkYXRpb25SDWludmFsaWRhdGlvbnM=');
+
+@$core.Deprecated('Use resourceInvalidationDescriptor instead')
+const ResourceInvalidation$json = {
+  '1': 'ResourceInvalidation',
+  '2': [
+    {'1': 'resource', '3': 1, '4': 1, '5': 9, '10': 'resource'},
+    {'1': 'reason', '3': 2, '4': 1, '5': 9, '10': 'reason'},
+  ],
+};
+
+/// Descriptor for `ResourceInvalidation`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List resourceInvalidationDescriptor = $convert.base64Decode(
+    'ChRSZXNvdXJjZUludmFsaWRhdGlvbhIaCghyZXNvdXJjZRgBIAEoCVIIcmVzb3VyY2USFgoGcm'
+    'Vhc29uGAIgASgJUgZyZWFzb24=');
 
 @$core.Deprecated('Use registerDeviceDescriptor instead')
 const RegisterDevice$json = {
@@ -884,6 +907,48 @@ final $typed_data.Uint8List registerDeviceDescriptor = $convert.base64Decode(
     'Cg5SZWdpc3RlckRldmljZRJRCgxjYXBhYmlsaXRpZXMYASABKAsyLS50ZXJtaW5hbHMuY2FwYW'
     'JpbGl0aWVzLnYxLkRldmljZUNhcGFiaWxpdGllc1IMY2FwYWJpbGl0aWVz');
 
+@$core.Deprecated('Use buildMetadataDescriptor instead')
+const BuildMetadata$json = {
+  '1': 'BuildMetadata',
+  '2': [
+    {'1': 'sha', '3': 1, '4': 1, '5': 9, '10': 'sha'},
+    {'1': 'date_rfc3339', '3': 2, '4': 1, '5': 9, '10': 'dateRfc3339'},
+  ],
+};
+
+/// Descriptor for `BuildMetadata`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List buildMetadataDescriptor = $convert.base64Decode(
+    'Cg1CdWlsZE1ldGFkYXRhEhAKA3NoYRgBIAEoCVIDc2hhEiEKDGRhdGVfcmZjMzMzORgCIAEoCV'
+    'ILZGF0ZVJmYzMzMzk=');
+
+@$core.Deprecated('Use serverMetadataDescriptor instead')
+const ServerMetadata$json = {
+  '1': 'ServerMetadata',
+  '2': [
+    {
+      '1': 'build',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.BuildMetadata',
+      '10': 'build'
+    },
+    {
+      '1': 'photo_frame_asset_base_url',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '10': 'photoFrameAssetBaseUrl'
+    },
+  ],
+};
+
+/// Descriptor for `ServerMetadata`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List serverMetadataDescriptor = $convert.base64Decode(
+    'Cg5TZXJ2ZXJNZXRhZGF0YRI5CgVidWlsZBgBIAEoCzIjLnRlcm1pbmFscy5jb250cm9sLnYxLk'
+    'J1aWxkTWV0YWRhdGFSBWJ1aWxkEjoKGnBob3RvX2ZyYW1lX2Fzc2V0X2Jhc2VfdXJsGAIgASgJ'
+    'UhZwaG90b0ZyYW1lQXNzZXRCYXNlVXJs');
+
 @$core.Deprecated('Use registerAckDescriptor instead')
 const RegisterAck$json = {
   '1': 'RegisterAck',
@@ -897,6 +962,14 @@ const RegisterAck$json = {
       '5': 11,
       '6': '.terminals.control.v1.RegisterAck.MetadataEntry',
       '10': 'metadata'
+    },
+    {
+      '1': 'server_metadata',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.ServerMetadata',
+      '10': 'serverMetadata'
     },
   ],
   '3': [RegisterAck_MetadataEntry$json],
@@ -916,8 +989,10 @@ const RegisterAck_MetadataEntry$json = {
 final $typed_data.Uint8List registerAckDescriptor = $convert.base64Decode(
     'CgtSZWdpc3RlckFjaxIbCglzZXJ2ZXJfaWQYASABKAlSCHNlcnZlcklkEhgKB21lc3NhZ2UYAi'
     'ABKAlSB21lc3NhZ2USSwoIbWV0YWRhdGEYAyADKAsyLy50ZXJtaW5hbHMuY29udHJvbC52MS5S'
-    'ZWdpc3RlckFjay5NZXRhZGF0YUVudHJ5UghtZXRhZGF0YRo7Cg1NZXRhZGF0YUVudHJ5EhAKA2'
-    'tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAE=');
+    'ZWdpc3RlckFjay5NZXRhZGF0YUVudHJ5UghtZXRhZGF0YRJNCg9zZXJ2ZXJfbWV0YWRhdGEYBC'
+    'ABKAsyJC50ZXJtaW5hbHMuY29udHJvbC52MS5TZXJ2ZXJNZXRhZGF0YVIOc2VydmVyTWV0YWRh'
+    'dGEaOwoNTWV0YWRhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdm'
+    'FsdWU6AjgB');
 
 @$core.Deprecated('Use capabilityUpdateDescriptor instead')
 const CapabilityUpdate$json = {
@@ -1221,9 +1296,12 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.control.v1.ConnectResponse': ConnectResponse$json,
   '.terminals.control.v1.HelloAck': HelloAck$json,
   '.terminals.control.v1.CapabilityAck': CapabilityAck$json,
+  '.terminals.control.v1.ResourceInvalidation': ResourceInvalidation$json,
   '.terminals.control.v1.RegisterAck': RegisterAck$json,
   '.terminals.control.v1.RegisterAck.MetadataEntry':
       RegisterAck_MetadataEntry$json,
+  '.terminals.control.v1.ServerMetadata': ServerMetadata$json,
+  '.terminals.control.v1.BuildMetadata': BuildMetadata$json,
   '.terminals.ui.v1.SetUI': $2.SetUI$json,
   '.terminals.io.v1.StartStream': $0.StartStream$json,
   '.terminals.io.v1.StartStream.MetadataEntry':

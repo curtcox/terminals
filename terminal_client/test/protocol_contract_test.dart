@@ -43,10 +43,17 @@ void _assertCapabilitySnapshot(WireEnvelope envelope) {
 }
 
 void _assertRegisterAckMetadata(WireEnvelope envelope) {
+  final ack = envelope.serverMessage.registerAck;
   final metadata = envelope.serverMessage.registerAck.metadata;
 
   _expectEqual(metadata['server_build_sha'], 'abc1234');
   _expectTrue(metadata['photo_frame_asset_base_url']?.isNotEmpty ?? false);
+  _expectEqual(ack.serverMetadata.build.sha, 'abc1234');
+  _expectEqual(
+    ack.serverMetadata.build.dateRfc3339,
+    '2026-05-03T14:00:00Z',
+  );
+  _expectTrue(ack.serverMetadata.photoFrameAssetBaseUrl.isNotEmpty);
 }
 
 void _assertSetUIBasic(WireEnvelope envelope) {

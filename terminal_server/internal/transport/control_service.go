@@ -19,13 +19,42 @@ type RegisterRequest struct {
 	Capabilities map[string]string
 }
 
+func serverMetadataFromLegacyMap(metadata map[string]string) ServerMetadata {
+	return ServerMetadata{
+		Build: BuildMetadata{
+			SHA:         metadata[registerMetadataServerBuildSHAKey],
+			DateRFC3339: metadata[registerMetadataServerBuildDateKey],
+		},
+		PhotoFrameAssetBaseURL: metadata[registerMetadataPhotoFrameAssetBaseURLKey],
+	}
+}
+
 // RegisterResponse is the transport-neutral register response payload.
 type RegisterResponse struct {
-	ServerID string
-	Message  string
-	Metadata map[string]string
-	Initial  ui.Descriptor
+	ServerID       string
+	Message        string
+	Metadata       map[string]string
+	ServerMetadata ServerMetadata
+	Initial        ui.Descriptor
 }
+
+// BuildMetadata is the typed register-ack server build metadata payload.
+type BuildMetadata struct {
+	SHA         string
+	DateRFC3339 string
+}
+
+// ServerMetadata is the typed register-ack metadata payload.
+type ServerMetadata struct {
+	Build                  BuildMetadata
+	PhotoFrameAssetBaseURL string
+}
+
+const (
+	registerMetadataPhotoFrameAssetBaseURLKey = "photo_frame_asset_base_url"
+	registerMetadataServerBuildSHAKey         = "server_build_sha"
+	registerMetadataServerBuildDateKey        = "server_build_date"
+)
 
 // HelloRequest is the transport-neutral hello handshake payload.
 type HelloRequest struct {
@@ -97,10 +126,11 @@ func (s *ControlService) Register(_ context.Context, req RegisterRequest) (Regis
 	}
 
 	return RegisterResponse{
-		ServerID: s.serverID,
-		Message:  "registered",
-		Metadata: cloneStringMap(s.metadata),
-		Initial:  initial,
+		ServerID:       s.serverID,
+		Message:        "registered",
+		Metadata:       cloneStringMap(s.metadata),
+		ServerMetadata: serverMetadataFromLegacyMap(s.metadata),
+		Initial:        initial,
 	}, nil
 }
 

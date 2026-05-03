@@ -1,10 +1,10 @@
 ---
 title: "Protocol Evolution Rules"
 kind: plan
-status: proposed
-owner: curtcox
+status: building
+owner: cascade
 validation: manual
-last-reviewed: 2026-05-02
+last-reviewed: 2026-05-03
 ---
 
 # Protocol Evolution Rules
@@ -886,6 +886,14 @@ Review focus: fixture generation and reproducibility.
 
 Risk: medium  
 Review focus: compatibility fallback.
+
+Incremental progress (2026-05-03):
+
+- Added additive typed `BuildMetadata` and `ServerMetadata` messages to `RegisterAck` while preserving legacy `metadata`.
+- Updated server register-ack generation to emit both typed `server_metadata` and legacy map values.
+- Updated client register-ack handling to prefer typed build metadata and fall back to legacy map keys.
+- Extended Go and Dart contract tests plus envelope fixtures to validate typed + legacy compatibility behavior.
+- Ran `make proto-generate`, refreshed binary fixtures via `go test ./internal/protocolcontract -run TestGoldenWireEnvelopeFixtures -update`, and re-ran targeted Go transport/contract tests.
 
 ### PR 5 - Stream and WebRTC Enum Migration
 
