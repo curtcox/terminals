@@ -2,6 +2,36 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by moving pure carrier target resolution, carrier label
+  formatting, gRPC discovered-port parsing, and carrier endpoint display labels
+  out of `TerminalClientShell` and into
+  `terminal_client/lib/connection/control_session_controller.dart`.
+- Moved application launch, playback artifact query, and playback metadata
+  query command request construction into the same controller helper module.
+- Added focused controller coverage for carrier labels, endpoint-to-target
+  resolution, endpoint labels, discovered gRPC port fallback behavior,
+  application launch requests, and playback diagnostics requests.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format lib/connection/control_session_controller.dart lib/app/terminal_client_shell.dart test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart --plain-name "sends system and playback debug commands and renders diagnostics data"
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart --plain-name "open application queues launch until register ack"
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+- One sandboxed targeted widget test attempt failed on DNS for pub.dev advisory
+  lookup; rerunning with approved network access passed.
+
+## 2026-05-03
+
 - Continued Phase 5 by moving system diagnostics command request construction
   out of `TerminalClientShell` and into
   `terminal_client/lib/connection/control_session_controller.dart`.

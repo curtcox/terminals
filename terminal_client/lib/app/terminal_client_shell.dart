@@ -696,98 +696,13 @@ class _TerminalClientShellState extends State<TerminalClientShell>
   }
 
   int _grpcPortFor(DiscoveredServer? server, int fallbackPort) {
-    final endpoint = _endpointForCarrier(
-      carrier: ControlCarrierKind.grpc,
-      server: server,
+    return grpcPortFromEndpoint(
+      endpoint: _endpointForCarrier(
+        carrier: ControlCarrierKind.grpc,
+        server: server,
+      ),
+      fallbackPort: fallbackPort,
     );
-    if (endpoint.isEmpty) {
-      return fallbackPort;
-    }
-    final parsed = Uri.tryParse('tcp://$endpoint');
-    if (parsed == null || parsed.port <= 0) {
-      return fallbackPort;
-    }
-    return parsed.port;
-  }
-
-  ConnectionTarget _targetForCarrier({
-    required ControlCarrierKind carrier,
-    required DiscoveredServer? server,
-    required String fallbackHost,
-    required int fallbackPort,
-  }) {
-    switch (carrier) {
-      case ControlCarrierKind.grpc:
-        final endpoint = _endpointForCarrier(carrier: carrier, server: server);
-        if (endpoint.isEmpty) {
-          return ConnectionTarget(host: fallbackHost, port: fallbackPort);
-        }
-        final parsed = Uri.tryParse('tcp://$endpoint');
-        if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
-          return ConnectionTarget(host: fallbackHost, port: fallbackPort);
-        }
-        return ConnectionTarget(host: parsed.host, port: parsed.port);
-      case ControlCarrierKind.websocket:
-        final endpoint = _endpointForCarrier(carrier: carrier, server: server);
-        if (endpoint.isEmpty) {
-          return ConnectionTarget(host: fallbackHost, port: fallbackPort);
-        }
-        final parsed = Uri.tryParse(endpoint);
-        if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
-          return ConnectionTarget(host: fallbackHost, port: fallbackPort);
-        }
-        return ConnectionTarget(host: parsed.host, port: parsed.port);
-      case ControlCarrierKind.tcp:
-        final endpoint = _endpointForCarrier(carrier: carrier, server: server);
-        if (endpoint.isEmpty) {
-          return ConnectionTarget(host: fallbackHost, port: 50055);
-        }
-        final parsed = Uri.tryParse('tcp://$endpoint');
-        if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
-          return ConnectionTarget(host: fallbackHost, port: 50055);
-        }
-        return ConnectionTarget(host: parsed.host, port: parsed.port);
-      case ControlCarrierKind.http:
-        final endpoint = _endpointForCarrier(carrier: carrier, server: server);
-        if (endpoint.isEmpty) {
-          return ConnectionTarget(host: fallbackHost, port: 50056);
-        }
-        final parsed = Uri.tryParse(endpoint);
-        if (parsed == null || parsed.host.isEmpty || parsed.port <= 0) {
-          return ConnectionTarget(host: fallbackHost, port: 50056);
-        }
-        return ConnectionTarget(host: parsed.host, port: parsed.port);
-    }
-  }
-
-  String _carrierName(ControlCarrierKind carrier) {
-    switch (carrier) {
-      case ControlCarrierKind.grpc:
-        return 'gRPC';
-      case ControlCarrierKind.websocket:
-        return 'WebSocket';
-      case ControlCarrierKind.tcp:
-        return 'TCP';
-      case ControlCarrierKind.http:
-        return 'HTTP';
-    }
-  }
-
-  String _carrierEndpointLabelForTarget({
-    required ControlCarrierKind carrier,
-    required ConnectionTarget target,
-    required DiscoveredServer? server,
-  }) {
-    switch (carrier) {
-      case ControlCarrierKind.grpc:
-        return '${target.host}:${target.port}';
-      case ControlCarrierKind.websocket:
-        return 'ws://${target.host}:${target.port}${_websocketPathFor(server)}';
-      case ControlCarrierKind.tcp:
-        return '${target.host}:${target.port}';
-      case ControlCarrierKind.http:
-        return 'http://${target.host}:${target.port}';
-    }
   }
 
   String _currentPageHost() {
@@ -1051,9 +966,9 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     }
 
     final carrier = _activeCarrierCycle[_activeCarrierIndex];
-    final rawTarget = _targetForCarrier(
+    final rawTarget = resolveConnectionTargetForCarrier(
       carrier: carrier,
-      server: selectedServer,
+      endpoint: _endpointForCarrier(carrier: carrier, server: selectedServer),
       fallbackHost: host,
       fallbackPort: port,
     );
@@ -1065,10 +980,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
       ),
       port: rawTarget.port,
     );
-    final carrierEndpoint = _carrierEndpointLabelForTarget(
+    final carrierEndpoint = buildCarrierEndpointLabel(
       carrier: carrier,
       target: target,
-      server: selectedServer,
+      websocketPath: _websocketPathFor(selectedServer),
     );
     final attemptStartedAt = DateTime.now().toUtc();
 
@@ -1079,7 +994,7 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     if (mounted) {
       setState(() {
         final verb = userInitiated ? 'Connecting' : 'Reconnecting';
-        _status = '$verb via ${_carrierName(carrier)}...';
+        _status = '$verb via ${controlCarrierLabel(carrier)}...';
         _lastConnectionStatus = _status;
       });
     }
@@ -1589,17 +1504,14 @@ class _TerminalClientShellState extends State<TerminalClientShell>
   }
 
   void _sendApplicationLaunchCommand(String intent) {
-    final request = ConnectRequest()
-      ..command = (CommandRequest()
-        ..requestId = _nextDebugRequestID('launch-app')
-        ..deviceId = _deviceId
-        ..action = CommandAction.COMMAND_ACTION_START
-        ..kind = CommandKind.COMMAND_KIND_MANUAL
-        ..intent = intent);
     unawaited(
       _sendWhenReady(
         operation: OutboundOperation.launchApplication,
-        request: request,
+        request: buildApplicationLaunchCommandRequest(
+          requestID: _nextDebugRequestID('launch-app'),
+          deviceID: _deviceId,
+          intent: intent,
+        ),
       ),
     );
     if (mounted) {
@@ -1614,15 +1526,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
   void _sendPlaybackArtifactsQuery() {
     final requestID = _nextDebugRequestID('debug-playback-artifacts');
     _pendingPlaybackArtifactsRequestID = requestID;
-    final request = ConnectRequest()
-      ..command = (CommandRequest()
-        ..requestId = requestID
-        ..kind = CommandKind.COMMAND_KIND_SYSTEM
-        ..intent = 'list_playback_artifacts');
     unawaited(
       _sendWhenReady(
         operation: OutboundOperation.playbackArtifactsQuery,
-        request: request,
+        request: buildPlaybackArtifactsQueryRequest(requestID),
       ),
     );
   }
@@ -1643,18 +1550,15 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     }
     final requestID = _nextDebugRequestID('debug-playback-metadata');
     _pendingPlaybackMetadataRequestID = requestID;
-    final request = ConnectRequest()
-      ..command = (CommandRequest()
-        ..requestId = requestID
-        ..deviceId = _deviceId
-        ..kind = CommandKind.COMMAND_KIND_MANUAL
-        ..intent = 'playback_metadata'
-        ..arguments['artifact_id'] = artifactID
-        ..arguments['target_device_id'] = targetDeviceID);
     unawaited(
       _sendWhenReady(
         operation: OutboundOperation.playbackMetadataQuery,
-        request: request,
+        request: buildPlaybackMetadataQueryRequest(
+          requestID: requestID,
+          deviceID: _deviceId,
+          artifactID: artifactID,
+          targetDeviceID: targetDeviceID,
+        ),
       ),
     );
   }
@@ -2553,7 +2457,7 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     _lastTransportDiagnostic = attemptSummary;
     _recordClientLog(
       'warn',
-      'control carrier failure carrier=${_carrierName(carrier)} stage=$stage '
+      'control carrier failure carrier=${controlCarrierLabel(carrier)} stage=$stage '
           'class=$failureClass endpoint=$endpoint elapsed_ms=${elapsed.inMilliseconds} '
           'error=$rawError',
     );
@@ -2575,12 +2479,12 @@ class _TerminalClientShellState extends State<TerminalClientShell>
       final nextCarrier = _activeCarrierCycle[_activeCarrierIndex];
       _recordClientLog(
         'info',
-        'switching control carrier from ${_carrierName(carrier)} to ${_carrierName(nextCarrier)}',
+        'switching control carrier from ${controlCarrierLabel(carrier)} to ${controlCarrierLabel(nextCarrier)}',
       );
       if (mounted) {
         setState(() {
           _status =
-              '${_carrierName(carrier)} failed, trying ${_carrierName(nextCarrier)}...';
+              '${controlCarrierLabel(carrier)} failed, trying ${controlCarrierLabel(nextCarrier)}...';
           _lastConnectionStatus = _status;
           _lastNotification = _lastTransportDiagnostic;
         });
