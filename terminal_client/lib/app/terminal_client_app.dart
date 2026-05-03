@@ -644,9 +644,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   final List<diagv1.ControlErrorEntry> _recentControlErrors =
       <diagv1.ControlErrorEntry>[];
   final Map<String, double> _lastSensorSnapshot = <String, double>{};
-  capv1.DeviceCapabilities? _lastRegisteredCapabilities;
-  int _capabilityGeneration = 0;
-  int _lastCapabilityAckGeneration = 0;
+  final CapabilitySession _capabilitySession = CapabilitySession();
   int _lastHeartbeatUnixMs = 0;
   int _pendingHeartbeatUnixMs = 0;
   double _lastRttMs = 0;
@@ -677,7 +675,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   String _lastKnownOrientation = 'unknown';
   TextDirection _lastKnownTextDirection = TextDirection.ltr;
   bool _capabilityPollInFlight = false;
-  String _lastCapabilitySignature = '';
   String _lastObservedDisplaySignature = '';
   bool _privacyModeEnabled = false;
   bool _wakeWordDetectorEnabled = false;
@@ -858,10 +855,6 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     );
   }
 
-  String _capabilitySignature(capv1.DeviceCapabilities capabilities) {
-    return capabilitySignature(capabilities);
-  }
-
   String _normalizedOrientationFromSize(Size size) {
     return orientationForScreenSize(
       size,
@@ -917,27 +910,22 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           ..clearCamera();
       }
       _syncWakeWordDetector(nextCapabilities);
-      final nextSignature = _capabilitySignature(nextCapabilities);
-      final changed = nextSignature != _lastCapabilitySignature;
-      if (!changed && !forceSnapshot) {
+      final publication = _capabilitySession.publishChange(
+        nextCapabilities,
+        force: forceSnapshot,
+      );
+      if (publication == null) {
         return;
       }
 
-      _lastRegisteredCapabilities = nextCapabilities;
-      _lastCapabilitySignature = nextSignature;
-      final nextGeneration = math.max(
-        _capabilityGeneration + 1,
-        _lastCapabilityAckGeneration + 1,
-      );
-      _capabilityGeneration = nextGeneration;
       if (forceSnapshot) {
         unawaited(
           _sendWhenReady(
             operation: OutboundOperation.capabilitySnapshot,
             request: TerminalControlGrpcClient.capabilitySnapshotRequest(
               deviceId: _deviceId,
-              generation: _capabilityGeneration,
-              capabilities: nextCapabilities,
+              generation: publication.generation,
+              capabilities: publication.capabilities,
             ),
           ),
         );
@@ -948,8 +936,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           operation: OutboundOperation.capabilityDelta,
           request: TerminalControlGrpcClient.capabilityDeltaRequest(
             deviceId: _deviceId,
-            generation: _capabilityGeneration,
-            capabilities: nextCapabilities,
+            generation: publication.generation,
+            capabilities: publication.capabilities,
             reason: reason,
           ),
         ),
@@ -966,28 +954,31 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       return;
     }
     await _stopLocalCaptureStreamsForPrivacyMode();
-    if (_lastRegisteredCapabilities == null || _deviceId.isEmpty) {
+    final registeredCapabilities =
+        _capabilitySession.lastRegisteredCapabilities;
+    if (registeredCapabilities == null || _deviceId.isEmpty) {
       _privacyModeEnabled = true;
       _setWakeWordDetectorEnabled(false);
       return;
     }
-    final nextCapabilities = _lastRegisteredCapabilities!.deepCopy()
+    final nextCapabilities = registeredCapabilities.deepCopy()
       ..clearMicrophone()
       ..clearCamera();
     _privacyModeEnabled = true;
-    _lastRegisteredCapabilities = nextCapabilities;
-    _lastCapabilitySignature = _capabilitySignature(nextCapabilities);
     _syncWakeWordDetector(nextCapabilities);
-    _capabilityGeneration = math.max(
-      _capabilityGeneration + 1,
-      _lastCapabilityAckGeneration + 1,
+    final publication = _capabilitySession.publishChange(
+      nextCapabilities,
+      force: true,
     );
+    if (publication == null) {
+      return;
+    }
     await _sendWhenReady(
       operation: OutboundOperation.capabilityDelta,
       request: TerminalControlGrpcClient.capabilityDeltaRequest(
         deviceId: _deviceId,
-        generation: _capabilityGeneration,
-        capabilities: nextCapabilities,
+        generation: publication.generation,
+        capabilities: publication.capabilities,
         reason: 'privacy.toggle',
       ),
     );
@@ -1030,7 +1021,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (_privacyModeEnabled || !_isConnectionRegistered) {
       return false;
     }
-    final capabilities = _lastRegisteredCapabilities;
+    final capabilities = _capabilitySession.lastRegisteredCapabilities;
     return capabilities != null && capabilities.hasMicrophone();
   }
 
@@ -1527,8 +1518,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _isConnecting = true;
     _cancelRegisterAckRetry();
     _hasRegisterAck = false;
-    _capabilityGeneration = 0;
-    _lastCapabilityAckGeneration = 0;
+    _capabilitySession.reset();
     if (mounted) {
       setState(() {
         final verb = userInitiated ? 'Connecting' : 'Reconnecting';
@@ -1677,8 +1667,9 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
               }
             }
             if (response.hasCapabilityAck()) {
-              _lastCapabilityAckGeneration =
-                  response.capabilityAck.acceptedGeneration.toInt();
+              _capabilitySession.observeAckGeneration(
+                response.capabilityAck.acceptedGeneration.toInt(),
+              );
             }
             _applyRegisterMetadata(response);
             if (_e2eEmitEvents && response.hasRegisterAck()) {
@@ -1765,21 +1756,19 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         ),
       );
 
-      _capabilityGeneration = 1;
-      _lastRegisteredCapabilities = _applyDisplayMetadata(
-        probedCapabilities.deepCopy(),
+      final bootstrapPublication = _capabilitySession.startBootstrap(
+        _applyDisplayMetadata(
+          probedCapabilities.deepCopy(),
+        ),
       );
-      _syncWakeWordDetector(_lastRegisteredCapabilities!);
-      _lastCapabilitySignature = _capabilitySignature(
-        _lastRegisteredCapabilities!,
-      );
+      _syncWakeWordDetector(bootstrapPublication.capabilities);
       unawaited(
         _sendWhenReady(
           operation: OutboundOperation.bootstrapCapabilitySnapshot,
           request: TerminalControlGrpcClient.capabilitySnapshotRequest(
             deviceId: _deviceId,
-            generation: _capabilityGeneration,
-            capabilities: _lastRegisteredCapabilities!,
+            generation: bootstrapPublication.generation,
+            capabilities: bootstrapPublication.capabilities,
           ),
         ),
       );
@@ -1877,7 +1866,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   ConnectRequest? _buildSensorTelemetryRequest() {
-    final capabilities = _lastRegisteredCapabilities;
+    final capabilities = _capabilitySession.lastRegisteredCapabilities;
     if (capabilities == null) {
       return null;
     }
@@ -1984,15 +1973,15 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   ConnectRequest? _buildBootstrapCapabilitySnapshotRequest() {
-    final capabilities = _lastRegisteredCapabilities;
+    final capabilities = _capabilitySession.lastRegisteredCapabilities;
     if (capabilities == null ||
         _deviceId.isEmpty ||
-        _capabilityGeneration <= 0) {
+        _capabilitySession.generation <= 0) {
       return null;
     }
     return TerminalControlGrpcClient.capabilitySnapshotRequest(
       deviceId: _deviceId,
-      generation: _capabilityGeneration,
+      generation: _capabilitySession.generation,
       capabilities: capabilities,
     );
   }
@@ -2002,7 +1991,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
       shouldContinue: () =>
           !_hasRegisterAck &&
           _hasActiveControlSession &&
-          _lastRegisteredCapabilities != null,
+          _capabilitySession.lastRegisteredCapabilities != null,
       onRetry: (attempt) {
         final request = _buildBootstrapCapabilitySnapshotRequest();
         if (request == null) {
@@ -2368,8 +2357,10 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
         ..lastErrorMessage = _lastFlutterErrorMessage
         ..lastErrorStack = _lastFlutterErrorStack
         ..lastErrorUnixMs = Int64(_lastFlutterErrorUnixMs));
-    if (_lastRegisteredCapabilities != null) {
-      contextProto.capabilities = _lastRegisteredCapabilities!.deepCopy();
+    final registeredCapabilities =
+        _capabilitySession.lastRegisteredCapabilities;
+    if (registeredCapabilities != null) {
+      contextProto.capabilities = registeredCapabilities.deepCopy();
     }
     return contextProto;
   }
@@ -3204,8 +3195,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _shouldStayConnected = false;
     _cancelRegisterAckRetry();
     _hasRegisterAck = false;
-    _capabilityGeneration = 0;
-    _lastCapabilityAckGeneration = 0;
+    _capabilitySession.reset();
     _reconnectAttempt = 0;
     _activeCarrierCycle = <ControlCarrierKind>[];
     _activeCarrierIndex = 0;
@@ -3524,7 +3514,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
                     'Media routes: ${_routesByStreamID.length}  Active streams: ${_activeStreamsByID.length}  Signals: ${_recentWebRTCSignals.length}',
                   ),
                   SelectableText(
-                    'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount  Capability ack gen: $_lastCapabilityAckGeneration',
+                    'Sensor sends: $_sensorSendCount  Last sensor unix_ms: $_lastSensorSendUnixMs  Stream-ready acks: $_streamReadyAckCount  Capability ack gen: ${_capabilitySession.lastAckGeneration}',
                   ),
                   if (_playAudioCount > 0)
                     SelectableText(

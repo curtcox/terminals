@@ -38,6 +38,73 @@ void main() {
     expect(first, isNot(second));
   });
 
+  test('CapabilitySession starts bootstrap at generation one', () {
+    final session = CapabilitySession();
+
+    final publication = session.startBootstrap(
+      capv1.DeviceCapabilities()..deviceId = 'device-a',
+    );
+
+    expect(publication.generation, 1);
+    expect(session.generation, 1);
+    expect(session.lastAckGeneration, 0);
+    expect(session.lastRegisteredCapabilities?.deviceId, 'device-a');
+  });
+
+  test('CapabilitySession publishes only changed capabilities by default', () {
+    final session = CapabilitySession();
+    session.startBootstrap(capv1.DeviceCapabilities()..deviceId = 'device-a');
+
+    final unchanged = session.publishChange(
+      capv1.DeviceCapabilities()..deviceId = 'device-a',
+    );
+    final changed = session.publishChange(
+      capv1.DeviceCapabilities()..deviceId = 'device-b',
+    );
+
+    expect(unchanged, isNull);
+    expect(changed?.generation, 2);
+    expect(session.lastRegisteredCapabilities?.deviceId, 'device-b');
+  });
+
+  test('CapabilitySession advances after accepted ack generation', () {
+    final session = CapabilitySession();
+    session.startBootstrap(capv1.DeviceCapabilities()..deviceId = 'device-a');
+    session.observeAckGeneration(7);
+
+    final publication = session.publishChange(
+      capv1.DeviceCapabilities()..deviceId = 'device-b',
+    );
+
+    expect(publication?.generation, 8);
+    expect(session.generation, 8);
+    expect(session.lastAckGeneration, 7);
+  });
+
+  test('CapabilitySession force republishes unchanged capabilities', () {
+    final session = CapabilitySession();
+    session.startBootstrap(capv1.DeviceCapabilities()..deviceId = 'device-a');
+
+    final publication = session.publishChange(
+      capv1.DeviceCapabilities()..deviceId = 'device-a',
+      force: true,
+    );
+
+    expect(publication?.generation, 2);
+  });
+
+  test('CapabilitySession reset clears tracked generation state', () {
+    final session = CapabilitySession();
+    session.startBootstrap(capv1.DeviceCapabilities()..deviceId = 'device-a');
+    session.observeAckGeneration(1);
+
+    session.reset();
+
+    expect(session.lastRegisteredCapabilities, isNull);
+    expect(session.generation, 0);
+    expect(session.lastAckGeneration, 0);
+  });
+
   test('isStaleCapabilityGenerationError detects protocol stale generations',
       () {
     expect(

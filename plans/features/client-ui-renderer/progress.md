@@ -2,6 +2,35 @@
 
 ## 2026-05-03
 
+- Continued Phase 4 by adding a stateful `CapabilitySession` abstraction for
+  registered capability snapshots, generation numbers, accepted ack generation,
+  and signature-based change detection.
+- Updated `TerminalClientApp` to delegate bootstrap snapshots, capability
+  deltas, forced stale-generation rebaselines, privacy capability withdrawal,
+  ack tracking, reconnect reset, and stop reset through `CapabilitySession`.
+- Expanded focused capability-session coverage for bootstrap generation,
+  unchanged suppression, ack-aware generation advancement, forced
+  republishing, and reset behavior.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed lib/capabilities/capability_session.dart test/capabilities/capability_session_test.dart lib/app/terminal_client_app.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/capabilities/capability_session_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+```
+
+Notes:
+
+- The first focused capability test attempt hit sandboxed DNS for pub.dev
+  advisories; rerunning with approved network access passed.
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 5 by moving pure command-result diagnostics classification
   into `terminal_client/lib/connection/control_response_dispatcher.dart`.
 - Moved register-ack metadata extraction and server build normalization into
