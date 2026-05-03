@@ -47,6 +47,41 @@ class RegisterMetadataUpdate {
   bool get hasDiagnosticsData => metadata.isNotEmpty;
 }
 
+class SynchronousMediaControlUpdate {
+  const SynchronousMediaControlUpdate({
+    this.startStreamID = '',
+    this.startStreamNotification = '',
+    this.stopStreamID = '',
+    this.stopStreamNotification = '',
+    this.routeStreamID = '',
+    this.routeNotification = '',
+    this.webrtcSignalNotification = '',
+  });
+
+  final String startStreamID;
+  final String startStreamNotification;
+  final String stopStreamID;
+  final String stopStreamNotification;
+  final String routeStreamID;
+  final String routeNotification;
+  final String webrtcSignalNotification;
+
+  bool get shouldAcknowledgeStartStream => startStreamID.isNotEmpty;
+
+  String get lastNotification {
+    if (webrtcSignalNotification.isNotEmpty) {
+      return webrtcSignalNotification;
+    }
+    if (routeNotification.isNotEmpty) {
+      return routeNotification;
+    }
+    if (stopStreamNotification.isNotEmpty) {
+      return stopStreamNotification;
+    }
+    return startStreamNotification;
+  }
+}
+
 String statusFromConnectResponse(ConnectResponse response) {
   if (response.hasError()) {
     return 'Server error';
@@ -103,6 +138,56 @@ String statusFromConnectResponse(ConnectResponse response) {
     return 'UI updated';
   }
   return 'Connected';
+}
+
+SynchronousMediaControlUpdate synchronousMediaControlUpdateFromResponse(
+  ConnectResponse response,
+) {
+  var startStreamID = '';
+  var startStreamNotification = '';
+  if (response.hasStartStream()) {
+    final start = response.startStream;
+    startStreamID = start.streamId;
+    if (start.kind.isNotEmpty) {
+      startStreamNotification = 'Start stream: ${start.kind} '
+          '(${start.streamId})';
+    }
+  }
+
+  var stopStreamID = '';
+  var stopStreamNotification = '';
+  if (response.hasStopStream()) {
+    stopStreamID = response.stopStream.streamId;
+    if (stopStreamID.isNotEmpty) {
+      stopStreamNotification = 'Stop stream: $stopStreamID';
+    }
+  }
+
+  var routeStreamID = '';
+  var routeNotification = '';
+  if (response.hasRouteStream()) {
+    final route = response.routeStream;
+    routeStreamID = route.streamId;
+    routeNotification = 'Route: ${route.sourceDeviceId} -> '
+        '${route.targetDeviceId} (${route.kind})';
+  }
+
+  var webrtcSignalNotification = '';
+  if (response.hasWebrtcSignal()) {
+    final signal = response.webrtcSignal;
+    webrtcSignalNotification =
+        'WebRTC signal: ${signal.signalType} (${signal.streamId})';
+  }
+
+  return SynchronousMediaControlUpdate(
+    startStreamID: startStreamID,
+    startStreamNotification: startStreamNotification,
+    stopStreamID: stopStreamID,
+    stopStreamNotification: stopStreamNotification,
+    routeStreamID: routeStreamID,
+    routeNotification: routeNotification,
+    webrtcSignalNotification: webrtcSignalNotification,
+  );
 }
 
 uiv1.Node? applyUpdateUi({

@@ -2,6 +2,34 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by moving synchronous media/control response derivation
+  into `terminal_client/lib/connection/control_response_dispatcher.dart`.
+- Added a typed dispatcher update for stream-start acknowledgement IDs and
+  generic start/stop/route/WebRTC notification text.
+- Updated the app shell to consume those dispatcher-derived values while
+  keeping media engine, WebRTC, and edge-host side effects local for later
+  controller slices.
+- Expanded focused dispatcher coverage for stream start, stream stop, route,
+  and WebRTC signal response derivation.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format lib/connection/control_response_dispatcher.dart test/connection/control_response_dispatcher_test.dart lib/app/terminal_client_app.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_response_dispatcher_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 5 by moving playback-artifact ID extraction and
   diagnostics-to-application-intent derivation into
   `terminal_client/lib/connection/control_response_dispatcher.dart`.

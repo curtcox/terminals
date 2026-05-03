@@ -251,6 +251,62 @@ void main() {
   });
 
   group('media and edge response helpers', () {
+    test('synchronousMediaControlUpdateFromResponse derives stream start data',
+        () {
+      final update = synchronousMediaControlUpdateFromResponse(
+        ConnectResponse()
+          ..startStream = (iov1.StartStream()
+            ..streamId = 'stream-1'
+            ..kind = 'audio'
+            ..sourceDeviceId = 'server'
+            ..targetDeviceId = 'client'),
+      );
+
+      expect(update.startStreamID, 'stream-1');
+      expect(update.shouldAcknowledgeStartStream, isTrue);
+      expect(update.startStreamNotification, 'Start stream: audio (stream-1)');
+      expect(update.lastNotification, 'Start stream: audio (stream-1)');
+    });
+
+    test('synchronousMediaControlUpdateFromResponse derives route and signal',
+        () {
+      final routeUpdate = synchronousMediaControlUpdateFromResponse(
+        ConnectResponse()
+          ..routeStream = (iov1.RouteStream()
+            ..streamId = 'video-1'
+            ..sourceDeviceId = 'source'
+            ..targetDeviceId = 'target'
+            ..kind = 'video'),
+      );
+
+      expect(routeUpdate.routeStreamID, 'video-1');
+      expect(routeUpdate.routeNotification, 'Route: source -> target (video)');
+      expect(routeUpdate.lastNotification, 'Route: source -> target (video)');
+
+      final signalUpdate = synchronousMediaControlUpdateFromResponse(
+        ConnectResponse()
+          ..webrtcSignal = (WebRTCSignal()
+            ..streamId = 'video-1'
+            ..signalType = 'answer'),
+      );
+
+      expect(signalUpdate.webrtcSignalNotification,
+          'WebRTC signal: answer (video-1)');
+      expect(signalUpdate.lastNotification, 'WebRTC signal: answer (video-1)');
+    });
+
+    test('synchronousMediaControlUpdateFromResponse derives stop stream data',
+        () {
+      final update = synchronousMediaControlUpdateFromResponse(
+        ConnectResponse()
+          ..stopStream = (iov1.StopStream()..streamId = 'stream-2'),
+      );
+
+      expect(update.stopStreamID, 'stream-2');
+      expect(update.stopStreamNotification, 'Stop stream: stream-2');
+      expect(update.lastNotification, 'Stop stream: stream-2');
+    });
+
     test('bundleIDFromFlowPlan returns the first non-empty bundle id', () {
       expect(bundleIDFromFlowPlan(null), isNull);
       expect(bundleIDFromFlowPlan(iov1.FlowPlan()), isNull);

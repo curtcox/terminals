@@ -3803,40 +3803,42 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   void _applyMediaControlResponse(ConnectResponse response) {
+    final synchronousUpdate =
+        synchronousMediaControlUpdateFromResponse(response);
     if (response.hasStartStream()) {
       final start = response.startStream;
-      if (start.streamId.isNotEmpty) {
-        _activeStreamsByID[start.streamId] = start.deepCopy();
+      if (synchronousUpdate.shouldAcknowledgeStartStream) {
+        _activeStreamsByID[synchronousUpdate.startStreamID] = start.deepCopy();
         unawaited(
           _sendWhenReady(
             operation: OutboundOperation.streamReady,
             request: ConnectRequest()
-              ..streamReady = (StreamReady()..streamId = start.streamId),
+              ..streamReady =
+                  (StreamReady()..streamId = synchronousUpdate.startStreamID),
           ),
         );
         _streamReadyAckCount += 1;
         unawaited(_startMediaStream(start.deepCopy()));
       }
-      if (start.kind.isNotEmpty) {
-        _lastNotification = 'Start stream: ${start.kind} (${start.streamId})';
+      if (synchronousUpdate.startStreamNotification.isNotEmpty) {
+        _lastNotification = synchronousUpdate.startStreamNotification;
       }
     }
     if (response.hasStopStream()) {
-      final streamID = response.stopStream.streamId;
+      final streamID = synchronousUpdate.stopStreamID;
       if (streamID.isNotEmpty) {
         _activeStreamsByID.remove(streamID);
         _routesByStreamID.remove(streamID);
         unawaited(_mediaEngine.stopStream(streamID));
-        _lastNotification = 'Stop stream: $streamID';
+        _lastNotification = synchronousUpdate.stopStreamNotification;
       }
     }
     if (response.hasRouteStream()) {
       final route = response.routeStream;
-      if (route.streamId.isNotEmpty) {
-        _routesByStreamID[route.streamId] = route.deepCopy();
+      if (synchronousUpdate.routeStreamID.isNotEmpty) {
+        _routesByStreamID[synchronousUpdate.routeStreamID] = route.deepCopy();
       }
-      _lastNotification =
-          'Route: ${route.sourceDeviceId} -> ${route.targetDeviceId} (${route.kind})';
+      _lastNotification = synchronousUpdate.routeNotification;
     }
     if (response.hasWebrtcSignal()) {
       _recentWebRTCSignals.add(response.webrtcSignal.deepCopy());
@@ -3847,8 +3849,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
           _recentWebRTCSignals.length - maxSignals,
         );
       }
-      _lastNotification =
-          'WebRTC signal: ${response.webrtcSignal.signalType} (${response.webrtcSignal.streamId})';
+      _lastNotification = synchronousUpdate.webrtcSignalNotification;
       unawaited(_mediaEngine.handleSignal(response.webrtcSignal.deepCopy()));
     }
     if (response.hasPlayAudio()) {
