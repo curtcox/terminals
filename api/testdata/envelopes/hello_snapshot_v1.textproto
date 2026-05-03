@@ -1,0 +1,14 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 1
+client_message: {
+  hello: {
+    device_id: "terminal-kitchen"
+    identity: {
+      device_name: "Kitchen Terminal"
+      device_type: "wall_display"
+      platform: "flutter_test"
+    }
+    client_version: "0.1.0"
+  }
+}

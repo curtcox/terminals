@@ -1,0 +1,31 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 4
+server_message: {
+  set_ui: {
+    device_id: "terminal-kitchen"
+    root: {
+      id: "root"
+      props: {
+        key: "accessibility_label"
+        value: "Timer"
+      }
+      stack: {}
+      children: {
+        id: "title"
+        text: {
+          value: "Timer ready"
+          style: "title"
+          color: "#ff336699"
+        }
+      }
+      children: {
+        id: "start"
+        button: {
+          label: "Start"
+          action: "timer.start"
+        }
+      }
+    }
+  }
+}

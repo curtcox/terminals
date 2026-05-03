@@ -26,3 +26,6 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Inventoried current flexible protocol fields across control, UI, IO, capabilities, and diagnostics protos.
 - Added an advisory `proto-flex-check` static guardrail and initial `proto-contract-test` Make target.
 - Added PR checklist language for protocol-affecting changes.
+- Added shared `WireEnvelope` golden fixtures under `api/testdata/envelopes/` for hello, capability snapshot, register ack metadata, set UI, start stream, flow plan, observation, unknown metadata, and deprecated register payloads.
+- Added Go and Dart protocol contract checks that decode the same binary fixtures and assert flexible-field compatibility behavior.
+- Expanded `proto-contract-test` to run proto lint, flex-field registry validation, Go fixture decoding, protocol-focused transport tests, and the Dart fixture decoder.

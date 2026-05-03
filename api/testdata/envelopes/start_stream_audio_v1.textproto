@@ -1,0 +1,23 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 5
+server_message: {
+  start_stream: {
+    stream_id: "stream-audio-1"
+    kind: "audio"
+    source_device_id: "terminal-kitchen"
+    target_device_id: "server-main"
+    metadata: {
+      key: "sample_rate"
+      value: "16000"
+    }
+    metadata: {
+      key: "channels"
+      value: "1"
+    }
+    metadata: {
+      key: "codec"
+      value: "pcm_s16le"
+    }
+  }
+}

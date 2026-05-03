@@ -1,0 +1,35 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 7
+client_message: {
+  observation_message: {
+    observation: {
+      kind: "sound.detected"
+      subject: "kettle"
+      source_device: {
+        device_id: "terminal-kitchen"
+      }
+      occurred_unix_ms: 1777816800000
+      confidence: 0.87
+      zone: "kitchen"
+      attributes: {
+        key: "label"
+        value: "whistle"
+      }
+      attributes: {
+        key: "loudness_db"
+        value: "72.5"
+      }
+      evidence: {
+        id: "artifact-audio-1"
+        kind: "audio_clip"
+        source: {
+          device_id: "terminal-kitchen"
+        }
+        start_unix_ms: 1777816795000
+        end_unix_ms: 1777816800000
+        uri: "artifact://audio/artifact-audio-1"
+      }
+    }
+  }
+}

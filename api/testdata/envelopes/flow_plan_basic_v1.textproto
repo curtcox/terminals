@@ -1,0 +1,32 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 6
+server_message: {
+  start_flow: {
+    flow_id: "flow-audio-watch"
+    plan: {
+      nodes: {
+        id: "capture"
+        kind: "audio.capture"
+        exec: "edge"
+        args: {
+          key: "stream_id"
+          value: "stream-audio-1"
+        }
+      }
+      nodes: {
+        id: "classify"
+        kind: "audio.classify"
+        exec: "server"
+        args: {
+          key: "model"
+          value: "silence-v1"
+        }
+      }
+      edges: {
+        from: "capture"
+        to: "classify"
+      }
+    }
+  }
+}

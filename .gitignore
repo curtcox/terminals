@@ -13,6 +13,7 @@ terminal_server/bin/
 terminal_server/server
 terminal_server/coverage.out
 terminal_server/.cache/
+.cache/
 
 # Flutter/Dart
 terminal_client/.dart_tool/

@@ -1,0 +1,20 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 9
+client_message: {
+  register: {
+    capabilities: {
+      device_id: "legacy-terminal"
+      identity: {
+        device_name: "Legacy Terminal"
+        device_type: "tablet"
+        platform: "flutter_test"
+      }
+      screen: {
+        width: 1024
+        height: 768
+        density: 1
+      }
+    }
+  }
+}

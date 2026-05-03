@@ -1,0 +1,21 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 3
+server_message: {
+  register_ack: {
+    server_id: "server-main"
+    message: "registered"
+    metadata: {
+      key: "photo_frame_asset_base_url"
+      value: "https://terminals.example/assets/"
+    }
+    metadata: {
+      key: "server_build_date"
+      value: "2026-05-03T14:00:00Z"
+    }
+    metadata: {
+      key: "server_build_sha"
+      value: "abc1234"
+    }
+  }
+}

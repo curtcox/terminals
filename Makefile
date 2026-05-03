@@ -1,6 +1,7 @@
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 LOCAL_BIN := $(ROOT_DIR)/.bin
 LOCAL_FLUTTER_BIN := $(ROOT_DIR)/.sdk/flutter/bin
+LOCAL_GO_CACHE := $(ROOT_DIR)/.cache/go-build
 CLIENT_WEB_PORT ?= 60739
 CLIENT_WEB_HOST ?= 0.0.0.0
 BUILD_SHA ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
@@ -113,7 +114,7 @@ client-coverage:
 
 proto-lint:
 	cd api && buf lint
-	cd terminal_server && go test ./internal/transport -run 'TestProtoRoundTrip' -count=1
+	cd terminal_server && GOCACHE="$(LOCAL_GO_CACHE)" go test ./internal/transport -run 'TestProtoRoundTrip' -count=1
 
 proto-breaking:
 	cd api && buf breaking --against '../.git#branch=main,subdir=api'
@@ -127,6 +128,9 @@ proto-flex-check:
 proto-contract-test:
 	$(MAKE) proto-lint
 	$(MAKE) proto-flex-check
+	cd terminal_server && GOCACHE="$(LOCAL_GO_CACHE)" go test ./internal/protocolcontract
+	cd terminal_server && GOCACHE="$(LOCAL_GO_CACHE)" go test ./internal/transport -run 'TestProto|TestGenerated' -count=1
+	cd terminal_client && HOME="$(ROOT_DIR)/.home" PUB_CACHE="$(ROOT_DIR)/.home/.pub-cache" dart test/protocol_contract_test.dart
 
 skills-validate:
 	./scripts/validate-skills.sh

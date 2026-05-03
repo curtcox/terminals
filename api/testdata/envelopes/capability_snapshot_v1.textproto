@@ -1,0 +1,33 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 2
+client_message: {
+  capability_snapshot: {
+    device_id: "terminal-kitchen"
+    generation: 7
+    capabilities: {
+      device_id: "terminal-kitchen"
+      identity: {
+        device_name: "Kitchen Terminal"
+        device_type: "wall_display"
+        platform: "flutter_test"
+      }
+      screen: {
+        width: 1280
+        height: 800
+        density: 2
+        touch: true
+        orientation: "landscape"
+        fullscreen_supported: true
+      }
+      pointer: {
+        type: "unknown_pointer_from_future"
+        hover: false
+      }
+      touch: {
+        supported: true
+        max_points: 5
+      }
+    }
+  }
+}
