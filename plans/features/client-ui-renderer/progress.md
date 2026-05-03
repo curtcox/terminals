@@ -2,6 +2,32 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by moving playback-artifact ID extraction and
+  diagnostics-to-application-intent derivation into
+  `terminal_client/lib/connection/control_response_dispatcher.dart`.
+- Updated the app shell to consume those dispatcher helpers while keeping the
+  mutable text controllers and launch UI state local for a later shell split.
+- Expanded focused dispatcher coverage for deterministic playback artifact
+  selection and generic application-intent ordering.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format --set-exit-if-changed lib/connection/control_response_dispatcher.dart test/connection/control_response_dispatcher_test.dart lib/app/terminal_client_app.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_response_dispatcher_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+
+## 2026-05-03
+
 - Continued Phase 5 by creating
   `terminal_client/lib/connection/control_session_controller.dart` for the
   first pure connection-session primitives.

@@ -282,5 +282,44 @@ void main() {
           'tts_text');
       expect(playAudioSourceLabel(iov1.PlayAudio()), 'not_set');
     });
+
+    test('firstPlaybackArtifactID returns first sorted non-empty id', () {
+      expect(firstPlaybackArtifactID(const <String, String>{}), '');
+      expect(
+        firstPlaybackArtifactID(const <String, String>{
+          'b': ' artifact-b | meta ',
+          'a': '   ',
+          'c': 'artifact-c',
+        }),
+        'artifact-b',
+      );
+      expect(
+        firstPlaybackArtifactID(const <String, String>{
+          'a': 'artifact-a|meta',
+          'b': 'artifact-b|meta',
+        }),
+        'artifact-a',
+      );
+    });
+
+    test('applicationIntentsFromDiagnostics keeps default first and sorts data',
+        () {
+      expect(
+        applicationIntentsFromDiagnostics(const <String, String>{
+          'weather': '',
+          ' terminal ': '',
+          'lights': '',
+          '': '',
+        }),
+        <String>['terminal', 'lights', 'weather'],
+      );
+      expect(
+        applicationIntentsFromDiagnostics(
+          const <String, String>{'z': '', 'a': ''},
+          defaultIntent: 'launcher',
+        ),
+        <String>['launcher', 'a', 'z'],
+      );
+    });
   });
 }

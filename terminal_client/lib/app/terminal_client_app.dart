@@ -2058,25 +2058,8 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     );
   }
 
-  String _firstPlaybackArtifactID(Map<String, String> data) {
-    final keys = data.keys.toList()..sort();
-    for (final key in keys) {
-      final parts = data[key]?.split('|') ?? const <String>[];
-      if (parts.isNotEmpty && parts.first.trim().isNotEmpty) {
-        return parts.first.trim();
-      }
-    }
-    return '';
-  }
-
   void _refreshAvailableApplications(Map<String, String> data) {
-    final discovered = data.keys
-        .map((key) => key.trim())
-        .where((key) => key.isNotEmpty)
-        .toSet();
-    discovered.remove('terminal');
-    final sorted = discovered.toList()..sort();
-    _availableApplicationIntents = <String>['terminal', ...sorted];
+    _availableApplicationIntents = applicationIntentsFromDiagnostics(data);
     if (!_availableApplicationIntents.contains(_selectedApplicationIntent)) {
       _selectedApplicationIntent = _availableApplicationIntents.first;
     }
@@ -2107,7 +2090,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     _diagnosticsTitle = diagnostics.title;
     _diagnosticsData = diagnostics.data;
     if (diagnostics.title == 'list_playback_artifacts') {
-      final firstArtifactID = _firstPlaybackArtifactID(diagnostics.data);
+      final firstArtifactID = firstPlaybackArtifactID(diagnostics.data);
       if (firstArtifactID.isNotEmpty) {
         _playbackArtifactIdController.text = firstArtifactID;
       }

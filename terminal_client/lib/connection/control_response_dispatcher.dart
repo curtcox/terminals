@@ -259,3 +259,30 @@ int playAudioPcmByteCount(iov1.PlayAudio playAudio) {
   }
   return playAudio.pcmData.length;
 }
+
+String firstPlaybackArtifactID(Map<String, String> data) {
+  final keys = data.keys.toList()..sort();
+  for (final key in keys) {
+    final parts = data[key]?.split('|') ?? const <String>[];
+    if (parts.isNotEmpty && parts.first.trim().isNotEmpty) {
+      return parts.first.trim();
+    }
+  }
+  return '';
+}
+
+List<String> applicationIntentsFromDiagnostics(
+  Map<String, String> data, {
+  String defaultIntent = 'terminal',
+}) {
+  final fallback = defaultIntent.trim();
+  final discovered = data.keys
+      .map((key) => key.trim())
+      .where((key) => key.isNotEmpty && key != fallback)
+      .toSet();
+  final sorted = discovered.toList()..sort();
+  return <String>[
+    if (fallback.isNotEmpty) fallback,
+    ...sorted,
+  ];
+}
