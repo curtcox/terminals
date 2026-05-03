@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:grpc/grpc.dart';
 import 'package:terminal_client/capabilities/probe.dart';
+import 'package:terminal_client/capabilities/screen_metrics.dart';
 import 'package:terminal_client/connection/carrier_preference.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';

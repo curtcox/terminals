@@ -2,6 +2,35 @@
 
 ## 2026-05-03
 
+- Continued Phase 4 by extracting screen metric types and display geometry
+  helper functions from `terminal_client/lib/app/terminal_client_app.dart`
+  into `terminal_client/lib/capabilities/screen_metrics.dart`.
+- Extracted pure capability-session helpers for capability signatures, display
+  metadata projection, and stale-generation error detection into
+  `terminal_client/lib/capabilities/capability_session.dart`.
+- Added focused screen metric tests under
+  `terminal_client/test/capabilities/screen_metrics_test.dart`.
+- Added focused capability-session tests under
+  `terminal_client/test/capabilities/capability_session_test.dart`.
+- Updated the broad widget smoke test to import the capability screen metrics
+  module directly while it still covers app-level capability lifecycle behavior.
+
+Validation:
+
+```bash
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/capabilities
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`.
+- The first focused test attempt failed under sandboxed networking while
+  checking pub.dev advisories; rerunning with approved network access passed.
+
+## 2026-05-03
+
 - Found that earlier work had already moved `main.dart` to a minimal
   `runApp(const TerminalClientApp())` entry point.
 - Found an existing `terminal_client/lib/ui/` renderer module and focused

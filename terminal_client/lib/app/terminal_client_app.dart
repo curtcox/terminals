@@ -6,6 +6,8 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:terminal_client/capabilities/capability_session.dart';
+import 'package:terminal_client/capabilities/screen_metrics.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/capabilities/probe.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -57,28 +59,10 @@ typedef AlertDelivery = void Function({
 typedef UnixMsProvider = int Function();
 typedef BugReportScreenshotCapture = Future<List<int>> Function();
 typedef WakeWordDetectorFactory = WakeWordDetectorController Function();
-typedef ScreenMetricsProvider = ScreenMetrics Function();
 typedef MediaPermissionProbe = Future<void> Function({
   required bool audio,
   required bool video,
 });
-
-class ScreenMetrics {
-  ScreenMetrics({
-    required this.logicalSize,
-    required this.devicePixelRatio,
-    this.safeAreaInsets = EdgeInsets.zero,
-    String? orientation,
-  }) : orientation = orientation ??
-            (logicalSize.width >= logicalSize.height
-                ? 'landscape'
-                : 'portrait');
-
-  final Size logicalSize;
-  final double devicePixelRatio;
-  final EdgeInsets safeAreaInsets;
-  final String orientation;
-}
 
 class WakeWordUtterance {
   const WakeWordUtterance({
@@ -214,7 +198,6 @@ const int _clientContextRecentUiCap = 32;
 const int _clientContextRecentLogCap = 200;
 const int _clientContextRecentErrorCap = 32;
 const Duration _capabilityMonitorInterval = Duration(seconds: 2);
-const Duration kDisplayGeometryDebounceInterval = Duration(milliseconds: 120);
 const RetryPolicy _bugReportAckRetryPolicy = RetryPolicy(
   interval: Duration(seconds: 1),
   maxDuration: Duration(seconds: 20),
@@ -833,31 +816,14 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     if (provider == null) {
       return null;
     }
-    final metrics = provider();
-    final size = metrics.logicalSize;
-    if (size.width <= 0 || size.height <= 0) {
-      return null;
-    }
-    final dpr = metrics.devicePixelRatio <= 0 ? 1.0 : metrics.devicePixelRatio;
-    return ScreenMetrics(
-      logicalSize: size,
-      devicePixelRatio: dpr,
-      safeAreaInsets: metrics.safeAreaInsets,
-      orientation: metrics.orientation.trim().isEmpty
-          ? _normalizedOrientationFromSize(size)
-          : metrics.orientation.trim(),
+    return normalizeScreenMetrics(
+      provider(),
+      fallbackOrientation: _lastKnownOrientation,
     );
   }
 
   EdgeInsets _safeAreaInsetsFromView(ui.FlutterView view, double dpr) {
-    final ratio = dpr <= 0 ? 1.0 : dpr;
-    final padding = view.padding;
-    return EdgeInsets.fromLTRB(
-      padding.left / ratio,
-      padding.top / ratio,
-      padding.right / ratio,
-      padding.bottom / ratio,
-    );
+    return safeAreaInsetsFromView(view, dpr);
   }
 
   EdgeInsets _currentSafeAreaInsets() {
@@ -941,7 +907,12 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
     required EdgeInsets safeAreaInsets,
     required String orientation,
   }) {
-    return '${logicalSize.width.round()}x${logicalSize.height.round()}@${devicePixelRatio.toStringAsFixed(3)}:${safeAreaInsets.left.toStringAsFixed(2)},${safeAreaInsets.top.toStringAsFixed(2)},${safeAreaInsets.right.toStringAsFixed(2)},${safeAreaInsets.bottom.toStringAsFixed(2)}:$orientation';
+    return displayGeometrySignature(
+      logicalSize: logicalSize,
+      devicePixelRatio: devicePixelRatio,
+      safeAreaInsets: safeAreaInsets,
+      orientation: orientation,
+    );
   }
 
   void _scheduleDisplayGeometryCapabilityUpdate() {
@@ -998,43 +969,29 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   String _capabilitySignature(capv1.DeviceCapabilities capabilities) {
-    return capabilities.writeToBuffer().join(',');
+    return capabilitySignature(capabilities);
   }
 
   String _normalizedOrientationFromSize(Size size) {
-    if (size.width <= 0 || size.height <= 0) {
-      return _lastKnownOrientation;
-    }
-    return size.width >= size.height ? 'landscape' : 'portrait';
+    return orientationForScreenSize(
+      size,
+      fallbackOrientation: _lastKnownOrientation,
+    );
   }
 
   capv1.DeviceCapabilities _applyDisplayMetadata(
     capv1.DeviceCapabilities capabilities,
   ) {
     final size = _currentLogicalSize();
-    final dpr = _currentDevicePixelRatio();
-    final safeAreaInsets = _currentSafeAreaInsets();
-    final orientation = _normalizedOrientationFromSize(size);
-    final screen = capabilities.hasScreen()
-        ? capabilities.screen
-        : (capabilities.screen = capv1.ScreenCapability());
-    screen
-      ..width = size.width.round()
-      ..height = size.height.round()
-      ..density = dpr
-      ..orientation = orientation
-      ..safeArea = (screen.hasSafeArea() ? screen.safeArea : capv1.Insets())
-      ..safeArea.left = safeAreaInsets.left.round()
-      ..safeArea.top = safeAreaInsets.top.round()
-      ..safeArea.right = safeAreaInsets.right.round()
-      ..safeArea.bottom = safeAreaInsets.bottom.round();
-
-    if (capabilities.displays.isEmpty) {
-      capabilities.displays.add(capv1.DisplayCapability());
-    }
-    final display = capabilities.displays.first;
-    display.screen = screen.deepCopy();
-    return capabilities;
+    return applyDisplayMetadataToCapabilities(
+      capabilities,
+      metrics: ScreenMetrics(
+        logicalSize: size,
+        devicePixelRatio: _currentDevicePixelRatio(),
+        safeAreaInsets: _currentSafeAreaInsets(),
+        orientation: _normalizedOrientationFromSize(size),
+      ),
+    );
   }
 
   Future<void> _probeAndPublishCapabilityChanges({
@@ -1205,12 +1162,7 @@ class _ControlStreamScaffoldState extends State<_ControlStreamScaffold>
   }
 
   bool _isStaleCapabilityGenerationError(ControlError error) {
-    if (error.code != ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION) {
-      return false;
-    }
-    final message = error.message.toLowerCase();
-    return message.contains('stale capability generation') ||
-        (message.contains('generation') && message.contains('stale'));
+    return isStaleCapabilityGenerationError(error);
   }
 
   DiscoveredServer? _selectedServerMetadata() {
