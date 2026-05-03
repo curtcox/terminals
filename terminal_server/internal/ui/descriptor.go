@@ -50,8 +50,9 @@ func TerminalView(deviceID string) Descriptor {
 // TerminalViewWithOutput returns a simple server-driven terminal layout with output.
 func TerminalViewWithOutput(deviceID, output string) Descriptor {
 	return New("stack", map[string]string{
-		"id":         "terminal_root",
-		"background": "#000000",
+		"id":            "terminal_root",
+		"background":    "#000000",
+		"client_chrome": "hidden",
 	}, New("text", map[string]string{
 		"id":    "terminal_banner",
 		"value": "Terminal session on " + deviceID,

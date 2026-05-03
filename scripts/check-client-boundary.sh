@@ -14,7 +14,7 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 1
 fi
 
-pattern='photo[_ -]?frame|red[_ -]?alert|kitchen[_ -]?timer|package_id|com\.example'
+pattern='terminal_root|photo[_ -]?frame|red[_ -]?alert|kitchen[_ -]?timer|package_id|com\.example'
 
 matches="$(
   rg --line-number --no-heading --glob '!gen/**' --glob '!**/*.pb*.dart' \
@@ -31,4 +31,3 @@ if [[ -n "${matches}" ]]; then
 fi
 
 echo "client boundary scan passed"
-

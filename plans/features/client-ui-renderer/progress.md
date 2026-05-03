@@ -2,6 +2,40 @@
 
 ## 2026-05-03
 
+- Continued Phase 6 by adding
+  `terminal_client/lib/app/terminal_client_view_state.dart` for generic
+  shell-level view decisions.
+- Replaced the client-side `terminal_root` fullscreen branch with a generic
+  server-declared `client_chrome=hidden` root prop.
+- Updated the server terminal descriptor to request hidden client chrome through
+  that generic prop, and updated widget coverage to assert the generic path.
+- Added server descriptor coverage for the generic hidden-chrome prop.
+- Tightened the client boundary scan so `terminal_root` cannot re-enter
+  production Flutter client code as a behavior token.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/app/terminal_client_view_state_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart --plain-name "server root can hide client chrome"
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test
+cd terminal_server && go test ./internal/ui
+cd terminal_server && GOCACHE=/tmp/terminals-go-build go test ./internal/transport
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+- Initial sandboxed Flutter test attempts failed on DNS for pub.dev advisory
+  lookup; rerunning with approved network access passed.
+- The first transport test run hit the sandbox loopback bind restriction in
+  websocket tests; rerunning with approved loopback access passed.
+
+## 2026-05-03
+
 - Continued Phase 6 by splitting the stateful client shell out of
   `terminal_client/lib/app/terminal_client_app.dart` into
   `terminal_client/lib/app/terminal_client_shell.dart`.

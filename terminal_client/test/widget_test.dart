@@ -3793,7 +3793,7 @@ void main() {
     );
   });
 
-  testWidgets('terminal root renders fullscreen app view',
+  testWidgets('server root can hide client chrome',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -3812,6 +3812,7 @@ void main() {
         ..setUi = (uiv1.SetUI()
           ..root = (uiv1.Node()
             ..id = 'terminal_root'
+            ..props['client_chrome'] = 'hidden'
             ..stack = (uiv1.StackWidget())
             ..children.add(
               uiv1.Node()
@@ -3826,7 +3827,7 @@ void main() {
     expect(find.text('Connect Stream'), findsNothing);
   });
 
-  testWidgets('scoped terminal root renders fullscreen app view',
+  testWidgets('scoped server root can hide client chrome',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -3845,6 +3846,7 @@ void main() {
         ..setUi = (uiv1.SetUI()
           ..root = (uiv1.Node()
             ..id = 'act:test-activation/terminal_root'
+            ..props['client_chrome'] = 'hidden'
             ..stack = (uiv1.StackWidget())
             ..children.add(
               uiv1.Node()

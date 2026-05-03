@@ -36,6 +36,9 @@ func TestTerminalViewIncludesRefreshButton(t *testing.T) {
 	if d.Type != "stack" {
 		t.Fatalf("Type = %q, want stack", d.Type)
 	}
+	if d.Props["client_chrome"] != "hidden" {
+		t.Fatalf("client_chrome = %q, want hidden", d.Props["client_chrome"])
+	}
 	if len(d.Children) < 4 {
 		t.Fatalf("children = %d, want at least 4", len(d.Children))
 	}

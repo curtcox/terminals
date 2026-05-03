@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:terminal_client/app/client_dependencies.dart';
+import 'package:terminal_client/app/terminal_client_view_state.dart';
 import 'package:terminal_client/capabilities/capability_session.dart';
 import 'package:terminal_client/capabilities/screen_metrics.dart';
 import 'package:terminal_client/capabilities/probe.dart';
@@ -2851,8 +2852,8 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     if (directionality != null) {
       _lastKnownTextDirection = directionality;
     }
-    final showTerminalFullscreen = _isTerminalRoot(_activeRoot);
-    if (showTerminalFullscreen) {
+    final hideClientChrome = shouldHideClientChromeForRoot(_activeRoot);
+    if (hideClientChrome) {
       return RepaintBoundary(
         key: _bugReportScreenshotKey,
         child: Scaffold(
@@ -3839,17 +3840,6 @@ class _TerminalClientShellState extends State<TerminalClientShell>
         request: ConnectRequest()..webrtcSignal = signal.deepCopy(),
       ),
     );
-  }
-
-  bool _isTerminalRoot(uiv1.Node? node) {
-    if (node == null) {
-      return false;
-    }
-    final id = serverDrivenNodeId(node).trim();
-    if (id == 'terminal_root') {
-      return true;
-    }
-    return id.endsWith('/terminal_root');
   }
 }
 
