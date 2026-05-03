@@ -1044,45 +1044,25 @@ class _TerminalClientShellState extends State<TerminalClientShell>
               _status = responseStatus;
               _lastConnectionStatus = responseStatus;
             }
-            var nextRoot = _activeRoot;
-            var uiChanged = false;
-            if (response.hasSetUi() && response.setUi.hasRoot()) {
-              nextRoot = response.setUi.root.deepCopy();
-              uiChanged = true;
-              _recordUiEvent(
-                kind: 'set_ui',
-                componentId: serverDrivenNodeId(response.setUi.root),
-                detail: 'root updated',
-              );
-            }
-            if (response.hasUpdateUi()) {
-              final updatedRoot = applyUpdateUi(
-                currentRoot: nextRoot,
-                update: response.updateUi,
-              );
-              if (!identical(updatedRoot, nextRoot)) {
-                uiChanged = true;
+            final uiUpdate = serverDrivenUiUpdateFromResponse(
+              response: response,
+              currentRoot: _activeRoot,
+            );
+            if (uiUpdate != null) {
+              _activeRoot = uiUpdate.activeRoot;
+              final transitionHint = uiUpdate.transitionHint;
+              if (transitionHint != null) {
+                _applyTransitionHint(transitionHint);
               }
-              nextRoot = updatedRoot;
-              _recordUiEvent(
-                kind: 'update_ui',
-                componentId: response.updateUi.componentId,
-                detail: 'component patch',
-              );
-            }
-            if (response.hasTransitionUi()) {
-              _applyTransitionHint(response.transitionUi);
-              if (nextRoot != null) {
-                uiChanged = true;
+              for (final event in uiUpdate.events) {
+                _recordUiEvent(
+                  kind: event.kind,
+                  componentId: event.componentId,
+                  detail: event.detail,
+                );
               }
-              _recordUiEvent(
-                kind: 'transition_ui',
-                componentId: serverDrivenNodeId(nextRoot ?? uiv1.Node()),
-                detail: response.transitionUi.transition,
-              );
             }
-            _activeRoot = nextRoot;
-            if (uiChanged) {
+            if (uiUpdate?.uiChanged ?? false) {
               _activeRootRevision += 1;
             }
             if (response.hasNotification()) {
@@ -3573,16 +3553,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     }
   }
 
-  void _applyTransitionHint(uiv1.TransitionUI transitionUi) {
-    final transition = transitionUi.transition.trim().toLowerCase();
-    final hasTransition = transition.isNotEmpty && transition != 'none';
-    final defaultDuration = hasTransition ? 250 : 0;
-    final durationMs =
-        transitionUi.durationMs > 0 ? transitionUi.durationMs : defaultDuration;
-    _activeTransition = transition;
-    _activeTransitionDuration = Duration(milliseconds: durationMs);
-    _lastNotification =
-        'Transition: ${transitionUi.transition} (${transitionUi.durationMs}ms)';
+  void _applyTransitionHint(ServerDrivenTransitionHint transitionHint) {
+    _activeTransition = transitionHint.transition;
+    _activeTransitionDuration = transitionHint.duration;
+    _lastNotification = transitionHint.notification;
   }
 
   Widget _buildTransition(Widget child, Animation<double> animation) {

@@ -2,6 +2,36 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by moving server-driven UI response derivation for
+  `SetUI`, `UpdateUI`, and `TransitionUI` out of `TerminalClientShell` and
+  into `terminal_client/lib/connection/control_response_dispatcher.dart`.
+- Added typed dispatcher updates for active root replacement, UI event logging
+  metadata, transition hints, and transition default-duration derivation.
+- Updated the shell to apply dispatcher-produced state while keeping widget
+  animation construction and local chrome state in the shell.
+- Added focused dispatcher tests for set, patch, and transition response
+  handling.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format lib/connection/control_response_dispatcher.dart lib/app/terminal_client_shell.dart test/connection/control_response_dispatcher_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_response_dispatcher_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart --plain-name "handles transition_ui responses"
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+- A first targeted widget-test attempt ran in parallel with `flutter analyze`
+  and then hit sandboxed DNS for pub.dev advisories; rerunning the targeted
+  widget test with approved network access passed.
+
+## 2026-05-03
+
 - Continued Phase 5 by moving sensor telemetry control-request construction
   out of `TerminalClientShell` and into
   `terminal_client/lib/connection/control_session_controller.dart`.

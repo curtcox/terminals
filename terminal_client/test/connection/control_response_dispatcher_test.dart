@@ -143,6 +143,111 @@ void main() {
     });
   });
 
+  group('serverDrivenUiUpdateFromResponse', () {
+    test('derives set UI updates outside the shell', () {
+      final root = uiv1.Node()
+        ..id = 'root'
+        ..stack = uiv1.StackWidget()
+        ..children.add(
+          uiv1.Node()
+            ..id = 'target'
+            ..text = (uiv1.TextWidget()..value = 'Old'),
+        );
+      final response = ConnectResponse()..setUi = (uiv1.SetUI()..root = root);
+
+      final update = serverDrivenUiUpdateFromResponse(
+        response: response,
+        currentRoot: null,
+      );
+
+      expect(update, isNotNull);
+      expect(update!.activeRoot!.children.single.text.value, 'Old');
+      expect(update.uiChanged, isTrue);
+      expect(
+        update.events.map((event) => event.kind),
+        <String>['set_ui'],
+      );
+      expect(
+        update.events.map((event) => event.componentId),
+        <String>['root'],
+      );
+    });
+
+    test('derives patch UI updates without mutating the current root', () {
+      final root = uiv1.Node()
+        ..id = 'root'
+        ..stack = uiv1.StackWidget()
+        ..children.add(
+          uiv1.Node()
+            ..id = 'target'
+            ..text = (uiv1.TextWidget()..value = 'Old'),
+        );
+      final response = ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'target'
+          ..node = (uiv1.Node()
+            ..id = 'target'
+            ..text = (uiv1.TextWidget()..value = 'New')));
+
+      final update = serverDrivenUiUpdateFromResponse(
+        response: response,
+        currentRoot: root,
+      );
+
+      expect(update, isNotNull);
+      expect(update!.activeRoot!.children.single.text.value, 'New');
+      expect(root.children.single.text.value, 'Old');
+      expect(update.uiChanged, isTrue);
+      expect(update.events.single.kind, 'update_ui');
+      expect(update.events.single.componentId, 'target');
+    });
+
+    test('derives transition updates and marks existing root changed', () {
+      final response = ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'fade'
+          ..durationMs = 120);
+      final update = serverDrivenUiUpdateFromResponse(
+        response: response,
+        currentRoot: uiv1.Node()..id = 'root',
+      );
+
+      expect(update, isNotNull);
+      expect(update!.uiChanged, isTrue);
+      expect(update.events.single.kind, 'transition_ui');
+      expect(update.events.single.componentId, 'root');
+      expect(update.transitionHint?.transition, 'fade');
+      expect(
+          update.transitionHint?.duration, const Duration(milliseconds: 120));
+      expect(update.transitionHint?.notification, 'Transition: fade (120ms)');
+    });
+
+    test('returns null when response has no UI work', () {
+      expect(
+        serverDrivenUiUpdateFromResponse(
+          response: ConnectResponse(),
+          currentRoot: null,
+        ),
+        isNull,
+      );
+    });
+
+    test('transition default duration is derived outside the shell', () {
+      final hint = transitionHintFromResponse(
+        uiv1.TransitionUI()..transition = 'slide_left',
+      );
+
+      expect(hint.transition, 'slide_left');
+      expect(hint.duration, const Duration(milliseconds: 250));
+      expect(hint.notification, 'Transition: slide_left (0ms)');
+
+      final none = transitionHintFromResponse(
+        uiv1.TransitionUI()..transition = 'none',
+      );
+      expect(none.duration, Duration.zero);
+    });
+  });
+
   group('commandDiagnosticsFromResponse', () {
     test('classifies command diagnostics by pending request id', () {
       final response = ConnectResponse()

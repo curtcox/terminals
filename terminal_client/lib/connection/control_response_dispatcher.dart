@@ -82,6 +82,47 @@ class SynchronousMediaControlUpdate {
   }
 }
 
+class ServerDrivenUiEventUpdate {
+  const ServerDrivenUiEventUpdate({
+    required this.kind,
+    required this.componentId,
+    required this.detail,
+  });
+
+  final String kind;
+  final String componentId;
+  final String detail;
+}
+
+class ServerDrivenTransitionHint {
+  const ServerDrivenTransitionHint({
+    required this.transition,
+    required this.duration,
+    required this.notification,
+  });
+
+  final String transition;
+  final Duration duration;
+  final String notification;
+}
+
+class ServerDrivenUiResponseUpdate {
+  const ServerDrivenUiResponseUpdate({
+    required this.activeRoot,
+    required this.uiChanged,
+    required this.events,
+    this.transitionHint,
+  });
+
+  final uiv1.Node? activeRoot;
+  final bool uiChanged;
+  final List<ServerDrivenUiEventUpdate> events;
+  final ServerDrivenTransitionHint? transitionHint;
+
+  bool get hasUiWork =>
+      uiChanged || events.isNotEmpty || transitionHint != null;
+}
+
 String statusFromConnectResponse(ConnectResponse response) {
   if (response.hasError()) {
     return 'Server error';
@@ -187,6 +228,82 @@ SynchronousMediaControlUpdate synchronousMediaControlUpdateFromResponse(
     routeStreamID: routeStreamID,
     routeNotification: routeNotification,
     webrtcSignalNotification: webrtcSignalNotification,
+  );
+}
+
+ServerDrivenUiResponseUpdate? serverDrivenUiUpdateFromResponse({
+  required ConnectResponse response,
+  required uiv1.Node? currentRoot,
+}) {
+  var nextRoot = currentRoot;
+  var uiChanged = false;
+  final events = <ServerDrivenUiEventUpdate>[];
+  ServerDrivenTransitionHint? transitionHint;
+
+  if (response.hasSetUi() && response.setUi.hasRoot()) {
+    nextRoot = response.setUi.root.deepCopy();
+    uiChanged = true;
+    events.add(
+      ServerDrivenUiEventUpdate(
+        kind: 'set_ui',
+        componentId: serverDrivenNodeId(response.setUi.root),
+        detail: 'root updated',
+      ),
+    );
+  }
+  if (response.hasUpdateUi()) {
+    final updatedRoot = applyUpdateUi(
+      currentRoot: nextRoot,
+      update: response.updateUi,
+    );
+    if (!identical(updatedRoot, nextRoot)) {
+      uiChanged = true;
+    }
+    nextRoot = updatedRoot;
+    events.add(
+      ServerDrivenUiEventUpdate(
+        kind: 'update_ui',
+        componentId: response.updateUi.componentId,
+        detail: 'component patch',
+      ),
+    );
+  }
+  if (response.hasTransitionUi()) {
+    transitionHint = transitionHintFromResponse(response.transitionUi);
+    if (nextRoot != null) {
+      uiChanged = true;
+    }
+    events.add(
+      ServerDrivenUiEventUpdate(
+        kind: 'transition_ui',
+        componentId: serverDrivenNodeId(nextRoot ?? uiv1.Node()),
+        detail: response.transitionUi.transition,
+      ),
+    );
+  }
+
+  final update = ServerDrivenUiResponseUpdate(
+    activeRoot: nextRoot,
+    uiChanged: uiChanged,
+    events: events,
+    transitionHint: transitionHint,
+  );
+  return update.hasUiWork ? update : null;
+}
+
+ServerDrivenTransitionHint transitionHintFromResponse(
+  uiv1.TransitionUI transitionUi,
+) {
+  final transition = transitionUi.transition.trim().toLowerCase();
+  final hasTransition = transition.isNotEmpty && transition != 'none';
+  final defaultDuration = hasTransition ? 250 : 0;
+  final durationMs =
+      transitionUi.durationMs > 0 ? transitionUi.durationMs : defaultDuration;
+  return ServerDrivenTransitionHint(
+    transition: transition,
+    duration: Duration(milliseconds: durationMs),
+    notification:
+        'Transition: ${transitionUi.transition} (${transitionUi.durationMs}ms)',
   );
 }
 
