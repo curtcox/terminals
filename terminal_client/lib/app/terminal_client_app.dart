@@ -12,6 +12,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:terminal_client/connection/control_client.dart';
 import 'package:terminal_client/connection/control_client_factory.dart';
 import 'package:terminal_client/connection/reliability.dart';
+import 'package:terminal_client/diagnostics/build_metadata.dart';
+import 'package:terminal_client/diagnostics/diagnostic_clipboard.dart';
 import 'package:terminal_client/discovery/mdns_scanner.dart';
 import 'package:terminal_client/edge/artifact_export.dart';
 import 'package:terminal_client/edge/bundle_store.dart';
@@ -260,144 +262,6 @@ String resolvePageHost({
     return fromLocation;
   }
   return uriBaseHost.trim();
-}
-
-String buildMetadataLabel(
-    {required String buildDate, required String buildSha}) {
-  final normalizedBuildDate = normalizeBuildValue(buildDate);
-  final normalizedBuildSha = normalizeBuildValue(buildSha);
-  return 'Build: $normalizedBuildDate | SHA: $normalizedBuildSha';
-}
-
-String normalizeBuildValue(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) {
-    return 'unknown';
-  }
-  return trimmed;
-}
-
-String buildVersionParityNote({
-  required String clientBuildDate,
-  required String clientBuildSha,
-  required String serverBuildDate,
-  required String serverBuildSha,
-}) {
-  final normalizedClientSha = normalizeBuildValue(clientBuildSha);
-  final normalizedServerSha = normalizeBuildValue(serverBuildSha);
-  final normalizedClientDate = normalizeBuildValue(clientBuildDate);
-  final normalizedServerDate = normalizeBuildValue(serverBuildDate);
-
-  if (normalizedServerSha == 'unknown' && normalizedServerDate == 'unknown') {
-    return 'Build Match: unknown (awaiting server register ack)';
-  }
-  if (normalizedClientSha != 'unknown' && normalizedServerSha != 'unknown') {
-    if (normalizedClientSha == normalizedServerSha) {
-      if (normalizedClientDate != 'unknown' &&
-          normalizedServerDate != 'unknown' &&
-          normalizedClientDate != normalizedServerDate) {
-        return 'Build Match: same SHA, different build date';
-      }
-      return 'Build Match: same SHA';
-    }
-    return 'Build Match: different SHA';
-  }
-  if (normalizedClientDate != 'unknown' && normalizedServerDate != 'unknown') {
-    if (normalizedClientDate == normalizedServerDate) {
-      return 'Build Match: same build date';
-    }
-    return 'Build Match: different build date';
-  }
-  return 'Build Match: unknown';
-}
-
-String buildServerBuildLine({
-  required String serverBuildDate,
-  required String serverBuildSha,
-  required bool hasRegisterAck,
-}) {
-  final normalizedServerSha = normalizeBuildValue(serverBuildSha);
-  final normalizedServerDate = normalizeBuildValue(serverBuildDate);
-  if (!hasRegisterAck &&
-      normalizedServerSha == 'unknown' &&
-      normalizedServerDate == 'unknown') {
-    return 'Server Build: awaiting register ack';
-  }
-  return 'Server ${buildMetadataLabel(
-    buildDate: serverBuildDate,
-    buildSha: serverBuildSha,
-  )}';
-}
-
-String buildWebConnectionChipLabel({
-  required bool hasRegisterAck,
-  required bool isConnecting,
-  required bool shouldStayConnected,
-}) {
-  final phase = deriveConnectionPhase(
-    shouldStayConnected: shouldStayConnected,
-    isConnecting: isConnecting,
-    hasClient: shouldStayConnected,
-    hasIncoming: shouldStayConnected,
-    hasRegisterAck: hasRegisterAck,
-    hasRecentTransportFailure: false,
-  );
-  return buildConnectionPhaseLabel(phase);
-}
-
-String buildConnectionPhaseLabel(ConnectionPhase phase) {
-  switch (phase) {
-    case ConnectionPhase.disconnected:
-      return 'Not connected';
-    case ConnectionPhase.connecting:
-      return 'Connecting';
-    case ConnectionPhase.connectedUnregistered:
-      return 'Connected (registering)';
-    case ConnectionPhase.registered:
-      return 'Connected';
-    case ConnectionPhase.degraded:
-      return 'Degraded';
-  }
-}
-
-String buildTransportDiagnosticsClipboardText({
-  required String lastTransportDiagnostic,
-  required List<String> recentAttempts,
-}) {
-  final lines = <String>['Transport Diagnostics'];
-  final normalizedDiagnostic = lastTransportDiagnostic.trim();
-  if (normalizedDiagnostic.isEmpty) {
-    lines.add('No transport failures captured yet');
-  } else {
-    lines.add(normalizedDiagnostic);
-  }
-  if (recentAttempts.isNotEmpty) {
-    lines.add('Recent Carrier Attempts');
-    lines.addAll(
-      recentAttempts
-          .map((attempt) => attempt.trim())
-          .where((a) => a.isNotEmpty),
-    );
-  }
-  return lines.join('\n');
-}
-
-String buildControlStreamClipboardText({
-  required String status,
-  required String notification,
-  required String transportDiagnostics,
-}) {
-  final lines = <String>['Control Stream: ${status.trim()}'];
-  final normalizedNotification = notification.trim();
-  if (normalizedNotification.isNotEmpty) {
-    lines.add(normalizedNotification);
-  }
-  final normalizedDiagnostics = transportDiagnostics.trim();
-  if (normalizedDiagnostics.isNotEmpty) {
-    lines.add('Transport Diagnostics');
-    lines.add(normalizedDiagnostics);
-  }
-  return lines.join('\n');
 }
 
 const List<String> _bugTokenWords = <String>[
