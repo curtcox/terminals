@@ -2,6 +2,32 @@
 
 ## 2026-05-03
 
+- Continued Phase 5 by moving system diagnostics command request construction
+  out of `TerminalClientShell` and into
+  `terminal_client/lib/connection/control_session_controller.dart`.
+- Added focused controller coverage for runtime status, device status, and
+  scenario-registry query request builders so the shell no longer hand-builds
+  those protobuf command envelopes.
+
+Validation:
+
+```bash
+./scripts/check-client-boundary.sh
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/dart format lib/connection/control_session_controller.dart lib/app/terminal_client_shell.dart test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/connection/control_session_controller_test.dart
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter test test/widget_test.dart --plain-name "sends system and playback debug commands and renders diagnostics data"
+cd terminal_client && HOME=/Users/curtcox/me/terminals/.home PUB_CACHE=/Users/curtcox/me/terminals/.home/.pub-cache ../.sdk/flutter/bin/flutter analyze
+```
+
+Notes:
+
+- Flutter/pub again printed the hosted advisory decode warning for `http`, but
+  validation completed successfully.
+- A first widget-test filter used the wrong test name and ran no tests; the
+  exact diagnostics test name above passed.
+
+## 2026-05-03
+
 - Continued Phase 6 by adding
   `terminal_client/lib/app/terminal_client_view_state.dart` for generic
   shell-level view decisions.

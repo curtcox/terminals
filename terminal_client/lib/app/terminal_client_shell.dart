@@ -1480,15 +1480,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
   void _sendRuntimeStatusQuery() {
     final requestID = _nextDebugRequestID('debug-runtime-status');
     _pendingRuntimeStatusRequestID = requestID;
-    final request = ConnectRequest()
-      ..command = (CommandRequest()
-        ..requestId = requestID
-        ..kind = CommandKind.COMMAND_KIND_SYSTEM
-        ..intent = 'runtime_status');
     unawaited(
       _sendWhenReady(
         operation: OutboundOperation.runtimeQuery,
-        request: request,
+        request: buildRuntimeStatusQueryRequest(requestID),
       ),
     );
   }
@@ -1496,15 +1491,13 @@ class _TerminalClientShellState extends State<TerminalClientShell>
   void _sendDeviceStatusQuery() {
     final requestID = _nextDebugRequestID('debug-device-status');
     _pendingDeviceStatusRequestID = requestID;
-    final request = ConnectRequest()
-      ..command = (CommandRequest()
-        ..requestId = requestID
-        ..kind = CommandKind.COMMAND_KIND_SYSTEM
-        ..intent = 'device_status $_deviceId');
     unawaited(
       _sendWhenReady(
         operation: OutboundOperation.deviceQuery,
-        request: request,
+        request: buildDeviceStatusQueryRequest(
+          requestID: requestID,
+          deviceID: _deviceId,
+        ),
       ),
     );
   }
@@ -1512,15 +1505,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
   void _sendScenarioRegistryQuery() {
     final requestID = _nextDebugRequestID('debug-scenario-registry');
     _pendingScenarioRegistryRequestID = requestID;
-    final request = ConnectRequest()
-      ..command = (CommandRequest()
-        ..requestId = requestID
-        ..kind = CommandKind.COMMAND_KIND_SYSTEM
-        ..intent = 'scenario_registry');
     unawaited(
       _sendWhenReady(
         operation: OutboundOperation.scenarioQuery,
-        request: request,
+        request: buildScenarioRegistryQueryRequest(requestID),
       ),
     );
   }

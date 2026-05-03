@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:terminal_client/connection/control_client_factory.dart';
+import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 
 Duration calculateReconnectDelay({
   required int reconnectAttempt,
@@ -57,4 +58,39 @@ class ConnectionTarget {
 
   final String host;
   final int port;
+}
+
+ConnectRequest buildSystemCommandRequest({
+  required String requestID,
+  required String intent,
+}) {
+  return ConnectRequest()
+    ..command = (CommandRequest()
+      ..requestId = requestID
+      ..kind = CommandKind.COMMAND_KIND_SYSTEM
+      ..intent = intent);
+}
+
+ConnectRequest buildRuntimeStatusQueryRequest(String requestID) {
+  return buildSystemCommandRequest(
+    requestID: requestID,
+    intent: 'runtime_status',
+  );
+}
+
+ConnectRequest buildDeviceStatusQueryRequest({
+  required String requestID,
+  required String deviceID,
+}) {
+  return buildSystemCommandRequest(
+    requestID: requestID,
+    intent: 'device_status $deviceID',
+  );
+}
+
+ConnectRequest buildScenarioRegistryQueryRequest(String requestID) {
+  return buildSystemCommandRequest(
+    requestID: requestID,
+    intent: 'scenario_registry',
+  );
 }
