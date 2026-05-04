@@ -928,6 +928,14 @@ Incremental progress (2026-05-03):
 - Expanded Go and Dart protocol contract/assertion coverage for typed stream kind behavior, plus adapter tests for enum-first WebRTC fallback semantics.
 - Updated protocol extension registry entries for `StartStream.kind`, `RouteStream.kind`, and `WebRTCSignal.signal_type` to describe typed-first compatibility behavior.
 
+Incremental progress (2026-05-04, CanvasWidget typed DrawOps):
+
+- Added additive typed drawing primitives (`DrawLine`, `DrawRect`, `DrawCircle`, `DrawText`, `DrawPath`) and a `DrawOp` oneof in `api/terminals/ui/v1/ui.proto`.
+- Added `repeated DrawOp draw_ops = 2` on `CanvasWidget` while keeping legacy `string draw_ops_json = 1`.
+- Regenerated Go bindings; synced Dart `terminals/ui/v1` bindings into the client tree.
+- Updated registry entry for `CanvasWidget.draw_ops_json` to describe typed-first compatibility semantics.
+- No application code currently produces/consumes draw ops, so adapter wiring is deferred until the first real consumer lands.
+
 Incremental progress (2026-05-04, PointerAction/TouchAction):
 
 - Added additive typed enums `terminals.io.v1.PointerAction` and `terminals.io.v1.TouchAction`, plus `PointerEvent.action_enum` (field 7) and `TouchEvent.action_enum` (field 3), while preserving legacy `action` strings.

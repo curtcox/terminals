@@ -1228,16 +1228,559 @@ func (x *AudioVisualizerWidget) GetStreamId() string {
 	return ""
 }
 
+type DrawLine struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X1            float64                `protobuf:"fixed64,1,opt,name=x1,proto3" json:"x1,omitempty"`
+	Y1            float64                `protobuf:"fixed64,2,opt,name=y1,proto3" json:"y1,omitempty"`
+	X2            float64                `protobuf:"fixed64,3,opt,name=x2,proto3" json:"x2,omitempty"`
+	Y2            float64                `protobuf:"fixed64,4,opt,name=y2,proto3" json:"y2,omitempty"`
+	Stroke        string                 `protobuf:"bytes,5,opt,name=stroke,proto3" json:"stroke,omitempty"`
+	StrokeWidth   float64                `protobuf:"fixed64,6,opt,name=stroke_width,json=strokeWidth,proto3" json:"stroke_width,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawLine) Reset() {
+	*x = DrawLine{}
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawLine) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawLine) ProtoMessage() {}
+
+func (x *DrawLine) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawLine.ProtoReflect.Descriptor instead.
+func (*DrawLine) Descriptor() ([]byte, []int) {
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *DrawLine) GetX1() float64 {
+	if x != nil {
+		return x.X1
+	}
+	return 0
+}
+
+func (x *DrawLine) GetY1() float64 {
+	if x != nil {
+		return x.Y1
+	}
+	return 0
+}
+
+func (x *DrawLine) GetX2() float64 {
+	if x != nil {
+		return x.X2
+	}
+	return 0
+}
+
+func (x *DrawLine) GetY2() float64 {
+	if x != nil {
+		return x.Y2
+	}
+	return 0
+}
+
+func (x *DrawLine) GetStroke() string {
+	if x != nil {
+		return x.Stroke
+	}
+	return ""
+}
+
+func (x *DrawLine) GetStrokeWidth() float64 {
+	if x != nil {
+		return x.StrokeWidth
+	}
+	return 0
+}
+
+type DrawRect struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
+	Width         float64                `protobuf:"fixed64,3,opt,name=width,proto3" json:"width,omitempty"`
+	Height        float64                `protobuf:"fixed64,4,opt,name=height,proto3" json:"height,omitempty"`
+	Fill          string                 `protobuf:"bytes,5,opt,name=fill,proto3" json:"fill,omitempty"`
+	Stroke        string                 `protobuf:"bytes,6,opt,name=stroke,proto3" json:"stroke,omitempty"`
+	StrokeWidth   float64                `protobuf:"fixed64,7,opt,name=stroke_width,json=strokeWidth,proto3" json:"stroke_width,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawRect) Reset() {
+	*x = DrawRect{}
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawRect) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawRect) ProtoMessage() {}
+
+func (x *DrawRect) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawRect.ProtoReflect.Descriptor instead.
+func (*DrawRect) Descriptor() ([]byte, []int) {
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *DrawRect) GetX() float64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *DrawRect) GetY() float64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *DrawRect) GetWidth() float64 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *DrawRect) GetHeight() float64 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *DrawRect) GetFill() string {
+	if x != nil {
+		return x.Fill
+	}
+	return ""
+}
+
+func (x *DrawRect) GetStroke() string {
+	if x != nil {
+		return x.Stroke
+	}
+	return ""
+}
+
+func (x *DrawRect) GetStrokeWidth() float64 {
+	if x != nil {
+		return x.StrokeWidth
+	}
+	return 0
+}
+
+type DrawCircle struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cx            float64                `protobuf:"fixed64,1,opt,name=cx,proto3" json:"cx,omitempty"`
+	Cy            float64                `protobuf:"fixed64,2,opt,name=cy,proto3" json:"cy,omitempty"`
+	Radius        float64                `protobuf:"fixed64,3,opt,name=radius,proto3" json:"radius,omitempty"`
+	Fill          string                 `protobuf:"bytes,4,opt,name=fill,proto3" json:"fill,omitempty"`
+	Stroke        string                 `protobuf:"bytes,5,opt,name=stroke,proto3" json:"stroke,omitempty"`
+	StrokeWidth   float64                `protobuf:"fixed64,6,opt,name=stroke_width,json=strokeWidth,proto3" json:"stroke_width,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawCircle) Reset() {
+	*x = DrawCircle{}
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawCircle) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawCircle) ProtoMessage() {}
+
+func (x *DrawCircle) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawCircle.ProtoReflect.Descriptor instead.
+func (*DrawCircle) Descriptor() ([]byte, []int) {
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *DrawCircle) GetCx() float64 {
+	if x != nil {
+		return x.Cx
+	}
+	return 0
+}
+
+func (x *DrawCircle) GetCy() float64 {
+	if x != nil {
+		return x.Cy
+	}
+	return 0
+}
+
+func (x *DrawCircle) GetRadius() float64 {
+	if x != nil {
+		return x.Radius
+	}
+	return 0
+}
+
+func (x *DrawCircle) GetFill() string {
+	if x != nil {
+		return x.Fill
+	}
+	return ""
+}
+
+func (x *DrawCircle) GetStroke() string {
+	if x != nil {
+		return x.Stroke
+	}
+	return ""
+}
+
+func (x *DrawCircle) GetStrokeWidth() float64 {
+	if x != nil {
+		return x.StrokeWidth
+	}
+	return 0
+}
+
+type DrawText struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             float64                `protobuf:"fixed64,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float64                `protobuf:"fixed64,2,opt,name=y,proto3" json:"y,omitempty"`
+	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	Fill          string                 `protobuf:"bytes,4,opt,name=fill,proto3" json:"fill,omitempty"`
+	FontSize      float64                `protobuf:"fixed64,5,opt,name=font_size,json=fontSize,proto3" json:"font_size,omitempty"`
+	FontFamily    string                 `protobuf:"bytes,6,opt,name=font_family,json=fontFamily,proto3" json:"font_family,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawText) Reset() {
+	*x = DrawText{}
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawText) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawText) ProtoMessage() {}
+
+func (x *DrawText) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawText.ProtoReflect.Descriptor instead.
+func (*DrawText) Descriptor() ([]byte, []int) {
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *DrawText) GetX() float64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *DrawText) GetY() float64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *DrawText) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *DrawText) GetFill() string {
+	if x != nil {
+		return x.Fill
+	}
+	return ""
+}
+
+func (x *DrawText) GetFontSize() float64 {
+	if x != nil {
+		return x.FontSize
+	}
+	return 0
+}
+
+func (x *DrawText) GetFontFamily() string {
+	if x != nil {
+		return x.FontFamily
+	}
+	return ""
+}
+
+type DrawPath struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	D             string                 `protobuf:"bytes,1,opt,name=d,proto3" json:"d,omitempty"`
+	Fill          string                 `protobuf:"bytes,2,opt,name=fill,proto3" json:"fill,omitempty"`
+	Stroke        string                 `protobuf:"bytes,3,opt,name=stroke,proto3" json:"stroke,omitempty"`
+	StrokeWidth   float64                `protobuf:"fixed64,4,opt,name=stroke_width,json=strokeWidth,proto3" json:"stroke_width,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawPath) Reset() {
+	*x = DrawPath{}
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawPath) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawPath) ProtoMessage() {}
+
+func (x *DrawPath) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawPath.ProtoReflect.Descriptor instead.
+func (*DrawPath) Descriptor() ([]byte, []int) {
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DrawPath) GetD() string {
+	if x != nil {
+		return x.D
+	}
+	return ""
+}
+
+func (x *DrawPath) GetFill() string {
+	if x != nil {
+		return x.Fill
+	}
+	return ""
+}
+
+func (x *DrawPath) GetStroke() string {
+	if x != nil {
+		return x.Stroke
+	}
+	return ""
+}
+
+func (x *DrawPath) GetStrokeWidth() float64 {
+	if x != nil {
+		return x.StrokeWidth
+	}
+	return 0
+}
+
+type DrawOp struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Op:
+	//
+	//	*DrawOp_Line
+	//	*DrawOp_Rect
+	//	*DrawOp_Circle
+	//	*DrawOp_Text
+	//	*DrawOp_Path
+	Op            isDrawOp_Op `protobuf_oneof:"op"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DrawOp) Reset() {
+	*x = DrawOp{}
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DrawOp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DrawOp) ProtoMessage() {}
+
+func (x *DrawOp) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DrawOp.ProtoReflect.Descriptor instead.
+func (*DrawOp) Descriptor() ([]byte, []int) {
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *DrawOp) GetOp() isDrawOp_Op {
+	if x != nil {
+		return x.Op
+	}
+	return nil
+}
+
+func (x *DrawOp) GetLine() *DrawLine {
+	if x != nil {
+		if x, ok := x.Op.(*DrawOp_Line); ok {
+			return x.Line
+		}
+	}
+	return nil
+}
+
+func (x *DrawOp) GetRect() *DrawRect {
+	if x != nil {
+		if x, ok := x.Op.(*DrawOp_Rect); ok {
+			return x.Rect
+		}
+	}
+	return nil
+}
+
+func (x *DrawOp) GetCircle() *DrawCircle {
+	if x != nil {
+		if x, ok := x.Op.(*DrawOp_Circle); ok {
+			return x.Circle
+		}
+	}
+	return nil
+}
+
+func (x *DrawOp) GetText() *DrawText {
+	if x != nil {
+		if x, ok := x.Op.(*DrawOp_Text); ok {
+			return x.Text
+		}
+	}
+	return nil
+}
+
+func (x *DrawOp) GetPath() *DrawPath {
+	if x != nil {
+		if x, ok := x.Op.(*DrawOp_Path); ok {
+			return x.Path
+		}
+	}
+	return nil
+}
+
+type isDrawOp_Op interface {
+	isDrawOp_Op()
+}
+
+type DrawOp_Line struct {
+	Line *DrawLine `protobuf:"bytes,1,opt,name=line,proto3,oneof"`
+}
+
+type DrawOp_Rect struct {
+	Rect *DrawRect `protobuf:"bytes,2,opt,name=rect,proto3,oneof"`
+}
+
+type DrawOp_Circle struct {
+	Circle *DrawCircle `protobuf:"bytes,3,opt,name=circle,proto3,oneof"`
+}
+
+type DrawOp_Text struct {
+	Text *DrawText `protobuf:"bytes,4,opt,name=text,proto3,oneof"`
+}
+
+type DrawOp_Path struct {
+	Path *DrawPath `protobuf:"bytes,5,opt,name=path,proto3,oneof"`
+}
+
+func (*DrawOp_Line) isDrawOp_Op() {}
+
+func (*DrawOp_Rect) isDrawOp_Op() {}
+
+func (*DrawOp_Circle) isDrawOp_Op() {}
+
+func (*DrawOp_Text) isDrawOp_Op() {}
+
+func (*DrawOp_Path) isDrawOp_Op() {}
+
 type CanvasWidget struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DrawOpsJson   string                 `protobuf:"bytes,1,opt,name=draw_ops_json,json=drawOpsJson,proto3" json:"draw_ops_json,omitempty"`
+	DrawOps       []*DrawOp              `protobuf:"bytes,2,rep,name=draw_ops,json=drawOps,proto3" json:"draw_ops,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CanvasWidget) Reset() {
 	*x = CanvasWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[16]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1249,7 +1792,7 @@ func (x *CanvasWidget) String() string {
 func (*CanvasWidget) ProtoMessage() {}
 
 func (x *CanvasWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[16]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1262,7 +1805,7 @@ func (x *CanvasWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanvasWidget.ProtoReflect.Descriptor instead.
 func (*CanvasWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{16}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *CanvasWidget) GetDrawOpsJson() string {
@@ -1270,6 +1813,13 @@ func (x *CanvasWidget) GetDrawOpsJson() string {
 		return x.DrawOpsJson
 	}
 	return ""
+}
+
+func (x *CanvasWidget) GetDrawOps() []*DrawOp {
+	if x != nil {
+		return x.DrawOps
+	}
+	return nil
 }
 
 type TextInputWidget struct {
@@ -1282,7 +1832,7 @@ type TextInputWidget struct {
 
 func (x *TextInputWidget) Reset() {
 	*x = TextInputWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[17]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1294,7 +1844,7 @@ func (x *TextInputWidget) String() string {
 func (*TextInputWidget) ProtoMessage() {}
 
 func (x *TextInputWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[17]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1307,7 +1857,7 @@ func (x *TextInputWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextInputWidget.ProtoReflect.Descriptor instead.
 func (*TextInputWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{17}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *TextInputWidget) GetPlaceholder() string {
@@ -1334,7 +1884,7 @@ type ButtonWidget struct {
 
 func (x *ButtonWidget) Reset() {
 	*x = ButtonWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[18]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1346,7 +1896,7 @@ func (x *ButtonWidget) String() string {
 func (*ButtonWidget) ProtoMessage() {}
 
 func (x *ButtonWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[18]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1359,7 +1909,7 @@ func (x *ButtonWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ButtonWidget.ProtoReflect.Descriptor instead.
 func (*ButtonWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{18}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ButtonWidget) GetLabel() string {
@@ -1387,7 +1937,7 @@ type SliderWidget struct {
 
 func (x *SliderWidget) Reset() {
 	*x = SliderWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[19]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1399,7 +1949,7 @@ func (x *SliderWidget) String() string {
 func (*SliderWidget) ProtoMessage() {}
 
 func (x *SliderWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[19]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1412,7 +1962,7 @@ func (x *SliderWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SliderWidget.ProtoReflect.Descriptor instead.
 func (*SliderWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{19}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SliderWidget) GetMin() float64 {
@@ -1445,7 +1995,7 @@ type ToggleWidget struct {
 
 func (x *ToggleWidget) Reset() {
 	*x = ToggleWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[20]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1457,7 +2007,7 @@ func (x *ToggleWidget) String() string {
 func (*ToggleWidget) ProtoMessage() {}
 
 func (x *ToggleWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[20]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1470,7 +2020,7 @@ func (x *ToggleWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToggleWidget.ProtoReflect.Descriptor instead.
 func (*ToggleWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{20}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ToggleWidget) GetValue() bool {
@@ -1490,7 +2040,7 @@ type DropdownWidget struct {
 
 func (x *DropdownWidget) Reset() {
 	*x = DropdownWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[21]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1502,7 +2052,7 @@ func (x *DropdownWidget) String() string {
 func (*DropdownWidget) ProtoMessage() {}
 
 func (x *DropdownWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[21]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1515,7 +2065,7 @@ func (x *DropdownWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DropdownWidget.ProtoReflect.Descriptor instead.
 func (*DropdownWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{21}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *DropdownWidget) GetOptions() []string {
@@ -1541,7 +2091,7 @@ type GestureAreaWidget struct {
 
 func (x *GestureAreaWidget) Reset() {
 	*x = GestureAreaWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[22]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1553,7 +2103,7 @@ func (x *GestureAreaWidget) String() string {
 func (*GestureAreaWidget) ProtoMessage() {}
 
 func (x *GestureAreaWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[22]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1566,7 +2116,7 @@ func (x *GestureAreaWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GestureAreaWidget.ProtoReflect.Descriptor instead.
 func (*GestureAreaWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{22}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GestureAreaWidget) GetAction() string {
@@ -1584,7 +2134,7 @@ type OverlayWidget struct {
 
 func (x *OverlayWidget) Reset() {
 	*x = OverlayWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[23]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1596,7 +2146,7 @@ func (x *OverlayWidget) String() string {
 func (*OverlayWidget) ProtoMessage() {}
 
 func (x *OverlayWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[23]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1609,7 +2159,7 @@ func (x *OverlayWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OverlayWidget.ProtoReflect.Descriptor instead.
 func (*OverlayWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{23}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{29}
 }
 
 type ProgressWidget struct {
@@ -1621,7 +2171,7 @@ type ProgressWidget struct {
 
 func (x *ProgressWidget) Reset() {
 	*x = ProgressWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[24]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1633,7 +2183,7 @@ func (x *ProgressWidget) String() string {
 func (*ProgressWidget) ProtoMessage() {}
 
 func (x *ProgressWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[24]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1646,7 +2196,7 @@ func (x *ProgressWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProgressWidget.ProtoReflect.Descriptor instead.
 func (*ProgressWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{24}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ProgressWidget) GetValue() float64 {
@@ -1665,7 +2215,7 @@ type FullscreenWidget struct {
 
 func (x *FullscreenWidget) Reset() {
 	*x = FullscreenWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[25]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1677,7 +2227,7 @@ func (x *FullscreenWidget) String() string {
 func (*FullscreenWidget) ProtoMessage() {}
 
 func (x *FullscreenWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[25]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1690,7 +2240,7 @@ func (x *FullscreenWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FullscreenWidget.ProtoReflect.Descriptor instead.
 func (*FullscreenWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{25}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *FullscreenWidget) GetEnabled() bool {
@@ -1709,7 +2259,7 @@ type KeepAwakeWidget struct {
 
 func (x *KeepAwakeWidget) Reset() {
 	*x = KeepAwakeWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[26]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1721,7 +2271,7 @@ func (x *KeepAwakeWidget) String() string {
 func (*KeepAwakeWidget) ProtoMessage() {}
 
 func (x *KeepAwakeWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[26]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1734,7 +2284,7 @@ func (x *KeepAwakeWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeepAwakeWidget.ProtoReflect.Descriptor instead.
 func (*KeepAwakeWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{26}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *KeepAwakeWidget) GetEnabled() bool {
@@ -1753,7 +2303,7 @@ type BrightnessWidget struct {
 
 func (x *BrightnessWidget) Reset() {
 	*x = BrightnessWidget{}
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[27]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1765,7 +2315,7 @@ func (x *BrightnessWidget) String() string {
 func (*BrightnessWidget) ProtoMessage() {}
 
 func (x *BrightnessWidget) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_ui_v1_ui_proto_msgTypes[27]
+	mi := &file_terminals_ui_v1_ui_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1778,7 +2328,7 @@ func (x *BrightnessWidget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrightnessWidget.ProtoReflect.Descriptor instead.
 func (*BrightnessWidget) Descriptor() ([]byte, []int) {
-	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{27}
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *BrightnessWidget) GetValue() float64 {
@@ -1873,9 +2423,53 @@ const file_terminals_ui_v1_ui_proto_rawDesc = "" +
 	"\x12VideoSurfaceWidget\x12\x19\n" +
 	"\btrack_id\x18\x01 \x01(\tR\atrackId\"4\n" +
 	"\x15AudioVisualizerWidget\x12\x1b\n" +
-	"\tstream_id\x18\x01 \x01(\tR\bstreamId\"2\n" +
+	"\tstream_id\x18\x01 \x01(\tR\bstreamId\"\x85\x01\n" +
+	"\bDrawLine\x12\x0e\n" +
+	"\x02x1\x18\x01 \x01(\x01R\x02x1\x12\x0e\n" +
+	"\x02y1\x18\x02 \x01(\x01R\x02y1\x12\x0e\n" +
+	"\x02x2\x18\x03 \x01(\x01R\x02x2\x12\x0e\n" +
+	"\x02y2\x18\x04 \x01(\x01R\x02y2\x12\x16\n" +
+	"\x06stroke\x18\x05 \x01(\tR\x06stroke\x12!\n" +
+	"\fstroke_width\x18\x06 \x01(\x01R\vstrokeWidth\"\xa3\x01\n" +
+	"\bDrawRect\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x01R\x01y\x12\x14\n" +
+	"\x05width\x18\x03 \x01(\x01R\x05width\x12\x16\n" +
+	"\x06height\x18\x04 \x01(\x01R\x06height\x12\x12\n" +
+	"\x04fill\x18\x05 \x01(\tR\x04fill\x12\x16\n" +
+	"\x06stroke\x18\x06 \x01(\tR\x06stroke\x12!\n" +
+	"\fstroke_width\x18\a \x01(\x01R\vstrokeWidth\"\x93\x01\n" +
+	"\n" +
+	"DrawCircle\x12\x0e\n" +
+	"\x02cx\x18\x01 \x01(\x01R\x02cx\x12\x0e\n" +
+	"\x02cy\x18\x02 \x01(\x01R\x02cy\x12\x16\n" +
+	"\x06radius\x18\x03 \x01(\x01R\x06radius\x12\x12\n" +
+	"\x04fill\x18\x04 \x01(\tR\x04fill\x12\x16\n" +
+	"\x06stroke\x18\x05 \x01(\tR\x06stroke\x12!\n" +
+	"\fstroke_width\x18\x06 \x01(\x01R\vstrokeWidth\"\x8c\x01\n" +
+	"\bDrawText\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x01R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x01R\x01y\x12\x12\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\x12\x12\n" +
+	"\x04fill\x18\x04 \x01(\tR\x04fill\x12\x1b\n" +
+	"\tfont_size\x18\x05 \x01(\x01R\bfontSize\x12\x1f\n" +
+	"\vfont_family\x18\x06 \x01(\tR\n" +
+	"fontFamily\"g\n" +
+	"\bDrawPath\x12\f\n" +
+	"\x01d\x18\x01 \x01(\tR\x01d\x12\x12\n" +
+	"\x04fill\x18\x02 \x01(\tR\x04fill\x12\x16\n" +
+	"\x06stroke\x18\x03 \x01(\tR\x06stroke\x12!\n" +
+	"\fstroke_width\x18\x04 \x01(\x01R\vstrokeWidth\"\x89\x02\n" +
+	"\x06DrawOp\x12/\n" +
+	"\x04line\x18\x01 \x01(\v2\x19.terminals.ui.v1.DrawLineH\x00R\x04line\x12/\n" +
+	"\x04rect\x18\x02 \x01(\v2\x19.terminals.ui.v1.DrawRectH\x00R\x04rect\x125\n" +
+	"\x06circle\x18\x03 \x01(\v2\x1b.terminals.ui.v1.DrawCircleH\x00R\x06circle\x12/\n" +
+	"\x04text\x18\x04 \x01(\v2\x19.terminals.ui.v1.DrawTextH\x00R\x04text\x12/\n" +
+	"\x04path\x18\x05 \x01(\v2\x19.terminals.ui.v1.DrawPathH\x00R\x04pathB\x04\n" +
+	"\x02op\"f\n" +
 	"\fCanvasWidget\x12\"\n" +
-	"\rdraw_ops_json\x18\x01 \x01(\tR\vdrawOpsJson\"Q\n" +
+	"\rdraw_ops_json\x18\x01 \x01(\tR\vdrawOpsJson\x122\n" +
+	"\bdraw_ops\x18\x02 \x03(\v2\x17.terminals.ui.v1.DrawOpR\adrawOps\"Q\n" +
 	"\x0fTextInputWidget\x12 \n" +
 	"\vplaceholder\x18\x01 \x01(\tR\vplaceholder\x12\x1c\n" +
 	"\tautofocus\x18\x02 \x01(\bR\tautofocus\"<\n" +
@@ -1920,7 +2514,7 @@ func file_terminals_ui_v1_ui_proto_rawDescGZIP() []byte {
 }
 
 var file_terminals_ui_v1_ui_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_terminals_ui_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_terminals_ui_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_terminals_ui_v1_ui_proto_goTypes = []any{
 	(ScrollDirection)(0),          // 0: terminals.ui.v1.ScrollDirection
 	(*SetUI)(nil),                 // 1: terminals.ui.v1.SetUI
@@ -1939,24 +2533,30 @@ var file_terminals_ui_v1_ui_proto_goTypes = []any{
 	(*ImageWidget)(nil),           // 14: terminals.ui.v1.ImageWidget
 	(*VideoSurfaceWidget)(nil),    // 15: terminals.ui.v1.VideoSurfaceWidget
 	(*AudioVisualizerWidget)(nil), // 16: terminals.ui.v1.AudioVisualizerWidget
-	(*CanvasWidget)(nil),          // 17: terminals.ui.v1.CanvasWidget
-	(*TextInputWidget)(nil),       // 18: terminals.ui.v1.TextInputWidget
-	(*ButtonWidget)(nil),          // 19: terminals.ui.v1.ButtonWidget
-	(*SliderWidget)(nil),          // 20: terminals.ui.v1.SliderWidget
-	(*ToggleWidget)(nil),          // 21: terminals.ui.v1.ToggleWidget
-	(*DropdownWidget)(nil),        // 22: terminals.ui.v1.DropdownWidget
-	(*GestureAreaWidget)(nil),     // 23: terminals.ui.v1.GestureAreaWidget
-	(*OverlayWidget)(nil),         // 24: terminals.ui.v1.OverlayWidget
-	(*ProgressWidget)(nil),        // 25: terminals.ui.v1.ProgressWidget
-	(*FullscreenWidget)(nil),      // 26: terminals.ui.v1.FullscreenWidget
-	(*KeepAwakeWidget)(nil),       // 27: terminals.ui.v1.KeepAwakeWidget
-	(*BrightnessWidget)(nil),      // 28: terminals.ui.v1.BrightnessWidget
-	nil,                           // 29: terminals.ui.v1.Node.PropsEntry
+	(*DrawLine)(nil),              // 17: terminals.ui.v1.DrawLine
+	(*DrawRect)(nil),              // 18: terminals.ui.v1.DrawRect
+	(*DrawCircle)(nil),            // 19: terminals.ui.v1.DrawCircle
+	(*DrawText)(nil),              // 20: terminals.ui.v1.DrawText
+	(*DrawPath)(nil),              // 21: terminals.ui.v1.DrawPath
+	(*DrawOp)(nil),                // 22: terminals.ui.v1.DrawOp
+	(*CanvasWidget)(nil),          // 23: terminals.ui.v1.CanvasWidget
+	(*TextInputWidget)(nil),       // 24: terminals.ui.v1.TextInputWidget
+	(*ButtonWidget)(nil),          // 25: terminals.ui.v1.ButtonWidget
+	(*SliderWidget)(nil),          // 26: terminals.ui.v1.SliderWidget
+	(*ToggleWidget)(nil),          // 27: terminals.ui.v1.ToggleWidget
+	(*DropdownWidget)(nil),        // 28: terminals.ui.v1.DropdownWidget
+	(*GestureAreaWidget)(nil),     // 29: terminals.ui.v1.GestureAreaWidget
+	(*OverlayWidget)(nil),         // 30: terminals.ui.v1.OverlayWidget
+	(*ProgressWidget)(nil),        // 31: terminals.ui.v1.ProgressWidget
+	(*FullscreenWidget)(nil),      // 32: terminals.ui.v1.FullscreenWidget
+	(*KeepAwakeWidget)(nil),       // 33: terminals.ui.v1.KeepAwakeWidget
+	(*BrightnessWidget)(nil),      // 34: terminals.ui.v1.BrightnessWidget
+	nil,                           // 35: terminals.ui.v1.Node.PropsEntry
 }
 var file_terminals_ui_v1_ui_proto_depIdxs = []int32{
 	5,  // 0: terminals.ui.v1.SetUI.root:type_name -> terminals.ui.v1.Node
 	5,  // 1: terminals.ui.v1.UpdateUI.node:type_name -> terminals.ui.v1.Node
-	29, // 2: terminals.ui.v1.Node.props:type_name -> terminals.ui.v1.Node.PropsEntry
+	35, // 2: terminals.ui.v1.Node.props:type_name -> terminals.ui.v1.Node.PropsEntry
 	5,  // 3: terminals.ui.v1.Node.children:type_name -> terminals.ui.v1.Node
 	6,  // 4: terminals.ui.v1.Node.stack:type_name -> terminals.ui.v1.StackWidget
 	7,  // 5: terminals.ui.v1.Node.row:type_name -> terminals.ui.v1.RowWidget
@@ -1969,24 +2569,30 @@ var file_terminals_ui_v1_ui_proto_depIdxs = []int32{
 	14, // 12: terminals.ui.v1.Node.image:type_name -> terminals.ui.v1.ImageWidget
 	15, // 13: terminals.ui.v1.Node.video_surface:type_name -> terminals.ui.v1.VideoSurfaceWidget
 	16, // 14: terminals.ui.v1.Node.audio_visualizer:type_name -> terminals.ui.v1.AudioVisualizerWidget
-	17, // 15: terminals.ui.v1.Node.canvas:type_name -> terminals.ui.v1.CanvasWidget
-	18, // 16: terminals.ui.v1.Node.text_input:type_name -> terminals.ui.v1.TextInputWidget
-	19, // 17: terminals.ui.v1.Node.button:type_name -> terminals.ui.v1.ButtonWidget
-	20, // 18: terminals.ui.v1.Node.slider:type_name -> terminals.ui.v1.SliderWidget
-	21, // 19: terminals.ui.v1.Node.toggle:type_name -> terminals.ui.v1.ToggleWidget
-	22, // 20: terminals.ui.v1.Node.dropdown:type_name -> terminals.ui.v1.DropdownWidget
-	23, // 21: terminals.ui.v1.Node.gesture_area:type_name -> terminals.ui.v1.GestureAreaWidget
-	24, // 22: terminals.ui.v1.Node.overlay:type_name -> terminals.ui.v1.OverlayWidget
-	25, // 23: terminals.ui.v1.Node.progress:type_name -> terminals.ui.v1.ProgressWidget
-	26, // 24: terminals.ui.v1.Node.fullscreen:type_name -> terminals.ui.v1.FullscreenWidget
-	27, // 25: terminals.ui.v1.Node.keep_awake:type_name -> terminals.ui.v1.KeepAwakeWidget
-	28, // 26: terminals.ui.v1.Node.brightness:type_name -> terminals.ui.v1.BrightnessWidget
+	23, // 15: terminals.ui.v1.Node.canvas:type_name -> terminals.ui.v1.CanvasWidget
+	24, // 16: terminals.ui.v1.Node.text_input:type_name -> terminals.ui.v1.TextInputWidget
+	25, // 17: terminals.ui.v1.Node.button:type_name -> terminals.ui.v1.ButtonWidget
+	26, // 18: terminals.ui.v1.Node.slider:type_name -> terminals.ui.v1.SliderWidget
+	27, // 19: terminals.ui.v1.Node.toggle:type_name -> terminals.ui.v1.ToggleWidget
+	28, // 20: terminals.ui.v1.Node.dropdown:type_name -> terminals.ui.v1.DropdownWidget
+	29, // 21: terminals.ui.v1.Node.gesture_area:type_name -> terminals.ui.v1.GestureAreaWidget
+	30, // 22: terminals.ui.v1.Node.overlay:type_name -> terminals.ui.v1.OverlayWidget
+	31, // 23: terminals.ui.v1.Node.progress:type_name -> terminals.ui.v1.ProgressWidget
+	32, // 24: terminals.ui.v1.Node.fullscreen:type_name -> terminals.ui.v1.FullscreenWidget
+	33, // 25: terminals.ui.v1.Node.keep_awake:type_name -> terminals.ui.v1.KeepAwakeWidget
+	34, // 26: terminals.ui.v1.Node.brightness:type_name -> terminals.ui.v1.BrightnessWidget
 	0,  // 27: terminals.ui.v1.ScrollWidget.direction_enum:type_name -> terminals.ui.v1.ScrollDirection
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	17, // 28: terminals.ui.v1.DrawOp.line:type_name -> terminals.ui.v1.DrawLine
+	18, // 29: terminals.ui.v1.DrawOp.rect:type_name -> terminals.ui.v1.DrawRect
+	19, // 30: terminals.ui.v1.DrawOp.circle:type_name -> terminals.ui.v1.DrawCircle
+	20, // 31: terminals.ui.v1.DrawOp.text:type_name -> terminals.ui.v1.DrawText
+	21, // 32: terminals.ui.v1.DrawOp.path:type_name -> terminals.ui.v1.DrawPath
+	22, // 33: terminals.ui.v1.CanvasWidget.draw_ops:type_name -> terminals.ui.v1.DrawOp
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_terminals_ui_v1_ui_proto_init() }
@@ -2019,13 +2625,20 @@ func file_terminals_ui_v1_ui_proto_init() {
 		(*Node_KeepAwake)(nil),
 		(*Node_Brightness)(nil),
 	}
+	file_terminals_ui_v1_ui_proto_msgTypes[21].OneofWrappers = []any{
+		(*DrawOp_Line)(nil),
+		(*DrawOp_Rect)(nil),
+		(*DrawOp_Circle)(nil),
+		(*DrawOp_Text)(nil),
+		(*DrawOp_Path)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_ui_v1_ui_proto_rawDesc), len(file_terminals_ui_v1_ui_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   29,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

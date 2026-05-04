@@ -252,13 +252,14 @@ Tests: renderer tests cover known tokens and fallback.
 
 Owner: ui/canvas  
 Classification: transitional_escape_hatch  
-Target state: prefer typed `DrawOp` messages; otherwise define strict JSON schema.  
+Target state: typed `repeated DrawOp draw_ops` (field 2) is the preferred shape; legacy `draw_ops_json` retained during the compatibility window.  
 Review date: 2026-06-15  
 Producer: server UI composer  
 Consumer: Flutter renderer  
-Unknown behavior: malformed JSON is ignored and canvas renders empty.  
-Validation: JSON array of drawing operation objects; current use must remain experimental.  
-Tests: add malformed JSON and typed replacement tests before durable canvas use.
+Unknown behavior: client prefers typed `draw_ops` when present; if absent or empty, legacy `draw_ops_json` is consumed; malformed JSON is ignored and canvas renders empty.  
+Validation: typed `DrawOp` messages use the `oneof op { line, rect, circle, text, path }` schema in `api/terminals/ui/v1/ui.proto`; legacy JSON is an array of drawing operation objects and must remain experimental.  
+Tests: typed messages compile and decode in Go and Dart; first non-test producer/consumer must add malformed-JSON and typed-vs-legacy preference coverage.  
+Migration status: typed `DrawOp` schema landed 2026-05-04 (additive). No application code currently produces or consumes draw ops, so adapter wiring is deferred until a real consumer lands.
 
 ## IO
 

@@ -1456,12 +1456,713 @@ class AudioVisualizerWidget extends $pb.GeneratedMessage {
   void clearStreamId() => $_clearField(1);
 }
 
+class DrawLine extends $pb.GeneratedMessage {
+  factory DrawLine({
+    $core.double? x1,
+    $core.double? y1,
+    $core.double? x2,
+    $core.double? y2,
+    $core.String? stroke,
+    $core.double? strokeWidth,
+  }) {
+    final result = create();
+    if (x1 != null) result.x1 = x1;
+    if (y1 != null) result.y1 = y1;
+    if (x2 != null) result.x2 = x2;
+    if (y2 != null) result.y2 = y2;
+    if (stroke != null) result.stroke = stroke;
+    if (strokeWidth != null) result.strokeWidth = strokeWidth;
+    return result;
+  }
+
+  DrawLine._();
+
+  factory DrawLine.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DrawLine.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DrawLine',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.ui.v1'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'x1')
+    ..aD(2, _omitFieldNames ? '' : 'y1')
+    ..aD(3, _omitFieldNames ? '' : 'x2')
+    ..aD(4, _omitFieldNames ? '' : 'y2')
+    ..aOS(5, _omitFieldNames ? '' : 'stroke')
+    ..aD(6, _omitFieldNames ? '' : 'strokeWidth')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawLine clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawLine copyWith(void Function(DrawLine) updates) =>
+      super.copyWith((message) => updates(message as DrawLine)) as DrawLine;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DrawLine create() => DrawLine._();
+  @$core.override
+  DrawLine createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DrawLine getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DrawLine>(create);
+  static DrawLine? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get x1 => $_getN(0);
+  @$pb.TagNumber(1)
+  set x1($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasX1() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearX1() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get y1 => $_getN(1);
+  @$pb.TagNumber(2)
+  set y1($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasY1() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearY1() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get x2 => $_getN(2);
+  @$pb.TagNumber(3)
+  set x2($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasX2() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearX2() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get y2 => $_getN(3);
+  @$pb.TagNumber(4)
+  set y2($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasY2() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearY2() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get stroke => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set stroke($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStroke() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStroke() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.double get strokeWidth => $_getN(5);
+  @$pb.TagNumber(6)
+  set strokeWidth($core.double value) => $_setDouble(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStrokeWidth() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStrokeWidth() => $_clearField(6);
+}
+
+class DrawRect extends $pb.GeneratedMessage {
+  factory DrawRect({
+    $core.double? x,
+    $core.double? y,
+    $core.double? width,
+    $core.double? height,
+    $core.String? fill,
+    $core.String? stroke,
+    $core.double? strokeWidth,
+  }) {
+    final result = create();
+    if (x != null) result.x = x;
+    if (y != null) result.y = y;
+    if (width != null) result.width = width;
+    if (height != null) result.height = height;
+    if (fill != null) result.fill = fill;
+    if (stroke != null) result.stroke = stroke;
+    if (strokeWidth != null) result.strokeWidth = strokeWidth;
+    return result;
+  }
+
+  DrawRect._();
+
+  factory DrawRect.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DrawRect.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DrawRect',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.ui.v1'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'x')
+    ..aD(2, _omitFieldNames ? '' : 'y')
+    ..aD(3, _omitFieldNames ? '' : 'width')
+    ..aD(4, _omitFieldNames ? '' : 'height')
+    ..aOS(5, _omitFieldNames ? '' : 'fill')
+    ..aOS(6, _omitFieldNames ? '' : 'stroke')
+    ..aD(7, _omitFieldNames ? '' : 'strokeWidth')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawRect clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawRect copyWith(void Function(DrawRect) updates) =>
+      super.copyWith((message) => updates(message as DrawRect)) as DrawRect;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DrawRect create() => DrawRect._();
+  @$core.override
+  DrawRect createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DrawRect getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DrawRect>(create);
+  static DrawRect? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get x => $_getN(0);
+  @$pb.TagNumber(1)
+  set x($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasX() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearX() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get y => $_getN(1);
+  @$pb.TagNumber(2)
+  set y($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasY() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearY() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get width => $_getN(2);
+  @$pb.TagNumber(3)
+  set width($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasWidth() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearWidth() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get height => $_getN(3);
+  @$pb.TagNumber(4)
+  set height($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasHeight() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearHeight() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get fill => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set fill($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFill() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFill() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get stroke => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set stroke($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStroke() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStroke() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.double get strokeWidth => $_getN(6);
+  @$pb.TagNumber(7)
+  set strokeWidth($core.double value) => $_setDouble(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasStrokeWidth() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStrokeWidth() => $_clearField(7);
+}
+
+class DrawCircle extends $pb.GeneratedMessage {
+  factory DrawCircle({
+    $core.double? cx,
+    $core.double? cy,
+    $core.double? radius,
+    $core.String? fill,
+    $core.String? stroke,
+    $core.double? strokeWidth,
+  }) {
+    final result = create();
+    if (cx != null) result.cx = cx;
+    if (cy != null) result.cy = cy;
+    if (radius != null) result.radius = radius;
+    if (fill != null) result.fill = fill;
+    if (stroke != null) result.stroke = stroke;
+    if (strokeWidth != null) result.strokeWidth = strokeWidth;
+    return result;
+  }
+
+  DrawCircle._();
+
+  factory DrawCircle.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DrawCircle.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DrawCircle',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.ui.v1'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'cx')
+    ..aD(2, _omitFieldNames ? '' : 'cy')
+    ..aD(3, _omitFieldNames ? '' : 'radius')
+    ..aOS(4, _omitFieldNames ? '' : 'fill')
+    ..aOS(5, _omitFieldNames ? '' : 'stroke')
+    ..aD(6, _omitFieldNames ? '' : 'strokeWidth')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawCircle clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawCircle copyWith(void Function(DrawCircle) updates) =>
+      super.copyWith((message) => updates(message as DrawCircle)) as DrawCircle;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DrawCircle create() => DrawCircle._();
+  @$core.override
+  DrawCircle createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DrawCircle getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DrawCircle>(create);
+  static DrawCircle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get cx => $_getN(0);
+  @$pb.TagNumber(1)
+  set cx($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCx() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCx() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get cy => $_getN(1);
+  @$pb.TagNumber(2)
+  set cy($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCy() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCy() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get radius => $_getN(2);
+  @$pb.TagNumber(3)
+  set radius($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRadius() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRadius() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get fill => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set fill($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFill() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFill() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get stroke => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set stroke($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStroke() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStroke() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.double get strokeWidth => $_getN(5);
+  @$pb.TagNumber(6)
+  set strokeWidth($core.double value) => $_setDouble(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStrokeWidth() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStrokeWidth() => $_clearField(6);
+}
+
+class DrawText extends $pb.GeneratedMessage {
+  factory DrawText({
+    $core.double? x,
+    $core.double? y,
+    $core.String? text,
+    $core.String? fill,
+    $core.double? fontSize,
+    $core.String? fontFamily,
+  }) {
+    final result = create();
+    if (x != null) result.x = x;
+    if (y != null) result.y = y;
+    if (text != null) result.text = text;
+    if (fill != null) result.fill = fill;
+    if (fontSize != null) result.fontSize = fontSize;
+    if (fontFamily != null) result.fontFamily = fontFamily;
+    return result;
+  }
+
+  DrawText._();
+
+  factory DrawText.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DrawText.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DrawText',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.ui.v1'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'x')
+    ..aD(2, _omitFieldNames ? '' : 'y')
+    ..aOS(3, _omitFieldNames ? '' : 'text')
+    ..aOS(4, _omitFieldNames ? '' : 'fill')
+    ..aD(5, _omitFieldNames ? '' : 'fontSize')
+    ..aOS(6, _omitFieldNames ? '' : 'fontFamily')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawText clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawText copyWith(void Function(DrawText) updates) =>
+      super.copyWith((message) => updates(message as DrawText)) as DrawText;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DrawText create() => DrawText._();
+  @$core.override
+  DrawText createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DrawText getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DrawText>(create);
+  static DrawText? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get x => $_getN(0);
+  @$pb.TagNumber(1)
+  set x($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasX() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearX() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get y => $_getN(1);
+  @$pb.TagNumber(2)
+  set y($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasY() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearY() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get text => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set text($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasText() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearText() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get fill => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set fill($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFill() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFill() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.double get fontSize => $_getN(4);
+  @$pb.TagNumber(5)
+  set fontSize($core.double value) => $_setDouble(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFontSize() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFontSize() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get fontFamily => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set fontFamily($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasFontFamily() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFontFamily() => $_clearField(6);
+}
+
+class DrawPath extends $pb.GeneratedMessage {
+  factory DrawPath({
+    $core.String? d,
+    $core.String? fill,
+    $core.String? stroke,
+    $core.double? strokeWidth,
+  }) {
+    final result = create();
+    if (d != null) result.d = d;
+    if (fill != null) result.fill = fill;
+    if (stroke != null) result.stroke = stroke;
+    if (strokeWidth != null) result.strokeWidth = strokeWidth;
+    return result;
+  }
+
+  DrawPath._();
+
+  factory DrawPath.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DrawPath.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DrawPath',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.ui.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'd')
+    ..aOS(2, _omitFieldNames ? '' : 'fill')
+    ..aOS(3, _omitFieldNames ? '' : 'stroke')
+    ..aD(4, _omitFieldNames ? '' : 'strokeWidth')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawPath clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawPath copyWith(void Function(DrawPath) updates) =>
+      super.copyWith((message) => updates(message as DrawPath)) as DrawPath;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DrawPath create() => DrawPath._();
+  @$core.override
+  DrawPath createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DrawPath getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DrawPath>(create);
+  static DrawPath? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get d => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set d($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasD() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearD() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get fill => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set fill($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFill() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFill() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get stroke => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set stroke($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStroke() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStroke() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get strokeWidth => $_getN(3);
+  @$pb.TagNumber(4)
+  set strokeWidth($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasStrokeWidth() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearStrokeWidth() => $_clearField(4);
+}
+
+enum DrawOp_Op { line, rect, circle, text, path, notSet }
+
+class DrawOp extends $pb.GeneratedMessage {
+  factory DrawOp({
+    DrawLine? line,
+    DrawRect? rect,
+    DrawCircle? circle,
+    DrawText? text,
+    DrawPath? path,
+  }) {
+    final result = create();
+    if (line != null) result.line = line;
+    if (rect != null) result.rect = rect;
+    if (circle != null) result.circle = circle;
+    if (text != null) result.text = text;
+    if (path != null) result.path = path;
+    return result;
+  }
+
+  DrawOp._();
+
+  factory DrawOp.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DrawOp.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, DrawOp_Op> _DrawOp_OpByTag = {
+    1: DrawOp_Op.line,
+    2: DrawOp_Op.rect,
+    3: DrawOp_Op.circle,
+    4: DrawOp_Op.text,
+    5: DrawOp_Op.path,
+    0: DrawOp_Op.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DrawOp',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.ui.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [1, 2, 3, 4, 5])
+    ..aOM<DrawLine>(1, _omitFieldNames ? '' : 'line',
+        subBuilder: DrawLine.create)
+    ..aOM<DrawRect>(2, _omitFieldNames ? '' : 'rect',
+        subBuilder: DrawRect.create)
+    ..aOM<DrawCircle>(3, _omitFieldNames ? '' : 'circle',
+        subBuilder: DrawCircle.create)
+    ..aOM<DrawText>(4, _omitFieldNames ? '' : 'text',
+        subBuilder: DrawText.create)
+    ..aOM<DrawPath>(5, _omitFieldNames ? '' : 'path',
+        subBuilder: DrawPath.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawOp clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DrawOp copyWith(void Function(DrawOp) updates) =>
+      super.copyWith((message) => updates(message as DrawOp)) as DrawOp;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DrawOp create() => DrawOp._();
+  @$core.override
+  DrawOp createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DrawOp getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DrawOp>(create);
+  static DrawOp? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  DrawOp_Op whichOp() => _DrawOp_OpByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  void clearOp() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  DrawLine get line => $_getN(0);
+  @$pb.TagNumber(1)
+  set line(DrawLine value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLine() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLine() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DrawLine ensureLine() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  DrawRect get rect => $_getN(1);
+  @$pb.TagNumber(2)
+  set rect(DrawRect value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRect() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRect() => $_clearField(2);
+  @$pb.TagNumber(2)
+  DrawRect ensureRect() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  DrawCircle get circle => $_getN(2);
+  @$pb.TagNumber(3)
+  set circle(DrawCircle value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCircle() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCircle() => $_clearField(3);
+  @$pb.TagNumber(3)
+  DrawCircle ensureCircle() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  DrawText get text => $_getN(3);
+  @$pb.TagNumber(4)
+  set text(DrawText value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasText() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearText() => $_clearField(4);
+  @$pb.TagNumber(4)
+  DrawText ensureText() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  DrawPath get path => $_getN(4);
+  @$pb.TagNumber(5)
+  set path(DrawPath value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPath() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPath() => $_clearField(5);
+  @$pb.TagNumber(5)
+  DrawPath ensurePath() => $_ensure(4);
+}
+
 class CanvasWidget extends $pb.GeneratedMessage {
   factory CanvasWidget({
     $core.String? drawOpsJson,
+    $core.Iterable<DrawOp>? drawOps,
   }) {
     final result = create();
     if (drawOpsJson != null) result.drawOpsJson = drawOpsJson;
+    if (drawOps != null) result.drawOps.addAll(drawOps);
     return result;
   }
 
@@ -1480,6 +2181,8 @@ class CanvasWidget extends $pb.GeneratedMessage {
           const $pb.PackageName(_omitMessageNames ? '' : 'terminals.ui.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'drawOpsJson')
+    ..pPM<DrawOp>(2, _omitFieldNames ? '' : 'drawOps',
+        subBuilder: DrawOp.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1509,6 +2212,9 @@ class CanvasWidget extends $pb.GeneratedMessage {
   $core.bool hasDrawOpsJson() => $_has(0);
   @$pb.TagNumber(1)
   void clearDrawOpsJson() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<DrawOp> get drawOps => $_getList(1);
 }
 
 class TextInputWidget extends $pb.GeneratedMessage {

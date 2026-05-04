@@ -517,17 +517,182 @@ const AudioVisualizerWidget$json = {
 final $typed_data.Uint8List audioVisualizerWidgetDescriptor = $convert.base64Decode(
     'ChVBdWRpb1Zpc3VhbGl6ZXJXaWRnZXQSGwoJc3RyZWFtX2lkGAEgASgJUghzdHJlYW1JZA==');
 
+@$core.Deprecated('Use drawLineDescriptor instead')
+const DrawLine$json = {
+  '1': 'DrawLine',
+  '2': [
+    {'1': 'x1', '3': 1, '4': 1, '5': 1, '10': 'x1'},
+    {'1': 'y1', '3': 2, '4': 1, '5': 1, '10': 'y1'},
+    {'1': 'x2', '3': 3, '4': 1, '5': 1, '10': 'x2'},
+    {'1': 'y2', '3': 4, '4': 1, '5': 1, '10': 'y2'},
+    {'1': 'stroke', '3': 5, '4': 1, '5': 9, '10': 'stroke'},
+    {'1': 'stroke_width', '3': 6, '4': 1, '5': 1, '10': 'strokeWidth'},
+  ],
+};
+
+/// Descriptor for `DrawLine`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List drawLineDescriptor = $convert.base64Decode(
+    'CghEcmF3TGluZRIOCgJ4MRgBIAEoAVICeDESDgoCeTEYAiABKAFSAnkxEg4KAngyGAMgASgBUg'
+    'J4MhIOCgJ5MhgEIAEoAVICeTISFgoGc3Ryb2tlGAUgASgJUgZzdHJva2USIQoMc3Ryb2tlX3dp'
+    'ZHRoGAYgASgBUgtzdHJva2VXaWR0aA==');
+
+@$core.Deprecated('Use drawRectDescriptor instead')
+const DrawRect$json = {
+  '1': 'DrawRect',
+  '2': [
+    {'1': 'x', '3': 1, '4': 1, '5': 1, '10': 'x'},
+    {'1': 'y', '3': 2, '4': 1, '5': 1, '10': 'y'},
+    {'1': 'width', '3': 3, '4': 1, '5': 1, '10': 'width'},
+    {'1': 'height', '3': 4, '4': 1, '5': 1, '10': 'height'},
+    {'1': 'fill', '3': 5, '4': 1, '5': 9, '10': 'fill'},
+    {'1': 'stroke', '3': 6, '4': 1, '5': 9, '10': 'stroke'},
+    {'1': 'stroke_width', '3': 7, '4': 1, '5': 1, '10': 'strokeWidth'},
+  ],
+};
+
+/// Descriptor for `DrawRect`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List drawRectDescriptor = $convert.base64Decode(
+    'CghEcmF3UmVjdBIMCgF4GAEgASgBUgF4EgwKAXkYAiABKAFSAXkSFAoFd2lkdGgYAyABKAFSBX'
+    'dpZHRoEhYKBmhlaWdodBgEIAEoAVIGaGVpZ2h0EhIKBGZpbGwYBSABKAlSBGZpbGwSFgoGc3Ry'
+    'b2tlGAYgASgJUgZzdHJva2USIQoMc3Ryb2tlX3dpZHRoGAcgASgBUgtzdHJva2VXaWR0aA==');
+
+@$core.Deprecated('Use drawCircleDescriptor instead')
+const DrawCircle$json = {
+  '1': 'DrawCircle',
+  '2': [
+    {'1': 'cx', '3': 1, '4': 1, '5': 1, '10': 'cx'},
+    {'1': 'cy', '3': 2, '4': 1, '5': 1, '10': 'cy'},
+    {'1': 'radius', '3': 3, '4': 1, '5': 1, '10': 'radius'},
+    {'1': 'fill', '3': 4, '4': 1, '5': 9, '10': 'fill'},
+    {'1': 'stroke', '3': 5, '4': 1, '5': 9, '10': 'stroke'},
+    {'1': 'stroke_width', '3': 6, '4': 1, '5': 1, '10': 'strokeWidth'},
+  ],
+};
+
+/// Descriptor for `DrawCircle`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List drawCircleDescriptor = $convert.base64Decode(
+    'CgpEcmF3Q2lyY2xlEg4KAmN4GAEgASgBUgJjeBIOCgJjeRgCIAEoAVICY3kSFgoGcmFkaXVzGA'
+    'MgASgBUgZyYWRpdXMSEgoEZmlsbBgEIAEoCVIEZmlsbBIWCgZzdHJva2UYBSABKAlSBnN0cm9r'
+    'ZRIhCgxzdHJva2Vfd2lkdGgYBiABKAFSC3N0cm9rZVdpZHRo');
+
+@$core.Deprecated('Use drawTextDescriptor instead')
+const DrawText$json = {
+  '1': 'DrawText',
+  '2': [
+    {'1': 'x', '3': 1, '4': 1, '5': 1, '10': 'x'},
+    {'1': 'y', '3': 2, '4': 1, '5': 1, '10': 'y'},
+    {'1': 'text', '3': 3, '4': 1, '5': 9, '10': 'text'},
+    {'1': 'fill', '3': 4, '4': 1, '5': 9, '10': 'fill'},
+    {'1': 'font_size', '3': 5, '4': 1, '5': 1, '10': 'fontSize'},
+    {'1': 'font_family', '3': 6, '4': 1, '5': 9, '10': 'fontFamily'},
+  ],
+};
+
+/// Descriptor for `DrawText`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List drawTextDescriptor = $convert.base64Decode(
+    'CghEcmF3VGV4dBIMCgF4GAEgASgBUgF4EgwKAXkYAiABKAFSAXkSEgoEdGV4dBgDIAEoCVIEdG'
+    'V4dBISCgRmaWxsGAQgASgJUgRmaWxsEhsKCWZvbnRfc2l6ZRgFIAEoAVIIZm9udFNpemUSHwoL'
+    'Zm9udF9mYW1pbHkYBiABKAlSCmZvbnRGYW1pbHk=');
+
+@$core.Deprecated('Use drawPathDescriptor instead')
+const DrawPath$json = {
+  '1': 'DrawPath',
+  '2': [
+    {'1': 'd', '3': 1, '4': 1, '5': 9, '10': 'd'},
+    {'1': 'fill', '3': 2, '4': 1, '5': 9, '10': 'fill'},
+    {'1': 'stroke', '3': 3, '4': 1, '5': 9, '10': 'stroke'},
+    {'1': 'stroke_width', '3': 4, '4': 1, '5': 1, '10': 'strokeWidth'},
+  ],
+};
+
+/// Descriptor for `DrawPath`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List drawPathDescriptor = $convert.base64Decode(
+    'CghEcmF3UGF0aBIMCgFkGAEgASgJUgFkEhIKBGZpbGwYAiABKAlSBGZpbGwSFgoGc3Ryb2tlGA'
+    'MgASgJUgZzdHJva2USIQoMc3Ryb2tlX3dpZHRoGAQgASgBUgtzdHJva2VXaWR0aA==');
+
+@$core.Deprecated('Use drawOpDescriptor instead')
+const DrawOp$json = {
+  '1': 'DrawOp',
+  '2': [
+    {
+      '1': 'line',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.ui.v1.DrawLine',
+      '9': 0,
+      '10': 'line'
+    },
+    {
+      '1': 'rect',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.ui.v1.DrawRect',
+      '9': 0,
+      '10': 'rect'
+    },
+    {
+      '1': 'circle',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.ui.v1.DrawCircle',
+      '9': 0,
+      '10': 'circle'
+    },
+    {
+      '1': 'text',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.ui.v1.DrawText',
+      '9': 0,
+      '10': 'text'
+    },
+    {
+      '1': 'path',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.ui.v1.DrawPath',
+      '9': 0,
+      '10': 'path'
+    },
+  ],
+  '8': [
+    {'1': 'op'},
+  ],
+};
+
+/// Descriptor for `DrawOp`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List drawOpDescriptor = $convert.base64Decode(
+    'CgZEcmF3T3ASLwoEbGluZRgBIAEoCzIZLnRlcm1pbmFscy51aS52MS5EcmF3TGluZUgAUgRsaW'
+    '5lEi8KBHJlY3QYAiABKAsyGS50ZXJtaW5hbHMudWkudjEuRHJhd1JlY3RIAFIEcmVjdBI1CgZj'
+    'aXJjbGUYAyABKAsyGy50ZXJtaW5hbHMudWkudjEuRHJhd0NpcmNsZUgAUgZjaXJjbGUSLwoEdG'
+    'V4dBgEIAEoCzIZLnRlcm1pbmFscy51aS52MS5EcmF3VGV4dEgAUgR0ZXh0Ei8KBHBhdGgYBSAB'
+    'KAsyGS50ZXJtaW5hbHMudWkudjEuRHJhd1BhdGhIAFIEcGF0aEIECgJvcA==');
+
 @$core.Deprecated('Use canvasWidgetDescriptor instead')
 const CanvasWidget$json = {
   '1': 'CanvasWidget',
   '2': [
     {'1': 'draw_ops_json', '3': 1, '4': 1, '5': 9, '10': 'drawOpsJson'},
+    {
+      '1': 'draw_ops',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.ui.v1.DrawOp',
+      '10': 'drawOps'
+    },
   ],
 };
 
 /// Descriptor for `CanvasWidget`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List canvasWidgetDescriptor = $convert.base64Decode(
-    'CgxDYW52YXNXaWRnZXQSIgoNZHJhd19vcHNfanNvbhgBIAEoCVILZHJhd09wc0pzb24=');
+    'CgxDYW52YXNXaWRnZXQSIgoNZHJhd19vcHNfanNvbhgBIAEoCVILZHJhd09wc0pzb24SMgoIZH'
+    'Jhd19vcHMYAiADKAsyFy50ZXJtaW5hbHMudWkudjEuRHJhd09wUgdkcmF3T3Bz');
 
 @$core.Deprecated('Use textInputWidgetDescriptor instead')
 const TextInputWidget$json = {

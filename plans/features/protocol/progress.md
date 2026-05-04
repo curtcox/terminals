@@ -77,6 +77,15 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Synced regenerated `terminals/io/v1` Dart bindings into `terminal_client/lib/gen/`.
 - Re-ran `make proto-contract-test` and full `go test ./...` in `terminal_server`; all green.
 
+## Protocol Evolution Rules (2026-05-04, CanvasWidget Typed DrawOps)
+
+- Added additive typed drawing primitives to `api/terminals/ui/v1/ui.proto`: `DrawLine`, `DrawRect`, `DrawCircle`, `DrawText`, `DrawPath`, and `DrawOp` (oneof of those primitives).
+- Added `repeated DrawOp draw_ops = 2` to `CanvasWidget` while preserving the legacy `string draw_ops_json = 1` for the compatibility window.
+- Regenerated Go bindings via `make proto-generate` and synced refreshed `terminals/ui/v1` Dart bindings (`ui.pb.dart`, `ui.pbenum.dart`, `ui.pbjson.dart`) into `terminal_client/lib/gen/`.
+- Updated the protocol extension registry entry for `CanvasWidget.draw_ops_json` to describe typed-first compatibility semantics and the deferred-wiring posture.
+- No application code currently produces or consumes canvas draw ops, so adapter wiring is deferred until the first real consumer lands; the typed schema is now available.
+- Re-ran `make proto-contract-test` and `make server-test`; all green.
+
 ## Protocol Evolution Rules (2026-05-04, PointerAction/TouchAction Enum Migration)
 
 - Added additive typed enums `terminals.io.v1.PointerAction` and `terminals.io.v1.TouchAction` and the corresponding `PointerEvent.action_enum` (field 7) and `TouchEvent.action_enum` (field 3) while preserving legacy `action` string fields.

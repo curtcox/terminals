@@ -103,8 +103,63 @@ message AudioVisualizerWidget {
   string stream_id = 1;
 }
 
+message DrawLine {
+  double x1 = 1;
+  double y1 = 2;
+  double x2 = 3;
+  double y2 = 4;
+  string stroke = 5;
+  double stroke_width = 6;
+}
+
+message DrawRect {
+  double x = 1;
+  double y = 2;
+  double width = 3;
+  double height = 4;
+  string fill = 5;
+  string stroke = 6;
+  double stroke_width = 7;
+}
+
+message DrawCircle {
+  double cx = 1;
+  double cy = 2;
+  double radius = 3;
+  string fill = 4;
+  string stroke = 5;
+  double stroke_width = 6;
+}
+
+message DrawText {
+  double x = 1;
+  double y = 2;
+  string text = 3;
+  string fill = 4;
+  double font_size = 5;
+  string font_family = 6;
+}
+
+message DrawPath {
+  string d = 1;
+  string fill = 2;
+  string stroke = 3;
+  double stroke_width = 4;
+}
+
+message DrawOp {
+  oneof op {
+    DrawLine line = 1;
+    DrawRect rect = 2;
+    DrawCircle circle = 3;
+    DrawText text = 4;
+    DrawPath path = 5;
+  }
+}
+
 message CanvasWidget {
   string draw_ops_json = 1;
+  repeated DrawOp draw_ops = 2;
 }
 
 message TextInputWidget {
