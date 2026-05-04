@@ -3,7 +3,7 @@ title: "Protocol Extension Registry"
 kind: reference
 status: active
 owner: curtcox
-last-reviewed: 2026-05-03
+last-reviewed: 2026-05-04
 ---
 
 # Protocol Extension Registry
@@ -570,21 +570,21 @@ Tests: bug report tests cover UI action capture.
 
 Owner: diagnostics/bug-reporting  
 Classification: transitional_escape_hatch  
-Target state: follow `StartStream.kind` migration to `StreamKind`.  
+Target state: typed `stream_kind` (`terminals.io.v1.StreamKind`) now mirrors `StartStream.stream_kind`; keep legacy string fallback during compatibility window.  
 Review date: 2026-06-15  
-Producer: client diagnostics capture  
+Producer: client diagnostics capture (mirrors typed enum from `StartStream.stream_kind` when present, alongside the legacy string)  
 Consumer: server bug report intake and diagnostics views  
-Unknown behavior: server preserves unknown kinds as diagnostic facts.  
-Validation: `audio`, `video`, `sensor`, or `data` when known.  
-Tests: bug report tests cover stream capture.
+Unknown behavior: server preserves unknown kinds as diagnostic facts; consumers prefer typed `stream_kind` when non-zero, fall back to legacy string.  
+Validation: `audio`, `video`, `sensor`, or `data` when known; typed enum matches the values from `terminals.io.v1.StreamKind`.  
+Tests: bug report tests cover stream capture; client widget bootstrap exercises typed-enum mirroring.
 
 ### Field: terminals.diagnostics.v1.RouteEntry.kind
 
 Owner: diagnostics/bug-reporting  
 Classification: transitional_escape_hatch  
-Target state: follow `RouteStream.kind` migration to `StreamKind`.  
+Target state: typed `stream_kind` (`terminals.io.v1.StreamKind`) now mirrors `RouteStream.stream_kind`; keep legacy string fallback during compatibility window.  
 Review date: 2026-06-15  
-Producer: client diagnostics capture  
+Producer: client diagnostics capture (mirrors typed enum from `RouteStream.stream_kind` when present, alongside the legacy string)  
 Consumer: server bug report intake and diagnostics views  
 Unknown behavior: server preserves unknown kinds as diagnostic facts.  
 Validation: `audio`, `video`, `sensor`, or `data` when known.  

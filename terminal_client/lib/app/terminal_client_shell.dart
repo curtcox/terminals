@@ -1679,22 +1679,26 @@ class _TerminalClientShellState extends State<TerminalClientShell>
       ..recentLogs.addAll(_recentLogs.map((item) => item.deepCopy()));
 
     _activeStreamsByID.forEach((streamID, start) {
-      runtime.activeStreams.add(
-        diagv1.StreamEntry()
-          ..streamId = streamID
-          ..kind = start.kind
-          ..sourceDeviceId = start.sourceDeviceId
-          ..targetDeviceId = start.targetDeviceId,
-      );
+      final entry = diagv1.StreamEntry()
+        ..streamId = streamID
+        ..kind = start.kind
+        ..sourceDeviceId = start.sourceDeviceId
+        ..targetDeviceId = start.targetDeviceId;
+      if (start.streamKind != iov1.StreamKind.STREAM_KIND_UNSPECIFIED) {
+        entry.streamKind = start.streamKind;
+      }
+      runtime.activeStreams.add(entry);
     });
     _routesByStreamID.forEach((streamID, route) {
-      runtime.activeRoutes.add(
-        diagv1.RouteEntry()
-          ..streamId = streamID
-          ..sourceDeviceId = route.sourceDeviceId
-          ..targetDeviceId = route.targetDeviceId
-          ..kind = route.kind,
-      );
+      final entry = diagv1.RouteEntry()
+        ..streamId = streamID
+        ..sourceDeviceId = route.sourceDeviceId
+        ..targetDeviceId = route.targetDeviceId
+        ..kind = route.kind;
+      if (route.streamKind != iov1.StreamKind.STREAM_KIND_UNSPECIFIED) {
+        entry.streamKind = route.streamKind;
+      }
+      runtime.activeRoutes.add(entry);
     });
     for (final signal in _recentWebRTCSignals) {
       runtime.recentWebrtcSignals.add(

@@ -8,6 +8,7 @@ package diagnosticsv1
 
 import (
 	v1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
+	v12 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	v11 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -844,6 +845,7 @@ type StreamEntry struct {
 	Kind           string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
 	SourceDeviceId string                 `protobuf:"bytes,3,opt,name=source_device_id,json=sourceDeviceId,proto3" json:"source_device_id,omitempty"`
 	TargetDeviceId string                 `protobuf:"bytes,4,opt,name=target_device_id,json=targetDeviceId,proto3" json:"target_device_id,omitempty"`
+	StreamKind     v12.StreamKind         `protobuf:"varint,5,opt,name=stream_kind,json=streamKind,proto3,enum=terminals.io.v1.StreamKind" json:"stream_kind,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -906,12 +908,20 @@ func (x *StreamEntry) GetTargetDeviceId() string {
 	return ""
 }
 
+func (x *StreamEntry) GetStreamKind() v12.StreamKind {
+	if x != nil {
+		return x.StreamKind
+	}
+	return v12.StreamKind(0)
+}
+
 type RouteEntry struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	StreamId       string                 `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
 	SourceDeviceId string                 `protobuf:"bytes,2,opt,name=source_device_id,json=sourceDeviceId,proto3" json:"source_device_id,omitempty"`
 	TargetDeviceId string                 `protobuf:"bytes,3,opt,name=target_device_id,json=targetDeviceId,proto3" json:"target_device_id,omitempty"`
 	Kind           string                 `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	StreamKind     v12.StreamKind         `protobuf:"varint,5,opt,name=stream_kind,json=streamKind,proto3,enum=terminals.io.v1.StreamKind" json:"stream_kind,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -972,6 +982,13 @@ func (x *RouteEntry) GetKind() string {
 		return x.Kind
 	}
 	return ""
+}
+
+func (x *RouteEntry) GetStreamKind() v12.StreamKind {
+	if x != nil {
+		return x.StreamKind
+	}
+	return v12.StreamKind(0)
 }
 
 type WebrtcSignalEntry struct {
@@ -1395,7 +1412,7 @@ var File_terminals_diagnostics_v1_diagnostics_proto protoreflect.FileDescriptor
 
 const file_terminals_diagnostics_v1_diagnostics_proto_rawDesc = "" +
 	"\n" +
-	"*terminals/diagnostics/v1/diagnostics.proto\x12\x18terminals.diagnostics.v1\x1a,terminals/capabilities/v1/capabilities.proto\x1a\x18terminals/ui/v1/ui.proto\"\xd4\x04\n" +
+	"*terminals/diagnostics/v1/diagnostics.proto\x12\x18terminals.diagnostics.v1\x1a,terminals/capabilities/v1/capabilities.proto\x1a\x18terminals/io/v1/io.proto\x1a\x18terminals/ui/v1/ui.proto\"\xd4\x04\n" +
 	"\tBugReport\x12\x1b\n" +
 	"\treport_id\x18\x01 \x01(\tR\breportId\x12,\n" +
 	"\x12reporter_device_id\x18\x02 \x01(\tR\x10reporterDeviceId\x12*\n" +
@@ -1465,18 +1482,22 @@ const file_terminals_diagnostics_v1_diagnostics_proto_rawDesc = "" +
 	"\aunix_ms\x18\x01 \x01(\x03R\x06unixMs\x12!\n" +
 	"\fcomponent_id\x18\x02 \x01(\tR\vcomponentId\x12\x16\n" +
 	"\x06action\x18\x03 \x01(\tR\x06action\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\tR\x05value\"\x92\x01\n" +
+	"\x05value\x18\x04 \x01(\tR\x05value\"\xd0\x01\n" +
 	"\vStreamEntry\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12(\n" +
 	"\x10source_device_id\x18\x03 \x01(\tR\x0esourceDeviceId\x12(\n" +
-	"\x10target_device_id\x18\x04 \x01(\tR\x0etargetDeviceId\"\x91\x01\n" +
+	"\x10target_device_id\x18\x04 \x01(\tR\x0etargetDeviceId\x12<\n" +
+	"\vstream_kind\x18\x05 \x01(\x0e2\x1b.terminals.io.v1.StreamKindR\n" +
+	"streamKind\"\xcf\x01\n" +
 	"\n" +
 	"RouteEntry\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12(\n" +
 	"\x10source_device_id\x18\x02 \x01(\tR\x0esourceDeviceId\x12(\n" +
 	"\x10target_device_id\x18\x03 \x01(\tR\x0etargetDeviceId\x12\x12\n" +
-	"\x04kind\x18\x04 \x01(\tR\x04kind\"j\n" +
+	"\x04kind\x18\x04 \x01(\tR\x04kind\x12<\n" +
+	"\vstream_kind\x18\x05 \x01(\x0e2\x1b.terminals.io.v1.StreamKindR\n" +
+	"streamKind\"j\n" +
 	"\x11WebrtcSignalEntry\x12\x17\n" +
 	"\aunix_ms\x18\x01 \x01(\x03R\x06unixMs\x12\x1b\n" +
 	"\tstream_id\x18\x02 \x01(\tR\bstreamId\x12\x1f\n" +
@@ -1570,6 +1591,7 @@ var file_terminals_diagnostics_v1_diagnostics_proto_goTypes = []any{
 	nil,                           // 18: terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
 	(*v1.DeviceCapabilities)(nil), // 19: terminals.capabilities.v1.DeviceCapabilities
 	(*v11.Node)(nil),              // 20: terminals.ui.v1.Node
+	(v12.StreamKind)(0),           // 21: terminals.io.v1.StreamKind
 }
 var file_terminals_diagnostics_v1_diagnostics_proto_depIdxs = []int32{
 	0,  // 0: terminals.diagnostics.v1.BugReport.source:type_name -> terminals.diagnostics.v1.BugReportSource
@@ -1589,13 +1611,15 @@ var file_terminals_diagnostics_v1_diagnostics_proto_depIdxs = []int32{
 	10, // 14: terminals.diagnostics.v1.RuntimeState.active_routes:type_name -> terminals.diagnostics.v1.RouteEntry
 	11, // 15: terminals.diagnostics.v1.RuntimeState.recent_webrtc_signals:type_name -> terminals.diagnostics.v1.WebrtcSignalEntry
 	12, // 16: terminals.diagnostics.v1.RuntimeState.recent_logs:type_name -> terminals.diagnostics.v1.LogEntry
-	14, // 17: terminals.diagnostics.v1.ConnectionHealth.recent_control_errors:type_name -> terminals.diagnostics.v1.ControlErrorEntry
-	18, // 18: terminals.diagnostics.v1.HardwareState.sensor_snapshot:type_name -> terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
-	19, // [19:19] is the sub-list for method output_type
-	19, // [19:19] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	21, // 17: terminals.diagnostics.v1.StreamEntry.stream_kind:type_name -> terminals.io.v1.StreamKind
+	21, // 18: terminals.diagnostics.v1.RouteEntry.stream_kind:type_name -> terminals.io.v1.StreamKind
+	14, // 19: terminals.diagnostics.v1.ConnectionHealth.recent_control_errors:type_name -> terminals.diagnostics.v1.ControlErrorEntry
+	18, // 20: terminals.diagnostics.v1.HardwareState.sensor_snapshot:type_name -> terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_terminals_diagnostics_v1_diagnostics_proto_init() }

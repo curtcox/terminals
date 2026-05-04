@@ -391,6 +391,14 @@ const StreamEntry$json = {
     {'1': 'kind', '3': 2, '4': 1, '5': 9, '10': 'kind'},
     {'1': 'source_device_id', '3': 3, '4': 1, '5': 9, '10': 'sourceDeviceId'},
     {'1': 'target_device_id', '3': 4, '4': 1, '5': 9, '10': 'targetDeviceId'},
+    {
+      '1': 'stream_kind',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.StreamKind',
+      '10': 'streamKind'
+    },
   ],
 };
 
@@ -398,7 +406,8 @@ const StreamEntry$json = {
 final $typed_data.Uint8List streamEntryDescriptor = $convert.base64Decode(
     'CgtTdHJlYW1FbnRyeRIbCglzdHJlYW1faWQYASABKAlSCHN0cmVhbUlkEhIKBGtpbmQYAiABKA'
     'lSBGtpbmQSKAoQc291cmNlX2RldmljZV9pZBgDIAEoCVIOc291cmNlRGV2aWNlSWQSKAoQdGFy'
-    'Z2V0X2RldmljZV9pZBgEIAEoCVIOdGFyZ2V0RGV2aWNlSWQ=');
+    'Z2V0X2RldmljZV9pZBgEIAEoCVIOdGFyZ2V0RGV2aWNlSWQSPAoLc3RyZWFtX2tpbmQYBSABKA'
+    '4yGy50ZXJtaW5hbHMuaW8udjEuU3RyZWFtS2luZFIKc3RyZWFtS2luZA==');
 
 @$core.Deprecated('Use routeEntryDescriptor instead')
 const RouteEntry$json = {
@@ -408,6 +417,14 @@ const RouteEntry$json = {
     {'1': 'source_device_id', '3': 2, '4': 1, '5': 9, '10': 'sourceDeviceId'},
     {'1': 'target_device_id', '3': 3, '4': 1, '5': 9, '10': 'targetDeviceId'},
     {'1': 'kind', '3': 4, '4': 1, '5': 9, '10': 'kind'},
+    {
+      '1': 'stream_kind',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.StreamKind',
+      '10': 'streamKind'
+    },
   ],
 };
 
@@ -415,7 +432,8 @@ const RouteEntry$json = {
 final $typed_data.Uint8List routeEntryDescriptor = $convert.base64Decode(
     'CgpSb3V0ZUVudHJ5EhsKCXN0cmVhbV9pZBgBIAEoCVIIc3RyZWFtSWQSKAoQc291cmNlX2Rldm'
     'ljZV9pZBgCIAEoCVIOc291cmNlRGV2aWNlSWQSKAoQdGFyZ2V0X2RldmljZV9pZBgDIAEoCVIO'
-    'dGFyZ2V0RGV2aWNlSWQSEgoEa2luZBgEIAEoCVIEa2luZA==');
+    'dGFyZ2V0RGV2aWNlSWQSEgoEa2luZBgEIAEoCVIEa2luZBI8CgtzdHJlYW1fa2luZBgFIAEoDj'
+    'IbLnRlcm1pbmFscy5pby52MS5TdHJlYW1LaW5kUgpzdHJlYW1LaW5k');
 
 @$core.Deprecated('Use webrtcSignalEntryDescriptor instead')
 const WebrtcSignalEntry$json = {

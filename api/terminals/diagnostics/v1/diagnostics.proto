@@ -3,6 +3,7 @@ syntax = "proto3";
 package terminals.diagnostics.v1;
 
 import "terminals/capabilities/v1/capabilities.proto";
+import "terminals/io/v1/io.proto";
 import "terminals/ui/v1/ui.proto";
 
 option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1;diagnosticsv1";
@@ -131,6 +132,7 @@ message StreamEntry {
   string kind = 2;
   string source_device_id = 3;
   string target_device_id = 4;
+  terminals.io.v1.StreamKind stream_kind = 5;
 }
 
 message RouteEntry {
@@ -138,12 +140,17 @@ message RouteEntry {
   string source_device_id = 2;
   string target_device_id = 3;
   string kind = 4;
+  terminals.io.v1.StreamKind stream_kind = 5;
 }
 
 message WebrtcSignalEntry {
   int64 unix_ms = 1;
   string stream_id = 2;
   string signal_type = 3;
+  // signal_type_enum migration is deferred: control.proto already imports
+  // diagnostics.proto, so a reverse import to use WebRTCSignalType here would
+  // create an import cycle. Resolve when WebRTCSignalType moves to a shared
+  // package.
 }
 
 message LogEntry {

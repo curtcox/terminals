@@ -16,6 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import '../../capabilities/v1/capabilities.pb.dart' as $0;
+import '../../io/v1/io.pbenum.dart' as $2;
 import '../../ui/v1/ui.pb.dart' as $1;
 import 'diagnostics.pbenum.dart';
 
@@ -943,12 +944,14 @@ class StreamEntry extends $pb.GeneratedMessage {
     $core.String? kind,
     $core.String? sourceDeviceId,
     $core.String? targetDeviceId,
+    $2.StreamKind? streamKind,
   }) {
     final result = create();
     if (streamId != null) result.streamId = streamId;
     if (kind != null) result.kind = kind;
     if (sourceDeviceId != null) result.sourceDeviceId = sourceDeviceId;
     if (targetDeviceId != null) result.targetDeviceId = targetDeviceId;
+    if (streamKind != null) result.streamKind = streamKind;
     return result;
   }
 
@@ -970,6 +973,8 @@ class StreamEntry extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'kind')
     ..aOS(3, _omitFieldNames ? '' : 'sourceDeviceId')
     ..aOS(4, _omitFieldNames ? '' : 'targetDeviceId')
+    ..aE<$2.StreamKind>(5, _omitFieldNames ? '' : 'streamKind',
+        enumValues: $2.StreamKind.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1026,6 +1031,15 @@ class StreamEntry extends $pb.GeneratedMessage {
   $core.bool hasTargetDeviceId() => $_has(3);
   @$pb.TagNumber(4)
   void clearTargetDeviceId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $2.StreamKind get streamKind => $_getN(4);
+  @$pb.TagNumber(5)
+  set streamKind($2.StreamKind value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStreamKind() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStreamKind() => $_clearField(5);
 }
 
 class RouteEntry extends $pb.GeneratedMessage {
@@ -1034,12 +1048,14 @@ class RouteEntry extends $pb.GeneratedMessage {
     $core.String? sourceDeviceId,
     $core.String? targetDeviceId,
     $core.String? kind,
+    $2.StreamKind? streamKind,
   }) {
     final result = create();
     if (streamId != null) result.streamId = streamId;
     if (sourceDeviceId != null) result.sourceDeviceId = sourceDeviceId;
     if (targetDeviceId != null) result.targetDeviceId = targetDeviceId;
     if (kind != null) result.kind = kind;
+    if (streamKind != null) result.streamKind = streamKind;
     return result;
   }
 
@@ -1061,6 +1077,8 @@ class RouteEntry extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'sourceDeviceId')
     ..aOS(3, _omitFieldNames ? '' : 'targetDeviceId')
     ..aOS(4, _omitFieldNames ? '' : 'kind')
+    ..aE<$2.StreamKind>(5, _omitFieldNames ? '' : 'streamKind',
+        enumValues: $2.StreamKind.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1116,6 +1134,15 @@ class RouteEntry extends $pb.GeneratedMessage {
   $core.bool hasKind() => $_has(3);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $2.StreamKind get streamKind => $_getN(4);
+  @$pb.TagNumber(5)
+  set streamKind($2.StreamKind value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStreamKind() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStreamKind() => $_clearField(5);
 }
 
 class WebrtcSignalEntry extends $pb.GeneratedMessage {

@@ -94,6 +94,15 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - No application-code paths currently route pointer/touch input, so adapter wiring is deferred until a producer/consumer lands; the typed fields are now available for the first non-test consumer.
 - Re-ran `make proto-contract-test` and `make server-test`; all green.
 
+## Protocol Evolution Rules (2026-05-04, Diagnostics StreamEntry/RouteEntry typed mirror)
+
+- Added additive `terminals.io.v1.StreamKind stream_kind = 5` to both `StreamEntry` and `RouteEntry` in `api/terminals/diagnostics/v1/diagnostics.proto`, mirroring the typed enum from the underlying `StartStream`/`RouteStream` while preserving the legacy `kind` strings.
+- Wired client diagnostics capture (`terminal_client_shell.dart`) to populate `streamKind` on `StreamEntry` / `RouteEntry` from `start.streamKind` / `route.streamKind` whenever the source is non-unspecified, alongside the legacy string `kind`.
+- Skipped the analogous `WebrtcSignalEntry.signal_type` typed mirror: `control.proto` already imports `diagnostics.proto`, so a reverse import to use `WebRTCSignalType` would create an import cycle. Documented the deferral in `diagnostics.proto`, the registry, and `docs/compatibility.md` so the migration can be revisited once `WebRTCSignalType` moves to a shared package.
+- Regenerated Go bindings via `make proto-generate` and synced refreshed `terminals/diagnostics/v1` Dart bindings into `terminal_client/lib/gen/`.
+- Updated registry entries for `StreamEntry.kind` and `RouteEntry.kind` to describe typed-first compatibility behavior; added a row to `docs/compatibility.md`'s open-windows table.
+- Re-ran `make proto-contract-test` (lint + flex-check + Go contract + Dart contract) and `make client-test`; all green.
+
 ## Protocol Evolution Rules (2026-05-04, Phase 5 enforcement + compatibility windows)
 
 - Flipped `proto-flex-check` from advisory to required by passing `--enforce` in the Makefile target. The registry now covers all 31 detected flexible fields, so missing-entry detections fail the gate.
