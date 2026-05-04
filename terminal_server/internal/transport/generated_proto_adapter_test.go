@@ -1037,7 +1037,12 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 			Kind:           "audio",
 			SourceDeviceID: "d1",
 			TargetDeviceID: "d2",
-			Metadata:       map[string]string{"codec": "opus"},
+			Metadata:       map[string]string{"codec": "legacy"},
+			AudioMetadata: &iov1.StreamAudioMetadata{
+				SampleRate: 48000,
+				Channels:   2,
+				Codec:      "opus",
+			},
 		},
 	})
 	if err != nil {
@@ -1059,8 +1064,53 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	if got := resp.GetStartStream().GetStreamKind(); got != iov1.StreamKind_STREAM_KIND_AUDIO {
 		t.Fatalf("start_stream stream_kind = %v, want STREAM_KIND_AUDIO", got)
 	}
+	if got := resp.GetStartStream().GetAudioMetadata().GetSampleRate(); got != 48000 {
+		t.Fatalf("start_stream typed sample_rate = %d, want 48000", got)
+	}
+	if got := resp.GetStartStream().GetAudioMetadata().GetChannels(); got != 2 {
+		t.Fatalf("start_stream typed channels = %d, want 2", got)
+	}
+	if got := resp.GetStartStream().GetAudioMetadata().GetCodec(); got != "opus" {
+		t.Fatalf("start_stream typed codec = %q, want opus", got)
+	}
+	if got := resp.GetStartStream().GetMetadata()["sample_rate"]; got != "48000" {
+		t.Fatalf("start_stream metadata sample_rate = %q, want 48000", got)
+	}
+	if got := resp.GetStartStream().GetMetadata()["channels"]; got != "2" {
+		t.Fatalf("start_stream metadata channels = %q, want 2", got)
+	}
 	if got := resp.GetStartStream().GetMetadata()["codec"]; got != "opus" {
 		t.Fatalf("start_stream metadata codec = %q, want opus", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		StartStream: &StartStreamResponse{
+			StreamID:       "stream-2",
+			Kind:           "audio",
+			SourceDeviceID: "d1",
+			TargetDeviceID: "d2",
+			Metadata: map[string]string{
+				"sample_rate": "16000",
+				"channels":    "1",
+				"codec":       "pcm_s16le",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() start_stream legacy metadata fallback error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("start_stream legacy metadata envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if got := resp.GetStartStream().GetAudioMetadata().GetSampleRate(); got != 16000 {
+		t.Fatalf("fallback typed sample_rate = %d, want 16000", got)
+	}
+	if got := resp.GetStartStream().GetAudioMetadata().GetChannels(); got != 1 {
+		t.Fatalf("fallback typed channels = %d, want 1", got)
+	}
+	if got := resp.GetStartStream().GetAudioMetadata().GetCodec(); got != "pcm_s16le" {
+		t.Fatalf("fallback typed codec = %q, want pcm_s16le", got)
 	}
 
 	envelope, err = adapter.FromInternal(ServerMessage{

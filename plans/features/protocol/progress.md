@@ -59,6 +59,15 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Split the `typed enum fields override legacy labels` dispatcher test into per-payload responses (start/route/signal share a `ConnectResponse.payload` oneof, so they cannot be exercised in a single response).
 - Re-ran `make proto-contract-test`, `make server-test`, and `make client-test`; all green.
 
+## Protocol Evolution Rules (2026-05-04, StartStream audio metadata typing)
+
+- Added additive typed `terminals.io.v1.StreamAudioMetadata` and `StartStream.audio_metadata = 8` in `api/terminals/io/v1/io.proto`, preserving legacy `StartStream.metadata` keys `sample_rate`/`channels`/`codec` during the compatibility window.
+- Updated transport proto adapter (`generated_proto_adapter.go`) to emit typed `audio_metadata` and legacy metadata keys together: producers use explicit typed metadata when present, otherwise derive typed values from legacy map keys; legacy map keys are mirrored from typed fields for consistency.
+- Updated server media stream registration (`media_control_state.go`) to prefer typed `AudioMetadata` and fall back to legacy metadata keys, then normalize stored/recorded metadata to the typed values during migration.
+- Added transport regression coverage for typed-first + fallback behavior in `generated_proto_adapter_test.go` and media-control metadata normalization coverage in `media_control_state_test.go`.
+- Extended shared Go/Dart protocol contract assertions and `start_stream_audio_v1` fixture content to validate typed `audio_metadata` plus legacy metadata coexistence.
+- Updated `docs/protocol-extension-registry.md` and `docs/compatibility.md` to track the new compatibility window (`StartStream.audio_metadata` -> legacy metadata keys) and refreshed pending-migration notes for `StartStream.metadata` cleanup.
+
 ## Protocol Evolution Rules (2026-05-04, Proto CI contract gate + flex-check annotations)
 
 - Updated `.github/workflows/proto-ci.yml` to run the full repository-level `make proto-contract-test` gate (in addition to existing Buf format/lint/generate/breaking checks), and expanded workflow path triggers to include protocol-relevant server/client/docs/script/Makefile changes.

@@ -270,6 +270,11 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 		if routing == nil {
 			routing = streamRoutingFromMetadata(msg.StartStream.Metadata)
 		}
+		audioMetadata := msg.StartStream.AudioMetadata
+		if audioMetadata == nil {
+			audioMetadata = streamAudioMetadataFromLegacy(msg.StartStream.Metadata)
+		}
+		metadata := mergeLegacyAudioMetadata(msg.StartStream.Metadata, audioMetadata)
 		return &controlv1.ConnectResponse{
 			Payload: &controlv1.ConnectResponse_StartStream{
 				StartStream: &iov1.StartStream{
@@ -277,9 +282,10 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					Kind:           msg.StartStream.Kind,
 					SourceDeviceId: msg.StartStream.SourceDeviceID,
 					TargetDeviceId: msg.StartStream.TargetDeviceID,
-					Metadata:       msg.StartStream.Metadata,
+					Metadata:       metadata,
 					StreamKind:     protoStreamKindFromInternal(msg.StartStream.Kind),
 					Routing:        routing,
+					AudioMetadata:  audioMetadata,
 				},
 			},
 		}

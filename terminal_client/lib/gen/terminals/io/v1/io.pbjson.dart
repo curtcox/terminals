@@ -186,6 +186,21 @@ final $typed_data.Uint8List streamRoutingDescriptor = $convert.base64Decode(
     '1PcmlnaW5SBm9yaWdpbhI8Cgt3ZWJydGNfbW9kZRgCIAEoDjIbLnRlcm1pbmFscy5pby52MS5X'
     'ZWJSVENNb2RlUgp3ZWJydGNNb2Rl');
 
+@$core.Deprecated('Use streamAudioMetadataDescriptor instead')
+const StreamAudioMetadata$json = {
+  '1': 'StreamAudioMetadata',
+  '2': [
+    {'1': 'sample_rate', '3': 1, '4': 1, '5': 13, '10': 'sampleRate'},
+    {'1': 'channels', '3': 2, '4': 1, '5': 13, '10': 'channels'},
+    {'1': 'codec', '3': 3, '4': 1, '5': 9, '10': 'codec'},
+  ],
+};
+
+/// Descriptor for `StreamAudioMetadata`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List streamAudioMetadataDescriptor = $convert.base64Decode(
+    'ChNTdHJlYW1BdWRpb01ldGFkYXRhEh8KC3NhbXBsZV9yYXRlGAEgASgNUgpzYW1wbGVSYXRlEh'
+    'oKCGNoYW5uZWxzGAIgASgNUghjaGFubmVscxIUCgVjb2RlYxgDIAEoCVIFY29kZWM=');
+
 @$core.Deprecated('Use startStreamDescriptor instead')
 const StartStream$json = {
   '1': 'StartStream',
@@ -218,6 +233,14 @@ const StartStream$json = {
       '6': '.terminals.io.v1.StreamRouting',
       '10': 'routing'
     },
+    {
+      '1': 'audio_metadata',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.StreamAudioMetadata',
+      '10': 'audioMetadata'
+    },
   ],
   '3': [StartStream_MetadataEntry$json],
 };
@@ -240,8 +263,9 @@ final $typed_data.Uint8List startStreamDescriptor = $convert.base64Decode(
     '50ZXJtaW5hbHMuaW8udjEuU3RhcnRTdHJlYW0uTWV0YWRhdGFFbnRyeVIIbWV0YWRhdGESPAoL'
     'c3RyZWFtX2tpbmQYBiABKA4yGy50ZXJtaW5hbHMuaW8udjEuU3RyZWFtS2luZFIKc3RyZWFtS2'
     'luZBI4Cgdyb3V0aW5nGAcgASgLMh4udGVybWluYWxzLmlvLnYxLlN0cmVhbVJvdXRpbmdSB3Jv'
-    'dXRpbmcaOwoNTWV0YWRhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCV'
-    'IFdmFsdWU6AjgB');
+    'dXRpbmcSSwoOYXVkaW9fbWV0YWRhdGEYCCABKAsyJC50ZXJtaW5hbHMuaW8udjEuU3RyZWFtQX'
+    'VkaW9NZXRhZGF0YVINYXVkaW9NZXRhZGF0YRo7Cg1NZXRhZGF0YUVudHJ5EhAKA2tleRgBIAEo'
+    'CVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAE=');
 
 @$core.Deprecated('Use stopStreamDescriptor instead')
 const StopStream$json = {

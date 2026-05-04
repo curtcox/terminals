@@ -107,6 +107,18 @@ func (m *MediaControlState) RegisterStream(start StartStreamResponse) {
 	for k, v := range start.Metadata {
 		metadata[k] = v
 	}
+	var audioMetadata *iov1.StreamAudioMetadata
+	if start.AudioMetadata != nil {
+		audioMetadata = &iov1.StreamAudioMetadata{
+			SampleRate: start.AudioMetadata.GetSampleRate(),
+			Channels:   start.AudioMetadata.GetChannels(),
+			Codec:      start.AudioMetadata.GetCodec(),
+		}
+	}
+	if audioMetadata == nil {
+		audioMetadata = streamAudioMetadataFromLegacy(metadata)
+	}
+	metadata = mergeLegacyAudioMetadata(metadata, audioMetadata)
 	var routingMode iov1.WebRTCMode
 	if start.Routing != nil {
 		routingMode = start.Routing.GetWebrtcMode()
@@ -118,6 +130,7 @@ func (m *MediaControlState) RegisterStream(start StartStreamResponse) {
 		TargetDeviceID:    start.TargetDeviceID,
 		Metadata:          metadata,
 		RoutingWebRTCMode: routingMode,
+		AudioMetadata:     audioMetadata,
 		Ready:             false,
 	}
 

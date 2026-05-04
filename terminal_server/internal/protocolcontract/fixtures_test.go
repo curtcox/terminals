@@ -160,8 +160,27 @@ func assertStartStreamAudio(t *testing.T, envelope *controlv1.WireEnvelope) {
 	if stream.GetStreamKind() != iov1.StreamKind_STREAM_KIND_AUDIO {
 		t.Fatalf("stream stream_kind = %v", stream.GetStreamKind())
 	}
+	audio := stream.GetAudioMetadata()
+	if audio == nil {
+		t.Fatalf("typed audio metadata missing")
+	}
+	if got := audio.GetSampleRate(); got != 16000 {
+		t.Fatalf("typed sample_rate = %d", got)
+	}
+	if got := audio.GetChannels(); got != 1 {
+		t.Fatalf("typed channels = %d", got)
+	}
+	if got := audio.GetCodec(); got != "pcm_s16le" {
+		t.Fatalf("typed codec = %q", got)
+	}
 	if stream.GetMetadata()["sample_rate"] != "16000" {
 		t.Fatalf("sample_rate metadata = %q", stream.GetMetadata()["sample_rate"])
+	}
+	if stream.GetMetadata()["channels"] != "1" {
+		t.Fatalf("channels metadata = %q", stream.GetMetadata()["channels"])
+	}
+	if stream.GetMetadata()["codec"] != "pcm_s16le" {
+		t.Fatalf("codec metadata = %q", stream.GetMetadata()["codec"])
 	}
 }
 

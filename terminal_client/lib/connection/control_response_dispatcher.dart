@@ -250,9 +250,9 @@ String streamKindLabel(String legacy, iov1.StreamKind typed) {
 }
 
 String webRtcSignalTypeLabel(String legacy, WebRTCSignalType typed) {
-  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_OFFER) return 'offer';
-  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER) return 'answer';
-  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE) {
+  if (typed == WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_OFFER) return 'offer';
+  if (typed == WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER) return 'answer';
+  if (typed == WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE) {
     return 'candidate';
   }
   return legacy;

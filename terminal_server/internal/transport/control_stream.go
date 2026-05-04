@@ -167,6 +167,7 @@ type StartStreamResponse struct {
 	TargetDeviceID string
 	Metadata       map[string]string
 	Routing        *iov1.StreamRouting
+	AudioMetadata  *iov1.StreamAudioMetadata
 }
 
 // StopStreamResponse instructs clients to stop an underlying media stream.
@@ -438,6 +439,7 @@ type mediaStreamState struct {
 	TargetDeviceID    string
 	Metadata          map[string]string
 	RoutingWebRTCMode iov1.WebRTCMode
+	AudioMetadata     *iov1.StreamAudioMetadata
 	Ready             bool
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 )
 
@@ -28,6 +29,44 @@ func TestMediaControlStateRegistersStartsAndStopsRecording(t *testing.T) {
 	state.UnregisterStream("route:d1|d2|audio")
 	if active := recorder.Active(); len(active) != 0 {
 		t.Fatalf("expected recorder to stop unregistered stream, got %+v", active)
+	}
+}
+
+func TestMediaControlStateRegisterStreamPrefersTypedAudioMetadata(t *testing.T) {
+	state := NewMediaControlState()
+	recorder := recording.NewMemoryManager()
+	state.SetRecordingManager(recorder)
+
+	state.RegisterStream(StartStreamResponse{
+		StreamID:       "stream-audio-typed",
+		Kind:           "audio",
+		SourceDeviceID: "source",
+		TargetDeviceID: "target",
+		Metadata: map[string]string{
+			"sample_rate": "16000",
+			"channels":    "1",
+			"codec":       "legacy-codec",
+		},
+		AudioMetadata: &iov1.StreamAudioMetadata{
+			SampleRate: 48000,
+			Channels:   2,
+			Codec:      "opus",
+		},
+	})
+
+	active := recorder.Active()
+	stream, ok := active["stream-audio-typed"]
+	if !ok {
+		t.Fatalf("expected recorder to track stream-audio-typed, got %+v", active)
+	}
+	if got := stream.Metadata["sample_rate"]; got != "48000" {
+		t.Fatalf("sample_rate metadata = %q, want 48000", got)
+	}
+	if got := stream.Metadata["channels"]; got != "2" {
+		t.Fatalf("channels metadata = %q, want 2", got)
+	}
+	if got := stream.Metadata["codec"]; got != "opus" {
+		t.Fatalf("codec metadata = %q, want opus", got)
 	}
 }
 

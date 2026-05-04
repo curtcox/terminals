@@ -279,21 +279,21 @@ Tests: transport adapter + contract fixtures cover enum-first resolution and leg
 
 Owner: transport/io  
 Classification: transitional_escape_hatch  
-Target state: typed `StartStream.routing` (`StreamRouting`) now carries the stable routing hints (`origin`, `webrtc_mode`); remaining keys (`sample_rate`, `channels`, `codec`) are media-codec hints retained as documented extension namespace.  
+Target state: typed `StartStream.routing` (`StreamRouting`) and `StartStream.audio_metadata` (`StreamAudioMetadata`) now carry the stable routing + audio hints; keep legacy map keys as compatibility mirrors during the migration window.  
 Review date: 2026-06-15  
-Producer: server stream planner emits both typed `routing` and the legacy `origin`/`webrtc_mode` map keys during the compatibility window.  
-Consumer: server media-control state prefers typed `routing.webrtc_mode` and falls back to the legacy `webrtc_mode` map key. Recording and replay paths still read legacy `origin`. Client media and edge stream setup ignore unknown keys.  
-Unknown behavior: clients and server ignore unknown map keys; consumers prefer typed `routing` when present.  
-Validation: typed `routing.origin` ∈ {`STREAM_ORIGIN_ROUTE_DELTA`, `STREAM_ORIGIN_RESTORE`}; typed `routing.webrtc_mode` ∈ {`WEB_RTC_MODE_SERVER_MANAGED`, `WEB_RTC_MODE_PEER_MANAGED`}. Legacy map values mirror the typed enums in lowercase. Other map keys use string values; known keys document stricter formats.  
-Tests: protocol contract fixtures `start_stream_route_delta_v1` and `route_stream_route_delta_v1` cover typed-enum + legacy-map coexistence. Stream setup tests cover current keys and unknown-key tolerance.
+Producer: server stream planner emits typed fields and legacy map mirrors. The generated proto adapter derives `audio_metadata` from legacy keys when needed and mirrors typed values back to legacy keys during migration.  
+Consumer: server media-control state prefers typed `routing.webrtc_mode` / `audio_metadata` and falls back to legacy `webrtc_mode` / `sample_rate` / `channels` / `codec` map keys. Recording paths consume the normalized metadata map. Client media and edge stream setup ignore unknown keys.  
+Unknown behavior: clients and server ignore unknown map keys; consumers prefer typed fields when present.  
+Validation: typed `routing.origin` ∈ {`STREAM_ORIGIN_ROUTE_DELTA`, `STREAM_ORIGIN_RESTORE`}; typed `routing.webrtc_mode` ∈ {`WEB_RTC_MODE_SERVER_MANAGED`, `WEB_RTC_MODE_PEER_MANAGED`}. Typed `audio_metadata.sample_rate` and `audio_metadata.channels` are positive integers when set; `audio_metadata.codec` is a non-empty token when set. Legacy map values mirror typed values in lowercase/decimal form.  
+Tests: protocol contract fixture `start_stream_audio_v1` covers typed `audio_metadata` + legacy map coexistence; `start_stream_route_delta_v1` and `route_stream_route_delta_v1` cover typed routing + legacy-map coexistence. Transport/media-control tests cover typed-first fallback and metadata normalization.
 
 Known keys:
 
 - `origin`: legacy mirror of `routing.origin` — `route_delta` or `restore`
 - `webrtc_mode`: legacy mirror of `routing.webrtc_mode` — `server_managed` or `peer_managed`
-- `sample_rate`: decimal hertz
-- `channels`: decimal count
-- `codec`: media codec token
+- `sample_rate`: legacy mirror of `audio_metadata.sample_rate` (decimal hertz)
+- `channels`: legacy mirror of `audio_metadata.channels` (decimal count)
+- `codec`: legacy mirror of `audio_metadata.codec` (media codec token)
 
 ### Field: terminals.io.v1.RouteStream.kind
 

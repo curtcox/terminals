@@ -74,7 +74,12 @@ void _assertStartStreamAudio(WireEnvelope envelope) {
 
   _expectEqual(stream.kind, 'audio');
   _expectEqual(stream.streamKind, StreamKind.STREAM_KIND_AUDIO);
+  _expectEqual(stream.audioMetadata.sampleRate, 16000);
+  _expectEqual(stream.audioMetadata.channels, 1);
+  _expectEqual(stream.audioMetadata.codec, 'pcm_s16le');
   _expectEqual(stream.metadata['sample_rate'], '16000');
+  _expectEqual(stream.metadata['channels'], '1');
+  _expectEqual(stream.metadata['codec'], 'pcm_s16le');
 }
 
 void _assertStartStreamRouteDelta(WireEnvelope envelope) {

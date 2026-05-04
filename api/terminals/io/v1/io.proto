@@ -48,6 +48,15 @@ message StreamRouting {
   WebRTCMode webrtc_mode = 2;
 }
 
+// StreamAudioMetadata carries typed audio stream metadata. It is the typed
+// replacement for durable StartStream.metadata keys `sample_rate`,
+// `channels`, and `codec`.
+message StreamAudioMetadata {
+  uint32 sample_rate = 1;
+  uint32 channels = 2;
+  string codec = 3;
+}
+
 message StartStream {
   string stream_id = 1;
   string kind = 2;
@@ -56,6 +65,7 @@ message StartStream {
   map<string, string> metadata = 5;
   StreamKind stream_kind = 6;
   StreamRouting routing = 7;
+  StreamAudioMetadata audio_metadata = 8;
 }
 
 message StopStream {

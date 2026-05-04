@@ -93,6 +93,88 @@ class StreamRouting extends $pb.GeneratedMessage {
   void clearWebrtcMode() => $_clearField(2);
 }
 
+/// StreamAudioMetadata carries typed audio stream metadata. It is the typed
+/// replacement for durable StartStream.metadata keys `sample_rate`,
+/// `channels`, and `codec`.
+class StreamAudioMetadata extends $pb.GeneratedMessage {
+  factory StreamAudioMetadata({
+    $core.int? sampleRate,
+    $core.int? channels,
+    $core.String? codec,
+  }) {
+    final result = create();
+    if (sampleRate != null) result.sampleRate = sampleRate;
+    if (channels != null) result.channels = channels;
+    if (codec != null) result.codec = codec;
+    return result;
+  }
+
+  StreamAudioMetadata._();
+
+  factory StreamAudioMetadata.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory StreamAudioMetadata.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StreamAudioMetadata',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.io.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'sampleRate', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'channels', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(3, _omitFieldNames ? '' : 'codec')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamAudioMetadata clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamAudioMetadata copyWith(void Function(StreamAudioMetadata) updates) =>
+      super.copyWith((message) => updates(message as StreamAudioMetadata))
+          as StreamAudioMetadata;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StreamAudioMetadata create() => StreamAudioMetadata._();
+  @$core.override
+  StreamAudioMetadata createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static StreamAudioMetadata getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StreamAudioMetadata>(create);
+  static StreamAudioMetadata? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get sampleRate => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set sampleRate($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSampleRate() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSampleRate() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get channels => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set channels($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasChannels() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearChannels() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get codec => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set codec($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCodec() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCodec() => $_clearField(3);
+}
+
 class StartStream extends $pb.GeneratedMessage {
   factory StartStream({
     $core.String? streamId,
@@ -102,6 +184,7 @@ class StartStream extends $pb.GeneratedMessage {
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
     StreamKind? streamKind,
     StreamRouting? routing,
+    StreamAudioMetadata? audioMetadata,
   }) {
     final result = create();
     if (streamId != null) result.streamId = streamId;
@@ -111,6 +194,7 @@ class StartStream extends $pb.GeneratedMessage {
     if (metadata != null) result.metadata.addEntries(metadata);
     if (streamKind != null) result.streamKind = streamKind;
     if (routing != null) result.routing = routing;
+    if (audioMetadata != null) result.audioMetadata = audioMetadata;
     return result;
   }
 
@@ -141,6 +225,8 @@ class StartStream extends $pb.GeneratedMessage {
         enumValues: StreamKind.values)
     ..aOM<StreamRouting>(7, _omitFieldNames ? '' : 'routing',
         subBuilder: StreamRouting.create)
+    ..aOM<StreamAudioMetadata>(8, _omitFieldNames ? '' : 'audioMetadata',
+        subBuilder: StreamAudioMetadata.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -220,6 +306,17 @@ class StartStream extends $pb.GeneratedMessage {
   void clearRouting() => $_clearField(7);
   @$pb.TagNumber(7)
   StreamRouting ensureRouting() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  StreamAudioMetadata get audioMetadata => $_getN(7);
+  @$pb.TagNumber(8)
+  set audioMetadata(StreamAudioMetadata value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasAudioMetadata() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearAudioMetadata() => $_clearField(8);
+  @$pb.TagNumber(8)
+  StreamAudioMetadata ensureAudioMetadata() => $_ensure(7);
 }
 
 class StopStream extends $pb.GeneratedMessage {

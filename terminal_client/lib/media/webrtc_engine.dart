@@ -28,9 +28,9 @@ String _streamKindLabel(String legacy, iov1.StreamKind typed) {
 }
 
 String _signalTypeLabel(String legacy, WebRTCSignalType typed) {
-  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_OFFER) return 'offer';
-  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER) return 'answer';
-  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE) {
+  if (typed == WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_OFFER) return 'offer';
+  if (typed == WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER) return 'answer';
+  if (typed == WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE) {
     return 'candidate';
   }
   return legacy;
@@ -39,14 +39,14 @@ String _signalTypeLabel(String legacy, WebRTCSignalType typed) {
 WebRTCSignalType _typedWebRTCSignalType(String signalType) {
   switch (signalType.trim().toLowerCase()) {
     case 'offer':
-      return WebRTCSignalType.WEBRTC_SIGNAL_TYPE_OFFER;
+      return WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_OFFER;
     case 'answer':
-      return WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER;
+      return WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER;
     case 'candidate':
     case 'ice_candidate':
-      return WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE;
+      return WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE;
     default:
-      return WebRTCSignalType.WEBRTC_SIGNAL_TYPE_UNSPECIFIED;
+      return WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_UNSPECIFIED;
   }
 }
 

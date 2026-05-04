@@ -428,7 +428,7 @@ void main() {
             ..streamId = 'video-1'
             ..signalType = 'answer'
             ..signalTypeEnum =
-                WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER),
+                WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER),
       );
 
       expect(signalUpdate.webrtcSignalNotification,
@@ -468,7 +468,7 @@ void main() {
             ..streamId = 'signal-typed'
             ..signalType = 'legacy-signal'
             ..signalTypeEnum =
-                WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE),
+                WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE),
       );
       expect(
         signalUpdate.webrtcSignalNotification,

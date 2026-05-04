@@ -20,5 +20,10 @@ server_message: {
       key: "codec"
       value: "pcm_s16le"
     }
+    audio_metadata: {
+      sample_rate: 16000
+      channels: 1
+      codec: "pcm_s16le"
+    }
   }
 }

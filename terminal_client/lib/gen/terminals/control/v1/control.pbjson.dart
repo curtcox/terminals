@@ -101,18 +101,18 @@ final $typed_data.Uint8List controlErrorCodeDescriptor = $convert.base64Decode(
 const WebRTCSignalType$json = {
   '1': 'WebRTCSignalType',
   '2': [
-    {'1': 'WEBRTC_SIGNAL_TYPE_UNSPECIFIED', '2': 0},
-    {'1': 'WEBRTC_SIGNAL_TYPE_OFFER', '2': 1},
-    {'1': 'WEBRTC_SIGNAL_TYPE_ANSWER', '2': 2},
-    {'1': 'WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE', '2': 3},
+    {'1': 'WEB_RTC_SIGNAL_TYPE_UNSPECIFIED', '2': 0},
+    {'1': 'WEB_RTC_SIGNAL_TYPE_OFFER', '2': 1},
+    {'1': 'WEB_RTC_SIGNAL_TYPE_ANSWER', '2': 2},
+    {'1': 'WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE', '2': 3},
   ],
 };
 
 /// Descriptor for `WebRTCSignalType`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List webRTCSignalTypeDescriptor = $convert.base64Decode(
-    'ChBXZWJSVENTaWduYWxUeXBlEiIKHldFQlJUQ19TSUdOQUxfVFlQRV9VTlNQRUNJRklFRBAAEh'
-    'wKGFdFQlJUQ19TSUdOQUxfVFlQRV9PRkZFUhABEh0KGVdFQlJUQ19TSUdOQUxfVFlQRV9BTlNX'
-    'RVIQAhIkCiBXRUJSVENfU0lHTkFMX1RZUEVfSUNFX0NBTkRJREFURRAD');
+    'ChBXZWJSVENTaWduYWxUeXBlEiMKH1dFQl9SVENfU0lHTkFMX1RZUEVfVU5TUEVDSUZJRUQQAB'
+    'IdChlXRUJfUlRDX1NJR05BTF9UWVBFX09GRkVSEAESHgoaV0VCX1JUQ19TSUdOQUxfVFlQRV9B'
+    'TlNXRVIQAhIlCiFXRUJfUlRDX1NJR05BTF9UWVBFX0lDRV9DQU5ESURBVEUQAw==');
 
 @$core.Deprecated('Use transportHelloDescriptor instead')
 const TransportHello$json = {
@@ -1293,6 +1293,12 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.ui.v1.VideoSurfaceWidget': $2.VideoSurfaceWidget$json,
   '.terminals.ui.v1.AudioVisualizerWidget': $2.AudioVisualizerWidget$json,
   '.terminals.ui.v1.CanvasWidget': $2.CanvasWidget$json,
+  '.terminals.ui.v1.DrawOp': $2.DrawOp$json,
+  '.terminals.ui.v1.DrawLine': $2.DrawLine$json,
+  '.terminals.ui.v1.DrawRect': $2.DrawRect$json,
+  '.terminals.ui.v1.DrawCircle': $2.DrawCircle$json,
+  '.terminals.ui.v1.DrawText': $2.DrawText$json,
+  '.terminals.ui.v1.DrawPath': $2.DrawPath$json,
   '.terminals.ui.v1.TextInputWidget': $2.TextInputWidget$json,
   '.terminals.ui.v1.ButtonWidget': $2.ButtonWidget$json,
   '.terminals.ui.v1.SliderWidget': $2.SliderWidget$json,
@@ -1333,6 +1339,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.io.v1.StartStream': $0.StartStream$json,
   '.terminals.io.v1.StartStream.MetadataEntry':
       $0.StartStream_MetadataEntry$json,
+  '.terminals.io.v1.StreamRouting': $0.StreamRouting$json,
+  '.terminals.io.v1.StreamAudioMetadata': $0.StreamAudioMetadata$json,
   '.terminals.io.v1.StopStream': $0.StopStream$json,
   '.terminals.io.v1.PlayAudio': $0.PlayAudio$json,
   '.terminals.io.v1.ShowMedia': $0.ShowMedia$json,
