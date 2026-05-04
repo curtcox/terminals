@@ -905,6 +905,14 @@ Incremental progress (2026-05-03):
 Risk: medium  
 Review focus: old-client behavior and route/media regressions.
 
+Incremental progress (2026-05-03):
+
+- Added additive typed enums: `terminals.io.v1.StreamKind` and `terminals.control.v1.WebRTCSignalType`, with new `StartStream.stream_kind`, `RouteStream.stream_kind`, and `WebRTCSignal.signal_type_enum` fields while preserving legacy string fields.
+- Updated generated-proto transport adapter to emit typed enum + legacy string fields and to resolve inbound WebRTC signal type from enum first with legacy fallback.
+- Updated Flutter client media/control response handling to prefer typed enum fields and fall back to legacy string values during compatibility.
+- Expanded Go and Dart protocol contract/assertion coverage for typed stream kind behavior, plus adapter tests for enum-first WebRTC fallback semantics.
+- Updated protocol extension registry entries for `StartStream.kind`, `RouteStream.kind`, and `WebRTCSignal.signal_type` to describe typed-first compatibility behavior.
+
 ### PR 6 - Enforcement
 
 - Flip `proto-flex-check` from advisory to required.

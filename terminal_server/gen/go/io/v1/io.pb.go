@@ -21,6 +21,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type StreamKind int32
+
+const (
+	StreamKind_STREAM_KIND_UNSPECIFIED StreamKind = 0
+	StreamKind_STREAM_KIND_AUDIO       StreamKind = 1
+	StreamKind_STREAM_KIND_VIDEO       StreamKind = 2
+	StreamKind_STREAM_KIND_SENSOR      StreamKind = 3
+	StreamKind_STREAM_KIND_DATA        StreamKind = 4
+)
+
+// Enum value maps for StreamKind.
+var (
+	StreamKind_name = map[int32]string{
+		0: "STREAM_KIND_UNSPECIFIED",
+		1: "STREAM_KIND_AUDIO",
+		2: "STREAM_KIND_VIDEO",
+		3: "STREAM_KIND_SENSOR",
+		4: "STREAM_KIND_DATA",
+	}
+	StreamKind_value = map[string]int32{
+		"STREAM_KIND_UNSPECIFIED": 0,
+		"STREAM_KIND_AUDIO":       1,
+		"STREAM_KIND_VIDEO":       2,
+		"STREAM_KIND_SENSOR":      3,
+		"STREAM_KIND_DATA":        4,
+	}
+)
+
+func (x StreamKind) Enum() *StreamKind {
+	p := new(StreamKind)
+	*p = x
+	return p
+}
+
+func (x StreamKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StreamKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_io_v1_io_proto_enumTypes[0].Descriptor()
+}
+
+func (StreamKind) Type() protoreflect.EnumType {
+	return &file_terminals_io_v1_io_proto_enumTypes[0]
+}
+
+func (x StreamKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StreamKind.Descriptor instead.
+func (StreamKind) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{0}
+}
+
 type StartStream struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	StreamId       string                 `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
@@ -28,6 +83,7 @@ type StartStream struct {
 	SourceDeviceId string                 `protobuf:"bytes,3,opt,name=source_device_id,json=sourceDeviceId,proto3" json:"source_device_id,omitempty"`
 	TargetDeviceId string                 `protobuf:"bytes,4,opt,name=target_device_id,json=targetDeviceId,proto3" json:"target_device_id,omitempty"`
 	Metadata       map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	StreamKind     StreamKind             `protobuf:"varint,6,opt,name=stream_kind,json=streamKind,proto3,enum=terminals.io.v1.StreamKind" json:"stream_kind,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -97,6 +153,13 @@ func (x *StartStream) GetMetadata() map[string]string {
 	return nil
 }
 
+func (x *StartStream) GetStreamKind() StreamKind {
+	if x != nil {
+		return x.StreamKind
+	}
+	return StreamKind_STREAM_KIND_UNSPECIFIED
+}
+
 type StopStream struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StreamId      string                 `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
@@ -147,6 +210,7 @@ type RouteStream struct {
 	SourceDeviceId string                 `protobuf:"bytes,2,opt,name=source_device_id,json=sourceDeviceId,proto3" json:"source_device_id,omitempty"`
 	TargetDeviceId string                 `protobuf:"bytes,3,opt,name=target_device_id,json=targetDeviceId,proto3" json:"target_device_id,omitempty"`
 	Kind           string                 `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
+	StreamKind     StreamKind             `protobuf:"varint,5,opt,name=stream_kind,json=streamKind,proto3,enum=terminals.io.v1.StreamKind" json:"stream_kind,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -207,6 +271,13 @@ func (x *RouteStream) GetKind() string {
 		return x.Kind
 	}
 	return ""
+}
+
+func (x *RouteStream) GetStreamKind() StreamKind {
+	if x != nil {
+		return x.StreamKind
+	}
+	return StreamKind_STREAM_KIND_UNSPECIFIED
 }
 
 type PlayAudio struct {
@@ -2121,24 +2192,28 @@ var File_terminals_io_v1_io_proto protoreflect.FileDescriptor
 
 const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\n" +
-	"\x18terminals/io/v1/io.proto\x12\x0fterminals.io.v1\"\x97\x02\n" +
+	"\x18terminals/io/v1/io.proto\x12\x0fterminals.io.v1\"\xd5\x02\n" +
 	"\vStartStream\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12(\n" +
 	"\x10source_device_id\x18\x03 \x01(\tR\x0esourceDeviceId\x12(\n" +
 	"\x10target_device_id\x18\x04 \x01(\tR\x0etargetDeviceId\x12F\n" +
-	"\bmetadata\x18\x05 \x03(\v2*.terminals.io.v1.StartStream.MetadataEntryR\bmetadata\x1a;\n" +
+	"\bmetadata\x18\x05 \x03(\v2*.terminals.io.v1.StartStream.MetadataEntryR\bmetadata\x12<\n" +
+	"\vstream_kind\x18\x06 \x01(\x0e2\x1b.terminals.io.v1.StreamKindR\n" +
+	"streamKind\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\")\n" +
 	"\n" +
 	"StopStream\x12\x1b\n" +
-	"\tstream_id\x18\x01 \x01(\tR\bstreamId\"\x92\x01\n" +
+	"\tstream_id\x18\x01 \x01(\tR\bstreamId\"\xd0\x01\n" +
 	"\vRouteStream\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12(\n" +
 	"\x10source_device_id\x18\x02 \x01(\tR\x0esourceDeviceId\x12(\n" +
 	"\x10target_device_id\x18\x03 \x01(\tR\x0etargetDeviceId\x12\x12\n" +
-	"\x04kind\x18\x04 \x01(\tR\x04kind\"\xb7\x01\n" +
+	"\x04kind\x18\x04 \x01(\tR\x04kind\x12<\n" +
+	"\vstream_kind\x18\x05 \x01(\x0e2\x1b.terminals.io.v1.StreamKindR\n" +
+	"streamKind\"\xb7\x01\n" +
 	"\tPlayAudio\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
@@ -2298,7 +2373,14 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x06tar_gz\x18\x03 \x01(\fR\x05tarGz\x12\x16\n" +
 	"\x06sha256\x18\x04 \x01(\tR\x06sha256\"+\n" +
 	"\fRemoveBundle\x12\x1b\n" +
-	"\tbundle_id\x18\x01 \x01(\tR\bbundleIdB@Z>github.com/curtcox/terminals/terminal_server/gen/go/io/v1;iov1b\x06proto3"
+	"\tbundle_id\x18\x01 \x01(\tR\bbundleId*\x85\x01\n" +
+	"\n" +
+	"StreamKind\x12\x1b\n" +
+	"\x17STREAM_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11STREAM_KIND_AUDIO\x10\x01\x12\x15\n" +
+	"\x11STREAM_KIND_VIDEO\x10\x02\x12\x16\n" +
+	"\x12STREAM_KIND_SENSOR\x10\x03\x12\x14\n" +
+	"\x10STREAM_KIND_DATA\x10\x04B@Z>github.com/curtcox/terminals/terminal_server/gen/go/io/v1;iov1b\x06proto3"
 
 var (
 	file_terminals_io_v1_io_proto_rawDescOnce sync.Once
@@ -2312,71 +2394,75 @@ func file_terminals_io_v1_io_proto_rawDescGZIP() []byte {
 	return file_terminals_io_v1_io_proto_rawDescData
 }
 
+var file_terminals_io_v1_io_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_terminals_io_v1_io_proto_goTypes = []any{
-	(*StartStream)(nil),           // 0: terminals.io.v1.StartStream
-	(*StopStream)(nil),            // 1: terminals.io.v1.StopStream
-	(*RouteStream)(nil),           // 2: terminals.io.v1.RouteStream
-	(*PlayAudio)(nil),             // 3: terminals.io.v1.PlayAudio
-	(*ShowMedia)(nil),             // 4: terminals.io.v1.ShowMedia
-	(*InputEvent)(nil),            // 5: terminals.io.v1.InputEvent
-	(*KeyEvent)(nil),              // 6: terminals.io.v1.KeyEvent
-	(*PointerEvent)(nil),          // 7: terminals.io.v1.PointerEvent
-	(*TouchPoint)(nil),            // 8: terminals.io.v1.TouchPoint
-	(*TouchEvent)(nil),            // 9: terminals.io.v1.TouchEvent
-	(*UIAction)(nil),              // 10: terminals.io.v1.UIAction
-	(*SensorData)(nil),            // 11: terminals.io.v1.SensorData
-	(*FlowNode)(nil),              // 12: terminals.io.v1.FlowNode
-	(*FlowEdge)(nil),              // 13: terminals.io.v1.FlowEdge
-	(*FlowPlan)(nil),              // 14: terminals.io.v1.FlowPlan
-	(*StartFlow)(nil),             // 15: terminals.io.v1.StartFlow
-	(*PatchFlow)(nil),             // 16: terminals.io.v1.PatchFlow
-	(*StopFlow)(nil),              // 17: terminals.io.v1.StopFlow
-	(*DeviceRef)(nil),             // 18: terminals.io.v1.DeviceRef
-	(*Pose)(nil),                  // 19: terminals.io.v1.Pose
-	(*LocationEstimate)(nil),      // 20: terminals.io.v1.LocationEstimate
-	(*ObservationProvenance)(nil), // 21: terminals.io.v1.ObservationProvenance
-	(*ArtifactRef)(nil),           // 22: terminals.io.v1.ArtifactRef
-	(*Observation)(nil),           // 23: terminals.io.v1.Observation
-	(*ObservationMessage)(nil),    // 24: terminals.io.v1.ObservationMessage
-	(*ArtifactAvailable)(nil),     // 25: terminals.io.v1.ArtifactAvailable
-	(*RequestArtifact)(nil),       // 26: terminals.io.v1.RequestArtifact
-	(*FlowStats)(nil),             // 27: terminals.io.v1.FlowStats
-	(*ClockSample)(nil),           // 28: terminals.io.v1.ClockSample
-	(*InstallBundle)(nil),         // 29: terminals.io.v1.InstallBundle
-	(*RemoveBundle)(nil),          // 30: terminals.io.v1.RemoveBundle
-	nil,                           // 31: terminals.io.v1.StartStream.MetadataEntry
-	nil,                           // 32: terminals.io.v1.SensorData.ValuesEntry
-	nil,                           // 33: terminals.io.v1.FlowNode.ArgsEntry
-	nil,                           // 34: terminals.io.v1.Observation.AttributesEntry
+	(StreamKind)(0),               // 0: terminals.io.v1.StreamKind
+	(*StartStream)(nil),           // 1: terminals.io.v1.StartStream
+	(*StopStream)(nil),            // 2: terminals.io.v1.StopStream
+	(*RouteStream)(nil),           // 3: terminals.io.v1.RouteStream
+	(*PlayAudio)(nil),             // 4: terminals.io.v1.PlayAudio
+	(*ShowMedia)(nil),             // 5: terminals.io.v1.ShowMedia
+	(*InputEvent)(nil),            // 6: terminals.io.v1.InputEvent
+	(*KeyEvent)(nil),              // 7: terminals.io.v1.KeyEvent
+	(*PointerEvent)(nil),          // 8: terminals.io.v1.PointerEvent
+	(*TouchPoint)(nil),            // 9: terminals.io.v1.TouchPoint
+	(*TouchEvent)(nil),            // 10: terminals.io.v1.TouchEvent
+	(*UIAction)(nil),              // 11: terminals.io.v1.UIAction
+	(*SensorData)(nil),            // 12: terminals.io.v1.SensorData
+	(*FlowNode)(nil),              // 13: terminals.io.v1.FlowNode
+	(*FlowEdge)(nil),              // 14: terminals.io.v1.FlowEdge
+	(*FlowPlan)(nil),              // 15: terminals.io.v1.FlowPlan
+	(*StartFlow)(nil),             // 16: terminals.io.v1.StartFlow
+	(*PatchFlow)(nil),             // 17: terminals.io.v1.PatchFlow
+	(*StopFlow)(nil),              // 18: terminals.io.v1.StopFlow
+	(*DeviceRef)(nil),             // 19: terminals.io.v1.DeviceRef
+	(*Pose)(nil),                  // 20: terminals.io.v1.Pose
+	(*LocationEstimate)(nil),      // 21: terminals.io.v1.LocationEstimate
+	(*ObservationProvenance)(nil), // 22: terminals.io.v1.ObservationProvenance
+	(*ArtifactRef)(nil),           // 23: terminals.io.v1.ArtifactRef
+	(*Observation)(nil),           // 24: terminals.io.v1.Observation
+	(*ObservationMessage)(nil),    // 25: terminals.io.v1.ObservationMessage
+	(*ArtifactAvailable)(nil),     // 26: terminals.io.v1.ArtifactAvailable
+	(*RequestArtifact)(nil),       // 27: terminals.io.v1.RequestArtifact
+	(*FlowStats)(nil),             // 28: terminals.io.v1.FlowStats
+	(*ClockSample)(nil),           // 29: terminals.io.v1.ClockSample
+	(*InstallBundle)(nil),         // 30: terminals.io.v1.InstallBundle
+	(*RemoveBundle)(nil),          // 31: terminals.io.v1.RemoveBundle
+	nil,                           // 32: terminals.io.v1.StartStream.MetadataEntry
+	nil,                           // 33: terminals.io.v1.SensorData.ValuesEntry
+	nil,                           // 34: terminals.io.v1.FlowNode.ArgsEntry
+	nil,                           // 35: terminals.io.v1.Observation.AttributesEntry
 }
 var file_terminals_io_v1_io_proto_depIdxs = []int32{
-	31, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
-	6,  // 1: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
-	7,  // 2: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
-	9,  // 3: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
-	10, // 4: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
-	8,  // 5: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
-	32, // 6: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
-	33, // 7: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
-	12, // 8: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
-	13, // 9: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
-	14, // 10: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	14, // 11: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	19, // 12: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
-	18, // 13: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
-	18, // 14: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
-	20, // 15: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
-	34, // 16: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
-	22, // 17: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
-	21, // 18: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
-	23, // 19: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
-	22, // 20: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	32, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
+	0,  // 1: terminals.io.v1.StartStream.stream_kind:type_name -> terminals.io.v1.StreamKind
+	0,  // 2: terminals.io.v1.RouteStream.stream_kind:type_name -> terminals.io.v1.StreamKind
+	7,  // 3: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
+	8,  // 4: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
+	10, // 5: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
+	11, // 6: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
+	9,  // 7: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
+	33, // 8: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
+	34, // 9: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
+	13, // 10: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
+	14, // 11: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
+	15, // 12: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	15, // 13: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	20, // 14: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
+	19, // 15: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
+	19, // 16: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
+	21, // 17: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
+	35, // 18: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
+	23, // 19: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
+	22, // 20: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
+	24, // 21: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
+	23, // 22: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_terminals_io_v1_io_proto_init() }
@@ -2400,13 +2486,14 @@ func file_terminals_io_v1_io_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_io_v1_io_proto_rawDesc), len(file_terminals_io_v1_io_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_terminals_io_v1_io_proto_goTypes,
 		DependencyIndexes: file_terminals_io_v1_io_proto_depIdxs,
+		EnumInfos:         file_terminals_io_v1_io_proto_enumTypes,
 		MessageInfos:      file_terminals_io_v1_io_proto_msgTypes,
 	}.Build()
 	File_terminals_io_v1_io_proto = out.File

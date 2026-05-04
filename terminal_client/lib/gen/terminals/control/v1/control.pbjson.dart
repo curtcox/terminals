@@ -97,6 +97,23 @@ final $typed_data.Uint8List controlErrorCodeDescriptor = $convert.base64Decode(
     'EAYSKQolQ09OVFJPTF9FUlJPUl9DT0RFX1BST1RPQ09MX1ZJT0xBVElPThAHEh4KGkNPTlRST0'
     'xfRVJST1JfQ09ERV9VTktOT1dOEGM=');
 
+@$core.Deprecated('Use webRTCSignalTypeDescriptor instead')
+const WebRTCSignalType$json = {
+  '1': 'WebRTCSignalType',
+  '2': [
+    {'1': 'WEBRTC_SIGNAL_TYPE_UNSPECIFIED', '2': 0},
+    {'1': 'WEBRTC_SIGNAL_TYPE_OFFER', '2': 1},
+    {'1': 'WEBRTC_SIGNAL_TYPE_ANSWER', '2': 2},
+    {'1': 'WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE', '2': 3},
+  ],
+};
+
+/// Descriptor for `WebRTCSignalType`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List webRTCSignalTypeDescriptor = $convert.base64Decode(
+    'ChBXZWJSVENTaWduYWxUeXBlEiIKHldFQlJUQ19TSUdOQUxfVFlQRV9VTlNQRUNJRklFRBAAEh'
+    'wKGFdFQlJUQ19TSUdOQUxfVFlQRV9PRkZFUhABEh0KGVdFQlJUQ19TSUdOQUxfVFlQRV9BTlNX'
+    'RVIQAhIkCiBXRUJSVENfU0lHTkFMX1RZUEVfSUNFX0NBTkRJREFURRAD');
+
 @$core.Deprecated('Use transportHelloDescriptor instead')
 const TransportHello$json = {
   '1': 'TransportHello',
@@ -1149,13 +1166,23 @@ const WebRTCSignal$json = {
     {'1': 'stream_id', '3': 1, '4': 1, '5': 9, '10': 'streamId'},
     {'1': 'signal_type', '3': 2, '4': 1, '5': 9, '10': 'signalType'},
     {'1': 'payload', '3': 3, '4': 1, '5': 9, '10': 'payload'},
+    {
+      '1': 'signal_type_enum',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.control.v1.WebRTCSignalType',
+      '10': 'signalTypeEnum'
+    },
   ],
 };
 
 /// Descriptor for `WebRTCSignal`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List webRTCSignalDescriptor = $convert.base64Decode(
     'CgxXZWJSVENTaWduYWwSGwoJc3RyZWFtX2lkGAEgASgJUghzdHJlYW1JZBIfCgtzaWduYWxfdH'
-    'lwZRgCIAEoCVIKc2lnbmFsVHlwZRIYCgdwYXlsb2FkGAMgASgJUgdwYXlsb2Fk');
+    'lwZRgCIAEoCVIKc2lnbmFsVHlwZRIYCgdwYXlsb2FkGAMgASgJUgdwYXlsb2FkElAKEHNpZ25h'
+    'bF90eXBlX2VudW0YBCABKA4yJi50ZXJtaW5hbHMuY29udHJvbC52MS5XZWJSVENTaWduYWxUeX'
+    'BlUg5zaWduYWxUeXBlRW51bQ==');
 
 @$core.Deprecated('Use heartbeatDescriptor instead')
 const Heartbeat$json = {

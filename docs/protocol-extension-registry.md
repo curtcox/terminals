@@ -133,13 +133,13 @@ Tests: command result tests cover currently consumed keys.
 
 Owner: transport/media  
 Classification: transitional_escape_hatch  
-Target state: add `WebRTCSignalType` enum and keep string fallback during migration.  
+Target state: typed `signal_type_enum` now emitted/consumed first; keep string fallback during compatibility window.  
 Review date: 2026-06-15  
 Producer: client and server WebRTC signaling engines  
 Consumer: client and server WebRTC signaling engines  
 Unknown behavior: reject unknown signal types for media setup.  
-Validation: one of `offer`, `answer`, or `ice_candidate`.  
-Tests: WebRTC signaling tests cover accepted signal types and malformed payloads.
+Validation: enum values `OFFER`, `ANSWER`, `ICE_CANDIDATE`; legacy string fallback accepts `offer`, `answer`, `candidate`/`ice_candidate`.  
+Tests: adapter + client media tests cover enum-first resolution, legacy fallback, and malformed payload behavior.
 
 ### Field: terminals.control.v1.WebRTCSignal.payload
 
@@ -266,13 +266,13 @@ Tests: add malformed JSON and typed replacement tests before durable canvas use.
 
 Owner: transport/io  
 Classification: transitional_escape_hatch  
-Target state: add `StreamKind` enum and keep string fallback during migration.  
+Target state: typed `stream_kind` now emitted/consumed first; keep string fallback during compatibility window.  
 Review date: 2026-06-15  
 Producer: server stream planner  
 Consumer: client media and edge stream setup  
 Unknown behavior: client rejects unknown stream kinds or treats them as unsupported.  
-Validation: `audio`, `video`, `sensor`, or `data`.  
-Tests: transport route tests cover known kinds and fallback.
+Validation: enum values `AUDIO`, `VIDEO`, `SENSOR`, `DATA`; legacy string fallback accepts `audio`, `video`, `sensor`, or `data`.  
+Tests: transport adapter + contract fixtures cover enum-first resolution and legacy fallback.
 
 ### Field: terminals.io.v1.StartStream.metadata
 
@@ -296,13 +296,13 @@ Known keys:
 
 Owner: transport/io  
 Classification: transitional_escape_hatch  
-Target state: add `StreamKind` enum and keep string fallback during migration.  
+Target state: typed `stream_kind` now emitted/consumed first; keep string fallback during compatibility window.  
 Review date: 2026-06-15  
 Producer: server stream router  
 Consumer: client media stream routing  
 Unknown behavior: client rejects unknown route kinds or treats them as unsupported.  
-Validation: `audio`, `video`, `sensor`, or `data`.  
-Tests: route stream tests cover known kinds and fallback.
+Validation: enum values `AUDIO`, `VIDEO`, `SENSOR`, `DATA`; legacy string fallback accepts `audio`, `video`, `sensor`, or `data`.  
+Tests: transport adapter + client response tests cover enum-first resolution and legacy fallback.
 
 ### Field: terminals.io.v1.PlayAudio.format
 

@@ -68,6 +68,7 @@ void _assertStartStreamAudio(WireEnvelope envelope) {
   final stream = envelope.serverMessage.startStream;
 
   _expectEqual(stream.kind, 'audio');
+  _expectEqual(stream.streamKind, StreamKind.STREAM_KIND_AUDIO);
   _expectEqual(stream.metadata['sample_rate'], '16000');
 }
 

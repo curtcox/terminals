@@ -248,6 +248,58 @@ func (ControlErrorCode) EnumDescriptor() ([]byte, []int) {
 	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{3}
 }
 
+type WebRTCSignalType int32
+
+const (
+	WebRTCSignalType_WEBRTC_SIGNAL_TYPE_UNSPECIFIED   WebRTCSignalType = 0
+	WebRTCSignalType_WEBRTC_SIGNAL_TYPE_OFFER         WebRTCSignalType = 1
+	WebRTCSignalType_WEBRTC_SIGNAL_TYPE_ANSWER        WebRTCSignalType = 2
+	WebRTCSignalType_WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE WebRTCSignalType = 3
+)
+
+// Enum value maps for WebRTCSignalType.
+var (
+	WebRTCSignalType_name = map[int32]string{
+		0: "WEBRTC_SIGNAL_TYPE_UNSPECIFIED",
+		1: "WEBRTC_SIGNAL_TYPE_OFFER",
+		2: "WEBRTC_SIGNAL_TYPE_ANSWER",
+		3: "WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE",
+	}
+	WebRTCSignalType_value = map[string]int32{
+		"WEBRTC_SIGNAL_TYPE_UNSPECIFIED":   0,
+		"WEBRTC_SIGNAL_TYPE_OFFER":         1,
+		"WEBRTC_SIGNAL_TYPE_ANSWER":        2,
+		"WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE": 3,
+	}
+)
+
+func (x WebRTCSignalType) Enum() *WebRTCSignalType {
+	p := new(WebRTCSignalType)
+	*p = x
+	return p
+}
+
+func (x WebRTCSignalType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WebRTCSignalType) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_control_v1_control_proto_enumTypes[4].Descriptor()
+}
+
+func (WebRTCSignalType) Type() protoreflect.EnumType {
+	return &file_terminals_control_v1_control_proto_enumTypes[4]
+}
+
+func (x WebRTCSignalType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WebRTCSignalType.Descriptor instead.
+func (WebRTCSignalType) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{4}
+}
+
 type TransportHello struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	ProtocolVersion   uint32                 `protobuf:"varint,1,opt,name=protocol_version,json=protocolVersion,proto3" json:"protocol_version,omitempty"`
@@ -2375,12 +2427,13 @@ func (x *ControlError) GetMessage() string {
 }
 
 type WebRTCSignal struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StreamId      string                 `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
-	SignalType    string                 `protobuf:"bytes,2,opt,name=signal_type,json=signalType,proto3" json:"signal_type,omitempty"`
-	Payload       string                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	StreamId       string                 `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
+	SignalType     string                 `protobuf:"bytes,2,opt,name=signal_type,json=signalType,proto3" json:"signal_type,omitempty"`
+	Payload        string                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	SignalTypeEnum WebRTCSignalType       `protobuf:"varint,4,opt,name=signal_type_enum,json=signalTypeEnum,proto3,enum=terminals.control.v1.WebRTCSignalType" json:"signal_type_enum,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *WebRTCSignal) Reset() {
@@ -2432,6 +2485,13 @@ func (x *WebRTCSignal) GetPayload() string {
 		return x.Payload
 	}
 	return ""
+}
+
+func (x *WebRTCSignal) GetSignalTypeEnum() WebRTCSignalType {
+	if x != nil {
+		return x.SignalTypeEnum
+	}
+	return WebRTCSignalType_WEBRTC_SIGNAL_TYPE_UNSPECIFIED
 }
 
 type Heartbeat struct {
@@ -2662,12 +2722,13 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"d\n" +
 	"\fControlError\x12:\n" +
 	"\x04code\x18\x01 \x01(\x0e2&.terminals.control.v1.ControlErrorCodeR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"f\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xb8\x01\n" +
 	"\fWebRTCSignal\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x1f\n" +
 	"\vsignal_type\x18\x02 \x01(\tR\n" +
 	"signalType\x12\x18\n" +
-	"\apayload\x18\x03 \x01(\tR\apayload\"A\n" +
+	"\apayload\x18\x03 \x01(\tR\apayload\x12P\n" +
+	"\x10signal_type_enum\x18\x04 \x01(\x0e2&.terminals.control.v1.WebRTCSignalTypeR\x0esignalTypeEnum\"A\n" +
 	"\tHeartbeat\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x17\n" +
 	"\aunix_ms\x18\x02 \x01(\x03R\x06unixMs*\x8b\x01\n" +
@@ -2695,7 +2756,12 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"'CONTROL_ERROR_CODE_MISSING_COMMAND_TEXT\x10\x05\x120\n" +
 	",CONTROL_ERROR_CODE_MISSING_COMMAND_DEVICE_ID\x10\x06\x12)\n" +
 	"%CONTROL_ERROR_CODE_PROTOCOL_VIOLATION\x10\a\x12\x1e\n" +
-	"\x1aCONTROL_ERROR_CODE_UNKNOWN\x10c2t\n" +
+	"\x1aCONTROL_ERROR_CODE_UNKNOWN\x10c*\x99\x01\n" +
+	"\x10WebRTCSignalType\x12\"\n" +
+	"\x1eWEBRTC_SIGNAL_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18WEBRTC_SIGNAL_TYPE_OFFER\x10\x01\x12\x1d\n" +
+	"\x19WEBRTC_SIGNAL_TYPE_ANSWER\x10\x02\x12$\n" +
+	" WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE\x10\x032t\n" +
 	"\x16TerminalControlService\x12Z\n" +
 	"\aConnect\x12$.terminals.control.v1.ConnectRequest\x1a%.terminals.control.v1.ConnectResponse(\x010\x01BJZHgithub.com/curtcox/terminals/terminal_server/gen/go/control/v1;controlv1b\x06proto3"
 
@@ -2711,139 +2777,141 @@ func file_terminals_control_v1_control_proto_rawDescGZIP() []byte {
 	return file_terminals_control_v1_control_proto_rawDescData
 }
 
-var file_terminals_control_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_terminals_control_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
 var file_terminals_control_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_terminals_control_v1_control_proto_goTypes = []any{
 	(CarrierKind)(0),               // 0: terminals.control.v1.CarrierKind
 	(CommandAction)(0),             // 1: terminals.control.v1.CommandAction
 	(CommandKind)(0),               // 2: terminals.control.v1.CommandKind
 	(ControlErrorCode)(0),          // 3: terminals.control.v1.ControlErrorCode
-	(*TransportHello)(nil),         // 4: terminals.control.v1.TransportHello
-	(*TransportHelloAck)(nil),      // 5: terminals.control.v1.TransportHelloAck
-	(*TransportHeartbeat)(nil),     // 6: terminals.control.v1.TransportHeartbeat
-	(*TransportError)(nil),         // 7: terminals.control.v1.TransportError
-	(*WireEnvelope)(nil),           // 8: terminals.control.v1.WireEnvelope
-	(*ConnectRequest)(nil),         // 9: terminals.control.v1.ConnectRequest
-	(*VoiceAudio)(nil),             // 10: terminals.control.v1.VoiceAudio
-	(*ConnectResponse)(nil),        // 11: terminals.control.v1.ConnectResponse
-	(*Hello)(nil),                  // 12: terminals.control.v1.Hello
-	(*HelloAck)(nil),               // 13: terminals.control.v1.HelloAck
-	(*CapabilitySnapshot)(nil),     // 14: terminals.control.v1.CapabilitySnapshot
-	(*CapabilityDelta)(nil),        // 15: terminals.control.v1.CapabilityDelta
-	(*CapabilityAck)(nil),          // 16: terminals.control.v1.CapabilityAck
-	(*ResourceInvalidation)(nil),   // 17: terminals.control.v1.ResourceInvalidation
-	(*RegisterDevice)(nil),         // 18: terminals.control.v1.RegisterDevice
-	(*BuildMetadata)(nil),          // 19: terminals.control.v1.BuildMetadata
-	(*ServerMetadata)(nil),         // 20: terminals.control.v1.ServerMetadata
-	(*RegisterAck)(nil),            // 21: terminals.control.v1.RegisterAck
-	(*CapabilityUpdate)(nil),       // 22: terminals.control.v1.CapabilityUpdate
-	(*StreamReady)(nil),            // 23: terminals.control.v1.StreamReady
-	(*CommandRequest)(nil),         // 24: terminals.control.v1.CommandRequest
-	(*CommandResult)(nil),          // 25: terminals.control.v1.CommandResult
-	(*ControlError)(nil),           // 26: terminals.control.v1.ControlError
-	(*WebRTCSignal)(nil),           // 27: terminals.control.v1.WebRTCSignal
-	(*Heartbeat)(nil),              // 28: terminals.control.v1.Heartbeat
-	nil,                            // 29: terminals.control.v1.TransportHelloAck.LimitsEntry
-	nil,                            // 30: terminals.control.v1.RegisterAck.MetadataEntry
-	nil,                            // 31: terminals.control.v1.CommandRequest.ArgumentsEntry
-	nil,                            // 32: terminals.control.v1.CommandResult.DataEntry
-	(*v1.InputEvent)(nil),          // 33: terminals.io.v1.InputEvent
-	(*v1.SensorData)(nil),          // 34: terminals.io.v1.SensorData
-	(*v1.ObservationMessage)(nil),  // 35: terminals.io.v1.ObservationMessage
-	(*v1.ArtifactAvailable)(nil),   // 36: terminals.io.v1.ArtifactAvailable
-	(*v1.FlowStats)(nil),           // 37: terminals.io.v1.FlowStats
-	(*v1.ClockSample)(nil),         // 38: terminals.io.v1.ClockSample
-	(*v11.BugReport)(nil),          // 39: terminals.diagnostics.v1.BugReport
-	(*v12.SetUI)(nil),              // 40: terminals.ui.v1.SetUI
-	(*v1.StartStream)(nil),         // 41: terminals.io.v1.StartStream
-	(*v1.StopStream)(nil),          // 42: terminals.io.v1.StopStream
-	(*v1.PlayAudio)(nil),           // 43: terminals.io.v1.PlayAudio
-	(*v1.ShowMedia)(nil),           // 44: terminals.io.v1.ShowMedia
-	(*v1.RouteStream)(nil),         // 45: terminals.io.v1.RouteStream
-	(*v12.Notification)(nil),       // 46: terminals.ui.v1.Notification
-	(*v12.UpdateUI)(nil),           // 47: terminals.ui.v1.UpdateUI
-	(*v12.TransitionUI)(nil),       // 48: terminals.ui.v1.TransitionUI
-	(*v1.InstallBundle)(nil),       // 49: terminals.io.v1.InstallBundle
-	(*v1.RemoveBundle)(nil),        // 50: terminals.io.v1.RemoveBundle
-	(*v1.StartFlow)(nil),           // 51: terminals.io.v1.StartFlow
-	(*v1.PatchFlow)(nil),           // 52: terminals.io.v1.PatchFlow
-	(*v1.StopFlow)(nil),            // 53: terminals.io.v1.StopFlow
-	(*v1.RequestArtifact)(nil),     // 54: terminals.io.v1.RequestArtifact
-	(*v11.BugReportAck)(nil),       // 55: terminals.diagnostics.v1.BugReportAck
-	(*v13.DeviceIdentity)(nil),     // 56: terminals.capabilities.v1.DeviceIdentity
-	(*v13.DeviceCapabilities)(nil), // 57: terminals.capabilities.v1.DeviceCapabilities
+	(WebRTCSignalType)(0),          // 4: terminals.control.v1.WebRTCSignalType
+	(*TransportHello)(nil),         // 5: terminals.control.v1.TransportHello
+	(*TransportHelloAck)(nil),      // 6: terminals.control.v1.TransportHelloAck
+	(*TransportHeartbeat)(nil),     // 7: terminals.control.v1.TransportHeartbeat
+	(*TransportError)(nil),         // 8: terminals.control.v1.TransportError
+	(*WireEnvelope)(nil),           // 9: terminals.control.v1.WireEnvelope
+	(*ConnectRequest)(nil),         // 10: terminals.control.v1.ConnectRequest
+	(*VoiceAudio)(nil),             // 11: terminals.control.v1.VoiceAudio
+	(*ConnectResponse)(nil),        // 12: terminals.control.v1.ConnectResponse
+	(*Hello)(nil),                  // 13: terminals.control.v1.Hello
+	(*HelloAck)(nil),               // 14: terminals.control.v1.HelloAck
+	(*CapabilitySnapshot)(nil),     // 15: terminals.control.v1.CapabilitySnapshot
+	(*CapabilityDelta)(nil),        // 16: terminals.control.v1.CapabilityDelta
+	(*CapabilityAck)(nil),          // 17: terminals.control.v1.CapabilityAck
+	(*ResourceInvalidation)(nil),   // 18: terminals.control.v1.ResourceInvalidation
+	(*RegisterDevice)(nil),         // 19: terminals.control.v1.RegisterDevice
+	(*BuildMetadata)(nil),          // 20: terminals.control.v1.BuildMetadata
+	(*ServerMetadata)(nil),         // 21: terminals.control.v1.ServerMetadata
+	(*RegisterAck)(nil),            // 22: terminals.control.v1.RegisterAck
+	(*CapabilityUpdate)(nil),       // 23: terminals.control.v1.CapabilityUpdate
+	(*StreamReady)(nil),            // 24: terminals.control.v1.StreamReady
+	(*CommandRequest)(nil),         // 25: terminals.control.v1.CommandRequest
+	(*CommandResult)(nil),          // 26: terminals.control.v1.CommandResult
+	(*ControlError)(nil),           // 27: terminals.control.v1.ControlError
+	(*WebRTCSignal)(nil),           // 28: terminals.control.v1.WebRTCSignal
+	(*Heartbeat)(nil),              // 29: terminals.control.v1.Heartbeat
+	nil,                            // 30: terminals.control.v1.TransportHelloAck.LimitsEntry
+	nil,                            // 31: terminals.control.v1.RegisterAck.MetadataEntry
+	nil,                            // 32: terminals.control.v1.CommandRequest.ArgumentsEntry
+	nil,                            // 33: terminals.control.v1.CommandResult.DataEntry
+	(*v1.InputEvent)(nil),          // 34: terminals.io.v1.InputEvent
+	(*v1.SensorData)(nil),          // 35: terminals.io.v1.SensorData
+	(*v1.ObservationMessage)(nil),  // 36: terminals.io.v1.ObservationMessage
+	(*v1.ArtifactAvailable)(nil),   // 37: terminals.io.v1.ArtifactAvailable
+	(*v1.FlowStats)(nil),           // 38: terminals.io.v1.FlowStats
+	(*v1.ClockSample)(nil),         // 39: terminals.io.v1.ClockSample
+	(*v11.BugReport)(nil),          // 40: terminals.diagnostics.v1.BugReport
+	(*v12.SetUI)(nil),              // 41: terminals.ui.v1.SetUI
+	(*v1.StartStream)(nil),         // 42: terminals.io.v1.StartStream
+	(*v1.StopStream)(nil),          // 43: terminals.io.v1.StopStream
+	(*v1.PlayAudio)(nil),           // 44: terminals.io.v1.PlayAudio
+	(*v1.ShowMedia)(nil),           // 45: terminals.io.v1.ShowMedia
+	(*v1.RouteStream)(nil),         // 46: terminals.io.v1.RouteStream
+	(*v12.Notification)(nil),       // 47: terminals.ui.v1.Notification
+	(*v12.UpdateUI)(nil),           // 48: terminals.ui.v1.UpdateUI
+	(*v12.TransitionUI)(nil),       // 49: terminals.ui.v1.TransitionUI
+	(*v1.InstallBundle)(nil),       // 50: terminals.io.v1.InstallBundle
+	(*v1.RemoveBundle)(nil),        // 51: terminals.io.v1.RemoveBundle
+	(*v1.StartFlow)(nil),           // 52: terminals.io.v1.StartFlow
+	(*v1.PatchFlow)(nil),           // 53: terminals.io.v1.PatchFlow
+	(*v1.StopFlow)(nil),            // 54: terminals.io.v1.StopFlow
+	(*v1.RequestArtifact)(nil),     // 55: terminals.io.v1.RequestArtifact
+	(*v11.BugReportAck)(nil),       // 56: terminals.diagnostics.v1.BugReportAck
+	(*v13.DeviceIdentity)(nil),     // 57: terminals.capabilities.v1.DeviceIdentity
+	(*v13.DeviceCapabilities)(nil), // 58: terminals.capabilities.v1.DeviceCapabilities
 }
 var file_terminals_control_v1_control_proto_depIdxs = []int32{
 	0,  // 0: terminals.control.v1.TransportHello.supported_carriers:type_name -> terminals.control.v1.CarrierKind
 	0,  // 1: terminals.control.v1.TransportHelloAck.negotiated_carrier:type_name -> terminals.control.v1.CarrierKind
-	29, // 2: terminals.control.v1.TransportHelloAck.limits:type_name -> terminals.control.v1.TransportHelloAck.LimitsEntry
-	9,  // 3: terminals.control.v1.WireEnvelope.client_message:type_name -> terminals.control.v1.ConnectRequest
-	11, // 4: terminals.control.v1.WireEnvelope.server_message:type_name -> terminals.control.v1.ConnectResponse
-	4,  // 5: terminals.control.v1.WireEnvelope.transport_hello:type_name -> terminals.control.v1.TransportHello
-	5,  // 6: terminals.control.v1.WireEnvelope.transport_hello_ack:type_name -> terminals.control.v1.TransportHelloAck
-	6,  // 7: terminals.control.v1.WireEnvelope.transport_heartbeat:type_name -> terminals.control.v1.TransportHeartbeat
-	7,  // 8: terminals.control.v1.WireEnvelope.transport_error:type_name -> terminals.control.v1.TransportError
-	12, // 9: terminals.control.v1.ConnectRequest.hello:type_name -> terminals.control.v1.Hello
-	14, // 10: terminals.control.v1.ConnectRequest.capability_snapshot:type_name -> terminals.control.v1.CapabilitySnapshot
-	15, // 11: terminals.control.v1.ConnectRequest.capability_delta:type_name -> terminals.control.v1.CapabilityDelta
-	18, // 12: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
-	22, // 13: terminals.control.v1.ConnectRequest.capability:type_name -> terminals.control.v1.CapabilityUpdate
-	33, // 14: terminals.control.v1.ConnectRequest.input:type_name -> terminals.io.v1.InputEvent
-	34, // 15: terminals.control.v1.ConnectRequest.sensor:type_name -> terminals.io.v1.SensorData
-	23, // 16: terminals.control.v1.ConnectRequest.stream_ready:type_name -> terminals.control.v1.StreamReady
-	24, // 17: terminals.control.v1.ConnectRequest.command:type_name -> terminals.control.v1.CommandRequest
-	28, // 18: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	27, // 19: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
-	10, // 20: terminals.control.v1.ConnectRequest.voice_audio:type_name -> terminals.control.v1.VoiceAudio
-	35, // 21: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
-	36, // 22: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
-	37, // 23: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
-	38, // 24: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
-	39, // 25: terminals.control.v1.ConnectRequest.bug_report:type_name -> terminals.diagnostics.v1.BugReport
-	13, // 26: terminals.control.v1.ConnectResponse.hello_ack:type_name -> terminals.control.v1.HelloAck
-	16, // 27: terminals.control.v1.ConnectResponse.capability_ack:type_name -> terminals.control.v1.CapabilityAck
-	21, // 28: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
-	40, // 29: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
-	41, // 30: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
-	42, // 31: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
-	43, // 32: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
-	44, // 33: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
-	45, // 34: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
-	46, // 35: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
-	27, // 36: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
-	25, // 37: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
-	28, // 38: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	26, // 39: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
-	47, // 40: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
-	48, // 41: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
-	49, // 42: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
-	50, // 43: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
-	51, // 44: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
-	52, // 45: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
-	53, // 46: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
-	54, // 47: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
-	55, // 48: terminals.control.v1.ConnectResponse.bug_report_ack:type_name -> terminals.diagnostics.v1.BugReportAck
-	56, // 49: terminals.control.v1.Hello.identity:type_name -> terminals.capabilities.v1.DeviceIdentity
-	57, // 50: terminals.control.v1.CapabilitySnapshot.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	57, // 51: terminals.control.v1.CapabilityDelta.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	17, // 52: terminals.control.v1.CapabilityAck.invalidations:type_name -> terminals.control.v1.ResourceInvalidation
-	57, // 53: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	19, // 54: terminals.control.v1.ServerMetadata.build:type_name -> terminals.control.v1.BuildMetadata
-	30, // 55: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
-	20, // 56: terminals.control.v1.RegisterAck.server_metadata:type_name -> terminals.control.v1.ServerMetadata
-	57, // 57: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	30, // 2: terminals.control.v1.TransportHelloAck.limits:type_name -> terminals.control.v1.TransportHelloAck.LimitsEntry
+	10, // 3: terminals.control.v1.WireEnvelope.client_message:type_name -> terminals.control.v1.ConnectRequest
+	12, // 4: terminals.control.v1.WireEnvelope.server_message:type_name -> terminals.control.v1.ConnectResponse
+	5,  // 5: terminals.control.v1.WireEnvelope.transport_hello:type_name -> terminals.control.v1.TransportHello
+	6,  // 6: terminals.control.v1.WireEnvelope.transport_hello_ack:type_name -> terminals.control.v1.TransportHelloAck
+	7,  // 7: terminals.control.v1.WireEnvelope.transport_heartbeat:type_name -> terminals.control.v1.TransportHeartbeat
+	8,  // 8: terminals.control.v1.WireEnvelope.transport_error:type_name -> terminals.control.v1.TransportError
+	13, // 9: terminals.control.v1.ConnectRequest.hello:type_name -> terminals.control.v1.Hello
+	15, // 10: terminals.control.v1.ConnectRequest.capability_snapshot:type_name -> terminals.control.v1.CapabilitySnapshot
+	16, // 11: terminals.control.v1.ConnectRequest.capability_delta:type_name -> terminals.control.v1.CapabilityDelta
+	19, // 12: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
+	23, // 13: terminals.control.v1.ConnectRequest.capability:type_name -> terminals.control.v1.CapabilityUpdate
+	34, // 14: terminals.control.v1.ConnectRequest.input:type_name -> terminals.io.v1.InputEvent
+	35, // 15: terminals.control.v1.ConnectRequest.sensor:type_name -> terminals.io.v1.SensorData
+	24, // 16: terminals.control.v1.ConnectRequest.stream_ready:type_name -> terminals.control.v1.StreamReady
+	25, // 17: terminals.control.v1.ConnectRequest.command:type_name -> terminals.control.v1.CommandRequest
+	29, // 18: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	28, // 19: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	11, // 20: terminals.control.v1.ConnectRequest.voice_audio:type_name -> terminals.control.v1.VoiceAudio
+	36, // 21: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
+	37, // 22: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
+	38, // 23: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
+	39, // 24: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
+	40, // 25: terminals.control.v1.ConnectRequest.bug_report:type_name -> terminals.diagnostics.v1.BugReport
+	14, // 26: terminals.control.v1.ConnectResponse.hello_ack:type_name -> terminals.control.v1.HelloAck
+	17, // 27: terminals.control.v1.ConnectResponse.capability_ack:type_name -> terminals.control.v1.CapabilityAck
+	22, // 28: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
+	41, // 29: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
+	42, // 30: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
+	43, // 31: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
+	44, // 32: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
+	45, // 33: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
+	46, // 34: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
+	47, // 35: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
+	28, // 36: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	26, // 37: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
+	29, // 38: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	27, // 39: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
+	48, // 40: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
+	49, // 41: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
+	50, // 42: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
+	51, // 43: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
+	52, // 44: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
+	53, // 45: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
+	54, // 46: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
+	55, // 47: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
+	56, // 48: terminals.control.v1.ConnectResponse.bug_report_ack:type_name -> terminals.diagnostics.v1.BugReportAck
+	57, // 49: terminals.control.v1.Hello.identity:type_name -> terminals.capabilities.v1.DeviceIdentity
+	58, // 50: terminals.control.v1.CapabilitySnapshot.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	58, // 51: terminals.control.v1.CapabilityDelta.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	18, // 52: terminals.control.v1.CapabilityAck.invalidations:type_name -> terminals.control.v1.ResourceInvalidation
+	58, // 53: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	20, // 54: terminals.control.v1.ServerMetadata.build:type_name -> terminals.control.v1.BuildMetadata
+	31, // 55: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
+	21, // 56: terminals.control.v1.RegisterAck.server_metadata:type_name -> terminals.control.v1.ServerMetadata
+	58, // 57: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
 	1,  // 58: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
 	2,  // 59: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
-	31, // 60: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
-	32, // 61: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
+	32, // 60: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
+	33, // 61: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
 	3,  // 62: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
-	9,  // 63: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
-	11, // 64: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
-	64, // [64:65] is the sub-list for method output_type
-	63, // [63:64] is the sub-list for method input_type
-	63, // [63:63] is the sub-list for extension type_name
-	63, // [63:63] is the sub-list for extension extendee
-	0,  // [0:63] is the sub-list for field type_name
+	4,  // 63: terminals.control.v1.WebRTCSignal.signal_type_enum:type_name -> terminals.control.v1.WebRTCSignalType
+	10, // 64: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
+	12, // 65: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
+	65, // [65:66] is the sub-list for method output_type
+	64, // [64:65] is the sub-list for method input_type
+	64, // [64:64] is the sub-list for extension type_name
+	64, // [64:64] is the sub-list for extension extendee
+	0,  // [0:64] is the sub-list for field type_name
 }
 
 func init() { file_terminals_control_v1_control_proto_init() }
@@ -2908,7 +2976,7 @@ func file_terminals_control_v1_control_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_control_v1_control_proto_rawDesc), len(file_terminals_control_v1_control_proto_rawDesc)),
-			NumEnums:      4,
+			NumEnums:      5,
 			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   1,

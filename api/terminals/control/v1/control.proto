@@ -236,10 +236,18 @@ message ControlError {
   string message = 2;
 }
 
+enum WebRTCSignalType {
+  WEB_RTC_SIGNAL_TYPE_UNSPECIFIED = 0;
+  WEB_RTC_SIGNAL_TYPE_OFFER = 1;
+  WEB_RTC_SIGNAL_TYPE_ANSWER = 2;
+  WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE = 3;
+}
+
 message WebRTCSignal {
   string stream_id = 1;
   string signal_type = 2;
   string payload = 3;
+  WebRTCSignalType signal_type_enum = 4;
 }
 
 message Heartbeat {

@@ -682,6 +682,25 @@ func TestGeneratedProtoAdapterToInternalSensorAndStreamReady(t *testing.T) {
 	if webrtcMsg.WebRTCSignal.Payload != "{\"sdp\":\"v=0...\"}" {
 		t.Fatalf("webrtc_signal payload = %q, want {\"sdp\":\"v=0...\"}", webrtcMsg.WebRTCSignal.Payload)
 	}
+
+	webrtcEnumMsg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_WebrtcSignal{
+			WebrtcSignal: &controlv1.WebRTCSignal{
+				StreamId:       "stream-8",
+				SignalTypeEnum: controlv1.WebRTCSignalType_WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE,
+				Payload:        "{\"candidate\":\"abc\"}",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal(webrtc_signal enum) error = %v", err)
+	}
+	if webrtcEnumMsg.WebRTCSignal == nil {
+		t.Fatalf("expected webrtc_signal enum message")
+	}
+	if webrtcEnumMsg.WebRTCSignal.SignalType != "candidate" {
+		t.Fatalf("webrtc_signal enum signal_type = %q, want candidate", webrtcEnumMsg.WebRTCSignal.SignalType)
+	}
 }
 
 func TestGeneratedProtoAdapterToInternalObservationArtifactAndFlowStats(t *testing.T) {
@@ -1037,6 +1056,9 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	if got := resp.GetStartStream().GetKind(); got != "audio" {
 		t.Fatalf("start_stream kind = %q, want audio", got)
 	}
+	if got := resp.GetStartStream().GetStreamKind(); got != iov1.StreamKind_STREAM_KIND_AUDIO {
+		t.Fatalf("start_stream stream_kind = %v, want STREAM_KIND_AUDIO", got)
+	}
 	if got := resp.GetStartStream().GetMetadata()["codec"]; got != "opus" {
 		t.Fatalf("start_stream metadata codec = %q, want opus", got)
 	}
@@ -1090,6 +1112,9 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	if got := resp.GetRouteStream().GetKind(); got != "audio" {
 		t.Fatalf("route_stream kind = %q, want audio", got)
 	}
+	if got := resp.GetRouteStream().GetStreamKind(); got != iov1.StreamKind_STREAM_KIND_AUDIO {
+		t.Fatalf("route_stream stream_kind = %v, want STREAM_KIND_AUDIO", got)
+	}
 
 	envelope, err = adapter.FromInternal(ServerMessage{
 		WebRTCSignal: &WebRTCSignalResponse{
@@ -1113,6 +1138,9 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	}
 	if got := resp.GetWebrtcSignal().GetSignalType(); got != "answer" {
 		t.Fatalf("webrtc_signal signal_type = %q, want answer", got)
+	}
+	if got := resp.GetWebrtcSignal().GetSignalTypeEnum(); got != controlv1.WebRTCSignalType_WEBRTC_SIGNAL_TYPE_ANSWER {
+		t.Fatalf("webrtc_signal signal_type_enum = %v, want WEBRTC_SIGNAL_TYPE_ANSWER", got)
 	}
 	if got := resp.GetWebrtcSignal().GetPayload(); got != "{\"sdp\":\"v=0-answer\"}" {
 		t.Fatalf("webrtc_signal payload = %q, want {\"sdp\":\"v=0-answer\"}", got)

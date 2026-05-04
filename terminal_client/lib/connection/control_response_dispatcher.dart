@@ -188,9 +188,10 @@ SynchronousMediaControlUpdate synchronousMediaControlUpdateFromResponse(
   var startStreamNotification = '';
   if (response.hasStartStream()) {
     final start = response.startStream;
+    final startKind = streamKindLabel(start.kind, start.streamKind);
     startStreamID = start.streamId;
-    if (start.kind.isNotEmpty) {
-      startStreamNotification = 'Start stream: ${start.kind} '
+    if (startKind.isNotEmpty) {
+      startStreamNotification = 'Start stream: $startKind '
           '(${start.streamId})';
     }
   }
@@ -208,16 +209,21 @@ SynchronousMediaControlUpdate synchronousMediaControlUpdateFromResponse(
   var routeNotification = '';
   if (response.hasRouteStream()) {
     final route = response.routeStream;
+    final routeKind = streamKindLabel(route.kind, route.streamKind);
     routeStreamID = route.streamId;
     routeNotification = 'Route: ${route.sourceDeviceId} -> '
-        '${route.targetDeviceId} (${route.kind})';
+        '${route.targetDeviceId} ($routeKind)';
   }
 
   var webrtcSignalNotification = '';
   if (response.hasWebrtcSignal()) {
     final signal = response.webrtcSignal;
+    final signalType = webRtcSignalTypeLabel(
+      signal.signalType,
+      signal.signalTypeEnum,
+    );
     webrtcSignalNotification =
-        'WebRTC signal: ${signal.signalType} (${signal.streamId})';
+        'WebRTC signal: $signalType (${signal.streamId})';
   }
 
   return SynchronousMediaControlUpdate(
@@ -229,6 +235,25 @@ SynchronousMediaControlUpdate synchronousMediaControlUpdateFromResponse(
     routeNotification: routeNotification,
     webrtcSignalNotification: webrtcSignalNotification,
   );
+}
+
+String streamKindLabel(String legacy, iov1.StreamKind typed) {
+  return switch (typed) {
+    iov1.StreamKind.STREAM_KIND_AUDIO => 'audio',
+    iov1.StreamKind.STREAM_KIND_VIDEO => 'video',
+    iov1.StreamKind.STREAM_KIND_SENSOR => 'sensor',
+    iov1.StreamKind.STREAM_KIND_DATA => 'data',
+    iov1.StreamKind.STREAM_KIND_UNSPECIFIED => legacy,
+  };
+}
+
+String webRtcSignalTypeLabel(String legacy, WebRTCSignalType typed) {
+  return switch (typed) {
+    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_OFFER => 'offer',
+    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER => 'answer',
+    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE => 'candidate',
+    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_UNSPECIFIED => legacy,
+  };
 }
 
 ServerDrivenUiResponseUpdate? serverDrivenUiUpdateFromResponse({

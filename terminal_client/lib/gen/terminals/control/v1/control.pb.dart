@@ -2765,11 +2765,13 @@ class WebRTCSignal extends $pb.GeneratedMessage {
     $core.String? streamId,
     $core.String? signalType,
     $core.String? payload,
+    WebRTCSignalType? signalTypeEnum,
   }) {
     final result = create();
     if (streamId != null) result.streamId = streamId;
     if (signalType != null) result.signalType = signalType;
     if (payload != null) result.payload = payload;
+    if (signalTypeEnum != null) result.signalTypeEnum = signalTypeEnum;
     return result;
   }
 
@@ -2790,6 +2792,8 @@ class WebRTCSignal extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'streamId')
     ..aOS(2, _omitFieldNames ? '' : 'signalType')
     ..aOS(3, _omitFieldNames ? '' : 'payload')
+    ..aE<WebRTCSignalType>(4, _omitFieldNames ? '' : 'signalTypeEnum',
+        enumValues: WebRTCSignalType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2837,6 +2841,15 @@ class WebRTCSignal extends $pb.GeneratedMessage {
   $core.bool hasPayload() => $_has(2);
   @$pb.TagNumber(3)
   void clearPayload() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  WebRTCSignalType get signalTypeEnum => $_getN(3);
+  @$pb.TagNumber(4)
+  set signalTypeEnum(WebRTCSignalType value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSignalTypeEnum() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSignalTypeEnum() => $_clearField(4);
 }
 
 class Heartbeat extends $pb.GeneratedMessage {

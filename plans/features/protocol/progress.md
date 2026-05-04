@@ -37,3 +37,11 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Updated Flutter register-ack parsing to prefer typed `server_metadata.build` values and fall back to legacy `metadata` keys.
 - Extended Go/Dart protocol contract assertions and `register_ack_metadata_v1` fixture content to validate both typed and legacy metadata behavior.
 - Ran `make proto-generate`, refreshed binary envelope fixtures via `go test ./internal/protocolcontract -run TestGoldenWireEnvelopeFixtures -update`, and re-ran Go transport/protocol-contract tests.
+
+## Protocol Evolution Rules (2026-05-03, StreamKind/WebRTCSignalType Enum Migration)
+
+- Added additive typed enums `StreamKind` and `WebRTCSignalType` in `api/terminals/io/v1/io.proto` and `api/terminals/control/v1/control.proto` with new `stream_kind` and `signal_type_enum` fields while preserving legacy string fields.
+- Updated generated transport adapter mappings to emit typed+legacy values and to resolve inbound WebRTC signal type from enum first with legacy-string fallback.
+- Updated Flutter control/media handling to prefer typed stream/signal enums for notifications and runtime media behavior, while retaining legacy fallback.
+- Extended Go adapter tests and Go/Dart protocol contract assertions to validate typed enum emission and compatibility fallback behavior.
+- Updated `start_stream_audio_v1` text/bin fixtures to include typed `stream_kind`, and refreshed protocol registry migration notes for typed-first semantics.

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 )
@@ -152,6 +153,9 @@ func assertStartStreamAudio(t *testing.T, envelope *controlv1.WireEnvelope) {
 	stream := envelope.GetServerMessage().GetStartStream()
 	if stream.GetKind() != "audio" {
 		t.Fatalf("stream kind = %q", stream.GetKind())
+	}
+	if stream.GetStreamKind() != iov1.StreamKind_STREAM_KIND_AUDIO {
+		t.Fatalf("stream stream_kind = %v", stream.GetStreamKind())
 	}
 	if stream.GetMetadata()["sample_rate"] != "16000" {
 		t.Fatalf("sample_rate metadata = %q", stream.GetMetadata()["sample_rate"])

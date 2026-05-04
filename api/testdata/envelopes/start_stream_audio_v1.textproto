@@ -5,6 +5,7 @@ server_message: {
   start_stream: {
     stream_id: "stream-audio-1"
     kind: "audio"
+    stream_kind: STREAM_KIND_AUDIO
     source_device_id: "terminal-kitchen"
     target_device_id: "server-main"
     metadata: {

@@ -1,5 +1,5 @@
-session-goldenZq*o
-stream-audio-1audioterminal-kitchen"server-main*
-codec	pcm_s16le*
+session-goldenZs*q
+stream-audio-1audioterminal-kitchen"server-main*
 sample_rate16000*
-channels1
+channels1*
+codec	pcm_s16le0

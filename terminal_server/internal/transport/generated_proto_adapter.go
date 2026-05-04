@@ -149,7 +149,7 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 		return ClientMessage{
 			WebRTCSignal: &WebRTCSignalRequest{
 				StreamID:   signal.GetStreamId(),
-				SignalType: signal.GetSignalType(),
+				SignalType: internalWebRTCSignalTypeFromProto(signal.GetSignalType(), signal.GetSignalTypeEnum()),
 				Payload:    signal.GetPayload(),
 			},
 		}, nil
@@ -273,6 +273,7 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					SourceDeviceId: msg.StartStream.SourceDeviceID,
 					TargetDeviceId: msg.StartStream.TargetDeviceID,
 					Metadata:       msg.StartStream.Metadata,
+					StreamKind:     protoStreamKindFromInternal(msg.StartStream.Kind),
 				},
 			},
 		}
@@ -292,6 +293,7 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					SourceDeviceId: msg.RouteStream.SourceDeviceID,
 					TargetDeviceId: msg.RouteStream.TargetDeviceID,
 					Kind:           msg.RouteStream.Kind,
+					StreamKind:     protoStreamKindFromInternal(msg.RouteStream.Kind),
 				},
 			},
 		}
@@ -299,9 +301,10 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 		return &controlv1.ConnectResponse{
 			Payload: &controlv1.ConnectResponse_WebrtcSignal{
 				WebrtcSignal: &controlv1.WebRTCSignal{
-					StreamId:   msg.WebRTCSignal.StreamID,
-					SignalType: msg.WebRTCSignal.SignalType,
-					Payload:    msg.WebRTCSignal.Payload,
+					StreamId:       msg.WebRTCSignal.StreamID,
+					SignalType:     msg.WebRTCSignal.SignalType,
+					Payload:        msg.WebRTCSignal.Payload,
+					SignalTypeEnum: protoWebRTCSignalTypeFromInternal(msg.WebRTCSignal.SignalType),
 				},
 			},
 		}
@@ -446,6 +449,47 @@ func internalKindFromProto(kind controlv1.CommandKind) string {
 		return CommandKindSystem
 	default:
 		return ""
+	}
+}
+
+func internalWebRTCSignalTypeFromProto(legacy string, signalType controlv1.WebRTCSignalType) string {
+	switch signalType {
+	case controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_OFFER:
+		return "offer"
+	case controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_ANSWER:
+		return "answer"
+	case controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE:
+		return "candidate"
+	default:
+		return legacy
+	}
+}
+
+func protoWebRTCSignalTypeFromInternal(signalType string) controlv1.WebRTCSignalType {
+	switch strings.ToLower(strings.TrimSpace(signalType)) {
+	case "offer":
+		return controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_OFFER
+	case "answer":
+		return controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_ANSWER
+	case "candidate", "ice_candidate":
+		return controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE
+	default:
+		return controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_UNSPECIFIED
+	}
+}
+
+func protoStreamKindFromInternal(kind string) iov1.StreamKind {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "audio":
+		return iov1.StreamKind_STREAM_KIND_AUDIO
+	case "video":
+		return iov1.StreamKind_STREAM_KIND_VIDEO
+	case "sensor":
+		return iov1.StreamKind_STREAM_KIND_SENSOR
+	case "data":
+		return iov1.StreamKind_STREAM_KIND_DATA
+	default:
+		return iov1.StreamKind_STREAM_KIND_UNSPECIFIED
 	}
 }
 

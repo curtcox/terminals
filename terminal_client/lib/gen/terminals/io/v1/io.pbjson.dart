@@ -15,6 +15,24 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+@$core.Deprecated('Use streamKindDescriptor instead')
+const StreamKind$json = {
+  '1': 'StreamKind',
+  '2': [
+    {'1': 'STREAM_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'STREAM_KIND_AUDIO', '2': 1},
+    {'1': 'STREAM_KIND_VIDEO', '2': 2},
+    {'1': 'STREAM_KIND_SENSOR', '2': 3},
+    {'1': 'STREAM_KIND_DATA', '2': 4},
+  ],
+};
+
+/// Descriptor for `StreamKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List streamKindDescriptor = $convert.base64Decode(
+    'CgpTdHJlYW1LaW5kEhsKF1NUUkVBTV9LSU5EX1VOU1BFQ0lGSUVEEAASFQoRU1RSRUFNX0tJTk'
+    'RfQVVESU8QARIVChFTVFJFQU1fS0lORF9WSURFTxACEhYKElNUUkVBTV9LSU5EX1NFTlNPUhAD'
+    'EhQKEFNUUkVBTV9LSU5EX0RBVEEQBA==');
+
 @$core.Deprecated('Use startStreamDescriptor instead')
 const StartStream$json = {
   '1': 'StartStream',
@@ -30,6 +48,14 @@ const StartStream$json = {
       '5': 11,
       '6': '.terminals.io.v1.StartStream.MetadataEntry',
       '10': 'metadata'
+    },
+    {
+      '1': 'stream_kind',
+      '3': 6,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.StreamKind',
+      '10': 'streamKind'
     },
   ],
   '3': [StartStream_MetadataEntry$json],
@@ -50,9 +76,10 @@ final $typed_data.Uint8List startStreamDescriptor = $convert.base64Decode(
     'CgtTdGFydFN0cmVhbRIbCglzdHJlYW1faWQYASABKAlSCHN0cmVhbUlkEhIKBGtpbmQYAiABKA'
     'lSBGtpbmQSKAoQc291cmNlX2RldmljZV9pZBgDIAEoCVIOc291cmNlRGV2aWNlSWQSKAoQdGFy'
     'Z2V0X2RldmljZV9pZBgEIAEoCVIOdGFyZ2V0RGV2aWNlSWQSRgoIbWV0YWRhdGEYBSADKAsyKi'
-    '50ZXJtaW5hbHMuaW8udjEuU3RhcnRTdHJlYW0uTWV0YWRhdGFFbnRyeVIIbWV0YWRhdGEaOwoN'
-    'TWV0YWRhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6Aj'
-    'gB');
+    '50ZXJtaW5hbHMuaW8udjEuU3RhcnRTdHJlYW0uTWV0YWRhdGFFbnRyeVIIbWV0YWRhdGESPAoL'
+    'c3RyZWFtX2tpbmQYBiABKA4yGy50ZXJtaW5hbHMuaW8udjEuU3RyZWFtS2luZFIKc3RyZWFtS2'
+    'luZBo7Cg1NZXRhZGF0YUVudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2'
+    'YWx1ZToCOAE=');
 
 @$core.Deprecated('Use stopStreamDescriptor instead')
 const StopStream$json = {
@@ -74,6 +101,14 @@ const RouteStream$json = {
     {'1': 'source_device_id', '3': 2, '4': 1, '5': 9, '10': 'sourceDeviceId'},
     {'1': 'target_device_id', '3': 3, '4': 1, '5': 9, '10': 'targetDeviceId'},
     {'1': 'kind', '3': 4, '4': 1, '5': 9, '10': 'kind'},
+    {
+      '1': 'stream_kind',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.StreamKind',
+      '10': 'streamKind'
+    },
   ],
 };
 
@@ -81,7 +116,8 @@ const RouteStream$json = {
 final $typed_data.Uint8List routeStreamDescriptor = $convert.base64Decode(
     'CgtSb3V0ZVN0cmVhbRIbCglzdHJlYW1faWQYASABKAlSCHN0cmVhbUlkEigKEHNvdXJjZV9kZX'
     'ZpY2VfaWQYAiABKAlSDnNvdXJjZURldmljZUlkEigKEHRhcmdldF9kZXZpY2VfaWQYAyABKAlS'
-    'DnRhcmdldERldmljZUlkEhIKBGtpbmQYBCABKAlSBGtpbmQ=');
+    'DnRhcmdldERldmljZUlkEhIKBGtpbmQYBCABKAlSBGtpbmQSPAoLc3RyZWFtX2tpbmQYBSABKA'
+    '4yGy50ZXJtaW5hbHMuaW8udjEuU3RyZWFtS2luZFIKc3RyZWFtS2luZA==');
 
 @$core.Deprecated('Use playAudioDescriptor instead')
 const PlayAudio$json = {

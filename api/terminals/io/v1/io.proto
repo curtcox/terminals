@@ -4,12 +4,21 @@ package terminals.io.v1;
 
 option go_package = "github.com/curtcox/terminals/terminal_server/gen/go/io/v1;iov1";
 
+enum StreamKind {
+  STREAM_KIND_UNSPECIFIED = 0;
+  STREAM_KIND_AUDIO = 1;
+  STREAM_KIND_VIDEO = 2;
+  STREAM_KIND_SENSOR = 3;
+  STREAM_KIND_DATA = 4;
+}
+
 message StartStream {
   string stream_id = 1;
   string kind = 2;
   string source_device_id = 3;
   string target_device_id = 4;
   map<string, string> metadata = 5;
+  StreamKind stream_kind = 6;
 }
 
 message StopStream {
@@ -21,6 +30,7 @@ message RouteStream {
   string source_device_id = 2;
   string target_device_id = 3;
   string kind = 4;
+  StreamKind stream_kind = 5;
 }
 
 message PlayAudio {

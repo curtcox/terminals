@@ -136,5 +136,32 @@ class ControlErrorCode extends $pb.ProtobufEnum {
   const ControlErrorCode._(super.value, super.name);
 }
 
+class WebRTCSignalType extends $pb.ProtobufEnum {
+  static const WebRTCSignalType WEBRTC_SIGNAL_TYPE_UNSPECIFIED =
+      WebRTCSignalType._(
+          0, _omitEnumNames ? '' : 'WEBRTC_SIGNAL_TYPE_UNSPECIFIED');
+  static const WebRTCSignalType WEBRTC_SIGNAL_TYPE_OFFER =
+      WebRTCSignalType._(1, _omitEnumNames ? '' : 'WEBRTC_SIGNAL_TYPE_OFFER');
+  static const WebRTCSignalType WEBRTC_SIGNAL_TYPE_ANSWER =
+      WebRTCSignalType._(2, _omitEnumNames ? '' : 'WEBRTC_SIGNAL_TYPE_ANSWER');
+  static const WebRTCSignalType WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE =
+      WebRTCSignalType._(
+          3, _omitEnumNames ? '' : 'WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE');
+
+  static const $core.List<WebRTCSignalType> values = <WebRTCSignalType>[
+    WEBRTC_SIGNAL_TYPE_UNSPECIFIED,
+    WEBRTC_SIGNAL_TYPE_OFFER,
+    WEBRTC_SIGNAL_TYPE_ANSWER,
+    WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE,
+  ];
+
+  static final $core.List<WebRTCSignalType?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static WebRTCSignalType? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const WebRTCSignalType._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

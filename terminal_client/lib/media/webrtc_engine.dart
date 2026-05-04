@@ -19,6 +19,39 @@ abstract class ClientMediaEngine {
   Future<void> dispose();
 }
 
+String _streamKindLabel(String legacy, iov1.StreamKind typed) {
+  return switch (typed) {
+    iov1.StreamKind.STREAM_KIND_AUDIO => 'audio',
+    iov1.StreamKind.STREAM_KIND_VIDEO => 'video',
+    iov1.StreamKind.STREAM_KIND_SENSOR => 'sensor',
+    iov1.StreamKind.STREAM_KIND_DATA => 'data',
+    iov1.StreamKind.STREAM_KIND_UNSPECIFIED => legacy,
+  };
+}
+
+String _signalTypeLabel(String legacy, WebRTCSignalType typed) {
+  return switch (typed) {
+    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_OFFER => 'offer',
+    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER => 'answer',
+    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE => 'candidate',
+    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_UNSPECIFIED => legacy,
+  };
+}
+
+WebRTCSignalType _typedWebRTCSignalType(String signalType) {
+  switch (signalType.trim().toLowerCase()) {
+    case 'offer':
+      return WebRTCSignalType.WEBRTC_SIGNAL_TYPE_OFFER;
+    case 'answer':
+      return WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER;
+    case 'candidate':
+    case 'ice_candidate':
+      return WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE;
+    default:
+      return WebRTCSignalType.WEBRTC_SIGNAL_TYPE_UNSPECIFIED;
+  }
+}
+
 ClientMediaEngine defaultClientMediaEngineFactory({
   required String localDeviceID,
   required OutboundSignalCallback onSignal,
@@ -56,8 +89,9 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
     }
 
     final sendLocalMedia = start.sourceDeviceId.trim() == localDeviceID;
-    final wantsAudio = _kindHas(start.kind, 'audio');
-    final wantsVideo = _kindHas(start.kind, 'video');
+    final resolvedKind = _streamKindLabel(start.kind, start.streamKind);
+    final wantsAudio = _kindHas(resolvedKind, 'audio');
+    final wantsVideo = _kindHas(resolvedKind, 'video');
     final peerConnection = await createPeerConnection(<String, dynamic>{
       'iceServers': <Map<String, dynamic>>[
         <String, dynamic>{'urls': 'stun:stun.l.google.com:19302'},
@@ -139,7 +173,10 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
       return;
     }
 
-    final signalType = signal.signalType.trim().toLowerCase();
+    final signalType = _signalTypeLabel(
+      signal.signalType,
+      signal.signalTypeEnum,
+    ).trim().toLowerCase();
     switch (signalType) {
       case 'offer':
         final remoteOffer = _decodeSessionDescription(
@@ -217,10 +254,12 @@ class FlutterWebRTCMediaEngine implements ClientMediaEngine {
   }
 
   void _emitSignal(String streamID, String signalType, String payload) {
+    final typedSignal = _typedWebRTCSignalType(signalType);
     onSignal(
       WebRTCSignal()
         ..streamId = streamID
         ..signalType = signalType
+        ..signalTypeEnum = typedSignal
         ..payload = payload,
     );
   }

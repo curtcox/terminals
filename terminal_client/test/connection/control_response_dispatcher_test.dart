@@ -381,6 +381,7 @@ void main() {
           ..startStream = (iov1.StartStream()
             ..streamId = 'stream-1'
             ..kind = 'audio'
+            ..streamKind = iov1.StreamKind.STREAM_KIND_AUDIO
             ..sourceDeviceId = 'server'
             ..targetDeviceId = 'client'),
       );
@@ -399,7 +400,8 @@ void main() {
             ..streamId = 'video-1'
             ..sourceDeviceId = 'source'
             ..targetDeviceId = 'target'
-            ..kind = 'video'),
+            ..kind = 'video'
+            ..streamKind = iov1.StreamKind.STREAM_KIND_VIDEO),
       );
 
       expect(routeUpdate.routeStreamID, 'video-1');
@@ -410,12 +412,42 @@ void main() {
         ConnectResponse()
           ..webrtcSignal = (WebRTCSignal()
             ..streamId = 'video-1'
-            ..signalType = 'answer'),
+            ..signalType = 'answer'
+            ..signalTypeEnum =
+                WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER),
       );
 
       expect(signalUpdate.webrtcSignalNotification,
           'WebRTC signal: answer (video-1)');
       expect(signalUpdate.lastNotification, 'WebRTC signal: answer (video-1)');
+    });
+
+    test('typed enum fields override legacy labels when both are present', () {
+      final update = synchronousMediaControlUpdateFromResponse(
+        ConnectResponse()
+          ..startStream = (iov1.StartStream()
+            ..streamId = 'stream-typed'
+            ..kind = 'legacy-kind'
+            ..streamKind = iov1.StreamKind.STREAM_KIND_SENSOR)
+          ..routeStream = (iov1.RouteStream()
+            ..streamId = 'route-typed'
+            ..sourceDeviceId = 'source'
+            ..targetDeviceId = 'target'
+            ..kind = 'legacy-route'
+            ..streamKind = iov1.StreamKind.STREAM_KIND_DATA)
+          ..webrtcSignal = (WebRTCSignal()
+            ..streamId = 'signal-typed'
+            ..signalType = 'legacy-signal'
+            ..signalTypeEnum =
+                WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE),
+      );
+
+      expect(update.startStreamNotification, 'Start stream: sensor (stream-typed)');
+      expect(update.routeNotification, 'Route: source -> target (data)');
+      expect(
+        update.webrtcSignalNotification,
+        'WebRTC signal: candidate (signal-typed)',
+      );
     });
 
     test('synchronousMediaControlUpdateFromResponse derives stop stream data',

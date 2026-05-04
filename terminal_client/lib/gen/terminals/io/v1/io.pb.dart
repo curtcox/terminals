@@ -15,7 +15,11 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'io.pbenum.dart';
+
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+
+export 'io.pbenum.dart';
 
 class StartStream extends $pb.GeneratedMessage {
   factory StartStream({
@@ -24,6 +28,7 @@ class StartStream extends $pb.GeneratedMessage {
     $core.String? sourceDeviceId,
     $core.String? targetDeviceId,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
+    StreamKind? streamKind,
   }) {
     final result = create();
     if (streamId != null) result.streamId = streamId;
@@ -31,6 +36,7 @@ class StartStream extends $pb.GeneratedMessage {
     if (sourceDeviceId != null) result.sourceDeviceId = sourceDeviceId;
     if (targetDeviceId != null) result.targetDeviceId = targetDeviceId;
     if (metadata != null) result.metadata.addEntries(metadata);
+    if (streamKind != null) result.streamKind = streamKind;
     return result;
   }
 
@@ -57,6 +63,8 @@ class StartStream extends $pb.GeneratedMessage {
         keyFieldType: $pb.PbFieldType.OS,
         valueFieldType: $pb.PbFieldType.OS,
         packageName: const $pb.PackageName('terminals.io.v1'))
+    ..aE<StreamKind>(6, _omitFieldNames ? '' : 'streamKind',
+        enumValues: StreamKind.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -116,6 +124,15 @@ class StartStream extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(5)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
+
+  @$pb.TagNumber(6)
+  StreamKind get streamKind => $_getN(5);
+  @$pb.TagNumber(6)
+  set streamKind(StreamKind value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStreamKind() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStreamKind() => $_clearField(6);
 }
 
 class StopStream extends $pb.GeneratedMessage {
@@ -178,12 +195,14 @@ class RouteStream extends $pb.GeneratedMessage {
     $core.String? sourceDeviceId,
     $core.String? targetDeviceId,
     $core.String? kind,
+    StreamKind? streamKind,
   }) {
     final result = create();
     if (streamId != null) result.streamId = streamId;
     if (sourceDeviceId != null) result.sourceDeviceId = sourceDeviceId;
     if (targetDeviceId != null) result.targetDeviceId = targetDeviceId;
     if (kind != null) result.kind = kind;
+    if (streamKind != null) result.streamKind = streamKind;
     return result;
   }
 
@@ -205,6 +224,8 @@ class RouteStream extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'sourceDeviceId')
     ..aOS(3, _omitFieldNames ? '' : 'targetDeviceId')
     ..aOS(4, _omitFieldNames ? '' : 'kind')
+    ..aE<StreamKind>(5, _omitFieldNames ? '' : 'streamKind',
+        enumValues: StreamKind.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -261,6 +282,15 @@ class RouteStream extends $pb.GeneratedMessage {
   $core.bool hasKind() => $_has(3);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  StreamKind get streamKind => $_getN(4);
+  @$pb.TagNumber(5)
+  set streamKind(StreamKind value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStreamKind() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStreamKind() => $_clearField(5);
 }
 
 enum PlayAudio_Source { url, pcmData, ttsText, notSet }
