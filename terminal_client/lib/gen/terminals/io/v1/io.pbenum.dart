@@ -74,6 +74,54 @@ class WebRTCSignalType extends $pb.ProtobufEnum {
   const WebRTCSignalType._(super.value, super.name);
 }
 
+/// StreamOrigin describes why a stream was created. It replaces the
+/// transitional `origin` key in `StartStream.metadata`.
+class StreamOrigin extends $pb.ProtobufEnum {
+  static const StreamOrigin STREAM_ORIGIN_UNSPECIFIED =
+      StreamOrigin._(0, _omitEnumNames ? '' : 'STREAM_ORIGIN_UNSPECIFIED');
+  static const StreamOrigin STREAM_ORIGIN_ROUTE_DELTA =
+      StreamOrigin._(1, _omitEnumNames ? '' : 'STREAM_ORIGIN_ROUTE_DELTA');
+  static const StreamOrigin STREAM_ORIGIN_RESTORE =
+      StreamOrigin._(2, _omitEnumNames ? '' : 'STREAM_ORIGIN_RESTORE');
+
+  static const $core.List<StreamOrigin> values = <StreamOrigin>[
+    STREAM_ORIGIN_UNSPECIFIED,
+    STREAM_ORIGIN_ROUTE_DELTA,
+    STREAM_ORIGIN_RESTORE,
+  ];
+
+  static final $core.List<StreamOrigin?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static StreamOrigin? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const StreamOrigin._(super.value, super.name);
+}
+
+/// WebRTCMode describes how WebRTC signaling for a stream is managed. It
+/// replaces the transitional `webrtc_mode` key in `StartStream.metadata`.
+class WebRTCMode extends $pb.ProtobufEnum {
+  static const WebRTCMode WEB_RTC_MODE_UNSPECIFIED =
+      WebRTCMode._(0, _omitEnumNames ? '' : 'WEB_RTC_MODE_UNSPECIFIED');
+  static const WebRTCMode WEB_RTC_MODE_SERVER_MANAGED =
+      WebRTCMode._(1, _omitEnumNames ? '' : 'WEB_RTC_MODE_SERVER_MANAGED');
+  static const WebRTCMode WEB_RTC_MODE_PEER_MANAGED =
+      WebRTCMode._(2, _omitEnumNames ? '' : 'WEB_RTC_MODE_PEER_MANAGED');
+
+  static const $core.List<WebRTCMode> values = <WebRTCMode>[
+    WEB_RTC_MODE_UNSPECIFIED,
+    WEB_RTC_MODE_SERVER_MANAGED,
+    WEB_RTC_MODE_PEER_MANAGED,
+  ];
+
+  static final $core.List<WebRTCMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static WebRTCMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const WebRTCMode._(super.value, super.name);
+}
+
 class PointerAction extends $pb.ProtobufEnum {
   static const PointerAction POINTER_ACTION_UNSPECIFIED =
       PointerAction._(0, _omitEnumNames ? '' : 'POINTER_ACTION_UNSPECIFIED');

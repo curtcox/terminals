@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 )
 
@@ -69,7 +70,10 @@ func (m *MediaControlState) ServerManagedSignalEngine(streamID string) (WebRTCSi
 	if !ok {
 		return nil, false
 	}
-	mode := strings.ToLower(strings.TrimSpace(state.Metadata["webrtc_mode"]))
+	mode := webRTCModeStringFromEnum(state.RoutingWebRTCMode)
+	if mode == "" {
+		mode = strings.ToLower(strings.TrimSpace(state.Metadata["webrtc_mode"]))
+	}
 	return m.webrtc, mode == "server_managed"
 }
 
@@ -103,13 +107,18 @@ func (m *MediaControlState) RegisterStream(start StartStreamResponse) {
 	for k, v := range start.Metadata {
 		metadata[k] = v
 	}
+	var routingMode iov1.WebRTCMode
+	if start.Routing != nil {
+		routingMode = start.Routing.GetWebrtcMode()
+	}
 	state := mediaStreamState{
-		StreamID:       streamID,
-		Kind:           start.Kind,
-		SourceDeviceID: start.SourceDeviceID,
-		TargetDeviceID: start.TargetDeviceID,
-		Metadata:       metadata,
-		Ready:          false,
+		StreamID:          streamID,
+		Kind:              start.Kind,
+		SourceDeviceID:    start.SourceDeviceID,
+		TargetDeviceID:    start.TargetDeviceID,
+		Metadata:          metadata,
+		RoutingWebRTCMode: routingMode,
+		Ready:             false,
 	}
 
 	m.mu.Lock()

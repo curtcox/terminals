@@ -21,6 +21,8 @@ func TestGoldenWireEnvelopeFixtures(t *testing.T) {
 		"register_ack_metadata_v1":      assertRegisterAckMetadata,
 		"set_ui_basic_v1":               assertSetUIBasic,
 		"start_stream_audio_v1":         assertStartStreamAudio,
+		"start_stream_route_delta_v1":   assertStartStreamRouteDelta,
+		"route_stream_route_delta_v1":   assertRouteStreamRouteDelta,
 		"flow_plan_basic_v1":            assertFlowPlanBasic,
 		"observation_sound_v1":          assertObservationSound,
 		"flow_stats_v1":                 assertFlowStats,
@@ -160,6 +162,48 @@ func assertStartStreamAudio(t *testing.T, envelope *controlv1.WireEnvelope) {
 	}
 	if stream.GetMetadata()["sample_rate"] != "16000" {
 		t.Fatalf("sample_rate metadata = %q", stream.GetMetadata()["sample_rate"])
+	}
+}
+
+func assertStartStreamRouteDelta(t *testing.T, envelope *controlv1.WireEnvelope) {
+	t.Helper()
+	stream := envelope.GetServerMessage().GetStartStream()
+	if stream.GetMetadata()["origin"] != "route_delta" {
+		t.Fatalf("legacy origin = %q", stream.GetMetadata()["origin"])
+	}
+	if stream.GetMetadata()["webrtc_mode"] != "server_managed" {
+		t.Fatalf("legacy webrtc_mode = %q", stream.GetMetadata()["webrtc_mode"])
+	}
+	routing := stream.GetRouting()
+	if routing == nil {
+		t.Fatalf("typed routing missing")
+	}
+	if got := routing.GetOrigin(); got != iov1.StreamOrigin_STREAM_ORIGIN_ROUTE_DELTA {
+		t.Fatalf("typed routing origin = %v", got)
+	}
+	if got := routing.GetWebrtcMode(); got != iov1.WebRTCMode_WEB_RTC_MODE_SERVER_MANAGED {
+		t.Fatalf("typed routing webrtc_mode = %v", got)
+	}
+}
+
+func assertRouteStreamRouteDelta(t *testing.T, envelope *controlv1.WireEnvelope) {
+	t.Helper()
+	route := envelope.GetServerMessage().GetRouteStream()
+	if route.GetKind() != "audio" {
+		t.Fatalf("legacy kind = %q", route.GetKind())
+	}
+	if got := route.GetStreamKind(); got != iov1.StreamKind_STREAM_KIND_AUDIO {
+		t.Fatalf("typed stream_kind = %v", got)
+	}
+	routing := route.GetRouting()
+	if routing == nil {
+		t.Fatalf("typed routing missing")
+	}
+	if got := routing.GetOrigin(); got != iov1.StreamOrigin_STREAM_ORIGIN_ROUTE_DELTA {
+		t.Fatalf("typed routing origin = %v", got)
+	}
+	if got := routing.GetWebrtcMode(); got != iov1.WebRTCMode_WEB_RTC_MODE_SERVER_MANAGED {
+		t.Fatalf("typed routing webrtc_mode = %v", got)
 	}
 }
 

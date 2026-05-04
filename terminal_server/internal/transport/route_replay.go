@@ -81,6 +81,7 @@ func (s *RouteReplayStore) MessagesForDevice(deviceID string, liveRoutes []iorou
 	out := make([]ServerMessage, 0, 2*len(routes))
 	for _, route := range routes {
 		routeID := routeStreamID(route)
+		routing := routeDeltaStreamRouting()
 		out = append(out, ServerMessage{
 			StartStream: &StartStreamResponse{
 				StreamID:       routeID,
@@ -91,6 +92,7 @@ func (s *RouteReplayStore) MessagesForDevice(deviceID string, liveRoutes []iorou
 					"origin":      "route_delta",
 					"webrtc_mode": "server_managed",
 				},
+				Routing: routing,
 			},
 		}, ServerMessage{
 			RouteStream: &RouteStreamResponse{
@@ -98,6 +100,7 @@ func (s *RouteReplayStore) MessagesForDevice(deviceID string, liveRoutes []iorou
 				SourceDeviceID: route.SourceID,
 				TargetDeviceID: route.TargetID,
 				Kind:           route.StreamKind,
+				Routing:        routing,
 			},
 		})
 	}

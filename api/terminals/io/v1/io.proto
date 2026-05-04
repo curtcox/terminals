@@ -24,6 +24,30 @@ enum WebRTCSignalType {
   WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE = 3;
 }
 
+// StreamOrigin describes why a stream was created. It replaces the
+// transitional `origin` key in `StartStream.metadata`.
+enum StreamOrigin {
+  STREAM_ORIGIN_UNSPECIFIED = 0;
+  STREAM_ORIGIN_ROUTE_DELTA = 1;
+  STREAM_ORIGIN_RESTORE = 2;
+}
+
+// WebRTCMode describes how WebRTC signaling for a stream is managed. It
+// replaces the transitional `webrtc_mode` key in `StartStream.metadata`.
+enum WebRTCMode {
+  WEB_RTC_MODE_UNSPECIFIED = 0;
+  WEB_RTC_MODE_SERVER_MANAGED = 1;
+  WEB_RTC_MODE_PEER_MANAGED = 2;
+}
+
+// StreamRouting carries typed routing/session hints for a stream lifecycle
+// message. It is the typed replacement for the well-known stable keys
+// (`origin`, `webrtc_mode`) in `StartStream.metadata`.
+message StreamRouting {
+  StreamOrigin origin = 1;
+  WebRTCMode webrtc_mode = 2;
+}
+
 message StartStream {
   string stream_id = 1;
   string kind = 2;
@@ -31,6 +55,7 @@ message StartStream {
   string target_device_id = 4;
   map<string, string> metadata = 5;
   StreamKind stream_kind = 6;
+  StreamRouting routing = 7;
 }
 
 message StopStream {
@@ -43,6 +68,7 @@ message RouteStream {
   string target_device_id = 3;
   string kind = 4;
   StreamKind stream_kind = 5;
+  StreamRouting routing = 6;
 }
 
 message PlayAudio {

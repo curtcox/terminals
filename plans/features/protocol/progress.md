@@ -127,3 +127,16 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Regenerated Go bindings via `make proto-generate` and synced refreshed `terminals/io/v1` and `terminals/diagnostics/v1` Dart bindings into `terminal_client/lib/gen/`.
 - Updated `docs/compatibility.md` to add a new open-window row for `WebrtcSignalEntry.signal_type_enum` and replace the prior deferral note with the parallel-enum rationale.
 - Re-ran `make proto-lint`, `make proto-breaking`, `make proto-flex-check`, `make proto-contract-test`, `make server-test`, and `make client-test`; all green.
+
+## Protocol Evolution Rules (2026-05-04, StartStream/RouteStream typed routing)
+
+- Added additive typed enums `terminals.io.v1.StreamOrigin` (`UNSPECIFIED`/`ROUTE_DELTA`/`RESTORE`) and `terminals.io.v1.WebRTCMode` (`UNSPECIFIED`/`SERVER_MANAGED`/`PEER_MANAGED`), and a `StreamRouting` message wrapping both, in `api/terminals/io/v1/io.proto`.
+- Added `StreamRouting routing = 7` to `StartStream` and `StreamRouting routing = 6` to `RouteStream` (both additive); legacy `StartStream.metadata` map keys `origin` and `webrtc_mode` remain populated during the compatibility window.
+- Wired the live route-delta producer in `terminal_server/internal/transport/control_stream.go` and the captured-route replay producer in `route_replay.go` to emit both typed `Routing` and the legacy metadata map. Added a new `stream_routing.go` helper file with `routeDeltaStreamRouting`, `streamRoutingFromMetadata`, and enum<->string converters.
+- Updated `generated_proto_adapter.go` to populate `StartStream.routing` (preferring the producer-supplied `Routing` and falling back to deriving from the legacy metadata map) and `RouteStream.routing` on outbound `ConnectResponse` payloads.
+- Migrated the only real consumer (`MediaControlState.ServerManagedSignalEngine` in `terminal_server/internal/transport/media_control_state.go`) to prefer typed `routing.webrtc_mode` and fall back to the legacy `webrtc_mode` map key. Added a `RoutingWebRTCMode` field to `mediaStreamState` populated in `RegisterStream`.
+- Added two new golden envelope fixtures (`api/testdata/envelopes/start_stream_route_delta_v1.{textproto,binpb}` and `route_stream_route_delta_v1.{textproto,binpb}`) covering typed-enum + legacy-map coexistence; refreshed binary fixtures via `go test ./internal/protocolcontract -run TestGoldenWireEnvelopeFixtures -update`. Added matching assertions in the Go and Dart contract tests.
+- Updated the protocol extension registry entry for `StartStream.metadata` to reclassify the stable `origin`/`webrtc_mode` keys as legacy mirrors of the typed `routing` field; the residual codec/media keys remain documented extension namespace.
+- Added an open-window row to `docs/compatibility.md` for `StartStream.routing` / `RouteStream.routing` and updated the pending-migrations summary.
+- Regenerated Go bindings via `make proto-generate` and synced the refreshed `terminals/io/v1` Dart bindings into `terminal_client/lib/gen/`.
+- Re-ran `make proto-contract-test`, `make server-test`, and `make client-test`; all green.

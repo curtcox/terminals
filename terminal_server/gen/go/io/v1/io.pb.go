@@ -133,6 +133,108 @@ func (WebRTCSignalType) EnumDescriptor() ([]byte, []int) {
 	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{1}
 }
 
+// StreamOrigin describes why a stream was created. It replaces the
+// transitional `origin` key in `StartStream.metadata`.
+type StreamOrigin int32
+
+const (
+	StreamOrigin_STREAM_ORIGIN_UNSPECIFIED StreamOrigin = 0
+	StreamOrigin_STREAM_ORIGIN_ROUTE_DELTA StreamOrigin = 1
+	StreamOrigin_STREAM_ORIGIN_RESTORE     StreamOrigin = 2
+)
+
+// Enum value maps for StreamOrigin.
+var (
+	StreamOrigin_name = map[int32]string{
+		0: "STREAM_ORIGIN_UNSPECIFIED",
+		1: "STREAM_ORIGIN_ROUTE_DELTA",
+		2: "STREAM_ORIGIN_RESTORE",
+	}
+	StreamOrigin_value = map[string]int32{
+		"STREAM_ORIGIN_UNSPECIFIED": 0,
+		"STREAM_ORIGIN_ROUTE_DELTA": 1,
+		"STREAM_ORIGIN_RESTORE":     2,
+	}
+)
+
+func (x StreamOrigin) Enum() *StreamOrigin {
+	p := new(StreamOrigin)
+	*p = x
+	return p
+}
+
+func (x StreamOrigin) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StreamOrigin) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_io_v1_io_proto_enumTypes[2].Descriptor()
+}
+
+func (StreamOrigin) Type() protoreflect.EnumType {
+	return &file_terminals_io_v1_io_proto_enumTypes[2]
+}
+
+func (x StreamOrigin) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StreamOrigin.Descriptor instead.
+func (StreamOrigin) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{2}
+}
+
+// WebRTCMode describes how WebRTC signaling for a stream is managed. It
+// replaces the transitional `webrtc_mode` key in `StartStream.metadata`.
+type WebRTCMode int32
+
+const (
+	WebRTCMode_WEB_RTC_MODE_UNSPECIFIED    WebRTCMode = 0
+	WebRTCMode_WEB_RTC_MODE_SERVER_MANAGED WebRTCMode = 1
+	WebRTCMode_WEB_RTC_MODE_PEER_MANAGED   WebRTCMode = 2
+)
+
+// Enum value maps for WebRTCMode.
+var (
+	WebRTCMode_name = map[int32]string{
+		0: "WEB_RTC_MODE_UNSPECIFIED",
+		1: "WEB_RTC_MODE_SERVER_MANAGED",
+		2: "WEB_RTC_MODE_PEER_MANAGED",
+	}
+	WebRTCMode_value = map[string]int32{
+		"WEB_RTC_MODE_UNSPECIFIED":    0,
+		"WEB_RTC_MODE_SERVER_MANAGED": 1,
+		"WEB_RTC_MODE_PEER_MANAGED":   2,
+	}
+)
+
+func (x WebRTCMode) Enum() *WebRTCMode {
+	p := new(WebRTCMode)
+	*p = x
+	return p
+}
+
+func (x WebRTCMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WebRTCMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_io_v1_io_proto_enumTypes[3].Descriptor()
+}
+
+func (WebRTCMode) Type() protoreflect.EnumType {
+	return &file_terminals_io_v1_io_proto_enumTypes[3]
+}
+
+func (x WebRTCMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WebRTCMode.Descriptor instead.
+func (WebRTCMode) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{3}
+}
+
 type PointerAction int32
 
 const (
@@ -175,11 +277,11 @@ func (x PointerAction) String() string {
 }
 
 func (PointerAction) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_io_v1_io_proto_enumTypes[2].Descriptor()
+	return file_terminals_io_v1_io_proto_enumTypes[4].Descriptor()
 }
 
 func (PointerAction) Type() protoreflect.EnumType {
-	return &file_terminals_io_v1_io_proto_enumTypes[2]
+	return &file_terminals_io_v1_io_proto_enumTypes[4]
 }
 
 func (x PointerAction) Number() protoreflect.EnumNumber {
@@ -188,7 +290,7 @@ func (x PointerAction) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PointerAction.Descriptor instead.
 func (PointerAction) EnumDescriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{2}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{4}
 }
 
 type TouchAction int32
@@ -230,11 +332,11 @@ func (x TouchAction) String() string {
 }
 
 func (TouchAction) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_io_v1_io_proto_enumTypes[3].Descriptor()
+	return file_terminals_io_v1_io_proto_enumTypes[5].Descriptor()
 }
 
 func (TouchAction) Type() protoreflect.EnumType {
-	return &file_terminals_io_v1_io_proto_enumTypes[3]
+	return &file_terminals_io_v1_io_proto_enumTypes[5]
 }
 
 func (x TouchAction) Number() protoreflect.EnumNumber {
@@ -243,7 +345,7 @@ func (x TouchAction) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TouchAction.Descriptor instead.
 func (TouchAction) EnumDescriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{3}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{5}
 }
 
 type ExecPolicy int32
@@ -285,11 +387,11 @@ func (x ExecPolicy) String() string {
 }
 
 func (ExecPolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_io_v1_io_proto_enumTypes[4].Descriptor()
+	return file_terminals_io_v1_io_proto_enumTypes[6].Descriptor()
 }
 
 func (ExecPolicy) Type() protoreflect.EnumType {
-	return &file_terminals_io_v1_io_proto_enumTypes[4]
+	return &file_terminals_io_v1_io_proto_enumTypes[6]
 }
 
 func (x ExecPolicy) Number() protoreflect.EnumNumber {
@@ -298,7 +400,7 @@ func (x ExecPolicy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExecPolicy.Descriptor instead.
 func (ExecPolicy) EnumDescriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{4}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{6}
 }
 
 type FlowState int32
@@ -346,11 +448,11 @@ func (x FlowState) String() string {
 }
 
 func (FlowState) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_io_v1_io_proto_enumTypes[5].Descriptor()
+	return file_terminals_io_v1_io_proto_enumTypes[7].Descriptor()
 }
 
 func (FlowState) Type() protoreflect.EnumType {
-	return &file_terminals_io_v1_io_proto_enumTypes[5]
+	return &file_terminals_io_v1_io_proto_enumTypes[7]
 }
 
 func (x FlowState) Number() protoreflect.EnumNumber {
@@ -359,7 +461,62 @@ func (x FlowState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FlowState.Descriptor instead.
 func (FlowState) EnumDescriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{5}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{7}
+}
+
+// StreamRouting carries typed routing/session hints for a stream lifecycle
+// message. It is the typed replacement for the well-known stable keys
+// (`origin`, `webrtc_mode`) in `StartStream.metadata`.
+type StreamRouting struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Origin        StreamOrigin           `protobuf:"varint,1,opt,name=origin,proto3,enum=terminals.io.v1.StreamOrigin" json:"origin,omitempty"`
+	WebrtcMode    WebRTCMode             `protobuf:"varint,2,opt,name=webrtc_mode,json=webrtcMode,proto3,enum=terminals.io.v1.WebRTCMode" json:"webrtc_mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamRouting) Reset() {
+	*x = StreamRouting{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamRouting) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamRouting) ProtoMessage() {}
+
+func (x *StreamRouting) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamRouting.ProtoReflect.Descriptor instead.
+func (*StreamRouting) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *StreamRouting) GetOrigin() StreamOrigin {
+	if x != nil {
+		return x.Origin
+	}
+	return StreamOrigin_STREAM_ORIGIN_UNSPECIFIED
+}
+
+func (x *StreamRouting) GetWebrtcMode() WebRTCMode {
+	if x != nil {
+		return x.WebrtcMode
+	}
+	return WebRTCMode_WEB_RTC_MODE_UNSPECIFIED
 }
 
 type StartStream struct {
@@ -370,13 +527,14 @@ type StartStream struct {
 	TargetDeviceId string                 `protobuf:"bytes,4,opt,name=target_device_id,json=targetDeviceId,proto3" json:"target_device_id,omitempty"`
 	Metadata       map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	StreamKind     StreamKind             `protobuf:"varint,6,opt,name=stream_kind,json=streamKind,proto3,enum=terminals.io.v1.StreamKind" json:"stream_kind,omitempty"`
+	Routing        *StreamRouting         `protobuf:"bytes,7,opt,name=routing,proto3" json:"routing,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *StartStream) Reset() {
 	*x = StartStream{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[0]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -388,7 +546,7 @@ func (x *StartStream) String() string {
 func (*StartStream) ProtoMessage() {}
 
 func (x *StartStream) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[0]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -401,7 +559,7 @@ func (x *StartStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartStream.ProtoReflect.Descriptor instead.
 func (*StartStream) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{0}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *StartStream) GetStreamId() string {
@@ -446,6 +604,13 @@ func (x *StartStream) GetStreamKind() StreamKind {
 	return StreamKind_STREAM_KIND_UNSPECIFIED
 }
 
+func (x *StartStream) GetRouting() *StreamRouting {
+	if x != nil {
+		return x.Routing
+	}
+	return nil
+}
+
 type StopStream struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StreamId      string                 `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
@@ -455,7 +620,7 @@ type StopStream struct {
 
 func (x *StopStream) Reset() {
 	*x = StopStream{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[1]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +632,7 @@ func (x *StopStream) String() string {
 func (*StopStream) ProtoMessage() {}
 
 func (x *StopStream) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[1]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +645,7 @@ func (x *StopStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopStream.ProtoReflect.Descriptor instead.
 func (*StopStream) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{1}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *StopStream) GetStreamId() string {
@@ -497,13 +662,14 @@ type RouteStream struct {
 	TargetDeviceId string                 `protobuf:"bytes,3,opt,name=target_device_id,json=targetDeviceId,proto3" json:"target_device_id,omitempty"`
 	Kind           string                 `protobuf:"bytes,4,opt,name=kind,proto3" json:"kind,omitempty"`
 	StreamKind     StreamKind             `protobuf:"varint,5,opt,name=stream_kind,json=streamKind,proto3,enum=terminals.io.v1.StreamKind" json:"stream_kind,omitempty"`
+	Routing        *StreamRouting         `protobuf:"bytes,6,opt,name=routing,proto3" json:"routing,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RouteStream) Reset() {
 	*x = RouteStream{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[2]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -515,7 +681,7 @@ func (x *RouteStream) String() string {
 func (*RouteStream) ProtoMessage() {}
 
 func (x *RouteStream) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[2]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -528,7 +694,7 @@ func (x *RouteStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RouteStream.ProtoReflect.Descriptor instead.
 func (*RouteStream) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{2}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RouteStream) GetStreamId() string {
@@ -566,6 +732,13 @@ func (x *RouteStream) GetStreamKind() StreamKind {
 	return StreamKind_STREAM_KIND_UNSPECIFIED
 }
 
+func (x *RouteStream) GetRouting() *StreamRouting {
+	if x != nil {
+		return x.Routing
+	}
+	return nil
+}
+
 type PlayAudio struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -583,7 +756,7 @@ type PlayAudio struct {
 
 func (x *PlayAudio) Reset() {
 	*x = PlayAudio{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[3]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -595,7 +768,7 @@ func (x *PlayAudio) String() string {
 func (*PlayAudio) ProtoMessage() {}
 
 func (x *PlayAudio) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[3]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -608,7 +781,7 @@ func (x *PlayAudio) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayAudio.ProtoReflect.Descriptor instead.
 func (*PlayAudio) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{3}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PlayAudio) GetRequestId() string {
@@ -700,7 +873,7 @@ type ShowMedia struct {
 
 func (x *ShowMedia) Reset() {
 	*x = ShowMedia{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[4]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -712,7 +885,7 @@ func (x *ShowMedia) String() string {
 func (*ShowMedia) ProtoMessage() {}
 
 func (x *ShowMedia) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[4]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +898,7 @@ func (x *ShowMedia) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShowMedia.ProtoReflect.Descriptor instead.
 func (*ShowMedia) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{4}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ShowMedia) GetRequestId() string {
@@ -772,7 +945,7 @@ type InputEvent struct {
 
 func (x *InputEvent) Reset() {
 	*x = InputEvent{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[5]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -784,7 +957,7 @@ func (x *InputEvent) String() string {
 func (*InputEvent) ProtoMessage() {}
 
 func (x *InputEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[5]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -797,7 +970,7 @@ func (x *InputEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InputEvent.ProtoReflect.Descriptor instead.
 func (*InputEvent) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{5}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *InputEvent) GetDeviceId() string {
@@ -890,7 +1063,7 @@ type KeyEvent struct {
 
 func (x *KeyEvent) Reset() {
 	*x = KeyEvent{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[6]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -902,7 +1075,7 @@ func (x *KeyEvent) String() string {
 func (*KeyEvent) ProtoMessage() {}
 
 func (x *KeyEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[6]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -915,7 +1088,7 @@ func (x *KeyEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyEvent.ProtoReflect.Descriptor instead.
 func (*KeyEvent) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{6}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *KeyEvent) GetKey() string {
@@ -961,7 +1134,7 @@ type PointerEvent struct {
 
 func (x *PointerEvent) Reset() {
 	*x = PointerEvent{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[7]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -973,7 +1146,7 @@ func (x *PointerEvent) String() string {
 func (*PointerEvent) ProtoMessage() {}
 
 func (x *PointerEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[7]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -986,7 +1159,7 @@ func (x *PointerEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PointerEvent.ProtoReflect.Descriptor instead.
 func (*PointerEvent) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{7}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PointerEvent) GetAction() string {
@@ -1049,7 +1222,7 @@ type TouchPoint struct {
 
 func (x *TouchPoint) Reset() {
 	*x = TouchPoint{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[8]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1061,7 +1234,7 @@ func (x *TouchPoint) String() string {
 func (*TouchPoint) ProtoMessage() {}
 
 func (x *TouchPoint) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[8]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1074,7 +1247,7 @@ func (x *TouchPoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TouchPoint.ProtoReflect.Descriptor instead.
 func (*TouchPoint) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{8}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *TouchPoint) GetId() int32 {
@@ -1109,7 +1282,7 @@ type TouchEvent struct {
 
 func (x *TouchEvent) Reset() {
 	*x = TouchEvent{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[9]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1121,7 +1294,7 @@ func (x *TouchEvent) String() string {
 func (*TouchEvent) ProtoMessage() {}
 
 func (x *TouchEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[9]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1134,7 +1307,7 @@ func (x *TouchEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TouchEvent.ProtoReflect.Descriptor instead.
 func (*TouchEvent) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{9}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *TouchEvent) GetAction() string {
@@ -1169,7 +1342,7 @@ type UIAction struct {
 
 func (x *UIAction) Reset() {
 	*x = UIAction{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[10]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1181,7 +1354,7 @@ func (x *UIAction) String() string {
 func (*UIAction) ProtoMessage() {}
 
 func (x *UIAction) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[10]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1194,7 +1367,7 @@ func (x *UIAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UIAction.ProtoReflect.Descriptor instead.
 func (*UIAction) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{10}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UIAction) GetComponentId() string {
@@ -1229,7 +1402,7 @@ type SensorData struct {
 
 func (x *SensorData) Reset() {
 	*x = SensorData{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[11]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1241,7 +1414,7 @@ func (x *SensorData) String() string {
 func (*SensorData) ProtoMessage() {}
 
 func (x *SensorData) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[11]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1254,7 +1427,7 @@ func (x *SensorData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SensorData.ProtoReflect.Descriptor instead.
 func (*SensorData) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{11}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SensorData) GetDeviceId() string {
@@ -1291,7 +1464,7 @@ type FlowNode struct {
 
 func (x *FlowNode) Reset() {
 	*x = FlowNode{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[12]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1303,7 +1476,7 @@ func (x *FlowNode) String() string {
 func (*FlowNode) ProtoMessage() {}
 
 func (x *FlowNode) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[12]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1316,7 +1489,7 @@ func (x *FlowNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowNode.ProtoReflect.Descriptor instead.
 func (*FlowNode) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{12}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FlowNode) GetId() string {
@@ -1364,7 +1537,7 @@ type FlowEdge struct {
 
 func (x *FlowEdge) Reset() {
 	*x = FlowEdge{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[13]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1376,7 +1549,7 @@ func (x *FlowEdge) String() string {
 func (*FlowEdge) ProtoMessage() {}
 
 func (x *FlowEdge) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[13]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1389,7 +1562,7 @@ func (x *FlowEdge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowEdge.ProtoReflect.Descriptor instead.
 func (*FlowEdge) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{13}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *FlowEdge) GetFrom() string {
@@ -1416,7 +1589,7 @@ type FlowPlan struct {
 
 func (x *FlowPlan) Reset() {
 	*x = FlowPlan{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1428,7 +1601,7 @@ func (x *FlowPlan) String() string {
 func (*FlowPlan) ProtoMessage() {}
 
 func (x *FlowPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1441,7 +1614,7 @@ func (x *FlowPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowPlan.ProtoReflect.Descriptor instead.
 func (*FlowPlan) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{14}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *FlowPlan) GetNodes() []*FlowNode {
@@ -1468,7 +1641,7 @@ type StartFlow struct {
 
 func (x *StartFlow) Reset() {
 	*x = StartFlow{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1480,7 +1653,7 @@ func (x *StartFlow) String() string {
 func (*StartFlow) ProtoMessage() {}
 
 func (x *StartFlow) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1493,7 +1666,7 @@ func (x *StartFlow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartFlow.ProtoReflect.Descriptor instead.
 func (*StartFlow) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{15}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StartFlow) GetFlowId() string {
@@ -1520,7 +1693,7 @@ type PatchFlow struct {
 
 func (x *PatchFlow) Reset() {
 	*x = PatchFlow{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1532,7 +1705,7 @@ func (x *PatchFlow) String() string {
 func (*PatchFlow) ProtoMessage() {}
 
 func (x *PatchFlow) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1545,7 +1718,7 @@ func (x *PatchFlow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PatchFlow.ProtoReflect.Descriptor instead.
 func (*PatchFlow) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{16}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PatchFlow) GetFlowId() string {
@@ -1571,7 +1744,7 @@ type StopFlow struct {
 
 func (x *StopFlow) Reset() {
 	*x = StopFlow{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1583,7 +1756,7 @@ func (x *StopFlow) String() string {
 func (*StopFlow) ProtoMessage() {}
 
 func (x *StopFlow) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1596,7 +1769,7 @@ func (x *StopFlow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopFlow.ProtoReflect.Descriptor instead.
 func (*StopFlow) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{17}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StopFlow) GetFlowId() string {
@@ -1615,7 +1788,7 @@ type DeviceRef struct {
 
 func (x *DeviceRef) Reset() {
 	*x = DeviceRef{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1627,7 +1800,7 @@ func (x *DeviceRef) String() string {
 func (*DeviceRef) ProtoMessage() {}
 
 func (x *DeviceRef) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1640,7 +1813,7 @@ func (x *DeviceRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceRef.ProtoReflect.Descriptor instead.
 func (*DeviceRef) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{18}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DeviceRef) GetDeviceId() string {
@@ -1665,7 +1838,7 @@ type Pose struct {
 
 func (x *Pose) Reset() {
 	*x = Pose{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1677,7 +1850,7 @@ func (x *Pose) String() string {
 func (*Pose) ProtoMessage() {}
 
 func (x *Pose) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1690,7 +1863,7 @@ func (x *Pose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pose.ProtoReflect.Descriptor instead.
 func (*Pose) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{19}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Pose) GetX() float64 {
@@ -1755,7 +1928,7 @@ type LocationEstimate struct {
 
 func (x *LocationEstimate) Reset() {
 	*x = LocationEstimate{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1767,7 +1940,7 @@ func (x *LocationEstimate) String() string {
 func (*LocationEstimate) ProtoMessage() {}
 
 func (x *LocationEstimate) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1780,7 +1953,7 @@ func (x *LocationEstimate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocationEstimate.ProtoReflect.Descriptor instead.
 func (*LocationEstimate) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{20}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *LocationEstimate) GetZone() string {
@@ -1831,7 +2004,7 @@ type ObservationProvenance struct {
 
 func (x *ObservationProvenance) Reset() {
 	*x = ObservationProvenance{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1843,7 +2016,7 @@ func (x *ObservationProvenance) String() string {
 func (*ObservationProvenance) ProtoMessage() {}
 
 func (x *ObservationProvenance) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1856,7 +2029,7 @@ func (x *ObservationProvenance) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservationProvenance.ProtoReflect.Descriptor instead.
 func (*ObservationProvenance) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{21}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ObservationProvenance) GetFlowId() string {
@@ -1908,7 +2081,7 @@ type ArtifactRef struct {
 
 func (x *ArtifactRef) Reset() {
 	*x = ArtifactRef{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1920,7 +2093,7 @@ func (x *ArtifactRef) String() string {
 func (*ArtifactRef) ProtoMessage() {}
 
 func (x *ArtifactRef) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1933,7 +2106,7 @@ func (x *ArtifactRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArtifactRef.ProtoReflect.Descriptor instead.
 func (*ArtifactRef) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{22}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ArtifactRef) GetId() string {
@@ -1997,7 +2170,7 @@ type Observation struct {
 
 func (x *Observation) Reset() {
 	*x = Observation{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2009,7 +2182,7 @@ func (x *Observation) String() string {
 func (*Observation) ProtoMessage() {}
 
 func (x *Observation) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2022,7 +2195,7 @@ func (x *Observation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Observation.ProtoReflect.Descriptor instead.
 func (*Observation) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{23}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Observation) GetKind() string {
@@ -2111,7 +2284,7 @@ type ObservationMessage struct {
 
 func (x *ObservationMessage) Reset() {
 	*x = ObservationMessage{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2123,7 +2296,7 @@ func (x *ObservationMessage) String() string {
 func (*ObservationMessage) ProtoMessage() {}
 
 func (x *ObservationMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2136,7 +2309,7 @@ func (x *ObservationMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservationMessage.ProtoReflect.Descriptor instead.
 func (*ObservationMessage) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{24}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ObservationMessage) GetObservation() *Observation {
@@ -2155,7 +2328,7 @@ type ArtifactAvailable struct {
 
 func (x *ArtifactAvailable) Reset() {
 	*x = ArtifactAvailable{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2167,7 +2340,7 @@ func (x *ArtifactAvailable) String() string {
 func (*ArtifactAvailable) ProtoMessage() {}
 
 func (x *ArtifactAvailable) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2180,7 +2353,7 @@ func (x *ArtifactAvailable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArtifactAvailable.ProtoReflect.Descriptor instead.
 func (*ArtifactAvailable) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{25}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ArtifactAvailable) GetArtifact() *ArtifactRef {
@@ -2199,7 +2372,7 @@ type RequestArtifact struct {
 
 func (x *RequestArtifact) Reset() {
 	*x = RequestArtifact{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2211,7 +2384,7 @@ func (x *RequestArtifact) String() string {
 func (*RequestArtifact) ProtoMessage() {}
 
 func (x *RequestArtifact) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2224,7 +2397,7 @@ func (x *RequestArtifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestArtifact.ProtoReflect.Descriptor instead.
 func (*RequestArtifact) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{26}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RequestArtifact) GetArtifactId() string {
@@ -2249,7 +2422,7 @@ type FlowStats struct {
 
 func (x *FlowStats) Reset() {
 	*x = FlowStats{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2261,7 +2434,7 @@ func (x *FlowStats) String() string {
 func (*FlowStats) ProtoMessage() {}
 
 func (x *FlowStats) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2274,7 +2447,7 @@ func (x *FlowStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowStats.ProtoReflect.Descriptor instead.
 func (*FlowStats) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{27}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *FlowStats) GetFlowId() string {
@@ -2338,7 +2511,7 @@ type ClockSample struct {
 
 func (x *ClockSample) Reset() {
 	*x = ClockSample{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2350,7 +2523,7 @@ func (x *ClockSample) String() string {
 func (*ClockSample) ProtoMessage() {}
 
 func (x *ClockSample) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2363,7 +2536,7 @@ func (x *ClockSample) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClockSample.ProtoReflect.Descriptor instead.
 func (*ClockSample) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{28}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ClockSample) GetDeviceId() string {
@@ -2406,7 +2579,7 @@ type InstallBundle struct {
 
 func (x *InstallBundle) Reset() {
 	*x = InstallBundle{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2418,7 +2591,7 @@ func (x *InstallBundle) String() string {
 func (*InstallBundle) ProtoMessage() {}
 
 func (x *InstallBundle) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2431,7 +2604,7 @@ func (x *InstallBundle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallBundle.ProtoReflect.Descriptor instead.
 func (*InstallBundle) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{29}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *InstallBundle) GetBundleId() string {
@@ -2471,7 +2644,7 @@ type RemoveBundle struct {
 
 func (x *RemoveBundle) Reset() {
 	*x = RemoveBundle{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2483,7 +2656,7 @@ func (x *RemoveBundle) String() string {
 func (*RemoveBundle) ProtoMessage() {}
 
 func (x *RemoveBundle) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2496,7 +2669,7 @@ func (x *RemoveBundle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveBundle.ProtoReflect.Descriptor instead.
 func (*RemoveBundle) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{30}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RemoveBundle) GetBundleId() string {
@@ -2510,7 +2683,11 @@ var File_terminals_io_v1_io_proto protoreflect.FileDescriptor
 
 const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\n" +
-	"\x18terminals/io/v1/io.proto\x12\x0fterminals.io.v1\"\xd5\x02\n" +
+	"\x18terminals/io/v1/io.proto\x12\x0fterminals.io.v1\"\x84\x01\n" +
+	"\rStreamRouting\x125\n" +
+	"\x06origin\x18\x01 \x01(\x0e2\x1d.terminals.io.v1.StreamOriginR\x06origin\x12<\n" +
+	"\vwebrtc_mode\x18\x02 \x01(\x0e2\x1b.terminals.io.v1.WebRTCModeR\n" +
+	"webrtcMode\"\x8f\x03\n" +
 	"\vStartStream\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12(\n" +
@@ -2518,20 +2695,22 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x10target_device_id\x18\x04 \x01(\tR\x0etargetDeviceId\x12F\n" +
 	"\bmetadata\x18\x05 \x03(\v2*.terminals.io.v1.StartStream.MetadataEntryR\bmetadata\x12<\n" +
 	"\vstream_kind\x18\x06 \x01(\x0e2\x1b.terminals.io.v1.StreamKindR\n" +
-	"streamKind\x1a;\n" +
+	"streamKind\x128\n" +
+	"\arouting\x18\a \x01(\v2\x1e.terminals.io.v1.StreamRoutingR\arouting\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\")\n" +
 	"\n" +
 	"StopStream\x12\x1b\n" +
-	"\tstream_id\x18\x01 \x01(\tR\bstreamId\"\xd0\x01\n" +
+	"\tstream_id\x18\x01 \x01(\tR\bstreamId\"\x8a\x02\n" +
 	"\vRouteStream\x12\x1b\n" +
 	"\tstream_id\x18\x01 \x01(\tR\bstreamId\x12(\n" +
 	"\x10source_device_id\x18\x02 \x01(\tR\x0esourceDeviceId\x12(\n" +
 	"\x10target_device_id\x18\x03 \x01(\tR\x0etargetDeviceId\x12\x12\n" +
 	"\x04kind\x18\x04 \x01(\tR\x04kind\x12<\n" +
 	"\vstream_kind\x18\x05 \x01(\x0e2\x1b.terminals.io.v1.StreamKindR\n" +
-	"streamKind\"\xb7\x01\n" +
+	"streamKind\x128\n" +
+	"\arouting\x18\x06 \x01(\v2\x1e.terminals.io.v1.StreamRoutingR\arouting\"\xb7\x01\n" +
 	"\tPlayAudio\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
@@ -2711,7 +2890,16 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x1fWEB_RTC_SIGNAL_TYPE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19WEB_RTC_SIGNAL_TYPE_OFFER\x10\x01\x12\x1e\n" +
 	"\x1aWEB_RTC_SIGNAL_TYPE_ANSWER\x10\x02\x12%\n" +
-	"!WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE\x10\x03*\xae\x01\n" +
+	"!WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE\x10\x03*g\n" +
+	"\fStreamOrigin\x12\x1d\n" +
+	"\x19STREAM_ORIGIN_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19STREAM_ORIGIN_ROUTE_DELTA\x10\x01\x12\x19\n" +
+	"\x15STREAM_ORIGIN_RESTORE\x10\x02*j\n" +
+	"\n" +
+	"WebRTCMode\x12\x1c\n" +
+	"\x18WEB_RTC_MODE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bWEB_RTC_MODE_SERVER_MANAGED\x10\x01\x12\x1d\n" +
+	"\x19WEB_RTC_MODE_PEER_MANAGED\x10\x02*\xae\x01\n" +
 	"\rPointerAction\x12\x1e\n" +
 	"\x1aPOINTER_ACTION_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13POINTER_ACTION_DOWN\x10\x01\x12\x17\n" +
@@ -2753,84 +2941,91 @@ func file_terminals_io_v1_io_proto_rawDescGZIP() []byte {
 	return file_terminals_io_v1_io_proto_rawDescData
 }
 
-var file_terminals_io_v1_io_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_terminals_io_v1_io_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_terminals_io_v1_io_proto_goTypes = []any{
 	(StreamKind)(0),               // 0: terminals.io.v1.StreamKind
 	(WebRTCSignalType)(0),         // 1: terminals.io.v1.WebRTCSignalType
-	(PointerAction)(0),            // 2: terminals.io.v1.PointerAction
-	(TouchAction)(0),              // 3: terminals.io.v1.TouchAction
-	(ExecPolicy)(0),               // 4: terminals.io.v1.ExecPolicy
-	(FlowState)(0),                // 5: terminals.io.v1.FlowState
-	(*StartStream)(nil),           // 6: terminals.io.v1.StartStream
-	(*StopStream)(nil),            // 7: terminals.io.v1.StopStream
-	(*RouteStream)(nil),           // 8: terminals.io.v1.RouteStream
-	(*PlayAudio)(nil),             // 9: terminals.io.v1.PlayAudio
-	(*ShowMedia)(nil),             // 10: terminals.io.v1.ShowMedia
-	(*InputEvent)(nil),            // 11: terminals.io.v1.InputEvent
-	(*KeyEvent)(nil),              // 12: terminals.io.v1.KeyEvent
-	(*PointerEvent)(nil),          // 13: terminals.io.v1.PointerEvent
-	(*TouchPoint)(nil),            // 14: terminals.io.v1.TouchPoint
-	(*TouchEvent)(nil),            // 15: terminals.io.v1.TouchEvent
-	(*UIAction)(nil),              // 16: terminals.io.v1.UIAction
-	(*SensorData)(nil),            // 17: terminals.io.v1.SensorData
-	(*FlowNode)(nil),              // 18: terminals.io.v1.FlowNode
-	(*FlowEdge)(nil),              // 19: terminals.io.v1.FlowEdge
-	(*FlowPlan)(nil),              // 20: terminals.io.v1.FlowPlan
-	(*StartFlow)(nil),             // 21: terminals.io.v1.StartFlow
-	(*PatchFlow)(nil),             // 22: terminals.io.v1.PatchFlow
-	(*StopFlow)(nil),              // 23: terminals.io.v1.StopFlow
-	(*DeviceRef)(nil),             // 24: terminals.io.v1.DeviceRef
-	(*Pose)(nil),                  // 25: terminals.io.v1.Pose
-	(*LocationEstimate)(nil),      // 26: terminals.io.v1.LocationEstimate
-	(*ObservationProvenance)(nil), // 27: terminals.io.v1.ObservationProvenance
-	(*ArtifactRef)(nil),           // 28: terminals.io.v1.ArtifactRef
-	(*Observation)(nil),           // 29: terminals.io.v1.Observation
-	(*ObservationMessage)(nil),    // 30: terminals.io.v1.ObservationMessage
-	(*ArtifactAvailable)(nil),     // 31: terminals.io.v1.ArtifactAvailable
-	(*RequestArtifact)(nil),       // 32: terminals.io.v1.RequestArtifact
-	(*FlowStats)(nil),             // 33: terminals.io.v1.FlowStats
-	(*ClockSample)(nil),           // 34: terminals.io.v1.ClockSample
-	(*InstallBundle)(nil),         // 35: terminals.io.v1.InstallBundle
-	(*RemoveBundle)(nil),          // 36: terminals.io.v1.RemoveBundle
-	nil,                           // 37: terminals.io.v1.StartStream.MetadataEntry
-	nil,                           // 38: terminals.io.v1.SensorData.ValuesEntry
-	nil,                           // 39: terminals.io.v1.FlowNode.ArgsEntry
-	nil,                           // 40: terminals.io.v1.Observation.AttributesEntry
+	(StreamOrigin)(0),             // 2: terminals.io.v1.StreamOrigin
+	(WebRTCMode)(0),               // 3: terminals.io.v1.WebRTCMode
+	(PointerAction)(0),            // 4: terminals.io.v1.PointerAction
+	(TouchAction)(0),              // 5: terminals.io.v1.TouchAction
+	(ExecPolicy)(0),               // 6: terminals.io.v1.ExecPolicy
+	(FlowState)(0),                // 7: terminals.io.v1.FlowState
+	(*StreamRouting)(nil),         // 8: terminals.io.v1.StreamRouting
+	(*StartStream)(nil),           // 9: terminals.io.v1.StartStream
+	(*StopStream)(nil),            // 10: terminals.io.v1.StopStream
+	(*RouteStream)(nil),           // 11: terminals.io.v1.RouteStream
+	(*PlayAudio)(nil),             // 12: terminals.io.v1.PlayAudio
+	(*ShowMedia)(nil),             // 13: terminals.io.v1.ShowMedia
+	(*InputEvent)(nil),            // 14: terminals.io.v1.InputEvent
+	(*KeyEvent)(nil),              // 15: terminals.io.v1.KeyEvent
+	(*PointerEvent)(nil),          // 16: terminals.io.v1.PointerEvent
+	(*TouchPoint)(nil),            // 17: terminals.io.v1.TouchPoint
+	(*TouchEvent)(nil),            // 18: terminals.io.v1.TouchEvent
+	(*UIAction)(nil),              // 19: terminals.io.v1.UIAction
+	(*SensorData)(nil),            // 20: terminals.io.v1.SensorData
+	(*FlowNode)(nil),              // 21: terminals.io.v1.FlowNode
+	(*FlowEdge)(nil),              // 22: terminals.io.v1.FlowEdge
+	(*FlowPlan)(nil),              // 23: terminals.io.v1.FlowPlan
+	(*StartFlow)(nil),             // 24: terminals.io.v1.StartFlow
+	(*PatchFlow)(nil),             // 25: terminals.io.v1.PatchFlow
+	(*StopFlow)(nil),              // 26: terminals.io.v1.StopFlow
+	(*DeviceRef)(nil),             // 27: terminals.io.v1.DeviceRef
+	(*Pose)(nil),                  // 28: terminals.io.v1.Pose
+	(*LocationEstimate)(nil),      // 29: terminals.io.v1.LocationEstimate
+	(*ObservationProvenance)(nil), // 30: terminals.io.v1.ObservationProvenance
+	(*ArtifactRef)(nil),           // 31: terminals.io.v1.ArtifactRef
+	(*Observation)(nil),           // 32: terminals.io.v1.Observation
+	(*ObservationMessage)(nil),    // 33: terminals.io.v1.ObservationMessage
+	(*ArtifactAvailable)(nil),     // 34: terminals.io.v1.ArtifactAvailable
+	(*RequestArtifact)(nil),       // 35: terminals.io.v1.RequestArtifact
+	(*FlowStats)(nil),             // 36: terminals.io.v1.FlowStats
+	(*ClockSample)(nil),           // 37: terminals.io.v1.ClockSample
+	(*InstallBundle)(nil),         // 38: terminals.io.v1.InstallBundle
+	(*RemoveBundle)(nil),          // 39: terminals.io.v1.RemoveBundle
+	nil,                           // 40: terminals.io.v1.StartStream.MetadataEntry
+	nil,                           // 41: terminals.io.v1.SensorData.ValuesEntry
+	nil,                           // 42: terminals.io.v1.FlowNode.ArgsEntry
+	nil,                           // 43: terminals.io.v1.Observation.AttributesEntry
 }
 var file_terminals_io_v1_io_proto_depIdxs = []int32{
-	37, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
-	0,  // 1: terminals.io.v1.StartStream.stream_kind:type_name -> terminals.io.v1.StreamKind
-	0,  // 2: terminals.io.v1.RouteStream.stream_kind:type_name -> terminals.io.v1.StreamKind
-	12, // 3: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
-	13, // 4: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
-	15, // 5: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
-	16, // 6: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
-	2,  // 7: terminals.io.v1.PointerEvent.action_enum:type_name -> terminals.io.v1.PointerAction
-	14, // 8: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
-	3,  // 9: terminals.io.v1.TouchEvent.action_enum:type_name -> terminals.io.v1.TouchAction
-	38, // 10: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
-	39, // 11: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
-	4,  // 12: terminals.io.v1.FlowNode.exec_policy:type_name -> terminals.io.v1.ExecPolicy
-	18, // 13: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
-	19, // 14: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
-	20, // 15: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	20, // 16: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	25, // 17: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
-	24, // 18: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
-	24, // 19: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
-	26, // 20: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
-	40, // 21: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
-	28, // 22: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
-	27, // 23: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
-	29, // 24: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
-	28, // 25: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
-	5,  // 26: terminals.io.v1.FlowStats.state_enum:type_name -> terminals.io.v1.FlowState
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	2,  // 0: terminals.io.v1.StreamRouting.origin:type_name -> terminals.io.v1.StreamOrigin
+	3,  // 1: terminals.io.v1.StreamRouting.webrtc_mode:type_name -> terminals.io.v1.WebRTCMode
+	40, // 2: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
+	0,  // 3: terminals.io.v1.StartStream.stream_kind:type_name -> terminals.io.v1.StreamKind
+	8,  // 4: terminals.io.v1.StartStream.routing:type_name -> terminals.io.v1.StreamRouting
+	0,  // 5: terminals.io.v1.RouteStream.stream_kind:type_name -> terminals.io.v1.StreamKind
+	8,  // 6: terminals.io.v1.RouteStream.routing:type_name -> terminals.io.v1.StreamRouting
+	15, // 7: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
+	16, // 8: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
+	18, // 9: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
+	19, // 10: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
+	4,  // 11: terminals.io.v1.PointerEvent.action_enum:type_name -> terminals.io.v1.PointerAction
+	17, // 12: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
+	5,  // 13: terminals.io.v1.TouchEvent.action_enum:type_name -> terminals.io.v1.TouchAction
+	41, // 14: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
+	42, // 15: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
+	6,  // 16: terminals.io.v1.FlowNode.exec_policy:type_name -> terminals.io.v1.ExecPolicy
+	21, // 17: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
+	22, // 18: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
+	23, // 19: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	23, // 20: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	28, // 21: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
+	27, // 22: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
+	27, // 23: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
+	29, // 24: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
+	43, // 25: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
+	31, // 26: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
+	30, // 27: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
+	32, // 28: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
+	31, // 29: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
+	7,  // 30: terminals.io.v1.FlowStats.state_enum:type_name -> terminals.io.v1.FlowState
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_terminals_io_v1_io_proto_init() }
@@ -2838,12 +3033,12 @@ func file_terminals_io_v1_io_proto_init() {
 	if File_terminals_io_v1_io_proto != nil {
 		return
 	}
-	file_terminals_io_v1_io_proto_msgTypes[3].OneofWrappers = []any{
+	file_terminals_io_v1_io_proto_msgTypes[4].OneofWrappers = []any{
 		(*PlayAudio_Url)(nil),
 		(*PlayAudio_PcmData)(nil),
 		(*PlayAudio_TtsText)(nil),
 	}
-	file_terminals_io_v1_io_proto_msgTypes[5].OneofWrappers = []any{
+	file_terminals_io_v1_io_proto_msgTypes[6].OneofWrappers = []any{
 		(*InputEvent_Key)(nil),
 		(*InputEvent_Pointer)(nil),
 		(*InputEvent_Touch)(nil),
@@ -2854,8 +3049,8 @@ func file_terminals_io_v1_io_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_io_v1_io_proto_rawDesc), len(file_terminals_io_v1_io_proto_rawDesc)),
-			NumEnums:      6,
-			NumMessages:   35,
+			NumEnums:      8,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

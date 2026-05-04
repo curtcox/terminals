@@ -11,6 +11,8 @@ void main() {
     'register_ack_metadata_v1': _assertRegisterAckMetadata,
     'set_ui_basic_v1': _assertSetUIBasic,
     'start_stream_audio_v1': _assertStartStreamAudio,
+    'start_stream_route_delta_v1': _assertStartStreamRouteDelta,
+    'route_stream_route_delta_v1': _assertRouteStreamRouteDelta,
     'flow_plan_basic_v1': _assertFlowPlanBasic,
     'observation_sound_v1': _assertObservationSound,
     'flow_stats_v1': _assertFlowStats,
@@ -73,6 +75,26 @@ void _assertStartStreamAudio(WireEnvelope envelope) {
   _expectEqual(stream.kind, 'audio');
   _expectEqual(stream.streamKind, StreamKind.STREAM_KIND_AUDIO);
   _expectEqual(stream.metadata['sample_rate'], '16000');
+}
+
+void _assertStartStreamRouteDelta(WireEnvelope envelope) {
+  final stream = envelope.serverMessage.startStream;
+
+  _expectEqual(stream.metadata['origin'], 'route_delta');
+  _expectEqual(stream.metadata['webrtc_mode'], 'server_managed');
+  _expectEqual(stream.routing.origin, StreamOrigin.STREAM_ORIGIN_ROUTE_DELTA);
+  _expectEqual(
+      stream.routing.webrtcMode, WebRTCMode.WEB_RTC_MODE_SERVER_MANAGED);
+}
+
+void _assertRouteStreamRouteDelta(WireEnvelope envelope) {
+  final route = envelope.serverMessage.routeStream;
+
+  _expectEqual(route.kind, 'audio');
+  _expectEqual(route.streamKind, StreamKind.STREAM_KIND_AUDIO);
+  _expectEqual(route.routing.origin, StreamOrigin.STREAM_ORIGIN_ROUTE_DELTA);
+  _expectEqual(
+      route.routing.webrtcMode, WebRTCMode.WEB_RTC_MODE_SERVER_MANAGED);
 }
 
 void _assertFlowPlanBasic(WireEnvelope envelope) {

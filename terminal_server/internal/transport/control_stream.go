@@ -156,6 +156,7 @@ type RouteStreamResponse struct {
 	SourceDeviceID string
 	TargetDeviceID string
 	Kind           string
+	Routing        *iov1.StreamRouting
 }
 
 // StartStreamResponse instructs clients to start an underlying media stream.
@@ -165,6 +166,7 @@ type StartStreamResponse struct {
 	SourceDeviceID string
 	TargetDeviceID string
 	Metadata       map[string]string
+	Routing        *iov1.StreamRouting
 }
 
 // StopStreamResponse instructs clients to stop an underlying media stream.
@@ -430,12 +432,13 @@ type StreamHandler struct {
 }
 
 type mediaStreamState struct {
-	StreamID       string
-	Kind           string
-	SourceDeviceID string
-	TargetDeviceID string
-	Metadata       map[string]string
-	Ready          bool
+	StreamID          string
+	Kind              string
+	SourceDeviceID    string
+	TargetDeviceID    string
+	Metadata          map[string]string
+	RoutingWebRTCMode iov1.WebRTCMode
+	Ready             bool
 }
 
 type multiWindowResumeState struct {
@@ -2146,6 +2149,7 @@ func (h *StreamHandler) routeUpdatesForCommand(
 			if _, exists := beforeSet[routeID]; exists {
 				continue
 			}
+			routing := routeDeltaStreamRouting()
 			startMsg := ServerMessage{
 				StartStream: &StartStreamResponse{
 					StreamID:       routeID,
@@ -2156,6 +2160,7 @@ func (h *StreamHandler) routeUpdatesForCommand(
 						"origin":      "route_delta",
 						"webrtc_mode": "server_managed",
 					},
+					Routing: routing,
 				},
 			}
 			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, startMsg)
@@ -2168,6 +2173,7 @@ func (h *StreamHandler) routeUpdatesForCommand(
 					"origin":      "route_delta",
 					"webrtc_mode": "server_managed",
 				},
+				Routing: routing,
 			})
 			routeMsg := ServerMessage{
 				RouteStream: &RouteStreamResponse{
@@ -2175,6 +2181,7 @@ func (h *StreamHandler) routeUpdatesForCommand(
 					SourceDeviceID: route.SourceID,
 					TargetDeviceID: route.TargetID,
 					Kind:           route.StreamKind,
+					Routing:        routing,
 				},
 			}
 			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, routeMsg)

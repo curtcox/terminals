@@ -279,16 +279,18 @@ Tests: transport adapter + contract fixtures cover enum-first resolution and leg
 
 Owner: transport/io  
 Classification: transitional_escape_hatch  
-Target state: type stable routing/session hints; document remaining extension namespace.  
+Target state: typed `StartStream.routing` (`StreamRouting`) now carries the stable routing hints (`origin`, `webrtc_mode`); remaining keys (`sample_rate`, `channels`, `codec`) are media-codec hints retained as documented extension namespace.  
 Review date: 2026-06-15  
-Producer: server stream planner  
-Consumer: client media and edge stream setup  
-Unknown behavior: clients ignore unknown keys.  
-Validation: string values; known keys document stricter formats.  
-Tests: stream setup tests cover current keys and unknown-key tolerance.
+Producer: server stream planner emits both typed `routing` and the legacy `origin`/`webrtc_mode` map keys during the compatibility window.  
+Consumer: server media-control state prefers typed `routing.webrtc_mode` and falls back to the legacy `webrtc_mode` map key. Recording and replay paths still read legacy `origin`. Client media and edge stream setup ignore unknown keys.  
+Unknown behavior: clients and server ignore unknown map keys; consumers prefer typed `routing` when present.  
+Validation: typed `routing.origin` ∈ {`STREAM_ORIGIN_ROUTE_DELTA`, `STREAM_ORIGIN_RESTORE`}; typed `routing.webrtc_mode` ∈ {`WEB_RTC_MODE_SERVER_MANAGED`, `WEB_RTC_MODE_PEER_MANAGED`}. Legacy map values mirror the typed enums in lowercase. Other map keys use string values; known keys document stricter formats.  
+Tests: protocol contract fixtures `start_stream_route_delta_v1` and `route_stream_route_delta_v1` cover typed-enum + legacy-map coexistence. Stream setup tests cover current keys and unknown-key tolerance.
 
 Known keys:
 
+- `origin`: legacy mirror of `routing.origin` — `route_delta` or `restore`
+- `webrtc_mode`: legacy mirror of `routing.webrtc_mode` — `server_managed` or `peer_managed`
 - `sample_rate`: decimal hertz
 - `channels`: decimal count
 - `codec`: media codec token

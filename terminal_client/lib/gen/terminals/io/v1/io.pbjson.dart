@@ -50,6 +50,36 @@ final $typed_data.Uint8List webRTCSignalTypeDescriptor = $convert.base64Decode(
     'IdChlXRUJfUlRDX1NJR05BTF9UWVBFX09GRkVSEAESHgoaV0VCX1JUQ19TSUdOQUxfVFlQRV9B'
     'TlNXRVIQAhIlCiFXRUJfUlRDX1NJR05BTF9UWVBFX0lDRV9DQU5ESURBVEUQAw==');
 
+@$core.Deprecated('Use streamOriginDescriptor instead')
+const StreamOrigin$json = {
+  '1': 'StreamOrigin',
+  '2': [
+    {'1': 'STREAM_ORIGIN_UNSPECIFIED', '2': 0},
+    {'1': 'STREAM_ORIGIN_ROUTE_DELTA', '2': 1},
+    {'1': 'STREAM_ORIGIN_RESTORE', '2': 2},
+  ],
+};
+
+/// Descriptor for `StreamOrigin`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List streamOriginDescriptor = $convert.base64Decode(
+    'CgxTdHJlYW1PcmlnaW4SHQoZU1RSRUFNX09SSUdJTl9VTlNQRUNJRklFRBAAEh0KGVNUUkVBTV'
+    '9PUklHSU5fUk9VVEVfREVMVEEQARIZChVTVFJFQU1fT1JJR0lOX1JFU1RPUkUQAg==');
+
+@$core.Deprecated('Use webRTCModeDescriptor instead')
+const WebRTCMode$json = {
+  '1': 'WebRTCMode',
+  '2': [
+    {'1': 'WEB_RTC_MODE_UNSPECIFIED', '2': 0},
+    {'1': 'WEB_RTC_MODE_SERVER_MANAGED', '2': 1},
+    {'1': 'WEB_RTC_MODE_PEER_MANAGED', '2': 2},
+  ],
+};
+
+/// Descriptor for `WebRTCMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List webRTCModeDescriptor = $convert.base64Decode(
+    'CgpXZWJSVENNb2RlEhwKGFdFQl9SVENfTU9ERV9VTlNQRUNJRklFRBAAEh8KG1dFQl9SVENfTU'
+    '9ERV9TRVJWRVJfTUFOQUdFRBABEh0KGVdFQl9SVENfTU9ERV9QRUVSX01BTkFHRUQQAg==');
+
 @$core.Deprecated('Use pointerActionDescriptor instead')
 const PointerAction$json = {
   '1': 'PointerAction',
@@ -127,6 +157,35 @@ final $typed_data.Uint8List flowStateDescriptor = $convert.base64Decode(
     'EAMSFwoTRkxPV19TVEFURV9TVE9QUElORxAEEhYKEkZMT1dfU1RBVEVfU1RPUFBFRBAFEhUKEU'
     'ZMT1dfU1RBVEVfRkFJTEVEEAY=');
 
+@$core.Deprecated('Use streamRoutingDescriptor instead')
+const StreamRouting$json = {
+  '1': 'StreamRouting',
+  '2': [
+    {
+      '1': 'origin',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.StreamOrigin',
+      '10': 'origin'
+    },
+    {
+      '1': 'webrtc_mode',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.WebRTCMode',
+      '10': 'webrtcMode'
+    },
+  ],
+};
+
+/// Descriptor for `StreamRouting`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List streamRoutingDescriptor = $convert.base64Decode(
+    'Cg1TdHJlYW1Sb3V0aW5nEjUKBm9yaWdpbhgBIAEoDjIdLnRlcm1pbmFscy5pby52MS5TdHJlYW'
+    '1PcmlnaW5SBm9yaWdpbhI8Cgt3ZWJydGNfbW9kZRgCIAEoDjIbLnRlcm1pbmFscy5pby52MS5X'
+    'ZWJSVENNb2RlUgp3ZWJydGNNb2Rl');
+
 @$core.Deprecated('Use startStreamDescriptor instead')
 const StartStream$json = {
   '1': 'StartStream',
@@ -151,6 +210,14 @@ const StartStream$json = {
       '6': '.terminals.io.v1.StreamKind',
       '10': 'streamKind'
     },
+    {
+      '1': 'routing',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.StreamRouting',
+      '10': 'routing'
+    },
   ],
   '3': [StartStream_MetadataEntry$json],
 };
@@ -172,8 +239,9 @@ final $typed_data.Uint8List startStreamDescriptor = $convert.base64Decode(
     'Z2V0X2RldmljZV9pZBgEIAEoCVIOdGFyZ2V0RGV2aWNlSWQSRgoIbWV0YWRhdGEYBSADKAsyKi'
     '50ZXJtaW5hbHMuaW8udjEuU3RhcnRTdHJlYW0uTWV0YWRhdGFFbnRyeVIIbWV0YWRhdGESPAoL'
     'c3RyZWFtX2tpbmQYBiABKA4yGy50ZXJtaW5hbHMuaW8udjEuU3RyZWFtS2luZFIKc3RyZWFtS2'
-    'luZBo7Cg1NZXRhZGF0YUVudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2'
-    'YWx1ZToCOAE=');
+    'luZBI4Cgdyb3V0aW5nGAcgASgLMh4udGVybWluYWxzLmlvLnYxLlN0cmVhbVJvdXRpbmdSB3Jv'
+    'dXRpbmcaOwoNTWV0YWRhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCV'
+    'IFdmFsdWU6AjgB');
 
 @$core.Deprecated('Use stopStreamDescriptor instead')
 const StopStream$json = {
@@ -203,6 +271,14 @@ const RouteStream$json = {
       '6': '.terminals.io.v1.StreamKind',
       '10': 'streamKind'
     },
+    {
+      '1': 'routing',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.StreamRouting',
+      '10': 'routing'
+    },
   ],
 };
 
@@ -211,7 +287,8 @@ final $typed_data.Uint8List routeStreamDescriptor = $convert.base64Decode(
     'CgtSb3V0ZVN0cmVhbRIbCglzdHJlYW1faWQYASABKAlSCHN0cmVhbUlkEigKEHNvdXJjZV9kZX'
     'ZpY2VfaWQYAiABKAlSDnNvdXJjZURldmljZUlkEigKEHRhcmdldF9kZXZpY2VfaWQYAyABKAlS'
     'DnRhcmdldERldmljZUlkEhIKBGtpbmQYBCABKAlSBGtpbmQSPAoLc3RyZWFtX2tpbmQYBSABKA'
-    '4yGy50ZXJtaW5hbHMuaW8udjEuU3RyZWFtS2luZFIKc3RyZWFtS2luZA==');
+    '4yGy50ZXJtaW5hbHMuaW8udjEuU3RyZWFtS2luZFIKc3RyZWFtS2luZBI4Cgdyb3V0aW5nGAYg'
+    'ASgLMh4udGVybWluYWxzLmlvLnYxLlN0cmVhbVJvdXRpbmdSB3JvdXRpbmc=');
 
 @$core.Deprecated('Use playAudioDescriptor instead')
 const PlayAudio$json = {

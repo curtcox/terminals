@@ -38,9 +38,10 @@ The following additive typed replacements have shipped. Producers emit both the 
 | `UiEventEntry.kind_enum` (`UiEventKind`) | `UiEventEntry.kind` string (`set_ui` / `update_ui` / `transition_ui`) | 2026-05-04 (client diagnostics capture and dispatcher emit typed enum alongside legacy string) | After two tagged releases past 2026-05-04 |
 
 | `WebrtcSignalEntry.signal_type_enum` (`terminals.io.v1.WebRTCSignalType`) | `WebrtcSignalEntry.signal_type` string | 2026-05-04 (client diagnostics capture mirrors typed enum from `WebRTCSignal.signal_type_enum`) | After two tagged releases past 2026-05-04 |
+| `StartStream.routing` / `RouteStream.routing` (`StreamRouting` with `StreamOrigin` + `WebRTCMode` enums) | `StartStream.metadata` map keys (`origin`, `webrtc_mode`) | 2026-05-04 (server route-delta and replay producers emit typed routing alongside legacy map keys; server media-control state prefers typed `routing.webrtc_mode`) | After two tagged releases past 2026-05-04 |
 
 `terminals.io.v1.WebRTCSignalType` is a parallel enum to `terminals.control.v1.WebRTCSignalType` introduced to break the import cycle (control/v1 already imports diagnostics/v1, so diagnostics cannot import control). Both enums share identical numeric values; consolidation onto a single shared package is deferred until a buf-breaking-friendly path is available.
 
 ## Pending Migrations
 
-The protocol extension registry identifies remaining transitional escape hatches that should be reviewed after 2026-06-15, including `RegisterAck.metadata` (post-typed cleanup), `CommandRequest.arguments`, `CommandResult.data`, `Node.props`, `StartStream.metadata`, `FlowNode.args`, and `Observation.attributes`.
+The protocol extension registry identifies remaining transitional escape hatches that should be reviewed after 2026-06-15, including `RegisterAck.metadata` (post-typed cleanup), `CommandRequest.arguments`, `CommandResult.data`, `Node.props`, `StartStream.metadata` (post-typed `routing` cleanup; remaining `sample_rate`/`channels`/`codec` keys still un-typed), `FlowNode.args`, and `Observation.attributes`.

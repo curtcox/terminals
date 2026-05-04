@@ -21,6 +21,78 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'io.pbenum.dart';
 
+/// StreamRouting carries typed routing/session hints for a stream lifecycle
+/// message. It is the typed replacement for the well-known stable keys
+/// (`origin`, `webrtc_mode`) in `StartStream.metadata`.
+class StreamRouting extends $pb.GeneratedMessage {
+  factory StreamRouting({
+    StreamOrigin? origin,
+    WebRTCMode? webrtcMode,
+  }) {
+    final result = create();
+    if (origin != null) result.origin = origin;
+    if (webrtcMode != null) result.webrtcMode = webrtcMode;
+    return result;
+  }
+
+  StreamRouting._();
+
+  factory StreamRouting.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory StreamRouting.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StreamRouting',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.io.v1'),
+      createEmptyInstance: create)
+    ..aE<StreamOrigin>(1, _omitFieldNames ? '' : 'origin',
+        enumValues: StreamOrigin.values)
+    ..aE<WebRTCMode>(2, _omitFieldNames ? '' : 'webrtcMode',
+        enumValues: WebRTCMode.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamRouting clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StreamRouting copyWith(void Function(StreamRouting) updates) =>
+      super.copyWith((message) => updates(message as StreamRouting))
+          as StreamRouting;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StreamRouting create() => StreamRouting._();
+  @$core.override
+  StreamRouting createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static StreamRouting getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StreamRouting>(create);
+  static StreamRouting? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  StreamOrigin get origin => $_getN(0);
+  @$pb.TagNumber(1)
+  set origin(StreamOrigin value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOrigin() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOrigin() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  WebRTCMode get webrtcMode => $_getN(1);
+  @$pb.TagNumber(2)
+  set webrtcMode(WebRTCMode value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWebrtcMode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWebrtcMode() => $_clearField(2);
+}
+
 class StartStream extends $pb.GeneratedMessage {
   factory StartStream({
     $core.String? streamId,
@@ -29,6 +101,7 @@ class StartStream extends $pb.GeneratedMessage {
     $core.String? targetDeviceId,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
     StreamKind? streamKind,
+    StreamRouting? routing,
   }) {
     final result = create();
     if (streamId != null) result.streamId = streamId;
@@ -37,6 +110,7 @@ class StartStream extends $pb.GeneratedMessage {
     if (targetDeviceId != null) result.targetDeviceId = targetDeviceId;
     if (metadata != null) result.metadata.addEntries(metadata);
     if (streamKind != null) result.streamKind = streamKind;
+    if (routing != null) result.routing = routing;
     return result;
   }
 
@@ -65,6 +139,8 @@ class StartStream extends $pb.GeneratedMessage {
         packageName: const $pb.PackageName('terminals.io.v1'))
     ..aE<StreamKind>(6, _omitFieldNames ? '' : 'streamKind',
         enumValues: StreamKind.values)
+    ..aOM<StreamRouting>(7, _omitFieldNames ? '' : 'routing',
+        subBuilder: StreamRouting.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -133,6 +209,17 @@ class StartStream extends $pb.GeneratedMessage {
   $core.bool hasStreamKind() => $_has(5);
   @$pb.TagNumber(6)
   void clearStreamKind() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  StreamRouting get routing => $_getN(6);
+  @$pb.TagNumber(7)
+  set routing(StreamRouting value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasRouting() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRouting() => $_clearField(7);
+  @$pb.TagNumber(7)
+  StreamRouting ensureRouting() => $_ensure(6);
 }
 
 class StopStream extends $pb.GeneratedMessage {
@@ -196,6 +283,7 @@ class RouteStream extends $pb.GeneratedMessage {
     $core.String? targetDeviceId,
     $core.String? kind,
     StreamKind? streamKind,
+    StreamRouting? routing,
   }) {
     final result = create();
     if (streamId != null) result.streamId = streamId;
@@ -203,6 +291,7 @@ class RouteStream extends $pb.GeneratedMessage {
     if (targetDeviceId != null) result.targetDeviceId = targetDeviceId;
     if (kind != null) result.kind = kind;
     if (streamKind != null) result.streamKind = streamKind;
+    if (routing != null) result.routing = routing;
     return result;
   }
 
@@ -226,6 +315,8 @@ class RouteStream extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'kind')
     ..aE<StreamKind>(5, _omitFieldNames ? '' : 'streamKind',
         enumValues: StreamKind.values)
+    ..aOM<StreamRouting>(6, _omitFieldNames ? '' : 'routing',
+        subBuilder: StreamRouting.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -291,6 +382,17 @@ class RouteStream extends $pb.GeneratedMessage {
   $core.bool hasStreamKind() => $_has(4);
   @$pb.TagNumber(5)
   void clearStreamKind() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  StreamRouting get routing => $_getN(5);
+  @$pb.TagNumber(6)
+  set routing(StreamRouting value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRouting() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRouting() => $_clearField(6);
+  @$pb.TagNumber(6)
+  StreamRouting ensureRouting() => $_ensure(5);
 }
 
 enum PlayAudio_Source { url, pcmData, ttsText, notSet }

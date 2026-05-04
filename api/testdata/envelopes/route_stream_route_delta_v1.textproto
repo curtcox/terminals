@@ -1,0 +1,16 @@
+protocol_version: 1
+session_id: "session-route-delta"
+sequence: 12
+server_message: {
+  route_stream: {
+    stream_id: "stream-route-1"
+    source_device_id: "terminal-kitchen"
+    target_device_id: "terminal-hallway"
+    kind: "audio"
+    stream_kind: STREAM_KIND_AUDIO
+    routing: {
+      origin: STREAM_ORIGIN_ROUTE_DELTA
+      webrtc_mode: WEB_RTC_MODE_SERVER_MANAGED
+    }
+  }
+}

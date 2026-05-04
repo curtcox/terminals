@@ -266,6 +266,10 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 			},
 		}
 	case msg.StartStream != nil:
+		routing := msg.StartStream.Routing
+		if routing == nil {
+			routing = streamRoutingFromMetadata(msg.StartStream.Metadata)
+		}
 		return &controlv1.ConnectResponse{
 			Payload: &controlv1.ConnectResponse_StartStream{
 				StartStream: &iov1.StartStream{
@@ -275,6 +279,7 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					TargetDeviceId: msg.StartStream.TargetDeviceID,
 					Metadata:       msg.StartStream.Metadata,
 					StreamKind:     protoStreamKindFromInternal(msg.StartStream.Kind),
+					Routing:        routing,
 				},
 			},
 		}
@@ -295,6 +300,7 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					TargetDeviceId: msg.RouteStream.TargetDeviceID,
 					Kind:           msg.RouteStream.Kind,
 					StreamKind:     protoStreamKindFromInternal(msg.RouteStream.Kind),
+					Routing:        msg.RouteStream.Routing,
 				},
 			},
 		}
