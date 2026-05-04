@@ -93,3 +93,9 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Updated the protocol extension registry entries for `PointerEvent.action` and `TouchEvent.action` to describe typed-first compatibility semantics (typed enum preferred, legacy string fallback during the migration window).
 - No application-code paths currently route pointer/touch input, so adapter wiring is deferred until a producer/consumer lands; the typed fields are now available for the first non-test consumer.
 - Re-ran `make proto-contract-test` and `make server-test`; all green.
+
+## Protocol Evolution Rules (2026-05-04, Phase 5 enforcement + compatibility windows)
+
+- Flipped `proto-flex-check` from advisory to required by passing `--enforce` in the Makefile target. The registry now covers all 31 detected flexible fields, so missing-entry detections fail the gate.
+- Updated `docs/compatibility.md` to enumerate the typed-replacement migration windows currently open (RegisterAck typed metadata, StreamKind, WebRTCSignalType, ScrollDirection, FlowState, ExecPolicy, CanvasWidget DrawOps, PointerAction, TouchAction) with shipped dates and earliest legacy-removal criteria, and refreshed the pending-migrations summary against the current registry.
+- Re-ran `make proto-flex-check` (now in enforce mode) and `make proto-contract-test`; all green.

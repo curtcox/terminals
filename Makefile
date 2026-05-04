@@ -123,7 +123,7 @@ proto-generate:
 	cd api && buf generate
 
 proto-flex-check:
-	python3 ./scripts/check-proto-flex-fields.py
+	python3 ./scripts/check-proto-flex-fields.py --enforce
 
 proto-contract-test:
 	$(MAKE) proto-lint
