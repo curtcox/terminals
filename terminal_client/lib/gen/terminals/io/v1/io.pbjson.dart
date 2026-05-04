@@ -33,6 +33,27 @@ final $typed_data.Uint8List streamKindDescriptor = $convert.base64Decode(
     'RfQVVESU8QARIVChFTVFJFQU1fS0lORF9WSURFTxACEhYKElNUUkVBTV9LSU5EX1NFTlNPUhAD'
     'EhQKEFNUUkVBTV9LSU5EX0RBVEEQBA==');
 
+@$core.Deprecated('Use flowStateDescriptor instead')
+const FlowState$json = {
+  '1': 'FlowState',
+  '2': [
+    {'1': 'FLOW_STATE_UNSPECIFIED', '2': 0},
+    {'1': 'FLOW_STATE_STARTING', '2': 1},
+    {'1': 'FLOW_STATE_RUNNING', '2': 2},
+    {'1': 'FLOW_STATE_DEGRADED', '2': 3},
+    {'1': 'FLOW_STATE_STOPPING', '2': 4},
+    {'1': 'FLOW_STATE_STOPPED', '2': 5},
+    {'1': 'FLOW_STATE_FAILED', '2': 6},
+  ],
+};
+
+/// Descriptor for `FlowState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List flowStateDescriptor = $convert.base64Decode(
+    'CglGbG93U3RhdGUSGgoWRkxPV19TVEFURV9VTlNQRUNJRklFRBAAEhcKE0ZMT1dfU1RBVEVfU1'
+    'RBUlRJTkcQARIWChJGTE9XX1NUQVRFX1JVTk5JTkcQAhIXChNGTE9XX1NUQVRFX0RFR1JBREVE'
+    'EAMSFwoTRkxPV19TVEFURV9TVE9QUElORxAEEhYKEkZMT1dfU1RBVEVfU1RPUFBFRBAFEhUKEU'
+    'ZMT1dfU1RBVEVfRkFJTEVEEAY=');
+
 @$core.Deprecated('Use startStreamDescriptor instead')
 const StartStream$json = {
   '1': 'StartStream',
@@ -716,6 +737,14 @@ const FlowStats$json = {
     {'1': 'dropped_frames', '3': 4, '4': 1, '5': 4, '10': 'droppedFrames'},
     {'1': 'state', '3': 5, '4': 1, '5': 9, '10': 'state'},
     {'1': 'error', '3': 6, '4': 1, '5': 9, '10': 'error'},
+    {
+      '1': 'state_enum',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.FlowState',
+      '10': 'stateEnum'
+    },
   ],
 };
 
@@ -724,7 +753,8 @@ final $typed_data.Uint8List flowStatsDescriptor = $convert.base64Decode(
     'CglGbG93U3RhdHMSFwoHZmxvd19pZBgBIAEoCVIGZmxvd0lkEhcKB2NwdV9wY3QYAiABKAFSBm'
     'NwdVBjdBIVCgZtZW1fbWIYAyABKAFSBW1lbU1iEiUKDmRyb3BwZWRfZnJhbWVzGAQgASgEUg1k'
     'cm9wcGVkRnJhbWVzEhQKBXN0YXRlGAUgASgJUgVzdGF0ZRIUCgVlcnJvchgGIAEoCVIFZXJyb3'
-    'I=');
+    'ISOQoKc3RhdGVfZW51bRgHIAEoDjIaLnRlcm1pbmFscy5pby52MS5GbG93U3RhdGVSCXN0YXRl'
+    'RW51bQ==');
 
 @$core.Deprecated('Use clockSampleDescriptor instead')
 const ClockSample$json = {

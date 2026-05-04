@@ -251,25 +251,25 @@ func (ControlErrorCode) EnumDescriptor() ([]byte, []int) {
 type WebRTCSignalType int32
 
 const (
-	WebRTCSignalType_WEBRTC_SIGNAL_TYPE_UNSPECIFIED   WebRTCSignalType = 0
-	WebRTCSignalType_WEBRTC_SIGNAL_TYPE_OFFER         WebRTCSignalType = 1
-	WebRTCSignalType_WEBRTC_SIGNAL_TYPE_ANSWER        WebRTCSignalType = 2
-	WebRTCSignalType_WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE WebRTCSignalType = 3
+	WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_UNSPECIFIED   WebRTCSignalType = 0
+	WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_OFFER         WebRTCSignalType = 1
+	WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_ANSWER        WebRTCSignalType = 2
+	WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE WebRTCSignalType = 3
 )
 
 // Enum value maps for WebRTCSignalType.
 var (
 	WebRTCSignalType_name = map[int32]string{
-		0: "WEBRTC_SIGNAL_TYPE_UNSPECIFIED",
-		1: "WEBRTC_SIGNAL_TYPE_OFFER",
-		2: "WEBRTC_SIGNAL_TYPE_ANSWER",
-		3: "WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE",
+		0: "WEB_RTC_SIGNAL_TYPE_UNSPECIFIED",
+		1: "WEB_RTC_SIGNAL_TYPE_OFFER",
+		2: "WEB_RTC_SIGNAL_TYPE_ANSWER",
+		3: "WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE",
 	}
 	WebRTCSignalType_value = map[string]int32{
-		"WEBRTC_SIGNAL_TYPE_UNSPECIFIED":   0,
-		"WEBRTC_SIGNAL_TYPE_OFFER":         1,
-		"WEBRTC_SIGNAL_TYPE_ANSWER":        2,
-		"WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE": 3,
+		"WEB_RTC_SIGNAL_TYPE_UNSPECIFIED":   0,
+		"WEB_RTC_SIGNAL_TYPE_OFFER":         1,
+		"WEB_RTC_SIGNAL_TYPE_ANSWER":        2,
+		"WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE": 3,
 	}
 )
 
@@ -2491,7 +2491,7 @@ func (x *WebRTCSignal) GetSignalTypeEnum() WebRTCSignalType {
 	if x != nil {
 		return x.SignalTypeEnum
 	}
-	return WebRTCSignalType_WEBRTC_SIGNAL_TYPE_UNSPECIFIED
+	return WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_UNSPECIFIED
 }
 
 type Heartbeat struct {
@@ -2756,12 +2756,12 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"'CONTROL_ERROR_CODE_MISSING_COMMAND_TEXT\x10\x05\x120\n" +
 	",CONTROL_ERROR_CODE_MISSING_COMMAND_DEVICE_ID\x10\x06\x12)\n" +
 	"%CONTROL_ERROR_CODE_PROTOCOL_VIOLATION\x10\a\x12\x1e\n" +
-	"\x1aCONTROL_ERROR_CODE_UNKNOWN\x10c*\x99\x01\n" +
-	"\x10WebRTCSignalType\x12\"\n" +
-	"\x1eWEBRTC_SIGNAL_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
-	"\x18WEBRTC_SIGNAL_TYPE_OFFER\x10\x01\x12\x1d\n" +
-	"\x19WEBRTC_SIGNAL_TYPE_ANSWER\x10\x02\x12$\n" +
-	" WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE\x10\x032t\n" +
+	"\x1aCONTROL_ERROR_CODE_UNKNOWN\x10c*\x9d\x01\n" +
+	"\x10WebRTCSignalType\x12#\n" +
+	"\x1fWEB_RTC_SIGNAL_TYPE_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19WEB_RTC_SIGNAL_TYPE_OFFER\x10\x01\x12\x1e\n" +
+	"\x1aWEB_RTC_SIGNAL_TYPE_ANSWER\x10\x02\x12%\n" +
+	"!WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE\x10\x032t\n" +
 	"\x16TerminalControlService\x12Z\n" +
 	"\aConnect\x12$.terminals.control.v1.ConnectRequest\x1a%.terminals.control.v1.ConnectResponse(\x010\x01BJZHgithub.com/curtcox/terminals/terminal_server/gen/go/control/v1;controlv1b\x06proto3"
 

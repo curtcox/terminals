@@ -905,6 +905,21 @@ Incremental progress (2026-05-03):
 Risk: medium  
 Review focus: old-client behavior and route/media regressions.
 
+Incremental progress (2026-05-03, ScrollDirection):
+
+- Added additive typed enum `terminals.ui.v1.ScrollDirection` and `ScrollWidget.direction_enum` while preserving the legacy `direction` string for compatibility.
+- Adapter `applyWidgetFromDescriptor` now populates both typed enum and legacy string from `props["direction"]`.
+- Flutter server-driven renderer prefers `direction_enum` and falls back to the legacy string when unspecified.
+- Updated registry entry for `ScrollWidget.direction` to describe typed-first compatibility semantics.
+- Replaced brittle Dart `switch` expressions over `ProtobufEnum` constants in `control_response_dispatcher` / `webrtc_engine` with defensive `if`/`==` chains; split the `typed enum fields override` dispatcher test into per-payload responses (oneof-aware).
+
+Incremental progress (2026-05-03, FlowState):
+
+- Added additive typed enum `terminals.io.v1.FlowState` and `FlowStats.state_enum` while keeping legacy `state` string for compatibility.
+- Adapter now reads the typed enum into `FlowStatsRequest.StateEnum`; server flow stats handler logs the resolved state enum-first with legacy string fallback.
+- Added `flow_stats_v1` golden envelope fixture exercised by both Go and Dart contract tests.
+- Updated registry entry for `FlowStats.state` to describe typed-first compatibility semantics.
+
 Incremental progress (2026-05-03):
 
 - Added additive typed enums: `terminals.io.v1.StreamKind` and `terminals.control.v1.WebRTCSignalType`, with new `StartStream.stream_kind`, `RouteStream.stream_kind`, and `WebRTCSignal.signal_type_enum` fields while preserving legacy string fields.

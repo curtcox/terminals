@@ -119,8 +119,15 @@ class ServerDrivenRenderer extends StatelessWidget {
           },
         );
       case uiv1.Node_Widget.scroll:
-        final isHorizontal =
-            node.scroll.direction.trim().toLowerCase() == 'horizontal';
+        final scroll = node.scroll;
+        final bool isHorizontal;
+        if (scroll.directionEnum !=
+            uiv1.ScrollDirection.SCROLL_DIRECTION_UNSPECIFIED) {
+          isHorizontal = scroll.directionEnum ==
+              uiv1.ScrollDirection.SCROLL_DIRECTION_HORIZONTAL;
+        } else {
+          isHorizontal = scroll.direction.trim().toLowerCase() == 'horizontal';
+        }
         return SingleChildScrollView(
           key: _key('scroll', node, path),
           scrollDirection: isHorizontal ? Axis.horizontal : Axis.vertical,

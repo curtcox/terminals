@@ -14,7 +14,11 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'ui.pbenum.dart';
+
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+
+export 'ui.pbenum.dart';
 
 class SetUI extends $pb.GeneratedMessage {
   factory SetUI({
@@ -1010,9 +1014,11 @@ class GridWidget extends $pb.GeneratedMessage {
 class ScrollWidget extends $pb.GeneratedMessage {
   factory ScrollWidget({
     $core.String? direction,
+    ScrollDirection? directionEnum,
   }) {
     final result = create();
     if (direction != null) result.direction = direction;
+    if (directionEnum != null) result.directionEnum = directionEnum;
     return result;
   }
 
@@ -1031,6 +1037,8 @@ class ScrollWidget extends $pb.GeneratedMessage {
           const $pb.PackageName(_omitMessageNames ? '' : 'terminals.ui.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'direction')
+    ..aE<ScrollDirection>(2, _omitFieldNames ? '' : 'directionEnum',
+        enumValues: ScrollDirection.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1060,6 +1068,15 @@ class ScrollWidget extends $pb.GeneratedMessage {
   $core.bool hasDirection() => $_has(0);
   @$pb.TagNumber(1)
   void clearDirection() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ScrollDirection get directionEnum => $_getN(1);
+  @$pb.TagNumber(2)
+  set directionEnum(ScrollDirection value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDirectionEnum() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDirectionEnum() => $_clearField(2);
 }
 
 class PaddingWidget extends $pb.GeneratedMessage {

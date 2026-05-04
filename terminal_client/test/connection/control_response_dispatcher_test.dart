@@ -423,29 +423,41 @@ void main() {
     });
 
     test('typed enum fields override legacy labels when both are present', () {
-      final update = synchronousMediaControlUpdateFromResponse(
+      // start_stream, route_stream, and webrtc_signal share a oneof on
+      // ConnectResponse, so each typed payload is exercised in its own
+      // response.
+      final startUpdate = synchronousMediaControlUpdateFromResponse(
         ConnectResponse()
           ..startStream = (iov1.StartStream()
             ..streamId = 'stream-typed'
             ..kind = 'legacy-kind'
-            ..streamKind = iov1.StreamKind.STREAM_KIND_SENSOR)
+            ..streamKind = iov1.StreamKind.STREAM_KIND_SENSOR),
+      );
+      expect(startUpdate.startStreamNotification,
+          'Start stream: sensor (stream-typed)');
+
+      final routeUpdate = synchronousMediaControlUpdateFromResponse(
+        ConnectResponse()
           ..routeStream = (iov1.RouteStream()
             ..streamId = 'route-typed'
             ..sourceDeviceId = 'source'
             ..targetDeviceId = 'target'
             ..kind = 'legacy-route'
-            ..streamKind = iov1.StreamKind.STREAM_KIND_DATA)
+            ..streamKind = iov1.StreamKind.STREAM_KIND_DATA),
+      );
+      expect(routeUpdate.routeNotification,
+          'Route: source -> target (data)');
+
+      final signalUpdate = synchronousMediaControlUpdateFromResponse(
+        ConnectResponse()
           ..webrtcSignal = (WebRTCSignal()
             ..streamId = 'signal-typed'
             ..signalType = 'legacy-signal'
             ..signalTypeEnum =
                 WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE),
       );
-
-      expect(update.startStreamNotification, 'Start stream: sensor (stream-typed)');
-      expect(update.routeNotification, 'Route: source -> target (data)');
       expect(
-        update.webrtcSignalNotification,
+        signalUpdate.webrtcSignalNotification,
         'WebRTC signal: candidate (signal-typed)',
       );
     });

@@ -21,6 +21,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ScrollDirection int32
+
+const (
+	ScrollDirection_SCROLL_DIRECTION_UNSPECIFIED ScrollDirection = 0
+	ScrollDirection_SCROLL_DIRECTION_VERTICAL    ScrollDirection = 1
+	ScrollDirection_SCROLL_DIRECTION_HORIZONTAL  ScrollDirection = 2
+)
+
+// Enum value maps for ScrollDirection.
+var (
+	ScrollDirection_name = map[int32]string{
+		0: "SCROLL_DIRECTION_UNSPECIFIED",
+		1: "SCROLL_DIRECTION_VERTICAL",
+		2: "SCROLL_DIRECTION_HORIZONTAL",
+	}
+	ScrollDirection_value = map[string]int32{
+		"SCROLL_DIRECTION_UNSPECIFIED": 0,
+		"SCROLL_DIRECTION_VERTICAL":    1,
+		"SCROLL_DIRECTION_HORIZONTAL":  2,
+	}
+)
+
+func (x ScrollDirection) Enum() *ScrollDirection {
+	p := new(ScrollDirection)
+	*p = x
+	return p
+}
+
+func (x ScrollDirection) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ScrollDirection) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_ui_v1_ui_proto_enumTypes[0].Descriptor()
+}
+
+func (ScrollDirection) Type() protoreflect.EnumType {
+	return &file_terminals_ui_v1_ui_proto_enumTypes[0]
+}
+
+func (x ScrollDirection) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ScrollDirection.Descriptor instead.
+func (ScrollDirection) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{0}
+}
+
 type SetUI struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
@@ -822,6 +871,7 @@ func (x *GridWidget) GetColumns() int32 {
 type ScrollWidget struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Direction     string                 `protobuf:"bytes,1,opt,name=direction,proto3" json:"direction,omitempty"`
+	DirectionEnum ScrollDirection        `protobuf:"varint,2,opt,name=direction_enum,json=directionEnum,proto3,enum=terminals.ui.v1.ScrollDirection" json:"direction_enum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -861,6 +911,13 @@ func (x *ScrollWidget) GetDirection() string {
 		return x.Direction
 	}
 	return ""
+}
+
+func (x *ScrollWidget) GetDirectionEnum() ScrollDirection {
+	if x != nil {
+		return x.DirectionEnum
+	}
+	return ScrollDirection_SCROLL_DIRECTION_UNSPECIFIED
 }
 
 type PaddingWidget struct {
@@ -1798,9 +1855,10 @@ const file_terminals_ui_v1_ui_proto_rawDesc = "" +
 	"\tRowWidget\"&\n" +
 	"\n" +
 	"GridWidget\x12\x18\n" +
-	"\acolumns\x18\x01 \x01(\x05R\acolumns\",\n" +
+	"\acolumns\x18\x01 \x01(\x05R\acolumns\"u\n" +
 	"\fScrollWidget\x12\x1c\n" +
-	"\tdirection\x18\x01 \x01(\tR\tdirection\"!\n" +
+	"\tdirection\x18\x01 \x01(\tR\tdirection\x12G\n" +
+	"\x0edirection_enum\x18\x02 \x01(\x0e2 .terminals.ui.v1.ScrollDirectionR\rdirectionEnum\"!\n" +
 	"\rPaddingWidget\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\x05R\x03all\"\x0e\n" +
 	"\fCenterWidget\"\x0e\n" +
@@ -1843,7 +1901,11 @@ const file_terminals_ui_v1_ui_proto_rawDesc = "" +
 	"\x0fKeepAwakeWidget\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\"(\n" +
 	"\x10BrightnessWidget\x12\x14\n" +
-	"\x05value\x18\x01 \x01(\x01R\x05valueB@Z>github.com/curtcox/terminals/terminal_server/gen/go/ui/v1;uiv1b\x06proto3"
+	"\x05value\x18\x01 \x01(\x01R\x05value*s\n" +
+	"\x0fScrollDirection\x12 \n" +
+	"\x1cSCROLL_DIRECTION_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19SCROLL_DIRECTION_VERTICAL\x10\x01\x12\x1f\n" +
+	"\x1bSCROLL_DIRECTION_HORIZONTAL\x10\x02B@Z>github.com/curtcox/terminals/terminal_server/gen/go/ui/v1;uiv1b\x06proto3"
 
 var (
 	file_terminals_ui_v1_ui_proto_rawDescOnce sync.Once
@@ -1857,71 +1919,74 @@ func file_terminals_ui_v1_ui_proto_rawDescGZIP() []byte {
 	return file_terminals_ui_v1_ui_proto_rawDescData
 }
 
+var file_terminals_ui_v1_ui_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_terminals_ui_v1_ui_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_terminals_ui_v1_ui_proto_goTypes = []any{
-	(*SetUI)(nil),                 // 0: terminals.ui.v1.SetUI
-	(*UpdateUI)(nil),              // 1: terminals.ui.v1.UpdateUI
-	(*TransitionUI)(nil),          // 2: terminals.ui.v1.TransitionUI
-	(*Notification)(nil),          // 3: terminals.ui.v1.Notification
-	(*Node)(nil),                  // 4: terminals.ui.v1.Node
-	(*StackWidget)(nil),           // 5: terminals.ui.v1.StackWidget
-	(*RowWidget)(nil),             // 6: terminals.ui.v1.RowWidget
-	(*GridWidget)(nil),            // 7: terminals.ui.v1.GridWidget
-	(*ScrollWidget)(nil),          // 8: terminals.ui.v1.ScrollWidget
-	(*PaddingWidget)(nil),         // 9: terminals.ui.v1.PaddingWidget
-	(*CenterWidget)(nil),          // 10: terminals.ui.v1.CenterWidget
-	(*ExpandWidget)(nil),          // 11: terminals.ui.v1.ExpandWidget
-	(*TextWidget)(nil),            // 12: terminals.ui.v1.TextWidget
-	(*ImageWidget)(nil),           // 13: terminals.ui.v1.ImageWidget
-	(*VideoSurfaceWidget)(nil),    // 14: terminals.ui.v1.VideoSurfaceWidget
-	(*AudioVisualizerWidget)(nil), // 15: terminals.ui.v1.AudioVisualizerWidget
-	(*CanvasWidget)(nil),          // 16: terminals.ui.v1.CanvasWidget
-	(*TextInputWidget)(nil),       // 17: terminals.ui.v1.TextInputWidget
-	(*ButtonWidget)(nil),          // 18: terminals.ui.v1.ButtonWidget
-	(*SliderWidget)(nil),          // 19: terminals.ui.v1.SliderWidget
-	(*ToggleWidget)(nil),          // 20: terminals.ui.v1.ToggleWidget
-	(*DropdownWidget)(nil),        // 21: terminals.ui.v1.DropdownWidget
-	(*GestureAreaWidget)(nil),     // 22: terminals.ui.v1.GestureAreaWidget
-	(*OverlayWidget)(nil),         // 23: terminals.ui.v1.OverlayWidget
-	(*ProgressWidget)(nil),        // 24: terminals.ui.v1.ProgressWidget
-	(*FullscreenWidget)(nil),      // 25: terminals.ui.v1.FullscreenWidget
-	(*KeepAwakeWidget)(nil),       // 26: terminals.ui.v1.KeepAwakeWidget
-	(*BrightnessWidget)(nil),      // 27: terminals.ui.v1.BrightnessWidget
-	nil,                           // 28: terminals.ui.v1.Node.PropsEntry
+	(ScrollDirection)(0),          // 0: terminals.ui.v1.ScrollDirection
+	(*SetUI)(nil),                 // 1: terminals.ui.v1.SetUI
+	(*UpdateUI)(nil),              // 2: terminals.ui.v1.UpdateUI
+	(*TransitionUI)(nil),          // 3: terminals.ui.v1.TransitionUI
+	(*Notification)(nil),          // 4: terminals.ui.v1.Notification
+	(*Node)(nil),                  // 5: terminals.ui.v1.Node
+	(*StackWidget)(nil),           // 6: terminals.ui.v1.StackWidget
+	(*RowWidget)(nil),             // 7: terminals.ui.v1.RowWidget
+	(*GridWidget)(nil),            // 8: terminals.ui.v1.GridWidget
+	(*ScrollWidget)(nil),          // 9: terminals.ui.v1.ScrollWidget
+	(*PaddingWidget)(nil),         // 10: terminals.ui.v1.PaddingWidget
+	(*CenterWidget)(nil),          // 11: terminals.ui.v1.CenterWidget
+	(*ExpandWidget)(nil),          // 12: terminals.ui.v1.ExpandWidget
+	(*TextWidget)(nil),            // 13: terminals.ui.v1.TextWidget
+	(*ImageWidget)(nil),           // 14: terminals.ui.v1.ImageWidget
+	(*VideoSurfaceWidget)(nil),    // 15: terminals.ui.v1.VideoSurfaceWidget
+	(*AudioVisualizerWidget)(nil), // 16: terminals.ui.v1.AudioVisualizerWidget
+	(*CanvasWidget)(nil),          // 17: terminals.ui.v1.CanvasWidget
+	(*TextInputWidget)(nil),       // 18: terminals.ui.v1.TextInputWidget
+	(*ButtonWidget)(nil),          // 19: terminals.ui.v1.ButtonWidget
+	(*SliderWidget)(nil),          // 20: terminals.ui.v1.SliderWidget
+	(*ToggleWidget)(nil),          // 21: terminals.ui.v1.ToggleWidget
+	(*DropdownWidget)(nil),        // 22: terminals.ui.v1.DropdownWidget
+	(*GestureAreaWidget)(nil),     // 23: terminals.ui.v1.GestureAreaWidget
+	(*OverlayWidget)(nil),         // 24: terminals.ui.v1.OverlayWidget
+	(*ProgressWidget)(nil),        // 25: terminals.ui.v1.ProgressWidget
+	(*FullscreenWidget)(nil),      // 26: terminals.ui.v1.FullscreenWidget
+	(*KeepAwakeWidget)(nil),       // 27: terminals.ui.v1.KeepAwakeWidget
+	(*BrightnessWidget)(nil),      // 28: terminals.ui.v1.BrightnessWidget
+	nil,                           // 29: terminals.ui.v1.Node.PropsEntry
 }
 var file_terminals_ui_v1_ui_proto_depIdxs = []int32{
-	4,  // 0: terminals.ui.v1.SetUI.root:type_name -> terminals.ui.v1.Node
-	4,  // 1: terminals.ui.v1.UpdateUI.node:type_name -> terminals.ui.v1.Node
-	28, // 2: terminals.ui.v1.Node.props:type_name -> terminals.ui.v1.Node.PropsEntry
-	4,  // 3: terminals.ui.v1.Node.children:type_name -> terminals.ui.v1.Node
-	5,  // 4: terminals.ui.v1.Node.stack:type_name -> terminals.ui.v1.StackWidget
-	6,  // 5: terminals.ui.v1.Node.row:type_name -> terminals.ui.v1.RowWidget
-	7,  // 6: terminals.ui.v1.Node.grid:type_name -> terminals.ui.v1.GridWidget
-	8,  // 7: terminals.ui.v1.Node.scroll:type_name -> terminals.ui.v1.ScrollWidget
-	9,  // 8: terminals.ui.v1.Node.padding:type_name -> terminals.ui.v1.PaddingWidget
-	10, // 9: terminals.ui.v1.Node.center:type_name -> terminals.ui.v1.CenterWidget
-	11, // 10: terminals.ui.v1.Node.expand:type_name -> terminals.ui.v1.ExpandWidget
-	12, // 11: terminals.ui.v1.Node.text:type_name -> terminals.ui.v1.TextWidget
-	13, // 12: terminals.ui.v1.Node.image:type_name -> terminals.ui.v1.ImageWidget
-	14, // 13: terminals.ui.v1.Node.video_surface:type_name -> terminals.ui.v1.VideoSurfaceWidget
-	15, // 14: terminals.ui.v1.Node.audio_visualizer:type_name -> terminals.ui.v1.AudioVisualizerWidget
-	16, // 15: terminals.ui.v1.Node.canvas:type_name -> terminals.ui.v1.CanvasWidget
-	17, // 16: terminals.ui.v1.Node.text_input:type_name -> terminals.ui.v1.TextInputWidget
-	18, // 17: terminals.ui.v1.Node.button:type_name -> terminals.ui.v1.ButtonWidget
-	19, // 18: terminals.ui.v1.Node.slider:type_name -> terminals.ui.v1.SliderWidget
-	20, // 19: terminals.ui.v1.Node.toggle:type_name -> terminals.ui.v1.ToggleWidget
-	21, // 20: terminals.ui.v1.Node.dropdown:type_name -> terminals.ui.v1.DropdownWidget
-	22, // 21: terminals.ui.v1.Node.gesture_area:type_name -> terminals.ui.v1.GestureAreaWidget
-	23, // 22: terminals.ui.v1.Node.overlay:type_name -> terminals.ui.v1.OverlayWidget
-	24, // 23: terminals.ui.v1.Node.progress:type_name -> terminals.ui.v1.ProgressWidget
-	25, // 24: terminals.ui.v1.Node.fullscreen:type_name -> terminals.ui.v1.FullscreenWidget
-	26, // 25: terminals.ui.v1.Node.keep_awake:type_name -> terminals.ui.v1.KeepAwakeWidget
-	27, // 26: terminals.ui.v1.Node.brightness:type_name -> terminals.ui.v1.BrightnessWidget
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	5,  // 0: terminals.ui.v1.SetUI.root:type_name -> terminals.ui.v1.Node
+	5,  // 1: terminals.ui.v1.UpdateUI.node:type_name -> terminals.ui.v1.Node
+	29, // 2: terminals.ui.v1.Node.props:type_name -> terminals.ui.v1.Node.PropsEntry
+	5,  // 3: terminals.ui.v1.Node.children:type_name -> terminals.ui.v1.Node
+	6,  // 4: terminals.ui.v1.Node.stack:type_name -> terminals.ui.v1.StackWidget
+	7,  // 5: terminals.ui.v1.Node.row:type_name -> terminals.ui.v1.RowWidget
+	8,  // 6: terminals.ui.v1.Node.grid:type_name -> terminals.ui.v1.GridWidget
+	9,  // 7: terminals.ui.v1.Node.scroll:type_name -> terminals.ui.v1.ScrollWidget
+	10, // 8: terminals.ui.v1.Node.padding:type_name -> terminals.ui.v1.PaddingWidget
+	11, // 9: terminals.ui.v1.Node.center:type_name -> terminals.ui.v1.CenterWidget
+	12, // 10: terminals.ui.v1.Node.expand:type_name -> terminals.ui.v1.ExpandWidget
+	13, // 11: terminals.ui.v1.Node.text:type_name -> terminals.ui.v1.TextWidget
+	14, // 12: terminals.ui.v1.Node.image:type_name -> terminals.ui.v1.ImageWidget
+	15, // 13: terminals.ui.v1.Node.video_surface:type_name -> terminals.ui.v1.VideoSurfaceWidget
+	16, // 14: terminals.ui.v1.Node.audio_visualizer:type_name -> terminals.ui.v1.AudioVisualizerWidget
+	17, // 15: terminals.ui.v1.Node.canvas:type_name -> terminals.ui.v1.CanvasWidget
+	18, // 16: terminals.ui.v1.Node.text_input:type_name -> terminals.ui.v1.TextInputWidget
+	19, // 17: terminals.ui.v1.Node.button:type_name -> terminals.ui.v1.ButtonWidget
+	20, // 18: terminals.ui.v1.Node.slider:type_name -> terminals.ui.v1.SliderWidget
+	21, // 19: terminals.ui.v1.Node.toggle:type_name -> terminals.ui.v1.ToggleWidget
+	22, // 20: terminals.ui.v1.Node.dropdown:type_name -> terminals.ui.v1.DropdownWidget
+	23, // 21: terminals.ui.v1.Node.gesture_area:type_name -> terminals.ui.v1.GestureAreaWidget
+	24, // 22: terminals.ui.v1.Node.overlay:type_name -> terminals.ui.v1.OverlayWidget
+	25, // 23: terminals.ui.v1.Node.progress:type_name -> terminals.ui.v1.ProgressWidget
+	26, // 24: terminals.ui.v1.Node.fullscreen:type_name -> terminals.ui.v1.FullscreenWidget
+	27, // 25: terminals.ui.v1.Node.keep_awake:type_name -> terminals.ui.v1.KeepAwakeWidget
+	28, // 26: terminals.ui.v1.Node.brightness:type_name -> terminals.ui.v1.BrightnessWidget
+	0,  // 27: terminals.ui.v1.ScrollWidget.direction_enum:type_name -> terminals.ui.v1.ScrollDirection
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_terminals_ui_v1_ui_proto_init() }
@@ -1959,13 +2024,14 @@ func file_terminals_ui_v1_ui_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_ui_v1_ui_proto_rawDesc), len(file_terminals_ui_v1_ui_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_terminals_ui_v1_ui_proto_goTypes,
 		DependencyIndexes: file_terminals_ui_v1_ui_proto_depIdxs,
+		EnumInfos:         file_terminals_ui_v1_ui_proto_enumTypes,
 		MessageInfos:      file_terminals_ui_v1_ui_proto_msgTypes,
 	}.Build()
 	File_terminals_ui_v1_ui_proto = out.File

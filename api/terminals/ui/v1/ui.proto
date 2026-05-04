@@ -67,8 +67,15 @@ message GridWidget {
   int32 columns = 1;
 }
 
+enum ScrollDirection {
+  SCROLL_DIRECTION_UNSPECIFIED = 0;
+  SCROLL_DIRECTION_VERTICAL = 1;
+  SCROLL_DIRECTION_HORIZONTAL = 2;
+}
+
 message ScrollWidget {
   string direction = 1;
+  ScrollDirection direction_enum = 2;
 }
 
 message PaddingWidget {

@@ -2411,6 +2411,7 @@ class FlowStats extends $pb.GeneratedMessage {
     $fixnum.Int64? droppedFrames,
     $core.String? state,
     $core.String? error,
+    FlowState? stateEnum,
   }) {
     final result = create();
     if (flowId != null) result.flowId = flowId;
@@ -2419,6 +2420,7 @@ class FlowStats extends $pb.GeneratedMessage {
     if (droppedFrames != null) result.droppedFrames = droppedFrames;
     if (state != null) result.state = state;
     if (error != null) result.error = error;
+    if (stateEnum != null) result.stateEnum = stateEnum;
     return result;
   }
 
@@ -2444,6 +2446,8 @@ class FlowStats extends $pb.GeneratedMessage {
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOS(5, _omitFieldNames ? '' : 'state')
     ..aOS(6, _omitFieldNames ? '' : 'error')
+    ..aE<FlowState>(7, _omitFieldNames ? '' : 'stateEnum',
+        enumValues: FlowState.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2517,6 +2521,15 @@ class FlowStats extends $pb.GeneratedMessage {
   $core.bool hasError() => $_has(5);
   @$pb.TagNumber(6)
   void clearError() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  FlowState get stateEnum => $_getN(6);
+  @$pb.TagNumber(7)
+  set stateEnum(FlowState value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasStateEnum() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStateEnum() => $_clearField(7);
 }
 
 class ClockSample extends $pb.GeneratedMessage {

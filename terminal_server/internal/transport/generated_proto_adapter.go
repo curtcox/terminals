@@ -185,6 +185,7 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				MemMB:         stats.GetMemMb(),
 				DroppedFrames: stats.GetDroppedFrames(),
 				State:         stats.GetState(),
+				StateEnum:     stats.GetStateEnum(),
 				Error:         stats.GetError(),
 			},
 		}, nil
@@ -861,7 +862,11 @@ func applyWidgetFromDescriptor(node *uiv1.Node, nodeType string, props map[strin
 	case "grid":
 		node.Widget = &uiv1.Node_Grid{Grid: &uiv1.GridWidget{Columns: parseInt32(props["columns"])}}
 	case "scroll":
-		node.Widget = &uiv1.Node_Scroll{Scroll: &uiv1.ScrollWidget{Direction: props["direction"]}}
+		direction := props["direction"]
+		node.Widget = &uiv1.Node_Scroll{Scroll: &uiv1.ScrollWidget{
+			Direction:     direction,
+			DirectionEnum: scrollDirectionFromString(direction),
+		}}
 	case "padding":
 		node.Widget = &uiv1.Node_Padding{Padding: &uiv1.PaddingWidget{All: parseInt32(props["all"])}}
 	case "center":
@@ -1036,6 +1041,17 @@ func unixMSTime(unixMS int64) time.Time {
 		return time.Time{}
 	}
 	return time.UnixMilli(unixMS).UTC()
+}
+
+func scrollDirectionFromString(value string) uiv1.ScrollDirection {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "horizontal":
+		return uiv1.ScrollDirection_SCROLL_DIRECTION_HORIZONTAL
+	case "vertical":
+		return uiv1.ScrollDirection_SCROLL_DIRECTION_VERTICAL
+	default:
+		return uiv1.ScrollDirection_SCROLL_DIRECTION_UNSPECIFIED
+	}
 }
 
 func cloneStringMapAdapter(in map[string]string) map[string]string {

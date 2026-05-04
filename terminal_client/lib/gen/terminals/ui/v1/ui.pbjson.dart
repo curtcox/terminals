@@ -15,6 +15,22 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+@$core.Deprecated('Use scrollDirectionDescriptor instead')
+const ScrollDirection$json = {
+  '1': 'ScrollDirection',
+  '2': [
+    {'1': 'SCROLL_DIRECTION_UNSPECIFIED', '2': 0},
+    {'1': 'SCROLL_DIRECTION_VERTICAL', '2': 1},
+    {'1': 'SCROLL_DIRECTION_HORIZONTAL', '2': 2},
+  ],
+};
+
+/// Descriptor for `ScrollDirection`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List scrollDirectionDescriptor = $convert.base64Decode(
+    'Cg9TY3JvbGxEaXJlY3Rpb24SIAocU0NST0xMX0RJUkVDVElPTl9VTlNQRUNJRklFRBAAEh0KGV'
+    'NDUk9MTF9ESVJFQ1RJT05fVkVSVElDQUwQARIfChtTQ1JPTExfRElSRUNUSU9OX0hPUklaT05U'
+    'QUwQAg==');
+
 @$core.Deprecated('Use setUIDescriptor instead')
 const SetUI$json = {
   '1': 'SetUI',
@@ -402,12 +418,22 @@ const ScrollWidget$json = {
   '1': 'ScrollWidget',
   '2': [
     {'1': 'direction', '3': 1, '4': 1, '5': 9, '10': 'direction'},
+    {
+      '1': 'direction_enum',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.ui.v1.ScrollDirection',
+      '10': 'directionEnum'
+    },
   ],
 };
 
 /// Descriptor for `ScrollWidget`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List scrollWidgetDescriptor = $convert.base64Decode(
-    'CgxTY3JvbGxXaWRnZXQSHAoJZGlyZWN0aW9uGAEgASgJUglkaXJlY3Rpb24=');
+    'CgxTY3JvbGxXaWRnZXQSHAoJZGlyZWN0aW9uGAEgASgJUglkaXJlY3Rpb24SRwoOZGlyZWN0aW'
+    '9uX2VudW0YAiABKA4yIC50ZXJtaW5hbHMudWkudjEuU2Nyb2xsRGlyZWN0aW9uUg1kaXJlY3Rp'
+    'b25FbnVt');
 
 @$core.Deprecated('Use paddingWidgetDescriptor instead')
 const PaddingWidget$json = {

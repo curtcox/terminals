@@ -207,13 +207,13 @@ Tests: renderer/media tests cover accepted and rejected URLs.
 
 Owner: ui/server-driven-renderer  
 Classification: transitional_escape_hatch  
-Target state: replace with enum.  
+Target state: typed `direction_enum` (`ScrollDirection`) now read first; keep legacy string fallback during compatibility window.  
 Review date: 2026-06-15  
 Producer: server UI composer  
 Consumer: Flutter renderer  
-Unknown behavior: client falls back to vertical scrolling.  
-Validation: `vertical` or `horizontal`.  
-Tests: renderer tests cover both directions and fallback.
+Unknown behavior: consumers prefer `direction_enum`, fall back to legacy string, and treat unknown values as vertical.  
+Validation: enum values `VERTICAL`, `HORIZONTAL`; legacy string accepts the lowercase forms.  
+Tests: renderer tests cover both directions and fallback; adapter populates typed enum + legacy string.
 
 ### Field: terminals.ui.v1.ButtonWidget.action
 
@@ -463,13 +463,13 @@ Tests: observation tests cover current attributes and unknown-key tolerance.
 
 Owner: edge/flow  
 Classification: transitional_escape_hatch  
-Target state: replace with `FlowState` enum and keep string fallback during migration.  
+Target state: typed `state_enum` (`FlowState`) now read first; keep legacy string fallback during compatibility window.  
 Review date: 2026-06-15  
 Producer: client/server edge execution runtime  
 Consumer: server diagnostics and admin surfaces  
-Unknown behavior: consumers preserve state string and treat unknown states as non-running.  
-Validation: `starting`, `running`, `degraded`, `stopping`, `stopped`, or `failed`.  
-Tests: flow stats tests cover known and unknown states.
+Unknown behavior: consumers prefer `state_enum`, fall back to legacy string, and treat unknown values as non-running.  
+Validation: enum values `STARTING`, `RUNNING`, `DEGRADED`, `STOPPING`, `STOPPED`, `FAILED`; legacy string fallback accepts the lowercase forms.  
+Tests: Go transport handler resolves enum-first; protocol contract fixtures cover typed + legacy compatibility.
 
 ### Field: terminals.io.v1.FlowStats.error
 

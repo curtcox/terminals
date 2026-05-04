@@ -238,22 +238,20 @@ SynchronousMediaControlUpdate synchronousMediaControlUpdateFromResponse(
 }
 
 String streamKindLabel(String legacy, iov1.StreamKind typed) {
-  return switch (typed) {
-    iov1.StreamKind.STREAM_KIND_AUDIO => 'audio',
-    iov1.StreamKind.STREAM_KIND_VIDEO => 'video',
-    iov1.StreamKind.STREAM_KIND_SENSOR => 'sensor',
-    iov1.StreamKind.STREAM_KIND_DATA => 'data',
-    iov1.StreamKind.STREAM_KIND_UNSPECIFIED => legacy,
-  };
+  if (typed == iov1.StreamKind.STREAM_KIND_AUDIO) return 'audio';
+  if (typed == iov1.StreamKind.STREAM_KIND_VIDEO) return 'video';
+  if (typed == iov1.StreamKind.STREAM_KIND_SENSOR) return 'sensor';
+  if (typed == iov1.StreamKind.STREAM_KIND_DATA) return 'data';
+  return legacy;
 }
 
 String webRtcSignalTypeLabel(String legacy, WebRTCSignalType typed) {
-  return switch (typed) {
-    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_OFFER => 'offer',
-    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER => 'answer',
-    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE => 'candidate',
-    WebRTCSignalType.WEBRTC_SIGNAL_TYPE_UNSPECIFIED => legacy,
-  };
+  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_OFFER) return 'offer';
+  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ANSWER) return 'answer';
+  if (typed == WebRTCSignalType.WEBRTC_SIGNAL_TYPE_ICE_CANDIDATE) {
+    return 'candidate';
+  }
+  return legacy;
 }
 
 ServerDrivenUiResponseUpdate? serverDrivenUiUpdateFromResponse({

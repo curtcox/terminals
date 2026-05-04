@@ -76,6 +76,67 @@ func (StreamKind) EnumDescriptor() ([]byte, []int) {
 	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{0}
 }
 
+type FlowState int32
+
+const (
+	FlowState_FLOW_STATE_UNSPECIFIED FlowState = 0
+	FlowState_FLOW_STATE_STARTING    FlowState = 1
+	FlowState_FLOW_STATE_RUNNING     FlowState = 2
+	FlowState_FLOW_STATE_DEGRADED    FlowState = 3
+	FlowState_FLOW_STATE_STOPPING    FlowState = 4
+	FlowState_FLOW_STATE_STOPPED     FlowState = 5
+	FlowState_FLOW_STATE_FAILED      FlowState = 6
+)
+
+// Enum value maps for FlowState.
+var (
+	FlowState_name = map[int32]string{
+		0: "FLOW_STATE_UNSPECIFIED",
+		1: "FLOW_STATE_STARTING",
+		2: "FLOW_STATE_RUNNING",
+		3: "FLOW_STATE_DEGRADED",
+		4: "FLOW_STATE_STOPPING",
+		5: "FLOW_STATE_STOPPED",
+		6: "FLOW_STATE_FAILED",
+	}
+	FlowState_value = map[string]int32{
+		"FLOW_STATE_UNSPECIFIED": 0,
+		"FLOW_STATE_STARTING":    1,
+		"FLOW_STATE_RUNNING":     2,
+		"FLOW_STATE_DEGRADED":    3,
+		"FLOW_STATE_STOPPING":    4,
+		"FLOW_STATE_STOPPED":     5,
+		"FLOW_STATE_FAILED":      6,
+	}
+)
+
+func (x FlowState) Enum() *FlowState {
+	p := new(FlowState)
+	*p = x
+	return p
+}
+
+func (x FlowState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FlowState) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_io_v1_io_proto_enumTypes[1].Descriptor()
+}
+
+func (FlowState) Type() protoreflect.EnumType {
+	return &file_terminals_io_v1_io_proto_enumTypes[1]
+}
+
+func (x FlowState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FlowState.Descriptor instead.
+func (FlowState) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{1}
+}
+
 type StartStream struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	StreamId       string                 `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
@@ -1932,6 +1993,7 @@ type FlowStats struct {
 	DroppedFrames uint64                 `protobuf:"varint,4,opt,name=dropped_frames,json=droppedFrames,proto3" json:"dropped_frames,omitempty"`
 	State         string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
 	Error         string                 `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	StateEnum     FlowState              `protobuf:"varint,7,opt,name=state_enum,json=stateEnum,proto3,enum=terminals.io.v1.FlowState" json:"state_enum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2006,6 +2068,13 @@ func (x *FlowStats) GetError() string {
 		return x.Error
 	}
 	return ""
+}
+
+func (x *FlowStats) GetStateEnum() FlowState {
+	if x != nil {
+		return x.StateEnum
+	}
+	return FlowState_FLOW_STATE_UNSPECIFIED
 }
 
 type ClockSample struct {
@@ -2354,14 +2423,16 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\bartifact\x18\x01 \x01(\v2\x1c.terminals.io.v1.ArtifactRefR\bartifact\"2\n" +
 	"\x0fRequestArtifact\x12\x1f\n" +
 	"\vartifact_id\x18\x01 \x01(\tR\n" +
-	"artifactId\"\xa7\x01\n" +
+	"artifactId\"\xe2\x01\n" +
 	"\tFlowStats\x12\x17\n" +
 	"\aflow_id\x18\x01 \x01(\tR\x06flowId\x12\x17\n" +
 	"\acpu_pct\x18\x02 \x01(\x01R\x06cpuPct\x12\x15\n" +
 	"\x06mem_mb\x18\x03 \x01(\x01R\x05memMb\x12%\n" +
 	"\x0edropped_frames\x18\x04 \x01(\x04R\rdroppedFrames\x12\x14\n" +
 	"\x05state\x18\x05 \x01(\tR\x05state\x12\x14\n" +
-	"\x05error\x18\x06 \x01(\tR\x05error\"\x91\x01\n" +
+	"\x05error\x18\x06 \x01(\tR\x05error\x129\n" +
+	"\n" +
+	"state_enum\x18\a \x01(\x0e2\x1a.terminals.io.v1.FlowStateR\tstateEnum\"\x91\x01\n" +
 	"\vClockSample\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12$\n" +
 	"\x0eclient_unix_ms\x18\x02 \x01(\x03R\fclientUnixMs\x12$\n" +
@@ -2380,7 +2451,15 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x11STREAM_KIND_AUDIO\x10\x01\x12\x15\n" +
 	"\x11STREAM_KIND_VIDEO\x10\x02\x12\x16\n" +
 	"\x12STREAM_KIND_SENSOR\x10\x03\x12\x14\n" +
-	"\x10STREAM_KIND_DATA\x10\x04B@Z>github.com/curtcox/terminals/terminal_server/gen/go/io/v1;iov1b\x06proto3"
+	"\x10STREAM_KIND_DATA\x10\x04*\xb9\x01\n" +
+	"\tFlowState\x12\x1a\n" +
+	"\x16FLOW_STATE_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13FLOW_STATE_STARTING\x10\x01\x12\x16\n" +
+	"\x12FLOW_STATE_RUNNING\x10\x02\x12\x17\n" +
+	"\x13FLOW_STATE_DEGRADED\x10\x03\x12\x17\n" +
+	"\x13FLOW_STATE_STOPPING\x10\x04\x12\x16\n" +
+	"\x12FLOW_STATE_STOPPED\x10\x05\x12\x15\n" +
+	"\x11FLOW_STATE_FAILED\x10\x06B@Z>github.com/curtcox/terminals/terminal_server/gen/go/io/v1;iov1b\x06proto3"
 
 var (
 	file_terminals_io_v1_io_proto_rawDescOnce sync.Once
@@ -2394,75 +2473,77 @@ func file_terminals_io_v1_io_proto_rawDescGZIP() []byte {
 	return file_terminals_io_v1_io_proto_rawDescData
 }
 
-var file_terminals_io_v1_io_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_terminals_io_v1_io_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_terminals_io_v1_io_proto_goTypes = []any{
 	(StreamKind)(0),               // 0: terminals.io.v1.StreamKind
-	(*StartStream)(nil),           // 1: terminals.io.v1.StartStream
-	(*StopStream)(nil),            // 2: terminals.io.v1.StopStream
-	(*RouteStream)(nil),           // 3: terminals.io.v1.RouteStream
-	(*PlayAudio)(nil),             // 4: terminals.io.v1.PlayAudio
-	(*ShowMedia)(nil),             // 5: terminals.io.v1.ShowMedia
-	(*InputEvent)(nil),            // 6: terminals.io.v1.InputEvent
-	(*KeyEvent)(nil),              // 7: terminals.io.v1.KeyEvent
-	(*PointerEvent)(nil),          // 8: terminals.io.v1.PointerEvent
-	(*TouchPoint)(nil),            // 9: terminals.io.v1.TouchPoint
-	(*TouchEvent)(nil),            // 10: terminals.io.v1.TouchEvent
-	(*UIAction)(nil),              // 11: terminals.io.v1.UIAction
-	(*SensorData)(nil),            // 12: terminals.io.v1.SensorData
-	(*FlowNode)(nil),              // 13: terminals.io.v1.FlowNode
-	(*FlowEdge)(nil),              // 14: terminals.io.v1.FlowEdge
-	(*FlowPlan)(nil),              // 15: terminals.io.v1.FlowPlan
-	(*StartFlow)(nil),             // 16: terminals.io.v1.StartFlow
-	(*PatchFlow)(nil),             // 17: terminals.io.v1.PatchFlow
-	(*StopFlow)(nil),              // 18: terminals.io.v1.StopFlow
-	(*DeviceRef)(nil),             // 19: terminals.io.v1.DeviceRef
-	(*Pose)(nil),                  // 20: terminals.io.v1.Pose
-	(*LocationEstimate)(nil),      // 21: terminals.io.v1.LocationEstimate
-	(*ObservationProvenance)(nil), // 22: terminals.io.v1.ObservationProvenance
-	(*ArtifactRef)(nil),           // 23: terminals.io.v1.ArtifactRef
-	(*Observation)(nil),           // 24: terminals.io.v1.Observation
-	(*ObservationMessage)(nil),    // 25: terminals.io.v1.ObservationMessage
-	(*ArtifactAvailable)(nil),     // 26: terminals.io.v1.ArtifactAvailable
-	(*RequestArtifact)(nil),       // 27: terminals.io.v1.RequestArtifact
-	(*FlowStats)(nil),             // 28: terminals.io.v1.FlowStats
-	(*ClockSample)(nil),           // 29: terminals.io.v1.ClockSample
-	(*InstallBundle)(nil),         // 30: terminals.io.v1.InstallBundle
-	(*RemoveBundle)(nil),          // 31: terminals.io.v1.RemoveBundle
-	nil,                           // 32: terminals.io.v1.StartStream.MetadataEntry
-	nil,                           // 33: terminals.io.v1.SensorData.ValuesEntry
-	nil,                           // 34: terminals.io.v1.FlowNode.ArgsEntry
-	nil,                           // 35: terminals.io.v1.Observation.AttributesEntry
+	(FlowState)(0),                // 1: terminals.io.v1.FlowState
+	(*StartStream)(nil),           // 2: terminals.io.v1.StartStream
+	(*StopStream)(nil),            // 3: terminals.io.v1.StopStream
+	(*RouteStream)(nil),           // 4: terminals.io.v1.RouteStream
+	(*PlayAudio)(nil),             // 5: terminals.io.v1.PlayAudio
+	(*ShowMedia)(nil),             // 6: terminals.io.v1.ShowMedia
+	(*InputEvent)(nil),            // 7: terminals.io.v1.InputEvent
+	(*KeyEvent)(nil),              // 8: terminals.io.v1.KeyEvent
+	(*PointerEvent)(nil),          // 9: terminals.io.v1.PointerEvent
+	(*TouchPoint)(nil),            // 10: terminals.io.v1.TouchPoint
+	(*TouchEvent)(nil),            // 11: terminals.io.v1.TouchEvent
+	(*UIAction)(nil),              // 12: terminals.io.v1.UIAction
+	(*SensorData)(nil),            // 13: terminals.io.v1.SensorData
+	(*FlowNode)(nil),              // 14: terminals.io.v1.FlowNode
+	(*FlowEdge)(nil),              // 15: terminals.io.v1.FlowEdge
+	(*FlowPlan)(nil),              // 16: terminals.io.v1.FlowPlan
+	(*StartFlow)(nil),             // 17: terminals.io.v1.StartFlow
+	(*PatchFlow)(nil),             // 18: terminals.io.v1.PatchFlow
+	(*StopFlow)(nil),              // 19: terminals.io.v1.StopFlow
+	(*DeviceRef)(nil),             // 20: terminals.io.v1.DeviceRef
+	(*Pose)(nil),                  // 21: terminals.io.v1.Pose
+	(*LocationEstimate)(nil),      // 22: terminals.io.v1.LocationEstimate
+	(*ObservationProvenance)(nil), // 23: terminals.io.v1.ObservationProvenance
+	(*ArtifactRef)(nil),           // 24: terminals.io.v1.ArtifactRef
+	(*Observation)(nil),           // 25: terminals.io.v1.Observation
+	(*ObservationMessage)(nil),    // 26: terminals.io.v1.ObservationMessage
+	(*ArtifactAvailable)(nil),     // 27: terminals.io.v1.ArtifactAvailable
+	(*RequestArtifact)(nil),       // 28: terminals.io.v1.RequestArtifact
+	(*FlowStats)(nil),             // 29: terminals.io.v1.FlowStats
+	(*ClockSample)(nil),           // 30: terminals.io.v1.ClockSample
+	(*InstallBundle)(nil),         // 31: terminals.io.v1.InstallBundle
+	(*RemoveBundle)(nil),          // 32: terminals.io.v1.RemoveBundle
+	nil,                           // 33: terminals.io.v1.StartStream.MetadataEntry
+	nil,                           // 34: terminals.io.v1.SensorData.ValuesEntry
+	nil,                           // 35: terminals.io.v1.FlowNode.ArgsEntry
+	nil,                           // 36: terminals.io.v1.Observation.AttributesEntry
 }
 var file_terminals_io_v1_io_proto_depIdxs = []int32{
-	32, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
+	33, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
 	0,  // 1: terminals.io.v1.StartStream.stream_kind:type_name -> terminals.io.v1.StreamKind
 	0,  // 2: terminals.io.v1.RouteStream.stream_kind:type_name -> terminals.io.v1.StreamKind
-	7,  // 3: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
-	8,  // 4: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
-	10, // 5: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
-	11, // 6: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
-	9,  // 7: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
-	33, // 8: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
-	34, // 9: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
-	13, // 10: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
-	14, // 11: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
-	15, // 12: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	15, // 13: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	20, // 14: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
-	19, // 15: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
-	19, // 16: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
-	21, // 17: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
-	35, // 18: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
-	23, // 19: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
-	22, // 20: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
-	24, // 21: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
-	23, // 22: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
-	23, // [23:23] is the sub-list for method output_type
-	23, // [23:23] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	8,  // 3: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
+	9,  // 4: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
+	11, // 5: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
+	12, // 6: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
+	10, // 7: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
+	34, // 8: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
+	35, // 9: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
+	14, // 10: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
+	15, // 11: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
+	16, // 12: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	16, // 13: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	21, // 14: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
+	20, // 15: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
+	20, // 16: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
+	22, // 17: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
+	36, // 18: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
+	24, // 19: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
+	23, // 20: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
+	25, // 21: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
+	24, // 22: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
+	1,  // 23: terminals.io.v1.FlowStats.state_enum:type_name -> terminals.io.v1.FlowState
+	24, // [24:24] is the sub-list for method output_type
+	24, // [24:24] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_terminals_io_v1_io_proto_init() }
@@ -2486,7 +2567,7 @@ func file_terminals_io_v1_io_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_io_v1_io_proto_rawDesc), len(file_terminals_io_v1_io_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,

@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart';
+import 'package:terminal_client/gen/terminals/io/v1/io.pbenum.dart';
 
 void main() {
   final cases = <String, void Function(WireEnvelope)>{
@@ -11,6 +13,7 @@ void main() {
     'start_stream_audio_v1': _assertStartStreamAudio,
     'flow_plan_basic_v1': _assertFlowPlanBasic,
     'observation_sound_v1': _assertObservationSound,
+    'flow_stats_v1': _assertFlowStats,
     'unknown_metadata_key_v1': _assertUnknownMetadataKey,
     'deprecated_register_device_v1': _assertDeprecatedRegisterDevice,
   };
@@ -86,6 +89,14 @@ void _assertObservationSound(WireEnvelope envelope) {
   _expectEqual(observation.kind, 'sound.detected');
   _expectEqual(observation.attributes['loudness_db'], '72.5');
   _expectEqual(observation.evidence.length, 1);
+}
+
+void _assertFlowStats(WireEnvelope envelope) {
+  final stats = envelope.clientMessage.flowStats;
+
+  _expectEqual(stats.flowId, 'flow-edge-1');
+  _expectEqual(stats.state, 'running');
+  _expectEqual(stats.stateEnum, FlowState.FLOW_STATE_RUNNING);
 }
 
 void _assertUnknownMetadataKey(WireEnvelope envelope) {

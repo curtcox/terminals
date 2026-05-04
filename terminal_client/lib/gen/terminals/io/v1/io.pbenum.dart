@@ -42,5 +42,39 @@ class StreamKind extends $pb.ProtobufEnum {
   const StreamKind._(super.value, super.name);
 }
 
+class FlowState extends $pb.ProtobufEnum {
+  static const FlowState FLOW_STATE_UNSPECIFIED =
+      FlowState._(0, _omitEnumNames ? '' : 'FLOW_STATE_UNSPECIFIED');
+  static const FlowState FLOW_STATE_STARTING =
+      FlowState._(1, _omitEnumNames ? '' : 'FLOW_STATE_STARTING');
+  static const FlowState FLOW_STATE_RUNNING =
+      FlowState._(2, _omitEnumNames ? '' : 'FLOW_STATE_RUNNING');
+  static const FlowState FLOW_STATE_DEGRADED =
+      FlowState._(3, _omitEnumNames ? '' : 'FLOW_STATE_DEGRADED');
+  static const FlowState FLOW_STATE_STOPPING =
+      FlowState._(4, _omitEnumNames ? '' : 'FLOW_STATE_STOPPING');
+  static const FlowState FLOW_STATE_STOPPED =
+      FlowState._(5, _omitEnumNames ? '' : 'FLOW_STATE_STOPPED');
+  static const FlowState FLOW_STATE_FAILED =
+      FlowState._(6, _omitEnumNames ? '' : 'FLOW_STATE_FAILED');
+
+  static const $core.List<FlowState> values = <FlowState>[
+    FLOW_STATE_UNSPECIFIED,
+    FLOW_STATE_STARTING,
+    FLOW_STATE_RUNNING,
+    FLOW_STATE_DEGRADED,
+    FLOW_STATE_STOPPING,
+    FLOW_STATE_STOPPED,
+    FLOW_STATE_FAILED,
+  ];
+
+  static final $core.List<FlowState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static FlowState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FlowState._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

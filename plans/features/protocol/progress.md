@@ -38,6 +38,27 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Extended Go/Dart protocol contract assertions and `register_ack_metadata_v1` fixture content to validate both typed and legacy metadata behavior.
 - Ran `make proto-generate`, refreshed binary envelope fixtures via `go test ./internal/protocolcontract -run TestGoldenWireEnvelopeFixtures -update`, and re-ran Go transport/protocol-contract tests.
 
+## Protocol Evolution Rules (2026-05-03, FlowState Enum Migration)
+
+- Added additive typed enum `terminals.io.v1.FlowState` and `FlowStats.state_enum` while preserving the legacy `state` string.
+- Updated the generated proto adapter to populate `FlowStatsRequest.StateEnum` from inbound payloads.
+- Reworked the server flow stats handler to log a resolved state derived enum-first with legacy string fallback.
+- Added a `flow_stats_v1` golden envelope fixture and registered it in both Go (`internal/protocolcontract`) and Dart (`test/protocol_contract_test.dart`) contract tests.
+- Updated the protocol extension registry entry for `FlowStats.state` to describe typed-first compatibility behavior.
+- Synced regenerated `terminals/io/v1` Dart bindings into `terminal_client/lib/gen/`; refreshed Go generated bindings via `make proto-generate`.
+- Realigned `WebRTCSignalType_*` Go enum references in `generated_proto_adapter_test.go` to the regenerated `WEB_RTC_SIGNAL_TYPE_*` names so the transport test suite builds.
+- Re-ran `make proto-contract-test` and the full server `go test ./...` suite.
+
+## Protocol Evolution Rules (2026-05-03, ScrollDirection Enum Migration)
+
+- Added additive typed enum `terminals.ui.v1.ScrollDirection` and `ScrollWidget.direction_enum` while preserving the legacy `direction` string.
+- Updated the generated proto adapter (`applyWidgetFromDescriptor`) to populate both typed enum and legacy string from `props["direction"]`.
+- Updated the Flutter server-driven renderer to prefer `direction_enum` for axis selection and fall back to the legacy string when the enum is unspecified.
+- Updated the protocol extension registry entry for `ScrollWidget.direction` to describe typed-first compatibility behavior.
+- Reverted brittle Dart `switch` expressions over `ProtobufEnum` constants in `control_response_dispatcher` and `webrtc_engine` to defensive `if`/`==` chains so the legacy fallback survives unknown enum values from older generators/clients.
+- Split the `typed enum fields override legacy labels` dispatcher test into per-payload responses (start/route/signal share a `ConnectResponse.payload` oneof, so they cannot be exercised in a single response).
+- Re-ran `make proto-contract-test`, `make server-test`, and `make client-test`; all green.
+
 ## Protocol Evolution Rules (2026-05-03, StreamKind/WebRTCSignalType Enum Migration)
 
 - Added additive typed enums `StreamKind` and `WebRTCSignalType` in `api/terminals/io/v1/io.proto` and `api/terminals/control/v1/control.proto` with new `stream_kind` and `signal_type_enum` fields while preserving legacy string fields.

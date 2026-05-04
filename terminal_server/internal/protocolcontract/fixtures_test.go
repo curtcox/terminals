@@ -23,6 +23,7 @@ func TestGoldenWireEnvelopeFixtures(t *testing.T) {
 		"start_stream_audio_v1":         assertStartStreamAudio,
 		"flow_plan_basic_v1":            assertFlowPlanBasic,
 		"observation_sound_v1":          assertObservationSound,
+		"flow_stats_v1":                 assertFlowStats,
 		"unknown_metadata_key_v1":       assertUnknownMetadataKey,
 		"deprecated_register_device_v1": assertDeprecatedRegisterDevice,
 	}
@@ -184,6 +185,20 @@ func assertObservationSound(t *testing.T, envelope *controlv1.WireEnvelope) {
 	}
 	if len(observation.GetEvidence()) != 1 {
 		t.Fatalf("evidence count = %d", len(observation.GetEvidence()))
+	}
+}
+
+func assertFlowStats(t *testing.T, envelope *controlv1.WireEnvelope) {
+	t.Helper()
+	stats := envelope.GetClientMessage().GetFlowStats()
+	if stats.GetFlowId() != "flow-edge-1" {
+		t.Fatalf("flow_id = %q", stats.GetFlowId())
+	}
+	if stats.GetState() != "running" {
+		t.Fatalf("legacy state = %q", stats.GetState())
+	}
+	if stats.GetStateEnum() != iov1.FlowState_FLOW_STATE_RUNNING {
+		t.Fatalf("state_enum = %v", stats.GetStateEnum())
 	}
 }
 

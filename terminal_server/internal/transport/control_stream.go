@@ -14,6 +14,7 @@ import (
 	"time"
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
+	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
@@ -218,6 +219,7 @@ type FlowStatsRequest struct {
 	MemMB         float64
 	DroppedFrames uint64
 	State         string
+	StateEnum     iov1.FlowState
 	Error         string
 }
 
@@ -897,9 +899,29 @@ func (h *StreamHandler) handleFlowStatsMessage(ctx context.Context, req *FlowSta
 		slog.Float64("cpu_pct", req.CPUPct),
 		slog.Float64("mem_mb", req.MemMB),
 		slog.Uint64("dropped_frames", req.DroppedFrames),
-		slog.String("state", strings.TrimSpace(req.State)),
+		slog.String("state", resolveFlowState(req)),
 		slog.String("error", strings.TrimSpace(req.Error)),
 	)
+}
+
+// resolveFlowState prefers the typed enum when set and falls back to the
+// legacy string for older clients.
+func resolveFlowState(req *FlowStatsRequest) string {
+	switch req.StateEnum {
+	case iov1.FlowState_FLOW_STATE_STARTING:
+		return "starting"
+	case iov1.FlowState_FLOW_STATE_RUNNING:
+		return "running"
+	case iov1.FlowState_FLOW_STATE_DEGRADED:
+		return "degraded"
+	case iov1.FlowState_FLOW_STATE_STOPPING:
+		return "stopping"
+	case iov1.FlowState_FLOW_STATE_STOPPED:
+		return "stopped"
+	case iov1.FlowState_FLOW_STATE_FAILED:
+		return "failed"
+	}
+	return strings.TrimSpace(req.State)
 }
 
 func (h *StreamHandler) handleClockSampleMessage(ctx context.Context, req *ClockSampleRequest) {

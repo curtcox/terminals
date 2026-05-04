@@ -196,6 +196,16 @@ message RequestArtifact {
   string artifact_id = 1;
 }
 
+enum FlowState {
+  FLOW_STATE_UNSPECIFIED = 0;
+  FLOW_STATE_STARTING = 1;
+  FLOW_STATE_RUNNING = 2;
+  FLOW_STATE_DEGRADED = 3;
+  FLOW_STATE_STOPPING = 4;
+  FLOW_STATE_STOPPED = 5;
+  FLOW_STATE_FAILED = 6;
+}
+
 message FlowStats {
   string flow_id = 1;
   double cpu_pct = 2;
@@ -203,6 +213,7 @@ message FlowStats {
   uint64 dropped_frames = 4;
   string state = 5;
   string error = 6;
+  FlowState state_enum = 7;
 }
 
 message ClockSample {

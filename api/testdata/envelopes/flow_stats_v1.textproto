@@ -1,0 +1,14 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 9
+client_message: {
+  flow_stats: {
+    flow_id: "flow-edge-1"
+    cpu_pct: 12.5
+    mem_mb: 88.25
+    dropped_frames: 4
+    state: "running"
+    state_enum: FLOW_STATE_RUNNING
+    error: ""
+  }
+}
