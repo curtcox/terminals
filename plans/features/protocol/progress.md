@@ -59,6 +59,14 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Split the `typed enum fields override legacy labels` dispatcher test into per-payload responses (start/route/signal share a `ConnectResponse.payload` oneof, so they cannot be exercised in a single response).
 - Re-ran `make proto-contract-test`, `make server-test`, and `make client-test`; all green.
 
+## Protocol Evolution Rules (2026-05-04, Proto CI contract gate + flex-check annotations)
+
+- Updated `.github/workflows/proto-ci.yml` to run the full repository-level `make proto-contract-test` gate (in addition to existing Buf format/lint/generate/breaking checks), and expanded workflow path triggers to include protocol-relevant server/client/docs/script/Makefile changes.
+- Added CI toolchain setup in Proto CI (`actions/setup-go` + `subosito/flutter-action`) so `make proto-contract-test` can execute Go + Dart protocol contract suites in workflow runs.
+- Kept Buf steps in `api/` via per-step `working-directory`, then executed the contract gate from repo root to match local Makefile behavior.
+- Enhanced `scripts/check-proto-flex-fields.py` to emit GitHub Actions `::error` annotations for each missing registry entry when running in CI, making `proto-flex-check` failures directly clickable/actionable in PRs.
+- Re-ran `make proto-flex-check` and `make proto-contract-test`; both passed.
+
 ## Protocol Evolution Rules (2026-05-03, StreamKind/WebRTCSignalType Enum Migration)
 
 - Added additive typed enums `StreamKind` and `WebRTCSignalType` in `api/terminals/io/v1/io.proto` and `api/terminals/control/v1/control.proto` with new `stream_kind` and `signal_type_enum` fields while preserving legacy string fields.

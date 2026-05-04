@@ -4,28 +4,47 @@ on:
   push:
     paths:
       - "api/**"
+      - "terminal_server/**"
+      - "terminal_client/**"
+      - "docs/protocol-*.md"
+      - "scripts/check-proto-flex-fields.py"
+      - "Makefile"
       - ".github/workflows/proto-ci.yml"
   pull_request:
     paths:
       - "api/**"
+      - "terminal_server/**"
+      - "terminal_client/**"
+      - "docs/protocol-*.md"
+      - "scripts/check-proto-flex-fields.py"
+      - "Makefile"
       - ".github/workflows/proto-ci.yml"
 
 jobs:
   proto:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: terminal_server/go.mod
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
       - uses: bufbuild/buf-setup-action@v1
       - name: Buf format check
+        working-directory: api
         run: buf format -d --exit-code
       - name: Buf lint
+        working-directory: api
         run: buf lint
       - name: Buf generate
+        working-directory: api
         run: buf generate
       - name: Verify generated code is up to date
         run: git diff --exit-code
       - name: Buf breaking
+        working-directory: api
         run: buf breaking --against 'https://github.com/curtcox/terminals.git#branch=main,subdir=api'
+      - name: Proto contract test
+        run: make proto-contract-test

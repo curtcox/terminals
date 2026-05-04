@@ -11,6 +11,7 @@ governed when docs/protocol-extension-registry.md contains:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -143,6 +144,16 @@ def registry_fields() -> set[str]:
     return set(re.findall(r"Field:\s+([A-Za-z0-9_.]+)", content))
 
 
+def github_actions_enabled() -> bool:
+    return os.getenv("GITHUB_ACTIONS", "").lower() == "true"
+
+
+def emit_github_annotation(finding: Finding) -> None:
+    rel = finding.path.relative_to(ROOT)
+    message = f"{finding.field}: {finding.reason} (add registry entry in docs/protocol-extension-registry.md)"
+    print(f"::error file={rel},line={finding.line}::{message}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -167,6 +178,8 @@ def main() -> int:
             print(f"{rel}:{finding.line}: {finding.field}: {finding.reason}")
             print(f"  {finding.source}")
             print(f"  add to {REGISTRY.relative_to(ROOT)} as: Field: {finding.field}")
+            if github_actions_enabled():
+                emit_github_annotation(finding)
         return 1 if args.enforce else 0
 
     print(f"proto-flex-check: {len(findings)} flexible field(s) detected; all are registered")
