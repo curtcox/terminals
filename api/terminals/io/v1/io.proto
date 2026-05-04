@@ -12,6 +12,18 @@ enum StreamKind {
   STREAM_KIND_DATA = 4;
 }
 
+// WebRTCSignalType mirrors terminals.control.v1.WebRTCSignalType so that
+// packages outside control/v1 (notably diagnostics) can reference a typed
+// signal type without creating an import cycle. Keep values numerically
+// aligned with control/v1.WebRTCSignalType during the migration window;
+// consolidate when buf breaking permits removing the control/v1 copy.
+enum WebRTCSignalType {
+  WEB_RTC_SIGNAL_TYPE_UNSPECIFIED = 0;
+  WEB_RTC_SIGNAL_TYPE_OFFER = 1;
+  WEB_RTC_SIGNAL_TYPE_ANSWER = 2;
+  WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE = 3;
+}
+
 message StartStream {
   string stream_id = 1;
   string kind = 2;

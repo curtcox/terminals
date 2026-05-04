@@ -37,7 +37,9 @@ The following additive typed replacements have shipped. Producers emit both the 
 | `StreamEntry.stream_kind` / `RouteEntry.stream_kind` (`terminals.io.v1.StreamKind`) | `StreamEntry.kind` / `RouteEntry.kind` strings | 2026-05-04 (client diagnostics capture mirrors typed enum from underlying `StartStream`/`RouteStream`) | After two tagged releases past 2026-05-04 |
 | `UiEventEntry.kind_enum` (`UiEventKind`) | `UiEventEntry.kind` string (`set_ui` / `update_ui` / `transition_ui`) | 2026-05-04 (client diagnostics capture and dispatcher emit typed enum alongside legacy string) | After two tagged releases past 2026-05-04 |
 
-`WebrtcSignalEntry.signal_type` migration to a typed `WebRTCSignalType` mirror is deferred: `control.proto` already imports `diagnostics.proto`, so a reverse import would create a cycle. Resolve when `WebRTCSignalType` moves to a shared package.
+| `WebrtcSignalEntry.signal_type_enum` (`terminals.io.v1.WebRTCSignalType`) | `WebrtcSignalEntry.signal_type` string | 2026-05-04 (client diagnostics capture mirrors typed enum from `WebRTCSignal.signal_type_enum`) | After two tagged releases past 2026-05-04 |
+
+`terminals.io.v1.WebRTCSignalType` is a parallel enum to `terminals.control.v1.WebRTCSignalType` introduced to break the import cycle (control/v1 already imports diagnostics/v1, so diagnostics cannot import control). Both enums share identical numeric values; consolidation onto a single shared package is deferred until a buf-breaking-friendly path is available.
 
 ## Pending Migrations
 

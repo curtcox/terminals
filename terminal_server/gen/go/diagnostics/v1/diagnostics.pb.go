@@ -1054,12 +1054,17 @@ func (x *RouteEntry) GetStreamKind() v12.StreamKind {
 }
 
 type WebrtcSignalEntry struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UnixMs        int64                  `protobuf:"varint,1,opt,name=unix_ms,json=unixMs,proto3" json:"unix_ms,omitempty"`
-	StreamId      string                 `protobuf:"bytes,2,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
-	SignalType    string                 `protobuf:"bytes,3,opt,name=signal_type,json=signalType,proto3" json:"signal_type,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	UnixMs     int64                  `protobuf:"varint,1,opt,name=unix_ms,json=unixMs,proto3" json:"unix_ms,omitempty"`
+	StreamId   string                 `protobuf:"bytes,2,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
+	SignalType string                 `protobuf:"bytes,3,opt,name=signal_type,json=signalType,proto3" json:"signal_type,omitempty"`
+	// signal_type_enum mirrors the control-plane WebRTC signal type using the
+	// shared terminals.io.v1.WebRTCSignalType enum, avoiding the import cycle
+	// that would arise from referencing terminals.control.v1.WebRTCSignalType
+	// (control/v1 already imports diagnostics/v1).
+	SignalTypeEnum v12.WebRTCSignalType `protobuf:"varint,4,opt,name=signal_type_enum,json=signalTypeEnum,proto3,enum=terminals.io.v1.WebRTCSignalType" json:"signal_type_enum,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *WebrtcSignalEntry) Reset() {
@@ -1111,6 +1116,13 @@ func (x *WebrtcSignalEntry) GetSignalType() string {
 		return x.SignalType
 	}
 	return ""
+}
+
+func (x *WebrtcSignalEntry) GetSignalTypeEnum() v12.WebRTCSignalType {
+	if x != nil {
+		return x.SignalTypeEnum
+	}
+	return v12.WebRTCSignalType(0)
 }
 
 type LogEntry struct {
@@ -1560,12 +1572,13 @@ const file_terminals_diagnostics_v1_diagnostics_proto_rawDesc = "" +
 	"\x10target_device_id\x18\x03 \x01(\tR\x0etargetDeviceId\x12\x12\n" +
 	"\x04kind\x18\x04 \x01(\tR\x04kind\x12<\n" +
 	"\vstream_kind\x18\x05 \x01(\x0e2\x1b.terminals.io.v1.StreamKindR\n" +
-	"streamKind\"j\n" +
+	"streamKind\"\xb7\x01\n" +
 	"\x11WebrtcSignalEntry\x12\x17\n" +
 	"\aunix_ms\x18\x01 \x01(\x03R\x06unixMs\x12\x1b\n" +
 	"\tstream_id\x18\x02 \x01(\tR\bstreamId\x12\x1f\n" +
 	"\vsignal_type\x18\x03 \x01(\tR\n" +
-	"signalType\"S\n" +
+	"signalType\x12K\n" +
+	"\x10signal_type_enum\x18\x04 \x01(\x0e2!.terminals.io.v1.WebRTCSignalTypeR\x0esignalTypeEnum\"S\n" +
 	"\bLogEntry\x12\x17\n" +
 	"\aunix_ms\x18\x01 \x01(\x03R\x06unixMs\x12\x14\n" +
 	"\x05level\x18\x02 \x01(\tR\x05level\x12\x18\n" +
@@ -1661,6 +1674,7 @@ var file_terminals_diagnostics_v1_diagnostics_proto_goTypes = []any{
 	(*v1.DeviceCapabilities)(nil), // 20: terminals.capabilities.v1.DeviceCapabilities
 	(*v11.Node)(nil),              // 21: terminals.ui.v1.Node
 	(v12.StreamKind)(0),           // 22: terminals.io.v1.StreamKind
+	(v12.WebRTCSignalType)(0),     // 23: terminals.io.v1.WebRTCSignalType
 }
 var file_terminals_diagnostics_v1_diagnostics_proto_depIdxs = []int32{
 	0,  // 0: terminals.diagnostics.v1.BugReport.source:type_name -> terminals.diagnostics.v1.BugReportSource
@@ -1683,13 +1697,14 @@ var file_terminals_diagnostics_v1_diagnostics_proto_depIdxs = []int32{
 	2,  // 17: terminals.diagnostics.v1.UiEventEntry.kind_enum:type_name -> terminals.diagnostics.v1.UiEventKind
 	22, // 18: terminals.diagnostics.v1.StreamEntry.stream_kind:type_name -> terminals.io.v1.StreamKind
 	22, // 19: terminals.diagnostics.v1.RouteEntry.stream_kind:type_name -> terminals.io.v1.StreamKind
-	15, // 20: terminals.diagnostics.v1.ConnectionHealth.recent_control_errors:type_name -> terminals.diagnostics.v1.ControlErrorEntry
-	19, // 21: terminals.diagnostics.v1.HardwareState.sensor_snapshot:type_name -> terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	23, // 20: terminals.diagnostics.v1.WebrtcSignalEntry.signal_type_enum:type_name -> terminals.io.v1.WebRTCSignalType
+	15, // 21: terminals.diagnostics.v1.ConnectionHealth.recent_control_errors:type_name -> terminals.diagnostics.v1.ControlErrorEntry
+	19, // 22: terminals.diagnostics.v1.HardwareState.sensor_snapshot:type_name -> terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_terminals_diagnostics_v1_diagnostics_proto_init() }

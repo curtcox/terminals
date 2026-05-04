@@ -117,3 +117,13 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Reclassified the registry entry for `UiEventEntry.kind` from `registry_backed_extension` to `transitional_escape_hatch` describing typed-first compatibility semantics.
 - Extended dispatcher tests in `terminal_client/test/connection/control_response_dispatcher_test.dart` to assert the typed enum mirrors the legacy string per UI response payload.
 - Regenerated Go bindings via `make proto-generate`, synced refreshed `terminals/diagnostics/v1` Dart bindings into `terminal_client/lib/gen/`, and re-ran `make proto-contract-test`, `make server-test`, and `make client-test`; all green.
+
+## Protocol Evolution Rules (2026-05-04, WebrtcSignalEntry typed mirror via parallel io/v1 enum)
+
+- Resolved the deferred `WebrtcSignalEntry.signal_type_enum` typed mirror by adding a parallel `terminals.io.v1.WebRTCSignalType` enum (numerically aligned with `terminals.control.v1.WebRTCSignalType`). Diagnostics now references the io/v1 copy, breaking the would-be import cycle (control/v1 already imports diagnostics/v1).
+- Did not move `WebRTCSignalType` out of `control/v1`; that would change the FQN of `WebRTCSignal.signal_type_enum`'s field type and trip `make proto-breaking`. Documented the parallel-enum approach in `io.proto`, `diagnostics.proto`, and `docs/compatibility.md`; consolidation onto a single shared package is deferred until a buf-breaking-friendly path is available.
+- Added `WebrtcSignalEntry.signal_type_enum = 4` referencing `terminals.io.v1.WebRTCSignalType` while preserving the legacy `signal_type` string for compatibility.
+- Wired client diagnostics capture in `terminal_client/lib/app/terminal_client_shell.dart` to populate `signalTypeEnum` from `WebRTCSignal.signalTypeEnum.value` (cross-package enum lookup via `iov1.WebRTCSignalType.valueOf`), alongside the legacy `signalType` string.
+- Regenerated Go bindings via `make proto-generate` and synced refreshed `terminals/io/v1` and `terminals/diagnostics/v1` Dart bindings into `terminal_client/lib/gen/`.
+- Updated `docs/compatibility.md` to add a new open-window row for `WebrtcSignalEntry.signal_type_enum` and replace the prior deferral note with the parallel-enum rationale.
+- Re-ran `make proto-lint`, `make proto-breaking`, `make proto-flex-check`, `make proto-contract-test`, `make server-test`, and `make client-test`; all green.

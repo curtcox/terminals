@@ -1163,11 +1163,13 @@ class WebrtcSignalEntry extends $pb.GeneratedMessage {
     $fixnum.Int64? unixMs,
     $core.String? streamId,
     $core.String? signalType,
+    $2.WebRTCSignalType? signalTypeEnum,
   }) {
     final result = create();
     if (unixMs != null) result.unixMs = unixMs;
     if (streamId != null) result.streamId = streamId;
     if (signalType != null) result.signalType = signalType;
+    if (signalTypeEnum != null) result.signalTypeEnum = signalTypeEnum;
     return result;
   }
 
@@ -1188,6 +1190,8 @@ class WebrtcSignalEntry extends $pb.GeneratedMessage {
     ..aInt64(1, _omitFieldNames ? '' : 'unixMs')
     ..aOS(2, _omitFieldNames ? '' : 'streamId')
     ..aOS(3, _omitFieldNames ? '' : 'signalType')
+    ..aE<$2.WebRTCSignalType>(4, _omitFieldNames ? '' : 'signalTypeEnum',
+        enumValues: $2.WebRTCSignalType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1235,6 +1239,19 @@ class WebrtcSignalEntry extends $pb.GeneratedMessage {
   $core.bool hasSignalType() => $_has(2);
   @$pb.TagNumber(3)
   void clearSignalType() => $_clearField(3);
+
+  /// signal_type_enum mirrors the control-plane WebRTC signal type using the
+  /// shared terminals.io.v1.WebRTCSignalType enum, avoiding the import cycle
+  /// that would arise from referencing terminals.control.v1.WebRTCSignalType
+  /// (control/v1 already imports diagnostics/v1).
+  @$pb.TagNumber(4)
+  $2.WebRTCSignalType get signalTypeEnum => $_getN(3);
+  @$pb.TagNumber(4)
+  set signalTypeEnum($2.WebRTCSignalType value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSignalTypeEnum() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSignalTypeEnum() => $_clearField(4);
 }
 
 class LogEntry extends $pb.GeneratedMessage {

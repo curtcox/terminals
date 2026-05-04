@@ -33,6 +33,23 @@ final $typed_data.Uint8List streamKindDescriptor = $convert.base64Decode(
     'RfQVVESU8QARIVChFTVFJFQU1fS0lORF9WSURFTxACEhYKElNUUkVBTV9LSU5EX1NFTlNPUhAD'
     'EhQKEFNUUkVBTV9LSU5EX0RBVEEQBA==');
 
+@$core.Deprecated('Use webRTCSignalTypeDescriptor instead')
+const WebRTCSignalType$json = {
+  '1': 'WebRTCSignalType',
+  '2': [
+    {'1': 'WEB_RTC_SIGNAL_TYPE_UNSPECIFIED', '2': 0},
+    {'1': 'WEB_RTC_SIGNAL_TYPE_OFFER', '2': 1},
+    {'1': 'WEB_RTC_SIGNAL_TYPE_ANSWER', '2': 2},
+    {'1': 'WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE', '2': 3},
+  ],
+};
+
+/// Descriptor for `WebRTCSignalType`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List webRTCSignalTypeDescriptor = $convert.base64Decode(
+    'ChBXZWJSVENTaWduYWxUeXBlEiMKH1dFQl9SVENfU0lHTkFMX1RZUEVfVU5TUEVDSUZJRUQQAB'
+    'IdChlXRUJfUlRDX1NJR05BTF9UWVBFX09GRkVSEAESHgoaV0VCX1JUQ19TSUdOQUxfVFlQRV9B'
+    'TlNXRVIQAhIlCiFXRUJfUlRDX1NJR05BTF9UWVBFX0lDRV9DQU5ESURBVEUQAw==');
+
 @$core.Deprecated('Use pointerActionDescriptor instead')
 const PointerAction$json = {
   '1': 'PointerAction',

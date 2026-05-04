@@ -42,6 +42,38 @@ class StreamKind extends $pb.ProtobufEnum {
   const StreamKind._(super.value, super.name);
 }
 
+/// WebRTCSignalType mirrors terminals.control.v1.WebRTCSignalType so that
+/// packages outside control/v1 (notably diagnostics) can reference a typed
+/// signal type without creating an import cycle. Keep values numerically
+/// aligned with control/v1.WebRTCSignalType during the migration window;
+/// consolidate when buf breaking permits removing the control/v1 copy.
+class WebRTCSignalType extends $pb.ProtobufEnum {
+  static const WebRTCSignalType WEB_RTC_SIGNAL_TYPE_UNSPECIFIED =
+      WebRTCSignalType._(
+          0, _omitEnumNames ? '' : 'WEB_RTC_SIGNAL_TYPE_UNSPECIFIED');
+  static const WebRTCSignalType WEB_RTC_SIGNAL_TYPE_OFFER =
+      WebRTCSignalType._(1, _omitEnumNames ? '' : 'WEB_RTC_SIGNAL_TYPE_OFFER');
+  static const WebRTCSignalType WEB_RTC_SIGNAL_TYPE_ANSWER =
+      WebRTCSignalType._(2, _omitEnumNames ? '' : 'WEB_RTC_SIGNAL_TYPE_ANSWER');
+  static const WebRTCSignalType WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE =
+      WebRTCSignalType._(
+          3, _omitEnumNames ? '' : 'WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE');
+
+  static const $core.List<WebRTCSignalType> values = <WebRTCSignalType>[
+    WEB_RTC_SIGNAL_TYPE_UNSPECIFIED,
+    WEB_RTC_SIGNAL_TYPE_OFFER,
+    WEB_RTC_SIGNAL_TYPE_ANSWER,
+    WEB_RTC_SIGNAL_TYPE_ICE_CANDIDATE,
+  ];
+
+  static final $core.List<WebRTCSignalType?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static WebRTCSignalType? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const WebRTCSignalType._(super.value, super.name);
+}
+
 class PointerAction extends $pb.ProtobufEnum {
   static const PointerAction POINTER_ACTION_UNSPECIFIED =
       PointerAction._(0, _omitEnumNames ? '' : 'POINTER_ACTION_UNSPECIFIED');

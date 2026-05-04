@@ -157,10 +157,11 @@ message WebrtcSignalEntry {
   int64 unix_ms = 1;
   string stream_id = 2;
   string signal_type = 3;
-  // signal_type_enum migration is deferred: control.proto already imports
-  // diagnostics.proto, so a reverse import to use WebRTCSignalType here would
-  // create an import cycle. Resolve when WebRTCSignalType moves to a shared
-  // package.
+  // signal_type_enum mirrors the control-plane WebRTC signal type using the
+  // shared terminals.io.v1.WebRTCSignalType enum, avoiding the import cycle
+  // that would arise from referencing terminals.control.v1.WebRTCSignalType
+  // (control/v1 already imports diagnostics/v1).
+  terminals.io.v1.WebRTCSignalType signal_type_enum = 4;
 }
 
 message LogEntry {

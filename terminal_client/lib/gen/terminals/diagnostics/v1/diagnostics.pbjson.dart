@@ -468,13 +468,23 @@ const WebrtcSignalEntry$json = {
     {'1': 'unix_ms', '3': 1, '4': 1, '5': 3, '10': 'unixMs'},
     {'1': 'stream_id', '3': 2, '4': 1, '5': 9, '10': 'streamId'},
     {'1': 'signal_type', '3': 3, '4': 1, '5': 9, '10': 'signalType'},
+    {
+      '1': 'signal_type_enum',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.WebRTCSignalType',
+      '10': 'signalTypeEnum'
+    },
   ],
 };
 
 /// Descriptor for `WebrtcSignalEntry`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List webrtcSignalEntryDescriptor = $convert.base64Decode(
     'ChFXZWJydGNTaWduYWxFbnRyeRIXCgd1bml4X21zGAEgASgDUgZ1bml4TXMSGwoJc3RyZWFtX2'
-    'lkGAIgASgJUghzdHJlYW1JZBIfCgtzaWduYWxfdHlwZRgDIAEoCVIKc2lnbmFsVHlwZQ==');
+    'lkGAIgASgJUghzdHJlYW1JZBIfCgtzaWduYWxfdHlwZRgDIAEoCVIKc2lnbmFsVHlwZRJLChBz'
+    'aWduYWxfdHlwZV9lbnVtGAQgASgOMiEudGVybWluYWxzLmlvLnYxLldlYlJUQ1NpZ25hbFR5cG'
+    'VSDnNpZ25hbFR5cGVFbnVt');
 
 @$core.Deprecated('Use logEntryDescriptor instead')
 const LogEntry$json = {

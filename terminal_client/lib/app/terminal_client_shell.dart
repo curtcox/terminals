@@ -1707,12 +1707,16 @@ class _TerminalClientShellState extends State<TerminalClientShell>
       runtime.activeRoutes.add(entry);
     });
     for (final signal in _recentWebRTCSignals) {
-      runtime.recentWebrtcSignals.add(
-        diagv1.WebrtcSignalEntry()
-          ..unixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
-          ..streamId = signal.streamId
-          ..signalType = signal.signalType,
-      );
+      final entry = diagv1.WebrtcSignalEntry()
+        ..unixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)
+        ..streamId = signal.streamId
+        ..signalType = signal.signalType;
+      final typed = iov1.WebRTCSignalType.valueOf(signal.signalTypeEnum.value);
+      if (typed != null &&
+          typed != iov1.WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_UNSPECIFIED) {
+        entry.signalTypeEnum = typed;
+      }
+      runtime.recentWebrtcSignals.add(entry);
     }
 
     final connection = diagv1.ConnectionHealth()
