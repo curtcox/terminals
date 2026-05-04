@@ -33,6 +33,44 @@ final $typed_data.Uint8List streamKindDescriptor = $convert.base64Decode(
     'RfQVVESU8QARIVChFTVFJFQU1fS0lORF9WSURFTxACEhYKElNUUkVBTV9LSU5EX1NFTlNPUhAD'
     'EhQKEFNUUkVBTV9LSU5EX0RBVEEQBA==');
 
+@$core.Deprecated('Use pointerActionDescriptor instead')
+const PointerAction$json = {
+  '1': 'PointerAction',
+  '2': [
+    {'1': 'POINTER_ACTION_UNSPECIFIED', '2': 0},
+    {'1': 'POINTER_ACTION_DOWN', '2': 1},
+    {'1': 'POINTER_ACTION_MOVE', '2': 2},
+    {'1': 'POINTER_ACTION_UP', '2': 3},
+    {'1': 'POINTER_ACTION_CANCEL', '2': 4},
+    {'1': 'POINTER_ACTION_SCROLL', '2': 5},
+  ],
+};
+
+/// Descriptor for `PointerAction`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List pointerActionDescriptor = $convert.base64Decode(
+    'Cg1Qb2ludGVyQWN0aW9uEh4KGlBPSU5URVJfQUNUSU9OX1VOU1BFQ0lGSUVEEAASFwoTUE9JTl'
+    'RFUl9BQ1RJT05fRE9XThABEhcKE1BPSU5URVJfQUNUSU9OX01PVkUQAhIVChFQT0lOVEVSX0FD'
+    'VElPTl9VUBADEhkKFVBPSU5URVJfQUNUSU9OX0NBTkNFTBAEEhkKFVBPSU5URVJfQUNUSU9OX1'
+    'NDUk9MTBAF');
+
+@$core.Deprecated('Use touchActionDescriptor instead')
+const TouchAction$json = {
+  '1': 'TouchAction',
+  '2': [
+    {'1': 'TOUCH_ACTION_UNSPECIFIED', '2': 0},
+    {'1': 'TOUCH_ACTION_START', '2': 1},
+    {'1': 'TOUCH_ACTION_MOVE', '2': 2},
+    {'1': 'TOUCH_ACTION_END', '2': 3},
+    {'1': 'TOUCH_ACTION_CANCEL', '2': 4},
+  ],
+};
+
+/// Descriptor for `TouchAction`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List touchActionDescriptor = $convert.base64Decode(
+    'CgtUb3VjaEFjdGlvbhIcChhUT1VDSF9BQ1RJT05fVU5TUEVDSUZJRUQQABIWChJUT1VDSF9BQ1'
+    'RJT05fU1RBUlQQARIVChFUT1VDSF9BQ1RJT05fTU9WRRACEhQKEFRPVUNIX0FDVElPTl9FTkQQ'
+    'AxIXChNUT1VDSF9BQ1RJT05fQ0FOQ0VMEAQ=');
+
 @$core.Deprecated('Use execPolicyDescriptor instead')
 const ExecPolicy$json = {
   '1': 'ExecPolicy',
@@ -279,6 +317,14 @@ const PointerEvent$json = {
     {'1': 'delta_x', '3': 4, '4': 1, '5': 1, '10': 'deltaX'},
     {'1': 'delta_y', '3': 5, '4': 1, '5': 1, '10': 'deltaY'},
     {'1': 'button', '3': 6, '4': 1, '5': 5, '10': 'button'},
+    {
+      '1': 'action_enum',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.PointerAction',
+      '10': 'actionEnum'
+    },
   ],
 };
 
@@ -286,7 +332,8 @@ const PointerEvent$json = {
 final $typed_data.Uint8List pointerEventDescriptor = $convert.base64Decode(
     'CgxQb2ludGVyRXZlbnQSFgoGYWN0aW9uGAEgASgJUgZhY3Rpb24SDAoBeBgCIAEoAVIBeBIMCg'
     'F5GAMgASgBUgF5EhcKB2RlbHRhX3gYBCABKAFSBmRlbHRhWBIXCgdkZWx0YV95GAUgASgBUgZk'
-    'ZWx0YVkSFgoGYnV0dG9uGAYgASgFUgZidXR0b24=');
+    'ZWx0YVkSFgoGYnV0dG9uGAYgASgFUgZidXR0b24SPwoLYWN0aW9uX2VudW0YByABKA4yHi50ZX'
+    'JtaW5hbHMuaW8udjEuUG9pbnRlckFjdGlvblIKYWN0aW9uRW51bQ==');
 
 @$core.Deprecated('Use touchPointDescriptor instead')
 const TouchPoint$json = {
@@ -316,13 +363,22 @@ const TouchEvent$json = {
       '6': '.terminals.io.v1.TouchPoint',
       '10': 'points'
     },
+    {
+      '1': 'action_enum',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.TouchAction',
+      '10': 'actionEnum'
+    },
   ],
 };
 
 /// Descriptor for `TouchEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List touchEventDescriptor = $convert.base64Decode(
     'CgpUb3VjaEV2ZW50EhYKBmFjdGlvbhgBIAEoCVIGYWN0aW9uEjMKBnBvaW50cxgCIAMoCzIbLn'
-    'Rlcm1pbmFscy5pby52MS5Ub3VjaFBvaW50UgZwb2ludHM=');
+    'Rlcm1pbmFscy5pby52MS5Ub3VjaFBvaW50UgZwb2ludHMSPQoLYWN0aW9uX2VudW0YAyABKA4y'
+    'HC50ZXJtaW5hbHMuaW8udjEuVG91Y2hBY3Rpb25SCmFjdGlvbkVudW0=');
 
 @$core.Deprecated('Use uIActionDescriptor instead')
 const UIAction$json = {

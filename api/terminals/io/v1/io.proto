@@ -68,6 +68,15 @@ message KeyEvent {
   string text = 4;
 }
 
+enum PointerAction {
+  POINTER_ACTION_UNSPECIFIED = 0;
+  POINTER_ACTION_DOWN = 1;
+  POINTER_ACTION_MOVE = 2;
+  POINTER_ACTION_UP = 3;
+  POINTER_ACTION_CANCEL = 4;
+  POINTER_ACTION_SCROLL = 5;
+}
+
 message PointerEvent {
   string action = 1;
   double x = 2;
@@ -75,6 +84,7 @@ message PointerEvent {
   double delta_x = 4;
   double delta_y = 5;
   int32 button = 6;
+  PointerAction action_enum = 7;
 }
 
 message TouchPoint {
@@ -83,9 +93,18 @@ message TouchPoint {
   double y = 3;
 }
 
+enum TouchAction {
+  TOUCH_ACTION_UNSPECIFIED = 0;
+  TOUCH_ACTION_START = 1;
+  TOUCH_ACTION_MOVE = 2;
+  TOUCH_ACTION_END = 3;
+  TOUCH_ACTION_CANCEL = 4;
+}
+
 message TouchEvent {
   string action = 1;
   repeated TouchPoint points = 2;
+  TouchAction action_enum = 3;
 }
 
 message UIAction {

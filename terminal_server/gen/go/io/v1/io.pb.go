@@ -76,6 +76,119 @@ func (StreamKind) EnumDescriptor() ([]byte, []int) {
 	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{0}
 }
 
+type PointerAction int32
+
+const (
+	PointerAction_POINTER_ACTION_UNSPECIFIED PointerAction = 0
+	PointerAction_POINTER_ACTION_DOWN        PointerAction = 1
+	PointerAction_POINTER_ACTION_MOVE        PointerAction = 2
+	PointerAction_POINTER_ACTION_UP          PointerAction = 3
+	PointerAction_POINTER_ACTION_CANCEL      PointerAction = 4
+	PointerAction_POINTER_ACTION_SCROLL      PointerAction = 5
+)
+
+// Enum value maps for PointerAction.
+var (
+	PointerAction_name = map[int32]string{
+		0: "POINTER_ACTION_UNSPECIFIED",
+		1: "POINTER_ACTION_DOWN",
+		2: "POINTER_ACTION_MOVE",
+		3: "POINTER_ACTION_UP",
+		4: "POINTER_ACTION_CANCEL",
+		5: "POINTER_ACTION_SCROLL",
+	}
+	PointerAction_value = map[string]int32{
+		"POINTER_ACTION_UNSPECIFIED": 0,
+		"POINTER_ACTION_DOWN":        1,
+		"POINTER_ACTION_MOVE":        2,
+		"POINTER_ACTION_UP":          3,
+		"POINTER_ACTION_CANCEL":      4,
+		"POINTER_ACTION_SCROLL":      5,
+	}
+)
+
+func (x PointerAction) Enum() *PointerAction {
+	p := new(PointerAction)
+	*p = x
+	return p
+}
+
+func (x PointerAction) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PointerAction) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_io_v1_io_proto_enumTypes[1].Descriptor()
+}
+
+func (PointerAction) Type() protoreflect.EnumType {
+	return &file_terminals_io_v1_io_proto_enumTypes[1]
+}
+
+func (x PointerAction) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PointerAction.Descriptor instead.
+func (PointerAction) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{1}
+}
+
+type TouchAction int32
+
+const (
+	TouchAction_TOUCH_ACTION_UNSPECIFIED TouchAction = 0
+	TouchAction_TOUCH_ACTION_START       TouchAction = 1
+	TouchAction_TOUCH_ACTION_MOVE        TouchAction = 2
+	TouchAction_TOUCH_ACTION_END         TouchAction = 3
+	TouchAction_TOUCH_ACTION_CANCEL      TouchAction = 4
+)
+
+// Enum value maps for TouchAction.
+var (
+	TouchAction_name = map[int32]string{
+		0: "TOUCH_ACTION_UNSPECIFIED",
+		1: "TOUCH_ACTION_START",
+		2: "TOUCH_ACTION_MOVE",
+		3: "TOUCH_ACTION_END",
+		4: "TOUCH_ACTION_CANCEL",
+	}
+	TouchAction_value = map[string]int32{
+		"TOUCH_ACTION_UNSPECIFIED": 0,
+		"TOUCH_ACTION_START":       1,
+		"TOUCH_ACTION_MOVE":        2,
+		"TOUCH_ACTION_END":         3,
+		"TOUCH_ACTION_CANCEL":      4,
+	}
+)
+
+func (x TouchAction) Enum() *TouchAction {
+	p := new(TouchAction)
+	*p = x
+	return p
+}
+
+func (x TouchAction) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TouchAction) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_io_v1_io_proto_enumTypes[2].Descriptor()
+}
+
+func (TouchAction) Type() protoreflect.EnumType {
+	return &file_terminals_io_v1_io_proto_enumTypes[2]
+}
+
+func (x TouchAction) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TouchAction.Descriptor instead.
+func (TouchAction) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{2}
+}
+
 type ExecPolicy int32
 
 const (
@@ -115,11 +228,11 @@ func (x ExecPolicy) String() string {
 }
 
 func (ExecPolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_io_v1_io_proto_enumTypes[1].Descriptor()
+	return file_terminals_io_v1_io_proto_enumTypes[3].Descriptor()
 }
 
 func (ExecPolicy) Type() protoreflect.EnumType {
-	return &file_terminals_io_v1_io_proto_enumTypes[1]
+	return &file_terminals_io_v1_io_proto_enumTypes[3]
 }
 
 func (x ExecPolicy) Number() protoreflect.EnumNumber {
@@ -128,7 +241,7 @@ func (x ExecPolicy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExecPolicy.Descriptor instead.
 func (ExecPolicy) EnumDescriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{1}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{3}
 }
 
 type FlowState int32
@@ -176,11 +289,11 @@ func (x FlowState) String() string {
 }
 
 func (FlowState) Descriptor() protoreflect.EnumDescriptor {
-	return file_terminals_io_v1_io_proto_enumTypes[2].Descriptor()
+	return file_terminals_io_v1_io_proto_enumTypes[4].Descriptor()
 }
 
 func (FlowState) Type() protoreflect.EnumType {
-	return &file_terminals_io_v1_io_proto_enumTypes[2]
+	return &file_terminals_io_v1_io_proto_enumTypes[4]
 }
 
 func (x FlowState) Number() protoreflect.EnumNumber {
@@ -189,7 +302,7 @@ func (x FlowState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FlowState.Descriptor instead.
 func (FlowState) EnumDescriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{2}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{4}
 }
 
 type StartStream struct {
@@ -784,6 +897,7 @@ type PointerEvent struct {
 	DeltaX        float64                `protobuf:"fixed64,4,opt,name=delta_x,json=deltaX,proto3" json:"delta_x,omitempty"`
 	DeltaY        float64                `protobuf:"fixed64,5,opt,name=delta_y,json=deltaY,proto3" json:"delta_y,omitempty"`
 	Button        int32                  `protobuf:"varint,6,opt,name=button,proto3" json:"button,omitempty"`
+	ActionEnum    PointerAction          `protobuf:"varint,7,opt,name=action_enum,json=actionEnum,proto3,enum=terminals.io.v1.PointerAction" json:"action_enum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -860,6 +974,13 @@ func (x *PointerEvent) GetButton() int32 {
 	return 0
 }
 
+func (x *PointerEvent) GetActionEnum() PointerAction {
+	if x != nil {
+		return x.ActionEnum
+	}
+	return PointerAction_POINTER_ACTION_UNSPECIFIED
+}
+
 type TouchPoint struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -924,6 +1045,7 @@ type TouchEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Action        string                 `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
 	Points        []*TouchPoint          `protobuf:"bytes,2,rep,name=points,proto3" json:"points,omitempty"`
+	ActionEnum    TouchAction            `protobuf:"varint,3,opt,name=action_enum,json=actionEnum,proto3,enum=terminals.io.v1.TouchAction" json:"action_enum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -970,6 +1092,13 @@ func (x *TouchEvent) GetPoints() []*TouchPoint {
 		return x.Points
 	}
 	return nil
+}
+
+func (x *TouchEvent) GetActionEnum() TouchAction {
+	if x != nil {
+		return x.ActionEnum
+	}
+	return TouchAction_TOUCH_ACTION_UNSPECIFIED
 }
 
 type UIAction struct {
@@ -2374,23 +2503,27 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
 	"\x04down\x18\x02 \x01(\bR\x04down\x12\x0e\n" +
 	"\x02up\x18\x03 \x01(\bR\x02up\x12\x12\n" +
-	"\x04text\x18\x04 \x01(\tR\x04text\"\x8c\x01\n" +
+	"\x04text\x18\x04 \x01(\tR\x04text\"\xcd\x01\n" +
 	"\fPointerEvent\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12\f\n" +
 	"\x01x\x18\x02 \x01(\x01R\x01x\x12\f\n" +
 	"\x01y\x18\x03 \x01(\x01R\x01y\x12\x17\n" +
 	"\adelta_x\x18\x04 \x01(\x01R\x06deltaX\x12\x17\n" +
 	"\adelta_y\x18\x05 \x01(\x01R\x06deltaY\x12\x16\n" +
-	"\x06button\x18\x06 \x01(\x05R\x06button\"8\n" +
+	"\x06button\x18\x06 \x01(\x05R\x06button\x12?\n" +
+	"\vaction_enum\x18\a \x01(\x0e2\x1e.terminals.io.v1.PointerActionR\n" +
+	"actionEnum\"8\n" +
 	"\n" +
 	"TouchPoint\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\f\n" +
 	"\x01x\x18\x02 \x01(\x01R\x01x\x12\f\n" +
-	"\x01y\x18\x03 \x01(\x01R\x01y\"Y\n" +
+	"\x01y\x18\x03 \x01(\x01R\x01y\"\x98\x01\n" +
 	"\n" +
 	"TouchEvent\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x123\n" +
-	"\x06points\x18\x02 \x03(\v2\x1b.terminals.io.v1.TouchPointR\x06points\"[\n" +
+	"\x06points\x18\x02 \x03(\v2\x1b.terminals.io.v1.TouchPointR\x06points\x12=\n" +
+	"\vaction_enum\x18\x03 \x01(\x0e2\x1c.terminals.io.v1.TouchActionR\n" +
+	"actionEnum\"[\n" +
 	"\bUIAction\x12!\n" +
 	"\fcomponent_id\x18\x01 \x01(\tR\vcomponentId\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12\x14\n" +
@@ -2516,7 +2649,20 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x11STREAM_KIND_AUDIO\x10\x01\x12\x15\n" +
 	"\x11STREAM_KIND_VIDEO\x10\x02\x12\x16\n" +
 	"\x12STREAM_KIND_SENSOR\x10\x03\x12\x14\n" +
-	"\x10STREAM_KIND_DATA\x10\x04*\x9b\x01\n" +
+	"\x10STREAM_KIND_DATA\x10\x04*\xae\x01\n" +
+	"\rPointerAction\x12\x1e\n" +
+	"\x1aPOINTER_ACTION_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13POINTER_ACTION_DOWN\x10\x01\x12\x17\n" +
+	"\x13POINTER_ACTION_MOVE\x10\x02\x12\x15\n" +
+	"\x11POINTER_ACTION_UP\x10\x03\x12\x19\n" +
+	"\x15POINTER_ACTION_CANCEL\x10\x04\x12\x19\n" +
+	"\x15POINTER_ACTION_SCROLL\x10\x05*\x89\x01\n" +
+	"\vTouchAction\x12\x1c\n" +
+	"\x18TOUCH_ACTION_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12TOUCH_ACTION_START\x10\x01\x12\x15\n" +
+	"\x11TOUCH_ACTION_MOVE\x10\x02\x12\x14\n" +
+	"\x10TOUCH_ACTION_END\x10\x03\x12\x17\n" +
+	"\x13TOUCH_ACTION_CANCEL\x10\x04*\x9b\x01\n" +
 	"\n" +
 	"ExecPolicy\x12\x1b\n" +
 	"\x17EXEC_POLICY_UNSPECIFIED\x10\x00\x12\x14\n" +
@@ -2545,79 +2691,83 @@ func file_terminals_io_v1_io_proto_rawDescGZIP() []byte {
 	return file_terminals_io_v1_io_proto_rawDescData
 }
 
-var file_terminals_io_v1_io_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_terminals_io_v1_io_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
 var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_terminals_io_v1_io_proto_goTypes = []any{
 	(StreamKind)(0),               // 0: terminals.io.v1.StreamKind
-	(ExecPolicy)(0),               // 1: terminals.io.v1.ExecPolicy
-	(FlowState)(0),                // 2: terminals.io.v1.FlowState
-	(*StartStream)(nil),           // 3: terminals.io.v1.StartStream
-	(*StopStream)(nil),            // 4: terminals.io.v1.StopStream
-	(*RouteStream)(nil),           // 5: terminals.io.v1.RouteStream
-	(*PlayAudio)(nil),             // 6: terminals.io.v1.PlayAudio
-	(*ShowMedia)(nil),             // 7: terminals.io.v1.ShowMedia
-	(*InputEvent)(nil),            // 8: terminals.io.v1.InputEvent
-	(*KeyEvent)(nil),              // 9: terminals.io.v1.KeyEvent
-	(*PointerEvent)(nil),          // 10: terminals.io.v1.PointerEvent
-	(*TouchPoint)(nil),            // 11: terminals.io.v1.TouchPoint
-	(*TouchEvent)(nil),            // 12: terminals.io.v1.TouchEvent
-	(*UIAction)(nil),              // 13: terminals.io.v1.UIAction
-	(*SensorData)(nil),            // 14: terminals.io.v1.SensorData
-	(*FlowNode)(nil),              // 15: terminals.io.v1.FlowNode
-	(*FlowEdge)(nil),              // 16: terminals.io.v1.FlowEdge
-	(*FlowPlan)(nil),              // 17: terminals.io.v1.FlowPlan
-	(*StartFlow)(nil),             // 18: terminals.io.v1.StartFlow
-	(*PatchFlow)(nil),             // 19: terminals.io.v1.PatchFlow
-	(*StopFlow)(nil),              // 20: terminals.io.v1.StopFlow
-	(*DeviceRef)(nil),             // 21: terminals.io.v1.DeviceRef
-	(*Pose)(nil),                  // 22: terminals.io.v1.Pose
-	(*LocationEstimate)(nil),      // 23: terminals.io.v1.LocationEstimate
-	(*ObservationProvenance)(nil), // 24: terminals.io.v1.ObservationProvenance
-	(*ArtifactRef)(nil),           // 25: terminals.io.v1.ArtifactRef
-	(*Observation)(nil),           // 26: terminals.io.v1.Observation
-	(*ObservationMessage)(nil),    // 27: terminals.io.v1.ObservationMessage
-	(*ArtifactAvailable)(nil),     // 28: terminals.io.v1.ArtifactAvailable
-	(*RequestArtifact)(nil),       // 29: terminals.io.v1.RequestArtifact
-	(*FlowStats)(nil),             // 30: terminals.io.v1.FlowStats
-	(*ClockSample)(nil),           // 31: terminals.io.v1.ClockSample
-	(*InstallBundle)(nil),         // 32: terminals.io.v1.InstallBundle
-	(*RemoveBundle)(nil),          // 33: terminals.io.v1.RemoveBundle
-	nil,                           // 34: terminals.io.v1.StartStream.MetadataEntry
-	nil,                           // 35: terminals.io.v1.SensorData.ValuesEntry
-	nil,                           // 36: terminals.io.v1.FlowNode.ArgsEntry
-	nil,                           // 37: terminals.io.v1.Observation.AttributesEntry
+	(PointerAction)(0),            // 1: terminals.io.v1.PointerAction
+	(TouchAction)(0),              // 2: terminals.io.v1.TouchAction
+	(ExecPolicy)(0),               // 3: terminals.io.v1.ExecPolicy
+	(FlowState)(0),                // 4: terminals.io.v1.FlowState
+	(*StartStream)(nil),           // 5: terminals.io.v1.StartStream
+	(*StopStream)(nil),            // 6: terminals.io.v1.StopStream
+	(*RouteStream)(nil),           // 7: terminals.io.v1.RouteStream
+	(*PlayAudio)(nil),             // 8: terminals.io.v1.PlayAudio
+	(*ShowMedia)(nil),             // 9: terminals.io.v1.ShowMedia
+	(*InputEvent)(nil),            // 10: terminals.io.v1.InputEvent
+	(*KeyEvent)(nil),              // 11: terminals.io.v1.KeyEvent
+	(*PointerEvent)(nil),          // 12: terminals.io.v1.PointerEvent
+	(*TouchPoint)(nil),            // 13: terminals.io.v1.TouchPoint
+	(*TouchEvent)(nil),            // 14: terminals.io.v1.TouchEvent
+	(*UIAction)(nil),              // 15: terminals.io.v1.UIAction
+	(*SensorData)(nil),            // 16: terminals.io.v1.SensorData
+	(*FlowNode)(nil),              // 17: terminals.io.v1.FlowNode
+	(*FlowEdge)(nil),              // 18: terminals.io.v1.FlowEdge
+	(*FlowPlan)(nil),              // 19: terminals.io.v1.FlowPlan
+	(*StartFlow)(nil),             // 20: terminals.io.v1.StartFlow
+	(*PatchFlow)(nil),             // 21: terminals.io.v1.PatchFlow
+	(*StopFlow)(nil),              // 22: terminals.io.v1.StopFlow
+	(*DeviceRef)(nil),             // 23: terminals.io.v1.DeviceRef
+	(*Pose)(nil),                  // 24: terminals.io.v1.Pose
+	(*LocationEstimate)(nil),      // 25: terminals.io.v1.LocationEstimate
+	(*ObservationProvenance)(nil), // 26: terminals.io.v1.ObservationProvenance
+	(*ArtifactRef)(nil),           // 27: terminals.io.v1.ArtifactRef
+	(*Observation)(nil),           // 28: terminals.io.v1.Observation
+	(*ObservationMessage)(nil),    // 29: terminals.io.v1.ObservationMessage
+	(*ArtifactAvailable)(nil),     // 30: terminals.io.v1.ArtifactAvailable
+	(*RequestArtifact)(nil),       // 31: terminals.io.v1.RequestArtifact
+	(*FlowStats)(nil),             // 32: terminals.io.v1.FlowStats
+	(*ClockSample)(nil),           // 33: terminals.io.v1.ClockSample
+	(*InstallBundle)(nil),         // 34: terminals.io.v1.InstallBundle
+	(*RemoveBundle)(nil),          // 35: terminals.io.v1.RemoveBundle
+	nil,                           // 36: terminals.io.v1.StartStream.MetadataEntry
+	nil,                           // 37: terminals.io.v1.SensorData.ValuesEntry
+	nil,                           // 38: terminals.io.v1.FlowNode.ArgsEntry
+	nil,                           // 39: terminals.io.v1.Observation.AttributesEntry
 }
 var file_terminals_io_v1_io_proto_depIdxs = []int32{
-	34, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
+	36, // 0: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
 	0,  // 1: terminals.io.v1.StartStream.stream_kind:type_name -> terminals.io.v1.StreamKind
 	0,  // 2: terminals.io.v1.RouteStream.stream_kind:type_name -> terminals.io.v1.StreamKind
-	9,  // 3: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
-	10, // 4: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
-	12, // 5: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
-	13, // 6: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
-	11, // 7: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
-	35, // 8: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
-	36, // 9: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
-	1,  // 10: terminals.io.v1.FlowNode.exec_policy:type_name -> terminals.io.v1.ExecPolicy
-	15, // 11: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
-	16, // 12: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
-	17, // 13: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	17, // 14: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	22, // 15: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
-	21, // 16: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
-	21, // 17: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
-	23, // 18: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
-	37, // 19: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
-	25, // 20: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
-	24, // 21: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
-	26, // 22: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
-	25, // 23: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
-	2,  // 24: terminals.io.v1.FlowStats.state_enum:type_name -> terminals.io.v1.FlowState
-	25, // [25:25] is the sub-list for method output_type
-	25, // [25:25] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	11, // 3: terminals.io.v1.InputEvent.key:type_name -> terminals.io.v1.KeyEvent
+	12, // 4: terminals.io.v1.InputEvent.pointer:type_name -> terminals.io.v1.PointerEvent
+	14, // 5: terminals.io.v1.InputEvent.touch:type_name -> terminals.io.v1.TouchEvent
+	15, // 6: terminals.io.v1.InputEvent.ui_action:type_name -> terminals.io.v1.UIAction
+	1,  // 7: terminals.io.v1.PointerEvent.action_enum:type_name -> terminals.io.v1.PointerAction
+	13, // 8: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
+	2,  // 9: terminals.io.v1.TouchEvent.action_enum:type_name -> terminals.io.v1.TouchAction
+	37, // 10: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
+	38, // 11: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
+	3,  // 12: terminals.io.v1.FlowNode.exec_policy:type_name -> terminals.io.v1.ExecPolicy
+	17, // 13: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
+	18, // 14: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
+	19, // 15: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	19, // 16: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	24, // 17: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
+	23, // 18: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
+	23, // 19: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
+	25, // 20: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
+	39, // 21: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
+	27, // 22: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
+	26, // 23: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
+	28, // 24: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
+	27, // 25: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
+	4,  // 26: terminals.io.v1.FlowStats.state_enum:type_name -> terminals.io.v1.FlowState
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_terminals_io_v1_io_proto_init() }
@@ -2641,7 +2791,7 @@ func file_terminals_io_v1_io_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_io_v1_io_proto_rawDesc), len(file_terminals_io_v1_io_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      5,
 			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,

@@ -330,25 +330,25 @@ Tests: media renderer tests cover accepted and unsupported media types.
 
 Owner: transport/input  
 Classification: transitional_escape_hatch  
-Target state: replace with enum.  
+Target state: typed `PointerAction` enum (`PointerEvent.action_enum`, field 7) is the typed replacement; legacy `action` string remains during the compatibility window.  
 Review date: 2026-06-15  
-Producer: client input layer  
-Consumer: server input dispatcher  
-Unknown behavior: server ignores unknown actions or records protocol error.  
-Validation: `down`, `move`, `up`, `cancel`, `scroll`.  
-Tests: input tests cover known actions and unknown-action handling.
+Producer: client input layer (emits both typed enum and legacy string when both are known)  
+Consumer: server input dispatcher (prefers typed enum, falls back to legacy string when unspecified)  
+Unknown behavior: server ignores unknown actions or records protocol error; unspecified enum + unknown string is treated as unknown.  
+Validation: legacy `down`, `move`, `up`, `cancel`, `scroll`; typed `POINTER_ACTION_DOWN`, `POINTER_ACTION_MOVE`, `POINTER_ACTION_UP`, `POINTER_ACTION_CANCEL`, `POINTER_ACTION_SCROLL`.  
+Tests: input tests cover known actions and unknown-action handling; protocol contract tests assert typed enum coexistence with legacy string.
 
 ### Field: terminals.io.v1.TouchEvent.action
 
 Owner: transport/input  
 Classification: transitional_escape_hatch  
-Target state: replace with enum.  
+Target state: typed `TouchAction` enum (`TouchEvent.action_enum`, field 3) is the typed replacement; legacy `action` string remains during the compatibility window.  
 Review date: 2026-06-15  
-Producer: client input layer  
-Consumer: server input dispatcher  
-Unknown behavior: server ignores unknown actions or records protocol error.  
-Validation: `start`, `move`, `end`, `cancel`.  
-Tests: input tests cover known actions and unknown-action handling.
+Producer: client input layer (emits both typed enum and legacy string when both are known)  
+Consumer: server input dispatcher (prefers typed enum, falls back to legacy string when unspecified)  
+Unknown behavior: server ignores unknown actions or records protocol error; unspecified enum + unknown string is treated as unknown.  
+Validation: legacy `start`, `move`, `end`, `cancel`; typed `TOUCH_ACTION_START`, `TOUCH_ACTION_MOVE`, `TOUCH_ACTION_END`, `TOUCH_ACTION_CANCEL`.  
+Tests: input tests cover known actions and unknown-action handling; protocol contract tests assert typed enum coexistence with legacy string.
 
 ### Field: terminals.io.v1.UIAction.action
 

@@ -76,3 +76,11 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Updated the protocol extension registry entry for `FlowNode.exec` to describe typed-first compatibility semantics.
 - Synced regenerated `terminals/io/v1` Dart bindings into `terminal_client/lib/gen/`.
 - Re-ran `make proto-contract-test` and full `go test ./...` in `terminal_server`; all green.
+
+## Protocol Evolution Rules (2026-05-04, PointerAction/TouchAction Enum Migration)
+
+- Added additive typed enums `terminals.io.v1.PointerAction` and `terminals.io.v1.TouchAction` and the corresponding `PointerEvent.action_enum` (field 7) and `TouchEvent.action_enum` (field 3) while preserving legacy `action` string fields.
+- Regenerated Go bindings via `make proto-generate` and synced the refreshed `terminals/io/v1` Dart bindings (`io.pb.dart`, `io.pbenum.dart`, `io.pbjson.dart`) into `terminal_client/lib/gen/`.
+- Updated the protocol extension registry entries for `PointerEvent.action` and `TouchEvent.action` to describe typed-first compatibility semantics (typed enum preferred, legacy string fallback during the migration window).
+- No application-code paths currently route pointer/touch input, so adapter wiring is deferred until a producer/consumer lands; the typed fields are now available for the first non-test consumer.
+- Re-ran `make proto-contract-test` and `make server-test`; all green.

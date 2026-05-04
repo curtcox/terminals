@@ -751,6 +751,7 @@ class PointerEvent extends $pb.GeneratedMessage {
     $core.double? deltaX,
     $core.double? deltaY,
     $core.int? button,
+    PointerAction? actionEnum,
   }) {
     final result = create();
     if (action != null) result.action = action;
@@ -759,6 +760,7 @@ class PointerEvent extends $pb.GeneratedMessage {
     if (deltaX != null) result.deltaX = deltaX;
     if (deltaY != null) result.deltaY = deltaY;
     if (button != null) result.button = button;
+    if (actionEnum != null) result.actionEnum = actionEnum;
     return result;
   }
 
@@ -782,6 +784,8 @@ class PointerEvent extends $pb.GeneratedMessage {
     ..aD(4, _omitFieldNames ? '' : 'deltaX')
     ..aD(5, _omitFieldNames ? '' : 'deltaY')
     ..aI(6, _omitFieldNames ? '' : 'button')
+    ..aE<PointerAction>(7, _omitFieldNames ? '' : 'actionEnum',
+        enumValues: PointerAction.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -856,6 +860,15 @@ class PointerEvent extends $pb.GeneratedMessage {
   $core.bool hasButton() => $_has(5);
   @$pb.TagNumber(6)
   void clearButton() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  PointerAction get actionEnum => $_getN(6);
+  @$pb.TagNumber(7)
+  set actionEnum(PointerAction value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasActionEnum() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearActionEnum() => $_clearField(7);
 }
 
 class TouchPoint extends $pb.GeneratedMessage {
@@ -940,10 +953,12 @@ class TouchEvent extends $pb.GeneratedMessage {
   factory TouchEvent({
     $core.String? action,
     $core.Iterable<TouchPoint>? points,
+    TouchAction? actionEnum,
   }) {
     final result = create();
     if (action != null) result.action = action;
     if (points != null) result.points.addAll(points);
+    if (actionEnum != null) result.actionEnum = actionEnum;
     return result;
   }
 
@@ -964,6 +979,8 @@ class TouchEvent extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'action')
     ..pPM<TouchPoint>(2, _omitFieldNames ? '' : 'points',
         subBuilder: TouchPoint.create)
+    ..aE<TouchAction>(3, _omitFieldNames ? '' : 'actionEnum',
+        enumValues: TouchAction.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -995,6 +1012,15 @@ class TouchEvent extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<TouchPoint> get points => $_getList(1);
+
+  @$pb.TagNumber(3)
+  TouchAction get actionEnum => $_getN(2);
+  @$pb.TagNumber(3)
+  set actionEnum(TouchAction value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasActionEnum() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearActionEnum() => $_clearField(3);
 }
 
 class UIAction extends $pb.GeneratedMessage {

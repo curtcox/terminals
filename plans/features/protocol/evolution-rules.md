@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: cascade
 validation: manual
-last-reviewed: 2026-05-03
+last-reviewed: 2026-05-04
 ---
 
 # Protocol Evolution Rules
@@ -927,6 +927,13 @@ Incremental progress (2026-05-03):
 - Updated Flutter client media/control response handling to prefer typed enum fields and fall back to legacy string values during compatibility.
 - Expanded Go and Dart protocol contract/assertion coverage for typed stream kind behavior, plus adapter tests for enum-first WebRTC fallback semantics.
 - Updated protocol extension registry entries for `StartStream.kind`, `RouteStream.kind`, and `WebRTCSignal.signal_type` to describe typed-first compatibility behavior.
+
+Incremental progress (2026-05-04, PointerAction/TouchAction):
+
+- Added additive typed enums `terminals.io.v1.PointerAction` and `terminals.io.v1.TouchAction`, plus `PointerEvent.action_enum` (field 7) and `TouchEvent.action_enum` (field 3), while preserving legacy `action` strings.
+- Regenerated Go bindings and synced Dart `terminals/io/v1` bindings into the client tree.
+- Updated registry entries for `PointerEvent.action` and `TouchEvent.action` to describe typed-first compatibility semantics.
+- No application code currently routes `InputEvent.pointer` / `InputEvent.touch`, so producer/consumer wiring is deferred until the first real consumer lands.
 
 Incremental progress (2026-05-03, ExecPolicy):
 
