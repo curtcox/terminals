@@ -548,6 +548,32 @@ final $typed_data.Uint8List sensorDataDescriptor = $convert.base64Decode(
     'LlZhbHVlc0VudHJ5UgZ2YWx1ZXMaOQoLVmFsdWVzRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSFA'
     'oFdmFsdWUYAiABKAFSBXZhbHVlOgI4AQ==');
 
+@$core.Deprecated('Use flowNodeArgsDescriptor instead')
+const FlowNodeArgs$json = {
+  '1': 'FlowNodeArgs',
+  '2': [
+    {'1': 'device_id', '3': 1, '4': 1, '5': 9, '10': 'deviceId'},
+    {'1': 'resource', '3': 2, '4': 1, '5': 9, '10': 'resource'},
+    {'1': 'stream_kind', '3': 3, '4': 1, '5': 9, '10': 'streamKind'},
+    {
+      '1': 'stream_kind_enum',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.StreamKind',
+      '10': 'streamKindEnum'
+    },
+    {'1': 'name', '3': 5, '4': 1, '5': 9, '10': 'name'},
+  ],
+};
+
+/// Descriptor for `FlowNodeArgs`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List flowNodeArgsDescriptor = $convert.base64Decode(
+    'CgxGbG93Tm9kZUFyZ3MSGwoJZGV2aWNlX2lkGAEgASgJUghkZXZpY2VJZBIaCghyZXNvdXJjZR'
+    'gCIAEoCVIIcmVzb3VyY2USHwoLc3RyZWFtX2tpbmQYAyABKAlSCnN0cmVhbUtpbmQSRQoQc3Ry'
+    'ZWFtX2tpbmRfZW51bRgEIAEoDjIbLnRlcm1pbmFscy5pby52MS5TdHJlYW1LaW5kUg5zdHJlYW'
+    '1LaW5kRW51bRISCgRuYW1lGAUgASgJUgRuYW1l');
+
 @$core.Deprecated('Use flowNodeDescriptor instead')
 const FlowNode$json = {
   '1': 'FlowNode',
@@ -571,6 +597,14 @@ const FlowNode$json = {
       '6': '.terminals.io.v1.ExecPolicy',
       '10': 'execPolicy'
     },
+    {
+      '1': 'typed_args',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.FlowNodeArgs',
+      '10': 'typedArgs'
+    },
   ],
   '3': [FlowNode_ArgsEntry$json],
 };
@@ -590,8 +624,9 @@ final $typed_data.Uint8List flowNodeDescriptor = $convert.base64Decode(
     'CghGbG93Tm9kZRIOCgJpZBgBIAEoCVICaWQSEgoEa2luZBgCIAEoCVIEa2luZBI3CgRhcmdzGA'
     'MgAygLMiMudGVybWluYWxzLmlvLnYxLkZsb3dOb2RlLkFyZ3NFbnRyeVIEYXJncxISCgRleGVj'
     'GAQgASgJUgRleGVjEjwKC2V4ZWNfcG9saWN5GAUgASgOMhsudGVybWluYWxzLmlvLnYxLkV4ZW'
-    'NQb2xpY3lSCmV4ZWNQb2xpY3kaNwoJQXJnc0VudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZh'
-    'bHVlGAIgASgJUgV2YWx1ZToCOAE=');
+    'NQb2xpY3lSCmV4ZWNQb2xpY3kSPAoKdHlwZWRfYXJncxgGIAEoCzIdLnRlcm1pbmFscy5pby52'
+    'MS5GbG93Tm9kZUFyZ3NSCXR5cGVkQXJncxo3CglBcmdzRW50cnkSEAoDa2V5GAEgASgJUgNrZX'
+    'kSFAoFdmFsdWUYAiABKAlSBXZhbHVlOgI4AQ==');
 
 @$core.Deprecated('Use flowEdgeDescriptor instead')
 const FlowEdge$json = {
@@ -848,6 +883,14 @@ const Observation$json = {
       '6': '.terminals.io.v1.ObservationProvenance',
       '10': 'provenance'
     },
+    {
+      '1': 'typed_attributes',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.io.v1.ObservationAttributes',
+      '10': 'typedAttributes'
+    },
   ],
   '3': [Observation_AttributesEntry$json],
 };
@@ -873,8 +916,26 @@ final $typed_data.Uint8List observationDescriptor = $convert.base64Decode(
     'cm1pbmFscy5pby52MS5PYnNlcnZhdGlvbi5BdHRyaWJ1dGVzRW50cnlSCmF0dHJpYnV0ZXMSOA'
     'oIZXZpZGVuY2UYCiADKAsyHC50ZXJtaW5hbHMuaW8udjEuQXJ0aWZhY3RSZWZSCGV2aWRlbmNl'
     'EkYKCnByb3ZlbmFuY2UYCyABKAsyJi50ZXJtaW5hbHMuaW8udjEuT2JzZXJ2YXRpb25Qcm92ZW'
-    '5hbmNlUgpwcm92ZW5hbmNlGj0KD0F0dHJpYnV0ZXNFbnRyeRIQCgNrZXkYASABKAlSA2tleRIU'
-    'CgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgB');
+    '5hbmNlUgpwcm92ZW5hbmNlElEKEHR5cGVkX2F0dHJpYnV0ZXMYDCABKAsyJi50ZXJtaW5hbHMu'
+    'aW8udjEuT2JzZXJ2YXRpb25BdHRyaWJ1dGVzUg90eXBlZEF0dHJpYnV0ZXMaPQoPQXR0cmlidX'
+    'Rlc0VudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAE=');
+
+@$core.Deprecated('Use observationAttributesDescriptor instead')
+const ObservationAttributes$json = {
+  '1': 'ObservationAttributes',
+  '2': [
+    {'1': 'label', '3': 1, '4': 1, '5': 9, '10': 'label'},
+    {'1': 'device', '3': 2, '4': 1, '5': 9, '10': 'device'},
+    {'1': 'mac', '3': 3, '4': 1, '5': 9, '10': 'mac'},
+    {'1': 'duration_seconds', '3': 4, '4': 1, '5': 9, '10': 'durationSeconds'},
+  ],
+};
+
+/// Descriptor for `ObservationAttributes`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List observationAttributesDescriptor = $convert.base64Decode(
+    'ChVPYnNlcnZhdGlvbkF0dHJpYnV0ZXMSFAoFbGFiZWwYASABKAlSBWxhYmVsEhYKBmRldmljZR'
+    'gCIAEoCVIGZGV2aWNlEhAKA21hYxgDIAEoCVIDbWFjEikKEGR1cmF0aW9uX3NlY29uZHMYBCAB'
+    'KAlSD2R1cmF0aW9uU2Vjb25kcw==');
 
 @$core.Deprecated('Use observationMessageDescriptor instead')
 const ObservationMessage$json = {

@@ -257,16 +257,22 @@ class ServerDrivenRenderer extends StatelessWidget {
           detail: streamId,
         );
       case uiv1.Node_Widget.canvas:
-        final drawOps = node.canvas.drawOpsJson.trim();
-        final drawOpsPreview = drawOps.isEmpty
-            ? 'No draw ops'
-            : (drawOps.length > 64
-                ? '${drawOps.substring(0, 64)}...'
-                : drawOps);
+        final typedOps = node.canvas.drawOps;
+        final String detail;
+        if (typedOps.isNotEmpty) {
+          detail = _typedDrawOpsSummary(typedOps);
+        } else {
+          final drawOps = node.canvas.drawOpsJson.trim();
+          detail = drawOps.isEmpty
+              ? 'No draw ops'
+              : (drawOps.length > 64
+                  ? '${drawOps.substring(0, 64)}...'
+                  : drawOps);
+        }
         return _placeholderPrimitive(
           key: _key('canvas', node, path),
           title: 'Canvas',
-          detail: drawOpsPreview,
+          detail: detail,
         );
       case uiv1.Node_Widget.fullscreen:
         return _placeholderPrimitive(
@@ -440,6 +446,30 @@ class ServerDrivenRenderer extends StatelessWidget {
       key: _key('unsupported', node, path),
       title: 'Unsupported UI node',
     );
+  }
+
+  String _typedDrawOpsSummary(List<uiv1.DrawOp> ops) {
+    final counts = <String, int>{};
+    for (final op in ops) {
+      final String label;
+      switch (op.whichOp()) {
+        case uiv1.DrawOp_Op.line:
+          label = 'line';
+        case uiv1.DrawOp_Op.rect:
+          label = 'rect';
+        case uiv1.DrawOp_Op.circle:
+          label = 'circle';
+        case uiv1.DrawOp_Op.text:
+          label = 'text';
+        case uiv1.DrawOp_Op.path:
+          label = 'path';
+        case uiv1.DrawOp_Op.notSet:
+          label = 'unset';
+      }
+      counts[label] = (counts[label] ?? 0) + 1;
+    }
+    final entries = counts.entries.map((e) => '${e.value} ${e.key}').toList();
+    return '${ops.length} draw ops (${entries.join(', ')})';
   }
 
   Widget _placeholderPrimitive({

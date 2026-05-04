@@ -417,7 +417,14 @@ final $typed_data.Uint8List gridWidgetDescriptor = $convert
 const ScrollWidget$json = {
   '1': 'ScrollWidget',
   '2': [
-    {'1': 'direction', '3': 1, '4': 1, '5': 9, '10': 'direction'},
+    {
+      '1': 'direction',
+      '3': 1,
+      '4': 1,
+      '5': 9,
+      '8': {'3': true},
+      '10': 'direction',
+    },
     {
       '1': 'direction_enum',
       '3': 2,
@@ -431,9 +438,9 @@ const ScrollWidget$json = {
 
 /// Descriptor for `ScrollWidget`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List scrollWidgetDescriptor = $convert.base64Decode(
-    'CgxTY3JvbGxXaWRnZXQSHAoJZGlyZWN0aW9uGAEgASgJUglkaXJlY3Rpb24SRwoOZGlyZWN0aW'
-    '9uX2VudW0YAiABKA4yIC50ZXJtaW5hbHMudWkudjEuU2Nyb2xsRGlyZWN0aW9uUg1kaXJlY3Rp'
-    'b25FbnVt');
+    'CgxTY3JvbGxXaWRnZXQSIAoJZGlyZWN0aW9uGAEgASgJQgIYAVIJZGlyZWN0aW9uEkcKDmRpcm'
+    'VjdGlvbl9lbnVtGAIgASgOMiAudGVybWluYWxzLnVpLnYxLlNjcm9sbERpcmVjdGlvblINZGly'
+    'ZWN0aW9uRW51bQ==');
 
 @$core.Deprecated('Use paddingWidgetDescriptor instead')
 const PaddingWidget$json = {

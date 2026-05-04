@@ -175,12 +175,30 @@ enum ExecPolicy {
   EXEC_POLICY_SERVER_ONLY = 4;
 }
 
+// FlowNodeArgs holds typed mirrors of stable, well-known FlowNode.args keys.
+// Producers should populate both this typed message and the legacy
+// FlowNode.args map during the compatibility window. Consumers prefer typed
+// fields and fall back to the legacy map for unknown or older payloads.
+message FlowNodeArgs {
+  // Mirrors legacy args["device_id"]. Source/sink device identifier.
+  string device_id = 1;
+  // Mirrors legacy args["resource"]. Resource selector on the source/sink.
+  string resource = 2;
+  // Mirrors legacy args["stream_kind"]. Used by sinks/forks to override the
+  // routed stream kind. Producer also sets the typed StreamKind.
+  string stream_kind = 3;
+  StreamKind stream_kind_enum = 4;
+  // Mirrors legacy args["name"]. Used by analyzer/feature/tracker nodes.
+  string name = 5;
+}
+
 message FlowNode {
   string id = 1;
   string kind = 2;
   map<string, string> args = 3;
   string exec = 4;
   ExecPolicy exec_policy = 5;
+  FlowNodeArgs typed_args = 6;
 }
 
 message FlowEdge {
@@ -258,6 +276,24 @@ message Observation {
   map<string, string> attributes = 9;
   repeated ArtifactRef evidence = 10;
   ObservationProvenance provenance = 11;
+  ObservationAttributes typed_attributes = 12;
+}
+
+// ObservationAttributes holds typed mirrors of stable, well-known
+// Observation.attributes keys. Producers should populate both this typed
+// message and the legacy map during the compatibility window. Consumers
+// prefer typed fields and fall back to the legacy map for unknown payloads.
+message ObservationAttributes {
+  // Mirrors legacy attributes["label"]. Analyzer/event label.
+  string label = 1;
+  // Mirrors legacy attributes["device"]. Detected device label.
+  string device = 2;
+  // Mirrors legacy attributes["mac"]. MAC address for presence/network events.
+  string mac = 3;
+  // Mirrors legacy attributes["duration_seconds"]. Duration in seconds for
+  // timer/duration-based observations. Stored as a string for compatibility
+  // with the legacy map representation.
+  string duration_seconds = 4;
 }
 
 message ObservationMessage {

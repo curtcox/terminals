@@ -112,6 +112,12 @@ void _assertFlowPlanBasic(WireEnvelope envelope) {
   _expectEqual(plan.nodes[0].execPolicy, ExecPolicy.EXEC_POLICY_PREFER_CLIENT);
   _expectEqual(plan.nodes[1].exec, 'server');
   _expectEqual(plan.nodes[1].execPolicy, ExecPolicy.EXEC_POLICY_SERVER_ONLY);
+  _expectEqual(plan.nodes[0].typedArgs.deviceId, 'kitchen-terminal');
+  _expectEqual(plan.nodes[0].typedArgs.resource, 'microphone');
+  _expectEqual(plan.nodes[0].typedArgs.streamKind, 'audio');
+  _expectEqual(
+      plan.nodes[0].typedArgs.streamKindEnum, StreamKind.STREAM_KIND_AUDIO);
+  _expectEqual(plan.nodes[0].args['device_id'], 'kitchen-terminal');
 }
 
 void _assertObservationSound(WireEnvelope envelope) {
@@ -119,6 +125,9 @@ void _assertObservationSound(WireEnvelope envelope) {
 
   _expectEqual(observation.kind, 'sound.detected');
   _expectEqual(observation.attributes['loudness_db'], '72.5');
+  _expectEqual(observation.attributes['label'], 'whistle');
+  _expectEqual(observation.typedAttributes.label, 'whistle');
+  _expectEqual(observation.typedAttributes.device, 'kettle');
   _expectEqual(observation.evidence.length, 1);
 }
 

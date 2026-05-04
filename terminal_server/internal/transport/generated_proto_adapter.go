@@ -615,6 +615,26 @@ func protoStreamKindFromInternal(kind string) iov1.StreamKind {
 	}
 }
 
+func flowNodeTypedArgsFromArgs(args map[string]string) *iov1.FlowNodeArgs {
+	if len(args) == 0 {
+		return nil
+	}
+	deviceID := strings.TrimSpace(args["device_id"])
+	resource := strings.TrimSpace(args["resource"])
+	streamKind := strings.TrimSpace(args["stream_kind"])
+	name := strings.TrimSpace(args["name"])
+	if deviceID == "" && resource == "" && streamKind == "" && name == "" {
+		return nil
+	}
+	return &iov1.FlowNodeArgs{
+		DeviceId:       deviceID,
+		Resource:       resource,
+		StreamKind:     streamKind,
+		StreamKindEnum: protoStreamKindFromInternal(streamKind),
+		Name:           name,
+	}
+}
+
 func protoExecPolicyFromInternal(exec iorouter.ExecPolicy) iov1.ExecPolicy {
 	switch exec {
 	case iorouter.ExecAuto:
@@ -1087,6 +1107,59 @@ func parseBool(raw string) bool {
 	return v
 }
 
+// observationAttributesFromProto resolves Observation.attributes preferring
+// the typed mirror message when populated, then merging in any legacy map
+// keys not already covered by typed fields. This implements the typed-first
+// fallback policy from plans/features/protocol/evolution-rules.md.
+func observationAttributesFromProto(ob *iov1.Observation) map[string]string {
+	legacy := ob.GetAttributes()
+	typed := ob.GetTypedAttributes()
+	if typed == nil {
+		return cloneStringMapAdapter(legacy)
+	}
+	out := make(map[string]string, len(legacy)+4)
+	for k, v := range legacy {
+		out[k] = v
+	}
+	if v := typed.GetLabel(); v != "" {
+		out["label"] = v
+	}
+	if v := typed.GetDevice(); v != "" {
+		out["device"] = v
+	}
+	if v := typed.GetMac(); v != "" {
+		out["mac"] = v
+	}
+	if v := typed.GetDurationSeconds(); v != "" {
+		out["duration_seconds"] = v
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// observationTypedAttributesFromInternal builds the typed mirror message from
+// an internal Attributes map. Returns nil if no known typed keys are present.
+func observationTypedAttributesFromInternal(attrs map[string]string) *iov1.ObservationAttributes {
+	if len(attrs) == 0 {
+		return nil
+	}
+	label := strings.TrimSpace(attrs["label"])
+	device := strings.TrimSpace(attrs["device"])
+	mac := strings.TrimSpace(attrs["mac"])
+	duration := strings.TrimSpace(attrs["duration_seconds"])
+	if label == "" && device == "" && mac == "" && duration == "" {
+		return nil
+	}
+	return &iov1.ObservationAttributes{
+		Label:           label,
+		Device:          device,
+		Mac:             mac,
+		DurationSeconds: duration,
+	}
+}
+
 func observationFromProto(ob *iov1.Observation) iorouter.Observation {
 	if ob == nil {
 		return iorouter.Observation{}
@@ -1098,7 +1171,7 @@ func observationFromProto(ob *iov1.Observation) iorouter.Observation {
 		Confidence: ob.GetConfidence(),
 		Zone:       ob.GetZone(),
 		TrackID:    ob.GetTrackId(),
-		Attributes: cloneStringMapAdapter(ob.GetAttributes()),
+		Attributes: observationAttributesFromProto(ob),
 		Provenance: iorouter.ObservationProvenance{
 			FlowID:             ob.GetProvenance().GetFlowId(),
 			NodeID:             ob.GetProvenance().GetNodeId(),
@@ -1158,6 +1231,7 @@ func flowPlanToProto(plan iorouter.FlowPlan) *iov1.FlowPlan {
 			Args:       cloneStringMapAdapter(node.Args),
 			Exec:       string(node.Exec),
 			ExecPolicy: protoExecPolicyFromInternal(node.Exec),
+			TypedArgs:  flowNodeTypedArgsFromArgs(node.Args),
 		})
 	}
 	edges := make([]*iov1.FlowEdge, 0, len(plan.Edges))

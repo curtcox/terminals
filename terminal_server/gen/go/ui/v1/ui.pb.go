@@ -869,9 +869,15 @@ func (x *GridWidget) GetColumns() int32 {
 }
 
 type ScrollWidget struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Direction     string                 `protobuf:"bytes,1,opt,name=direction,proto3" json:"direction,omitempty"`
-	DirectionEnum ScrollDirection        `protobuf:"varint,2,opt,name=direction_enum,json=directionEnum,proto3,enum=terminals.ui.v1.ScrollDirection" json:"direction_enum,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated: prefer direction_enum. Producers continue to mirror the typed
+	// enum into this string during the compatibility window described in
+	// docs/compatibility.md. Earliest removal is two tagged releases past
+	// 2026-05-03.
+	//
+	// Deprecated: Marked as deprecated in terminals/ui/v1/ui.proto.
+	Direction     string          `protobuf:"bytes,1,opt,name=direction,proto3" json:"direction,omitempty"`
+	DirectionEnum ScrollDirection `protobuf:"varint,2,opt,name=direction_enum,json=directionEnum,proto3,enum=terminals.ui.v1.ScrollDirection" json:"direction_enum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -906,6 +912,7 @@ func (*ScrollWidget) Descriptor() ([]byte, []int) {
 	return file_terminals_ui_v1_ui_proto_rawDescGZIP(), []int{8}
 }
 
+// Deprecated: Marked as deprecated in terminals/ui/v1/ui.proto.
 func (x *ScrollWidget) GetDirection() string {
 	if x != nil {
 		return x.Direction
@@ -2405,9 +2412,9 @@ const file_terminals_ui_v1_ui_proto_rawDesc = "" +
 	"\tRowWidget\"&\n" +
 	"\n" +
 	"GridWidget\x12\x18\n" +
-	"\acolumns\x18\x01 \x01(\x05R\acolumns\"u\n" +
-	"\fScrollWidget\x12\x1c\n" +
-	"\tdirection\x18\x01 \x01(\tR\tdirection\x12G\n" +
+	"\acolumns\x18\x01 \x01(\x05R\acolumns\"y\n" +
+	"\fScrollWidget\x12 \n" +
+	"\tdirection\x18\x01 \x01(\tB\x02\x18\x01R\tdirection\x12G\n" +
 	"\x0edirection_enum\x18\x02 \x01(\x0e2 .terminals.ui.v1.ScrollDirectionR\rdirectionEnum\"!\n" +
 	"\rPaddingWidget\x12\x10\n" +
 	"\x03all\x18\x01 \x01(\x05R\x03all\"\x0e\n" +

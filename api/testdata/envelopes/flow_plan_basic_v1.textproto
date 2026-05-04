@@ -14,6 +14,24 @@ server_message: {
           key: "stream_id"
           value: "stream-audio-1"
         }
+        args: {
+          key: "device_id"
+          value: "kitchen-terminal"
+        }
+        args: {
+          key: "resource"
+          value: "microphone"
+        }
+        args: {
+          key: "stream_kind"
+          value: "audio"
+        }
+        typed_args: {
+          device_id: "kitchen-terminal"
+          resource: "microphone"
+          stream_kind: "audio"
+          stream_kind_enum: STREAM_KIND_AUDIO
+        }
       }
       nodes: {
         id: "classify"

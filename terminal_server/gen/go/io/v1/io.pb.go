@@ -1522,6 +1522,91 @@ func (x *SensorData) GetValues() map[string]float64 {
 	return nil
 }
 
+// FlowNodeArgs holds typed mirrors of stable, well-known FlowNode.args keys.
+// Producers should populate both this typed message and the legacy
+// FlowNode.args map during the compatibility window. Consumers prefer typed
+// fields and fall back to the legacy map for unknown or older payloads.
+type FlowNodeArgs struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Mirrors legacy args["device_id"]. Source/sink device identifier.
+	DeviceId string `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	// Mirrors legacy args["resource"]. Resource selector on the source/sink.
+	Resource string `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
+	// Mirrors legacy args["stream_kind"]. Used by sinks/forks to override the
+	// routed stream kind. Producer also sets the typed StreamKind.
+	StreamKind     string     `protobuf:"bytes,3,opt,name=stream_kind,json=streamKind,proto3" json:"stream_kind,omitempty"`
+	StreamKindEnum StreamKind `protobuf:"varint,4,opt,name=stream_kind_enum,json=streamKindEnum,proto3,enum=terminals.io.v1.StreamKind" json:"stream_kind_enum,omitempty"`
+	// Mirrors legacy args["name"]. Used by analyzer/feature/tracker nodes.
+	Name          string `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlowNodeArgs) Reset() {
+	*x = FlowNodeArgs{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlowNodeArgs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlowNodeArgs) ProtoMessage() {}
+
+func (x *FlowNodeArgs) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlowNodeArgs.ProtoReflect.Descriptor instead.
+func (*FlowNodeArgs) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *FlowNodeArgs) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *FlowNodeArgs) GetResource() string {
+	if x != nil {
+		return x.Resource
+	}
+	return ""
+}
+
+func (x *FlowNodeArgs) GetStreamKind() string {
+	if x != nil {
+		return x.StreamKind
+	}
+	return ""
+}
+
+func (x *FlowNodeArgs) GetStreamKindEnum() StreamKind {
+	if x != nil {
+		return x.StreamKindEnum
+	}
+	return StreamKind_STREAM_KIND_UNSPECIFIED
+}
+
+func (x *FlowNodeArgs) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type FlowNode struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1529,13 +1614,14 @@ type FlowNode struct {
 	Args          map[string]string      `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Exec          string                 `protobuf:"bytes,4,opt,name=exec,proto3" json:"exec,omitempty"`
 	ExecPolicy    ExecPolicy             `protobuf:"varint,5,opt,name=exec_policy,json=execPolicy,proto3,enum=terminals.io.v1.ExecPolicy" json:"exec_policy,omitempty"`
+	TypedArgs     *FlowNodeArgs          `protobuf:"bytes,6,opt,name=typed_args,json=typedArgs,proto3" json:"typed_args,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FlowNode) Reset() {
 	*x = FlowNode{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1547,7 +1633,7 @@ func (x *FlowNode) String() string {
 func (*FlowNode) ProtoMessage() {}
 
 func (x *FlowNode) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[14]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1560,7 +1646,7 @@ func (x *FlowNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowNode.ProtoReflect.Descriptor instead.
 func (*FlowNode) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{14}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *FlowNode) GetId() string {
@@ -1598,6 +1684,13 @@ func (x *FlowNode) GetExecPolicy() ExecPolicy {
 	return ExecPolicy_EXEC_POLICY_UNSPECIFIED
 }
 
+func (x *FlowNode) GetTypedArgs() *FlowNodeArgs {
+	if x != nil {
+		return x.TypedArgs
+	}
+	return nil
+}
+
 type FlowEdge struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	From          string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
@@ -1608,7 +1701,7 @@ type FlowEdge struct {
 
 func (x *FlowEdge) Reset() {
 	*x = FlowEdge{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1620,7 +1713,7 @@ func (x *FlowEdge) String() string {
 func (*FlowEdge) ProtoMessage() {}
 
 func (x *FlowEdge) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[15]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1633,7 +1726,7 @@ func (x *FlowEdge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowEdge.ProtoReflect.Descriptor instead.
 func (*FlowEdge) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{15}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *FlowEdge) GetFrom() string {
@@ -1660,7 +1753,7 @@ type FlowPlan struct {
 
 func (x *FlowPlan) Reset() {
 	*x = FlowPlan{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1672,7 +1765,7 @@ func (x *FlowPlan) String() string {
 func (*FlowPlan) ProtoMessage() {}
 
 func (x *FlowPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[16]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1685,7 +1778,7 @@ func (x *FlowPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowPlan.ProtoReflect.Descriptor instead.
 func (*FlowPlan) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{16}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *FlowPlan) GetNodes() []*FlowNode {
@@ -1712,7 +1805,7 @@ type StartFlow struct {
 
 func (x *StartFlow) Reset() {
 	*x = StartFlow{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1724,7 +1817,7 @@ func (x *StartFlow) String() string {
 func (*StartFlow) ProtoMessage() {}
 
 func (x *StartFlow) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[17]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1737,7 +1830,7 @@ func (x *StartFlow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartFlow.ProtoReflect.Descriptor instead.
 func (*StartFlow) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{17}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StartFlow) GetFlowId() string {
@@ -1764,7 +1857,7 @@ type PatchFlow struct {
 
 func (x *PatchFlow) Reset() {
 	*x = PatchFlow{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1776,7 +1869,7 @@ func (x *PatchFlow) String() string {
 func (*PatchFlow) ProtoMessage() {}
 
 func (x *PatchFlow) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[18]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1789,7 +1882,7 @@ func (x *PatchFlow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PatchFlow.ProtoReflect.Descriptor instead.
 func (*PatchFlow) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{18}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PatchFlow) GetFlowId() string {
@@ -1815,7 +1908,7 @@ type StopFlow struct {
 
 func (x *StopFlow) Reset() {
 	*x = StopFlow{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1827,7 +1920,7 @@ func (x *StopFlow) String() string {
 func (*StopFlow) ProtoMessage() {}
 
 func (x *StopFlow) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[19]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1840,7 +1933,7 @@ func (x *StopFlow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopFlow.ProtoReflect.Descriptor instead.
 func (*StopFlow) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{19}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *StopFlow) GetFlowId() string {
@@ -1859,7 +1952,7 @@ type DeviceRef struct {
 
 func (x *DeviceRef) Reset() {
 	*x = DeviceRef{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1871,7 +1964,7 @@ func (x *DeviceRef) String() string {
 func (*DeviceRef) ProtoMessage() {}
 
 func (x *DeviceRef) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[20]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1884,7 +1977,7 @@ func (x *DeviceRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceRef.ProtoReflect.Descriptor instead.
 func (*DeviceRef) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{20}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DeviceRef) GetDeviceId() string {
@@ -1909,7 +2002,7 @@ type Pose struct {
 
 func (x *Pose) Reset() {
 	*x = Pose{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1921,7 +2014,7 @@ func (x *Pose) String() string {
 func (*Pose) ProtoMessage() {}
 
 func (x *Pose) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[21]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1934,7 +2027,7 @@ func (x *Pose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pose.ProtoReflect.Descriptor instead.
 func (*Pose) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{21}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Pose) GetX() float64 {
@@ -1999,7 +2092,7 @@ type LocationEstimate struct {
 
 func (x *LocationEstimate) Reset() {
 	*x = LocationEstimate{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2011,7 +2104,7 @@ func (x *LocationEstimate) String() string {
 func (*LocationEstimate) ProtoMessage() {}
 
 func (x *LocationEstimate) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[22]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2024,7 +2117,7 @@ func (x *LocationEstimate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocationEstimate.ProtoReflect.Descriptor instead.
 func (*LocationEstimate) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{22}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *LocationEstimate) GetZone() string {
@@ -2075,7 +2168,7 @@ type ObservationProvenance struct {
 
 func (x *ObservationProvenance) Reset() {
 	*x = ObservationProvenance{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2087,7 +2180,7 @@ func (x *ObservationProvenance) String() string {
 func (*ObservationProvenance) ProtoMessage() {}
 
 func (x *ObservationProvenance) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[23]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2100,7 +2193,7 @@ func (x *ObservationProvenance) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservationProvenance.ProtoReflect.Descriptor instead.
 func (*ObservationProvenance) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{23}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ObservationProvenance) GetFlowId() string {
@@ -2152,7 +2245,7 @@ type ArtifactRef struct {
 
 func (x *ArtifactRef) Reset() {
 	*x = ArtifactRef{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2164,7 +2257,7 @@ func (x *ArtifactRef) String() string {
 func (*ArtifactRef) ProtoMessage() {}
 
 func (x *ArtifactRef) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[24]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2177,7 +2270,7 @@ func (x *ArtifactRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArtifactRef.ProtoReflect.Descriptor instead.
 func (*ArtifactRef) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{24}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ArtifactRef) GetId() string {
@@ -2223,25 +2316,26 @@ func (x *ArtifactRef) GetUri() string {
 }
 
 type Observation struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Kind           string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	Subject        string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
-	SourceDevice   *DeviceRef             `protobuf:"bytes,3,opt,name=source_device,json=sourceDevice,proto3" json:"source_device,omitempty"`
-	OccurredUnixMs int64                  `protobuf:"varint,4,opt,name=occurred_unix_ms,json=occurredUnixMs,proto3" json:"occurred_unix_ms,omitempty"`
-	Confidence     float64                `protobuf:"fixed64,5,opt,name=confidence,proto3" json:"confidence,omitempty"`
-	Zone           string                 `protobuf:"bytes,6,opt,name=zone,proto3" json:"zone,omitempty"`
-	Location       *LocationEstimate      `protobuf:"bytes,7,opt,name=location,proto3" json:"location,omitempty"`
-	TrackId        string                 `protobuf:"bytes,8,opt,name=track_id,json=trackId,proto3" json:"track_id,omitempty"`
-	Attributes     map[string]string      `protobuf:"bytes,9,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Evidence       []*ArtifactRef         `protobuf:"bytes,10,rep,name=evidence,proto3" json:"evidence,omitempty"`
-	Provenance     *ObservationProvenance `protobuf:"bytes,11,opt,name=provenance,proto3" json:"provenance,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Kind            string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Subject         string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	SourceDevice    *DeviceRef             `protobuf:"bytes,3,opt,name=source_device,json=sourceDevice,proto3" json:"source_device,omitempty"`
+	OccurredUnixMs  int64                  `protobuf:"varint,4,opt,name=occurred_unix_ms,json=occurredUnixMs,proto3" json:"occurred_unix_ms,omitempty"`
+	Confidence      float64                `protobuf:"fixed64,5,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	Zone            string                 `protobuf:"bytes,6,opt,name=zone,proto3" json:"zone,omitempty"`
+	Location        *LocationEstimate      `protobuf:"bytes,7,opt,name=location,proto3" json:"location,omitempty"`
+	TrackId         string                 `protobuf:"bytes,8,opt,name=track_id,json=trackId,proto3" json:"track_id,omitempty"`
+	Attributes      map[string]string      `protobuf:"bytes,9,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Evidence        []*ArtifactRef         `protobuf:"bytes,10,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	Provenance      *ObservationProvenance `protobuf:"bytes,11,opt,name=provenance,proto3" json:"provenance,omitempty"`
+	TypedAttributes *ObservationAttributes `protobuf:"bytes,12,opt,name=typed_attributes,json=typedAttributes,proto3" json:"typed_attributes,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Observation) Reset() {
 	*x = Observation{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2253,7 +2347,7 @@ func (x *Observation) String() string {
 func (*Observation) ProtoMessage() {}
 
 func (x *Observation) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[25]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2266,7 +2360,7 @@ func (x *Observation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Observation.ProtoReflect.Descriptor instead.
 func (*Observation) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{25}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Observation) GetKind() string {
@@ -2346,6 +2440,91 @@ func (x *Observation) GetProvenance() *ObservationProvenance {
 	return nil
 }
 
+func (x *Observation) GetTypedAttributes() *ObservationAttributes {
+	if x != nil {
+		return x.TypedAttributes
+	}
+	return nil
+}
+
+// ObservationAttributes holds typed mirrors of stable, well-known
+// Observation.attributes keys. Producers should populate both this typed
+// message and the legacy map during the compatibility window. Consumers
+// prefer typed fields and fall back to the legacy map for unknown payloads.
+type ObservationAttributes struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Mirrors legacy attributes["label"]. Analyzer/event label.
+	Label string `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	// Mirrors legacy attributes["device"]. Detected device label.
+	Device string `protobuf:"bytes,2,opt,name=device,proto3" json:"device,omitempty"`
+	// Mirrors legacy attributes["mac"]. MAC address for presence/network events.
+	Mac string `protobuf:"bytes,3,opt,name=mac,proto3" json:"mac,omitempty"`
+	// Mirrors legacy attributes["duration_seconds"]. Duration in seconds for
+	// timer/duration-based observations. Stored as a string for compatibility
+	// with the legacy map representation.
+	DurationSeconds string `protobuf:"bytes,4,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ObservationAttributes) Reset() {
+	*x = ObservationAttributes{}
+	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ObservationAttributes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ObservationAttributes) ProtoMessage() {}
+
+func (x *ObservationAttributes) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ObservationAttributes.ProtoReflect.Descriptor instead.
+func (*ObservationAttributes) Descriptor() ([]byte, []int) {
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ObservationAttributes) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ObservationAttributes) GetDevice() string {
+	if x != nil {
+		return x.Device
+	}
+	return ""
+}
+
+func (x *ObservationAttributes) GetMac() string {
+	if x != nil {
+		return x.Mac
+	}
+	return ""
+}
+
+func (x *ObservationAttributes) GetDurationSeconds() string {
+	if x != nil {
+		return x.DurationSeconds
+	}
+	return ""
+}
+
 type ObservationMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Observation   *Observation           `protobuf:"bytes,1,opt,name=observation,proto3" json:"observation,omitempty"`
@@ -2355,7 +2534,7 @@ type ObservationMessage struct {
 
 func (x *ObservationMessage) Reset() {
 	*x = ObservationMessage{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2367,7 +2546,7 @@ func (x *ObservationMessage) String() string {
 func (*ObservationMessage) ProtoMessage() {}
 
 func (x *ObservationMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[26]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2380,7 +2559,7 @@ func (x *ObservationMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservationMessage.ProtoReflect.Descriptor instead.
 func (*ObservationMessage) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{26}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ObservationMessage) GetObservation() *Observation {
@@ -2399,7 +2578,7 @@ type ArtifactAvailable struct {
 
 func (x *ArtifactAvailable) Reset() {
 	*x = ArtifactAvailable{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2411,7 +2590,7 @@ func (x *ArtifactAvailable) String() string {
 func (*ArtifactAvailable) ProtoMessage() {}
 
 func (x *ArtifactAvailable) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[27]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2424,7 +2603,7 @@ func (x *ArtifactAvailable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArtifactAvailable.ProtoReflect.Descriptor instead.
 func (*ArtifactAvailable) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{27}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ArtifactAvailable) GetArtifact() *ArtifactRef {
@@ -2443,7 +2622,7 @@ type RequestArtifact struct {
 
 func (x *RequestArtifact) Reset() {
 	*x = RequestArtifact{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2455,7 +2634,7 @@ func (x *RequestArtifact) String() string {
 func (*RequestArtifact) ProtoMessage() {}
 
 func (x *RequestArtifact) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[28]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2468,7 +2647,7 @@ func (x *RequestArtifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestArtifact.ProtoReflect.Descriptor instead.
 func (*RequestArtifact) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{28}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *RequestArtifact) GetArtifactId() string {
@@ -2493,7 +2672,7 @@ type FlowStats struct {
 
 func (x *FlowStats) Reset() {
 	*x = FlowStats{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2505,7 +2684,7 @@ func (x *FlowStats) String() string {
 func (*FlowStats) ProtoMessage() {}
 
 func (x *FlowStats) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[29]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2518,7 +2697,7 @@ func (x *FlowStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowStats.ProtoReflect.Descriptor instead.
 func (*FlowStats) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{29}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *FlowStats) GetFlowId() string {
@@ -2582,7 +2761,7 @@ type ClockSample struct {
 
 func (x *ClockSample) Reset() {
 	*x = ClockSample{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2594,7 +2773,7 @@ func (x *ClockSample) String() string {
 func (*ClockSample) ProtoMessage() {}
 
 func (x *ClockSample) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[30]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2607,7 +2786,7 @@ func (x *ClockSample) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClockSample.ProtoReflect.Descriptor instead.
 func (*ClockSample) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{30}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ClockSample) GetDeviceId() string {
@@ -2650,7 +2829,7 @@ type InstallBundle struct {
 
 func (x *InstallBundle) Reset() {
 	*x = InstallBundle{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[31]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2662,7 +2841,7 @@ func (x *InstallBundle) String() string {
 func (*InstallBundle) ProtoMessage() {}
 
 func (x *InstallBundle) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[31]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2675,7 +2854,7 @@ func (x *InstallBundle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallBundle.ProtoReflect.Descriptor instead.
 func (*InstallBundle) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{31}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *InstallBundle) GetBundleId() string {
@@ -2715,7 +2894,7 @@ type RemoveBundle struct {
 
 func (x *RemoveBundle) Reset() {
 	*x = RemoveBundle{}
-	mi := &file_terminals_io_v1_io_proto_msgTypes[32]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2727,7 +2906,7 @@ func (x *RemoveBundle) String() string {
 func (*RemoveBundle) ProtoMessage() {}
 
 func (x *RemoveBundle) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_io_v1_io_proto_msgTypes[32]
+	mi := &file_terminals_io_v1_io_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2740,7 +2919,7 @@ func (x *RemoveBundle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveBundle.ProtoReflect.Descriptor instead.
 func (*RemoveBundle) Descriptor() ([]byte, []int) {
-	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{32}
+	return file_terminals_io_v1_io_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *RemoveBundle) GetBundleId() string {
@@ -2848,14 +3027,23 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x06values\x18\x03 \x03(\v2'.terminals.io.v1.SensorData.ValuesEntryR\x06values\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\"\xf2\x01\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\"\xc3\x01\n" +
+	"\fFlowNodeArgs\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x1a\n" +
+	"\bresource\x18\x02 \x01(\tR\bresource\x12\x1f\n" +
+	"\vstream_kind\x18\x03 \x01(\tR\n" +
+	"streamKind\x12E\n" +
+	"\x10stream_kind_enum\x18\x04 \x01(\x0e2\x1b.terminals.io.v1.StreamKindR\x0estreamKindEnum\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\"\xb0\x02\n" +
 	"\bFlowNode\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x127\n" +
 	"\x04args\x18\x03 \x03(\v2#.terminals.io.v1.FlowNode.ArgsEntryR\x04args\x12\x12\n" +
 	"\x04exec\x18\x04 \x01(\tR\x04exec\x12<\n" +
 	"\vexec_policy\x18\x05 \x01(\x0e2\x1b.terminals.io.v1.ExecPolicyR\n" +
-	"execPolicy\x1a7\n" +
+	"execPolicy\x12<\n" +
+	"\n" +
+	"typed_args\x18\x06 \x01(\v2\x1d.terminals.io.v1.FlowNodeArgsR\ttypedArgs\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\".\n" +
@@ -2905,7 +3093,7 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	"\x06source\x18\x03 \x01(\v2\x1a.terminals.io.v1.DeviceRefR\x06source\x12\"\n" +
 	"\rstart_unix_ms\x18\x04 \x01(\x03R\vstartUnixMs\x12\x1e\n" +
 	"\vend_unix_ms\x18\x05 \x01(\x03R\tendUnixMs\x12\x10\n" +
-	"\x03uri\x18\x06 \x01(\tR\x03uri\"\xc3\x04\n" +
+	"\x03uri\x18\x06 \x01(\tR\x03uri\"\x96\x05\n" +
 	"\vObservation\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x18\n" +
 	"\asubject\x18\x02 \x01(\tR\asubject\x12?\n" +
@@ -2924,10 +3112,16 @@ const file_terminals_io_v1_io_proto_rawDesc = "" +
 	" \x03(\v2\x1c.terminals.io.v1.ArtifactRefR\bevidence\x12F\n" +
 	"\n" +
 	"provenance\x18\v \x01(\v2&.terminals.io.v1.ObservationProvenanceR\n" +
-	"provenance\x1a=\n" +
+	"provenance\x12Q\n" +
+	"\x10typed_attributes\x18\f \x01(\v2&.terminals.io.v1.ObservationAttributesR\x0ftypedAttributes\x1a=\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"T\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x82\x01\n" +
+	"\x15ObservationAttributes\x12\x14\n" +
+	"\x05label\x18\x01 \x01(\tR\x05label\x12\x16\n" +
+	"\x06device\x18\x02 \x01(\tR\x06device\x12\x10\n" +
+	"\x03mac\x18\x03 \x01(\tR\x03mac\x12)\n" +
+	"\x10duration_seconds\x18\x04 \x01(\tR\x0fdurationSeconds\"T\n" +
 	"\x12ObservationMessage\x12>\n" +
 	"\vobservation\x18\x01 \x01(\v2\x1c.terminals.io.v1.ObservationR\vobservation\"M\n" +
 	"\x11ArtifactAvailable\x128\n" +
@@ -3019,7 +3213,7 @@ func file_terminals_io_v1_io_proto_rawDescGZIP() []byte {
 }
 
 var file_terminals_io_v1_io_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_terminals_io_v1_io_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
 var file_terminals_io_v1_io_proto_goTypes = []any{
 	(StreamKind)(0),               // 0: terminals.io.v1.StreamKind
 	(WebRTCSignalType)(0),         // 1: terminals.io.v1.WebRTCSignalType
@@ -3043,34 +3237,36 @@ var file_terminals_io_v1_io_proto_goTypes = []any{
 	(*TouchEvent)(nil),            // 19: terminals.io.v1.TouchEvent
 	(*UIAction)(nil),              // 20: terminals.io.v1.UIAction
 	(*SensorData)(nil),            // 21: terminals.io.v1.SensorData
-	(*FlowNode)(nil),              // 22: terminals.io.v1.FlowNode
-	(*FlowEdge)(nil),              // 23: terminals.io.v1.FlowEdge
-	(*FlowPlan)(nil),              // 24: terminals.io.v1.FlowPlan
-	(*StartFlow)(nil),             // 25: terminals.io.v1.StartFlow
-	(*PatchFlow)(nil),             // 26: terminals.io.v1.PatchFlow
-	(*StopFlow)(nil),              // 27: terminals.io.v1.StopFlow
-	(*DeviceRef)(nil),             // 28: terminals.io.v1.DeviceRef
-	(*Pose)(nil),                  // 29: terminals.io.v1.Pose
-	(*LocationEstimate)(nil),      // 30: terminals.io.v1.LocationEstimate
-	(*ObservationProvenance)(nil), // 31: terminals.io.v1.ObservationProvenance
-	(*ArtifactRef)(nil),           // 32: terminals.io.v1.ArtifactRef
-	(*Observation)(nil),           // 33: terminals.io.v1.Observation
-	(*ObservationMessage)(nil),    // 34: terminals.io.v1.ObservationMessage
-	(*ArtifactAvailable)(nil),     // 35: terminals.io.v1.ArtifactAvailable
-	(*RequestArtifact)(nil),       // 36: terminals.io.v1.RequestArtifact
-	(*FlowStats)(nil),             // 37: terminals.io.v1.FlowStats
-	(*ClockSample)(nil),           // 38: terminals.io.v1.ClockSample
-	(*InstallBundle)(nil),         // 39: terminals.io.v1.InstallBundle
-	(*RemoveBundle)(nil),          // 40: terminals.io.v1.RemoveBundle
-	nil,                           // 41: terminals.io.v1.StartStream.MetadataEntry
-	nil,                           // 42: terminals.io.v1.SensorData.ValuesEntry
-	nil,                           // 43: terminals.io.v1.FlowNode.ArgsEntry
-	nil,                           // 44: terminals.io.v1.Observation.AttributesEntry
+	(*FlowNodeArgs)(nil),          // 22: terminals.io.v1.FlowNodeArgs
+	(*FlowNode)(nil),              // 23: terminals.io.v1.FlowNode
+	(*FlowEdge)(nil),              // 24: terminals.io.v1.FlowEdge
+	(*FlowPlan)(nil),              // 25: terminals.io.v1.FlowPlan
+	(*StartFlow)(nil),             // 26: terminals.io.v1.StartFlow
+	(*PatchFlow)(nil),             // 27: terminals.io.v1.PatchFlow
+	(*StopFlow)(nil),              // 28: terminals.io.v1.StopFlow
+	(*DeviceRef)(nil),             // 29: terminals.io.v1.DeviceRef
+	(*Pose)(nil),                  // 30: terminals.io.v1.Pose
+	(*LocationEstimate)(nil),      // 31: terminals.io.v1.LocationEstimate
+	(*ObservationProvenance)(nil), // 32: terminals.io.v1.ObservationProvenance
+	(*ArtifactRef)(nil),           // 33: terminals.io.v1.ArtifactRef
+	(*Observation)(nil),           // 34: terminals.io.v1.Observation
+	(*ObservationAttributes)(nil), // 35: terminals.io.v1.ObservationAttributes
+	(*ObservationMessage)(nil),    // 36: terminals.io.v1.ObservationMessage
+	(*ArtifactAvailable)(nil),     // 37: terminals.io.v1.ArtifactAvailable
+	(*RequestArtifact)(nil),       // 38: terminals.io.v1.RequestArtifact
+	(*FlowStats)(nil),             // 39: terminals.io.v1.FlowStats
+	(*ClockSample)(nil),           // 40: terminals.io.v1.ClockSample
+	(*InstallBundle)(nil),         // 41: terminals.io.v1.InstallBundle
+	(*RemoveBundle)(nil),          // 42: terminals.io.v1.RemoveBundle
+	nil,                           // 43: terminals.io.v1.StartStream.MetadataEntry
+	nil,                           // 44: terminals.io.v1.SensorData.ValuesEntry
+	nil,                           // 45: terminals.io.v1.FlowNode.ArgsEntry
+	nil,                           // 46: terminals.io.v1.Observation.AttributesEntry
 }
 var file_terminals_io_v1_io_proto_depIdxs = []int32{
 	2,  // 0: terminals.io.v1.StreamRouting.origin:type_name -> terminals.io.v1.StreamOrigin
 	3,  // 1: terminals.io.v1.StreamRouting.webrtc_mode:type_name -> terminals.io.v1.WebRTCMode
-	41, // 2: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
+	43, // 2: terminals.io.v1.StartStream.metadata:type_name -> terminals.io.v1.StartStream.MetadataEntry
 	0,  // 3: terminals.io.v1.StartStream.stream_kind:type_name -> terminals.io.v1.StreamKind
 	8,  // 4: terminals.io.v1.StartStream.routing:type_name -> terminals.io.v1.StreamRouting
 	9,  // 5: terminals.io.v1.StartStream.audio_metadata:type_name -> terminals.io.v1.StreamAudioMetadata
@@ -3083,28 +3279,31 @@ var file_terminals_io_v1_io_proto_depIdxs = []int32{
 	4,  // 12: terminals.io.v1.PointerEvent.action_enum:type_name -> terminals.io.v1.PointerAction
 	18, // 13: terminals.io.v1.TouchEvent.points:type_name -> terminals.io.v1.TouchPoint
 	5,  // 14: terminals.io.v1.TouchEvent.action_enum:type_name -> terminals.io.v1.TouchAction
-	42, // 15: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
-	43, // 16: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
-	6,  // 17: terminals.io.v1.FlowNode.exec_policy:type_name -> terminals.io.v1.ExecPolicy
-	22, // 18: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
-	23, // 19: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
-	24, // 20: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	24, // 21: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
-	29, // 22: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
-	28, // 23: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
-	28, // 24: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
-	30, // 25: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
-	44, // 26: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
-	32, // 27: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
-	31, // 28: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
-	33, // 29: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
-	32, // 30: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
-	7,  // 31: terminals.io.v1.FlowStats.state_enum:type_name -> terminals.io.v1.FlowState
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	44, // 15: terminals.io.v1.SensorData.values:type_name -> terminals.io.v1.SensorData.ValuesEntry
+	0,  // 16: terminals.io.v1.FlowNodeArgs.stream_kind_enum:type_name -> terminals.io.v1.StreamKind
+	45, // 17: terminals.io.v1.FlowNode.args:type_name -> terminals.io.v1.FlowNode.ArgsEntry
+	6,  // 18: terminals.io.v1.FlowNode.exec_policy:type_name -> terminals.io.v1.ExecPolicy
+	22, // 19: terminals.io.v1.FlowNode.typed_args:type_name -> terminals.io.v1.FlowNodeArgs
+	23, // 20: terminals.io.v1.FlowPlan.nodes:type_name -> terminals.io.v1.FlowNode
+	24, // 21: terminals.io.v1.FlowPlan.edges:type_name -> terminals.io.v1.FlowEdge
+	25, // 22: terminals.io.v1.StartFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	25, // 23: terminals.io.v1.PatchFlow.plan:type_name -> terminals.io.v1.FlowPlan
+	30, // 24: terminals.io.v1.LocationEstimate.pose:type_name -> terminals.io.v1.Pose
+	29, // 25: terminals.io.v1.ArtifactRef.source:type_name -> terminals.io.v1.DeviceRef
+	29, // 26: terminals.io.v1.Observation.source_device:type_name -> terminals.io.v1.DeviceRef
+	31, // 27: terminals.io.v1.Observation.location:type_name -> terminals.io.v1.LocationEstimate
+	46, // 28: terminals.io.v1.Observation.attributes:type_name -> terminals.io.v1.Observation.AttributesEntry
+	33, // 29: terminals.io.v1.Observation.evidence:type_name -> terminals.io.v1.ArtifactRef
+	32, // 30: terminals.io.v1.Observation.provenance:type_name -> terminals.io.v1.ObservationProvenance
+	35, // 31: terminals.io.v1.Observation.typed_attributes:type_name -> terminals.io.v1.ObservationAttributes
+	34, // 32: terminals.io.v1.ObservationMessage.observation:type_name -> terminals.io.v1.Observation
+	33, // 33: terminals.io.v1.ArtifactAvailable.artifact:type_name -> terminals.io.v1.ArtifactRef
+	7,  // 34: terminals.io.v1.FlowStats.state_enum:type_name -> terminals.io.v1.FlowState
+	35, // [35:35] is the sub-list for method output_type
+	35, // [35:35] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_terminals_io_v1_io_proto_init() }
@@ -3129,7 +3328,7 @@ func file_terminals_io_v1_io_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_io_v1_io_proto_rawDesc), len(file_terminals_io_v1_io_proto_rawDesc)),
 			NumEnums:      8,
-			NumMessages:   37,
+			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

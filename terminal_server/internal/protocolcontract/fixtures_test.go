@@ -247,6 +247,22 @@ func assertFlowPlanBasic(t *testing.T, envelope *controlv1.WireEnvelope) {
 	if got := plan.GetNodes()[1].GetExecPolicy(); got != iov1.ExecPolicy_EXEC_POLICY_SERVER_ONLY {
 		t.Fatalf("typed exec_policy[1] = %v", got)
 	}
+	capture := plan.GetNodes()[0]
+	if got := capture.GetTypedArgs().GetDeviceId(); got != "kitchen-terminal" {
+		t.Fatalf("typed_args.device_id = %q", got)
+	}
+	if got := capture.GetTypedArgs().GetResource(); got != "microphone" {
+		t.Fatalf("typed_args.resource = %q", got)
+	}
+	if got := capture.GetTypedArgs().GetStreamKind(); got != "audio" {
+		t.Fatalf("typed_args.stream_kind = %q", got)
+	}
+	if got := capture.GetTypedArgs().GetStreamKindEnum(); got != iov1.StreamKind_STREAM_KIND_AUDIO {
+		t.Fatalf("typed_args.stream_kind_enum = %v", got)
+	}
+	if got := capture.GetArgs()["device_id"]; got != "kitchen-terminal" {
+		t.Fatalf("legacy args[device_id] = %q", got)
+	}
 }
 
 func assertObservationSound(t *testing.T, envelope *controlv1.WireEnvelope) {
@@ -257,6 +273,15 @@ func assertObservationSound(t *testing.T, envelope *controlv1.WireEnvelope) {
 	}
 	if observation.GetAttributes()["loudness_db"] != "72.5" {
 		t.Fatalf("attributes not preserved")
+	}
+	if got := observation.GetTypedAttributes().GetLabel(); got != "whistle" {
+		t.Fatalf("typed_attributes.label = %q", got)
+	}
+	if got := observation.GetTypedAttributes().GetDevice(); got != "kettle" {
+		t.Fatalf("typed_attributes.device = %q", got)
+	}
+	if got := observation.GetAttributes()["label"]; got != "whistle" {
+		t.Fatalf("legacy attributes[label] = %q", got)
 	}
 	if len(observation.GetEvidence()) != 1 {
 		t.Fatalf("evidence count = %d", len(observation.GetEvidence()))

@@ -1013,7 +1013,7 @@ class GridWidget extends $pb.GeneratedMessage {
 
 class ScrollWidget extends $pb.GeneratedMessage {
   factory ScrollWidget({
-    $core.String? direction,
+    @$core.Deprecated('This field is deprecated.') $core.String? direction,
     ScrollDirection? directionEnum,
   }) {
     final result = create();
@@ -1060,12 +1060,20 @@ class ScrollWidget extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ScrollWidget>(create);
   static ScrollWidget? _defaultInstance;
 
+  /// Deprecated: prefer direction_enum. Producers continue to mirror the typed
+  /// enum into this string during the compatibility window described in
+  /// docs/compatibility.md. Earliest removal is two tagged releases past
+  /// 2026-05-03.
+  @$core.Deprecated('This field is deprecated.')
   @$pb.TagNumber(1)
   $core.String get direction => $_getSZ(0);
+  @$core.Deprecated('This field is deprecated.')
   @$pb.TagNumber(1)
   set direction($core.String value) => $_setString(0, value);
+  @$core.Deprecated('This field is deprecated.')
   @$pb.TagNumber(1)
   $core.bool hasDirection() => $_has(0);
+  @$core.Deprecated('This field is deprecated.')
   @$pb.TagNumber(1)
   void clearDirection() => $_clearField(1);
 

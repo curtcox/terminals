@@ -207,9 +207,9 @@ Tests: renderer/media tests cover accepted and rejected URLs.
 
 Owner: ui/server-driven-renderer  
 Classification: transitional_escape_hatch  
-Target state: typed `direction_enum` (`ScrollDirection`) now read first; keep legacy string fallback during compatibility window.  
+Target state: typed `direction_enum` (`ScrollDirection`) now read first; legacy `direction` string is marked `[deprecated = true]` in `api/terminals/ui/v1/ui.proto` and is retained only as a compatibility mirror until two tagged releases past 2026-05-03 elapse.  
 Review date: 2026-06-15  
-Producer: server UI composer  
+Producer: server UI composer (still mirrors typed enum into the deprecated legacy string during the compatibility window).  
 Consumer: Flutter renderer  
 Unknown behavior: consumers prefer `direction_enum`, fall back to legacy string, and treat unknown values as vertical.  
 Validation: enum values `VERTICAL`, `HORIZONTAL`; legacy string accepts the lowercase forms.  
@@ -258,8 +258,8 @@ Producer: server UI composer
 Consumer: Flutter renderer  
 Unknown behavior: client prefers typed `draw_ops` when present; if absent or empty, legacy `draw_ops_json` is consumed; malformed JSON is ignored and canvas renders empty.  
 Validation: typed `DrawOp` messages use the `oneof op { line, rect, circle, text, path }` schema in `api/terminals/ui/v1/ui.proto`; legacy JSON is an array of drawing operation objects and must remain experimental.  
-Tests: typed messages compile and decode in Go and Dart; first non-test producer/consumer must add malformed-JSON and typed-vs-legacy preference coverage.  
-Migration status: typed `DrawOp` schema landed 2026-05-04 (additive). No application code currently produces or consumes draw ops, so adapter wiring is deferred until a real consumer lands.
+Tests: typed messages compile and decode in Go and Dart; renderer tests must cover typed-vs-legacy preference once a producer ships drawing primitives.  
+Migration status: typed `DrawOp` schema landed 2026-05-04 (additive). The Flutter `ServerDrivenRenderer` canvas case now consumes typed `draw_ops` first (counting primitives by `oneof` arm) and only falls back to the legacy JSON preview when typed ops are empty. A real producer is still pending; first producer must add typed-vs-legacy preference and malformed-JSON coverage.
 
 ## IO
 
@@ -397,13 +397,13 @@ Tests: flow execution tests cover known and unknown operators.
 
 Owner: edge/flow  
 Classification: transitional_escape_hatch  
-Target state: type built-in operator arguments once stable.  
+Target state: typed `FlowNode.typed_args` (`FlowNodeArgs`) now mirrors the stable built-in keys (`device_id`, `resource`, `stream_kind` + typed `stream_kind_enum`, `name`); legacy `args` map remains as a compatibility mirror and as the namespace for operator-specific extension keys until two tagged releases past 2026-05-04 elapse.  
 Review date: 2026-06-15  
-Producer: server flow planner  
-Consumer: client/server edge execution runtime  
+Producer: server flow planner emits both typed `FlowNodeArgs` (via `flowNodeTypedArgsFromArgs` in `terminal_server/internal/transport/generated_proto_adapter.go`) and the legacy `args` map.  
+Consumer: client/server edge execution runtime; consumers prefer typed fields when set and fall back to legacy `args` keys for unknown or older payloads.  
 Unknown behavior: executor ignores unknown args unless the operator declares them required.  
-Validation: string values with operator-specific validation.  
-Tests: flow execution tests cover current operator args.
+Validation: typed `device_id`, `resource`, `name` are non-empty trimmed strings when set; typed `stream_kind` mirrors legacy `args["stream_kind"]` and `stream_kind_enum` resolves to `terminals.io.v1.StreamKind`.  
+Tests: flow_plan_basic_v1 contract fixture covers typed `FlowNodeArgs` + legacy map coexistence; flow execution tests cover current operator args.
 
 ### Field: terminals.io.v1.FlowNode.exec
 
@@ -454,13 +454,13 @@ Tests: observation store tests cover known and unknown kinds.
 
 Owner: observation  
 Classification: transitional_escape_hatch  
-Target state: type stable attributes per observation kind.  
+Target state: typed `Observation.typed_attributes` (`ObservationAttributes`) now mirrors the stable common keys (`label`, `device`, `mac`, `duration_seconds`); legacy `attributes` map remains as the compatibility mirror and the namespace for observation-kind-specific extension keys until two tagged releases past 2026-05-04 elapse.  
 Review date: 2026-06-15  
-Producer: sensing/observation pipeline  
-Consumer: server scenario engine, world model, diagnostics  
-Unknown behavior: consumers ignore unknown attributes.  
-Validation: string values with observation-kind-specific formats.  
-Tests: observation tests cover current attributes and unknown-key tolerance.
+Producer: sensing/observation pipeline; outbound proto observations should populate both `typed_attributes` and the legacy map for the stable keys.  
+Consumer: server scenario engine, world model, diagnostics; the generated proto adapter (`observationAttributesFromProto` in `terminal_server/internal/transport/generated_proto_adapter.go`) merges typed fields over the legacy map so internal `iorouter.Observation.Attributes` reflects the typed-first preference.  
+Unknown behavior: consumers ignore unknown attributes; legacy keys not represented by typed fields pass through unchanged.  
+Validation: typed `label`, `device`, `mac` are trimmed strings when set; `duration_seconds` is a decimal-seconds string mirroring legacy `attributes["duration_seconds"]`.  
+Tests: adapter merges typed + legacy keys with typed-first preference; observation contract fixtures cover typed-vs-legacy preference and unknown-key tolerance.
 
 ### Field: terminals.io.v1.FlowStats.state
 

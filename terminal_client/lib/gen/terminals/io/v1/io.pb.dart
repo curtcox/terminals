@@ -1376,6 +1376,119 @@ class SensorData extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.double> get values => $_getMap(2);
 }
 
+/// FlowNodeArgs holds typed mirrors of stable, well-known FlowNode.args keys.
+/// Producers should populate both this typed message and the legacy
+/// FlowNode.args map during the compatibility window. Consumers prefer typed
+/// fields and fall back to the legacy map for unknown or older payloads.
+class FlowNodeArgs extends $pb.GeneratedMessage {
+  factory FlowNodeArgs({
+    $core.String? deviceId,
+    $core.String? resource,
+    $core.String? streamKind,
+    StreamKind? streamKindEnum,
+    $core.String? name,
+  }) {
+    final result = create();
+    if (deviceId != null) result.deviceId = deviceId;
+    if (resource != null) result.resource = resource;
+    if (streamKind != null) result.streamKind = streamKind;
+    if (streamKindEnum != null) result.streamKindEnum = streamKindEnum;
+    if (name != null) result.name = name;
+    return result;
+  }
+
+  FlowNodeArgs._();
+
+  factory FlowNodeArgs.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FlowNodeArgs.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FlowNodeArgs',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.io.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'deviceId')
+    ..aOS(2, _omitFieldNames ? '' : 'resource')
+    ..aOS(3, _omitFieldNames ? '' : 'streamKind')
+    ..aE<StreamKind>(4, _omitFieldNames ? '' : 'streamKindEnum',
+        enumValues: StreamKind.values)
+    ..aOS(5, _omitFieldNames ? '' : 'name')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FlowNodeArgs clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FlowNodeArgs copyWith(void Function(FlowNodeArgs) updates) =>
+      super.copyWith((message) => updates(message as FlowNodeArgs))
+          as FlowNodeArgs;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FlowNodeArgs create() => FlowNodeArgs._();
+  @$core.override
+  FlowNodeArgs createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FlowNodeArgs getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FlowNodeArgs>(create);
+  static FlowNodeArgs? _defaultInstance;
+
+  /// Mirrors legacy args["device_id"]. Source/sink device identifier.
+  @$pb.TagNumber(1)
+  $core.String get deviceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set deviceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDeviceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeviceId() => $_clearField(1);
+
+  /// Mirrors legacy args["resource"]. Resource selector on the source/sink.
+  @$pb.TagNumber(2)
+  $core.String get resource => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set resource($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasResource() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearResource() => $_clearField(2);
+
+  /// Mirrors legacy args["stream_kind"]. Used by sinks/forks to override the
+  /// routed stream kind. Producer also sets the typed StreamKind.
+  @$pb.TagNumber(3)
+  $core.String get streamKind => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set streamKind($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStreamKind() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStreamKind() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  StreamKind get streamKindEnum => $_getN(3);
+  @$pb.TagNumber(4)
+  set streamKindEnum(StreamKind value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasStreamKindEnum() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearStreamKindEnum() => $_clearField(4);
+
+  /// Mirrors legacy args["name"]. Used by analyzer/feature/tracker nodes.
+  @$pb.TagNumber(5)
+  $core.String get name => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set name($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasName() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearName() => $_clearField(5);
+}
+
 class FlowNode extends $pb.GeneratedMessage {
   factory FlowNode({
     $core.String? id,
@@ -1383,6 +1496,7 @@ class FlowNode extends $pb.GeneratedMessage {
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? args,
     $core.String? exec,
     ExecPolicy? execPolicy,
+    FlowNodeArgs? typedArgs,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -1390,6 +1504,7 @@ class FlowNode extends $pb.GeneratedMessage {
     if (args != null) result.args.addEntries(args);
     if (exec != null) result.exec = exec;
     if (execPolicy != null) result.execPolicy = execPolicy;
+    if (typedArgs != null) result.typedArgs = typedArgs;
     return result;
   }
 
@@ -1417,6 +1532,8 @@ class FlowNode extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'exec')
     ..aE<ExecPolicy>(5, _omitFieldNames ? '' : 'execPolicy',
         enumValues: ExecPolicy.values)
+    ..aOM<FlowNodeArgs>(6, _omitFieldNames ? '' : 'typedArgs',
+        subBuilder: FlowNodeArgs.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1475,6 +1592,17 @@ class FlowNode extends $pb.GeneratedMessage {
   $core.bool hasExecPolicy() => $_has(4);
   @$pb.TagNumber(5)
   void clearExecPolicy() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  FlowNodeArgs get typedArgs => $_getN(5);
+  @$pb.TagNumber(6)
+  set typedArgs(FlowNodeArgs value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTypedArgs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTypedArgs() => $_clearField(6);
+  @$pb.TagNumber(6)
+  FlowNodeArgs ensureTypedArgs() => $_ensure(5);
 }
 
 class FlowEdge extends $pb.GeneratedMessage {
@@ -2306,6 +2434,7 @@ class Observation extends $pb.GeneratedMessage {
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? attributes,
     $core.Iterable<ArtifactRef>? evidence,
     ObservationProvenance? provenance,
+    ObservationAttributes? typedAttributes,
   }) {
     final result = create();
     if (kind != null) result.kind = kind;
@@ -2319,6 +2448,7 @@ class Observation extends $pb.GeneratedMessage {
     if (attributes != null) result.attributes.addEntries(attributes);
     if (evidence != null) result.evidence.addAll(evidence);
     if (provenance != null) result.provenance = provenance;
+    if (typedAttributes != null) result.typedAttributes = typedAttributes;
     return result;
   }
 
@@ -2355,6 +2485,8 @@ class Observation extends $pb.GeneratedMessage {
         subBuilder: ArtifactRef.create)
     ..aOM<ObservationProvenance>(11, _omitFieldNames ? '' : 'provenance',
         subBuilder: ObservationProvenance.create)
+    ..aOM<ObservationAttributes>(12, _omitFieldNames ? '' : 'typedAttributes',
+        subBuilder: ObservationAttributes.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2468,6 +2600,119 @@ class Observation extends $pb.GeneratedMessage {
   void clearProvenance() => $_clearField(11);
   @$pb.TagNumber(11)
   ObservationProvenance ensureProvenance() => $_ensure(10);
+
+  @$pb.TagNumber(12)
+  ObservationAttributes get typedAttributes => $_getN(11);
+  @$pb.TagNumber(12)
+  set typedAttributes(ObservationAttributes value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasTypedAttributes() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearTypedAttributes() => $_clearField(12);
+  @$pb.TagNumber(12)
+  ObservationAttributes ensureTypedAttributes() => $_ensure(11);
+}
+
+/// ObservationAttributes holds typed mirrors of stable, well-known
+/// Observation.attributes keys. Producers should populate both this typed
+/// message and the legacy map during the compatibility window. Consumers
+/// prefer typed fields and fall back to the legacy map for unknown payloads.
+class ObservationAttributes extends $pb.GeneratedMessage {
+  factory ObservationAttributes({
+    $core.String? label,
+    $core.String? device,
+    $core.String? mac,
+    $core.String? durationSeconds,
+  }) {
+    final result = create();
+    if (label != null) result.label = label;
+    if (device != null) result.device = device;
+    if (mac != null) result.mac = mac;
+    if (durationSeconds != null) result.durationSeconds = durationSeconds;
+    return result;
+  }
+
+  ObservationAttributes._();
+
+  factory ObservationAttributes.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ObservationAttributes.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ObservationAttributes',
+      package:
+          const $pb.PackageName(_omitMessageNames ? '' : 'terminals.io.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'label')
+    ..aOS(2, _omitFieldNames ? '' : 'device')
+    ..aOS(3, _omitFieldNames ? '' : 'mac')
+    ..aOS(4, _omitFieldNames ? '' : 'durationSeconds')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ObservationAttributes clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ObservationAttributes copyWith(
+          void Function(ObservationAttributes) updates) =>
+      super.copyWith((message) => updates(message as ObservationAttributes))
+          as ObservationAttributes;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ObservationAttributes create() => ObservationAttributes._();
+  @$core.override
+  ObservationAttributes createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ObservationAttributes getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ObservationAttributes>(create);
+  static ObservationAttributes? _defaultInstance;
+
+  /// Mirrors legacy attributes["label"]. Analyzer/event label.
+  @$pb.TagNumber(1)
+  $core.String get label => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set label($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLabel() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLabel() => $_clearField(1);
+
+  /// Mirrors legacy attributes["device"]. Detected device label.
+  @$pb.TagNumber(2)
+  $core.String get device => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set device($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDevice() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDevice() => $_clearField(2);
+
+  /// Mirrors legacy attributes["mac"]. MAC address for presence/network events.
+  @$pb.TagNumber(3)
+  $core.String get mac => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set mac($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMac() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMac() => $_clearField(3);
+
+  /// Mirrors legacy attributes["duration_seconds"]. Duration in seconds for
+  /// timer/duration-based observations. Stored as a string for compatibility
+  /// with the legacy map representation.
+  @$pb.TagNumber(4)
+  $core.String get durationSeconds => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set durationSeconds($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDurationSeconds() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDurationSeconds() => $_clearField(4);
 }
 
 class ObservationMessage extends $pb.GeneratedMessage {

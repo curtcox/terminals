@@ -20,6 +20,14 @@ client_message: {
         key: "loudness_db"
         value: "72.5"
       }
+      attributes: {
+        key: "device"
+        value: "kettle"
+      }
+      typed_attributes: {
+        label: "whistle"
+        device: "kettle"
+      }
       evidence: {
         id: "artifact-audio-1"
         kind: "audio_clip"

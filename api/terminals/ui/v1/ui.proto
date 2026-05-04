@@ -74,7 +74,11 @@ enum ScrollDirection {
 }
 
 message ScrollWidget {
-  string direction = 1;
+  // Deprecated: prefer direction_enum. Producers continue to mirror the typed
+  // enum into this string during the compatibility window described in
+  // docs/compatibility.md. Earliest removal is two tagged releases past
+  // 2026-05-03.
+  string direction = 1 [deprecated = true];
   ScrollDirection direction_enum = 2;
 }
 
