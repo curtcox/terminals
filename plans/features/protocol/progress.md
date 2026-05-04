@@ -66,3 +66,13 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Updated Flutter control/media handling to prefer typed stream/signal enums for notifications and runtime media behavior, while retaining legacy fallback.
 - Extended Go adapter tests and Go/Dart protocol contract assertions to validate typed enum emission and compatibility fallback behavior.
 - Updated `start_stream_audio_v1` text/bin fixtures to include typed `stream_kind`, and refreshed protocol registry migration notes for typed-first semantics.
+
+## Protocol Evolution Rules (2026-05-03, ExecPolicy Enum Migration)
+
+- Added additive typed enum `terminals.io.v1.ExecPolicy` and `FlowNode.exec_policy` (field 5) while preserving the legacy `exec` string.
+- Updated `flowPlanToProto` in `terminal_server/internal/transport/generated_proto_adapter.go` to emit both the typed `exec_policy` enum and the legacy `exec` string from internal `iorouter.ExecPolicy` values via a new `protoExecPolicyFromInternal` helper (covering `auto`, `prefer_client`, `require_client`, `server_only`).
+- Extended the `flow_plan_basic_v1` golden envelope fixture (textproto + binpb) to include typed `exec_policy` values alongside legacy `exec` strings; refreshed binary fixture via `go test ./internal/protocolcontract -run TestGoldenWireEnvelopeFixtures -update`.
+- Updated Go and Dart contract assertions to verify typed-enum + legacy-string compatibility for both flow plan nodes.
+- Updated the protocol extension registry entry for `FlowNode.exec` to describe typed-first compatibility semantics.
+- Synced regenerated `terminals/io/v1` Dart bindings into `terminal_client/lib/gen/`.
+- Re-ran `make proto-contract-test` and full `go test ./...` in `terminal_server`; all green.

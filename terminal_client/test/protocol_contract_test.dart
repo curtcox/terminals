@@ -81,6 +81,10 @@ void _assertFlowPlanBasic(WireEnvelope envelope) {
   _expectEqual(plan.nodes.length, 2);
   _expectEqual(plan.edges.length, 1);
   _expectEqual(plan.nodes.first.args['stream_id'], 'stream-audio-1');
+  _expectEqual(plan.nodes[0].exec, 'edge');
+  _expectEqual(plan.nodes[0].execPolicy, ExecPolicy.EXEC_POLICY_PREFER_CLIENT);
+  _expectEqual(plan.nodes[1].exec, 'server');
+  _expectEqual(plan.nodes[1].execPolicy, ExecPolicy.EXEC_POLICY_SERVER_ONLY);
 }
 
 void _assertObservationSound(WireEnvelope envelope) {

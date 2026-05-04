@@ -1157,12 +1157,14 @@ class FlowNode extends $pb.GeneratedMessage {
     $core.String? kind,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? args,
     $core.String? exec,
+    ExecPolicy? execPolicy,
   }) {
     final result = create();
     if (id != null) result.id = id;
     if (kind != null) result.kind = kind;
     if (args != null) result.args.addEntries(args);
     if (exec != null) result.exec = exec;
+    if (execPolicy != null) result.execPolicy = execPolicy;
     return result;
   }
 
@@ -1188,6 +1190,8 @@ class FlowNode extends $pb.GeneratedMessage {
         valueFieldType: $pb.PbFieldType.OS,
         packageName: const $pb.PackageName('terminals.io.v1'))
     ..aOS(4, _omitFieldNames ? '' : 'exec')
+    ..aE<ExecPolicy>(5, _omitFieldNames ? '' : 'execPolicy',
+        enumValues: ExecPolicy.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1237,6 +1241,15 @@ class FlowNode extends $pb.GeneratedMessage {
   $core.bool hasExec() => $_has(3);
   @$pb.TagNumber(4)
   void clearExec() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  ExecPolicy get execPolicy => $_getN(4);
+  @$pb.TagNumber(5)
+  set execPolicy(ExecPolicy value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasExecPolicy() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearExecPolicy() => $_clearField(5);
 }
 
 class FlowEdge extends $pb.GeneratedMessage {

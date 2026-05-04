@@ -494,6 +494,21 @@ func protoStreamKindFromInternal(kind string) iov1.StreamKind {
 	}
 }
 
+func protoExecPolicyFromInternal(exec iorouter.ExecPolicy) iov1.ExecPolicy {
+	switch exec {
+	case iorouter.ExecAuto:
+		return iov1.ExecPolicy_EXEC_POLICY_AUTO
+	case iorouter.ExecPreferClient:
+		return iov1.ExecPolicy_EXEC_POLICY_PREFER_CLIENT
+	case iorouter.ExecRequireClient:
+		return iov1.ExecPolicy_EXEC_POLICY_REQUIRE_CLIENT
+	case iorouter.ExecServerOnly:
+		return iov1.ExecPolicy_EXEC_POLICY_SERVER_ONLY
+	default:
+		return iov1.ExecPolicy_EXEC_POLICY_UNSPECIFIED
+	}
+}
+
 func protoErrorCodeFromInternal(code string) controlv1.ControlErrorCode {
 	switch code {
 	case ErrorCodeInvalidClientMessage:
@@ -1017,10 +1032,11 @@ func flowPlanToProto(plan iorouter.FlowPlan) *iov1.FlowPlan {
 	nodes := make([]*iov1.FlowNode, 0, len(plan.Nodes))
 	for _, node := range plan.Nodes {
 		nodes = append(nodes, &iov1.FlowNode{
-			Id:   node.ID,
-			Kind: string(node.Kind),
-			Args: cloneStringMapAdapter(node.Args),
-			Exec: string(node.Exec),
+			Id:         node.ID,
+			Kind:       string(node.Kind),
+			Args:       cloneStringMapAdapter(node.Args),
+			Exec:       string(node.Exec),
+			ExecPolicy: protoExecPolicyFromInternal(node.Exec),
 		})
 	}
 	edges := make([]*iov1.FlowEdge, 0, len(plan.Edges))

@@ -928,6 +928,13 @@ Incremental progress (2026-05-03):
 - Expanded Go and Dart protocol contract/assertion coverage for typed stream kind behavior, plus adapter tests for enum-first WebRTC fallback semantics.
 - Updated protocol extension registry entries for `StartStream.kind`, `RouteStream.kind`, and `WebRTCSignal.signal_type` to describe typed-first compatibility behavior.
 
+Incremental progress (2026-05-03, ExecPolicy):
+
+- Added additive typed enum `terminals.io.v1.ExecPolicy` and `FlowNode.exec_policy` while preserving the legacy `exec` string.
+- Generated proto adapter emits both typed `exec_policy` and legacy `exec` from internal `iorouter.ExecPolicy` values (`auto`, `prefer_client`, `require_client`, `server_only`).
+- Extended `flow_plan_basic_v1` envelope fixture and Go/Dart contract assertions for typed-first + legacy-string compatibility.
+- Updated registry entry for `FlowNode.exec` to describe typed-first compatibility semantics.
+
 ### PR 6 - Enforcement
 
 - Flip `proto-flex-check` from advisory to required.

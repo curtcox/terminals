@@ -406,13 +406,13 @@ Tests: flow execution tests cover current operator args.
 
 Owner: edge/flow  
 Classification: transitional_escape_hatch  
-Target state: replace with enum.  
+Target state: typed `ExecPolicy` (`exec_policy` field) is preferred; legacy `exec` string remains during the compatibility window.  
 Review date: 2026-06-15  
-Producer: server flow planner  
-Consumer: client/server edge execution runtime  
-Unknown behavior: executor rejects unknown execution targets.  
-Validation: `server`, `edge`, or `auto`.  
-Tests: flow execution tests cover execution target selection.
+Producer: server flow planner emits both typed `exec_policy` enum and legacy `exec` string.  
+Consumer: client/server edge execution runtime prefers typed `exec_policy` when not `EXEC_POLICY_UNSPECIFIED`, otherwise falls back to the legacy `exec` string.  
+Unknown behavior: executor rejects unknown execution targets; unknown enum values fall through to legacy string handling.  
+Validation: typed enum values `EXEC_POLICY_AUTO`, `EXEC_POLICY_PREFER_CLIENT`, `EXEC_POLICY_REQUIRE_CLIENT`, or `EXEC_POLICY_SERVER_ONLY`; legacy string mirrors with `auto`, `prefer_client`, `require_client`, or `server_only`.  
+Tests: Go contract tests cover typed-enum emission and legacy-string compatibility for flow plan envelopes; flow execution tests cover execution target selection.
 
 ### Field: terminals.io.v1.ArtifactRef.kind
 

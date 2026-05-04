@@ -33,6 +33,24 @@ final $typed_data.Uint8List streamKindDescriptor = $convert.base64Decode(
     'RfQVVESU8QARIVChFTVFJFQU1fS0lORF9WSURFTxACEhYKElNUUkVBTV9LSU5EX1NFTlNPUhAD'
     'EhQKEFNUUkVBTV9LSU5EX0RBVEEQBA==');
 
+@$core.Deprecated('Use execPolicyDescriptor instead')
+const ExecPolicy$json = {
+  '1': 'ExecPolicy',
+  '2': [
+    {'1': 'EXEC_POLICY_UNSPECIFIED', '2': 0},
+    {'1': 'EXEC_POLICY_AUTO', '2': 1},
+    {'1': 'EXEC_POLICY_PREFER_CLIENT', '2': 2},
+    {'1': 'EXEC_POLICY_REQUIRE_CLIENT', '2': 3},
+    {'1': 'EXEC_POLICY_SERVER_ONLY', '2': 4},
+  ],
+};
+
+/// Descriptor for `ExecPolicy`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List execPolicyDescriptor = $convert.base64Decode(
+    'CgpFeGVjUG9saWN5EhsKF0VYRUNfUE9MSUNZX1VOU1BFQ0lGSUVEEAASFAoQRVhFQ19QT0xJQ1'
+    'lfQVVUTxABEh0KGUVYRUNfUE9MSUNZX1BSRUZFUl9DTElFTlQQAhIeChpFWEVDX1BPTElDWV9S'
+    'RVFVSVJFX0NMSUVOVBADEhsKF0VYRUNfUE9MSUNZX1NFUlZFUl9PTkxZEAQ=');
+
 @$core.Deprecated('Use flowStateDescriptor instead')
 const FlowState$json = {
   '1': 'FlowState',
@@ -371,6 +389,14 @@ const FlowNode$json = {
       '10': 'args'
     },
     {'1': 'exec', '3': 4, '4': 1, '5': 9, '10': 'exec'},
+    {
+      '1': 'exec_policy',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.io.v1.ExecPolicy',
+      '10': 'execPolicy'
+    },
   ],
   '3': [FlowNode_ArgsEntry$json],
 };
@@ -389,8 +415,9 @@ const FlowNode_ArgsEntry$json = {
 final $typed_data.Uint8List flowNodeDescriptor = $convert.base64Decode(
     'CghGbG93Tm9kZRIOCgJpZBgBIAEoCVICaWQSEgoEa2luZBgCIAEoCVIEa2luZBI3CgRhcmdzGA'
     'MgAygLMiMudGVybWluYWxzLmlvLnYxLkZsb3dOb2RlLkFyZ3NFbnRyeVIEYXJncxISCgRleGVj'
-    'GAQgASgJUgRleGVjGjcKCUFyZ3NFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIA'
-    'EoCVIFdmFsdWU6AjgB');
+    'GAQgASgJUgRleGVjEjwKC2V4ZWNfcG9saWN5GAUgASgOMhsudGVybWluYWxzLmlvLnYxLkV4ZW'
+    'NQb2xpY3lSCmV4ZWNQb2xpY3kaNwoJQXJnc0VudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZh'
+    'bHVlGAIgASgJUgV2YWx1ZToCOAE=');
 
 @$core.Deprecated('Use flowEdgeDescriptor instead')
 const FlowEdge$json = {

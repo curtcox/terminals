@@ -172,6 +172,18 @@ func assertFlowPlanBasic(t *testing.T, envelope *controlv1.WireEnvelope) {
 	if plan.GetNodes()[0].GetArgs()["stream_id"] != "stream-audio-1" {
 		t.Fatalf("flow args not preserved")
 	}
+	if got := plan.GetNodes()[0].GetExec(); got != "edge" {
+		t.Fatalf("legacy exec[0] = %q", got)
+	}
+	if got := plan.GetNodes()[0].GetExecPolicy(); got != iov1.ExecPolicy_EXEC_POLICY_PREFER_CLIENT {
+		t.Fatalf("typed exec_policy[0] = %v", got)
+	}
+	if got := plan.GetNodes()[1].GetExec(); got != "server" {
+		t.Fatalf("legacy exec[1] = %q", got)
+	}
+	if got := plan.GetNodes()[1].GetExecPolicy(); got != iov1.ExecPolicy_EXEC_POLICY_SERVER_ONLY {
+		t.Fatalf("typed exec_policy[1] = %v", got)
+	}
 }
 
 func assertObservationSound(t *testing.T, envelope *controlv1.WireEnvelope) {

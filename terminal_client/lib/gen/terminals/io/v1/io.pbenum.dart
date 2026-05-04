@@ -42,6 +42,34 @@ class StreamKind extends $pb.ProtobufEnum {
   const StreamKind._(super.value, super.name);
 }
 
+class ExecPolicy extends $pb.ProtobufEnum {
+  static const ExecPolicy EXEC_POLICY_UNSPECIFIED =
+      ExecPolicy._(0, _omitEnumNames ? '' : 'EXEC_POLICY_UNSPECIFIED');
+  static const ExecPolicy EXEC_POLICY_AUTO =
+      ExecPolicy._(1, _omitEnumNames ? '' : 'EXEC_POLICY_AUTO');
+  static const ExecPolicy EXEC_POLICY_PREFER_CLIENT =
+      ExecPolicy._(2, _omitEnumNames ? '' : 'EXEC_POLICY_PREFER_CLIENT');
+  static const ExecPolicy EXEC_POLICY_REQUIRE_CLIENT =
+      ExecPolicy._(3, _omitEnumNames ? '' : 'EXEC_POLICY_REQUIRE_CLIENT');
+  static const ExecPolicy EXEC_POLICY_SERVER_ONLY =
+      ExecPolicy._(4, _omitEnumNames ? '' : 'EXEC_POLICY_SERVER_ONLY');
+
+  static const $core.List<ExecPolicy> values = <ExecPolicy>[
+    EXEC_POLICY_UNSPECIFIED,
+    EXEC_POLICY_AUTO,
+    EXEC_POLICY_PREFER_CLIENT,
+    EXEC_POLICY_REQUIRE_CLIENT,
+    EXEC_POLICY_SERVER_ONLY,
+  ];
+
+  static final $core.List<ExecPolicy?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static ExecPolicy? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ExecPolicy._(super.value, super.name);
+}
+
 class FlowState extends $pb.ProtobufEnum {
   static const FlowState FLOW_STATE_UNSPECIFIED =
       FlowState._(0, _omitEnumNames ? '' : 'FLOW_STATE_UNSPECIFIED');

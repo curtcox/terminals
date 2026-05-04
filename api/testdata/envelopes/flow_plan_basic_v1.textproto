@@ -9,6 +9,7 @@ server_message: {
         id: "capture"
         kind: "audio.capture"
         exec: "edge"
+        exec_policy: EXEC_POLICY_PREFER_CLIENT
         args: {
           key: "stream_id"
           value: "stream-audio-1"
@@ -18,6 +19,7 @@ server_message: {
         id: "classify"
         kind: "audio.classify"
         exec: "server"
+        exec_policy: EXEC_POLICY_SERVER_ONLY
         args: {
           key: "model"
           value: "silence-v1"
