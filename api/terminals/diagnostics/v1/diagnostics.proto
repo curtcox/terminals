@@ -112,11 +112,21 @@ message RuntimeState {
   repeated LogEntry recent_logs = 9; // cap 200
 }
 
+// UiEventKind classifies a recorded UI event for diagnostics. Mirrors the
+// `set_ui` / `update_ui` / `transition_ui` legacy strings on UiEventEntry.kind.
+enum UiEventKind {
+  UI_EVENT_KIND_UNSPECIFIED = 0;
+  UI_EVENT_KIND_SET_UI = 1;
+  UI_EVENT_KIND_UPDATE_UI = 2;
+  UI_EVENT_KIND_TRANSITION_UI = 3;
+}
+
 message UiEventEntry {
   int64 unix_ms = 1;
   string kind = 2; // set_ui | update_ui | transition_ui
   string component_id = 3;
   string detail = 4;
+  UiEventKind kind_enum = 5;
 }
 
 message UiActionEntry {

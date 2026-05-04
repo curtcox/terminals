@@ -547,13 +547,14 @@ Known keys include `voice_transcript`, `voice_confidence`, `nfc_tag_id`, `sip_ca
 ### Field: terminals.diagnostics.v1.UiEventEntry.kind
 
 Owner: diagnostics/bug-reporting  
-Classification: registry_backed_extension  
-Target state: keep diagnostic event kind registry.  
-Producer: client diagnostics capture  
-Consumer: server bug report intake and diagnostics views  
+Classification: transitional_escape_hatch  
+Target state: typed `kind_enum` (`terminals.diagnostics.v1.UiEventKind`) mirrors the legacy string for current UI event kinds; keep the legacy string fallback during the compatibility window.  
+Review date: 2026-06-15  
+Producer: client diagnostics capture (sets typed `kind_enum` alongside the legacy `kind` string for `set_ui`/`update_ui`/`transition_ui`)  
+Consumer: server bug report intake and diagnostics views (prefer typed `kind_enum` when non-zero, fall back to legacy string)  
 Unknown behavior: server preserves unknown kinds as diagnostic facts.  
-Validation: `set_ui`, `update_ui`, or `transition_ui` for current UI events.  
-Tests: bug report tests cover UI event capture.
+Validation: `set_ui`, `update_ui`, or `transition_ui` when known; typed enum matches the values in `terminals.diagnostics.v1.UiEventKind`.  
+Tests: bug report tests cover UI event capture; dispatcher tests assert typed-enum mirroring per UI response payload.
 
 ### Field: terminals.diagnostics.v1.UiActionEntry.action
 

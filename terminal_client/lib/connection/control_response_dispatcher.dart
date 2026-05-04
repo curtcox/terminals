@@ -1,4 +1,6 @@
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart'
+    as diagv1;
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/diagnostics/build_metadata.dart';
@@ -87,11 +89,13 @@ class ServerDrivenUiEventUpdate {
     required this.kind,
     required this.componentId,
     required this.detail,
+    this.kindEnum = diagv1.UiEventKind.UI_EVENT_KIND_UNSPECIFIED,
   });
 
   final String kind;
   final String componentId;
   final String detail;
+  final diagv1.UiEventKind kindEnum;
 }
 
 class ServerDrivenTransitionHint {
@@ -269,6 +273,7 @@ ServerDrivenUiResponseUpdate? serverDrivenUiUpdateFromResponse({
     events.add(
       ServerDrivenUiEventUpdate(
         kind: 'set_ui',
+        kindEnum: diagv1.UiEventKind.UI_EVENT_KIND_SET_UI,
         componentId: serverDrivenNodeId(response.setUi.root),
         detail: 'root updated',
       ),
@@ -286,6 +291,7 @@ ServerDrivenUiResponseUpdate? serverDrivenUiUpdateFromResponse({
     events.add(
       ServerDrivenUiEventUpdate(
         kind: 'update_ui',
+        kindEnum: diagv1.UiEventKind.UI_EVENT_KIND_UPDATE_UI,
         componentId: response.updateUi.componentId,
         detail: 'component patch',
       ),
@@ -299,6 +305,7 @@ ServerDrivenUiResponseUpdate? serverDrivenUiUpdateFromResponse({
     events.add(
       ServerDrivenUiEventUpdate(
         kind: 'transition_ui',
+        kindEnum: diagv1.UiEventKind.UI_EVENT_KIND_TRANSITION_UI,
         componentId: serverDrivenNodeId(nextRoot ?? uiv1.Node()),
         detail: response.transitionUi.transition,
       ),

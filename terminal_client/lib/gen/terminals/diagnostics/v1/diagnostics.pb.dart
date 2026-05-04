@@ -761,12 +761,14 @@ class UiEventEntry extends $pb.GeneratedMessage {
     $core.String? kind,
     $core.String? componentId,
     $core.String? detail,
+    UiEventKind? kindEnum,
   }) {
     final result = create();
     if (unixMs != null) result.unixMs = unixMs;
     if (kind != null) result.kind = kind;
     if (componentId != null) result.componentId = componentId;
     if (detail != null) result.detail = detail;
+    if (kindEnum != null) result.kindEnum = kindEnum;
     return result;
   }
 
@@ -788,6 +790,8 @@ class UiEventEntry extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'kind')
     ..aOS(3, _omitFieldNames ? '' : 'componentId')
     ..aOS(4, _omitFieldNames ? '' : 'detail')
+    ..aE<UiEventKind>(5, _omitFieldNames ? '' : 'kindEnum',
+        enumValues: UiEventKind.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -844,6 +848,15 @@ class UiEventEntry extends $pb.GeneratedMessage {
   $core.bool hasDetail() => $_has(3);
   @$pb.TagNumber(4)
   void clearDetail() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  UiEventKind get kindEnum => $_getN(4);
+  @$pb.TagNumber(5)
+  set kindEnum(UiEventKind value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasKindEnum() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearKindEnum() => $_clearField(5);
 }
 
 class UiActionEntry extends $pb.GeneratedMessage {

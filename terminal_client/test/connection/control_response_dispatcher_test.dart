@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terminal_client/connection/control_response_dispatcher.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart'
+    as diagv1;
 import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 
@@ -168,6 +170,10 @@ void main() {
         <String>['set_ui'],
       );
       expect(
+        update.events.map((event) => event.kindEnum),
+        <diagv1.UiEventKind>[diagv1.UiEventKind.UI_EVENT_KIND_SET_UI],
+      );
+      expect(
         update.events.map((event) => event.componentId),
         <String>['root'],
       );
@@ -199,6 +205,10 @@ void main() {
       expect(root.children.single.text.value, 'Old');
       expect(update.uiChanged, isTrue);
       expect(update.events.single.kind, 'update_ui');
+      expect(
+        update.events.single.kindEnum,
+        diagv1.UiEventKind.UI_EVENT_KIND_UPDATE_UI,
+      );
       expect(update.events.single.componentId, 'target');
     });
 
@@ -215,6 +225,10 @@ void main() {
       expect(update, isNotNull);
       expect(update!.uiChanged, isTrue);
       expect(update.events.single.kind, 'transition_ui');
+      expect(
+        update.events.single.kindEnum,
+        diagv1.UiEventKind.UI_EVENT_KIND_TRANSITION_UI,
+      );
       expect(update.events.single.componentId, 'root');
       expect(update.transitionHint?.transition, 'fade');
       expect(

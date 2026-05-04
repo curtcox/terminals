@@ -96,5 +96,32 @@ class BugReportStatus extends $pb.ProtobufEnum {
   const BugReportStatus._(super.value, super.name);
 }
 
+/// UiEventKind classifies a recorded UI event for diagnostics. Mirrors the
+/// `set_ui` / `update_ui` / `transition_ui` legacy strings on UiEventEntry.kind.
+class UiEventKind extends $pb.ProtobufEnum {
+  static const UiEventKind UI_EVENT_KIND_UNSPECIFIED =
+      UiEventKind._(0, _omitEnumNames ? '' : 'UI_EVENT_KIND_UNSPECIFIED');
+  static const UiEventKind UI_EVENT_KIND_SET_UI =
+      UiEventKind._(1, _omitEnumNames ? '' : 'UI_EVENT_KIND_SET_UI');
+  static const UiEventKind UI_EVENT_KIND_UPDATE_UI =
+      UiEventKind._(2, _omitEnumNames ? '' : 'UI_EVENT_KIND_UPDATE_UI');
+  static const UiEventKind UI_EVENT_KIND_TRANSITION_UI =
+      UiEventKind._(3, _omitEnumNames ? '' : 'UI_EVENT_KIND_TRANSITION_UI');
+
+  static const $core.List<UiEventKind> values = <UiEventKind>[
+    UI_EVENT_KIND_UNSPECIFIED,
+    UI_EVENT_KIND_SET_UI,
+    UI_EVENT_KIND_UPDATE_UI,
+    UI_EVENT_KIND_TRANSITION_UI,
+  ];
+
+  static final $core.List<UiEventKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static UiEventKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const UiEventKind._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

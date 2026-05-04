@@ -63,6 +63,23 @@ final $typed_data.Uint8List bugReportStatusDescriptor = $convert.base64Decode(
     'dCVUdfUkVQT1JUX1NUQVRVU19GSUxFRBABEiwKKEJVR19SRVBPUlRfU1RBVFVTX01FUkdFRF9X'
     'SVRIX0FVVE9ERVRFQ1QQAhIeChpCVUdfUkVQT1JUX1NUQVRVU19SRUpFQ1RFRBAD');
 
+@$core.Deprecated('Use uiEventKindDescriptor instead')
+const UiEventKind$json = {
+  '1': 'UiEventKind',
+  '2': [
+    {'1': 'UI_EVENT_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'UI_EVENT_KIND_SET_UI', '2': 1},
+    {'1': 'UI_EVENT_KIND_UPDATE_UI', '2': 2},
+    {'1': 'UI_EVENT_KIND_TRANSITION_UI', '2': 3},
+  ],
+};
+
+/// Descriptor for `UiEventKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List uiEventKindDescriptor = $convert.base64Decode(
+    'CgtVaUV2ZW50S2luZBIdChlVSV9FVkVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASGAoUVUlfRVZFTl'
+    'RfS0lORF9TRVRfVUkQARIbChdVSV9FVkVOVF9LSU5EX1VQREFURV9VSRACEh8KG1VJX0VWRU5U'
+    'X0tJTkRfVFJBTlNJVElPTl9VSRAD');
+
 @$core.Deprecated('Use bugReportDescriptor instead')
 const BugReport$json = {
   '1': 'BugReport',
@@ -357,6 +374,14 @@ const UiEventEntry$json = {
     {'1': 'kind', '3': 2, '4': 1, '5': 9, '10': 'kind'},
     {'1': 'component_id', '3': 3, '4': 1, '5': 9, '10': 'componentId'},
     {'1': 'detail', '3': 4, '4': 1, '5': 9, '10': 'detail'},
+    {
+      '1': 'kind_enum',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.terminals.diagnostics.v1.UiEventKind',
+      '10': 'kindEnum'
+    },
   ],
 };
 
@@ -364,7 +389,8 @@ const UiEventEntry$json = {
 final $typed_data.Uint8List uiEventEntryDescriptor = $convert.base64Decode(
     'CgxVaUV2ZW50RW50cnkSFwoHdW5peF9tcxgBIAEoA1IGdW5peE1zEhIKBGtpbmQYAiABKAlSBG'
     'tpbmQSIQoMY29tcG9uZW50X2lkGAMgASgJUgtjb21wb25lbnRJZBIWCgZkZXRhaWwYBCABKAlS'
-    'BmRldGFpbA==');
+    'BmRldGFpbBJCCglraW5kX2VudW0YBSABKA4yJS50ZXJtaW5hbHMuZGlhZ25vc3RpY3MudjEuVW'
+    'lFdmVudEtpbmRSCGtpbmRFbnVt');
 
 @$core.Deprecated('Use uiActionEntryDescriptor instead')
 const UiActionEntry$json = {

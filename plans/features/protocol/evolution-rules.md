@@ -943,6 +943,14 @@ Incremental progress (2026-05-04, PointerAction/TouchAction):
 - Updated registry entries for `PointerEvent.action` and `TouchEvent.action` to describe typed-first compatibility semantics.
 - No application code currently routes `InputEvent.pointer` / `InputEvent.touch`, so producer/consumer wiring is deferred until the first real consumer lands.
 
+Incremental progress (2026-05-04, UiEventEntry typed kind enum):
+
+- Added additive typed enum `terminals.diagnostics.v1.UiEventKind` (UNSPECIFIED/SET_UI/UPDATE_UI/TRANSITION_UI) and `UiEventEntry.kind_enum = 5` while preserving the legacy `kind` string.
+- Updated `serverDrivenUiUpdateFromResponse` and `_recordUiEvent` to populate the typed enum alongside the legacy string for `set_ui`/`update_ui`/`transition_ui` events.
+- Reclassified the registry entry for `UiEventEntry.kind` as transitional escape hatch with typed-first compatibility semantics; added compatibility-window row in `docs/compatibility.md`.
+- Extended dispatcher tests to assert the typed enum mirrors the legacy string per UI response payload.
+- Regenerated Go bindings, synced refreshed Dart bindings into `terminal_client/lib/gen/`, and re-ran `make proto-contract-test`, `make server-test`, and `make client-test`; all green.
+
 Incremental progress (2026-05-03, ExecPolicy):
 
 - Added additive typed enum `terminals.io.v1.ExecPolicy` and `FlowNode.exec_policy` while preserving the legacy `exec` string.

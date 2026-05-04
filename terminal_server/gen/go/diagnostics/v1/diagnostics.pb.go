@@ -157,6 +157,60 @@ func (BugReportStatus) EnumDescriptor() ([]byte, []int) {
 	return file_terminals_diagnostics_v1_diagnostics_proto_rawDescGZIP(), []int{1}
 }
 
+// UiEventKind classifies a recorded UI event for diagnostics. Mirrors the
+// `set_ui` / `update_ui` / `transition_ui` legacy strings on UiEventEntry.kind.
+type UiEventKind int32
+
+const (
+	UiEventKind_UI_EVENT_KIND_UNSPECIFIED   UiEventKind = 0
+	UiEventKind_UI_EVENT_KIND_SET_UI        UiEventKind = 1
+	UiEventKind_UI_EVENT_KIND_UPDATE_UI     UiEventKind = 2
+	UiEventKind_UI_EVENT_KIND_TRANSITION_UI UiEventKind = 3
+)
+
+// Enum value maps for UiEventKind.
+var (
+	UiEventKind_name = map[int32]string{
+		0: "UI_EVENT_KIND_UNSPECIFIED",
+		1: "UI_EVENT_KIND_SET_UI",
+		2: "UI_EVENT_KIND_UPDATE_UI",
+		3: "UI_EVENT_KIND_TRANSITION_UI",
+	}
+	UiEventKind_value = map[string]int32{
+		"UI_EVENT_KIND_UNSPECIFIED":   0,
+		"UI_EVENT_KIND_SET_UI":        1,
+		"UI_EVENT_KIND_UPDATE_UI":     2,
+		"UI_EVENT_KIND_TRANSITION_UI": 3,
+	}
+)
+
+func (x UiEventKind) Enum() *UiEventKind {
+	p := new(UiEventKind)
+	*p = x
+	return p
+}
+
+func (x UiEventKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (UiEventKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_terminals_diagnostics_v1_diagnostics_proto_enumTypes[2].Descriptor()
+}
+
+func (UiEventKind) Type() protoreflect.EnumType {
+	return &file_terminals_diagnostics_v1_diagnostics_proto_enumTypes[2]
+}
+
+func (x UiEventKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use UiEventKind.Descriptor instead.
+func (UiEventKind) EnumDescriptor() ([]byte, []int) {
+	return file_terminals_diagnostics_v1_diagnostics_proto_rawDescGZIP(), []int{2}
+}
+
 // BugReport is filed by a reporter device against a subject device (which may
 // be the same device, a different device, or unknown). The client contributes
 // ClientContext; the server enriches the record with subject-side state.
@@ -708,6 +762,7 @@ type UiEventEntry struct {
 	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"` // set_ui | update_ui | transition_ui
 	ComponentId   string                 `protobuf:"bytes,3,opt,name=component_id,json=componentId,proto3" json:"component_id,omitempty"`
 	Detail        string                 `protobuf:"bytes,4,opt,name=detail,proto3" json:"detail,omitempty"`
+	KindEnum      UiEventKind            `protobuf:"varint,5,opt,name=kind_enum,json=kindEnum,proto3,enum=terminals.diagnostics.v1.UiEventKind" json:"kind_enum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -768,6 +823,13 @@ func (x *UiEventEntry) GetDetail() string {
 		return x.Detail
 	}
 	return ""
+}
+
+func (x *UiEventEntry) GetKindEnum() UiEventKind {
+	if x != nil {
+		return x.KindEnum
+	}
+	return UiEventKind_UI_EVENT_KIND_UNSPECIFIED
 }
 
 type UiActionEntry struct {
@@ -1472,12 +1534,13 @@ const file_terminals_diagnostics_v1_diagnostics_proto_rawDesc = "" +
 	"\ractive_routes\x18\a \x03(\v2$.terminals.diagnostics.v1.RouteEntryR\factiveRoutes\x12_\n" +
 	"\x15recent_webrtc_signals\x18\b \x03(\v2+.terminals.diagnostics.v1.WebrtcSignalEntryR\x13recentWebrtcSignals\x12C\n" +
 	"\vrecent_logs\x18\t \x03(\v2\".terminals.diagnostics.v1.LogEntryR\n" +
-	"recentLogs\"v\n" +
+	"recentLogs\"\xba\x01\n" +
 	"\fUiEventEntry\x12\x17\n" +
 	"\aunix_ms\x18\x01 \x01(\x03R\x06unixMs\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12!\n" +
 	"\fcomponent_id\x18\x03 \x01(\tR\vcomponentId\x12\x16\n" +
-	"\x06detail\x18\x04 \x01(\tR\x06detail\"y\n" +
+	"\x06detail\x18\x04 \x01(\tR\x06detail\x12B\n" +
+	"\tkind_enum\x18\x05 \x01(\x0e2%.terminals.diagnostics.v1.UiEventKindR\bkindEnum\"y\n" +
 	"\rUiActionEntry\x12\x17\n" +
 	"\aunix_ms\x18\x01 \x01(\x03R\x06unixMs\x12!\n" +
 	"\fcomponent_id\x18\x02 \x01(\tR\vcomponentId\x12\x16\n" +
@@ -1553,7 +1616,12 @@ const file_terminals_diagnostics_v1_diagnostics_proto_rawDesc = "" +
 	"\x1dBUG_REPORT_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17BUG_REPORT_STATUS_FILED\x10\x01\x12,\n" +
 	"(BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT\x10\x02\x12\x1e\n" +
-	"\x1aBUG_REPORT_STATUS_REJECTED\x10\x03BRZPgithub.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1;diagnosticsv1b\x06proto3"
+	"\x1aBUG_REPORT_STATUS_REJECTED\x10\x03*\x84\x01\n" +
+	"\vUiEventKind\x12\x1d\n" +
+	"\x19UI_EVENT_KIND_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14UI_EVENT_KIND_SET_UI\x10\x01\x12\x1b\n" +
+	"\x17UI_EVENT_KIND_UPDATE_UI\x10\x02\x12\x1f\n" +
+	"\x1bUI_EVENT_KIND_TRANSITION_UI\x10\x03BRZPgithub.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1;diagnosticsv1b\x06proto3"
 
 var (
 	file_terminals_diagnostics_v1_diagnostics_proto_rawDescOnce sync.Once
@@ -1567,59 +1635,61 @@ func file_terminals_diagnostics_v1_diagnostics_proto_rawDescGZIP() []byte {
 	return file_terminals_diagnostics_v1_diagnostics_proto_rawDescData
 }
 
-var file_terminals_diagnostics_v1_diagnostics_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_terminals_diagnostics_v1_diagnostics_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_terminals_diagnostics_v1_diagnostics_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_terminals_diagnostics_v1_diagnostics_proto_goTypes = []any{
 	(BugReportSource)(0),          // 0: terminals.diagnostics.v1.BugReportSource
 	(BugReportStatus)(0),          // 1: terminals.diagnostics.v1.BugReportStatus
-	(*BugReport)(nil),             // 2: terminals.diagnostics.v1.BugReport
-	(*BugReportAck)(nil),          // 3: terminals.diagnostics.v1.BugReportAck
-	(*ClientContext)(nil),         // 4: terminals.diagnostics.v1.ClientContext
-	(*ClientIdentity)(nil),        // 5: terminals.diagnostics.v1.ClientIdentity
-	(*RuntimeState)(nil),          // 6: terminals.diagnostics.v1.RuntimeState
-	(*UiEventEntry)(nil),          // 7: terminals.diagnostics.v1.UiEventEntry
-	(*UiActionEntry)(nil),         // 8: terminals.diagnostics.v1.UiActionEntry
-	(*StreamEntry)(nil),           // 9: terminals.diagnostics.v1.StreamEntry
-	(*RouteEntry)(nil),            // 10: terminals.diagnostics.v1.RouteEntry
-	(*WebrtcSignalEntry)(nil),     // 11: terminals.diagnostics.v1.WebrtcSignalEntry
-	(*LogEntry)(nil),              // 12: terminals.diagnostics.v1.LogEntry
-	(*ConnectionHealth)(nil),      // 13: terminals.diagnostics.v1.ConnectionHealth
-	(*ControlErrorEntry)(nil),     // 14: terminals.diagnostics.v1.ControlErrorEntry
-	(*HardwareState)(nil),         // 15: terminals.diagnostics.v1.HardwareState
-	(*ErrorCapture)(nil),          // 16: terminals.diagnostics.v1.ErrorCapture
-	nil,                           // 17: terminals.diagnostics.v1.BugReport.SourceHintsEntry
-	nil,                           // 18: terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
-	(*v1.DeviceCapabilities)(nil), // 19: terminals.capabilities.v1.DeviceCapabilities
-	(*v11.Node)(nil),              // 20: terminals.ui.v1.Node
-	(v12.StreamKind)(0),           // 21: terminals.io.v1.StreamKind
+	(UiEventKind)(0),              // 2: terminals.diagnostics.v1.UiEventKind
+	(*BugReport)(nil),             // 3: terminals.diagnostics.v1.BugReport
+	(*BugReportAck)(nil),          // 4: terminals.diagnostics.v1.BugReportAck
+	(*ClientContext)(nil),         // 5: terminals.diagnostics.v1.ClientContext
+	(*ClientIdentity)(nil),        // 6: terminals.diagnostics.v1.ClientIdentity
+	(*RuntimeState)(nil),          // 7: terminals.diagnostics.v1.RuntimeState
+	(*UiEventEntry)(nil),          // 8: terminals.diagnostics.v1.UiEventEntry
+	(*UiActionEntry)(nil),         // 9: terminals.diagnostics.v1.UiActionEntry
+	(*StreamEntry)(nil),           // 10: terminals.diagnostics.v1.StreamEntry
+	(*RouteEntry)(nil),            // 11: terminals.diagnostics.v1.RouteEntry
+	(*WebrtcSignalEntry)(nil),     // 12: terminals.diagnostics.v1.WebrtcSignalEntry
+	(*LogEntry)(nil),              // 13: terminals.diagnostics.v1.LogEntry
+	(*ConnectionHealth)(nil),      // 14: terminals.diagnostics.v1.ConnectionHealth
+	(*ControlErrorEntry)(nil),     // 15: terminals.diagnostics.v1.ControlErrorEntry
+	(*HardwareState)(nil),         // 16: terminals.diagnostics.v1.HardwareState
+	(*ErrorCapture)(nil),          // 17: terminals.diagnostics.v1.ErrorCapture
+	nil,                           // 18: terminals.diagnostics.v1.BugReport.SourceHintsEntry
+	nil,                           // 19: terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
+	(*v1.DeviceCapabilities)(nil), // 20: terminals.capabilities.v1.DeviceCapabilities
+	(*v11.Node)(nil),              // 21: terminals.ui.v1.Node
+	(v12.StreamKind)(0),           // 22: terminals.io.v1.StreamKind
 }
 var file_terminals_diagnostics_v1_diagnostics_proto_depIdxs = []int32{
 	0,  // 0: terminals.diagnostics.v1.BugReport.source:type_name -> terminals.diagnostics.v1.BugReportSource
-	4,  // 1: terminals.diagnostics.v1.BugReport.client_context:type_name -> terminals.diagnostics.v1.ClientContext
-	17, // 2: terminals.diagnostics.v1.BugReport.source_hints:type_name -> terminals.diagnostics.v1.BugReport.SourceHintsEntry
+	5,  // 1: terminals.diagnostics.v1.BugReport.client_context:type_name -> terminals.diagnostics.v1.ClientContext
+	18, // 2: terminals.diagnostics.v1.BugReport.source_hints:type_name -> terminals.diagnostics.v1.BugReport.SourceHintsEntry
 	1,  // 3: terminals.diagnostics.v1.BugReportAck.status:type_name -> terminals.diagnostics.v1.BugReportStatus
-	5,  // 4: terminals.diagnostics.v1.ClientContext.identity:type_name -> terminals.diagnostics.v1.ClientIdentity
-	19, // 5: terminals.diagnostics.v1.ClientContext.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	6,  // 6: terminals.diagnostics.v1.ClientContext.runtime:type_name -> terminals.diagnostics.v1.RuntimeState
-	13, // 7: terminals.diagnostics.v1.ClientContext.connection:type_name -> terminals.diagnostics.v1.ConnectionHealth
-	15, // 8: terminals.diagnostics.v1.ClientContext.hardware:type_name -> terminals.diagnostics.v1.HardwareState
-	16, // 9: terminals.diagnostics.v1.ClientContext.error_capture:type_name -> terminals.diagnostics.v1.ErrorCapture
-	20, // 10: terminals.diagnostics.v1.RuntimeState.active_ui_root:type_name -> terminals.ui.v1.Node
-	7,  // 11: terminals.diagnostics.v1.RuntimeState.recent_ui_updates:type_name -> terminals.diagnostics.v1.UiEventEntry
-	8,  // 12: terminals.diagnostics.v1.RuntimeState.recent_ui_actions:type_name -> terminals.diagnostics.v1.UiActionEntry
-	9,  // 13: terminals.diagnostics.v1.RuntimeState.active_streams:type_name -> terminals.diagnostics.v1.StreamEntry
-	10, // 14: terminals.diagnostics.v1.RuntimeState.active_routes:type_name -> terminals.diagnostics.v1.RouteEntry
-	11, // 15: terminals.diagnostics.v1.RuntimeState.recent_webrtc_signals:type_name -> terminals.diagnostics.v1.WebrtcSignalEntry
-	12, // 16: terminals.diagnostics.v1.RuntimeState.recent_logs:type_name -> terminals.diagnostics.v1.LogEntry
-	21, // 17: terminals.diagnostics.v1.StreamEntry.stream_kind:type_name -> terminals.io.v1.StreamKind
-	21, // 18: terminals.diagnostics.v1.RouteEntry.stream_kind:type_name -> terminals.io.v1.StreamKind
-	14, // 19: terminals.diagnostics.v1.ConnectionHealth.recent_control_errors:type_name -> terminals.diagnostics.v1.ControlErrorEntry
-	18, // 20: terminals.diagnostics.v1.HardwareState.sensor_snapshot:type_name -> terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	6,  // 4: terminals.diagnostics.v1.ClientContext.identity:type_name -> terminals.diagnostics.v1.ClientIdentity
+	20, // 5: terminals.diagnostics.v1.ClientContext.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	7,  // 6: terminals.diagnostics.v1.ClientContext.runtime:type_name -> terminals.diagnostics.v1.RuntimeState
+	14, // 7: terminals.diagnostics.v1.ClientContext.connection:type_name -> terminals.diagnostics.v1.ConnectionHealth
+	16, // 8: terminals.diagnostics.v1.ClientContext.hardware:type_name -> terminals.diagnostics.v1.HardwareState
+	17, // 9: terminals.diagnostics.v1.ClientContext.error_capture:type_name -> terminals.diagnostics.v1.ErrorCapture
+	21, // 10: terminals.diagnostics.v1.RuntimeState.active_ui_root:type_name -> terminals.ui.v1.Node
+	8,  // 11: terminals.diagnostics.v1.RuntimeState.recent_ui_updates:type_name -> terminals.diagnostics.v1.UiEventEntry
+	9,  // 12: terminals.diagnostics.v1.RuntimeState.recent_ui_actions:type_name -> terminals.diagnostics.v1.UiActionEntry
+	10, // 13: terminals.diagnostics.v1.RuntimeState.active_streams:type_name -> terminals.diagnostics.v1.StreamEntry
+	11, // 14: terminals.diagnostics.v1.RuntimeState.active_routes:type_name -> terminals.diagnostics.v1.RouteEntry
+	12, // 15: terminals.diagnostics.v1.RuntimeState.recent_webrtc_signals:type_name -> terminals.diagnostics.v1.WebrtcSignalEntry
+	13, // 16: terminals.diagnostics.v1.RuntimeState.recent_logs:type_name -> terminals.diagnostics.v1.LogEntry
+	2,  // 17: terminals.diagnostics.v1.UiEventEntry.kind_enum:type_name -> terminals.diagnostics.v1.UiEventKind
+	22, // 18: terminals.diagnostics.v1.StreamEntry.stream_kind:type_name -> terminals.io.v1.StreamKind
+	22, // 19: terminals.diagnostics.v1.RouteEntry.stream_kind:type_name -> terminals.io.v1.StreamKind
+	15, // 20: terminals.diagnostics.v1.ConnectionHealth.recent_control_errors:type_name -> terminals.diagnostics.v1.ControlErrorEntry
+	19, // 21: terminals.diagnostics.v1.HardwareState.sensor_snapshot:type_name -> terminals.diagnostics.v1.HardwareState.SensorSnapshotEntry
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_terminals_diagnostics_v1_diagnostics_proto_init() }
@@ -1632,7 +1702,7 @@ func file_terminals_diagnostics_v1_diagnostics_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_diagnostics_v1_diagnostics_proto_rawDesc), len(file_terminals_diagnostics_v1_diagnostics_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,

@@ -108,3 +108,12 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Flipped `proto-flex-check` from advisory to required by passing `--enforce` in the Makefile target. The registry now covers all 31 detected flexible fields, so missing-entry detections fail the gate.
 - Updated `docs/compatibility.md` to enumerate the typed-replacement migration windows currently open (RegisterAck typed metadata, StreamKind, WebRTCSignalType, ScrollDirection, FlowState, ExecPolicy, CanvasWidget DrawOps, PointerAction, TouchAction) with shipped dates and earliest legacy-removal criteria, and refreshed the pending-migrations summary against the current registry.
 - Re-ran `make proto-flex-check` (now in enforce mode) and `make proto-contract-test`; all green.
+
+## Protocol Evolution Rules (2026-05-04, UiEventEntry typed kind enum)
+
+- Added additive typed enum `terminals.diagnostics.v1.UiEventKind` (`UNSPECIFIED`/`SET_UI`/`UPDATE_UI`/`TRANSITION_UI`) and `UiEventEntry.kind_enum = 5` while preserving the legacy `kind` string in `api/terminals/diagnostics/v1/diagnostics.proto`.
+- Updated `serverDrivenUiUpdateFromResponse` in `terminal_client/lib/connection/control_response_dispatcher.dart` to emit `kindEnum` alongside the legacy `kind` string for `set_ui`/`update_ui`/`transition_ui` events.
+- Updated `_recordUiEvent` in `terminal_client/lib/app/terminal_client_shell.dart` to copy the typed enum onto each `UiEventEntry` when present, leaving the legacy string in place as a fallback.
+- Reclassified the registry entry for `UiEventEntry.kind` from `registry_backed_extension` to `transitional_escape_hatch` describing typed-first compatibility semantics.
+- Extended dispatcher tests in `terminal_client/test/connection/control_response_dispatcher_test.dart` to assert the typed enum mirrors the legacy string per UI response payload.
+- Regenerated Go bindings via `make proto-generate`, synced refreshed `terminals/diagnostics/v1` Dart bindings into `terminal_client/lib/gen/`, and re-ran `make proto-contract-test`, `make server-test`, and `make client-test`; all green.
