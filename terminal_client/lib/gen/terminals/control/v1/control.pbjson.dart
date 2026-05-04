@@ -1043,6 +1043,92 @@ const StreamReady$json = {
 final $typed_data.Uint8List streamReadyDescriptor = $convert
     .base64Decode('CgtTdHJlYW1SZWFkeRIbCglzdHJlYW1faWQYASABKAlSCHN0cmVhbUlk');
 
+@$core.Deprecated('Use commandStringListDescriptor instead')
+const CommandStringList$json = {
+  '1': 'CommandStringList',
+  '2': [
+    {'1': 'values', '3': 1, '4': 3, '5': 9, '10': 'values'},
+  ],
+};
+
+/// Descriptor for `CommandStringList`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List commandStringListDescriptor = $convert.base64Decode(
+    'ChFDb21tYW5kU3RyaW5nTGlzdBIWCgZ2YWx1ZXMYASADKAlSBnZhbHVlcw==');
+
+@$core.Deprecated('Use commandTypedValueDescriptor instead')
+const CommandTypedValue$json = {
+  '1': 'CommandTypedValue',
+  '2': [
+    {'1': 'string_value', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'stringValue'},
+    {'1': 'int64_value', '3': 2, '4': 1, '5': 3, '9': 0, '10': 'int64Value'},
+    {'1': 'bool_value', '3': 3, '4': 1, '5': 8, '9': 0, '10': 'boolValue'},
+    {'1': 'double_value', '3': 4, '4': 1, '5': 1, '9': 0, '10': 'doubleValue'},
+    {
+      '1': 'string_list_value',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.CommandStringList',
+      '9': 0,
+      '10': 'stringListValue'
+    },
+  ],
+  '8': [
+    {'1': 'kind'},
+  ],
+};
+
+/// Descriptor for `CommandTypedValue`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List commandTypedValueDescriptor = $convert.base64Decode(
+    'ChFDb21tYW5kVHlwZWRWYWx1ZRIjCgxzdHJpbmdfdmFsdWUYASABKAlIAFILc3RyaW5nVmFsdW'
+    'USIQoLaW50NjRfdmFsdWUYAiABKANIAFIKaW50NjRWYWx1ZRIfCgpib29sX3ZhbHVlGAMgASgI'
+    'SABSCWJvb2xWYWx1ZRIjCgxkb3VibGVfdmFsdWUYBCABKAFIAFILZG91YmxlVmFsdWUSVQoRc3'
+    'RyaW5nX2xpc3RfdmFsdWUYBSABKAsyJy50ZXJtaW5hbHMuY29udHJvbC52MS5Db21tYW5kU3Ry'
+    'aW5nTGlzdEgAUg9zdHJpbmdMaXN0VmFsdWVCBgoEa2luZA==');
+
+@$core.Deprecated('Use commandArgumentEntryDescriptor instead')
+const CommandArgumentEntry$json = {
+  '1': 'CommandArgumentEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.CommandTypedValue',
+      '10': 'value'
+    },
+  ],
+};
+
+/// Descriptor for `CommandArgumentEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List commandArgumentEntryDescriptor = $convert.base64Decode(
+    'ChRDb21tYW5kQXJndW1lbnRFbnRyeRIQCgNrZXkYASABKAlSA2tleRI9CgV2YWx1ZRgCIAEoCz'
+    'InLnRlcm1pbmFscy5jb250cm9sLnYxLkNvbW1hbmRUeXBlZFZhbHVlUgV2YWx1ZQ==');
+
+@$core.Deprecated('Use commandResultDataEntryDescriptor instead')
+const CommandResultDataEntry$json = {
+  '1': 'CommandResultDataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.terminals.control.v1.CommandTypedValue',
+      '10': 'value'
+    },
+  ],
+};
+
+/// Descriptor for `CommandResultDataEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List commandResultDataEntryDescriptor =
+    $convert.base64Decode(
+        'ChZDb21tYW5kUmVzdWx0RGF0YUVudHJ5EhAKA2tleRgBIAEoCVIDa2V5Ej0KBXZhbHVlGAIgAS'
+        'gLMicudGVybWluYWxzLmNvbnRyb2wudjEuQ29tbWFuZFR5cGVkVmFsdWVSBXZhbHVl');
+
 @$core.Deprecated('Use commandRequestDescriptor instead')
 const CommandRequest$json = {
   '1': 'CommandRequest',
@@ -1075,6 +1161,14 @@ const CommandRequest$json = {
       '6': '.terminals.control.v1.CommandRequest.ArgumentsEntry',
       '10': 'arguments'
     },
+    {
+      '1': 'typed_arguments',
+      '3': 8,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.control.v1.CommandArgumentEntry',
+      '10': 'typedArguments'
+    },
   ],
   '3': [CommandRequest_ArgumentsEntry$json],
 };
@@ -1096,8 +1190,10 @@ final $typed_data.Uint8List commandRequestDescriptor = $convert.base64Decode(
     'bC52MS5Db21tYW5kQWN0aW9uUgZhY3Rpb24SNQoEa2luZBgEIAEoDjIhLnRlcm1pbmFscy5jb2'
     '50cm9sLnYxLkNvbW1hbmRLaW5kUgRraW5kEhIKBHRleHQYBSABKAlSBHRleHQSFgoGaW50ZW50'
     'GAYgASgJUgZpbnRlbnQSUQoJYXJndW1lbnRzGAcgAygLMjMudGVybWluYWxzLmNvbnRyb2wudj'
-    'EuQ29tbWFuZFJlcXVlc3QuQXJndW1lbnRzRW50cnlSCWFyZ3VtZW50cxo8Cg5Bcmd1bWVudHNF'
-    'bnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgB');
+    'EuQ29tbWFuZFJlcXVlc3QuQXJndW1lbnRzRW50cnlSCWFyZ3VtZW50cxJTCg90eXBlZF9hcmd1'
+    'bWVudHMYCCADKAsyKi50ZXJtaW5hbHMuY29udHJvbC52MS5Db21tYW5kQXJndW1lbnRFbnRyeV'
+    'IOdHlwZWRBcmd1bWVudHMaPAoOQXJndW1lbnRzRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSFAoF'
+    'dmFsdWUYAiABKAlSBXZhbHVlOgI4AQ==');
 
 @$core.Deprecated('Use commandResultDescriptor instead')
 const CommandResult$json = {
@@ -1114,6 +1210,14 @@ const CommandResult$json = {
       '5': 11,
       '6': '.terminals.control.v1.CommandResult.DataEntry',
       '10': 'data'
+    },
+    {
+      '1': 'typed_data',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.terminals.control.v1.CommandResultDataEntry',
+      '10': 'typedData'
     },
   ],
   '3': [CommandResult_DataEntry$json],
@@ -1135,8 +1239,9 @@ final $typed_data.Uint8List commandResultDescriptor = $convert.base64Decode(
     'Jpb19zdGFydBgCIAEoCVINc2NlbmFyaW9TdGFydBIjCg1zY2VuYXJpb19zdG9wGAMgASgJUgxz'
     'Y2VuYXJpb1N0b3ASIgoMbm90aWZpY2F0aW9uGAQgASgJUgxub3RpZmljYXRpb24SQQoEZGF0YR'
     'gFIAMoCzItLnRlcm1pbmFscy5jb250cm9sLnYxLkNvbW1hbmRSZXN1bHQuRGF0YUVudHJ5UgRk'
-    'YXRhGjcKCURhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdW'
-    'U6AjgB');
+    'YXRhEksKCnR5cGVkX2RhdGEYBiADKAsyLC50ZXJtaW5hbHMuY29udHJvbC52MS5Db21tYW5kUm'
+    'VzdWx0RGF0YUVudHJ5Ugl0eXBlZERhdGEaNwoJRGF0YUVudHJ5EhAKA2tleRgBIAEoCVIDa2V5'
+    'EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAE=');
 
 @$core.Deprecated('Use controlErrorDescriptor instead')
 const ControlError$json = {
@@ -1260,6 +1365,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.control.v1.CommandRequest': CommandRequest$json,
   '.terminals.control.v1.CommandRequest.ArgumentsEntry':
       CommandRequest_ArgumentsEntry$json,
+  '.terminals.control.v1.CommandArgumentEntry': CommandArgumentEntry$json,
+  '.terminals.control.v1.CommandTypedValue': CommandTypedValue$json,
+  '.terminals.control.v1.CommandStringList': CommandStringList$json,
   '.terminals.control.v1.Heartbeat': Heartbeat$json,
   '.terminals.control.v1.WebRTCSignal': WebRTCSignal$json,
   '.terminals.control.v1.VoiceAudio': VoiceAudio$json,
@@ -1348,6 +1456,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.terminals.ui.v1.Notification': $2.Notification$json,
   '.terminals.control.v1.CommandResult': CommandResult$json,
   '.terminals.control.v1.CommandResult.DataEntry': CommandResult_DataEntry$json,
+  '.terminals.control.v1.CommandResultDataEntry': CommandResultDataEntry$json,
   '.terminals.control.v1.ControlError': ControlError$json,
   '.terminals.ui.v1.UpdateUI': $2.UpdateUI$json,
   '.terminals.ui.v1.TransitionUI': $2.TransitionUI$json,

@@ -273,12 +273,22 @@ ConnectRequest buildPlaybackMetadataQueryRequest({
   required String artifactID,
   required String targetDeviceID,
 }) {
+  final typedArtifactID = CommandArgumentEntry()
+    ..key = 'artifact_id'
+    ..value = (CommandTypedValue()..stringValue = artifactID);
+  final typedTargetDeviceID = CommandArgumentEntry()
+    ..key = 'target_device_id'
+    ..value = (CommandTypedValue()..stringValue = targetDeviceID);
   return ConnectRequest()
     ..command = (CommandRequest()
       ..requestId = requestID
       ..deviceId = deviceID
       ..kind = CommandKind.COMMAND_KIND_MANUAL
       ..intent = 'playback_metadata'
+      ..typedArguments.addAll(<CommandArgumentEntry>[
+        typedArtifactID,
+        typedTargetDeviceID,
+      ])
       ..arguments['artifact_id'] = artifactID
       ..arguments['target_device_id'] = targetDeviceID);
 }

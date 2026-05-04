@@ -201,6 +201,30 @@ enum CommandKind {
   COMMAND_KIND_SYSTEM = 3;
 }
 
+message CommandStringList {
+  repeated string values = 1;
+}
+
+message CommandTypedValue {
+  oneof kind {
+    string string_value = 1;
+    int64 int64_value = 2;
+    bool bool_value = 3;
+    double double_value = 4;
+    CommandStringList string_list_value = 5;
+  }
+}
+
+message CommandArgumentEntry {
+  string key = 1;
+  CommandTypedValue value = 2;
+}
+
+message CommandResultDataEntry {
+  string key = 1;
+  CommandTypedValue value = 2;
+}
+
 message CommandRequest {
   string request_id = 1;
   string device_id = 2;
@@ -209,6 +233,7 @@ message CommandRequest {
   string text = 5; // voice transcript
   string intent = 6; // intent name or system intent
   map<string, string> arguments = 7; // optional trigger/system arguments (e.g. device_ids)
+  repeated CommandArgumentEntry typed_arguments = 8;
 }
 
 message CommandResult {
@@ -217,6 +242,7 @@ message CommandResult {
   string scenario_stop = 3;
   string notification = 4;
   map<string, string> data = 5;
+  repeated CommandResultDataEntry typed_data = 6;
 }
 
 enum ControlErrorCode {

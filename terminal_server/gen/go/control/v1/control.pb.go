@@ -2206,22 +2206,301 @@ func (x *StreamReady) GetStreamId() string {
 	return ""
 }
 
-type CommandRequest struct {
+type CommandStringList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	DeviceId      string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	Action        CommandAction          `protobuf:"varint,3,opt,name=action,proto3,enum=terminals.control.v1.CommandAction" json:"action,omitempty"`
-	Kind          CommandKind            `protobuf:"varint,4,opt,name=kind,proto3,enum=terminals.control.v1.CommandKind" json:"kind,omitempty"`
-	Text          string                 `protobuf:"bytes,5,opt,name=text,proto3" json:"text,omitempty"`                                                                                     // voice transcript
-	Intent        string                 `protobuf:"bytes,6,opt,name=intent,proto3" json:"intent,omitempty"`                                                                                 // intent name or system intent
-	Arguments     map[string]string      `protobuf:"bytes,7,rep,name=arguments,proto3" json:"arguments,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // optional trigger/system arguments (e.g. device_ids)
+	Values        []string               `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *CommandStringList) Reset() {
+	*x = CommandStringList{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandStringList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandStringList) ProtoMessage() {}
+
+func (x *CommandStringList) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandStringList.ProtoReflect.Descriptor instead.
+func (*CommandStringList) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *CommandStringList) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+type CommandTypedValue struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Kind:
+	//
+	//	*CommandTypedValue_StringValue
+	//	*CommandTypedValue_Int64Value
+	//	*CommandTypedValue_BoolValue
+	//	*CommandTypedValue_DoubleValue
+	//	*CommandTypedValue_StringListValue
+	Kind          isCommandTypedValue_Kind `protobuf_oneof:"kind"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommandTypedValue) Reset() {
+	*x = CommandTypedValue{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandTypedValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandTypedValue) ProtoMessage() {}
+
+func (x *CommandTypedValue) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandTypedValue.ProtoReflect.Descriptor instead.
+func (*CommandTypedValue) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *CommandTypedValue) GetKind() isCommandTypedValue_Kind {
+	if x != nil {
+		return x.Kind
+	}
+	return nil
+}
+
+func (x *CommandTypedValue) GetStringValue() string {
+	if x != nil {
+		if x, ok := x.Kind.(*CommandTypedValue_StringValue); ok {
+			return x.StringValue
+		}
+	}
+	return ""
+}
+
+func (x *CommandTypedValue) GetInt64Value() int64 {
+	if x != nil {
+		if x, ok := x.Kind.(*CommandTypedValue_Int64Value); ok {
+			return x.Int64Value
+		}
+	}
+	return 0
+}
+
+func (x *CommandTypedValue) GetBoolValue() bool {
+	if x != nil {
+		if x, ok := x.Kind.(*CommandTypedValue_BoolValue); ok {
+			return x.BoolValue
+		}
+	}
+	return false
+}
+
+func (x *CommandTypedValue) GetDoubleValue() float64 {
+	if x != nil {
+		if x, ok := x.Kind.(*CommandTypedValue_DoubleValue); ok {
+			return x.DoubleValue
+		}
+	}
+	return 0
+}
+
+func (x *CommandTypedValue) GetStringListValue() *CommandStringList {
+	if x != nil {
+		if x, ok := x.Kind.(*CommandTypedValue_StringListValue); ok {
+			return x.StringListValue
+		}
+	}
+	return nil
+}
+
+type isCommandTypedValue_Kind interface {
+	isCommandTypedValue_Kind()
+}
+
+type CommandTypedValue_StringValue struct {
+	StringValue string `protobuf:"bytes,1,opt,name=string_value,json=stringValue,proto3,oneof"`
+}
+
+type CommandTypedValue_Int64Value struct {
+	Int64Value int64 `protobuf:"varint,2,opt,name=int64_value,json=int64Value,proto3,oneof"`
+}
+
+type CommandTypedValue_BoolValue struct {
+	BoolValue bool `protobuf:"varint,3,opt,name=bool_value,json=boolValue,proto3,oneof"`
+}
+
+type CommandTypedValue_DoubleValue struct {
+	DoubleValue float64 `protobuf:"fixed64,4,opt,name=double_value,json=doubleValue,proto3,oneof"`
+}
+
+type CommandTypedValue_StringListValue struct {
+	StringListValue *CommandStringList `protobuf:"bytes,5,opt,name=string_list_value,json=stringListValue,proto3,oneof"`
+}
+
+func (*CommandTypedValue_StringValue) isCommandTypedValue_Kind() {}
+
+func (*CommandTypedValue_Int64Value) isCommandTypedValue_Kind() {}
+
+func (*CommandTypedValue_BoolValue) isCommandTypedValue_Kind() {}
+
+func (*CommandTypedValue_DoubleValue) isCommandTypedValue_Kind() {}
+
+func (*CommandTypedValue_StringListValue) isCommandTypedValue_Kind() {}
+
+type CommandArgumentEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         *CommandTypedValue     `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommandArgumentEntry) Reset() {
+	*x = CommandArgumentEntry{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandArgumentEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandArgumentEntry) ProtoMessage() {}
+
+func (x *CommandArgumentEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandArgumentEntry.ProtoReflect.Descriptor instead.
+func (*CommandArgumentEntry) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *CommandArgumentEntry) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *CommandArgumentEntry) GetValue() *CommandTypedValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+type CommandResultDataEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         *CommandTypedValue     `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommandResultDataEntry) Reset() {
+	*x = CommandResultDataEntry{}
+	mi := &file_terminals_control_v1_control_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandResultDataEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandResultDataEntry) ProtoMessage() {}
+
+func (x *CommandResultDataEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_terminals_control_v1_control_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandResultDataEntry.ProtoReflect.Descriptor instead.
+func (*CommandResultDataEntry) Descriptor() ([]byte, []int) {
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *CommandResultDataEntry) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *CommandResultDataEntry) GetValue() *CommandTypedValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+type CommandRequest struct {
+	state          protoimpl.MessageState  `protogen:"open.v1"`
+	RequestId      string                  `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	DeviceId       string                  `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	Action         CommandAction           `protobuf:"varint,3,opt,name=action,proto3,enum=terminals.control.v1.CommandAction" json:"action,omitempty"`
+	Kind           CommandKind             `protobuf:"varint,4,opt,name=kind,proto3,enum=terminals.control.v1.CommandKind" json:"kind,omitempty"`
+	Text           string                  `protobuf:"bytes,5,opt,name=text,proto3" json:"text,omitempty"`                                                                                     // voice transcript
+	Intent         string                  `protobuf:"bytes,6,opt,name=intent,proto3" json:"intent,omitempty"`                                                                                 // intent name or system intent
+	Arguments      map[string]string       `protobuf:"bytes,7,rep,name=arguments,proto3" json:"arguments,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // optional trigger/system arguments (e.g. device_ids)
+	TypedArguments []*CommandArgumentEntry `protobuf:"bytes,8,rep,name=typed_arguments,json=typedArguments,proto3" json:"typed_arguments,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
 func (x *CommandRequest) Reset() {
 	*x = CommandRequest{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[20]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2233,7 +2512,7 @@ func (x *CommandRequest) String() string {
 func (*CommandRequest) ProtoMessage() {}
 
 func (x *CommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[20]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2246,7 +2525,7 @@ func (x *CommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandRequest.ProtoReflect.Descriptor instead.
 func (*CommandRequest) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{20}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CommandRequest) GetRequestId() string {
@@ -2298,20 +2577,28 @@ func (x *CommandRequest) GetArguments() map[string]string {
 	return nil
 }
 
+func (x *CommandRequest) GetTypedArguments() []*CommandArgumentEntry {
+	if x != nil {
+		return x.TypedArguments
+	}
+	return nil
+}
+
 type CommandResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // echoes CommandRequest.request_id
-	ScenarioStart string                 `protobuf:"bytes,2,opt,name=scenario_start,json=scenarioStart,proto3" json:"scenario_start,omitempty"`
-	ScenarioStop  string                 `protobuf:"bytes,3,opt,name=scenario_stop,json=scenarioStop,proto3" json:"scenario_stop,omitempty"`
-	Notification  string                 `protobuf:"bytes,4,opt,name=notification,proto3" json:"notification,omitempty"`
-	Data          map[string]string      `protobuf:"bytes,5,rep,name=data,proto3" json:"data,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	RequestId     string                    `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // echoes CommandRequest.request_id
+	ScenarioStart string                    `protobuf:"bytes,2,opt,name=scenario_start,json=scenarioStart,proto3" json:"scenario_start,omitempty"`
+	ScenarioStop  string                    `protobuf:"bytes,3,opt,name=scenario_stop,json=scenarioStop,proto3" json:"scenario_stop,omitempty"`
+	Notification  string                    `protobuf:"bytes,4,opt,name=notification,proto3" json:"notification,omitempty"`
+	Data          map[string]string         `protobuf:"bytes,5,rep,name=data,proto3" json:"data,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	TypedData     []*CommandResultDataEntry `protobuf:"bytes,6,rep,name=typed_data,json=typedData,proto3" json:"typed_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[21]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2323,7 +2610,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[21]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2336,7 +2623,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{21}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *CommandResult) GetRequestId() string {
@@ -2374,6 +2661,13 @@ func (x *CommandResult) GetData() map[string]string {
 	return nil
 }
 
+func (x *CommandResult) GetTypedData() []*CommandResultDataEntry {
+	if x != nil {
+		return x.TypedData
+	}
+	return nil
+}
+
 type ControlError struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          ControlErrorCode       `protobuf:"varint,1,opt,name=code,proto3,enum=terminals.control.v1.ControlErrorCode" json:"code,omitempty"`
@@ -2384,7 +2678,7 @@ type ControlError struct {
 
 func (x *ControlError) Reset() {
 	*x = ControlError{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[22]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2396,7 +2690,7 @@ func (x *ControlError) String() string {
 func (*ControlError) ProtoMessage() {}
 
 func (x *ControlError) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[22]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2409,7 +2703,7 @@ func (x *ControlError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlError.ProtoReflect.Descriptor instead.
 func (*ControlError) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{22}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ControlError) GetCode() ControlErrorCode {
@@ -2438,7 +2732,7 @@ type WebRTCSignal struct {
 
 func (x *WebRTCSignal) Reset() {
 	*x = WebRTCSignal{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[23]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2450,7 +2744,7 @@ func (x *WebRTCSignal) String() string {
 func (*WebRTCSignal) ProtoMessage() {}
 
 func (x *WebRTCSignal) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[23]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2463,7 +2757,7 @@ func (x *WebRTCSignal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebRTCSignal.ProtoReflect.Descriptor instead.
 func (*WebRTCSignal) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{23}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *WebRTCSignal) GetStreamId() string {
@@ -2504,7 +2798,7 @@ type Heartbeat struct {
 
 func (x *Heartbeat) Reset() {
 	*x = Heartbeat{}
-	mi := &file_terminals_control_v1_control_proto_msgTypes[24]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2516,7 +2810,7 @@ func (x *Heartbeat) String() string {
 func (*Heartbeat) ProtoMessage() {}
 
 func (x *Heartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_terminals_control_v1_control_proto_msgTypes[24]
+	mi := &file_terminals_control_v1_control_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2529,7 +2823,7 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
-	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{24}
+	return file_terminals_control_v1_control_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *Heartbeat) GetDeviceId() string {
@@ -2697,7 +2991,24 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\x10CapabilityUpdate\x12Q\n" +
 	"\fcapabilities\x18\x01 \x01(\v2-.terminals.capabilities.v1.DeviceCapabilitiesR\fcapabilities\"*\n" +
 	"\vStreamReady\x12\x1b\n" +
-	"\tstream_id\x18\x01 \x01(\tR\bstreamId\"\xfd\x02\n" +
+	"\tstream_id\x18\x01 \x01(\tR\bstreamId\"+\n" +
+	"\x11CommandStringList\x12\x16\n" +
+	"\x06values\x18\x01 \x03(\tR\x06values\"\x80\x02\n" +
+	"\x11CommandTypedValue\x12#\n" +
+	"\fstring_value\x18\x01 \x01(\tH\x00R\vstringValue\x12!\n" +
+	"\vint64_value\x18\x02 \x01(\x03H\x00R\n" +
+	"int64Value\x12\x1f\n" +
+	"\n" +
+	"bool_value\x18\x03 \x01(\bH\x00R\tboolValue\x12#\n" +
+	"\fdouble_value\x18\x04 \x01(\x01H\x00R\vdoubleValue\x12U\n" +
+	"\x11string_list_value\x18\x05 \x01(\v2'.terminals.control.v1.CommandStringListH\x00R\x0fstringListValueB\x06\n" +
+	"\x04kind\"g\n" +
+	"\x14CommandArgumentEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12=\n" +
+	"\x05value\x18\x02 \x01(\v2'.terminals.control.v1.CommandTypedValueR\x05value\"i\n" +
+	"\x16CommandResultDataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12=\n" +
+	"\x05value\x18\x02 \x01(\v2'.terminals.control.v1.CommandTypedValueR\x05value\"\xd2\x03\n" +
 	"\x0eCommandRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
@@ -2706,17 +3017,20 @@ const file_terminals_control_v1_control_proto_rawDesc = "" +
 	"\x04kind\x18\x04 \x01(\x0e2!.terminals.control.v1.CommandKindR\x04kind\x12\x12\n" +
 	"\x04text\x18\x05 \x01(\tR\x04text\x12\x16\n" +
 	"\x06intent\x18\x06 \x01(\tR\x06intent\x12Q\n" +
-	"\targuments\x18\a \x03(\v23.terminals.control.v1.CommandRequest.ArgumentsEntryR\targuments\x1a<\n" +
+	"\targuments\x18\a \x03(\v23.terminals.control.v1.CommandRequest.ArgumentsEntryR\targuments\x12S\n" +
+	"\x0ftyped_arguments\x18\b \x03(\v2*.terminals.control.v1.CommandArgumentEntryR\x0etypedArguments\x1a<\n" +
 	"\x0eArgumentsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9a\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe7\x02\n" +
 	"\rCommandResult\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12%\n" +
 	"\x0escenario_start\x18\x02 \x01(\tR\rscenarioStart\x12#\n" +
 	"\rscenario_stop\x18\x03 \x01(\tR\fscenarioStop\x12\"\n" +
 	"\fnotification\x18\x04 \x01(\tR\fnotification\x12A\n" +
-	"\x04data\x18\x05 \x03(\v2-.terminals.control.v1.CommandResult.DataEntryR\x04data\x1a7\n" +
+	"\x04data\x18\x05 \x03(\v2-.terminals.control.v1.CommandResult.DataEntryR\x04data\x12K\n" +
+	"\n" +
+	"typed_data\x18\x06 \x03(\v2,.terminals.control.v1.CommandResultDataEntryR\ttypedData\x1a7\n" +
 	"\tDataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"d\n" +
@@ -2778,7 +3092,7 @@ func file_terminals_control_v1_control_proto_rawDescGZIP() []byte {
 }
 
 var file_terminals_control_v1_control_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_terminals_control_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_terminals_control_v1_control_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_terminals_control_v1_control_proto_goTypes = []any{
 	(CarrierKind)(0),               // 0: terminals.control.v1.CarrierKind
 	(CommandAction)(0),             // 1: terminals.control.v1.CommandAction
@@ -2805,45 +3119,49 @@ var file_terminals_control_v1_control_proto_goTypes = []any{
 	(*RegisterAck)(nil),            // 22: terminals.control.v1.RegisterAck
 	(*CapabilityUpdate)(nil),       // 23: terminals.control.v1.CapabilityUpdate
 	(*StreamReady)(nil),            // 24: terminals.control.v1.StreamReady
-	(*CommandRequest)(nil),         // 25: terminals.control.v1.CommandRequest
-	(*CommandResult)(nil),          // 26: terminals.control.v1.CommandResult
-	(*ControlError)(nil),           // 27: terminals.control.v1.ControlError
-	(*WebRTCSignal)(nil),           // 28: terminals.control.v1.WebRTCSignal
-	(*Heartbeat)(nil),              // 29: terminals.control.v1.Heartbeat
-	nil,                            // 30: terminals.control.v1.TransportHelloAck.LimitsEntry
-	nil,                            // 31: terminals.control.v1.RegisterAck.MetadataEntry
-	nil,                            // 32: terminals.control.v1.CommandRequest.ArgumentsEntry
-	nil,                            // 33: terminals.control.v1.CommandResult.DataEntry
-	(*v1.InputEvent)(nil),          // 34: terminals.io.v1.InputEvent
-	(*v1.SensorData)(nil),          // 35: terminals.io.v1.SensorData
-	(*v1.ObservationMessage)(nil),  // 36: terminals.io.v1.ObservationMessage
-	(*v1.ArtifactAvailable)(nil),   // 37: terminals.io.v1.ArtifactAvailable
-	(*v1.FlowStats)(nil),           // 38: terminals.io.v1.FlowStats
-	(*v1.ClockSample)(nil),         // 39: terminals.io.v1.ClockSample
-	(*v11.BugReport)(nil),          // 40: terminals.diagnostics.v1.BugReport
-	(*v12.SetUI)(nil),              // 41: terminals.ui.v1.SetUI
-	(*v1.StartStream)(nil),         // 42: terminals.io.v1.StartStream
-	(*v1.StopStream)(nil),          // 43: terminals.io.v1.StopStream
-	(*v1.PlayAudio)(nil),           // 44: terminals.io.v1.PlayAudio
-	(*v1.ShowMedia)(nil),           // 45: terminals.io.v1.ShowMedia
-	(*v1.RouteStream)(nil),         // 46: terminals.io.v1.RouteStream
-	(*v12.Notification)(nil),       // 47: terminals.ui.v1.Notification
-	(*v12.UpdateUI)(nil),           // 48: terminals.ui.v1.UpdateUI
-	(*v12.TransitionUI)(nil),       // 49: terminals.ui.v1.TransitionUI
-	(*v1.InstallBundle)(nil),       // 50: terminals.io.v1.InstallBundle
-	(*v1.RemoveBundle)(nil),        // 51: terminals.io.v1.RemoveBundle
-	(*v1.StartFlow)(nil),           // 52: terminals.io.v1.StartFlow
-	(*v1.PatchFlow)(nil),           // 53: terminals.io.v1.PatchFlow
-	(*v1.StopFlow)(nil),            // 54: terminals.io.v1.StopFlow
-	(*v1.RequestArtifact)(nil),     // 55: terminals.io.v1.RequestArtifact
-	(*v11.BugReportAck)(nil),       // 56: terminals.diagnostics.v1.BugReportAck
-	(*v13.DeviceIdentity)(nil),     // 57: terminals.capabilities.v1.DeviceIdentity
-	(*v13.DeviceCapabilities)(nil), // 58: terminals.capabilities.v1.DeviceCapabilities
+	(*CommandStringList)(nil),      // 25: terminals.control.v1.CommandStringList
+	(*CommandTypedValue)(nil),      // 26: terminals.control.v1.CommandTypedValue
+	(*CommandArgumentEntry)(nil),   // 27: terminals.control.v1.CommandArgumentEntry
+	(*CommandResultDataEntry)(nil), // 28: terminals.control.v1.CommandResultDataEntry
+	(*CommandRequest)(nil),         // 29: terminals.control.v1.CommandRequest
+	(*CommandResult)(nil),          // 30: terminals.control.v1.CommandResult
+	(*ControlError)(nil),           // 31: terminals.control.v1.ControlError
+	(*WebRTCSignal)(nil),           // 32: terminals.control.v1.WebRTCSignal
+	(*Heartbeat)(nil),              // 33: terminals.control.v1.Heartbeat
+	nil,                            // 34: terminals.control.v1.TransportHelloAck.LimitsEntry
+	nil,                            // 35: terminals.control.v1.RegisterAck.MetadataEntry
+	nil,                            // 36: terminals.control.v1.CommandRequest.ArgumentsEntry
+	nil,                            // 37: terminals.control.v1.CommandResult.DataEntry
+	(*v1.InputEvent)(nil),          // 38: terminals.io.v1.InputEvent
+	(*v1.SensorData)(nil),          // 39: terminals.io.v1.SensorData
+	(*v1.ObservationMessage)(nil),  // 40: terminals.io.v1.ObservationMessage
+	(*v1.ArtifactAvailable)(nil),   // 41: terminals.io.v1.ArtifactAvailable
+	(*v1.FlowStats)(nil),           // 42: terminals.io.v1.FlowStats
+	(*v1.ClockSample)(nil),         // 43: terminals.io.v1.ClockSample
+	(*v11.BugReport)(nil),          // 44: terminals.diagnostics.v1.BugReport
+	(*v12.SetUI)(nil),              // 45: terminals.ui.v1.SetUI
+	(*v1.StartStream)(nil),         // 46: terminals.io.v1.StartStream
+	(*v1.StopStream)(nil),          // 47: terminals.io.v1.StopStream
+	(*v1.PlayAudio)(nil),           // 48: terminals.io.v1.PlayAudio
+	(*v1.ShowMedia)(nil),           // 49: terminals.io.v1.ShowMedia
+	(*v1.RouteStream)(nil),         // 50: terminals.io.v1.RouteStream
+	(*v12.Notification)(nil),       // 51: terminals.ui.v1.Notification
+	(*v12.UpdateUI)(nil),           // 52: terminals.ui.v1.UpdateUI
+	(*v12.TransitionUI)(nil),       // 53: terminals.ui.v1.TransitionUI
+	(*v1.InstallBundle)(nil),       // 54: terminals.io.v1.InstallBundle
+	(*v1.RemoveBundle)(nil),        // 55: terminals.io.v1.RemoveBundle
+	(*v1.StartFlow)(nil),           // 56: terminals.io.v1.StartFlow
+	(*v1.PatchFlow)(nil),           // 57: terminals.io.v1.PatchFlow
+	(*v1.StopFlow)(nil),            // 58: terminals.io.v1.StopFlow
+	(*v1.RequestArtifact)(nil),     // 59: terminals.io.v1.RequestArtifact
+	(*v11.BugReportAck)(nil),       // 60: terminals.diagnostics.v1.BugReportAck
+	(*v13.DeviceIdentity)(nil),     // 61: terminals.capabilities.v1.DeviceIdentity
+	(*v13.DeviceCapabilities)(nil), // 62: terminals.capabilities.v1.DeviceCapabilities
 }
 var file_terminals_control_v1_control_proto_depIdxs = []int32{
 	0,  // 0: terminals.control.v1.TransportHello.supported_carriers:type_name -> terminals.control.v1.CarrierKind
 	0,  // 1: terminals.control.v1.TransportHelloAck.negotiated_carrier:type_name -> terminals.control.v1.CarrierKind
-	30, // 2: terminals.control.v1.TransportHelloAck.limits:type_name -> terminals.control.v1.TransportHelloAck.LimitsEntry
+	34, // 2: terminals.control.v1.TransportHelloAck.limits:type_name -> terminals.control.v1.TransportHelloAck.LimitsEntry
 	10, // 3: terminals.control.v1.WireEnvelope.client_message:type_name -> terminals.control.v1.ConnectRequest
 	12, // 4: terminals.control.v1.WireEnvelope.server_message:type_name -> terminals.control.v1.ConnectResponse
 	5,  // 5: terminals.control.v1.WireEnvelope.transport_hello:type_name -> terminals.control.v1.TransportHello
@@ -2855,63 +3173,68 @@ var file_terminals_control_v1_control_proto_depIdxs = []int32{
 	16, // 11: terminals.control.v1.ConnectRequest.capability_delta:type_name -> terminals.control.v1.CapabilityDelta
 	19, // 12: terminals.control.v1.ConnectRequest.register:type_name -> terminals.control.v1.RegisterDevice
 	23, // 13: terminals.control.v1.ConnectRequest.capability:type_name -> terminals.control.v1.CapabilityUpdate
-	34, // 14: terminals.control.v1.ConnectRequest.input:type_name -> terminals.io.v1.InputEvent
-	35, // 15: terminals.control.v1.ConnectRequest.sensor:type_name -> terminals.io.v1.SensorData
+	38, // 14: terminals.control.v1.ConnectRequest.input:type_name -> terminals.io.v1.InputEvent
+	39, // 15: terminals.control.v1.ConnectRequest.sensor:type_name -> terminals.io.v1.SensorData
 	24, // 16: terminals.control.v1.ConnectRequest.stream_ready:type_name -> terminals.control.v1.StreamReady
-	25, // 17: terminals.control.v1.ConnectRequest.command:type_name -> terminals.control.v1.CommandRequest
-	29, // 18: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	28, // 19: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	29, // 17: terminals.control.v1.ConnectRequest.command:type_name -> terminals.control.v1.CommandRequest
+	33, // 18: terminals.control.v1.ConnectRequest.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	32, // 19: terminals.control.v1.ConnectRequest.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
 	11, // 20: terminals.control.v1.ConnectRequest.voice_audio:type_name -> terminals.control.v1.VoiceAudio
-	36, // 21: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
-	37, // 22: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
-	38, // 23: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
-	39, // 24: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
-	40, // 25: terminals.control.v1.ConnectRequest.bug_report:type_name -> terminals.diagnostics.v1.BugReport
+	40, // 21: terminals.control.v1.ConnectRequest.observation_message:type_name -> terminals.io.v1.ObservationMessage
+	41, // 22: terminals.control.v1.ConnectRequest.artifact_available:type_name -> terminals.io.v1.ArtifactAvailable
+	42, // 23: terminals.control.v1.ConnectRequest.flow_stats:type_name -> terminals.io.v1.FlowStats
+	43, // 24: terminals.control.v1.ConnectRequest.clock_sample:type_name -> terminals.io.v1.ClockSample
+	44, // 25: terminals.control.v1.ConnectRequest.bug_report:type_name -> terminals.diagnostics.v1.BugReport
 	14, // 26: terminals.control.v1.ConnectResponse.hello_ack:type_name -> terminals.control.v1.HelloAck
 	17, // 27: terminals.control.v1.ConnectResponse.capability_ack:type_name -> terminals.control.v1.CapabilityAck
 	22, // 28: terminals.control.v1.ConnectResponse.register_ack:type_name -> terminals.control.v1.RegisterAck
-	41, // 29: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
-	42, // 30: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
-	43, // 31: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
-	44, // 32: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
-	45, // 33: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
-	46, // 34: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
-	47, // 35: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
-	28, // 36: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
-	26, // 37: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
-	29, // 38: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
-	27, // 39: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
-	48, // 40: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
-	49, // 41: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
-	50, // 42: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
-	51, // 43: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
-	52, // 44: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
-	53, // 45: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
-	54, // 46: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
-	55, // 47: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
-	56, // 48: terminals.control.v1.ConnectResponse.bug_report_ack:type_name -> terminals.diagnostics.v1.BugReportAck
-	57, // 49: terminals.control.v1.Hello.identity:type_name -> terminals.capabilities.v1.DeviceIdentity
-	58, // 50: terminals.control.v1.CapabilitySnapshot.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	58, // 51: terminals.control.v1.CapabilityDelta.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	45, // 29: terminals.control.v1.ConnectResponse.set_ui:type_name -> terminals.ui.v1.SetUI
+	46, // 30: terminals.control.v1.ConnectResponse.start_stream:type_name -> terminals.io.v1.StartStream
+	47, // 31: terminals.control.v1.ConnectResponse.stop_stream:type_name -> terminals.io.v1.StopStream
+	48, // 32: terminals.control.v1.ConnectResponse.play_audio:type_name -> terminals.io.v1.PlayAudio
+	49, // 33: terminals.control.v1.ConnectResponse.show_media:type_name -> terminals.io.v1.ShowMedia
+	50, // 34: terminals.control.v1.ConnectResponse.route_stream:type_name -> terminals.io.v1.RouteStream
+	51, // 35: terminals.control.v1.ConnectResponse.notification:type_name -> terminals.ui.v1.Notification
+	32, // 36: terminals.control.v1.ConnectResponse.webrtc_signal:type_name -> terminals.control.v1.WebRTCSignal
+	30, // 37: terminals.control.v1.ConnectResponse.command_result:type_name -> terminals.control.v1.CommandResult
+	33, // 38: terminals.control.v1.ConnectResponse.heartbeat:type_name -> terminals.control.v1.Heartbeat
+	31, // 39: terminals.control.v1.ConnectResponse.error:type_name -> terminals.control.v1.ControlError
+	52, // 40: terminals.control.v1.ConnectResponse.update_ui:type_name -> terminals.ui.v1.UpdateUI
+	53, // 41: terminals.control.v1.ConnectResponse.transition_ui:type_name -> terminals.ui.v1.TransitionUI
+	54, // 42: terminals.control.v1.ConnectResponse.install_bundle:type_name -> terminals.io.v1.InstallBundle
+	55, // 43: terminals.control.v1.ConnectResponse.remove_bundle:type_name -> terminals.io.v1.RemoveBundle
+	56, // 44: terminals.control.v1.ConnectResponse.start_flow:type_name -> terminals.io.v1.StartFlow
+	57, // 45: terminals.control.v1.ConnectResponse.patch_flow:type_name -> terminals.io.v1.PatchFlow
+	58, // 46: terminals.control.v1.ConnectResponse.stop_flow:type_name -> terminals.io.v1.StopFlow
+	59, // 47: terminals.control.v1.ConnectResponse.request_artifact:type_name -> terminals.io.v1.RequestArtifact
+	60, // 48: terminals.control.v1.ConnectResponse.bug_report_ack:type_name -> terminals.diagnostics.v1.BugReportAck
+	61, // 49: terminals.control.v1.Hello.identity:type_name -> terminals.capabilities.v1.DeviceIdentity
+	62, // 50: terminals.control.v1.CapabilitySnapshot.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	62, // 51: terminals.control.v1.CapabilityDelta.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
 	18, // 52: terminals.control.v1.CapabilityAck.invalidations:type_name -> terminals.control.v1.ResourceInvalidation
-	58, // 53: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	62, // 53: terminals.control.v1.RegisterDevice.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
 	20, // 54: terminals.control.v1.ServerMetadata.build:type_name -> terminals.control.v1.BuildMetadata
-	31, // 55: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
+	35, // 55: terminals.control.v1.RegisterAck.metadata:type_name -> terminals.control.v1.RegisterAck.MetadataEntry
 	21, // 56: terminals.control.v1.RegisterAck.server_metadata:type_name -> terminals.control.v1.ServerMetadata
-	58, // 57: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
-	1,  // 58: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
-	2,  // 59: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
-	32, // 60: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
-	33, // 61: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
-	3,  // 62: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
-	4,  // 63: terminals.control.v1.WebRTCSignal.signal_type_enum:type_name -> terminals.control.v1.WebRTCSignalType
-	10, // 64: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
-	12, // 65: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
-	65, // [65:66] is the sub-list for method output_type
-	64, // [64:65] is the sub-list for method input_type
-	64, // [64:64] is the sub-list for extension type_name
-	64, // [64:64] is the sub-list for extension extendee
-	0,  // [0:64] is the sub-list for field type_name
+	62, // 57: terminals.control.v1.CapabilityUpdate.capabilities:type_name -> terminals.capabilities.v1.DeviceCapabilities
+	25, // 58: terminals.control.v1.CommandTypedValue.string_list_value:type_name -> terminals.control.v1.CommandStringList
+	26, // 59: terminals.control.v1.CommandArgumentEntry.value:type_name -> terminals.control.v1.CommandTypedValue
+	26, // 60: terminals.control.v1.CommandResultDataEntry.value:type_name -> terminals.control.v1.CommandTypedValue
+	1,  // 61: terminals.control.v1.CommandRequest.action:type_name -> terminals.control.v1.CommandAction
+	2,  // 62: terminals.control.v1.CommandRequest.kind:type_name -> terminals.control.v1.CommandKind
+	36, // 63: terminals.control.v1.CommandRequest.arguments:type_name -> terminals.control.v1.CommandRequest.ArgumentsEntry
+	27, // 64: terminals.control.v1.CommandRequest.typed_arguments:type_name -> terminals.control.v1.CommandArgumentEntry
+	37, // 65: terminals.control.v1.CommandResult.data:type_name -> terminals.control.v1.CommandResult.DataEntry
+	28, // 66: terminals.control.v1.CommandResult.typed_data:type_name -> terminals.control.v1.CommandResultDataEntry
+	3,  // 67: terminals.control.v1.ControlError.code:type_name -> terminals.control.v1.ControlErrorCode
+	4,  // 68: terminals.control.v1.WebRTCSignal.signal_type_enum:type_name -> terminals.control.v1.WebRTCSignalType
+	10, // 69: terminals.control.v1.TerminalControlService.Connect:input_type -> terminals.control.v1.ConnectRequest
+	12, // 70: terminals.control.v1.TerminalControlService.Connect:output_type -> terminals.control.v1.ConnectResponse
+	70, // [70:71] is the sub-list for method output_type
+	69, // [69:70] is the sub-list for method input_type
+	69, // [69:69] is the sub-list for extension type_name
+	69, // [69:69] is the sub-list for extension extendee
+	0,  // [0:69] is the sub-list for field type_name
 }
 
 func init() { file_terminals_control_v1_control_proto_init() }
@@ -2971,13 +3294,20 @@ func file_terminals_control_v1_control_proto_init() {
 		(*ConnectResponse_RequestArtifact)(nil),
 		(*ConnectResponse_BugReportAck)(nil),
 	}
+	file_terminals_control_v1_control_proto_msgTypes[21].OneofWrappers = []any{
+		(*CommandTypedValue_StringValue)(nil),
+		(*CommandTypedValue_Int64Value)(nil),
+		(*CommandTypedValue_BoolValue)(nil),
+		(*CommandTypedValue_DoubleValue)(nil),
+		(*CommandTypedValue_StringListValue)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_terminals_control_v1_control_proto_rawDesc), len(file_terminals_control_v1_control_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   29,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

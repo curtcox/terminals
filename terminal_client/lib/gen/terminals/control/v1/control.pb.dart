@@ -2464,6 +2464,335 @@ class StreamReady extends $pb.GeneratedMessage {
   void clearStreamId() => $_clearField(1);
 }
 
+class CommandStringList extends $pb.GeneratedMessage {
+  factory CommandStringList({
+    $core.Iterable<$core.String>? values,
+  }) {
+    final result = create();
+    if (values != null) result.values.addAll(values);
+    return result;
+  }
+
+  CommandStringList._();
+
+  factory CommandStringList.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CommandStringList.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CommandStringList',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..pPS(1, _omitFieldNames ? '' : 'values')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommandStringList clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommandStringList copyWith(void Function(CommandStringList) updates) =>
+      super.copyWith((message) => updates(message as CommandStringList))
+          as CommandStringList;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CommandStringList create() => CommandStringList._();
+  @$core.override
+  CommandStringList createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CommandStringList getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CommandStringList>(create);
+  static CommandStringList? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get values => $_getList(0);
+}
+
+enum CommandTypedValue_Kind {
+  stringValue,
+  int64Value,
+  boolValue,
+  doubleValue,
+  stringListValue,
+  notSet
+}
+
+class CommandTypedValue extends $pb.GeneratedMessage {
+  factory CommandTypedValue({
+    $core.String? stringValue,
+    $fixnum.Int64? int64Value,
+    $core.bool? boolValue,
+    $core.double? doubleValue,
+    CommandStringList? stringListValue,
+  }) {
+    final result = create();
+    if (stringValue != null) result.stringValue = stringValue;
+    if (int64Value != null) result.int64Value = int64Value;
+    if (boolValue != null) result.boolValue = boolValue;
+    if (doubleValue != null) result.doubleValue = doubleValue;
+    if (stringListValue != null) result.stringListValue = stringListValue;
+    return result;
+  }
+
+  CommandTypedValue._();
+
+  factory CommandTypedValue.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CommandTypedValue.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, CommandTypedValue_Kind>
+      _CommandTypedValue_KindByTag = {
+    1: CommandTypedValue_Kind.stringValue,
+    2: CommandTypedValue_Kind.int64Value,
+    3: CommandTypedValue_Kind.boolValue,
+    4: CommandTypedValue_Kind.doubleValue,
+    5: CommandTypedValue_Kind.stringListValue,
+    0: CommandTypedValue_Kind.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CommandTypedValue',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [1, 2, 3, 4, 5])
+    ..aOS(1, _omitFieldNames ? '' : 'stringValue')
+    ..aInt64(2, _omitFieldNames ? '' : 'int64Value')
+    ..aOB(3, _omitFieldNames ? '' : 'boolValue')
+    ..aD(4, _omitFieldNames ? '' : 'doubleValue')
+    ..aOM<CommandStringList>(5, _omitFieldNames ? '' : 'stringListValue',
+        subBuilder: CommandStringList.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommandTypedValue clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommandTypedValue copyWith(void Function(CommandTypedValue) updates) =>
+      super.copyWith((message) => updates(message as CommandTypedValue))
+          as CommandTypedValue;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CommandTypedValue create() => CommandTypedValue._();
+  @$core.override
+  CommandTypedValue createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CommandTypedValue getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CommandTypedValue>(create);
+  static CommandTypedValue? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  CommandTypedValue_Kind whichKind() =>
+      _CommandTypedValue_KindByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  void clearKind() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.String get stringValue => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set stringValue($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStringValue() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStringValue() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get int64Value => $_getI64(1);
+  @$pb.TagNumber(2)
+  set int64Value($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasInt64Value() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearInt64Value() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get boolValue => $_getBF(2);
+  @$pb.TagNumber(3)
+  set boolValue($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBoolValue() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBoolValue() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get doubleValue => $_getN(3);
+  @$pb.TagNumber(4)
+  set doubleValue($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDoubleValue() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDoubleValue() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  CommandStringList get stringListValue => $_getN(4);
+  @$pb.TagNumber(5)
+  set stringListValue(CommandStringList value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStringListValue() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStringListValue() => $_clearField(5);
+  @$pb.TagNumber(5)
+  CommandStringList ensureStringListValue() => $_ensure(4);
+}
+
+class CommandArgumentEntry extends $pb.GeneratedMessage {
+  factory CommandArgumentEntry({
+    $core.String? key,
+    CommandTypedValue? value,
+  }) {
+    final result = create();
+    if (key != null) result.key = key;
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  CommandArgumentEntry._();
+
+  factory CommandArgumentEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CommandArgumentEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CommandArgumentEntry',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'key')
+    ..aOM<CommandTypedValue>(2, _omitFieldNames ? '' : 'value',
+        subBuilder: CommandTypedValue.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommandArgumentEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommandArgumentEntry copyWith(void Function(CommandArgumentEntry) updates) =>
+      super.copyWith((message) => updates(message as CommandArgumentEntry))
+          as CommandArgumentEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CommandArgumentEntry create() => CommandArgumentEntry._();
+  @$core.override
+  CommandArgumentEntry createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CommandArgumentEntry getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CommandArgumentEntry>(create);
+  static CommandArgumentEntry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get key => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set key($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  CommandTypedValue get value => $_getN(1);
+  @$pb.TagNumber(2)
+  set value(CommandTypedValue value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearValue() => $_clearField(2);
+  @$pb.TagNumber(2)
+  CommandTypedValue ensureValue() => $_ensure(1);
+}
+
+class CommandResultDataEntry extends $pb.GeneratedMessage {
+  factory CommandResultDataEntry({
+    $core.String? key,
+    CommandTypedValue? value,
+  }) {
+    final result = create();
+    if (key != null) result.key = key;
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  CommandResultDataEntry._();
+
+  factory CommandResultDataEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CommandResultDataEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CommandResultDataEntry',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'terminals.control.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'key')
+    ..aOM<CommandTypedValue>(2, _omitFieldNames ? '' : 'value',
+        subBuilder: CommandTypedValue.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommandResultDataEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommandResultDataEntry copyWith(
+          void Function(CommandResultDataEntry) updates) =>
+      super.copyWith((message) => updates(message as CommandResultDataEntry))
+          as CommandResultDataEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CommandResultDataEntry create() => CommandResultDataEntry._();
+  @$core.override
+  CommandResultDataEntry createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CommandResultDataEntry getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CommandResultDataEntry>(create);
+  static CommandResultDataEntry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get key => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set key($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  CommandTypedValue get value => $_getN(1);
+  @$pb.TagNumber(2)
+  set value(CommandTypedValue value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearValue() => $_clearField(2);
+  @$pb.TagNumber(2)
+  CommandTypedValue ensureValue() => $_ensure(1);
+}
+
 class CommandRequest extends $pb.GeneratedMessage {
   factory CommandRequest({
     $core.String? requestId,
@@ -2473,6 +2802,7 @@ class CommandRequest extends $pb.GeneratedMessage {
     $core.String? text,
     $core.String? intent,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? arguments,
+    $core.Iterable<CommandArgumentEntry>? typedArguments,
   }) {
     final result = create();
     if (requestId != null) result.requestId = requestId;
@@ -2482,6 +2812,7 @@ class CommandRequest extends $pb.GeneratedMessage {
     if (text != null) result.text = text;
     if (intent != null) result.intent = intent;
     if (arguments != null) result.arguments.addEntries(arguments);
+    if (typedArguments != null) result.typedArguments.addAll(typedArguments);
     return result;
   }
 
@@ -2512,6 +2843,8 @@ class CommandRequest extends $pb.GeneratedMessage {
         keyFieldType: $pb.PbFieldType.OS,
         valueFieldType: $pb.PbFieldType.OS,
         packageName: const $pb.PackageName('terminals.control.v1'))
+    ..pPM<CommandArgumentEntry>(8, _omitFieldNames ? '' : 'typedArguments',
+        subBuilder: CommandArgumentEntry.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2589,6 +2922,9 @@ class CommandRequest extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(7)
   $pb.PbMap<$core.String, $core.String> get arguments => $_getMap(6);
+
+  @$pb.TagNumber(8)
+  $pb.PbList<CommandArgumentEntry> get typedArguments => $_getList(7);
 }
 
 class CommandResult extends $pb.GeneratedMessage {
@@ -2598,6 +2934,7 @@ class CommandResult extends $pb.GeneratedMessage {
     $core.String? scenarioStop,
     $core.String? notification,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? data,
+    $core.Iterable<CommandResultDataEntry>? typedData,
   }) {
     final result = create();
     if (requestId != null) result.requestId = requestId;
@@ -2605,6 +2942,7 @@ class CommandResult extends $pb.GeneratedMessage {
     if (scenarioStop != null) result.scenarioStop = scenarioStop;
     if (notification != null) result.notification = notification;
     if (data != null) result.data.addEntries(data);
+    if (typedData != null) result.typedData.addAll(typedData);
     return result;
   }
 
@@ -2631,6 +2969,8 @@ class CommandResult extends $pb.GeneratedMessage {
         keyFieldType: $pb.PbFieldType.OS,
         valueFieldType: $pb.PbFieldType.OS,
         packageName: const $pb.PackageName('terminals.control.v1'))
+    ..pPM<CommandResultDataEntry>(6, _omitFieldNames ? '' : 'typedData',
+        subBuilder: CommandResultDataEntry.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2690,6 +3030,9 @@ class CommandResult extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(5)
   $pb.PbMap<$core.String, $core.String> get data => $_getMap(4);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<CommandResultDataEntry> get typedData => $_getList(5);
 }
 
 class ControlError extends $pb.GeneratedMessage {

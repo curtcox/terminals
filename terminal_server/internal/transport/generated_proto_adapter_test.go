@@ -593,8 +593,25 @@ func TestGeneratedProtoAdapterToInternalCommandArguments(t *testing.T) {
 				DeviceId:  "device-1",
 				Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
 				Intent:    "photo frame",
+				TypedArguments: []*controlv1.CommandArgumentEntry{
+					{
+						Key: "device_ids",
+						Value: &controlv1.CommandTypedValue{
+							Kind: &controlv1.CommandTypedValue_StringListValue{
+								StringListValue: &controlv1.CommandStringList{Values: []string{"device-1", "device-2"}},
+							},
+						},
+					},
+					{
+						Key: "priority",
+						Value: &controlv1.CommandTypedValue{
+							Kind: &controlv1.CommandTypedValue_Int64Value{Int64Value: 3},
+						},
+					},
+				},
 				Arguments: map[string]string{
-					"device_ids": "device-1,device-2",
+					"device_ids":  "legacy-device",
+					"artifact_id": "artifact-1",
 				},
 			},
 		},
@@ -607,6 +624,12 @@ func TestGeneratedProtoAdapterToInternalCommandArguments(t *testing.T) {
 	}
 	if got := msg.Command.Arguments["device_ids"]; got != "device-1,device-2" {
 		t.Fatalf("device_ids argument = %q, want device-1,device-2", got)
+	}
+	if got := msg.Command.Arguments["priority"]; got != "3" {
+		t.Fatalf("priority argument = %q, want 3", got)
+	}
+	if got := msg.Command.Arguments["artifact_id"]; got != "artifact-1" {
+		t.Fatalf("artifact_id argument = %q, want artifact-1", got)
 	}
 }
 
@@ -968,6 +991,20 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	}
 	if result.GetData()["a"] != "1" || result.GetData()["b"] != "2" {
 		t.Fatalf("unexpected data map: %+v", result.GetData())
+	}
+	typed := result.GetTypedData()
+	if len(typed) != 2 {
+		t.Fatalf("typed_data len = %d, want 2", len(typed))
+	}
+	typedByKey := map[string]*controlv1.CommandTypedValue{}
+	for _, entry := range typed {
+		typedByKey[entry.GetKey()] = entry.GetValue()
+	}
+	if got := typedByKey["a"].GetInt64Value(); got != 1 {
+		t.Fatalf("typed_data[a].int64_value = %d, want 1", got)
+	}
+	if got := typedByKey["b"].GetInt64Value(); got != 2 {
+		t.Fatalf("typed_data[b].int64_value = %d, want 2", got)
 	}
 
 	envelope, err = adapter.FromInternal(ServerMessage{

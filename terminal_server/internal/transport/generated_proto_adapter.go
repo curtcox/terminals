@@ -122,7 +122,7 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 				Kind:      internalKindFromProto(command.GetKind()),
 				Text:      command.GetText(),
 				Intent:    command.GetIntent(),
-				Arguments: command.GetArguments(),
+				Arguments: commandArgumentsToInternalMap(command.GetTypedArguments(), command.GetArguments()),
 			},
 		}, nil
 	case *controlv1.ConnectRequest_Sensor:
@@ -397,6 +397,7 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 					ScenarioStop:  msg.ScenarioStop,
 					Notification:  msg.Notification,
 					Data:          msg.Data,
+					TypedData:     commandResultDataEntriesFromMap(msg.Data),
 				},
 			},
 		}
@@ -463,6 +464,114 @@ func internalKindFromProto(kind controlv1.CommandKind) string {
 	default:
 		return ""
 	}
+}
+
+func commandArgumentsToInternalMap(
+	typed []*controlv1.CommandArgumentEntry,
+	legacy map[string]string,
+) map[string]string {
+	resolved := copyStringMap(legacy)
+	for _, entry := range typed {
+		if entry == nil {
+			continue
+		}
+		key := strings.TrimSpace(entry.GetKey())
+		if key == "" {
+			continue
+		}
+		value, ok := commandTypedValueToString(entry.GetValue())
+		if !ok {
+			continue
+		}
+		resolved[key] = value
+	}
+	return resolved
+}
+
+func commandTypedValueToString(value *controlv1.CommandTypedValue) (string, bool) {
+	if value == nil {
+		return "", false
+	}
+	switch kind := value.GetKind().(type) {
+	case *controlv1.CommandTypedValue_StringValue:
+		return kind.StringValue, true
+	case *controlv1.CommandTypedValue_Int64Value:
+		return strconv.FormatInt(kind.Int64Value, 10), true
+	case *controlv1.CommandTypedValue_BoolValue:
+		return strconv.FormatBool(kind.BoolValue), true
+	case *controlv1.CommandTypedValue_DoubleValue:
+		return strconv.FormatFloat(kind.DoubleValue, 'f', -1, 64), true
+	case *controlv1.CommandTypedValue_StringListValue:
+		if kind.StringListValue == nil {
+			return "", true
+		}
+		return strings.Join(kind.StringListValue.GetValues(), ","), true
+	default:
+		return "", false
+	}
+}
+
+func commandResultDataEntriesFromMap(data map[string]string) []*controlv1.CommandResultDataEntry {
+	if len(data) == 0 {
+		return nil
+	}
+	out := make([]*controlv1.CommandResultDataEntry, 0, len(data))
+	for key, raw := range data {
+		entry := &controlv1.CommandResultDataEntry{Key: key}
+		entry.Value = commandTypedValueFromLegacyString(key, raw)
+		out = append(out, entry)
+	}
+	return out
+}
+
+func commandTypedValueFromLegacyString(key, raw string) *controlv1.CommandTypedValue {
+	trimmed := strings.TrimSpace(raw)
+	if shouldUseStringListValue(key, trimmed) {
+		parts := strings.Split(trimmed, ",")
+		values := make([]string, 0, len(parts))
+		for _, part := range parts {
+			item := strings.TrimSpace(part)
+			if item != "" {
+				values = append(values, item)
+			}
+		}
+		if len(values) > 0 {
+			return &controlv1.CommandTypedValue{
+				Kind: &controlv1.CommandTypedValue_StringListValue{
+					StringListValue: &controlv1.CommandStringList{Values: values},
+				},
+			}
+		}
+	}
+	if parsed, err := strconv.ParseBool(trimmed); err == nil {
+		return &controlv1.CommandTypedValue{
+			Kind: &controlv1.CommandTypedValue_BoolValue{BoolValue: parsed},
+		}
+	}
+	if parsed, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+		return &controlv1.CommandTypedValue{
+			Kind: &controlv1.CommandTypedValue_Int64Value{Int64Value: parsed},
+		}
+	}
+	if parsed, err := strconv.ParseFloat(trimmed, 64); err == nil && strings.Contains(trimmed, ".") {
+		return &controlv1.CommandTypedValue{
+			Kind: &controlv1.CommandTypedValue_DoubleValue{DoubleValue: parsed},
+		}
+	}
+	return &controlv1.CommandTypedValue{
+		Kind: &controlv1.CommandTypedValue_StringValue{StringValue: raw},
+	}
+}
+
+func shouldUseStringListValue(key, value string) bool {
+	if value == "" || strings.Contains(value, "|") || !strings.Contains(value, ",") {
+		return false
+	}
+	normalizedKey := strings.TrimSpace(strings.ToLower(key))
+	return normalizedKey == "device_ids" ||
+		normalizedKey == "system_intents" ||
+		normalizedKey == "command_kinds" ||
+		normalizedKey == "command_actions"
 }
 
 func internalWebRTCSignalTypeFromProto(legacy string, signalType controlv1.WebRTCSignalType) string {

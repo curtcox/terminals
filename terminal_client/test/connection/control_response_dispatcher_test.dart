@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fixnum/fixnum.dart';
 import 'package:terminal_client/connection/control_response_dispatcher.dart';
 import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
 import 'package:terminal_client/gen/terminals/diagnostics/v1/diagnostics.pb.dart'
@@ -42,6 +43,39 @@ void main() {
         ),
         'Server error',
       );
+    });
+
+    test('prefers typed command result data over legacy map', () {
+      final response = ConnectResponse()
+        ..commandResult = (CommandResult()
+          ..requestId = 'runtime-typed'
+          ..typedData.addAll(<CommandResultDataEntry>[
+            CommandResultDataEntry()
+              ..key = 'processed'
+              ..value = (CommandTypedValue()..int64Value = Int64(3)),
+            CommandResultDataEntry()
+              ..key = 'ok'
+              ..value = (CommandTypedValue()..boolValue = true),
+            CommandResultDataEntry()
+              ..key = 'kinds'
+              ..value = (CommandTypedValue()
+                ..stringListValue = (CommandStringList()
+                  ..values.addAll(<String>['voice', 'manual']))),
+          ])
+          ..data['processed'] = 'legacy');
+
+      final update = commandDiagnosticsFromResponse(
+        response: response,
+        pendingRequestIDs: const CommandDiagnosticsRequestIDs(
+          runtimeStatus: 'runtime-typed',
+        ),
+      );
+
+      expect(update, isNotNull);
+      expect(update!.title, 'runtime_status');
+      expect(update.data['processed'], '3');
+      expect(update.data['ok'], 'true');
+      expect(update.data['kinds'], 'voice,manual');
     });
 
     test('keeps first-match precedence for compound responses', () {

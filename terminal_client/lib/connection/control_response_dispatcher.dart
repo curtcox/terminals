@@ -398,7 +398,8 @@ CommandDiagnosticsUpdate? commandDiagnosticsFromResponse({
     return null;
   }
   final result = response.commandResult;
-  if (result.data.isEmpty) {
+  final resolvedData = commandResultDataMap(result);
+  if (resolvedData.isEmpty) {
     return null;
   }
 
@@ -411,8 +412,44 @@ CommandDiagnosticsUpdate? commandDiagnosticsFromResponse({
   }
   return CommandDiagnosticsUpdate(
     title: title,
-    data: Map<String, String>.from(result.data),
+    data: resolvedData,
   );
+}
+
+Map<String, String> commandResultDataMap(CommandResult result) {
+  final typed = <String, String>{};
+  for (final entry in result.typedData) {
+    final key = entry.key.trim();
+    if (key.isEmpty || !entry.hasValue()) {
+      continue;
+    }
+    final value = commandTypedValueToString(entry.value);
+    if (value == null) {
+      continue;
+    }
+    typed[key] = value;
+  }
+  if (typed.isNotEmpty) {
+    return typed;
+  }
+  return Map<String, String>.from(result.data);
+}
+
+String? commandTypedValueToString(CommandTypedValue value) {
+  switch (value.whichKind()) {
+    case CommandTypedValue_Kind.stringValue:
+      return value.stringValue;
+    case CommandTypedValue_Kind.int64Value:
+      return value.int64Value.toString();
+    case CommandTypedValue_Kind.boolValue:
+      return value.boolValue ? 'true' : 'false';
+    case CommandTypedValue_Kind.doubleValue:
+      return value.doubleValue.toString();
+    case CommandTypedValue_Kind.stringListValue:
+      return value.stringListValue.values.join(',');
+    case CommandTypedValue_Kind.notSet:
+      return null;
+  }
 }
 
 String diagnosticsTitleForCommandResult({
