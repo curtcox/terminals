@@ -1,10 +1,10 @@
 ---
 title: "Protocol Evolution Rules"
 kind: plan
-status: building
+status: shipped-validated
 owner: cascade
 validation: manual
-last-reviewed: 2026-05-04
+last-reviewed: 2026-05-05
 ---
 
 # Protocol Evolution Rules
