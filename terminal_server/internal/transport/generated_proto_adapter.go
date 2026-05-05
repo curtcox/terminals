@@ -615,7 +615,9 @@ func shouldUseStringListValue(key, value string) bool {
 	return normalizedKey == "device_ids" ||
 		normalizedKey == "system_intents" ||
 		normalizedKey == "command_kinds" ||
-		normalizedKey == "command_actions"
+		normalizedKey == "command_actions" ||
+		normalizedKey == "sensor_device_ids" ||
+		normalizedKey == "recording_stream_ids"
 }
 
 func internalWebRTCSignalTypeFromProto(legacy string, signalType controlv1.WebRTCSignalType) string {

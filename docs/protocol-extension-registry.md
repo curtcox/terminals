@@ -125,11 +125,20 @@ Owner: scenario/transport
 Classification: transitional_escape_hatch  
 Target state: typed `CommandResult.typed_data` now mirrors durable command result data; keep legacy `data` map during the compatibility window.  
 Review date: 2026-06-15  
-Producer: server command dispatcher and scenarios emit both typed entries and the legacy map.  
+Producer: server command dispatcher and scenarios emit both typed entries and the legacy map; the generated proto adapter promotes generic numeric, boolean, double, and known comma-separated list values into the corresponding `CommandTypedValue` variants while preserving the legacy strings.  
 Consumer: clients and diagnostics surfaces prefer typed entries when present and fall back to the legacy map for older servers.  
 Unknown behavior: clients ignore unknown keys.  
 Validation: typed values use `CommandTypedValue` (`string_value`, `int64_value`, `bool_value`, `double_value`, or `string_list_value`); legacy string values remain for compatibility and known keys document stricter formats with the owning command.  
-Tests: command result tests cover currently consumed keys; `command_result_typed_data_v1` golden fixture is decoded by both Go and Dart contract tests and pins typed + legacy coexistence.
+Tests: command result tests cover currently consumed keys; adapter tests assert typed status list promotion for `sensor_device_ids` and `recording_stream_ids` while preserving compound detail strings; `command_result_typed_data_v1` golden fixture is decoded by both Go and Dart contract tests and pins typed + legacy coexistence.
+
+Known generic list keys:
+
+- `device_ids`
+- `system_intents`
+- `command_kinds`
+- `command_actions`
+- `sensor_device_ids`
+- `recording_stream_ids`
 
 ### Field: terminals.control.v1.WebRTCSignal.signal_type
 

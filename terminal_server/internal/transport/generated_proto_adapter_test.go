@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -1087,6 +1088,35 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	}
 	if got := typedByKey["b"].GetInt64Value(); got != 2 {
 		t.Fatalf("typed_data[b].int64_value = %d, want 2", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		CommandAck: "runtime-status-1",
+		Data: map[string]string{
+			"sensor_device_ids":    "device-1,device-2",
+			"recording_stream_ids": "stream-audio-1,stream-audio-2",
+			"media_streams":        "stream-audio-1|ready=true,stream-audio-2|ready=false",
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() status lists error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("response envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	typedByKey = map[string]*controlv1.CommandTypedValue{}
+	for _, entry := range resp.GetCommandResult().GetTypedData() {
+		typedByKey[entry.GetKey()] = entry.GetValue()
+	}
+	if got := typedByKey["sensor_device_ids"].GetStringListValue().GetValues(); !reflect.DeepEqual(got, []string{"device-1", "device-2"}) {
+		t.Fatalf("typed_data[sensor_device_ids].string_list_value = %v, want device list", got)
+	}
+	if got := typedByKey["recording_stream_ids"].GetStringListValue().GetValues(); !reflect.DeepEqual(got, []string{"stream-audio-1", "stream-audio-2"}) {
+		t.Fatalf("typed_data[recording_stream_ids].string_list_value = %v, want stream list", got)
+	}
+	if got := typedByKey["media_streams"].GetStringValue(); got != "stream-audio-1|ready=true,stream-audio-2|ready=false" {
+		t.Fatalf("typed_data[media_streams].string_value = %q, want legacy detail string", got)
 	}
 
 	envelope, err = adapter.FromInternal(ServerMessage{

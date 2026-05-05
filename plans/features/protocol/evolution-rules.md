@@ -951,6 +951,13 @@ Incremental progress (2026-05-05, PointerAction consumer coverage):
 - Added `input_pointer_action_v1` golden envelope fixture, with Go and Dart protocol contract assertions pinning typed pointer action + legacy string coexistence.
 - Updated the protocol extension registry and compatibility window notes for pointer/touch action wiring.
 
+Incremental progress (2026-05-05, CommandResult status list typed data):
+
+- Confirmed the Flutter client still has no durable generic `InputEvent.pointer` / `InputEvent.touch` producer; pointer/touch typed producer wiring remains deferred until that path exists.
+- Tightened `CommandResult.typed_data` production in the server generated-proto adapter by promoting generic comma-separated status list keys `sensor_device_ids` and `recording_stream_ids` into `CommandTypedValue.string_list_value`.
+- Preserved unknown and compound legacy strings, including pipe-delimited detail payloads such as `media_streams`, as `string_value` so typed mirroring does not reinterpret structured diagnostic text.
+- Added focused adapter coverage for the new list-key promotion and updated the protocol extension registry.
+
 Incremental progress (2026-05-04, UiEventEntry typed kind enum):
 
 - Added additive typed enum `terminals.diagnostics.v1.UiEventKind` (UNSPECIFIED/SET_UI/UPDATE_UI/TRANSITION_UI) and `UiEventEntry.kind_enum = 5` while preserving the legacy `kind` string.
