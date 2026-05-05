@@ -1341,6 +1341,75 @@ func TestObservationTypedAttributesFromInternalEmptyOrUnknownReturnsNil(t *testi
 	}
 }
 
+func TestFlowPlanToProtoEmitsTypedArgsAlongsideLegacyArgs(t *testing.T) {
+	plan := iorouter.FlowPlan{
+		Nodes: []iorouter.FlowNode{{
+			ID:   "src",
+			Kind: iorouter.NodeSourceMic,
+			Args: map[string]string{
+				"device_id":   "dev-1",
+				"resource":    "mic.primary",
+				"stream_kind": "audio",
+				"name":        "main_mic",
+				"unrelated":   "passthrough",
+			},
+			Exec: iorouter.ExecPreferClient,
+		}},
+		Edges: []iorouter.FlowEdge{},
+	}
+
+	got := flowPlanToProto(plan)
+	if got == nil || len(got.GetNodes()) != 1 {
+		t.Fatalf("flowPlanToProto returned %+v, want one node", got)
+	}
+	node := got.GetNodes()[0]
+
+	legacy := node.GetArgs()
+	if legacy["device_id"] != "dev-1" || legacy["resource"] != "mic.primary" ||
+		legacy["stream_kind"] != "audio" || legacy["name"] != "main_mic" ||
+		legacy["unrelated"] != "passthrough" {
+		t.Fatalf("legacy args not preserved: %+v", legacy)
+	}
+
+	typed := node.GetTypedArgs()
+	if typed == nil {
+		t.Fatalf("typed_args missing; expected mirror alongside legacy args")
+	}
+	if got := typed.GetDeviceId(); got != "dev-1" {
+		t.Fatalf("typed_args.device_id = %q, want dev-1", got)
+	}
+	if got := typed.GetResource(); got != "mic.primary" {
+		t.Fatalf("typed_args.resource = %q, want mic.primary", got)
+	}
+	if got := typed.GetStreamKind(); got != "audio" {
+		t.Fatalf("typed_args.stream_kind = %q, want audio", got)
+	}
+	if got := typed.GetStreamKindEnum(); got != iov1.StreamKind_STREAM_KIND_AUDIO {
+		t.Fatalf("typed_args.stream_kind_enum = %v, want STREAM_KIND_AUDIO", got)
+	}
+	if got := typed.GetName(); got != "main_mic" {
+		t.Fatalf("typed_args.name = %q, want main_mic", got)
+	}
+}
+
+func TestFlowPlanToProtoTypedArgsNilWhenNoKnownKeys(t *testing.T) {
+	plan := iorouter.FlowPlan{
+		Nodes: []iorouter.FlowNode{{
+			ID:   "src",
+			Kind: iorouter.NodeSourceMic,
+			Args: map[string]string{"unrelated": "x"},
+			Exec: iorouter.ExecAuto,
+		}},
+	}
+	got := flowPlanToProto(plan)
+	if got.GetNodes()[0].GetTypedArgs() != nil {
+		t.Fatalf("typed_args = %+v, want nil when no known keys present", got.GetNodes()[0].GetTypedArgs())
+	}
+	if got.GetNodes()[0].GetArgs()["unrelated"] != "x" {
+		t.Fatalf("legacy args lost: %+v", got.GetNodes()[0].GetArgs())
+	}
+}
+
 func TestObservationTypedAttributesFromInternalTrimsWhitespace(t *testing.T) {
 	got := observationTypedAttributesFromInternal(map[string]string{
 		"label":  "  front_door  ",
