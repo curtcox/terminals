@@ -13,7 +13,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	client-test client-lint client-boundary client-boundary-test client-coverage \
 	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-generate proto-contract-test proto-contract-verify \
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
-	all-lint all-test all-check stop-server stop-server-test run-server run-client-web \
+	all-lint all-test all-check ci-local stop-server stop-server-test run-server run-client-web \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
 	ui-inspect-test
 
@@ -165,6 +165,8 @@ all-lint: server-lint client-lint client-boundary proto-lint
 all-test: server-test client-test client-boundary-test
 
 all-check: all-lint all-test proto-breaking proto-contract-test client-build-all development-docs-test usecases-index validation-matrix
+
+ci-local: all-check
 
 stop-server:
 	./scripts/stop-server.sh
