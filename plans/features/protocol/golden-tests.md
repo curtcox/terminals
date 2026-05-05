@@ -1,10 +1,10 @@
 ---
 title: "Go-Dart Contract Golden Tests"
 kind: plan
-status: draft
+status: implemented
 owner: copilot
 validation: automated
-last-reviewed: 2026-05-02
+last-reviewed: 2026-05-05
 ---
 
 # Go-Dart Contract Golden Tests
