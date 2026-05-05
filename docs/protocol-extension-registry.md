@@ -456,7 +456,7 @@ Owner: observation
 Classification: transitional_escape_hatch  
 Target state: typed `Observation.typed_attributes` (`ObservationAttributes`) now mirrors the stable common keys (`label`, `device`, `mac`, `duration_seconds`); legacy `attributes` map remains as the compatibility mirror and the namespace for observation-kind-specific extension keys until two tagged releases past 2026-05-04 elapse.  
 Review date: 2026-06-15  
-Producer: sensing/observation pipeline; outbound proto observations should populate both `typed_attributes` and the legacy map for the stable keys.  
+Producer: sensing/observation pipeline; today only the inbound (client→server) path exists in production code (`ObservationMessage` is part of `ConnectRequest`, not `ConnectResponse`), so no outbound proto producer wires the typed mirror yet. The helper `observationTypedAttributesFromInternal` (in `terminal_server/internal/transport/generated_proto_adapter.go`) is staged for the first real outbound producer; when one lands it must populate both `typed_attributes` and the legacy map for the stable keys.  
 Consumer: server scenario engine, world model, diagnostics; the generated proto adapter (`observationAttributesFromProto` in `terminal_server/internal/transport/generated_proto_adapter.go`) merges typed fields over the legacy map so internal `iorouter.Observation.Attributes` reflects the typed-first preference.  
 Unknown behavior: consumers ignore unknown attributes; legacy keys not represented by typed fields pass through unchanged.  
 Validation: typed `label`, `device`, `mac` are trimmed strings when set; `duration_seconds` is a decimal-seconds string mirroring legacy `attributes["duration_seconds"]`.  

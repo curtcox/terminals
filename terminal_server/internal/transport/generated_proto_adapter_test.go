@@ -1300,3 +1300,59 @@ func TestGeneratedProtoAdapterFromInternalRegisterAckMetadata(t *testing.T) {
 		t.Fatalf("register_ack server_metadata.photo_frame_asset_base_url = %q, want configured value", got)
 	}
 }
+
+func TestObservationTypedAttributesFromInternalKnownKeys(t *testing.T) {
+	got := observationTypedAttributesFromInternal(map[string]string{
+		"label":            "front_door",
+		"device":           "cam-1",
+		"mac":              "aa:bb:cc:dd:ee:ff",
+		"duration_seconds": "12.5",
+		"unrelated":        "ignored",
+	})
+	if got == nil {
+		t.Fatalf("observationTypedAttributesFromInternal returned nil for populated attrs")
+	}
+	if got.GetLabel() != "front_door" {
+		t.Fatalf("Label = %q, want front_door", got.GetLabel())
+	}
+	if got.GetDevice() != "cam-1" {
+		t.Fatalf("Device = %q, want cam-1", got.GetDevice())
+	}
+	if got.GetMac() != "aa:bb:cc:dd:ee:ff" {
+		t.Fatalf("Mac = %q, want aa:bb:cc:dd:ee:ff", got.GetMac())
+	}
+	if got.GetDurationSeconds() != "12.5" {
+		t.Fatalf("DurationSeconds = %q, want 12.5", got.GetDurationSeconds())
+	}
+}
+
+func TestObservationTypedAttributesFromInternalEmptyOrUnknownReturnsNil(t *testing.T) {
+	if got := observationTypedAttributesFromInternal(nil); got != nil {
+		t.Fatalf("nil attrs: got %+v, want nil", got)
+	}
+	if got := observationTypedAttributesFromInternal(map[string]string{}); got != nil {
+		t.Fatalf("empty attrs: got %+v, want nil", got)
+	}
+	if got := observationTypedAttributesFromInternal(map[string]string{"only_unknown": "x"}); got != nil {
+		t.Fatalf("only-unknown attrs: got %+v, want nil", got)
+	}
+	if got := observationTypedAttributesFromInternal(map[string]string{"label": "  ", "device": ""}); got != nil {
+		t.Fatalf("blank typed values: got %+v, want nil", got)
+	}
+}
+
+func TestObservationTypedAttributesFromInternalTrimsWhitespace(t *testing.T) {
+	got := observationTypedAttributesFromInternal(map[string]string{
+		"label":  "  front_door  ",
+		"device": "\tcam-1\n",
+	})
+	if got == nil {
+		t.Fatalf("observationTypedAttributesFromInternal returned nil")
+	}
+	if got.GetLabel() != "front_door" {
+		t.Fatalf("Label = %q, want trimmed front_door", got.GetLabel())
+	}
+	if got.GetDevice() != "cam-1" {
+		t.Fatalf("Device = %q, want trimmed cam-1", got.GetDevice())
+	}
+}
