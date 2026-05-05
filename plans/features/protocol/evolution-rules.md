@@ -964,6 +964,12 @@ Incremental progress (2026-05-05, CommandResult typed data fixture):
 - Added Go and Dart fixture assertions that pin typed `int64`, `bool`, `string_list`, and `string` values alongside legacy `data` map mirrors.
 - Updated the `CommandResult.data` registry entry to describe typed-first compatibility semantics.
 
+Incremental progress (2026-05-05, CommandRequest typed arguments fixture):
+
+- Promoted `CommandRequest.typed_arguments` into the shared golden contract suite with `command_request_typed_arguments_v1`.
+- Added Go and Dart fixture assertions that pin typed `string_list`, `string`, `bool`, and `int64` values alongside legacy `arguments` map mirrors.
+- Updated the `CommandRequest.arguments` registry and compatibility notes to describe typed-first coexistence while command-path producer/consumer wiring continues incrementally.
+
 ### PR 6 - Enforcement
 
 - Flip `proto-flex-check` from advisory to required.

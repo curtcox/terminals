@@ -15,6 +15,7 @@ void main() {
     'start_stream_route_delta_v1': _assertStartStreamRouteDelta,
     'route_stream_route_delta_v1': _assertRouteStreamRouteDelta,
     'flow_plan_basic_v1': _assertFlowPlanBasic,
+    'command_request_typed_arguments_v1': _assertCommandRequestTypedArguments,
     'command_result_typed_data_v1': _assertCommandResultTypedData,
     'observation_sound_v1': _assertObservationSound,
     'flow_stats_v1': _assertFlowStats,
@@ -133,6 +134,23 @@ void _assertFlowPlanBasic(WireEnvelope envelope) {
   _expectEqual(
       plan.nodes[0].typedArgs.streamKindEnum, StreamKind.STREAM_KIND_AUDIO);
   _expectEqual(plan.nodes[0].args['device_id'], 'kitchen-terminal');
+}
+
+void _assertCommandRequestTypedArguments(WireEnvelope envelope) {
+  final request = envelope.clientMessage.command;
+
+  _expectEqual(request.requestId, 'manual-command-1');
+  _expectEqual(request.action, CommandAction.COMMAND_ACTION_START);
+  _expectEqual(request.kind, CommandKind.COMMAND_KIND_MANUAL);
+  _expectEqual(request.arguments['device_ids'], 'terminal-kitchen,terminal-den');
+  final typed = <String, CommandTypedValue>{
+    for (final entry in request.typedArguments) entry.key: entry.value,
+  };
+  _expectEqual(typed['device_ids']?.stringListValue.values.join(','),
+      'terminal-kitchen,terminal-den');
+  _expectEqual(typed['activation_id']?.stringValue, 'typed-activation');
+  _expectEqual(typed['dry_run']?.boolValue, true);
+  _expectEqual(typed['priority']?.int64Value.toInt(), 7);
 }
 
 void _assertCommandResultTypedData(WireEnvelope envelope) {

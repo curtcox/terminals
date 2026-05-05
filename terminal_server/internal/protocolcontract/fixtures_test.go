@@ -16,20 +16,21 @@ var updateFixtures = flag.Bool("update", false, "regenerate binary protocol cont
 
 func TestGoldenWireEnvelopeFixtures(t *testing.T) {
 	cases := map[string]func(t *testing.T, envelope *controlv1.WireEnvelope){
-		"hello_snapshot_v1":             assertHelloSnapshot,
-		"capability_snapshot_v1":        assertCapabilitySnapshot,
-		"register_ack_metadata_v1":      assertRegisterAckMetadata,
-		"set_ui_basic_v1":               assertSetUIBasic,
-		"set_ui_canvas_v1":              assertSetUICanvas,
-		"start_stream_audio_v1":         assertStartStreamAudio,
-		"start_stream_route_delta_v1":   assertStartStreamRouteDelta,
-		"route_stream_route_delta_v1":   assertRouteStreamRouteDelta,
-		"flow_plan_basic_v1":            assertFlowPlanBasic,
-		"command_result_typed_data_v1":  assertCommandResultTypedData,
-		"observation_sound_v1":          assertObservationSound,
-		"flow_stats_v1":                 assertFlowStats,
-		"unknown_metadata_key_v1":       assertUnknownMetadataKey,
-		"deprecated_register_device_v1": assertDeprecatedRegisterDevice,
+		"hello_snapshot_v1":                  assertHelloSnapshot,
+		"capability_snapshot_v1":             assertCapabilitySnapshot,
+		"register_ack_metadata_v1":           assertRegisterAckMetadata,
+		"set_ui_basic_v1":                    assertSetUIBasic,
+		"set_ui_canvas_v1":                   assertSetUICanvas,
+		"start_stream_audio_v1":              assertStartStreamAudio,
+		"start_stream_route_delta_v1":        assertStartStreamRouteDelta,
+		"route_stream_route_delta_v1":        assertRouteStreamRouteDelta,
+		"flow_plan_basic_v1":                 assertFlowPlanBasic,
+		"command_request_typed_arguments_v1": assertCommandRequestTypedArguments,
+		"command_result_typed_data_v1":       assertCommandResultTypedData,
+		"observation_sound_v1":               assertObservationSound,
+		"flow_stats_v1":                      assertFlowStats,
+		"unknown_metadata_key_v1":            assertUnknownMetadataKey,
+		"deprecated_register_device_v1":      assertDeprecatedRegisterDevice,
 	}
 
 	for name, assert := range cases {
@@ -289,6 +290,39 @@ func assertFlowPlanBasic(t *testing.T, envelope *controlv1.WireEnvelope) {
 	}
 	if got := capture.GetArgs()["device_id"]; got != "kitchen-terminal" {
 		t.Fatalf("legacy args[device_id] = %q", got)
+	}
+}
+
+func assertCommandRequestTypedArguments(t *testing.T, envelope *controlv1.WireEnvelope) {
+	t.Helper()
+	request := envelope.GetClientMessage().GetCommand()
+	if request.GetRequestId() != "manual-command-1" {
+		t.Fatalf("request_id = %q", request.GetRequestId())
+	}
+	if request.GetAction() != controlv1.CommandAction_COMMAND_ACTION_START {
+		t.Fatalf("action = %v", request.GetAction())
+	}
+	if request.GetKind() != controlv1.CommandKind_COMMAND_KIND_MANUAL {
+		t.Fatalf("kind = %v", request.GetKind())
+	}
+	if request.GetArguments()["device_ids"] != "terminal-kitchen,terminal-den" {
+		t.Fatalf("legacy device_ids = %q", request.GetArguments()["device_ids"])
+	}
+	typed := map[string]*controlv1.CommandTypedValue{}
+	for _, entry := range request.GetTypedArguments() {
+		typed[entry.GetKey()] = entry.GetValue()
+	}
+	if got := typed["device_ids"].GetStringListValue().GetValues(); len(got) != 2 || got[0] != "terminal-kitchen" || got[1] != "terminal-den" {
+		t.Fatalf("typed device_ids = %v, want [terminal-kitchen terminal-den]", got)
+	}
+	if got := typed["activation_id"].GetStringValue(); got != "typed-activation" {
+		t.Fatalf("typed activation_id = %q", got)
+	}
+	if got := typed["dry_run"].GetBoolValue(); !got {
+		t.Fatalf("typed dry_run = %v, want true", got)
+	}
+	if got := typed["priority"].GetInt64Value(); got != 7 {
+		t.Fatalf("typed priority = %d, want 7", got)
 	}
 }
 

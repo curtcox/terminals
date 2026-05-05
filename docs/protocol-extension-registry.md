@@ -92,13 +92,13 @@ Token namespaces:
 
 Owner: scenario/transport  
 Classification: transitional_escape_hatch  
-Target state: type stable command argument shapes or move them to command-specific messages.  
+Target state: typed `CommandRequest.typed_arguments` now mirrors durable command arguments; keep legacy `arguments` map during the compatibility window.  
 Review date: 2026-06-15  
-Producer: client or system command producer  
-Consumer: server command dispatcher and scenarios  
+Producer: client or system command producer emits both typed entries and the legacy map for durable argument keys.  
+Consumer: server command dispatcher and scenarios prefer typed entries when present and fall back to the legacy map for older clients.  
 Unknown behavior: unknown keys are ignored unless the selected intent explicitly requires them.  
-Validation: values are strings; known keys document stricter formats in scenario or system-intent tests.  
-Tests: command dispatcher tests cover current required keys and unknown-key tolerance.
+Validation: typed values use `CommandTypedValue` (`string_value`, `int64_value`, `bool_value`, `double_value`, or `string_list_value`); legacy string values remain for compatibility and known keys document stricter formats in scenario or system-intent tests.  
+Tests: command dispatcher tests cover current required keys and unknown-key tolerance; `command_request_typed_arguments_v1` golden fixture is decoded by both Go and Dart contract tests and pins typed + legacy coexistence.
 
 Known keys:
 
