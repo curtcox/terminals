@@ -970,6 +970,12 @@ Incremental progress (2026-05-05, CommandRequest typed arguments fixture):
 - Added Go and Dart fixture assertions that pin typed `string_list`, `string`, `bool`, and `int64` values alongside legacy `arguments` map mirrors.
 - Updated the `CommandRequest.arguments` registry and compatibility notes to describe typed-first coexistence while command-path producer/consumer wiring continues incrementally.
 
+Incremental progress (2026-05-05, CommandRequest typed producer helper):
+
+- Added a generic Flutter `commandStringArguments` helper that mirrors string command arguments into `CommandArgumentEntry` / `CommandTypedValue.string_value` entries while keeping the legacy `arguments` map populated.
+- Switched the playback metadata command builder to use the helper for `artifact_id` and `target_device_id`, preserving generic client behavior and avoiding scenario-specific renderer logic.
+- Extended Flutter command-builder tests and updated the registry/compatibility docs for the newly covered typed producer path.
+
 ### PR 6 - Enforcement
 
 - Flip `proto-flex-check` from advisory to required.

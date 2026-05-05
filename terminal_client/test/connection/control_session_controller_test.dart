@@ -261,5 +261,24 @@ void main() {
     expect(metadata.command.intent, 'playback_metadata');
     expect(metadata.command.arguments['artifact_id'], 'playback-1');
     expect(metadata.command.arguments['target_device_id'], 'terminal-b');
+    final typedArguments = {
+      for (final entry in metadata.command.typedArguments)
+        entry.key: entry.value.stringValue,
+    };
+    expect(typedArguments['artifact_id'], 'playback-1');
+    expect(typedArguments['target_device_id'], 'terminal-b');
+  });
+
+  test('mirrors string command arguments into typed entries', () {
+    final typedArguments = commandStringArguments({
+      'artifact_id': 'playback-1',
+      'target_device_id': 'terminal-b',
+    });
+
+    expect(typedArguments, hasLength(2));
+    expect(typedArguments[0].key, 'artifact_id');
+    expect(typedArguments[0].value.stringValue, 'playback-1');
+    expect(typedArguments[1].key, 'target_device_id');
+    expect(typedArguments[1].value.stringValue, 'terminal-b');
   });
 }

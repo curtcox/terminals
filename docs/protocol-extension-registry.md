@@ -94,17 +94,19 @@ Owner: scenario/transport
 Classification: transitional_escape_hatch  
 Target state: typed `CommandRequest.typed_arguments` now mirrors durable command arguments; keep legacy `arguments` map during the compatibility window.  
 Review date: 2026-06-15  
-Producer: client or system command producer emits both typed entries and the legacy map for durable argument keys.  
+Producer: client or system command producer emits both typed entries and the legacy map for durable argument keys; shared client helpers mirror generic string arguments into `CommandTypedValue.string_value` entries.  
 Consumer: server command dispatcher and scenarios prefer typed entries when present and fall back to the legacy map for older clients.  
 Unknown behavior: unknown keys are ignored unless the selected intent explicitly requires them.  
 Validation: typed values use `CommandTypedValue` (`string_value`, `int64_value`, `bool_value`, `double_value`, or `string_list_value`); legacy string values remain for compatibility and known keys document stricter formats in scenario or system-intent tests.  
-Tests: command dispatcher tests cover current required keys and unknown-key tolerance; `command_request_typed_arguments_v1` golden fixture is decoded by both Go and Dart contract tests and pins typed + legacy coexistence.
+Tests: command dispatcher tests cover current required keys and unknown-key tolerance; `command_request_typed_arguments_v1` golden fixture is decoded by both Go and Dart contract tests and pins typed + legacy coexistence; Flutter command-builder tests assert playback metadata arguments are emitted through both typed and legacy surfaces.
 
 Known keys:
 
 - `device_id`: terminal device id
 - `device_ids`: comma-separated terminal device ids for multi-device commands
 - `activation_id`: scenario activation id
+- `artifact_id`: playback/artifact identifier for diagnostic artifact commands
+- `target_device_id`: terminal device id selected as the playback target
 
 ### Field: terminals.control.v1.CommandResult.notification
 
