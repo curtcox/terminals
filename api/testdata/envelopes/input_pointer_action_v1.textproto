@@ -1,0 +1,17 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 16
+client_message: {
+  input: {
+    device_id: "terminal-kitchen"
+    pointer: {
+      action: "down"
+      x: 12.5
+      y: 44
+      delta_x: 0
+      delta_y: 0
+      button: 1
+      action_enum: POINTER_ACTION_MOVE
+    }
+  }
+}

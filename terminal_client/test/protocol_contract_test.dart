@@ -15,6 +15,7 @@ void main() {
     'start_stream_route_delta_v1': _assertStartStreamRouteDelta,
     'route_stream_route_delta_v1': _assertRouteStreamRouteDelta,
     'flow_plan_basic_v1': _assertFlowPlanBasic,
+    'input_pointer_action_v1': _assertInputPointerAction,
     'command_request_typed_arguments_v1': _assertCommandRequestTypedArguments,
     'command_result_typed_data_v1': _assertCommandResultTypedData,
     'observation_sound_v1': _assertObservationSound,
@@ -134,6 +135,14 @@ void _assertFlowPlanBasic(WireEnvelope envelope) {
   _expectEqual(
       plan.nodes[0].typedArgs.streamKindEnum, StreamKind.STREAM_KIND_AUDIO);
   _expectEqual(plan.nodes[0].args['device_id'], 'kitchen-terminal');
+}
+
+void _assertInputPointerAction(WireEnvelope envelope) {
+  final pointer = envelope.clientMessage.input.pointer;
+
+  _expectEqual(pointer.action, 'down');
+  _expectEqual(pointer.actionEnum, PointerAction.POINTER_ACTION_MOVE);
+  _expectEqual(pointer.button, 1);
 }
 
 void _assertCommandRequestTypedArguments(WireEnvelope envelope) {

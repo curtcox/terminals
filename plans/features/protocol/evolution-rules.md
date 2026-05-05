@@ -943,6 +943,14 @@ Incremental progress (2026-05-04, PointerAction/TouchAction):
 - Updated registry entries for `PointerEvent.action` and `TouchEvent.action` to describe typed-first compatibility semantics.
 - No application code currently routes `InputEvent.pointer` / `InputEvent.touch`, so producer/consumer wiring is deferred until the first real consumer lands.
 
+Incremental progress (2026-05-05, PointerAction consumer coverage):
+
+- Updated the server generated-proto adapter to consume `InputEvent.pointer.action_enum` and `InputEvent.touch.action_enum` first, falling back to the legacy `action` strings when the enum is unspecified.
+- Kept the internal behavior generic by normalizing resolved pointer/touch actions into the existing `InputRequest.Action` path rather than adding scenario-specific client or server handling.
+- Added focused adapter tests for pointer enum-first resolution, pointer legacy fallback, and touch enum-first resolution.
+- Added `input_pointer_action_v1` golden envelope fixture, with Go and Dart protocol contract assertions pinning typed pointer action + legacy string coexistence.
+- Updated the protocol extension registry and compatibility window notes for pointer/touch action wiring.
+
 Incremental progress (2026-05-04, UiEventEntry typed kind enum):
 
 - Added additive typed enum `terminals.diagnostics.v1.UiEventKind` (UNSPECIFIED/SET_UI/UPDATE_UI/TRANSITION_UI) and `UiEventEntry.kind_enum = 5` while preserving the legacy `kind` string.

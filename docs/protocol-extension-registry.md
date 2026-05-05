@@ -338,10 +338,10 @@ Classification: transitional_escape_hatch
 Target state: typed `PointerAction` enum (`PointerEvent.action_enum`, field 7) is the typed replacement; legacy `action` string remains during the compatibility window.  
 Review date: 2026-06-15  
 Producer: client input layer (emits both typed enum and legacy string when both are known)  
-Consumer: server input dispatcher (prefers typed enum, falls back to legacy string when unspecified)  
+Consumer: server input dispatcher (generated proto adapter prefers typed enum, falls back to legacy string when unspecified, and normalizes the resolved action into the generic `InputRequest.Action` path)  
 Unknown behavior: server ignores unknown actions or records protocol error; unspecified enum + unknown string is treated as unknown.  
 Validation: legacy `down`, `move`, `up`, `cancel`, `scroll`; typed `POINTER_ACTION_DOWN`, `POINTER_ACTION_MOVE`, `POINTER_ACTION_UP`, `POINTER_ACTION_CANCEL`, `POINTER_ACTION_SCROLL`.  
-Tests: input tests cover known actions and unknown-action handling; protocol contract tests assert typed enum coexistence with legacy string.
+Tests: generated proto adapter tests cover enum-first resolution and legacy fallback for pointer actions; `input_pointer_action_v1` golden envelope (textproto + binpb) plus matching Go and Dart assertions pin typed enum coexistence with the legacy string.
 
 ### Field: terminals.io.v1.TouchEvent.action
 
@@ -350,10 +350,10 @@ Classification: transitional_escape_hatch
 Target state: typed `TouchAction` enum (`TouchEvent.action_enum`, field 3) is the typed replacement; legacy `action` string remains during the compatibility window.  
 Review date: 2026-06-15  
 Producer: client input layer (emits both typed enum and legacy string when both are known)  
-Consumer: server input dispatcher (prefers typed enum, falls back to legacy string when unspecified)  
+Consumer: server input dispatcher (generated proto adapter prefers typed enum, falls back to legacy string when unspecified, and normalizes the resolved action into the generic `InputRequest.Action` path)  
 Unknown behavior: server ignores unknown actions or records protocol error; unspecified enum + unknown string is treated as unknown.  
 Validation: legacy `start`, `move`, `end`, `cancel`; typed `TOUCH_ACTION_START`, `TOUCH_ACTION_MOVE`, `TOUCH_ACTION_END`, `TOUCH_ACTION_CANCEL`.  
-Tests: input tests cover known actions and unknown-action handling; protocol contract tests assert typed enum coexistence with legacy string.
+Tests: generated proto adapter tests cover enum-first resolution for touch actions; add a shared golden fixture when the first durable touch producer lands.
 
 ### Field: terminals.io.v1.UIAction.action
 

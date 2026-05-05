@@ -584,6 +584,88 @@ func TestGeneratedProtoAdapterToInternalInput(t *testing.T) {
 	}
 }
 
+func TestGeneratedProtoAdapterToInternalPointerInputPrefersTypedAction(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Input{
+			Input: &iov1.InputEvent{
+				DeviceId: "device-2",
+				Payload: &iov1.InputEvent_Pointer{
+					Pointer: &iov1.PointerEvent{
+						Action:     "down",
+						ActionEnum: iov1.PointerAction_POINTER_ACTION_MOVE,
+						X:          12.5,
+						Y:          44,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal() error = %v", err)
+	}
+	if msg.Input == nil {
+		t.Fatalf("expected input message")
+	}
+	if msg.Input.Action != "move" {
+		t.Fatalf("input action = %q, want typed move", msg.Input.Action)
+	}
+}
+
+func TestGeneratedProtoAdapterToInternalPointerInputFallsBackToLegacyAction(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Input{
+			Input: &iov1.InputEvent{
+				DeviceId: "device-2",
+				Payload: &iov1.InputEvent_Pointer{
+					Pointer: &iov1.PointerEvent{
+						Action: " Scroll ",
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal() error = %v", err)
+	}
+	if msg.Input == nil {
+		t.Fatalf("expected input message")
+	}
+	if msg.Input.Action != "scroll" {
+		t.Fatalf("input action = %q, want legacy scroll", msg.Input.Action)
+	}
+}
+
+func TestGeneratedProtoAdapterToInternalTouchInputPrefersTypedAction(t *testing.T) {
+	adapter := GeneratedProtoAdapter{}
+	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{
+		Payload: &controlv1.ConnectRequest_Input{
+			Input: &iov1.InputEvent{
+				DeviceId: "device-2",
+				Payload: &iov1.InputEvent_Touch{
+					Touch: &iov1.TouchEvent{
+						Action:     "start",
+						ActionEnum: iov1.TouchAction_TOUCH_ACTION_END,
+						Points: []*iov1.TouchPoint{
+							{Id: 1, X: 12.5, Y: 44},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToInternal() error = %v", err)
+	}
+	if msg.Input == nil {
+		t.Fatalf("expected input message")
+	}
+	if msg.Input.Action != "end" {
+		t.Fatalf("input action = %q, want typed end", msg.Input.Action)
+	}
+}
+
 func TestGeneratedProtoAdapterToInternalCommandArguments(t *testing.T) {
 	adapter := GeneratedProtoAdapter{}
 	msg, err := adapter.ToInternal(&controlv1.ConnectRequest{

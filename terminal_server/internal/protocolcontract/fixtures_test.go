@@ -25,6 +25,7 @@ func TestGoldenWireEnvelopeFixtures(t *testing.T) {
 		"start_stream_route_delta_v1":        assertStartStreamRouteDelta,
 		"route_stream_route_delta_v1":        assertRouteStreamRouteDelta,
 		"flow_plan_basic_v1":                 assertFlowPlanBasic,
+		"input_pointer_action_v1":            assertInputPointerAction,
 		"command_request_typed_arguments_v1": assertCommandRequestTypedArguments,
 		"command_result_typed_data_v1":       assertCommandResultTypedData,
 		"observation_sound_v1":               assertObservationSound,
@@ -290,6 +291,23 @@ func assertFlowPlanBasic(t *testing.T, envelope *controlv1.WireEnvelope) {
 	}
 	if got := capture.GetArgs()["device_id"]; got != "kitchen-terminal" {
 		t.Fatalf("legacy args[device_id] = %q", got)
+	}
+}
+
+func assertInputPointerAction(t *testing.T, envelope *controlv1.WireEnvelope) {
+	t.Helper()
+	pointer := envelope.GetClientMessage().GetInput().GetPointer()
+	if pointer == nil {
+		t.Fatalf("pointer input missing")
+	}
+	if got := pointer.GetAction(); got != "down" {
+		t.Fatalf("legacy pointer action = %q", got)
+	}
+	if got := pointer.GetActionEnum(); got != iov1.PointerAction_POINTER_ACTION_MOVE {
+		t.Fatalf("typed pointer action = %v", got)
+	}
+	if got := pointer.GetButton(); got != 1 {
+		t.Fatalf("pointer button = %d", got)
 	}
 }
 

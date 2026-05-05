@@ -111,6 +111,12 @@ func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, err
 		if key := input.GetKey(); key != nil {
 			internal.KeyText = key.GetText()
 		}
+		if pointer := input.GetPointer(); pointer != nil {
+			internal.Action = internalPointerActionFromProto(pointer.GetAction(), pointer.GetActionEnum())
+		}
+		if touch := input.GetTouch(); touch != nil {
+			internal.Action = internalTouchActionFromProto(touch.GetAction(), touch.GetActionEnum())
+		}
 		return ClientMessage{Input: internal}, nil
 	case *controlv1.ConnectRequest_Command:
 		command := payload.Command
@@ -463,6 +469,38 @@ func internalKindFromProto(kind controlv1.CommandKind) string {
 		return CommandKindSystem
 	default:
 		return ""
+	}
+}
+
+func internalPointerActionFromProto(legacy string, action iov1.PointerAction) string {
+	switch action {
+	case iov1.PointerAction_POINTER_ACTION_DOWN:
+		return "down"
+	case iov1.PointerAction_POINTER_ACTION_MOVE:
+		return "move"
+	case iov1.PointerAction_POINTER_ACTION_UP:
+		return "up"
+	case iov1.PointerAction_POINTER_ACTION_CANCEL:
+		return "cancel"
+	case iov1.PointerAction_POINTER_ACTION_SCROLL:
+		return "scroll"
+	default:
+		return strings.ToLower(strings.TrimSpace(legacy))
+	}
+}
+
+func internalTouchActionFromProto(legacy string, action iov1.TouchAction) string {
+	switch action {
+	case iov1.TouchAction_TOUCH_ACTION_START:
+		return "start"
+	case iov1.TouchAction_TOUCH_ACTION_MOVE:
+		return "move"
+	case iov1.TouchAction_TOUCH_ACTION_END:
+		return "end"
+	case iov1.TouchAction_TOUCH_ACTION_CANCEL:
+		return "cancel"
+	default:
+		return strings.ToLower(strings.TrimSpace(legacy))
 	}
 }
 
