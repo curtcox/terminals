@@ -136,8 +136,8 @@ proto-contract-test:
 	cd terminal_server && GOCACHE="$(LOCAL_GO_CACHE)" go test ./internal/transport -run 'TestProto|TestGenerated' -count=1
 	cd terminal_client && HOME="$(ROOT_DIR)/.home" PUB_CACHE="$(ROOT_DIR)/.home/.pub-cache" dart test/protocol_contract_test.dart
 
-proto-contract-verify: proto-contract-generate proto-contract-test
-	git diff --exit-code -- api/testdata/contract
+proto-contract-verify:
+	./scripts/proto-contract-verify.sh
 
 skills-validate:
 	./scripts/validate-skills.sh

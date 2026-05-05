@@ -238,3 +238,9 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Registered the fixtures in `manifest.yaml` and updated `api/testdata/contract/README.md` to describe the broader coverage.
 - Extended the Dart contract assertion helper with explicit paths for the new observation, flow, error, and notification assertions; the Go contract test covers the same paths through protobuf reflection.
 - Re-ran `make proto-contract-generate` and `make proto-contract-test`; all contract gates passed. `make proto-contract-verify` also ran the suite successfully and then reported the expected `git diff` because these new fixture files are intentionally uncommitted.
+
+## Go-Dart Contract Golden Tests (2026-05-05, verify script hardening)
+
+- Added the documented `scripts/proto-contract-verify.sh` entry point so the Make target and CI job share the same regenerate/test/diff workflow.
+- Updated `scripts/proto-contract-test.sh` to use the repo-local Dart SDK when available and fall back to `dart` on `PATH`, matching GitHub Actions Flutter setup on clean runners.
+- Re-ran `make proto-contract-verify`; the full contract gate passed and the shared fixture corpus remained current.
