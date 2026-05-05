@@ -204,6 +204,7 @@ ConnectRequest buildApplicationLaunchCommandRequest({
   required String requestID,
   required String deviceID,
   required String intent,
+  Map<String, String> arguments = const {},
 }) {
   return ConnectRequest()
     ..command = (CommandRequest()
@@ -211,7 +212,9 @@ ConnectRequest buildApplicationLaunchCommandRequest({
       ..deviceId = deviceID
       ..action = CommandAction.COMMAND_ACTION_START
       ..kind = CommandKind.COMMAND_KIND_MANUAL
-      ..intent = intent);
+      ..intent = intent
+      ..typedArguments.addAll(commandStringArguments(arguments))
+      ..arguments.addAll(arguments));
 }
 
 ConnectRequest buildUiActionInputRequest({

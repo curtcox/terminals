@@ -976,6 +976,12 @@ Incremental progress (2026-05-05, CommandRequest typed producer helper):
 - Switched the playback metadata command builder to use the helper for `artifact_id` and `target_device_id`, preserving generic client behavior and avoiding scenario-specific renderer logic.
 - Extended Flutter command-builder tests and updated the registry/compatibility docs for the newly covered typed producer path.
 
+Incremental progress (2026-05-05, CommandRequest manual argument producer):
+
+- Extended the generic Flutter application-launch command builder with optional string arguments that are mirrored through `CommandRequest.typed_arguments` and the legacy `arguments` map.
+- Added focused command-builder coverage for `activation_id` and `device_ids` to pin typed + legacy coexistence on this manual command producer path.
+- Updated the registry entry for `CommandRequest.arguments` so the documented producer coverage matches the current client wiring.
+
 ### PR 6 - Enforcement
 
 - Flip `proto-flex-check` from advisory to required.

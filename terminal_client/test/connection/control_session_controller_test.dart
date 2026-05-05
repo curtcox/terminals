@@ -169,6 +169,10 @@ void main() {
       requestID: 'launch-1',
       deviceID: 'terminal-a',
       intent: 'dashboard',
+      arguments: {
+        'activation_id': 'activation-1',
+        'device_ids': 'terminal-a,terminal-b',
+      },
     );
 
     expect(request.command.requestId, 'launch-1');
@@ -176,6 +180,14 @@ void main() {
     expect(request.command.action, CommandAction.COMMAND_ACTION_START);
     expect(request.command.kind, CommandKind.COMMAND_KIND_MANUAL);
     expect(request.command.intent, 'dashboard');
+    expect(request.command.arguments['activation_id'], 'activation-1');
+    expect(request.command.arguments['device_ids'], 'terminal-a,terminal-b');
+    final typedArguments = {
+      for (final entry in request.command.typedArguments)
+        entry.key: entry.value.stringValue,
+    };
+    expect(typedArguments['activation_id'], 'activation-1');
+    expect(typedArguments['device_ids'], 'terminal-a,terminal-b');
   });
 
   test('translates server-driven renderer actions into UIAction input', () {
