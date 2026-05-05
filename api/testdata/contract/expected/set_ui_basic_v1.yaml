@@ -19,5 +19,9 @@ assertions:
     equals: "#1f2937"
   - path: set_ui.root.children[1].widget
     equals: button
+  - path: set_ui.root.children[1].button
+    present: true
+  - path: set_ui.root.children[1].text
+    absent: true
   - path: set_ui.root.children[1].button.action
     equals: timer.start

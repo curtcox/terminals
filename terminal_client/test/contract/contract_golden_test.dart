@@ -88,6 +88,16 @@ void _assertMessage(
   List<_Assertion> assertions,
 ) {
   for (final assertion in assertions) {
+    if (assertion.present != null) {
+      _expectEqual(_pathPresent(message, assertion.path), assertion.present,
+          assertion.path);
+      continue;
+    }
+    if (assertion.absent != null) {
+      _expectEqual(!_pathPresent(message, assertion.path), assertion.absent,
+          assertion.path);
+      continue;
+    }
     final actual = _valueAtPath(message, assertion.path);
     if (assertion.length != null) {
       _expectEqual((actual as List).length, assertion.length, assertion.path);
@@ -103,6 +113,22 @@ void _assertMessage(
     } else {
       _expectEqual(actual, assertion.equals, assertion.path);
     }
+  }
+}
+
+bool _pathPresent(GeneratedMessage message, String path) {
+  switch (path) {
+    case 'hello.identity':
+      return (message as ConnectRequest).hello.hasIdentity();
+    case 'command':
+      return (message as ConnectRequest).hasCommand();
+    case 'set_ui.root.children[1].button':
+      return (message as ConnectResponse).setUi.root.children[1].hasButton();
+    case 'set_ui.root.children[1].text':
+      return (message as ConnectResponse).setUi.root.children[1].hasText();
+    default:
+      _valueAtPath(message, path);
+      return true;
   }
 }
 
@@ -386,6 +412,8 @@ class _Assertion {
     required this.equals,
     required this.contains,
     required this.length,
+    required this.present,
+    required this.absent,
   });
 
   factory _Assertion.fromYaml(YamlMap yaml) => _Assertion(
@@ -395,10 +423,14 @@ class _Assertion {
             ? const []
             : List<Object?>.from(yaml['contains'] as YamlList),
         length: yaml['length'] as int?,
+        present: yaml['present'] as bool?,
+        absent: yaml['absent'] as bool?,
       );
 
   final String path;
   final Object? equals;
   final List<Object?> contains;
   final int? length;
+  final bool? present;
+  final bool? absent;
 }

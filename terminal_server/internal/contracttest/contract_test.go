@@ -45,11 +45,14 @@ type assertion struct {
 	Equals   interface{}   `yaml:"equals"`
 	Contains []interface{} `yaml:"contains"`
 	Length   *int          `yaml:"length"`
+	Present  *bool         `yaml:"present"`
+	Absent   *bool         `yaml:"absent"`
 }
 
 type resolvedValue struct {
-	Value protoreflect.Value
-	Field protoreflect.FieldDescriptor
+	Value   protoreflect.Value
+	Field   protoreflect.FieldDescriptor
+	Present bool
 }
 
 func TestContractGoldenFixtures(t *testing.T) {
@@ -152,6 +155,18 @@ func assertMessage(t *testing.T, msg proto.Message, assertions []assertion) {
 		if err != nil {
 			t.Fatalf("%s: %v", assertion.Path, err)
 		}
+		if assertion.Present != nil {
+			if got.Present != *assertion.Present {
+				t.Fatalf("%s present = %t, want %t", assertion.Path, got.Present, *assertion.Present)
+			}
+			continue
+		}
+		if assertion.Absent != nil {
+			if absent := !got.Present; absent != *assertion.Absent {
+				t.Fatalf("%s absent = %t, want %t", assertion.Path, absent, *assertion.Absent)
+			}
+			continue
+		}
 		if assertion.Length != nil {
 			if got.Value.List().Len() != *assertion.Length {
 				t.Fatalf("%s length = %d, want %d", assertion.Path, got.Value.List().Len(), *assertion.Length)
@@ -177,6 +192,7 @@ var pathSegmentRE = regexp.MustCompile(`^([a-z0-9_]+)(?:\[(\d+)\])?$`)
 func valueAtPath(msg protoreflect.Message, path string) (resolvedValue, error) {
 	var current protoreflect.Value
 	var currentField protoreflect.FieldDescriptor
+	present := true
 	current = protoreflect.ValueOfMessage(msg)
 	for _, segment := range strings.Split(path, ".") {
 		match := pathSegmentRE.FindStringSubmatch(segment)
@@ -192,14 +208,22 @@ func valueAtPath(msg protoreflect.Message, path string) (resolvedValue, error) {
 			}
 			chosen := m.WhichOneof(oneof)
 			if chosen == nil {
-				return resolvedValue{}, fmt.Errorf("oneof %q is unset on %s", match[1], m.Descriptor().FullName())
+				return resolvedValue{Present: false}, nil
 			}
 			current = protoreflect.ValueOfString(string(chosen.Name()))
 			currentField = nil
+			present = true
 			continue
 		}
 		currentField = field
 		current = m.Get(field)
+		if field.IsMap() {
+			present = current.Map().Len() > 0
+		} else if field.IsList() {
+			present = current.List().Len() > 0
+		} else {
+			present = m.Has(field)
+		}
 		if match[2] != "" {
 			if !field.IsList() {
 				return resolvedValue{}, fmt.Errorf("field %q is not a list", match[1])
@@ -210,9 +234,10 @@ func valueAtPath(msg protoreflect.Message, path string) (resolvedValue, error) {
 				return resolvedValue{}, fmt.Errorf("index %d out of range for %q", index, match[1])
 			}
 			current = list.Get(index)
+			present = true
 		}
 	}
-	return resolvedValue{Value: current, Field: currentField}, nil
+	return resolvedValue{Value: current, Field: currentField, Present: present}, nil
 }
 
 func scalarEquals(got resolvedValue, want interface{}) bool {

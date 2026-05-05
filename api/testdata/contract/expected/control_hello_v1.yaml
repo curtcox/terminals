@@ -1,6 +1,10 @@
 message: terminals.control.v1.ConnectRequest
 payload: hello
 assertions:
+  - path: hello.identity
+    present: true
+  - path: command
+    absent: true
   - path: hello.device_id
     equals: kitchen-tablet-01
   - path: hello.identity.device_name
