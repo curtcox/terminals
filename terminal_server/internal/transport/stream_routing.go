@@ -60,6 +60,26 @@ func streamRoutingFromMetadata(metadata map[string]string) *iov1.StreamRouting {
 	}
 }
 
+func mergeLegacyRoutingMetadata(metadata map[string]string, routing *iov1.StreamRouting) map[string]string {
+	out := copyMediaStringMap(metadata)
+	if out == nil {
+		out = map[string]string{}
+	}
+	if routing == nil {
+		return out
+	}
+	switch routing.GetOrigin() {
+	case iov1.StreamOrigin_STREAM_ORIGIN_ROUTE_DELTA:
+		out["origin"] = "route_delta"
+	case iov1.StreamOrigin_STREAM_ORIGIN_RESTORE:
+		out["origin"] = "restore"
+	}
+	if mode := webRTCModeStringFromEnum(routing.GetWebrtcMode()); mode != "" {
+		out["webrtc_mode"] = mode
+	}
+	return out
+}
+
 // webRTCModeStringFromEnum returns the legacy `webrtc_mode` token for a
 // typed enum. UNSPECIFIED returns the empty string so callers can fall back
 // to a legacy metadata lookup.

@@ -280,7 +280,8 @@ func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse {
 		if audioMetadata == nil {
 			audioMetadata = streamAudioMetadataFromLegacy(msg.StartStream.Metadata)
 		}
-		metadata := mergeLegacyAudioMetadata(msg.StartStream.Metadata, audioMetadata)
+		metadata := mergeLegacyRoutingMetadata(msg.StartStream.Metadata, routing)
+		metadata = mergeLegacyAudioMetadata(metadata, audioMetadata)
 		return &controlv1.ConnectResponse{
 			Payload: &controlv1.ConnectResponse_StartStream{
 				StartStream: &iov1.StartStream{

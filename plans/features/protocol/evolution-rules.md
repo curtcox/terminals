@@ -996,6 +996,12 @@ Incremental progress (2026-05-05, Observation typed attribute fallback):
 - Kept observation handling generic: typed `label`/`device`/`duration_seconds` normalize into the existing internal attributes map, and observation-kind-specific legacy keys remain available to server consumers.
 - Updated the `Observation.attributes` registry entry to name the exact test that pins typed-first merge behavior and unknown-key preservation.
 
+Incremental progress (2026-05-05, StartStream routing metadata mirror cleanup):
+
+- Updated the generated proto adapter so typed `StartStream.routing` mirrors back over legacy `metadata["origin"]` / `metadata["webrtc_mode"]` keys during the compatibility window, matching the existing typed-first audio metadata behavior.
+- Added focused Go adapter coverage for typed routing winning over conflicting legacy routing metadata while preserving unknown `StartStream.metadata` extension keys.
+- Updated the registry and compatibility docs for the tightened `StartStream.metadata` producer/mirror behavior.
+
 ### PR 6 - Enforcement
 
 - Flip `proto-flex-check` from advisory to required.

@@ -283,11 +283,11 @@ Owner: transport/io
 Classification: transitional_escape_hatch  
 Target state: typed `StartStream.routing` (`StreamRouting`) and `StartStream.audio_metadata` (`StreamAudioMetadata`) now carry the stable routing + audio hints; keep legacy map keys as compatibility mirrors during the migration window.  
 Review date: 2026-06-15  
-Producer: server stream planner emits typed fields and legacy map mirrors. The generated proto adapter derives `audio_metadata` from legacy keys when needed and mirrors typed values back to legacy keys during migration.  
+Producer: server stream planner emits typed fields and legacy map mirrors. The generated proto adapter derives `routing` / `audio_metadata` from legacy keys when needed and mirrors typed values back to legacy keys during migration.  
 Consumer: server media-control state prefers typed `routing.webrtc_mode` / `audio_metadata` and falls back to legacy `webrtc_mode` / `sample_rate` / `channels` / `codec` map keys. Recording paths consume the normalized metadata map. Client media and edge stream setup ignore unknown keys.  
 Unknown behavior: clients and server ignore unknown map keys; consumers prefer typed fields when present.  
 Validation: typed `routing.origin` ∈ {`STREAM_ORIGIN_ROUTE_DELTA`, `STREAM_ORIGIN_RESTORE`}; typed `routing.webrtc_mode` ∈ {`WEB_RTC_MODE_SERVER_MANAGED`, `WEB_RTC_MODE_PEER_MANAGED`}. Typed `audio_metadata.sample_rate` and `audio_metadata.channels` are positive integers when set; `audio_metadata.codec` is a non-empty token when set. Legacy map values mirror typed values in lowercase/decimal form.  
-Tests: protocol contract fixture `start_stream_audio_v1` covers typed `audio_metadata` + legacy map coexistence; `start_stream_route_delta_v1` and `route_stream_route_delta_v1` cover typed routing + legacy-map coexistence. Transport/media-control tests cover typed-first fallback and metadata normalization.
+Tests: protocol contract fixture `start_stream_audio_v1` covers typed `audio_metadata` + legacy map coexistence; `start_stream_route_delta_v1` and `route_stream_route_delta_v1` cover typed routing + legacy-map coexistence. Transport/media-control tests cover typed-first fallback and metadata normalization; `TestGeneratedProtoAdapterFromInternal` pins `StartStream.routing` typed-first legacy mirror cleanup while preserving unknown metadata keys.
 
 Known keys:
 

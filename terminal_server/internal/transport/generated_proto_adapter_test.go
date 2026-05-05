@@ -1204,6 +1204,46 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 
 	envelope, err = adapter.FromInternal(ServerMessage{
 		StartStream: &StartStreamResponse{
+			StreamID:       "stream-routing-typed",
+			Kind:           "video",
+			SourceDeviceID: "d1",
+			TargetDeviceID: "d2",
+			Metadata: map[string]string{
+				"origin":            "restore",
+				"webrtc_mode":       "peer_managed",
+				"future.route_hint": "preserve",
+			},
+			Routing: &iov1.StreamRouting{
+				Origin:     iov1.StreamOrigin_STREAM_ORIGIN_ROUTE_DELTA,
+				WebrtcMode: iov1.WebRTCMode_WEB_RTC_MODE_SERVER_MANAGED,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() start_stream typed routing error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("start_stream typed routing envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	if got := resp.GetStartStream().GetRouting().GetOrigin(); got != iov1.StreamOrigin_STREAM_ORIGIN_ROUTE_DELTA {
+		t.Fatalf("typed routing origin = %v, want STREAM_ORIGIN_ROUTE_DELTA", got)
+	}
+	if got := resp.GetStartStream().GetRouting().GetWebrtcMode(); got != iov1.WebRTCMode_WEB_RTC_MODE_SERVER_MANAGED {
+		t.Fatalf("typed routing webrtc_mode = %v, want WEB_RTC_MODE_SERVER_MANAGED", got)
+	}
+	if got := resp.GetStartStream().GetMetadata()["origin"]; got != "route_delta" {
+		t.Fatalf("start_stream metadata origin = %q, want route_delta", got)
+	}
+	if got := resp.GetStartStream().GetMetadata()["webrtc_mode"]; got != "server_managed" {
+		t.Fatalf("start_stream metadata webrtc_mode = %q, want server_managed", got)
+	}
+	if got := resp.GetStartStream().GetMetadata()["future.route_hint"]; got != "preserve" {
+		t.Fatalf("start_stream unknown metadata = %q, want preserve", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		StartStream: &StartStreamResponse{
 			StreamID:       "stream-2",
 			Kind:           "audio",
 			SourceDeviceID: "d1",
