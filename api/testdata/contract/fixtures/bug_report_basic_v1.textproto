@@ -1,0 +1,67 @@
+bug_report: {
+  report_id: "bug-local-20260505-001"
+  reporter_device_id: "kitchen-tablet-01"
+  subject_device_id: "kitchen-display-01"
+  source: BUG_REPORT_SOURCE_SCREEN_BUTTON
+  description: "Timer screen is frozen after rotation"
+  tags: "ui"
+  tags: "rotation"
+  timestamp_unix_ms: 1778006400123
+  client_context: {
+    identity: {
+      device_id: "kitchen-tablet-01"
+      device_name: "Kitchen Tablet"
+      device_type: "tablet"
+      platform: "android"
+      client_version: "0.1.0-dev"
+      locale: "en-US"
+      timezone: "America/Chicago"
+      clock_offset_ms: 42
+    }
+    runtime: {
+      scenario_ids: "timer"
+      active_ui_root: {
+        id: "root"
+        stack: {}
+      }
+      recent_ui_actions: {
+        unix_ms: 1778006399000
+        component_id: "bug_report_button"
+        action: "tap"
+        value: "redacted"
+      }
+      recent_logs: {
+        unix_ms: 1778006399500
+        level: "warn"
+        message: "ui frame delayed"
+      }
+    }
+    connection: {
+      last_heartbeat_unix_ms: 1778006398000
+      reconnect_attempt: 1
+      last_status: "connected"
+      last_rtt_ms: 12.5
+      online: true
+    }
+    hardware: {
+      battery_level: 0.72
+      battery_charging: true
+      screen_width_px: 1920
+      screen_height_px: 1200
+      device_pixel_ratio: 2.0
+      orientation: "landscape"
+      sensor_snapshot: {
+        key: "temperature_c"
+        value: 31.5
+      }
+    }
+    error_capture: {
+      last_error_message: "setState after dispose"
+      last_error_unix_ms: 1778006397000
+    }
+  }
+  source_hints: {
+    key: "screenshot_byte_count"
+    value: "128"
+  }
+}

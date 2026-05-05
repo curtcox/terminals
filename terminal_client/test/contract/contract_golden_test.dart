@@ -424,6 +424,90 @@ Object? _valueAtPath(GeneratedMessage message, String path) {
           .value
           .int64Value
           .toInt();
+    case 'bug_report.report_id':
+      return (message as ConnectRequest).bugReport.reportId;
+    case 'bug_report.reporter_device_id':
+      return (message as ConnectRequest).bugReport.reporterDeviceId;
+    case 'bug_report.subject_device_id':
+      return (message as ConnectRequest).bugReport.subjectDeviceId;
+    case 'bug_report.source':
+      return (message as ConnectRequest).bugReport.source.name;
+    case 'bug_report.tags':
+      return (message as ConnectRequest).bugReport.tags;
+    case 'bug_report.client_context.identity.device_id':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .identity
+          .deviceId;
+    case 'bug_report.client_context.identity.timezone':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .identity
+          .timezone;
+    case 'bug_report.client_context.runtime.scenario_ids':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .runtime
+          .scenarioIds;
+    case 'bug_report.client_context.runtime.active_ui_root.widget':
+      return _snakeCase((message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .runtime
+          .activeUiRoot
+          .whichWidget()
+          .name);
+    case 'bug_report.client_context.runtime.recent_ui_actions[0].component_id':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .runtime
+          .recentUiActions[0]
+          .componentId;
+    case 'bug_report.client_context.runtime.recent_logs[0].level':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .runtime
+          .recentLogs[0]
+          .level;
+    case 'bug_report.client_context.connection.online':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .connection
+          .online;
+    case 'bug_report.client_context.connection.last_rtt_ms':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .connection
+          .lastRttMs;
+    case 'bug_report.client_context.hardware.screen_width_px':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .hardware
+          .screenWidthPx;
+    case 'bug_report.client_context.hardware.sensor_snapshot[temperature_c]':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .hardware
+          .sensorSnapshot['temperature_c'];
+    case 'bug_report.client_context.error_capture.last_error_message':
+      return (message as ConnectRequest)
+          .bugReport
+          .clientContext
+          .errorCapture
+          .lastErrorMessage;
+    case 'bug_report.source_hints[screenshot_byte_count]':
+      return (message as ConnectRequest)
+          .bugReport
+          .sourceHints['screenshot_byte_count'];
     case 'protocol_version':
       return (message as WireEnvelope).protocolVersion;
     case 'session_id':
@@ -467,6 +551,16 @@ Object? _valueAtPath(GeneratedMessage message, String path) {
       return (message as WireEnvelope)
           .transportHelloAck
           .limits['heartbeat_interval_ms'];
+    case 'bug_report_ack.report_id':
+      return (message as ConnectResponse).bugReportAck.reportId;
+    case 'bug_report_ack.correlation_id':
+      return (message as ConnectResponse).bugReportAck.correlationId;
+    case 'bug_report_ack.status':
+      return (message as ConnectResponse).bugReportAck.status.name;
+    case 'bug_report_ack.report_path':
+      return (message as ConnectResponse).bugReportAck.reportPath;
+    case 'bug_report_ack.message':
+      return (message as ConnectResponse).bugReportAck.message;
     default:
       throw UnsupportedError('unsupported assertion path $path');
   }

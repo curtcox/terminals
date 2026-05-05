@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "$ROOT_DIR/terminal_server"
-GOCACHE="${GOCACHE:-$ROOT_DIR/.cache/go-build}" go test ./internal/contracttest
+GOCACHE="${GOCACHE:-$ROOT_DIR/.cache/go-build}" go test ./internal/contracttest -count=1
 
 cd "$ROOT_DIR/terminal_client"
 mkdir -p "$ROOT_DIR/.home"

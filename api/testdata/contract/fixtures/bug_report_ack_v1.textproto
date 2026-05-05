@@ -1,0 +1,7 @@
+bug_report_ack: {
+  report_id: "bug-local-20260505-001"
+  correlation_id: "corr-20260505-001"
+  status: BUG_REPORT_STATUS_FILED
+  report_path: "logs/bug_reports/2026-05-05/bug-local-20260505-001.json"
+  message: "Bug report filed"
+}

@@ -1,0 +1,37 @@
+message: terminals.control.v1.ConnectRequest
+payload: bug_report
+assertions:
+  - path: bug_report.report_id
+    equals: bug-local-20260505-001
+  - path: bug_report.reporter_device_id
+    equals: kitchen-tablet-01
+  - path: bug_report.subject_device_id
+    equals: kitchen-display-01
+  - path: bug_report.source
+    equals: BUG_REPORT_SOURCE_SCREEN_BUTTON
+  - path: bug_report.tags
+    contains: [ui, rotation]
+  - path: bug_report.client_context.identity.device_id
+    equals: kitchen-tablet-01
+  - path: bug_report.client_context.identity.timezone
+    equals: America/Chicago
+  - path: bug_report.client_context.runtime.scenario_ids
+    contains: [timer]
+  - path: bug_report.client_context.runtime.active_ui_root.widget
+    equals: stack
+  - path: bug_report.client_context.runtime.recent_ui_actions[0].component_id
+    equals: bug_report_button
+  - path: bug_report.client_context.runtime.recent_logs[0].level
+    equals: warn
+  - path: bug_report.client_context.connection.online
+    equals: true
+  - path: bug_report.client_context.connection.last_rtt_ms
+    equals: 12.5
+  - path: bug_report.client_context.hardware.screen_width_px
+    equals: 1920
+  - path: bug_report.client_context.hardware.sensor_snapshot[temperature_c]
+    equals: 31.5
+  - path: bug_report.client_context.error_capture.last_error_message
+    equals: setState after dispose
+  - path: bug_report.source_hints[screenshot_byte_count]
+    equals: "128"

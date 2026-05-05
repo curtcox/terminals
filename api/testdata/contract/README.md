@@ -8,8 +8,9 @@ This directory contains shared Go-Dart protobuf contract fixtures.
 - `expected/*.yaml` contains small semantic assertions shared by both runtimes.
 
 The corpus covers handshake, capabilities, server-driven UI, input events,
-transport negotiation, and command request compatibility. Deprecated fixtures
-are parse-only when marked that way in `manifest.yaml`.
+transport negotiation, command request compatibility, and diagnostics bug
+reports. Deprecated fixtures are parse-only when marked that way in
+`manifest.yaml`.
 
 Tests read `.binpb` files only. Regenerate binary fixtures after editing textproto:
 

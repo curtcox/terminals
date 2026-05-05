@@ -1,0 +1,13 @@
+message: terminals.control.v1.ConnectResponse
+payload: bug_report_ack
+assertions:
+  - path: bug_report_ack.report_id
+    equals: bug-local-20260505-001
+  - path: bug_report_ack.correlation_id
+    equals: corr-20260505-001
+  - path: bug_report_ack.status
+    equals: BUG_REPORT_STATUS_FILED
+  - path: bug_report_ack.report_path
+    equals: logs/bug_reports/2026-05-05/bug-local-20260505-001.json
+  - path: bug_report_ack.message
+    equals: Bug report filed

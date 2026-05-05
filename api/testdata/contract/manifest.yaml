@@ -90,3 +90,23 @@ fixtures:
     round_trip: semantic
     expected: expected/update_ui_component_v1.yaml
     tags: [ui, patch]
+  - id: bug_report_basic_v1
+    file: fixtures/bug_report_basic_v1.binpb
+    textproto: fixtures/bug_report_basic_v1.textproto
+    message: terminals.control.v1.ConnectRequest
+    payload: bug_report
+    direction: client_to_server
+    purpose: Diagnostics bug report preserving source, client context, hardware, and source hints.
+    round_trip: semantic
+    expected: expected/bug_report_basic_v1.yaml
+    tags: [diagnostics, bug-report]
+  - id: bug_report_ack_v1
+    file: fixtures/bug_report_ack_v1.binpb
+    textproto: fixtures/bug_report_ack_v1.textproto
+    message: terminals.control.v1.ConnectResponse
+    payload: bug_report_ack
+    direction: server_to_client
+    purpose: Diagnostics bug report acknowledgement preserving status and durable report location.
+    round_trip: semantic
+    expected: expected/bug_report_ack_v1.yaml
+    tags: [diagnostics, bug-report]
