@@ -1,0 +1,11 @@
+message: terminals.control.v1.ConnectResponse
+payload: notification
+assertions:
+  - path: notification.device_id
+    equals: kitchen-tablet-01
+  - path: notification.title
+    equals: Flow started
+  - path: notification.body
+    equals: Audio watch is now running.
+  - path: notification.level
+    equals: info

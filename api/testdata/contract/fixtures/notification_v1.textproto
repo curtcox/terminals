@@ -1,0 +1,6 @@
+notification: {
+  device_id: "kitchen-tablet-01"
+  title: "Flow started"
+  body: "Audio watch is now running."
+  level: "info"
+}

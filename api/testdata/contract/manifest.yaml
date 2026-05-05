@@ -90,6 +90,46 @@ fixtures:
     round_trip: semantic
     expected: expected/update_ui_component_v1.yaml
     tags: [ui, patch]
+  - id: observation_with_artifact_v1
+    file: fixtures/observation_with_artifact_v1.binpb
+    textproto: fixtures/observation_with_artifact_v1.textproto
+    message: terminals.control.v1.ConnectRequest
+    payload: observation_message
+    direction: client_to_server
+    purpose: Edge observation preserving typed attributes, legacy attributes, provenance, and evidence artifact references.
+    round_trip: semantic
+    expected: expected/observation_with_artifact_v1.yaml
+    tags: [observation, artifact, io]
+  - id: flow_start_basic_v1
+    file: fixtures/flow_start_basic_v1.binpb
+    textproto: fixtures/flow_start_basic_v1.textproto
+    message: terminals.control.v1.ConnectResponse
+    payload: start_flow
+    direction: server_to_client
+    purpose: Flow start preserving node topology, exec policies, legacy args, and typed argument mirrors.
+    round_trip: semantic
+    expected: expected/flow_start_basic_v1.yaml
+    tags: [flow, io]
+  - id: control_error_protocol_violation_v1
+    file: fixtures/control_error_protocol_violation_v1.binpb
+    textproto: fixtures/control_error_protocol_violation_v1.textproto
+    message: terminals.control.v1.ConnectResponse
+    payload: error
+    direction: server_to_client
+    purpose: Typed control error for protocol violations.
+    round_trip: semantic
+    expected: expected/control_error_protocol_violation_v1.yaml
+    tags: [control, error]
+  - id: notification_v1
+    file: fixtures/notification_v1.binpb
+    textproto: fixtures/notification_v1.textproto
+    message: terminals.control.v1.ConnectResponse
+    payload: notification
+    direction: server_to_client
+    purpose: UI notification envelope distinct from command-result notification text.
+    round_trip: semantic
+    expected: expected/notification_v1.yaml
+    tags: [ui, notification]
   - id: bug_report_basic_v1
     file: fixtures/bug_report_basic_v1.binpb
     textproto: fixtures/bug_report_basic_v1.textproto

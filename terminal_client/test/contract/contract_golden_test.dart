@@ -508,6 +508,143 @@ Object? _valueAtPath(GeneratedMessage message, String path) {
       return (message as ConnectRequest)
           .bugReport
           .sourceHints['screenshot_byte_count'];
+    case 'observation_message.observation.kind':
+      return (message as ConnectRequest).observationMessage.observation.kind;
+    case 'observation_message.observation.subject':
+      return (message as ConnectRequest).observationMessage.observation.subject;
+    case 'observation_message.observation.source_device.device_id':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .sourceDevice
+          .deviceId;
+    case 'observation_message.observation.attributes[label]':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .attributes['label'];
+    case 'observation_message.observation.attributes[device]':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .attributes['device'];
+    case 'observation_message.observation.typed_attributes.label':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .typedAttributes
+          .label;
+    case 'observation_message.observation.typed_attributes.device':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .typedAttributes
+          .device;
+    case 'observation_message.observation.provenance.flow_id':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .provenance
+          .flowId;
+    case 'observation_message.observation.provenance.node_id':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .provenance
+          .nodeId;
+    case 'observation_message.observation.evidence':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .evidence;
+    case 'observation_message.observation.evidence[0].id':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .evidence[0]
+          .id;
+    case 'observation_message.observation.evidence[0].kind':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .evidence[0]
+          .kind;
+    case 'observation_message.observation.evidence[0].uri':
+      return (message as ConnectRequest)
+          .observationMessage
+          .observation
+          .evidence[0]
+          .uri;
+    case 'start_flow.flow_id':
+      return (message as ConnectResponse).startFlow.flowId;
+    case 'start_flow.plan.nodes':
+      return (message as ConnectResponse).startFlow.plan.nodes;
+    case 'start_flow.plan.edges':
+      return (message as ConnectResponse).startFlow.plan.edges;
+    case 'start_flow.plan.nodes[0].id':
+      return (message as ConnectResponse).startFlow.plan.nodes[0].id;
+    case 'start_flow.plan.nodes[0].exec':
+      return (message as ConnectResponse).startFlow.plan.nodes[0].exec;
+    case 'start_flow.plan.nodes[0].exec_policy':
+      return (message as ConnectResponse)
+          .startFlow
+          .plan
+          .nodes[0]
+          .execPolicy
+          .name;
+    case 'start_flow.plan.nodes[0].args[device_id]':
+      return (message as ConnectResponse)
+          .startFlow
+          .plan
+          .nodes[0]
+          .args['device_id'];
+    case 'start_flow.plan.nodes[0].typed_args.device_id':
+      return (message as ConnectResponse)
+          .startFlow
+          .plan
+          .nodes[0]
+          .typedArgs
+          .deviceId;
+    case 'start_flow.plan.nodes[0].typed_args.resource':
+      return (message as ConnectResponse)
+          .startFlow
+          .plan
+          .nodes[0]
+          .typedArgs
+          .resource;
+    case 'start_flow.plan.nodes[0].typed_args.stream_kind_enum':
+      return (message as ConnectResponse)
+          .startFlow
+          .plan
+          .nodes[0]
+          .typedArgs
+          .streamKindEnum
+          .name;
+    case 'start_flow.plan.nodes[1].id':
+      return (message as ConnectResponse).startFlow.plan.nodes[1].id;
+    case 'start_flow.plan.nodes[1].exec_policy':
+      return (message as ConnectResponse)
+          .startFlow
+          .plan
+          .nodes[1]
+          .execPolicy
+          .name;
+    case 'start_flow.plan.edges[0].from':
+      return (message as ConnectResponse).startFlow.plan.edges[0].from;
+    case 'start_flow.plan.edges[0].to':
+      return (message as ConnectResponse).startFlow.plan.edges[0].to;
+    case 'error.code':
+      return (message as ConnectResponse).error.code.name;
+    case 'error.message':
+      return (message as ConnectResponse).error.message;
+    case 'notification.device_id':
+      return (message as ConnectResponse).notification.deviceId;
+    case 'notification.title':
+      return (message as ConnectResponse).notification.title;
+    case 'notification.body':
+      return (message as ConnectResponse).notification.body;
+    case 'notification.level':
+      return (message as ConnectResponse).notification.level;
     case 'protocol_version':
       return (message as WireEnvelope).protocolVersion;
     case 'session_id':

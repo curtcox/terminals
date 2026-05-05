@@ -1,0 +1,44 @@
+observation_message: {
+  observation: {
+    kind: "sound.detected"
+    subject: "kettle"
+    source_device: {
+      device_id: "terminal-kitchen"
+    }
+    occurred_unix_ms: 1777816800000
+    confidence: 0.87
+    zone: "kitchen"
+    attributes: {
+      key: "label"
+      value: "whistle"
+    }
+    attributes: {
+      key: "loudness_db"
+      value: "72.5"
+    }
+    attributes: {
+      key: "device"
+      value: "kettle"
+    }
+    typed_attributes: {
+      label: "whistle"
+      device: "kettle"
+    }
+    provenance: {
+      flow_id: "flow-audio-watch"
+      node_id: "classify"
+      exec_site: "server"
+      model_id: "silence-v1"
+    }
+    evidence: {
+      id: "artifact-audio-1"
+      kind: "audio_clip"
+      source: {
+        device_id: "terminal-kitchen"
+      }
+      start_unix_ms: 1777816795000
+      end_unix_ms: 1777816800000
+      uri: "artifact://audio/artifact-audio-1"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+error: {
+  code: CONTROL_ERROR_CODE_PROTOCOL_VIOLATION
+  message: "received out-of-order control sequence"
+}

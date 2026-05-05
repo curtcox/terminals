@@ -1,0 +1,31 @@
+message: terminals.control.v1.ConnectResponse
+payload: start_flow
+assertions:
+  - path: start_flow.flow_id
+    equals: flow-audio-watch
+  - path: start_flow.plan.nodes
+    length: 2
+  - path: start_flow.plan.edges
+    length: 1
+  - path: start_flow.plan.nodes[0].id
+    equals: capture
+  - path: start_flow.plan.nodes[0].exec
+    equals: edge
+  - path: start_flow.plan.nodes[0].exec_policy
+    equals: EXEC_POLICY_PREFER_CLIENT
+  - path: start_flow.plan.nodes[0].args[device_id]
+    equals: kitchen-terminal
+  - path: start_flow.plan.nodes[0].typed_args.device_id
+    equals: kitchen-terminal
+  - path: start_flow.plan.nodes[0].typed_args.resource
+    equals: microphone
+  - path: start_flow.plan.nodes[0].typed_args.stream_kind_enum
+    equals: STREAM_KIND_AUDIO
+  - path: start_flow.plan.nodes[1].id
+    equals: classify
+  - path: start_flow.plan.nodes[1].exec_policy
+    equals: EXEC_POLICY_SERVER_ONLY
+  - path: start_flow.plan.edges[0].from
+    equals: capture
+  - path: start_flow.plan.edges[0].to
+    equals: classify

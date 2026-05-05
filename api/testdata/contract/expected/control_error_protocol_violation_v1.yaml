@@ -1,0 +1,7 @@
+message: terminals.control.v1.ConnectResponse
+payload: error
+assertions:
+  - path: error.code
+    equals: CONTROL_ERROR_CODE_PROTOCOL_VIOLATION
+  - path: error.message
+    equals: received out-of-order control sequence

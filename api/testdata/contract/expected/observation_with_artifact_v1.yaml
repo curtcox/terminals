@@ -1,0 +1,29 @@
+message: terminals.control.v1.ConnectRequest
+payload: observation_message
+assertions:
+  - path: observation_message.observation.kind
+    equals: sound.detected
+  - path: observation_message.observation.subject
+    equals: kettle
+  - path: observation_message.observation.source_device.device_id
+    equals: terminal-kitchen
+  - path: observation_message.observation.attributes[label]
+    equals: whistle
+  - path: observation_message.observation.attributes[device]
+    equals: kettle
+  - path: observation_message.observation.typed_attributes.label
+    equals: whistle
+  - path: observation_message.observation.typed_attributes.device
+    equals: kettle
+  - path: observation_message.observation.provenance.flow_id
+    equals: flow-audio-watch
+  - path: observation_message.observation.provenance.node_id
+    equals: classify
+  - path: observation_message.observation.evidence
+    length: 1
+  - path: observation_message.observation.evidence[0].id
+    equals: artifact-audio-1
+  - path: observation_message.observation.evidence[0].kind
+    equals: audio_clip
+  - path: observation_message.observation.evidence[0].uri
+    equals: artifact://audio/artifact-audio-1

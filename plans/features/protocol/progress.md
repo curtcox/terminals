@@ -230,3 +230,11 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Extended the Dart contract assertion helper with the new `update_ui.*` paths; the Go helper already resolves these paths through protobuf reflection.
 - Regenerated the new `.binpb` fixture with `make proto-contract-generate`.
 - Re-ran `make proto-contract-test`; all protocol contract gates passed.
+
+## Go-Dart Contract Golden Tests (2026-05-05, remaining expanded fixtures)
+
+- Added the remaining expanded-plan fixtures to the shared `api/testdata/contract` corpus: `observation_with_artifact_v1`, `flow_start_basic_v1`, `control_error_protocol_violation_v1`, and `notification_v1`.
+- Added textproto, regenerated binpb, and expected YAML assertions for each new fixture, covering typed observation attributes plus evidence artifacts, flow topology plus typed/legacy node args, protocol error enums, and UI notifications distinct from command-result notification strings.
+- Registered the fixtures in `manifest.yaml` and updated `api/testdata/contract/README.md` to describe the broader coverage.
+- Extended the Dart contract assertion helper with explicit paths for the new observation, flow, error, and notification assertions; the Go contract test covers the same paths through protobuf reflection.
+- Re-ran `make proto-contract-generate` and `make proto-contract-test`; all contract gates passed. `make proto-contract-verify` also ran the suite successfully and then reported the expected `git diff` because these new fixture files are intentionally uncommitted.
