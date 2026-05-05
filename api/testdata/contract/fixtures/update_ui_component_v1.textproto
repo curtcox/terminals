@@ -1,0 +1,12 @@
+update_ui: {
+  device_id: "kitchen-tablet-01"
+  component_id: "timer_status"
+  node: {
+    id: "timer_status"
+    text: {
+      value: "Timer running"
+      style: "body"
+      color: "#0f766e"
+    }
+  }
+}

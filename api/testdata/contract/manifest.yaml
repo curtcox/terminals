@@ -80,3 +80,13 @@ fixtures:
     round_trip: semantic
     expected: expected/command_request_manual_start_v1.yaml
     tags: [command, input]
+  - id: update_ui_component_v1
+    file: fixtures/update_ui_component_v1.binpb
+    textproto: fixtures/update_ui_component_v1.textproto
+    message: terminals.control.v1.ConnectResponse
+    payload: update_ui
+    direction: server_to_client
+    purpose: Component patch preserving target id and replacement widget semantics.
+    round_trip: semantic
+    expected: expected/update_ui_component_v1.yaml
+    tags: [ui, patch]

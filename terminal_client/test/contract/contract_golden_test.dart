@@ -126,6 +126,10 @@ bool _pathPresent(GeneratedMessage message, String path) {
       return (message as ConnectResponse).setUi.root.children[1].hasButton();
     case 'set_ui.root.children[1].text':
       return (message as ConnectResponse).setUi.root.children[1].hasText();
+    case 'update_ui.node.text':
+      return (message as ConnectResponse).updateUi.node.hasText();
+    case 'update_ui.node.button':
+      return (message as ConnectResponse).updateUi.node.hasButton();
     default:
       _valueAtPath(message, path);
       return true;
@@ -331,6 +335,21 @@ Object? _valueAtPath(GeneratedMessage message, String path) {
       );
     case 'set_ui.root.children[1].button.action':
       return (message as ConnectResponse).setUi.root.children[1].button.action;
+    case 'update_ui.device_id':
+      return (message as ConnectResponse).updateUi.deviceId;
+    case 'update_ui.component_id':
+      return (message as ConnectResponse).updateUi.componentId;
+    case 'update_ui.node.id':
+      return (message as ConnectResponse).updateUi.node.id;
+    case 'update_ui.node.widget':
+      return _snakeCase(
+          (message as ConnectResponse).updateUi.node.whichWidget().name);
+    case 'update_ui.node.text.value':
+      return (message as ConnectResponse).updateUi.node.text.value;
+    case 'update_ui.node.text.style':
+      return (message as ConnectResponse).updateUi.node.text.style;
+    case 'update_ui.node.text.color':
+      return (message as ConnectResponse).updateUi.node.text.color;
     case 'input.device_id':
       return (message as ConnectRequest).input.deviceId;
     case 'input.ui_action.component_id':

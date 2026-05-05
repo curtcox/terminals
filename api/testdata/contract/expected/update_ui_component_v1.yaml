@@ -1,0 +1,21 @@
+message: terminals.control.v1.ConnectResponse
+payload: update_ui
+assertions:
+  - path: update_ui.device_id
+    equals: kitchen-tablet-01
+  - path: update_ui.component_id
+    equals: timer_status
+  - path: update_ui.node.id
+    equals: timer_status
+  - path: update_ui.node.widget
+    equals: text
+  - path: update_ui.node.text
+    present: true
+  - path: update_ui.node.button
+    absent: true
+  - path: update_ui.node.text.value
+    equals: Timer running
+  - path: update_ui.node.text.style
+    equals: body
+  - path: update_ui.node.text.color
+    equals: "#0f766e"

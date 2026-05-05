@@ -222,3 +222,11 @@ Any future compatibility-window cleanup (for example fully removing deprecated p
 - Auto-applied `dart format` changes to four Dart files; `make all-check` exits 0 with 0 issues.
 - Verified all whole-plan acceptance criteria are satisfied: 31/31 flexible fields registered, CI enforcement on (enforce mode), 16 golden envelope fixtures, Go and Dart contract suites pass, typed replacements shipped for all five Phase 4 candidates (BuildMetadata, StreamKind, WebRTCSignalType, FlowState, CanvasWidget DrawOps) plus ScrollDirection, ExecPolicy, PointerAction, TouchAction, FlowNodeArgs, ObservationAttributes, UiEventKind, StreamRouting, and DiagnosticsStreamEntry.
 - Promoted plan status to `shipped-validated`.
+
+## Go-Dart Contract Golden Tests (2026-05-05, UpdateUI expansion)
+
+- Added `update_ui_component_v1` to the shared `api/testdata/contract` corpus, covering the expanded-plan component patch case with a `ConnectResponse.update_ui` payload.
+- Added matching semantic assertions for target device id, component id, replacement node id, widget oneof case, text widget content/style/color, and button absence.
+- Extended the Dart contract assertion helper with the new `update_ui.*` paths; the Go helper already resolves these paths through protobuf reflection.
+- Regenerated the new `.binpb` fixture with `make proto-contract-generate`.
+- Re-ran `make proto-contract-test`; all protocol contract gates passed.
