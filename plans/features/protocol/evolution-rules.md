@@ -990,6 +990,12 @@ Incremental progress (2026-05-05, CommandRequest manual argument producer):
 - Added focused command-builder coverage for `activation_id` and `device_ids` to pin typed + legacy coexistence on this manual command producer path.
 - Updated the registry entry for `CommandRequest.arguments` so the documented producer coverage matches the current client wiring.
 
+Incremental progress (2026-05-05, Observation typed attribute fallback):
+
+- Added focused server adapter coverage for `Observation.typed_attributes` consuming typed common keys first while preserving unknown legacy `Observation.attributes` keys.
+- Kept observation handling generic: typed `label`/`device`/`duration_seconds` normalize into the existing internal attributes map, and observation-kind-specific legacy keys remain available to server consumers.
+- Updated the `Observation.attributes` registry entry to name the exact test that pins typed-first merge behavior and unknown-key preservation.
+
 ### PR 6 - Enforcement
 
 - Flip `proto-flex-check` from advisory to required.

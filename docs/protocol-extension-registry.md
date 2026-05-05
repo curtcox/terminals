@@ -462,7 +462,7 @@ Producer: sensing/observation pipeline; today only the inbound (client→server)
 Consumer: server scenario engine, world model, diagnostics; the generated proto adapter (`observationAttributesFromProto` in `terminal_server/internal/transport/generated_proto_adapter.go`) merges typed fields over the legacy map so internal `iorouter.Observation.Attributes` reflects the typed-first preference.  
 Unknown behavior: consumers ignore unknown attributes; legacy keys not represented by typed fields pass through unchanged.  
 Validation: typed `label`, `device`, `mac` are trimmed strings when set; `duration_seconds` is a decimal-seconds string mirroring legacy `attributes["duration_seconds"]`.  
-Tests: adapter merges typed + legacy keys with typed-first preference; observation contract fixtures cover typed-vs-legacy preference and unknown-key tolerance.
+Tests: `TestObservationAttributesFromProtoTypedWinsAndPreservesUnknownLegacy` pins typed-first merge behavior while preserving unknown legacy extension keys; observation contract fixtures cover typed-vs-legacy coexistence and unknown-key tolerance.
 
 ### Field: terminals.io.v1.FlowStats.state
 

@@ -1508,6 +1508,38 @@ func TestObservationTypedAttributesFromInternalTrimsWhitespace(t *testing.T) {
 	}
 }
 
+func TestObservationAttributesFromProtoTypedWinsAndPreservesUnknownLegacy(t *testing.T) {
+	got := observationAttributesFromProto(&iov1.Observation{
+		Attributes: map[string]string{
+			"label":       "legacy-label",
+			"device":      "legacy-device",
+			"loudness_db": "72.5",
+			"future.key":  "preserve-me",
+		},
+		TypedAttributes: &iov1.ObservationAttributes{
+			Label:           "typed-label",
+			Device:          "typed-device",
+			DurationSeconds: "3.25",
+		},
+	})
+
+	if got["label"] != "typed-label" {
+		t.Fatalf("label = %q, want typed-label", got["label"])
+	}
+	if got["device"] != "typed-device" {
+		t.Fatalf("device = %q, want typed-device", got["device"])
+	}
+	if got["duration_seconds"] != "3.25" {
+		t.Fatalf("duration_seconds = %q, want 3.25", got["duration_seconds"])
+	}
+	if got["loudness_db"] != "72.5" {
+		t.Fatalf("loudness_db legacy extension key lost: %+v", got)
+	}
+	if got["future.key"] != "preserve-me" {
+		t.Fatalf("future legacy extension key lost: %+v", got)
+	}
+}
+
 func TestCanvasDrawOpsFromJSONParsesAllVariants(t *testing.T) {
 	raw := `{"ops":[
 		{"line":{"x1":1,"y1":2,"x2":3,"y2":4,"stroke":"#000","stroke_width":1.5}},
