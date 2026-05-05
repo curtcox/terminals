@@ -958,6 +958,13 @@ Incremental progress (2026-05-05, CommandResult status list typed data):
 - Preserved unknown and compound legacy strings, including pipe-delimited detail payloads such as `media_streams`, as `string_value` so typed mirroring does not reinterpret structured diagnostic text.
 - Added focused adapter coverage for the new list-key promotion and updated the protocol extension registry.
 
+Incremental progress (2026-05-05, CommandResult playback metadata typed data):
+
+- Tightened `CommandResult.typed_data` production for durable playback metadata results by making generated adapter entries deterministic by key.
+- Added focused adapter coverage that pins playback metadata IDs/categories as typed string values and `size_bytes` / `updated_unix_ms` as typed int64 values while preserving legacy `CommandResult.data`.
+- Preserved unknown playback metadata keys through both the legacy map and typed string mirror so consumers can ignore future keys without data loss.
+- Updated the protocol extension registry with the stable playback metadata keys and deterministic typed-entry behavior.
+
 Incremental progress (2026-05-04, UiEventEntry typed kind enum):
 
 - Added additive typed enum `terminals.diagnostics.v1.UiEventKind` (UNSPECIFIED/SET_UI/UPDATE_UI/TRANSITION_UI) and `UiEventEntry.kind_enum = 5` while preserving the legacy `kind` string.

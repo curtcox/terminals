@@ -125,11 +125,11 @@ Owner: scenario/transport
 Classification: transitional_escape_hatch  
 Target state: typed `CommandResult.typed_data` now mirrors durable command result data; keep legacy `data` map during the compatibility window.  
 Review date: 2026-06-15  
-Producer: server command dispatcher and scenarios emit both typed entries and the legacy map; the generated proto adapter promotes generic numeric, boolean, double, and known comma-separated list values into the corresponding `CommandTypedValue` variants while preserving the legacy strings.  
+Producer: server command dispatcher and scenarios emit both typed entries and the legacy map; the generated proto adapter emits deterministic key-sorted typed entries, promotes generic numeric, boolean, double, and known comma-separated list values into the corresponding `CommandTypedValue` variants, and preserves the legacy strings.  
 Consumer: clients and diagnostics surfaces prefer typed entries when present and fall back to the legacy map for older servers.  
 Unknown behavior: clients ignore unknown keys.  
 Validation: typed values use `CommandTypedValue` (`string_value`, `int64_value`, `bool_value`, `double_value`, or `string_list_value`); legacy string values remain for compatibility and known keys document stricter formats with the owning command.  
-Tests: command result tests cover currently consumed keys; adapter tests assert typed status list promotion for `sensor_device_ids` and `recording_stream_ids` while preserving compound detail strings; `command_result_typed_data_v1` golden fixture is decoded by both Go and Dart contract tests and pins typed + legacy coexistence.
+Tests: command result tests cover currently consumed keys; adapter tests assert typed status list promotion for `sensor_device_ids` and `recording_stream_ids`, deterministic typed entry ordering, and playback metadata scalar mirroring while preserving unknown keys and compound detail strings; `command_result_typed_data_v1` golden fixture is decoded by both Go and Dart contract tests and pins typed + legacy coexistence.
 
 Known generic list keys:
 
@@ -139,6 +139,17 @@ Known generic list keys:
 - `command_actions`
 - `sensor_device_ids`
 - `recording_stream_ids`
+
+Known playback metadata keys:
+
+- `artifact_id`: string
+- `stream_id`: string
+- `kind`: string stream/artifact category
+- `source_device_id`: string
+- `target_device_id`: string
+- `audio_path`: string path or URI-like artifact locator
+- `size_bytes`: decimal int64 byte count
+- `updated_unix_ms`: decimal int64 Unix milliseconds
 
 ### Field: terminals.control.v1.WebRTCSignal.signal_type
 

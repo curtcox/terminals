@@ -1079,6 +1079,9 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	if len(typed) != 2 {
 		t.Fatalf("typed_data len = %d, want 2", len(typed))
 	}
+	if typed[0].GetKey() != "a" || typed[1].GetKey() != "b" {
+		t.Fatalf("typed_data keys = [%q,%q], want sorted keys [a,b]", typed[0].GetKey(), typed[1].GetKey())
+	}
 	typedByKey := map[string]*controlv1.CommandTypedValue{}
 	for _, entry := range typed {
 		typedByKey[entry.GetKey()] = entry.GetValue()
@@ -1117,6 +1120,72 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 	}
 	if got := typedByKey["media_streams"].GetStringValue(); got != "stream-audio-1|ready=true,stream-audio-2|ready=false" {
 		t.Fatalf("typed_data[media_streams].string_value = %q, want legacy detail string", got)
+	}
+
+	envelope, err = adapter.FromInternal(ServerMessage{
+		CommandAck: "playback-metadata-1",
+		Data: map[string]string{
+			"artifact_id":      "route:device-a|device-b|audio",
+			"kind":             "audio",
+			"size_bytes":       "3",
+			"source_device_id": "device-a",
+			"stream_id":        "route:device-a|device-b|audio",
+			"target_device_id": "hall-display",
+			"updated_unix_ms":  "1714867200123",
+			"unknown_playback": "preserve-me",
+		},
+	})
+	if err != nil {
+		t.Fatalf("FromInternal() playback metadata error = %v", err)
+	}
+	resp, ok = envelope.(*controlv1.ConnectResponse)
+	if !ok {
+		t.Fatalf("response envelope type = %T, want *controlv1.ConnectResponse", envelope)
+	}
+	typedByKey = map[string]*controlv1.CommandTypedValue{}
+	var typedKeys []string
+	for _, entry := range resp.GetCommandResult().GetTypedData() {
+		typedKeys = append(typedKeys, entry.GetKey())
+		typedByKey[entry.GetKey()] = entry.GetValue()
+	}
+	if !reflect.DeepEqual(typedKeys, []string{
+		"artifact_id",
+		"kind",
+		"size_bytes",
+		"source_device_id",
+		"stream_id",
+		"target_device_id",
+		"unknown_playback",
+		"updated_unix_ms",
+	}) {
+		t.Fatalf("playback typed_data keys = %v, want sorted stable keys", typedKeys)
+	}
+	if got := typedByKey["artifact_id"].GetStringValue(); got != "route:device-a|device-b|audio" {
+		t.Fatalf("typed_data[artifact_id].string_value = %q, want artifact id", got)
+	}
+	if got := typedByKey["source_device_id"].GetStringValue(); got != "device-a" {
+		t.Fatalf("typed_data[source_device_id].string_value = %q, want source device", got)
+	}
+	if got := typedByKey["target_device_id"].GetStringValue(); got != "hall-display" {
+		t.Fatalf("typed_data[target_device_id].string_value = %q, want target device", got)
+	}
+	if got := typedByKey["stream_id"].GetStringValue(); got != "route:device-a|device-b|audio" {
+		t.Fatalf("typed_data[stream_id].string_value = %q, want stream id", got)
+	}
+	if got := typedByKey["kind"].GetStringValue(); got != "audio" {
+		t.Fatalf("typed_data[kind].string_value = %q, want audio", got)
+	}
+	if got := typedByKey["size_bytes"].GetInt64Value(); got != 3 {
+		t.Fatalf("typed_data[size_bytes].int64_value = %d, want 3", got)
+	}
+	if got := typedByKey["updated_unix_ms"].GetInt64Value(); got != 1714867200123 {
+		t.Fatalf("typed_data[updated_unix_ms].int64_value = %d, want timestamp", got)
+	}
+	if got := resp.GetCommandResult().GetData()["unknown_playback"]; got != "preserve-me" {
+		t.Fatalf("legacy data unknown_playback = %q, want preserved", got)
+	}
+	if got := typedByKey["unknown_playback"].GetStringValue(); got != "preserve-me" {
+		t.Fatalf("typed_data[unknown_playback].string_value = %q, want preserved string", got)
 	}
 
 	envelope, err = adapter.FromInternal(ServerMessage{

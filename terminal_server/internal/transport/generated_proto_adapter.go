@@ -2,6 +2,7 @@ package transport
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -554,8 +555,14 @@ func commandResultDataEntriesFromMap(data map[string]string) []*controlv1.Comman
 	if len(data) == 0 {
 		return nil
 	}
+	keys := make([]string, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
 	out := make([]*controlv1.CommandResultDataEntry, 0, len(data))
-	for key, raw := range data {
+	for _, key := range keys {
+		raw := data[key]
 		entry := &controlv1.CommandResultDataEntry{Key: key}
 		entry.Value = commandTypedValueFromLegacyString(key, raw)
 		out = append(out, entry)
