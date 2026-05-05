@@ -543,14 +543,19 @@ func commandTypedValueFromLegacyString(key, raw string) *controlv1.CommandTypedV
 			}
 		}
 	}
-	if parsed, err := strconv.ParseBool(trimmed); err == nil {
-		return &controlv1.CommandTypedValue{
-			Kind: &controlv1.CommandTypedValue_BoolValue{BoolValue: parsed},
-		}
-	}
 	if parsed, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
 		return &controlv1.CommandTypedValue{
 			Kind: &controlv1.CommandTypedValue_Int64Value{Int64Value: parsed},
+		}
+	}
+	switch strings.ToLower(trimmed) {
+	case "true":
+		return &controlv1.CommandTypedValue{
+			Kind: &controlv1.CommandTypedValue_BoolValue{BoolValue: true},
+		}
+	case "false":
+		return &controlv1.CommandTypedValue{
+			Kind: &controlv1.CommandTypedValue_BoolValue{BoolValue: false},
 		}
 	}
 	if parsed, err := strconv.ParseFloat(trimmed, 64); err == nil && strings.Contains(trimmed, ".") {
