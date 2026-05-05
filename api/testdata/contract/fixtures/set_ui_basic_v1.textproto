@@ -1,0 +1,22 @@
+set_ui: {
+  device_id: "kitchen-tablet-01"
+  root: {
+    id: "root"
+    stack: {}
+    children: {
+      id: "title"
+      text: {
+        value: "Kitchen timer"
+        style: "title"
+        color: "#1f2937"
+      }
+    }
+    children: {
+      id: "start_button"
+      button: {
+        label: "Start"
+        action: "timer.start"
+      }
+    }
+  }
+}

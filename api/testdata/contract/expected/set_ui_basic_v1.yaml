@@ -1,0 +1,23 @@
+message: terminals.control.v1.ConnectResponse
+payload: set_ui
+assertions:
+  - path: set_ui.device_id
+    equals: kitchen-tablet-01
+  - path: set_ui.root.id
+    equals: root
+  - path: set_ui.root.widget
+    equals: stack
+  - path: set_ui.root.children
+    length: 2
+  - path: set_ui.root.children[0].widget
+    equals: text
+  - path: set_ui.root.children[0].text.value
+    equals: Kitchen timer
+  - path: set_ui.root.children[0].text.style
+    equals: title
+  - path: set_ui.root.children[0].text.color
+    equals: "#1f2937"
+  - path: set_ui.root.children[1].widget
+    equals: button
+  - path: set_ui.root.children[1].button.action
+    equals: timer.start

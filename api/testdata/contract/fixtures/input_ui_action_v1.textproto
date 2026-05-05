@@ -1,0 +1,8 @@
+input: {
+  device_id: "kitchen-tablet-01"
+  ui_action: {
+    component_id: "start_button"
+    action: "tap"
+    value: "timer.start"
+  }
+}

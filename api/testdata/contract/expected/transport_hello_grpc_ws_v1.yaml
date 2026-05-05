@@ -1,0 +1,15 @@
+message: terminals.control.v1.WireEnvelope
+payload: transport_hello
+assertions:
+  - path: protocol_version
+    equals: 1
+  - path: sequence
+    equals: 1
+  - path: transport_hello.protocol_version
+    equals: 1
+  - path: transport_hello.supported_carriers
+    contains:
+      - CARRIER_KIND_GRPC
+      - CARRIER_KIND_WEBSOCKET
+  - path: transport_hello.desired_device_id
+    equals: kitchen-tablet-01

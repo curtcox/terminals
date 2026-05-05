@@ -1,0 +1,33 @@
+capability_delta: {
+  device_id: "kitchen-tablet-01"
+  generation: 43
+  reason: "display_resize"
+  capabilities: {
+    device_id: "kitchen-tablet-01"
+    screen: {
+      width: 1600
+      height: 2560
+      density: 2.5
+      touch: true
+      orientation: "portrait"
+      safe_area: {
+        left: 0
+        top: 36
+        right: 0
+        bottom: 24
+      }
+    }
+    displays: {
+      display_id: "built-in"
+      display_name: "Built-in display"
+      primary: true
+      screen: {
+        width: 1600
+        height: 2560
+        density: 2.5
+        touch: true
+        orientation: "portrait"
+      }
+    }
+  }
+}

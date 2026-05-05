@@ -1,0 +1,39 @@
+message: terminals.control.v1.ConnectRequest
+payload: capability_snapshot
+assertions:
+  - path: capability_snapshot.device_id
+    equals: kitchen-tablet-01
+  - path: capability_snapshot.generation
+    equals: 42
+  - path: capability_snapshot.capabilities.screen.width
+    equals: 2560
+  - path: capability_snapshot.capabilities.screen.height
+    equals: 1600
+  - path: capability_snapshot.capabilities.screen.orientation
+    equals: landscape
+  - path: capability_snapshot.capabilities.keyboard.layout
+    equals: virtual-us
+  - path: capability_snapshot.capabilities.pointer.type
+    equals: touch
+  - path: capability_snapshot.capabilities.touch.max_points
+    equals: 10
+  - path: capability_snapshot.capabilities.speakers.endpoints[0].endpoint_id
+    equals: speaker-main
+  - path: capability_snapshot.capabilities.microphone.endpoints[0].endpoint_id
+    equals: mic-front
+  - path: capability_snapshot.capabilities.camera.endpoints[0].modes[0].width
+    equals: 1280
+  - path: capability_snapshot.capabilities.sensors.accelerometer
+    equals: true
+  - path: capability_snapshot.capabilities.connectivity.bluetooth_version
+    equals: "5.2"
+  - path: capability_snapshot.capabilities.battery.charging
+    equals: true
+  - path: capability_snapshot.capabilities.edge.runtimes
+    contains: [dart, wasm]
+  - path: capability_snapshot.capabilities.edge.operators
+    contains: [wake_word, audio_level]
+  - path: capability_snapshot.capabilities.displays
+    length: 1
+  - path: capability_snapshot.capabilities.haptics.vibration
+    equals: true

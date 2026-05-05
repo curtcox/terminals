@@ -11,7 +11,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-boundary client-boundary-test client-coverage \
-	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-test \
+	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-generate proto-contract-test proto-contract-verify \
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
 	all-lint all-test all-check stop-server stop-server-test run-server run-client-web \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
@@ -125,12 +125,19 @@ proto-generate:
 proto-flex-check:
 	python3 ./scripts/check-proto-flex-fields.py --enforce
 
+proto-contract-generate:
+	./scripts/proto-contract-generate.sh
+
 proto-contract-test:
 	$(MAKE) proto-lint
 	$(MAKE) proto-flex-check
+	./scripts/proto-contract-test.sh
 	cd terminal_server && GOCACHE="$(LOCAL_GO_CACHE)" go test ./internal/protocolcontract
 	cd terminal_server && GOCACHE="$(LOCAL_GO_CACHE)" go test ./internal/transport -run 'TestProto|TestGenerated' -count=1
 	cd terminal_client && HOME="$(ROOT_DIR)/.home" PUB_CACHE="$(ROOT_DIR)/.home/.pub-cache" dart test/protocol_contract_test.dart
+
+proto-contract-verify: proto-contract-generate proto-contract-test
+	git diff --exit-code -- api/testdata/contract
 
 skills-validate:
 	./scripts/validate-skills.sh
@@ -157,7 +164,7 @@ all-lint: server-lint client-lint client-boundary proto-lint
 
 all-test: server-test client-test client-boundary-test
 
-all-check: all-lint all-test proto-breaking client-build-all development-docs-test usecases-index validation-matrix
+all-check: all-lint all-test proto-breaking proto-contract-test client-build-all development-docs-test usecases-index validation-matrix
 
 stop-server:
 	./scripts/stop-server.sh

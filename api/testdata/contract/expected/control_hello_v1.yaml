@@ -1,0 +1,13 @@
+message: terminals.control.v1.ConnectRequest
+payload: hello
+assertions:
+  - path: hello.device_id
+    equals: kitchen-tablet-01
+  - path: hello.identity.device_name
+    equals: Kitchen Tablet
+  - path: hello.identity.device_type
+    equals: tablet
+  - path: hello.identity.platform
+    equals: android
+  - path: hello.client_version
+    equals: 0.1.0-dev

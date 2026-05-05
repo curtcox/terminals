@@ -1,0 +1,10 @@
+protocol_version: 1
+session_id: "pending"
+sequence: 1
+transport_hello: {
+  protocol_version: 1
+  supported_carriers: CARRIER_KIND_GRPC
+  supported_carriers: CARRIER_KIND_WEBSOCKET
+  desired_device_id: "kitchen-tablet-01"
+  resume_token: "resume-token-abc"
+}

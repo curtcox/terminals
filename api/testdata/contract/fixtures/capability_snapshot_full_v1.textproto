@@ -1,0 +1,144 @@
+capability_snapshot: {
+  device_id: "kitchen-tablet-01"
+  generation: 42
+  capabilities: {
+    device_id: "kitchen-tablet-01"
+    identity: {
+      device_name: "Kitchen Tablet"
+      device_type: "tablet"
+      platform: "android"
+    }
+    screen: {
+      width: 2560
+      height: 1600
+      density: 2.5
+      touch: true
+      orientation: "landscape"
+      fullscreen_supported: true
+      multi_window_supported: true
+      safe_area: {
+        left: 0
+        top: 24
+        right: 0
+        bottom: 16
+      }
+    }
+    keyboard: {
+      physical: false
+      layout: "virtual-us"
+    }
+    pointer: {
+      type: "touch"
+      hover: false
+    }
+    touch: {
+      supported: true
+      max_points: 10
+    }
+    speakers: {
+      channels: 2
+      sample_rates: 48000
+      endpoints: {
+        endpoint_id: "speaker-main"
+        endpoint_name: "Built-in speakers"
+        connection_type: "built_in"
+        channels: 2
+        sample_rates: 48000
+        available: true
+      }
+    }
+    microphone: {
+      channels: 1
+      sample_rates: 16000
+      endpoints: {
+        endpoint_id: "mic-front"
+        endpoint_name: "Front microphone"
+        connection_type: "built_in"
+        channels: 1
+        sample_rates: 16000
+        available: true
+      }
+    }
+    camera: {
+      front: {
+        width: 1280
+        height: 720
+        fps: 30
+      }
+      endpoints: {
+        endpoint_id: "camera-front"
+        endpoint_name: "Front camera"
+        connection_type: "built_in"
+        facing: "front"
+        modes: {
+          width: 1280
+          height: 720
+          fps: 30
+        }
+        available: true
+      }
+    }
+    sensors: {
+      accelerometer: true
+      gyroscope: true
+      compass: true
+      ambient_light: true
+      proximity: false
+      gps: false
+    }
+    connectivity: {
+      bluetooth_version: "5.2"
+      wifi_signal_strength: true
+      usb_host: true
+      usb_ports: 1
+      nfc: false
+    }
+    battery: {
+      level: 0.82
+      charging: true
+    }
+    edge: {
+      runtimes: "dart"
+      runtimes: "wasm"
+      compute: {
+        cpu_realtime: 2
+        gpu_realtime: 1
+        npu_realtime: 0
+        mem_mb: 4096
+      }
+      operators: "wake_word"
+      operators: "audio_level"
+      retention: {
+        audio_sec: 30
+        video_sec: 10
+        sensor_sec: 60
+        radio_sec: 0
+      }
+      timing: {
+        sync_error_ms: 4.5
+      }
+      geometry: {
+        mic_array: true
+        camera_intrinsics: true
+        compass: true
+      }
+    }
+    displays: {
+      display_id: "built-in"
+      display_name: "Built-in display"
+      primary: true
+      screen: {
+        width: 2560
+        height: 1600
+        density: 2.5
+        touch: true
+        orientation: "landscape"
+      }
+    }
+    haptics: {
+      supported: true
+      vibration: true
+      haptics_engine: false
+    }
+  }
+}

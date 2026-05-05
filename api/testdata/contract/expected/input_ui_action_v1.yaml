@@ -1,0 +1,11 @@
+message: terminals.control.v1.ConnectRequest
+payload: input
+assertions:
+  - path: input.device_id
+    equals: kitchen-tablet-01
+  - path: input.ui_action.component_id
+    equals: start_button
+  - path: input.ui_action.action
+    equals: tap
+  - path: input.ui_action.value
+    equals: timer.start

@@ -1,0 +1,19 @@
+message: terminals.control.v1.ConnectRequest
+payload: capability_delta
+assertions:
+  - path: capability_delta.device_id
+    equals: kitchen-tablet-01
+  - path: capability_delta.generation
+    equals: 43
+  - path: capability_delta.reason
+    equals: display_resize
+  - path: capability_delta.capabilities.screen.width
+    equals: 1600
+  - path: capability_delta.capabilities.screen.height
+    equals: 2560
+  - path: capability_delta.capabilities.screen.orientation
+    equals: portrait
+  - path: capability_delta.capabilities.screen.safe_area.top
+    equals: 36
+  - path: capability_delta.capabilities.screen.safe_area.bottom
+    equals: 24

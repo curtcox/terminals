@@ -1,0 +1,9 @@
+hello: {
+  device_id: "kitchen-tablet-01"
+  identity: {
+    device_name: "Kitchen Tablet"
+    device_type: "tablet"
+    platform: "android"
+  }
+  client_version: "0.1.0-dev"
+}

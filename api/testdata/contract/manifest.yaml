@@ -1,0 +1,62 @@
+version: 1
+fixtures:
+  - id: control_hello_v1
+    file: fixtures/control_hello_v1.binpb
+    textproto: fixtures/control_hello_v1.textproto
+    message: terminals.control.v1.ConnectRequest
+    payload: hello
+    direction: client_to_server
+    purpose: Initial client hello with identity and client version.
+    round_trip: semantic
+    expected: expected/control_hello_v1.yaml
+    tags: [control, handshake]
+  - id: capability_snapshot_full_v1
+    file: fixtures/capability_snapshot_full_v1.binpb
+    textproto: fixtures/capability_snapshot_full_v1.textproto
+    message: terminals.control.v1.ConnectRequest
+    payload: capability_snapshot
+    direction: client_to_server
+    purpose: Full capability baseline with display, input, media, sensor, battery, edge, and haptic data.
+    round_trip: semantic
+    expected: expected/capability_snapshot_full_v1.yaml
+    tags: [capabilities, snapshot]
+  - id: capability_delta_display_resize_v1
+    file: fixtures/capability_delta_display_resize_v1.binpb
+    textproto: fixtures/capability_delta_display_resize_v1.textproto
+    message: terminals.control.v1.ConnectRequest
+    payload: capability_delta
+    direction: client_to_server
+    purpose: Display geometry resize represented as a capability delta.
+    round_trip: semantic
+    expected: expected/capability_delta_display_resize_v1.yaml
+    tags: [capabilities, delta]
+  - id: set_ui_basic_v1
+    file: fixtures/set_ui_basic_v1.binpb
+    textproto: fixtures/set_ui_basic_v1.textproto
+    message: terminals.control.v1.ConnectResponse
+    payload: set_ui
+    direction: server_to_client
+    purpose: Basic server-driven UI tree with layout, text, button, and action identifiers.
+    round_trip: semantic
+    expected: expected/set_ui_basic_v1.yaml
+    tags: [ui]
+  - id: input_ui_action_v1
+    file: fixtures/input_ui_action_v1.binpb
+    textproto: fixtures/input_ui_action_v1.textproto
+    message: terminals.control.v1.ConnectRequest
+    payload: input
+    direction: client_to_server
+    purpose: Client UI action preserving component id, action, and value.
+    round_trip: semantic
+    expected: expected/input_ui_action_v1.yaml
+    tags: [input, ui]
+  - id: transport_hello_grpc_ws_v1
+    file: fixtures/transport_hello_grpc_ws_v1.binpb
+    textproto: fixtures/transport_hello_grpc_ws_v1.textproto
+    message: terminals.control.v1.WireEnvelope
+    payload: transport_hello
+    direction: transport
+    purpose: Transport envelope and carrier negotiation fields.
+    round_trip: semantic
+    expected: expected/transport_hello_grpc_ws_v1.yaml
+    tags: [transport, handshake]
