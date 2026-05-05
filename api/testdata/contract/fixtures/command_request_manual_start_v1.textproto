@@ -1,0 +1,43 @@
+command: {
+  request_id: "manual-command-1"
+  device_id: "terminal-kitchen"
+  action: COMMAND_ACTION_START
+  kind: COMMAND_KIND_MANUAL
+  text: "start the timer"
+  intent: "timer.start"
+  arguments: {
+    key: "activation_id"
+    value: "legacy-activation"
+  }
+  arguments: {
+    key: "device_ids"
+    value: "terminal-kitchen,terminal-den"
+  }
+  typed_arguments: {
+    key: "activation_id"
+    value: {
+      string_value: "typed-activation"
+    }
+  }
+  typed_arguments: {
+    key: "device_ids"
+    value: {
+      string_list_value: {
+        values: "terminal-kitchen"
+        values: "terminal-den"
+      }
+    }
+  }
+  typed_arguments: {
+    key: "dry_run"
+    value: {
+      bool_value: true
+    }
+  }
+  typed_arguments: {
+    key: "priority"
+    value: {
+      int64_value: 7
+    }
+  }
+}

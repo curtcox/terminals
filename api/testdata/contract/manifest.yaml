@@ -70,3 +70,13 @@ fixtures:
     round_trip: semantic
     expected: expected/transport_hello_ack_v1.yaml
     tags: [transport, handshake]
+  - id: command_request_manual_start_v1
+    file: fixtures/command_request_manual_start_v1.binpb
+    textproto: fixtures/command_request_manual_start_v1.textproto
+    message: terminals.control.v1.ConnectRequest
+    payload: command
+    direction: client_to_server
+    purpose: Manual command request preserving action/kind enums, legacy argument map keys, and typed argument mirrors.
+    round_trip: semantic
+    expected: expected/command_request_manual_start_v1.yaml
+    tags: [command, input]

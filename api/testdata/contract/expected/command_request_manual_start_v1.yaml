@@ -1,0 +1,41 @@
+message: terminals.control.v1.ConnectRequest
+payload: command
+assertions:
+  - path: command.request_id
+    equals: manual-command-1
+  - path: command.device_id
+    equals: terminal-kitchen
+  - path: command.action
+    equals: COMMAND_ACTION_START
+  - path: command.kind
+    equals: COMMAND_KIND_MANUAL
+  - path: command.text
+    equals: start the timer
+  - path: command.intent
+    equals: timer.start
+  - path: command.arguments[activation_id]
+    equals: legacy-activation
+  - path: command.arguments[device_ids]
+    equals: terminal-kitchen,terminal-den
+  - path: command.typed_arguments
+    length: 4
+  - path: command.typed_arguments[0].key
+    equals: activation_id
+  - path: command.typed_arguments[0].value.kind
+    equals: string_value
+  - path: command.typed_arguments[0].value.string_value
+    equals: typed-activation
+  - path: command.typed_arguments[1].key
+    equals: device_ids
+  - path: command.typed_arguments[1].value.kind
+    equals: string_list_value
+  - path: command.typed_arguments[1].value.string_list_value.values
+    contains: [terminal-kitchen, terminal-den]
+  - path: command.typed_arguments[2].key
+    equals: dry_run
+  - path: command.typed_arguments[2].value.bool_value
+    equals: true
+  - path: command.typed_arguments[3].key
+    equals: priority
+  - path: command.typed_arguments[3].value.int64_value
+    equals: 7

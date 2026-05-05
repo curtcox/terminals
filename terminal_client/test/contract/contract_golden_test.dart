@@ -339,6 +339,72 @@ Object? _valueAtPath(GeneratedMessage message, String path) {
       return (message as ConnectRequest).input.uiAction.action;
     case 'input.ui_action.value':
       return (message as ConnectRequest).input.uiAction.value;
+    case 'command.request_id':
+      return (message as ConnectRequest).command.requestId;
+    case 'command.device_id':
+      return (message as ConnectRequest).command.deviceId;
+    case 'command.action':
+      return (message as ConnectRequest).command.action.name;
+    case 'command.kind':
+      return (message as ConnectRequest).command.kind.name;
+    case 'command.text':
+      return (message as ConnectRequest).command.text;
+    case 'command.intent':
+      return (message as ConnectRequest).command.intent;
+    case 'command.arguments[activation_id]':
+      return (message as ConnectRequest).command.arguments['activation_id'];
+    case 'command.arguments[device_ids]':
+      return (message as ConnectRequest).command.arguments['device_ids'];
+    case 'command.typed_arguments':
+      return (message as ConnectRequest).command.typedArguments;
+    case 'command.typed_arguments[0].key':
+      return (message as ConnectRequest).command.typedArguments[0].key;
+    case 'command.typed_arguments[0].value.kind':
+      return _snakeCase((message as ConnectRequest)
+          .command
+          .typedArguments[0]
+          .value
+          .whichKind()
+          .name);
+    case 'command.typed_arguments[0].value.string_value':
+      return (message as ConnectRequest)
+          .command
+          .typedArguments[0]
+          .value
+          .stringValue;
+    case 'command.typed_arguments[1].key':
+      return (message as ConnectRequest).command.typedArguments[1].key;
+    case 'command.typed_arguments[1].value.kind':
+      return _snakeCase((message as ConnectRequest)
+          .command
+          .typedArguments[1]
+          .value
+          .whichKind()
+          .name);
+    case 'command.typed_arguments[1].value.string_list_value.values':
+      return (message as ConnectRequest)
+          .command
+          .typedArguments[1]
+          .value
+          .stringListValue
+          .values;
+    case 'command.typed_arguments[2].key':
+      return (message as ConnectRequest).command.typedArguments[2].key;
+    case 'command.typed_arguments[2].value.bool_value':
+      return (message as ConnectRequest)
+          .command
+          .typedArguments[2]
+          .value
+          .boolValue;
+    case 'command.typed_arguments[3].key':
+      return (message as ConnectRequest).command.typedArguments[3].key;
+    case 'command.typed_arguments[3].value.int64_value':
+      return (message as ConnectRequest)
+          .command
+          .typedArguments[3]
+          .value
+          .int64Value
+          .toInt();
     case 'protocol_version':
       return (message as WireEnvelope).protocolVersion;
     case 'session_id':

@@ -51,7 +51,7 @@ func main() {
 		if err := prototext.Unmarshal(text, msg); err != nil {
 			fatalf("parse %s: %v", fx.Textproto, err)
 		}
-		bin, err := proto.Marshal(msg)
+		bin, err := proto.MarshalOptions{Deterministic: true}.Marshal(msg)
 		if err != nil {
 			fatalf("marshal %s: %v", fx.Textproto, err)
 		}

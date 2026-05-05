@@ -7,6 +7,10 @@ This directory contains shared Go-Dart protobuf contract fixtures.
 - `fixtures/*.binpb` is the binary protobuf artifact decoded by both Go and Dart tests.
 - `expected/*.yaml` contains small semantic assertions shared by both runtimes.
 
+The corpus covers handshake, capabilities, server-driven UI, input events,
+transport negotiation, and command request compatibility. Deprecated fixtures
+are parse-only when marked that way in `manifest.yaml`.
+
 Tests read `.binpb` files only. Regenerate binary fixtures after editing textproto:
 
 ```bash
