@@ -1049,7 +1049,11 @@ func applyWidgetFromDescriptor(node *uiv1.Node, nodeType string, props map[strin
 	case "audio_visualizer":
 		node.Widget = &uiv1.Node_AudioVisualizer{AudioVisualizer: &uiv1.AudioVisualizerWidget{StreamId: props["stream_id"]}}
 	case "canvas":
-		node.Widget = &uiv1.Node_Canvas{Canvas: &uiv1.CanvasWidget{DrawOpsJson: props["draw_ops_json"]}}
+		drawOpsJSON := props["draw_ops_json"]
+		node.Widget = &uiv1.Node_Canvas{Canvas: &uiv1.CanvasWidget{
+			DrawOpsJson: drawOpsJSON,
+			DrawOps:     canvasDrawOpsFromJSON(drawOpsJSON),
+		}}
 	case "text_input":
 		node.Widget = &uiv1.Node_TextInput{
 			TextInput: &uiv1.TextInputWidget{

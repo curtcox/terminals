@@ -10,6 +10,7 @@ void main() {
     'capability_snapshot_v1': _assertCapabilitySnapshot,
     'register_ack_metadata_v1': _assertRegisterAckMetadata,
     'set_ui_basic_v1': _assertSetUIBasic,
+    'set_ui_canvas_v1': _assertSetUICanvas,
     'start_stream_audio_v1': _assertStartStreamAudio,
     'start_stream_route_delta_v1': _assertStartStreamRouteDelta,
     'route_stream_route_delta_v1': _assertRouteStreamRouteDelta,
@@ -67,6 +68,19 @@ void _assertSetUIBasic(WireEnvelope envelope) {
   _expectEqual(root.id, 'root');
   _expectEqual(root.children.length, 2);
   _expectEqual(root.children.first.text.style, 'title');
+}
+
+void _assertSetUICanvas(WireEnvelope envelope) {
+  final root = envelope.serverMessage.setUi.root;
+
+  _expectEqual(root.children.length, 1);
+  final canvas = root.children.first.canvas;
+  _expectTrue(canvas.drawOpsJson.isNotEmpty);
+  _expectEqual(canvas.drawOps.length, 2);
+  _expectEqual(canvas.drawOps[0].rect.fill, '#abc');
+  _expectEqual(canvas.drawOps[0].rect.width, 3);
+  _expectEqual(canvas.drawOps[1].line.stroke, '#000');
+  _expectEqual(canvas.drawOps[1].line.strokeWidth, 1.5);
 }
 
 void _assertStartStreamAudio(WireEnvelope envelope) {

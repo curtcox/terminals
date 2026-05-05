@@ -20,6 +20,7 @@ func TestGoldenWireEnvelopeFixtures(t *testing.T) {
 		"capability_snapshot_v1":        assertCapabilitySnapshot,
 		"register_ack_metadata_v1":      assertRegisterAckMetadata,
 		"set_ui_basic_v1":               assertSetUIBasic,
+		"set_ui_canvas_v1":              assertSetUICanvas,
 		"start_stream_audio_v1":         assertStartStreamAudio,
 		"start_stream_route_delta_v1":   assertStartStreamRouteDelta,
 		"route_stream_route_delta_v1":   assertRouteStreamRouteDelta,
@@ -148,6 +149,31 @@ func assertSetUIBasic(t *testing.T, envelope *controlv1.WireEnvelope) {
 	}
 	if root.GetChildren()[0].GetText().GetStyle() != "title" {
 		t.Fatalf("text style not preserved")
+	}
+}
+
+func assertSetUICanvas(t *testing.T, envelope *controlv1.WireEnvelope) {
+	t.Helper()
+	root := envelope.GetServerMessage().GetSetUi().GetRoot()
+	if len(root.GetChildren()) != 1 {
+		t.Fatalf("root children = %d, want 1", len(root.GetChildren()))
+	}
+	canvas := root.GetChildren()[0].GetCanvas()
+	if canvas == nil {
+		t.Fatalf("canvas widget missing on first child")
+	}
+	if canvas.GetDrawOpsJson() == "" {
+		t.Fatalf("legacy draw_ops_json empty; typed-vs-legacy coexistence requires both surfaces")
+	}
+	ops := canvas.GetDrawOps()
+	if len(ops) != 2 {
+		t.Fatalf("typed draw_ops len = %d, want 2", len(ops))
+	}
+	if rect := ops[0].GetRect(); rect == nil || rect.GetFill() != "#abc" || rect.GetWidth() != 3 {
+		t.Fatalf("ops[0] = %+v, want rect fill=#abc width=3", ops[0])
+	}
+	if line := ops[1].GetLine(); line == nil || line.GetStroke() != "#000" || line.GetStrokeWidth() != 1.5 {
+		t.Fatalf("ops[1] = %+v, want line stroke=#000 stroke_width=1.5", ops[1])
 	}
 }
 

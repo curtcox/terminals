@@ -1,0 +1,41 @@
+protocol_version: 1
+session_id: "session-golden"
+sequence: 5
+server_message: {
+  set_ui: {
+    device_id: "terminal-livingroom"
+    root: {
+      id: "root"
+      stack: {}
+      children: {
+        id: "canvas-1"
+        props: {
+          key: "draw_ops_json"
+          value: "{\"ops\":[{\"rect\":{\"x\":1,\"y\":2,\"width\":3,\"height\":4,\"fill\":\"#abc\"}},{\"line\":{\"x1\":0,\"y1\":0,\"x2\":10,\"y2\":10,\"stroke\":\"#000\",\"stroke_width\":1.5}}]}"
+        }
+        canvas: {
+          draw_ops_json: "{\"ops\":[{\"rect\":{\"x\":1,\"y\":2,\"width\":3,\"height\":4,\"fill\":\"#abc\"}},{\"line\":{\"x1\":0,\"y1\":0,\"x2\":10,\"y2\":10,\"stroke\":\"#000\",\"stroke_width\":1.5}}]}"
+          draw_ops: {
+            rect: {
+              x: 1
+              y: 2
+              width: 3
+              height: 4
+              fill: "#abc"
+            }
+          }
+          draw_ops: {
+            line: {
+              x1: 0
+              y1: 0
+              x2: 10
+              y2: 10
+              stroke: "#000"
+              stroke_width: 1.5
+            }
+          }
+        }
+      }
+    }
+  }
+}

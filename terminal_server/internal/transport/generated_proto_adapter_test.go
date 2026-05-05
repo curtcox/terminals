@@ -1425,3 +1425,107 @@ func TestObservationTypedAttributesFromInternalTrimsWhitespace(t *testing.T) {
 		t.Fatalf("Device = %q, want trimmed cam-1", got.GetDevice())
 	}
 }
+
+func TestCanvasDrawOpsFromJSONParsesAllVariants(t *testing.T) {
+	raw := `{"ops":[
+		{"line":{"x1":1,"y1":2,"x2":3,"y2":4,"stroke":"#000","stroke_width":1.5}},
+		{"rect":{"x":5,"y":6,"width":7,"height":8,"fill":"#fff","stroke":"#111","stroke_width":2}},
+		{"circle":{"cx":9,"cy":10,"radius":11,"fill":"#eee","stroke":"#222","stroke_width":2.5}},
+		{"text":{"x":12,"y":13,"text":"hello","fill":"#333","font_size":14,"font_family":"Helvetica"}},
+		{"path":{"d":"M0 0 L10 10","fill":"#444","stroke":"#555","stroke_width":3}}
+	]}`
+	ops := canvasDrawOpsFromJSON(raw)
+	if len(ops) != 5 {
+		t.Fatalf("len(ops) = %d, want 5", len(ops))
+	}
+	if line := ops[0].GetLine(); line == nil || line.GetX1() != 1 || line.GetY2() != 4 || line.GetStroke() != "#000" || line.GetStrokeWidth() != 1.5 {
+		t.Fatalf("line variant = %+v", line)
+	}
+	if rect := ops[1].GetRect(); rect == nil || rect.GetWidth() != 7 || rect.GetFill() != "#fff" || rect.GetStrokeWidth() != 2 {
+		t.Fatalf("rect variant = %+v", rect)
+	}
+	if circle := ops[2].GetCircle(); circle == nil || circle.GetRadius() != 11 || circle.GetCx() != 9 {
+		t.Fatalf("circle variant = %+v", circle)
+	}
+	if text := ops[3].GetText(); text == nil || text.GetText() != "hello" || text.GetFontFamily() != "Helvetica" || text.GetFontSize() != 14 {
+		t.Fatalf("text variant = %+v", text)
+	}
+	if path := ops[4].GetPath(); path == nil || path.GetD() != "M0 0 L10 10" || path.GetStrokeWidth() != 3 {
+		t.Fatalf("path variant = %+v", path)
+	}
+}
+
+func TestCanvasDrawOpsFromJSONReturnsNilForMalformedOrEmpty(t *testing.T) {
+	cases := []string{
+		"",
+		"   ",
+		"not json",
+		`{"ops":[{"line":"x"}]}`,
+		`{"ops":[{}]}`,
+		`{"ops":[{"line":{},"rect":{}}]}`,
+		`{"ops":[]}`,
+	}
+	for _, raw := range cases {
+		if got := canvasDrawOpsFromJSON(raw); got != nil {
+			t.Fatalf("canvasDrawOpsFromJSON(%q) = %+v, want nil", raw, got)
+		}
+	}
+}
+
+func TestCanvasDrawOpsFromJSONSkipsInvalidOpsKeepsValidOnes(t *testing.T) {
+	raw := `{"ops":[
+		{"line":{"x1":1,"y1":2,"x2":3,"y2":4}},
+		{},
+		{"rect":{"x":5,"y":6,"width":7,"height":8}, "circle":{"cx":1,"cy":1,"radius":1}},
+		{"path":{"d":"M0 0"}}
+	]}`
+	ops := canvasDrawOpsFromJSON(raw)
+	if len(ops) != 2 {
+		t.Fatalf("len(ops) = %d, want 2 (line+path; empty and multi-variant skipped)", len(ops))
+	}
+	if ops[0].GetLine() == nil {
+		t.Fatalf("ops[0] = %+v, want line variant", ops[0])
+	}
+	if ops[1].GetPath() == nil {
+		t.Fatalf("ops[1] = %+v, want path variant", ops[1])
+	}
+}
+
+func TestDescriptorToUINodeCanvasEmitsTypedAndLegacyDrawOps(t *testing.T) {
+	rawJSON := `{"ops":[{"rect":{"x":1,"y":2,"width":3,"height":4,"fill":"#abc"}}]}`
+	desc := ui.Descriptor{
+		ID:    "canvas-1",
+		Type:  "canvas",
+		Props: map[string]string{"draw_ops_json": rawJSON},
+	}
+	node := descriptorToUINode(desc)
+	canvas := node.GetCanvas()
+	if canvas == nil {
+		t.Fatalf("canvas widget not set on node: %+v", node.GetWidget())
+	}
+	if canvas.GetDrawOpsJson() != rawJSON {
+		t.Fatalf("legacy DrawOpsJson = %q, want preserved", canvas.GetDrawOpsJson())
+	}
+	if got := canvas.GetDrawOps(); len(got) != 1 || got[0].GetRect() == nil || got[0].GetRect().GetFill() != "#abc" {
+		t.Fatalf("typed DrawOps = %+v, want single rect with fill=#abc", got)
+	}
+}
+
+func TestDescriptorToUINodeCanvasMalformedJSONLeavesTypedDrawOpsEmpty(t *testing.T) {
+	rawJSON := `{"ops":[{"line":"x"}]}`
+	node := descriptorToUINode(ui.Descriptor{
+		ID:    "canvas-2",
+		Type:  "canvas",
+		Props: map[string]string{"draw_ops_json": rawJSON},
+	})
+	canvas := node.GetCanvas()
+	if canvas == nil {
+		t.Fatalf("canvas widget not set")
+	}
+	if canvas.GetDrawOpsJson() != rawJSON {
+		t.Fatalf("legacy DrawOpsJson lost: %q", canvas.GetDrawOpsJson())
+	}
+	if got := canvas.GetDrawOps(); len(got) != 0 {
+		t.Fatalf("typed DrawOps = %+v, want empty for malformed-shape JSON", got)
+	}
+}
