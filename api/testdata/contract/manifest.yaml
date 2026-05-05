@@ -110,3 +110,14 @@ fixtures:
     round_trip: semantic
     expected: expected/bug_report_ack_v1.yaml
     tags: [diagnostics, bug-report]
+  - id: deprecated_register_device_v1
+    file: fixtures/deprecated_register_device_v1.binpb
+    textproto: fixtures/deprecated_register_device_v1.textproto
+    message: terminals.control.v1.WireEnvelope
+    payload: client_message
+    direction: client_to_server
+    purpose: Parse-only compatibility coverage for the deprecated register payload.
+    usage: parse_only
+    round_trip: semantic
+    expected: expected/deprecated_register_device_v1.yaml
+    tags: [deprecated, parse-only, control, capabilities]

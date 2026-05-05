@@ -1,0 +1,22 @@
+message: terminals.control.v1.WireEnvelope
+payload: client_message
+usage: parse_only
+assertions:
+  - path: protocol_version
+    equals: 1
+  - path: session_id
+    equals: session-golden
+  - path: sequence
+    equals: 9
+  - path: client_message.payload
+    equals: register
+  - path: client_message.register.capabilities.device_id
+    equals: legacy-terminal
+  - path: client_message.register.capabilities.identity.device_name
+    equals: Legacy Terminal
+  - path: client_message.register.capabilities.identity.platform
+    equals: flutter_test
+  - path: client_message.register.capabilities.screen.width
+    equals: 1024
+  - path: client_message.register.capabilities.screen.height
+    equals: 768

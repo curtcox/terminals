@@ -551,6 +551,43 @@ Object? _valueAtPath(GeneratedMessage message, String path) {
       return (message as WireEnvelope)
           .transportHelloAck
           .limits['heartbeat_interval_ms'];
+    case 'client_message.payload':
+      return _snakeCase(
+          (message as WireEnvelope).clientMessage.whichPayload().name);
+    case 'client_message.register.capabilities.device_id':
+      return (message as WireEnvelope)
+          .clientMessage
+          .register
+          .capabilities
+          .deviceId;
+    case 'client_message.register.capabilities.identity.device_name':
+      return (message as WireEnvelope)
+          .clientMessage
+          .register
+          .capabilities
+          .identity
+          .deviceName;
+    case 'client_message.register.capabilities.identity.platform':
+      return (message as WireEnvelope)
+          .clientMessage
+          .register
+          .capabilities
+          .identity
+          .platform;
+    case 'client_message.register.capabilities.screen.width':
+      return (message as WireEnvelope)
+          .clientMessage
+          .register
+          .capabilities
+          .screen
+          .width;
+    case 'client_message.register.capabilities.screen.height':
+      return (message as WireEnvelope)
+          .clientMessage
+          .register
+          .capabilities
+          .screen
+          .height;
     case 'bug_report_ack.report_id':
       return (message as ConnectResponse).bugReportAck.reportId;
     case 'bug_report_ack.correlation_id':
