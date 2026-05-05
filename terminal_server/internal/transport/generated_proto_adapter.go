@@ -1010,11 +1010,13 @@ func descriptorToUINode(d ui.Descriptor) *uiv1.Node {
 		Props:    props,
 		Children: children,
 	}
-	applyWidgetFromDescriptor(node, d.Type, d.Props)
+	applyWidgetFromDescriptor(node, d)
 	return node
 }
 
-func applyWidgetFromDescriptor(node *uiv1.Node, nodeType string, props map[string]string) {
+func applyWidgetFromDescriptor(node *uiv1.Node, d ui.Descriptor) {
+	nodeType := d.Type
+	props := d.Props
 	switch nodeType {
 	case "stack":
 		node.Widget = &uiv1.Node_Stack{Stack: &uiv1.StackWidget{}}
@@ -1050,9 +1052,18 @@ func applyWidgetFromDescriptor(node *uiv1.Node, nodeType string, props map[strin
 		node.Widget = &uiv1.Node_AudioVisualizer{AudioVisualizer: &uiv1.AudioVisualizerWidget{StreamId: props["stream_id"]}}
 	case "canvas":
 		drawOpsJSON := props["draw_ops_json"]
+		var typedOps []*uiv1.DrawOp
+		if len(d.CanvasOps) > 0 {
+			typedOps = canvasDrawOpsFromUI(d.CanvasOps)
+			if drawOpsJSON == "" {
+				drawOpsJSON = ui.CanvasOpsToJSON(d.CanvasOps)
+			}
+		} else {
+			typedOps = canvasDrawOpsFromJSON(drawOpsJSON)
+		}
 		node.Widget = &uiv1.Node_Canvas{Canvas: &uiv1.CanvasWidget{
 			DrawOpsJson: drawOpsJSON,
-			DrawOps:     canvasDrawOpsFromJSON(drawOpsJSON),
+			DrawOps:     typedOps,
 		}}
 	case "text_input":
 		node.Widget = &uiv1.Node_TextInput{

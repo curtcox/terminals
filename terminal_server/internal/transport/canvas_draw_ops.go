@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	uiv1 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
+	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
 type drawOpsEnvelope struct {
@@ -141,4 +142,72 @@ func drawOpToProto(op drawOpJSON) *uiv1.DrawOp {
 		}}}
 	}
 	return nil
+}
+
+// canvasDrawOpsFromUI converts native typed CanvasOp values from the
+// internal/ui package into proto DrawOp messages without going through the
+// legacy JSON envelope. Ops with CanvasOpUnspecified kind or a nil variant
+// pointer are skipped. Returns nil if every op was skipped.
+func canvasDrawOpsFromUI(ops []ui.CanvasOp) []*uiv1.DrawOp {
+	if len(ops) == 0 {
+		return nil
+	}
+	out := make([]*uiv1.DrawOp, 0, len(ops))
+	for _, op := range ops {
+		converted := uiCanvasOpToProto(op)
+		if converted == nil {
+			continue
+		}
+		out = append(out, converted)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func uiCanvasOpToProto(op ui.CanvasOp) *uiv1.DrawOp {
+	switch op.Kind {
+	case ui.CanvasOpLineKind:
+		if op.Line == nil {
+			return nil
+		}
+		return &uiv1.DrawOp{Op: &uiv1.DrawOp_Line{Line: &uiv1.DrawLine{
+			X1: op.Line.X1, Y1: op.Line.Y1, X2: op.Line.X2, Y2: op.Line.Y2,
+			Stroke: op.Line.Stroke, StrokeWidth: op.Line.StrokeWidth,
+		}}}
+	case ui.CanvasOpRectKind:
+		if op.Rect == nil {
+			return nil
+		}
+		return &uiv1.DrawOp{Op: &uiv1.DrawOp_Rect{Rect: &uiv1.DrawRect{
+			X: op.Rect.X, Y: op.Rect.Y, Width: op.Rect.Width, Height: op.Rect.Height,
+			Fill: op.Rect.Fill, Stroke: op.Rect.Stroke, StrokeWidth: op.Rect.StrokeWidth,
+		}}}
+	case ui.CanvasOpCircleKind:
+		if op.Circle == nil {
+			return nil
+		}
+		return &uiv1.DrawOp{Op: &uiv1.DrawOp_Circle{Circle: &uiv1.DrawCircle{
+			Cx: op.Circle.CX, Cy: op.Circle.CY, Radius: op.Circle.Radius,
+			Fill: op.Circle.Fill, Stroke: op.Circle.Stroke, StrokeWidth: op.Circle.StrokeWidth,
+		}}}
+	case ui.CanvasOpTextKind:
+		if op.Text == nil {
+			return nil
+		}
+		return &uiv1.DrawOp{Op: &uiv1.DrawOp_Text{Text: &uiv1.DrawText{
+			X: op.Text.X, Y: op.Text.Y, Text: op.Text.Text, Fill: op.Text.Fill,
+			FontSize: op.Text.FontSize, FontFamily: op.Text.FontFamily,
+		}}}
+	case ui.CanvasOpPathKind:
+		if op.Path == nil {
+			return nil
+		}
+		return &uiv1.DrawOp{Op: &uiv1.DrawOp_Path{Path: &uiv1.DrawPath{
+			D: op.Path.D, Fill: op.Path.Fill, Stroke: op.Path.Stroke, StrokeWidth: op.Path.StrokeWidth,
+		}}}
+	default:
+		return nil
+	}
 }

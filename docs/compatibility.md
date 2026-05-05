@@ -3,7 +3,7 @@ title: "Compatibility"
 kind: reference
 status: active
 owner: curtcox
-last-reviewed: 2026-05-04
+last-reviewed: 2026-05-05
 ---
 
 # Compatibility
@@ -31,7 +31,7 @@ The following additive typed replacements have shipped. Producers emit both the 
 | `ScrollWidget.direction_enum` (`ScrollDirection`) | `ScrollWidget.direction` string | 2026-05-03 | After two tagged releases past 2026-05-03 |
 | `FlowStats.state_enum` (`FlowState`) | `FlowStats.state` string | 2026-05-03 | After two tagged releases past 2026-05-03 |
 | `FlowNode.exec_policy` (`ExecPolicy`) | `FlowNode.exec` string | 2026-05-03 | After two tagged releases past 2026-05-03 |
-| `CanvasWidget.draw_ops` (`repeated DrawOp`) | `CanvasWidget.draw_ops_json` string | 2026-05-05 (first producer landed in `descriptorToUINode`'s canvas case via `canvasDrawOpsFromJSON`, parsing legacy JSON into typed `DrawOp` oneofs alongside the preserved JSON string; consumer wiring in `ServerDrivenRenderer` shipped 2026-05-04; malformed JSON yields empty typed mirror so the legacy preview still renders) | After two tagged releases past 2026-05-05 |
+| `CanvasWidget.draw_ops` (`repeated DrawOp`) | `CanvasWidget.draw_ops_json` string | 2026-05-05 (first JSON-driven producer landed in `descriptorToUINode`'s canvas case via `canvasDrawOpsFromJSON`; native-typed producer landed same day via `terminal_server/internal/ui/canvas.go` typed builders + `CanvasNode` + `Descriptor.CanvasOps` field + concrete diagnostics surface `DiagnosticsConnectionPulseOverlay`; adapter prefers native typed ops via `canvasDrawOpsFromUI` and falls back to JSON; consumer wiring in `ServerDrivenRenderer` shipped 2026-05-04; malformed JSON yields empty typed mirror so the legacy preview still renders) | After two tagged releases past 2026-05-05 |
 | `PointerEvent.action_enum` (`PointerAction`) | `PointerEvent.action` string | 2026-05-04 (schema only; producer/consumer wiring deferred) | After typed wiring lands plus two tagged releases |
 | `TouchEvent.action_enum` (`TouchAction`) | `TouchEvent.action` string | 2026-05-04 (schema only; producer/consumer wiring deferred) | After typed wiring lands plus two tagged releases |
 | `StreamEntry.stream_kind` / `RouteEntry.stream_kind` (`terminals.io.v1.StreamKind`) | `StreamEntry.kind` / `RouteEntry.kind` strings | 2026-05-04 (client diagnostics capture mirrors typed enum from underlying `StartStream`/`RouteStream`) | After two tagged releases past 2026-05-04 |

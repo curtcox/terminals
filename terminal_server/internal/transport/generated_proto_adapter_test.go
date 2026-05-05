@@ -1529,3 +1529,111 @@ func TestDescriptorToUINodeCanvasMalformedJSONLeavesTypedDrawOpsEmpty(t *testing
 		t.Fatalf("typed DrawOps = %+v, want empty for malformed-shape JSON", got)
 	}
 }
+
+func TestDescriptorToUINodeCanvasNativeTypedOpsBypassJSONParsing(t *testing.T) {
+	desc := ui.CanvasNode("native-1",
+		ui.Rect(1, 2, 3, 4, "#abc", "", 0),
+		ui.Circle(5, 6, 7, "#0f0", "", 0),
+	)
+	node := descriptorToUINode(desc)
+	canvas := node.GetCanvas()
+	if canvas == nil {
+		t.Fatalf("canvas widget not set")
+	}
+	got := canvas.GetDrawOps()
+	if len(got) != 2 {
+		t.Fatalf("typed DrawOps len = %d, want 2", len(got))
+	}
+	if got[0].GetRect() == nil || got[0].GetRect().GetFill() != "#abc" {
+		t.Fatalf("op[0] = %+v, want rect fill=#abc", got[0])
+	}
+	if got[1].GetCircle() == nil || got[1].GetCircle().GetRadius() != 7 {
+		t.Fatalf("op[1] = %+v, want circle radius=7", got[1])
+	}
+	if canvas.GetDrawOpsJson() == "" {
+		t.Fatalf("expected legacy DrawOpsJson mirror to be populated when typed ops are native")
+	}
+}
+
+func TestDescriptorToUINodeCanvasNativeTypedOpsTrumpsLegacyJSON(t *testing.T) {
+	// When both surfaces are populated, the native typed slice wins (no
+	// JSON re-parse) and the legacy string is preserved verbatim.
+	rawJSON := `{"ops":[{"rect":{"x":99,"y":99,"width":1,"height":1,"fill":"#999"}}]}`
+	desc := ui.CanvasNode("native-2",
+		ui.Line(1, 2, 3, 4, "#fff", 0.5),
+	)
+	desc.Props["draw_ops_json"] = rawJSON
+	node := descriptorToUINode(desc)
+	canvas := node.GetCanvas()
+	if canvas.GetDrawOpsJson() != rawJSON {
+		t.Fatalf("legacy DrawOpsJson = %q, want preserved-verbatim raw", canvas.GetDrawOpsJson())
+	}
+	got := canvas.GetDrawOps()
+	if len(got) != 1 || got[0].GetLine() == nil {
+		t.Fatalf("typed DrawOps = %+v, want single line from native (not re-parsed from JSON)", got)
+	}
+	if got[0].GetLine().GetStrokeWidth() != 0.5 {
+		t.Fatalf("line stroke_width = %v, want 0.5 (native), not 0 (would mean re-parse)", got[0].GetLine().GetStrokeWidth())
+	}
+}
+
+func TestDescriptorToUINodeCanvasNativeEmptyTypedFallsBackToJSON(t *testing.T) {
+	// Empty CanvasOps slice means "no native input" — adapter should still
+	// fall through to JSON parsing.
+	rawJSON := `{"ops":[{"text":{"x":1,"y":2,"text":"hi","fill":"#fff","font_size":12,"font_family":"mono"}}]}`
+	desc := ui.Descriptor{
+		ID:        "canvas-fallback",
+		Type:      "canvas",
+		Props:     map[string]string{"draw_ops_json": rawJSON},
+		CanvasOps: nil,
+	}
+	node := descriptorToUINode(desc)
+	canvas := node.GetCanvas()
+	got := canvas.GetDrawOps()
+	if len(got) != 1 || got[0].GetText() == nil || got[0].GetText().GetText() != "hi" {
+		t.Fatalf("typed DrawOps = %+v, want single text via JSON fallback", got)
+	}
+}
+
+func TestDiagnosticsConnectionPulseOverlayProducesTypedCanvasOnWire(t *testing.T) {
+	desc := ui.DiagnosticsConnectionPulseOverlay("device-3", true, 17)
+	node := descriptorToUINode(desc)
+	if node.GetOverlay() == nil {
+		t.Fatalf("expected overlay widget at root")
+	}
+	// overlay -> stack -> [text label, canvas]
+	if len(node.GetChildren()) != 1 {
+		t.Fatalf("overlay child count = %d, want 1", len(node.GetChildren()))
+	}
+	stack := node.GetChildren()[0]
+	if stack.GetStack() == nil {
+		t.Fatalf("expected stack child of overlay")
+	}
+	if len(stack.GetChildren()) != 2 {
+		t.Fatalf("stack child count = %d, want 2", len(stack.GetChildren()))
+	}
+	canvasNode := stack.GetChildren()[1]
+	canvas := canvasNode.GetCanvas()
+	if canvas == nil {
+		t.Fatalf("expected canvas widget at stack child[1]")
+	}
+	if canvas.GetDrawOpsJson() == "" {
+		t.Fatalf("legacy DrawOpsJson missing on diagnostics canvas")
+	}
+	ops := canvas.GetDrawOps()
+	if len(ops) != 4 {
+		t.Fatalf("typed ops len = %d, want 4 (rect, circle, line, text)", len(ops))
+	}
+	if ops[0].GetRect() == nil {
+		t.Fatalf("op[0] = %+v, want rect", ops[0])
+	}
+	if ops[1].GetCircle() == nil || ops[1].GetCircle().GetFill() != "#33CC66" {
+		t.Fatalf("op[1] = %+v, want healthy-green circle", ops[1])
+	}
+	if ops[2].GetLine() == nil {
+		t.Fatalf("op[2] = %+v, want line", ops[2])
+	}
+	if ops[3].GetText() == nil || ops[3].GetText().GetText() != "17ms" {
+		t.Fatalf("op[3] = %+v, want text '17ms'", ops[3])
+	}
+}

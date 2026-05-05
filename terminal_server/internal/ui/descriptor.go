@@ -17,6 +17,14 @@ type Descriptor struct {
 	Type     string            `json:"type"`
 	Props    map[string]string `json:"props,omitempty"`
 	Children []Descriptor      `json:"children,omitempty"`
+	// CanvasOps carries typed canvas primitives for nodes whose Type is
+	// "canvas". When set, the transport adapter uses these directly to
+	// populate CanvasWidget.draw_ops without going through draw_ops_json
+	// parsing. Producers that build canvases from typed primitives (rather
+	// than hand-rolled JSON) should use CanvasNode instead of populating
+	// this field directly. Excluded from JSON serialization so the existing
+	// Descriptor wire shape is unchanged.
+	CanvasOps []CanvasOp `json:"-"`
 }
 
 // New builds a descriptor node with type and optional props.
