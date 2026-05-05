@@ -1,0 +1,22 @@
+protocol_version: 1
+session_id: "session-kitchen-tablet-01"
+sequence: 2
+transport_hello_ack: {
+  accepted_protocol_version: 1
+  negotiated_carrier: CARRIER_KIND_WEBSOCKET
+  session_id: "session-kitchen-tablet-01"
+  resume_token: "resume-kitchen-tablet-01"
+  heartbeat_interval_ms: 15000
+  limits: {
+    key: "max_frame_bytes"
+    value: "1048576"
+  }
+  limits: {
+    key: "max_inflight_messages"
+    value: "32"
+  }
+  limits: {
+    key: "heartbeat_interval_ms"
+    value: "15000"
+  }
+}

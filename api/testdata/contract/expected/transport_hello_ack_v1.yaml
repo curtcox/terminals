@@ -1,0 +1,25 @@
+message: terminals.control.v1.WireEnvelope
+payload: transport_hello_ack
+assertions:
+  - path: protocol_version
+    equals: 1
+  - path: session_id
+    equals: session-kitchen-tablet-01
+  - path: sequence
+    equals: 2
+  - path: transport_hello_ack.accepted_protocol_version
+    equals: 1
+  - path: transport_hello_ack.negotiated_carrier
+    equals: CARRIER_KIND_WEBSOCKET
+  - path: transport_hello_ack.session_id
+    equals: session-kitchen-tablet-01
+  - path: transport_hello_ack.resume_token
+    equals: resume-kitchen-tablet-01
+  - path: transport_hello_ack.heartbeat_interval_ms
+    equals: 15000
+  - path: transport_hello_ack.limits[max_frame_bytes]
+    equals: "1048576"
+  - path: transport_hello_ack.limits[max_inflight_messages]
+    equals: "32"
+  - path: transport_hello_ack.limits[heartbeat_interval_ms]
+    equals: "15000"

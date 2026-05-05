@@ -187,7 +187,7 @@ func assertMessage(t *testing.T, msg proto.Message, assertions []assertion) {
 	}
 }
 
-var pathSegmentRE = regexp.MustCompile(`^([a-z0-9_]+)(?:\[(\d+)\])?$`)
+var pathSegmentRE = regexp.MustCompile(`^([a-z0-9_]+)(?:\[([A-Za-z0-9_.:-]+)\])?$`)
 
 func valueAtPath(msg protoreflect.Message, path string) (resolvedValue, error) {
 	var current protoreflect.Value
@@ -224,20 +224,60 @@ func valueAtPath(msg protoreflect.Message, path string) (resolvedValue, error) {
 		} else {
 			present = m.Has(field)
 		}
-		if match[2] != "" {
-			if !field.IsList() {
-				return resolvedValue{}, fmt.Errorf("field %q is not a list", match[1])
+		if selector := match[2]; selector != "" {
+			switch {
+			case field.IsList():
+				index, err := strconv.Atoi(selector)
+				if err != nil {
+					return resolvedValue{}, fmt.Errorf("list index %q for field %q: %w", selector, match[1], err)
+				}
+				list := current.List()
+				if index >= list.Len() {
+					return resolvedValue{}, fmt.Errorf("index %d out of range for %q", index, match[1])
+				}
+				current = list.Get(index)
+				present = true
+			case field.IsMap():
+				key, err := mapKey(field.MapKey(), selector)
+				if err != nil {
+					return resolvedValue{}, fmt.Errorf("%q map key %q: %w", match[1], selector, err)
+				}
+				value := current.Map().Get(key)
+				if !value.IsValid() {
+					return resolvedValue{Field: field, Present: false}, nil
+				}
+				current = value
+				present = true
+			default:
+				return resolvedValue{}, fmt.Errorf("field %q is not indexable", match[1])
 			}
-			index, _ := strconv.Atoi(match[2])
-			list := current.List()
-			if index >= list.Len() {
-				return resolvedValue{}, fmt.Errorf("index %d out of range for %q", index, match[1])
-			}
-			current = list.Get(index)
-			present = true
 		}
 	}
 	return resolvedValue{Value: current, Field: currentField, Present: present}, nil
+}
+
+func mapKey(field protoreflect.FieldDescriptor, raw string) (protoreflect.MapKey, error) {
+	switch field.Kind() {
+	case protoreflect.StringKind:
+		return protoreflect.ValueOfString(raw).MapKey(), nil
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		value, err := strconv.ParseInt(raw, 10, 32)
+		return protoreflect.ValueOfInt32(int32(value)).MapKey(), err
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		value, err := strconv.ParseInt(raw, 10, 64)
+		return protoreflect.ValueOfInt64(value).MapKey(), err
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		value, err := strconv.ParseUint(raw, 10, 32)
+		return protoreflect.ValueOfUint32(uint32(value)).MapKey(), err
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		value, err := strconv.ParseUint(raw, 10, 64)
+		return protoreflect.ValueOfUint64(value).MapKey(), err
+	case protoreflect.BoolKind:
+		value, err := strconv.ParseBool(raw)
+		return protoreflect.ValueOfBool(value).MapKey(), err
+	default:
+		return protoreflect.MapKey{}, fmt.Errorf("unsupported key kind %s", field.Kind())
+	}
 }
 
 func scalarEquals(got resolvedValue, want interface{}) bool {

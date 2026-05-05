@@ -60,3 +60,13 @@ fixtures:
     round_trip: semantic
     expected: expected/transport_hello_grpc_ws_v1.yaml
     tags: [transport, handshake]
+  - id: transport_hello_ack_v1
+    file: fixtures/transport_hello_ack_v1.binpb
+    textproto: fixtures/transport_hello_ack_v1.textproto
+    message: terminals.control.v1.WireEnvelope
+    payload: transport_hello_ack
+    direction: transport
+    purpose: Server transport negotiation acknowledgement with carrier, heartbeat, resume token, and limits.
+    round_trip: semantic
+    expected: expected/transport_hello_ack_v1.yaml
+    tags: [transport, handshake]

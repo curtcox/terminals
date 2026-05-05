@@ -341,6 +341,8 @@ Object? _valueAtPath(GeneratedMessage message, String path) {
       return (message as ConnectRequest).input.uiAction.value;
     case 'protocol_version':
       return (message as WireEnvelope).protocolVersion;
+    case 'session_id':
+      return (message as WireEnvelope).sessionId;
     case 'sequence':
       return (message as WireEnvelope).sequence.toInt();
     case 'transport_hello.protocol_version':
@@ -353,6 +355,33 @@ Object? _valueAtPath(GeneratedMessage message, String path) {
           .toList();
     case 'transport_hello.desired_device_id':
       return (message as WireEnvelope).transportHello.desiredDeviceId;
+    case 'transport_hello_ack.accepted_protocol_version':
+      return (message as WireEnvelope)
+          .transportHelloAck
+          .acceptedProtocolVersion;
+    case 'transport_hello_ack.negotiated_carrier':
+      return (message as WireEnvelope).transportHelloAck.negotiatedCarrier.name;
+    case 'transport_hello_ack.session_id':
+      return (message as WireEnvelope).transportHelloAck.sessionId;
+    case 'transport_hello_ack.resume_token':
+      return (message as WireEnvelope).transportHelloAck.resumeToken;
+    case 'transport_hello_ack.heartbeat_interval_ms':
+      return (message as WireEnvelope)
+          .transportHelloAck
+          .heartbeatIntervalMs
+          .toInt();
+    case 'transport_hello_ack.limits[max_frame_bytes]':
+      return (message as WireEnvelope)
+          .transportHelloAck
+          .limits['max_frame_bytes'];
+    case 'transport_hello_ack.limits[max_inflight_messages]':
+      return (message as WireEnvelope)
+          .transportHelloAck
+          .limits['max_inflight_messages'];
+    case 'transport_hello_ack.limits[heartbeat_interval_ms]':
+      return (message as WireEnvelope)
+          .transportHelloAck
+          .limits['heartbeat_interval_ms'];
     default:
       throw UnsupportedError('unsupported assertion path $path');
   }
