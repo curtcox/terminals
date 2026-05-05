@@ -121,13 +121,13 @@ Tests: UI/transport tests assert presence when needed, not exact behavior based 
 
 Owner: scenario/transport  
 Classification: transitional_escape_hatch  
-Target state: type durable command result data.  
+Target state: typed `CommandResult.typed_data` now mirrors durable command result data; keep legacy `data` map during the compatibility window.  
 Review date: 2026-06-15  
-Producer: server command dispatcher and scenarios  
-Consumer: clients and diagnostics surfaces  
+Producer: server command dispatcher and scenarios emit both typed entries and the legacy map.  
+Consumer: clients and diagnostics surfaces prefer typed entries when present and fall back to the legacy map for older servers.  
 Unknown behavior: clients ignore unknown keys.  
-Validation: string values; known keys document stricter formats with the owning command.  
-Tests: command result tests cover currently consumed keys.
+Validation: typed values use `CommandTypedValue` (`string_value`, `int64_value`, `bool_value`, `double_value`, or `string_list_value`); legacy string values remain for compatibility and known keys document stricter formats with the owning command.  
+Tests: command result tests cover currently consumed keys; `command_result_typed_data_v1` golden fixture is decoded by both Go and Dart contract tests and pins typed + legacy coexistence.
 
 ### Field: terminals.control.v1.WebRTCSignal.signal_type
 

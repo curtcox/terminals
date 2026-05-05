@@ -1,0 +1,43 @@
+protocol_version: 1
+sequence: 9
+server_message: {
+  command_result: {
+    request_id: "runtime-status-1"
+    notification: "Runtime status ready"
+    data: {
+      key: "processed"
+      value: "legacy-processed"
+    }
+    data: {
+      key: "detail"
+      value: "legacy detail"
+    }
+    typed_data: {
+      key: "processed"
+      value: {
+        int64_value: 3
+      }
+    }
+    typed_data: {
+      key: "ok"
+      value: {
+        bool_value: true
+      }
+    }
+    typed_data: {
+      key: "command_kinds"
+      value: {
+        string_list_value: {
+          values: "voice"
+          values: "manual"
+        }
+      }
+    }
+    typed_data: {
+      key: "detail"
+      value: {
+        string_value: "typed values win"
+      }
+    }
+  }
+}

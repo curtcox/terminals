@@ -25,6 +25,7 @@ func TestGoldenWireEnvelopeFixtures(t *testing.T) {
 		"start_stream_route_delta_v1":   assertStartStreamRouteDelta,
 		"route_stream_route_delta_v1":   assertRouteStreamRouteDelta,
 		"flow_plan_basic_v1":            assertFlowPlanBasic,
+		"command_result_typed_data_v1":  assertCommandResultTypedData,
 		"observation_sound_v1":          assertObservationSound,
 		"flow_stats_v1":                 assertFlowStats,
 		"unknown_metadata_key_v1":       assertUnknownMetadataKey,
@@ -288,6 +289,33 @@ func assertFlowPlanBasic(t *testing.T, envelope *controlv1.WireEnvelope) {
 	}
 	if got := capture.GetArgs()["device_id"]; got != "kitchen-terminal" {
 		t.Fatalf("legacy args[device_id] = %q", got)
+	}
+}
+
+func assertCommandResultTypedData(t *testing.T, envelope *controlv1.WireEnvelope) {
+	t.Helper()
+	result := envelope.GetServerMessage().GetCommandResult()
+	if result.GetRequestId() != "runtime-status-1" {
+		t.Fatalf("request_id = %q", result.GetRequestId())
+	}
+	if result.GetData()["processed"] != "legacy-processed" {
+		t.Fatalf("legacy processed data = %q", result.GetData()["processed"])
+	}
+	typed := map[string]*controlv1.CommandTypedValue{}
+	for _, entry := range result.GetTypedData() {
+		typed[entry.GetKey()] = entry.GetValue()
+	}
+	if got := typed["processed"].GetInt64Value(); got != 3 {
+		t.Fatalf("typed processed = %d, want 3", got)
+	}
+	if got := typed["ok"].GetBoolValue(); !got {
+		t.Fatalf("typed ok = %v, want true", got)
+	}
+	if got := typed["command_kinds"].GetStringListValue().GetValues(); len(got) != 2 || got[0] != "voice" || got[1] != "manual" {
+		t.Fatalf("typed command_kinds = %v, want [voice manual]", got)
+	}
+	if got := typed["detail"].GetStringValue(); got != "typed values win" {
+		t.Fatalf("typed detail = %q", got)
 	}
 }
 

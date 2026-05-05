@@ -958,6 +958,12 @@ Incremental progress (2026-05-03, ExecPolicy):
 - Extended `flow_plan_basic_v1` envelope fixture and Go/Dart contract assertions for typed-first + legacy-string compatibility.
 - Updated registry entry for `FlowNode.exec` to describe typed-first compatibility semantics.
 
+Incremental progress (2026-05-05, CommandResult typed data fixture):
+
+- Promoted `CommandResult.typed_data` from adapter-only coverage into the shared golden contract suite with `command_result_typed_data_v1`.
+- Added Go and Dart fixture assertions that pin typed `int64`, `bool`, `string_list`, and `string` values alongside legacy `data` map mirrors.
+- Updated the `CommandResult.data` registry entry to describe typed-first compatibility semantics.
+
 ### PR 6 - Enforcement
 
 - Flip `proto-flex-check` from advisory to required.

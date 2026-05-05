@@ -15,6 +15,7 @@ void main() {
     'start_stream_route_delta_v1': _assertStartStreamRouteDelta,
     'route_stream_route_delta_v1': _assertRouteStreamRouteDelta,
     'flow_plan_basic_v1': _assertFlowPlanBasic,
+    'command_result_typed_data_v1': _assertCommandResultTypedData,
     'observation_sound_v1': _assertObservationSound,
     'flow_stats_v1': _assertFlowStats,
     'unknown_metadata_key_v1': _assertUnknownMetadataKey,
@@ -132,6 +133,21 @@ void _assertFlowPlanBasic(WireEnvelope envelope) {
   _expectEqual(
       plan.nodes[0].typedArgs.streamKindEnum, StreamKind.STREAM_KIND_AUDIO);
   _expectEqual(plan.nodes[0].args['device_id'], 'kitchen-terminal');
+}
+
+void _assertCommandResultTypedData(WireEnvelope envelope) {
+  final result = envelope.serverMessage.commandResult;
+
+  _expectEqual(result.requestId, 'runtime-status-1');
+  _expectEqual(result.data['processed'], 'legacy-processed');
+  final typed = <String, CommandTypedValue>{
+    for (final entry in result.typedData) entry.key: entry.value,
+  };
+  _expectEqual(typed['processed']?.int64Value.toInt(), 3);
+  _expectEqual(typed['ok']?.boolValue, true);
+  _expectEqual(typed['command_kinds']?.stringListValue.values.join(','),
+      'voice,manual');
+  _expectEqual(typed['detail']?.stringValue, 'typed values win');
 }
 
 void _assertObservationSound(WireEnvelope envelope) {
