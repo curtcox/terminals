@@ -913,6 +913,8 @@ func (h *StreamHandler) handleFlowStatsMessage(ctx context.Context, req *FlowSta
 // legacy string for older clients.
 func resolveFlowState(req *FlowStatsRequest) string {
 	switch req.StateEnum {
+	case iov1.FlowState_FLOW_STATE_UNSPECIFIED:
+		return strings.TrimSpace(req.State)
 	case iov1.FlowState_FLOW_STATE_STARTING:
 		return "starting"
 	case iov1.FlowState_FLOW_STATE_RUNNING:

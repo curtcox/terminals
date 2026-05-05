@@ -168,6 +168,8 @@ func canvasDrawOpsFromUI(ops []ui.CanvasOp) []*uiv1.DrawOp {
 
 func uiCanvasOpToProto(op ui.CanvasOp) *uiv1.DrawOp {
 	switch op.Kind {
+	case ui.CanvasOpUnspecified:
+		return nil
 	case ui.CanvasOpLineKind:
 		if op.Line == nil {
 			return nil

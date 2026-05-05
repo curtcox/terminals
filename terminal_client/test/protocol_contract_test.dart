@@ -151,7 +151,8 @@ void _assertCommandRequestTypedArguments(WireEnvelope envelope) {
   _expectEqual(request.requestId, 'manual-command-1');
   _expectEqual(request.action, CommandAction.COMMAND_ACTION_START);
   _expectEqual(request.kind, CommandKind.COMMAND_KIND_MANUAL);
-  _expectEqual(request.arguments['device_ids'], 'terminal-kitchen,terminal-den');
+  _expectEqual(
+      request.arguments['device_ids'], 'terminal-kitchen,terminal-den');
   final typed = <String, CommandTypedValue>{
     for (final entry in request.typedArguments) entry.key: entry.value,
   };
@@ -172,8 +173,8 @@ void _assertCommandResultTypedData(WireEnvelope envelope) {
   };
   _expectEqual(typed['processed']?.int64Value.toInt(), 3);
   _expectEqual(typed['ok']?.boolValue, true);
-  _expectEqual(typed['command_kinds']?.stringListValue.values.join(','),
-      'voice,manual');
+  _expectEqual(
+      typed['command_kinds']?.stringListValue.values.join(','), 'voice,manual');
   _expectEqual(typed['detail']?.stringValue, 'typed values win');
 }
 

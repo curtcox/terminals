@@ -69,6 +69,8 @@ func mergeLegacyRoutingMetadata(metadata map[string]string, routing *iov1.Stream
 		return out
 	}
 	switch routing.GetOrigin() {
+	case iov1.StreamOrigin_STREAM_ORIGIN_UNSPECIFIED:
+		// no legacy key emitted
 	case iov1.StreamOrigin_STREAM_ORIGIN_ROUTE_DELTA:
 		out["origin"] = "route_delta"
 	case iov1.StreamOrigin_STREAM_ORIGIN_RESTORE:

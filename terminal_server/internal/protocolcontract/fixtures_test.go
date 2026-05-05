@@ -418,6 +418,7 @@ func assertUnknownMetadataKey(t *testing.T, envelope *controlv1.WireEnvelope) {
 
 func assertDeprecatedRegisterDevice(t *testing.T, envelope *controlv1.WireEnvelope) {
 	t.Helper()
+	//nolint:staticcheck // intentionally decoding a deprecated field to test backward compatibility
 	register := envelope.GetClientMessage().GetRegister()
 	if register.GetCapabilities().GetDeviceId() != "legacy-terminal" {
 		t.Fatalf("legacy register payload not decodable")

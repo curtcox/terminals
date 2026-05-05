@@ -1143,7 +1143,7 @@ func TestGeneratedProtoAdapterFromInternal(t *testing.T) {
 		t.Fatalf("response envelope type = %T, want *controlv1.ConnectResponse", envelope)
 	}
 	typedByKey = map[string]*controlv1.CommandTypedValue{}
-	var typedKeys []string
+	typedKeys := make([]string, 0, len(resp.GetCommandResult().GetTypedData()))
 	for _, entry := range resp.GetCommandResult().GetTypedData() {
 		typedKeys = append(typedKeys, entry.GetKey())
 		typedByKey[entry.GetKey()] = entry.GetValue()

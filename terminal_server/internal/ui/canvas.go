@@ -12,10 +12,15 @@ const (
 	// CanvasOpUnspecified is the zero value; CanvasOp instances of this
 	// kind are skipped by serializers and the transport adapter.
 	CanvasOpUnspecified CanvasOpKind = iota
+	// CanvasOpLineKind marks a CanvasOp carrying a DrawLine primitive.
 	CanvasOpLineKind
+	// CanvasOpRectKind marks a CanvasOp carrying a DrawRect primitive.
 	CanvasOpRectKind
+	// CanvasOpCircleKind marks a CanvasOp carrying a DrawCircle primitive.
 	CanvasOpCircleKind
+	// CanvasOpTextKind marks a CanvasOp carrying a DrawText primitive.
 	CanvasOpTextKind
+	// CanvasOpPathKind marks a CanvasOp carrying a DrawPath primitive.
 	CanvasOpPathKind
 )
 
@@ -151,6 +156,8 @@ func CanvasOpsToJSON(ops []CanvasOp) string {
 
 func opToJSONEntry(op CanvasOp) map[string]any {
 	switch op.Kind {
+	case CanvasOpUnspecified:
+		return nil
 	case CanvasOpLineKind:
 		if op.Line == nil {
 			return nil

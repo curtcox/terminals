@@ -1633,8 +1633,7 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     required String kind,
     required String componentId,
     required String detail,
-    diagv1.UiEventKind kindEnum =
-        diagv1.UiEventKind.UI_EVENT_KIND_UNSPECIFIED,
+    diagv1.UiEventKind kindEnum = diagv1.UiEventKind.UI_EVENT_KIND_UNSPECIFIED,
   }) {
     final entry = diagv1.UiEventEntry()
       ..unixMs = Int64(DateTime.now().toUtc().millisecondsSinceEpoch)

@@ -476,6 +476,8 @@ func internalKindFromProto(kind controlv1.CommandKind) string {
 
 func internalPointerActionFromProto(legacy string, action iov1.PointerAction) string {
 	switch action {
+	case iov1.PointerAction_POINTER_ACTION_UNSPECIFIED:
+		return strings.ToLower(strings.TrimSpace(legacy))
 	case iov1.PointerAction_POINTER_ACTION_DOWN:
 		return "down"
 	case iov1.PointerAction_POINTER_ACTION_MOVE:
@@ -493,6 +495,8 @@ func internalPointerActionFromProto(legacy string, action iov1.PointerAction) st
 
 func internalTouchActionFromProto(legacy string, action iov1.TouchAction) string {
 	switch action {
+	case iov1.TouchAction_TOUCH_ACTION_UNSPECIFIED:
+		return strings.ToLower(strings.TrimSpace(legacy))
 	case iov1.TouchAction_TOUCH_ACTION_START:
 		return "start"
 	case iov1.TouchAction_TOUCH_ACTION_MOVE:
@@ -629,6 +633,8 @@ func shouldUseStringListValue(key, value string) bool {
 
 func internalWebRTCSignalTypeFromProto(legacy string, signalType controlv1.WebRTCSignalType) string {
 	switch signalType {
+	case controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_UNSPECIFIED:
+		return legacy
 	case controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_OFFER:
 		return "offer"
 	case controlv1.WebRTCSignalType_WEB_RTC_SIGNAL_TYPE_ANSWER:

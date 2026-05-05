@@ -461,8 +461,7 @@ void main() {
           ..webrtcSignal = (WebRTCSignal()
             ..streamId = 'video-1'
             ..signalType = 'answer'
-            ..signalTypeEnum =
-                WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER),
+            ..signalTypeEnum = WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER),
       );
 
       expect(signalUpdate.webrtcSignalNotification,
@@ -493,8 +492,7 @@ void main() {
             ..kind = 'legacy-route'
             ..streamKind = iov1.StreamKind.STREAM_KIND_DATA),
       );
-      expect(routeUpdate.routeNotification,
-          'Route: source -> target (data)');
+      expect(routeUpdate.routeNotification, 'Route: source -> target (data)');
 
       final signalUpdate = synchronousMediaControlUpdateFromResponse(
         ConnectResponse()

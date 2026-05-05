@@ -490,10 +490,12 @@ RegisterMetadataUpdate? registerMetadataFromResponse(ConnectResponse response) {
   }
   final ack = response.registerAck;
   final metadata = Map<String, String>.from(ack.metadata);
-  final typedServerMetadata = ack.hasServerMetadata() ? ack.serverMetadata : null;
-  final typedBuild = typedServerMetadata != null && typedServerMetadata.hasBuild()
-      ? typedServerMetadata.build
-      : null;
+  final typedServerMetadata =
+      ack.hasServerMetadata() ? ack.serverMetadata : null;
+  final typedBuild =
+      typedServerMetadata != null && typedServerMetadata.hasBuild()
+          ? typedServerMetadata.build
+          : null;
   final typedBuildSha = typedBuild?.sha ?? '';
   final typedBuildDate = typedBuild?.dateRfc3339 ?? '';
   return RegisterMetadataUpdate(
