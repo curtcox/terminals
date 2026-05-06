@@ -70,6 +70,36 @@ class AndroidControlSessionControllerTest {
     }
 
     @Test
+    fun staleGenerationRebaselineSendsFreshSnapshot() = runTest {
+        val client = FakeControlClient()
+        val probe = MutableProbe(baseInput())
+        val controller = controller(client = client, probe = probe)
+
+        controller.connect(EndpointResolution("terminal.local", 8080))
+        probe.input = baseInput().copy(
+            screenMetrics = AndroidScreenMetrics(widthPx = 800, heightPx = 1280, density = 2f, orientation = "portrait"),
+        )
+        controller.rebaselineCapabilitiesAfterStaleGeneration()
+
+        assertTrue(client.sent.last().hasCapabilitySnapshot())
+        assertEquals(2, client.sent.last().capabilitySnapshot.generation)
+        assertEquals("portrait", client.sent.last().capabilitySnapshot.capabilities.screen.orientation)
+        assertEquals(2, controller.status.lastCapabilityGeneration)
+    }
+
+    @Test
+    fun failedRebaselineLeavesPreviousGenerationInStatus() = runTest {
+        val client = FakeControlClient(sendErrorOnCapabilitySnapshotAfterFirst = IllegalStateException("stream closed"))
+        val controller = controller(client = client)
+
+        controller.connect(EndpointResolution("terminal.local", 8080))
+        val result = runCatching { controller.rebaselineCapabilitiesAfterStaleGeneration() }
+
+        assertTrue(result.isFailure)
+        assertEquals(1, controller.status.lastCapabilityGeneration)
+    }
+
+    @Test
     fun failedConnectClosesClientAndRecordsError() = runTest {
         val client = FakeControlClient(connectError = IllegalStateException("no route"))
         val controller = controller(client = client)
@@ -97,6 +127,7 @@ class AndroidControlSessionControllerTest {
 
     private class FakeControlClient(
         private val connectError: Throwable? = null,
+        private val sendErrorOnCapabilitySnapshotAfterFirst: Throwable? = null,
     ) : AndroidControlClient {
         var connectedEndpoint: EndpointResolution? = null
         val sent = mutableListOf<Control.ConnectRequest>()
@@ -108,6 +139,13 @@ class AndroidControlSessionControllerTest {
         }
 
         override suspend fun send(request: Control.ConnectRequest) {
+            if (
+                sendErrorOnCapabilitySnapshotAfterFirst != null &&
+                request.hasCapabilitySnapshot() &&
+                sent.any { it.hasCapabilitySnapshot() }
+            ) {
+                throw sendErrorOnCapabilitySnapshotAfterFirst
+            }
             sent += request
         }
 

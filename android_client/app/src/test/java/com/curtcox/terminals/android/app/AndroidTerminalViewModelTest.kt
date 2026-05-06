@@ -113,6 +113,50 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_capability_delta=configuration"))
     }
 
+    @Test
+    fun staleGenerationProtocolErrorTriggersCapabilityRebaseline() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setError(
+                    Control.ControlError.newBuilder()
+                        .setCode(Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION)
+                        .setMessage("stale capability generation"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, session.rebaselineCount)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_capability_rebaseline=stale-generation"))
+    }
+
+    @Test
+    fun unrelatedProtocolErrorDoesNotRebaselineCapabilities() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setError(
+                    Control.ControlError.newBuilder()
+                        .setCode(Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION)
+                        .setMessage("malformed input"),
+                )
+                .build(),
+        )
+
+        assertEquals(0, session.rebaselineCount)
+    }
+
     private fun viewModel(session: FakeSession): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -133,6 +177,7 @@ class AndroidTerminalViewModelTest {
         var connectedEndpoint: EndpointResolution? = null
         val actions = mutableListOf<ServerDrivenAction>()
         val capabilityDeltaReasons = mutableListOf<String>()
+        var rebaselineCount = 0
 
         override suspend fun connect(endpoint: EndpointResolution) {
             connectError?.let { throw it }
@@ -151,7 +196,9 @@ class AndroidTerminalViewModelTest {
             return capabilityDeltaSent
         }
 
-        override suspend fun rebaselineCapabilitiesAfterStaleGeneration() = Unit
+        override suspend fun rebaselineCapabilitiesAfterStaleGeneration() {
+            rebaselineCount += 1
+        }
 
         override suspend fun close() = Unit
     }

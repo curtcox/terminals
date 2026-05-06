@@ -779,6 +779,10 @@ make android-client-lint
 - Added ViewModel coverage for capability delta refresh dispatch through the connected control session seam.
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+- Wired stale capability-generation protocol errors from the Android response sink to `AndroidControlSession.rebaselineCapabilitiesAfterStaleGeneration()`, preserving generic terminal behavior while sending a fresh protobuf capability snapshot.
+- Added controller and ViewModel tests covering stale-generation rebaseline dispatch, snapshot generation/status updates, and unrelated protocol errors that should not rebaseline.
+- Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*' --tests '*AndroidControlSessionControllerTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
 ## Test Plan
 

@@ -22,9 +22,23 @@ class AndroidTerminalViewModel(
     private val dispatcher = ControlResponseDispatcher()
     private val responseSink = object : AndroidControlResponseSink {
         override suspend fun onResponse(response: Control.ConnectResponse) {
+            val rebaselineSent = if (response.requiresCapabilityRebaseline()) {
+                runCatching {
+                    session?.rebaselineCapabilitiesAfterStaleGeneration()
+                }.isSuccess
+            } else {
+                false
+            }
             mutableState.update {
                 val next = dispatcher.dispatch(it, response)
-                next.copy(diagnosticsText = chrome.formatDiagnostics(parser.parse(next.endpointText), next.connectionState))
+                val diagnostics = chrome.formatDiagnostics(parser.parse(next.endpointText), next.connectionState)
+                next.copy(
+                    diagnosticsText = if (rebaselineSent) {
+                        "$diagnostics\nlast_capability_rebaseline=stale-generation"
+                    } else {
+                        diagnostics
+                    },
+                )
             }
         }
     }
@@ -131,5 +145,12 @@ class AndroidTerminalViewModel(
         session = null
         viewModelScope.launch { closingSession?.close() }
         super.onCleared()
+    }
+
+    private fun Control.ConnectResponse.requiresCapabilityRebaseline(): Boolean {
+        if (!hasError()) return false
+        if (error.code != Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION) return false
+        return error.message.contains("stale", ignoreCase = true) &&
+            error.message.contains("generation", ignoreCase = true)
     }
 }
