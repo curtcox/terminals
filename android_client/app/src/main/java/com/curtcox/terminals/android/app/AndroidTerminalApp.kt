@@ -20,6 +20,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.curtcox.terminals.android.ui.ServerDrivenRenderer
+import com.curtcox.terminals.android.ui.ServerDrivenRendererPlaceholder
 
 @Composable
 fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
@@ -57,6 +59,14 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                 SelectionContainer {
                     Text(state.diagnosticsText, fontFamily = FontFamily.Monospace)
                 }
+
+                state.serverRoot?.let { root ->
+                    ServerDrivenRenderer(
+                        root = root,
+                        onAction = viewModel::sendUiAction,
+                        imageLoader = { url, _ -> Text(url) },
+                    )
+                } ?: ServerDrivenRendererPlaceholder()
             }
         }
     }

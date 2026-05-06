@@ -3,6 +3,7 @@ package com.curtcox.terminals.android.app
 import androidx.lifecycle.ViewModel
 import com.curtcox.terminals.android.connection.ManualEndpointParser
 import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
+import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -42,6 +43,12 @@ class AndroidTerminalViewModel(
                     diagnosticsText = chrome.formatDiagnostics(resolved, ConnectionState.Connecting),
                 )
             }
+        }
+    }
+
+    fun sendUiAction(action: ServerDrivenAction) {
+        mutableState.update {
+            it.copy(diagnosticsText = "${it.diagnosticsText}\nlast_ui_action=${action.componentId}:${action.action}:${action.value}")
         }
     }
 }
