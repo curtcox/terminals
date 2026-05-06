@@ -39,4 +39,4 @@ npm run build
 
 ## Protocol Note
 
-`src/protocol/generated/**` is intentionally isolated behind `src/protocol/codec.js` and `src/transport/envelope_codec.js`. The current dependency-free bindings cover the web client boundary and tests; replacing them with a richer generator should not require renderer or app changes.
+`src/protocol/generated/**` is intentionally isolated behind `src/protocol/codec.js` and `src/transport/envelope_codec.js`. The current bindings are generated from `api/terminals/**` with Buf and `protoc-gen-es`; changing the generator should not require renderer or app changes.
