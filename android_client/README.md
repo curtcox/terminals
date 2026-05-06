@@ -1,7 +1,7 @@
 # Terminals Native Android Client
 
-This is the native Android client scaffold for Terminals. It is a generic
-terminal shell for Android and Kindle Fire tablets.
+This is the native Android client for Terminals. It is a generic terminal
+runtime for Android and Kindle Fire tablets.
 
 The client must remain scenario-agnostic:
 

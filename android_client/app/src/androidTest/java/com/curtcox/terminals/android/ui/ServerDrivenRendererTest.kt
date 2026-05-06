@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -131,6 +132,67 @@ class ServerDrivenRendererTest {
 
         compose.onNodeWithText("brightness=0.42").assertIsDisplayed()
         compose.waitUntil { calls == listOf(0.42) }
+    }
+
+    @Test
+    fun textInputEmitsValueChanges() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = node("name") {
+            textInput = Ui.TextInputWidget.newBuilder().setPlaceholder("Name").build()
+        }
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithText("Name").performTextInput("Ada")
+
+        assertEquals(ServerDrivenAction("name", "change", "Ada"), actions.last())
+    }
+
+    @Test
+    fun toggleEmitsCheckedState() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = node("enabled") {
+            toggle = Ui.ToggleWidget.newBuilder().setValue(false).build()
+        }
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithTag("terminal-node-enabled").performClick()
+
+        assertEquals(listOf(ServerDrivenAction("enabled", "change", "true")), actions)
+    }
+
+    @Test
+    fun dropdownEmitsSelectedOption() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = node("mode") {
+            dropdown = Ui.DropdownWidget.newBuilder()
+                .setValue("Manual")
+                .addOptions("Manual")
+                .addOptions("Auto")
+                .build()
+        }
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithText("Manual").performClick()
+        compose.onNodeWithText("Auto").performClick()
+
+        assertEquals(listOf(ServerDrivenAction("mode", "change", "Auto")), actions)
+    }
+
+    @Test
+    fun gestureAreaEmitsConfiguredAction() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = Ui.Node.newBuilder()
+            .setId("surface")
+            .setGestureArea(Ui.GestureAreaWidget.newBuilder().setAction("primary"))
+            .addChildren(node("label") {
+                text = Ui.TextWidget.newBuilder().setValue("Tap target").build()
+            })
+            .build()
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithText("Tap target").performClick()
+
+        assertEquals(listOf(ServerDrivenAction("surface", "primary")), actions)
     }
 
     private fun render(

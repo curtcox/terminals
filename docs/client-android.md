@@ -114,10 +114,11 @@ make run-server
 192.168.1.50:50051
 ```
 
-The current native Android scaffold validates manual endpoints and displays
-generic diagnostics. Control-stream protocol, protobuf request builders,
-discovery, capability deltas, and server-driven rendering land in later phases
-of `plans/features/android-client/plan.md`.
+The native Android client validates manual endpoints, manages the generic
+control-session lifecycle, sends protobuf-backed hello/capability/action
+messages, surfaces local diagnostics, and renders server-driven UI primitives.
+Discovery, media, kiosk, and connected-device behavior continue to mature under
+`plans/features/android-client/plan.md`.
 
 ## Boundary Rules
 

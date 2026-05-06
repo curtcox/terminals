@@ -42,4 +42,16 @@ if ANDROID_CLIENT_DIR="${TMP_DIR}/android_client" "${ROOT_DIR}/scripts/check-and
   exit 1
 fi
 
+cp "${ROOT_DIR}/android_client/app/build.gradle.kts" "${TMP_DIR}/android_client/app/build.gradle.kts"
+cat >"${TMP_DIR}/android_client/app/src/main/java/com/curtcox/terminals/android/ui/RendererLeak.kt" <<'KT'
+package com.curtcox.terminals.android.ui
+import com.curtcox.terminals.android.connection.AndroidControlClient
+class RendererLeak
+KT
+
+if ANDROID_CLIENT_DIR="${TMP_DIR}/android_client" "${ROOT_DIR}/scripts/check-android-client-boundary.sh" >/dev/null 2>&1; then
+  echo "ERROR: boundary scan did not catch renderer subsystem import"
+  exit 1
+fi
+
 echo "android client boundary tests passed"
