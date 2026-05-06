@@ -11,6 +11,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-boundary client-boundary-test client-coverage \
+	android-client-build android-client-test android-client-lint android-client-connected-test android-client-boundary android-client-boundary-test \
 	web-client-build web-client-test web-client-lint web-client-boundary web-client-proto-check web-client-smoke-test run-web-client \
 	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-generate proto-contract-test proto-contract-verify \
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
@@ -113,6 +114,40 @@ client-boundary-test:
 client-coverage:
 	cd terminal_client && flutter test --coverage
 
+android-client-build:
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
+		cd android_client && ./gradlew assembleDebug -PTERMINALS_BUILD_SHA=$(BUILD_SHA) -PTERMINALS_BUILD_DATE=$(BUILD_DATE); \
+	else \
+		echo "Skipping native Android build: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
+	fi
+
+android-client-test:
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
+		cd android_client && ./gradlew testDebugUnitTest; \
+	else \
+		echo "Skipping native Android tests: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
+	fi
+
+android-client-lint:
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
+		cd android_client && ./gradlew lintDebug; \
+	else \
+		echo "Skipping native Android lint: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
+	fi
+
+android-client-connected-test:
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
+		cd android_client && ./gradlew connectedDebugAndroidTest; \
+	else \
+		echo "Skipping native Android connected tests: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
+	fi
+
+android-client-boundary:
+	./scripts/check-android-client-boundary.sh
+
+android-client-boundary-test:
+	./scripts/test-android-client-boundary.sh
+
 web-client-build:
 	cd web_client && npm run build
 
@@ -179,9 +214,9 @@ pick-next-work:
 next:
 	@python3 ./scripts/next.py
 
-all-lint: server-lint client-lint client-boundary web-client-lint proto-lint
+all-lint: server-lint client-lint client-boundary android-client-boundary web-client-lint proto-lint
 
-all-test: server-test client-test client-boundary-test web-client-test
+all-test: server-test client-test client-boundary-test android-client-boundary-test web-client-test
 
 all-check: all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all web-client-build development-docs-test usecases-index validation-matrix
 

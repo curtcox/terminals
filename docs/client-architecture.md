@@ -1,6 +1,6 @@
 # Client Architecture
 
-The Flutter client is a generic terminal runtime. It does not contain
+Terminals clients are generic terminal runtimes. They do not contain
 scenario-specific behavior. Scenario orchestration, policy, and planning stay
 on the Go server.
 
@@ -29,6 +29,8 @@ Current implementation centers on:
   reliability wrappers.
 - `terminal_client/lib/media/` and `terminal_client/lib/io/` for media and
   sensor/input execution.
+- `android_client/` for the native Android/Kindle Fire client scaffold and
+  Android-specific platform seams.
 
 The architecture remains generic even where code is physically concentrated,
 and is covered by widget/integration-style tests in `terminal_client/test/`.
@@ -69,6 +71,7 @@ Repository-wide quality and compatibility gates are run via `make all-check`.
 
 - `docs/discovery-and-connection.md`
 - `docs/server.md`
+- `docs/client-android.md`
 - `docs/client-web.md`
 - `docs/client-macos.md`
 - `plans/features/protocol.md`

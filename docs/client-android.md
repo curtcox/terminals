@@ -1,112 +1,152 @@
-# Client (Android) — Build & Run
+# Client (Native Android)
 
-The Flutter client lives in `terminal_client/`. This guide covers the **Android** target.
+The native Android client lives in `android_client/`. It is a generic Terminals
+thin client for Android and Kindle Fire tablets; scenario behavior, routing,
+policy, and orchestration remain on the Go server.
+
+The existing Flutter Android target still lives under `terminal_client/` and is
+built by `make client-build-android`.
+
+## Target
+
+- Package: `com.curtcox.terminals.android`
+- Initial device class: Kindle Fire tablets running Fire OS 6 or newer
+- Android API: `minSdk 25`, `targetSdk 36`, `compileSdk 36`
+- Google services: not used
+- Install path: Android Studio, ADB, or Fire tablet sideloading
+
+Do not add Google Play Services, Firebase, Nearby, Cast, Play Integrity,
+SafetyNet, Play Store-only APIs, Amazon account APIs, or scenario-specific
+Android code without a follow-up plan.
 
 ## Prerequisites
 
-| Tool | Minimum version | Install |
-|------|-----------------|---------|
-| Flutter SDK | 3.4+ | <https://docs.flutter.dev/get-started/install> |
-| Android Studio | latest | <https://developer.android.com/studio> |
-| Android SDK | API 21+ | Via Android Studio SDK Manager |
-| Java JDK | 17 | Bundled with Android Studio or install separately |
+| Tool | Version | Notes |
+| --- | --- | --- |
+| Android Studio | current stable | Includes Android SDK and platform tools |
+| Android SDK | API 36 installed | API 25+ runtime compatibility is required |
+| JDK | 17 | Android Studio bundled JDK is fine |
+| Gradle | wrapper included | `android_client/gradlew` downloads Gradle 8.13 when needed |
+| ADB | current platform tools | Needed for Fire tablet install/smoke tests |
 
-Verify your environment:
-
-```bash
-flutter doctor
-```
-
-Ensure `flutter doctor` shows no issues for the Android toolchain.
-
-## Install dependencies
+Set one SDK environment variable:
 
 ```bash
-cd terminal_client
-flutter pub get
+export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
 ```
 
-## Run (Emulator)
-
-1. Create an AVD (Android Virtual Device) via Android Studio's Device Manager.
-2. Start the emulator, then:
+## Build
 
 ```bash
-cd terminal_client && flutter run
+make android-client-build
 ```
 
-Or target a specific emulator:
+Direct Gradle command:
 
 ```bash
-flutter devices                        # list available devices
-cd terminal_client && flutter run -d <emulator-id>
+cd android_client
+./gradlew assembleDebug
 ```
 
-## Run (physical device)
+Debug APK output:
 
-1. Enable **Developer Options** and **USB Debugging** on the device.
-2. Connect via USB and accept the debugging prompt.
-3. Run:
+```text
+android_client/app/build/outputs/apk/debug/app-debug.apk
+```
+
+## Test And Lint
 
 ```bash
-cd terminal_client && flutter run -d <device-id>
+make android-client-test
+make android-client-lint
+make android-client-boundary
 ```
 
-## Build (release)
-
-### APK
+Direct Gradle commands:
 
 ```bash
-cd terminal_client && flutter build apk
+cd android_client
+./gradlew testDebugUnitTest
+./gradlew lintDebug
 ```
 
-Output: `terminal_client/build/app/outputs/flutter-apk/app-release.apk`
-
-### App Bundle (for Play Store)
+Connected-device tests require an emulator or physical device:
 
 ```bash
-cd terminal_client && flutter build appbundle
+adb devices
+make android-client-connected-test
 ```
 
-Output: `terminal_client/build/app/outputs/bundle/release/app-release.aab`
+## Fire Tablet Setup
 
-## Permissions
-
-The Android manifest (`terminal_client/android/app/src/main/AndroidManifest.xml`) must include:
-
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.CAMERA" />
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-```
-
-- `INTERNET` — gRPC and WebRTC communication.
-- `CAMERA` — camera access for live video scenarios.
-- `RECORD_AUDIO` — microphone access for voice/WebRTC features.
-- `CHANGE_WIFI_MULTICAST_STATE` — mDNS server discovery on the local network.
-
-When camera or microphone permission is denied at runtime, the client surfaces a
-deterministic control-stream status (`Media permission required`) and emits a
-failure notification for the rejected stream start.
-
-## Test
+1. Open Fire tablet settings.
+2. Enable developer options.
+3. Enable USB debugging.
+4. Connect the tablet over USB.
+5. Accept the debugging prompt on the tablet.
+6. Confirm the device is visible:
 
 ```bash
-cd terminal_client && flutter test
+adb devices
 ```
 
-Tests are platform-independent and shared across all client targets.
-
-## Lint
+Install the debug APK:
 
 ```bash
-cd terminal_client && flutter analyze && dart format --set-exit-if-changed .
+adb install -r android_client/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Connecting to the server
+For kiosk-like smoke tests, also review Fire OS settings for screen timeout,
+battery optimization, Wi-Fi sleep, and app background restrictions.
 
-1. Start the server (see [server.md](server.md)).
-2. The device and server must be on the same local network for mDNS discovery.
-3. If using an emulator, the host machine's `localhost` is reachable at `10.0.2.2`. Enter `10.0.2.2:50051` in the manual connect screen.
-4. Communication uses gRPC (port 50051 by default) with WebRTC for media.
+## Run
+
+1. Start the server on the same LAN:
+
+```bash
+make run-server
+```
+
+2. Open Terminals on the Android device.
+3. Enter a manual endpoint such as:
+
+```text
+192.168.1.50:50051
+```
+
+The current native Android scaffold validates manual endpoints and displays
+generic diagnostics. Control-stream protocol, protobuf request builders,
+discovery, capability deltas, and server-driven rendering land in later phases
+of `plans/features/android-client/plan.md`.
+
+## Boundary Rules
+
+Production Android code is scanned for:
+
+- scenario names and package-id branching,
+- forbidden Google service dependencies,
+- renderer imports of connection, discovery, media internals, or platform APIs.
+
+Run:
+
+```bash
+./scripts/check-android-client-boundary.sh
+./scripts/test-android-client-boundary.sh
+```
+
+## Troubleshooting
+
+If `adb devices` shows no device, reconnect USB, approve the tablet prompt, and
+verify platform tools are from the configured Android SDK.
+
+If install fails, remove any existing incompatible package:
+
+```bash
+adb uninstall com.curtcox.terminals.android
+adb install -r android_client/app/build/outputs/apk/debug/app-debug.apk
+```
+
+If discovery later fails on Fire OS, use manual endpoint entry first. Some Wi-Fi
+networks block multicast or isolate clients.
+
+If Gradle cannot find the SDK, set `ANDROID_SDK_ROOT` or `ANDROID_HOME`.
