@@ -1,4 +1,5 @@
 import { mapRendererActionToConnectRequest } from "./protocol/ui_action_mapper.js";
+import { normalizeServerMetadata } from "./protocol/metadata_mapper.js";
 
 export class TerminalWebClientApp {
   constructor({ config, store, endpointResolution, transport, renderer, chrome }) {
@@ -50,8 +51,10 @@ export class TerminalWebClientApp {
       this.renderer.patch(value.componentId, value.node);
     } else if (payload.case === "transitionUi") {
       this.renderer.transition(value.componentId, value);
-    } else if (payload.case === "helloAck" || payload.case === "registerAck") {
-      this.store.dispatch({ type: "server.metadata", metadata: value.serverMetadata ?? value });
+    } else if (payload.case === "registerAck") {
+      this.store.dispatch({ type: "server.metadata", metadata: normalizeServerMetadata(value) });
+    } else if (payload.case === "helloAck") {
+      this.store.dispatch({ type: "server.metadata", metadata: value });
     }
   }
 }
