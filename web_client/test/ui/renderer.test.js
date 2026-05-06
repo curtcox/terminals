@@ -103,6 +103,39 @@ test("renders content and media primitives", () => {
   restore();
 });
 
+test("canvas renders typed draw operations and ignores malformed legacy payloads", () => {
+  const restore = installDomHarness();
+  const root = createElement("div");
+  new ServerDrivenRenderer({ rootElement: root }).render(node("canvas", {
+    drawOpsJson: "{bad",
+    drawOps: [
+      { op: { case: "line", value: { x1: 1, y1: 2, x2: 3, y2: 4, stroke: "#123456", strokeWidth: 2 } } },
+      { op: { case: "rect", value: { x: 5, y: 6, width: 7, height: 8, fill: "red" } } },
+      { op: { case: "circle", value: { cx: 9, cy: 10, radius: 11, stroke: "blue" } } },
+      { op: { case: "text", value: { x: 12, y: 13, text: "hello", fill: "green", fontSize: 14, fontFamily: "serif" } } }
+    ]
+  }));
+  assert.deepEqual(root.children[0].canvasCalls, [
+    ["strokeStyle", "#123456"],
+    ["lineWidth", 2],
+    ["beginPath"],
+    ["moveTo", 1, 2],
+    ["lineTo", 3, 4],
+    ["stroke"],
+    ["fillStyle", "red"],
+    ["fillRect", 5, 6, 7, 8],
+    ["strokeStyle", "blue"],
+    ["beginPath"],
+    ["arc", 9, 10, 11, 0, Math.PI * 2],
+    ["stroke"],
+    ["font", "14px serif"],
+    ["fillStyle", "green"],
+    ["fillText", "hello", 12, 13]
+  ]);
+  assert.equal(root.children[0].attributes["data-legacy-draw-ops"], "true");
+  restore();
+});
+
 test("input primitives emit generic actions", () => {
   const restore = installDomHarness();
   const root = createElement("div");

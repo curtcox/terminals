@@ -125,8 +125,10 @@ export class ServerDrivenRenderer {
     const el = document.createElement("canvas");
     el.className = "sd sd-canvas";
     const canvas = widgetValue(node);
-    el.setAttribute("data-draw-op-count", String(canvas?.drawOps?.length ?? 0));
+    const drawOps = canvas?.drawOps ?? [];
+    el.setAttribute("data-draw-op-count", String(drawOps.length));
     if (canvas?.drawOpsJson) el.setAttribute("data-legacy-draw-ops", "true");
+    drawCanvasOps(el, drawOps);
     return el;
   }
 
@@ -245,4 +247,69 @@ function widgetKind(node) {
 function widgetValue(node) {
   if (node?.widget?.case) return node.widget.value;
   return node?.[widgetKind(node)];
+}
+
+function drawCanvasOps(canvasElement, drawOps) {
+  const context = canvasElement.getContext?.("2d");
+  if (!context) return;
+  for (const drawOp of drawOps) {
+    const op = drawOp?.op;
+    if (!op?.case) continue;
+    drawCanvasOp(context, op.case, op.value ?? {});
+  }
+}
+
+function drawCanvasOp(context, kind, value) {
+  switch (kind) {
+    case "line":
+      withStroke(context, value, () => {
+        context.beginPath?.();
+        context.moveTo?.(value.x1 ?? 0, value.y1 ?? 0);
+        context.lineTo?.(value.x2 ?? 0, value.y2 ?? 0);
+        context.stroke?.();
+      });
+      break;
+    case "rect":
+      withFillAndStroke(context, value, () => {
+        if (value.fill) context.fillRect?.(value.x ?? 0, value.y ?? 0, value.width ?? 0, value.height ?? 0);
+        if (value.stroke) context.strokeRect?.(value.x ?? 0, value.y ?? 0, value.width ?? 0, value.height ?? 0);
+      });
+      break;
+    case "circle":
+      withFillAndStroke(context, value, () => {
+        context.beginPath?.();
+        context.arc?.(value.cx ?? 0, value.cy ?? 0, Math.max(0, value.radius ?? 0), 0, Math.PI * 2);
+        if (value.fill) context.fill?.();
+        if (value.stroke) context.stroke?.();
+      });
+      break;
+    case "text":
+      if (value.fontSize || value.fontFamily) {
+        const size = Math.max(1, value.fontSize || 16);
+        context.font = `${size}px ${value.fontFamily || "sans-serif"}`;
+      }
+      if (value.fill) context.fillStyle = safeCssColor(value.fill);
+      context.fillText?.(value.text ?? "", value.x ?? 0, value.y ?? 0);
+      break;
+    case "path":
+      withFillAndStroke(context, value, () => {
+        const path = typeof Path2D === "function" ? new Path2D(value.d ?? "") : null;
+        if (path && value.fill) context.fill?.(path);
+        if (path && value.stroke) context.stroke?.(path);
+      });
+      break;
+  }
+}
+
+function withStroke(context, value, draw) {
+  if (value.stroke) context.strokeStyle = safeCssColor(value.stroke);
+  if (value.strokeWidth) context.lineWidth = Math.max(0, value.strokeWidth);
+  draw();
+}
+
+function withFillAndStroke(context, value, draw) {
+  if (value.fill) context.fillStyle = safeCssColor(value.fill);
+  if (value.stroke) context.strokeStyle = safeCssColor(value.stroke);
+  if (value.strokeWidth) context.lineWidth = Math.max(0, value.strokeWidth);
+  draw();
 }

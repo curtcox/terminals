@@ -8,6 +8,7 @@ export function createElement(tagName = "div") {
     textContent: "",
     value: "",
     checked: false,
+    canvasCalls: [],
     append(...nodes) {
       for (const node of nodes) node.parentNode = this;
       this.children.push(...nodes);
@@ -32,6 +33,25 @@ export function createElement(tagName = "div") {
     setAttribute(key, value) { this.attributes[key] = String(value); },
     getAttribute(key) { return this.attributes[key]; },
     addEventListener(type, handler) { this[`on${type}`] = handler; },
+    getContext(kind) {
+      if (tagName !== "canvas" || kind !== "2d") return null;
+      const calls = this.canvasCalls;
+      return {
+        beginPath: () => calls.push(["beginPath"]),
+        moveTo: (x, y) => calls.push(["moveTo", x, y]),
+        lineTo: (x, y) => calls.push(["lineTo", x, y]),
+        stroke: () => calls.push(["stroke"]),
+        fill: () => calls.push(["fill"]),
+        arc: (cx, cy, radius, start, end) => calls.push(["arc", cx, cy, radius, start, end]),
+        fillRect: (x, y, width, height) => calls.push(["fillRect", x, y, width, height]),
+        strokeRect: (x, y, width, height) => calls.push(["strokeRect", x, y, width, height]),
+        fillText: (text, x, y) => calls.push(["fillText", text, x, y]),
+        set fillStyle(value) { calls.push(["fillStyle", value]); },
+        set strokeStyle(value) { calls.push(["strokeStyle", value]); },
+        set lineWidth(value) { calls.push(["lineWidth", value]); },
+        set font(value) { calls.push(["font", value]); }
+      };
+    },
     querySelector(selector) {
       const attribute = selector.match(/^\[(data-[a-z-]+)="([^"]+)"\]$/);
       const match = (node) => attribute
