@@ -11,16 +11,19 @@ export function readScreenMetrics({ window = globalThis.window, document = globa
   };
 }
 
-export function watchScreenMetrics(callback, { window = globalThis.window, delayMs = 100 } = {}) {
+export function watchScreenMetrics(callback, { window = globalThis.window, document = globalThis.document, delayMs = 100 } = {}) {
   let timer = null;
   const handler = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => callback(readScreenMetrics()), delayMs);
+    timer = setTimeout(() => callback(readScreenMetrics({ window, document })), delayMs);
   };
   window?.addEventListener?.("resize", handler);
   window?.screen?.orientation?.addEventListener?.("change", handler);
+  document?.addEventListener?.("visibilitychange", handler);
   return () => {
+    clearTimeout(timer);
     window?.removeEventListener?.("resize", handler);
     window?.screen?.orientation?.removeEventListener?.("change", handler);
+    document?.removeEventListener?.("visibilitychange", handler);
   };
 }

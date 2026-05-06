@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test",
+    "test": "node scripts/test.mjs",
     "lint": "node scripts/check-boundary.mjs",
     "boundary": "node scripts/check-boundary.mjs",
     "serve": "node scripts/serve-dev.mjs",
