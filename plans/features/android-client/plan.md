@@ -787,6 +787,8 @@ make android-client-lint
 - Added renderer and ViewModel coverage for keep-awake effect dispatch.
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+- Wired server-driven Android `FullscreenWidget` and `BrightnessWidget` through the same generic device-control effect path, ViewModel platform seams, and concrete `Window` adapters.
+- Added renderer and ViewModel coverage for fullscreen and brightness effect dispatch.
 
 ## Test Plan
 

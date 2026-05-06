@@ -5,6 +5,8 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
+import com.curtcox.terminals.android.platform.AndroidBrightnessController
+import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.Dispatchers
@@ -169,6 +171,32 @@ class AndroidTerminalViewModelTest {
         viewModel.setKeepAwake(false)
 
         assertEquals(listOf(true, false), calls)
+    }
+
+    @Test
+    fun fullscreenDelegatesToPlatformAdapter() {
+        val calls = mutableListOf<Boolean>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(fullscreenController = AndroidFullscreenController { calls.add(it) }),
+        )
+
+        viewModel.setFullscreen(true)
+        viewModel.setFullscreen(false)
+
+        assertEquals(listOf(true, false), calls)
+    }
+
+    @Test
+    fun brightnessDelegatesToPlatformAdapter() {
+        val calls = mutableListOf<Double>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(brightnessController = AndroidBrightnessController { calls.add(it) }),
+        )
+
+        viewModel.setBrightness(0.25)
+        viewModel.setBrightness(1.0)
+
+        assertEquals(listOf(0.25, 1.0), calls)
     }
 
     private fun viewModel(session: FakeSession): AndroidTerminalViewModel =

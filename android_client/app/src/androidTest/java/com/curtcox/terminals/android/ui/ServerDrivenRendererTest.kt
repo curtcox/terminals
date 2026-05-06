@@ -93,6 +93,46 @@ class ServerDrivenRendererTest {
         compose.waitUntil { calls == listOf(true) }
     }
 
+    @Test
+    fun fullscreenWidgetInvokesInjectedDeviceControlEffect() {
+        val calls = mutableListOf<Boolean>()
+        val root = node("full") {
+            fullscreen = Ui.FullscreenWidget.newBuilder().setEnabled(true).build()
+        }
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                imageLoader = { url, _ -> Text(url) },
+                deviceControlEffects = DeviceControlEffects(setFullscreen = calls::add),
+            )
+        }
+
+        compose.onNodeWithText("fullscreen=true").assertIsDisplayed()
+        compose.waitUntil { calls == listOf(true) }
+    }
+
+    @Test
+    fun brightnessWidgetInvokesInjectedDeviceControlEffect() {
+        val calls = mutableListOf<Double>()
+        val root = node("brightness") {
+            brightness = Ui.BrightnessWidget.newBuilder().setValue(0.42).build()
+        }
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                imageLoader = { url, _ -> Text(url) },
+                deviceControlEffects = DeviceControlEffects(setBrightness = calls::add),
+            )
+        }
+
+        compose.onNodeWithText("brightness=0.42").assertIsDisplayed()
+        compose.waitUntil { calls == listOf(0.42) }
+    }
+
     private fun render(
         root: Ui.Node,
         onAction: (ServerDrivenAction) -> Unit = {},

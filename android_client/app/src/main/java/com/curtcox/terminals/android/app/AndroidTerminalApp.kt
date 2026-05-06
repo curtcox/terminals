@@ -68,6 +68,8 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                         imageLoader = { url, _ -> Text(url) },
                         deviceControlEffects = DeviceControlEffects(
                             setKeepAwake = viewModel::setKeepAwake,
+                            setFullscreen = viewModel::setFullscreen,
+                            setBrightness = viewModel::setBrightness,
                         ),
                     )
                 } ?: ServerDrivenRendererPlaceholder()

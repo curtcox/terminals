@@ -150,6 +150,26 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun setFullscreen(enabled: Boolean) {
+        runCatching {
+            dependencies.fullscreenController.setFullscreen(enabled)
+        }.onFailure { error ->
+            mutableState.update {
+                it.copy(lastError = error.message ?: error::class.java.simpleName)
+            }
+        }
+    }
+
+    fun setBrightness(value: Double) {
+        runCatching {
+            dependencies.brightnessController.setBrightness(value)
+        }.onFailure { error ->
+            mutableState.update {
+                it.copy(lastError = error.message ?: error::class.java.simpleName)
+            }
+        }
+    }
+
     override fun onCleared() {
         val closingSession = session
         session = null
