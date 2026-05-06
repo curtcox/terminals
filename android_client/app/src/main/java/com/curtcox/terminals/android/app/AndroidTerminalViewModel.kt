@@ -11,6 +11,8 @@ import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
 import com.curtcox.terminals.android.media.AudioPlaybackResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.ui.ServerDrivenAction
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,14 +77,18 @@ class AndroidTerminalViewModel(
         }
     }
     private var session: AndroidControlSession? = null
+    private var heartbeatJob: Job? = null
     private val mutableState = MutableStateFlow(
-        AndroidTerminalViewState(diagnosticsText = formatDiagnostics(null, ConnectionState.Disconnected)),
+        initialState(),
     )
 
     val state: StateFlow<AndroidTerminalViewState> = mutableState
 
     fun updateEndpoint(text: String) {
         val resolved = parser.parse(text)
+        if (resolved != null) {
+            dependencies.terminalSettings.setLastManualEndpoint(text)
+        }
         mutableState.update {
             it.copy(
                 endpointText = text,
@@ -111,9 +117,13 @@ class AndroidTerminalViewModel(
         }
         viewModelScope.launch {
             runCatching {
+                stopHeartbeat()
+                session?.close()
                 val nextSession = dependencies.sessionFactory(responseSink)
                 session = nextSession
                 nextSession.connect(resolved)
+                dependencies.terminalSettings.setLastManualEndpoint(mutableState.value.endpointText)
+                startHeartbeat(nextSession)
             }.onSuccess {
                 mutableState.update {
                     it.copy(
@@ -123,6 +133,7 @@ class AndroidTerminalViewModel(
                     )
                 }
             }.onFailure { error ->
+                stopHeartbeat()
                 session = null
                 mutableState.update {
                     val message = error.message ?: error::class.java.simpleName
@@ -212,8 +223,31 @@ class AndroidTerminalViewModel(
     override fun onCleared() {
         val closingSession = session
         session = null
+        stopHeartbeat()
         viewModelScope.launch { closingSession?.close() }
         super.onCleared()
+    }
+
+    private fun startHeartbeat(connectedSession: AndroidControlSession) {
+        if (dependencies.heartbeatIntervalMillis <= 0) return
+        heartbeatJob = viewModelScope.launch {
+            while (true) {
+                delay(dependencies.heartbeatIntervalMillis)
+                runCatching {
+                    connectedSession.sendHeartbeat()
+                }.onFailure { error ->
+                    mutableState.update {
+                        it.copy(lastError = error.message ?: error::class.java.simpleName)
+                    }
+                    stopHeartbeat()
+                }
+            }
+        }
+    }
+
+    private fun stopHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = null
     }
 
     private fun Control.ConnectResponse.requiresCapabilityRebaseline(): Boolean {
@@ -229,6 +263,22 @@ class AndroidTerminalViewModel(
             state = state,
             networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
         )
+
+    private fun initialState(): AndroidTerminalViewState {
+        val lastEndpoint = runCatching { dependencies.terminalSettings.lastManualEndpoint() }.getOrDefault("")
+        val resolved = parser.parse(lastEndpoint)
+        val state = when {
+            lastEndpoint.isBlank() -> ConnectionState.Disconnected
+            resolved != null -> ConnectionState.ReadyToConnect
+            else -> ConnectionState.InvalidEndpoint
+        }
+        return AndroidTerminalViewState(
+            endpointText = lastEndpoint,
+            connectionState = state,
+            lastError = if (state == ConnectionState.InvalidEndpoint) "Enter a host:port or http(s) URL." else null,
+            diagnosticsText = formatDiagnostics(resolved, state),
+        )
+    }
 
     private fun AudioPlaybackResult.toStatus(requestId: String): Pair<String, String> =
         when (this) {

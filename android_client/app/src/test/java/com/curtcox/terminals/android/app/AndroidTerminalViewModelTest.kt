@@ -16,13 +16,16 @@ import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
 import com.curtcox.terminals.android.platform.AndroidNetworkState
 import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
+import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -102,6 +105,74 @@ class AndroidTerminalViewModelTest {
         assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
         assertEquals("no route", viewModel.state.value.lastError)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_error=no route"))
+    }
+
+    @Test
+    fun validEndpointUpdatesAreRememberedAsManualEndpoint() {
+        val settings = AndroidTerminalSettings.inMemory()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                terminalSettings = settings,
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+
+        assertEquals("10.0.0.8:8080", settings.lastManualEndpoint())
+    }
+
+    @Test
+    fun initialStateRestoresRememberedManualEndpoint() {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                terminalSettings = AndroidTerminalSettings.inMemory("10.0.0.8:8080"),
+            ),
+        )
+
+        assertEquals("10.0.0.8:8080", viewModel.state.value.endpointText)
+        assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
+    }
+
+    @Test
+    fun reconnectClosesPreviousSessionBeforeOpeningNext() = runTest(dispatcher) {
+        val first = FakeSession()
+        val second = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.connect()
+        advanceUntilIdle()
+
+        assertEquals(1, first.closeCount)
+        assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+    }
+
+    @Test
+    fun connectedSessionSendsPeriodicHeartbeats() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session, heartbeatIntervalMillis = 100)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(250)
+        runCurrent()
+
+        assertEquals(2, session.heartbeatCount)
     }
 
     @Test
@@ -367,6 +438,7 @@ class AndroidTerminalViewModelTest {
         notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
         mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
         networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
+        heartbeatIntervalMillis: Long = 0,
     ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -374,6 +446,7 @@ class AndroidTerminalViewModelTest {
                 notificationDelivery = notificationDelivery,
                 mediaEngine = mediaEngine,
                 networkStateProvider = networkStateProvider,
+                heartbeatIntervalMillis = heartbeatIntervalMillis,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session
@@ -391,6 +464,8 @@ class AndroidTerminalViewModelTest {
         val actions = mutableListOf<ServerDrivenAction>()
         val capabilityDeltaReasons = mutableListOf<String>()
         var rebaselineCount = 0
+        var heartbeatCount = 0
+        var closeCount = 0
 
         override suspend fun connect(endpoint: EndpointResolution) {
             connectError?.let { throw it }
@@ -398,7 +473,9 @@ class AndroidTerminalViewModelTest {
             status = status.copy(connected = true, endpoint = endpoint)
         }
 
-        override suspend fun sendHeartbeat() = Unit
+        override suspend fun sendHeartbeat() {
+            heartbeatCount += 1
+        }
 
         override suspend fun sendUiAction(action: ServerDrivenAction) {
             actions += action
@@ -413,6 +490,8 @@ class AndroidTerminalViewModelTest {
             rebaselineCount += 1
         }
 
-        override suspend fun close() = Unit
+        override suspend fun close() {
+            closeCount += 1
+        }
     }
 }

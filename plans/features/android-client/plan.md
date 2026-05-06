@@ -800,6 +800,11 @@ make android-client-lint
 - Added ViewModel coverage for network diagnostic sampling during connect and explicit network refresh.
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*' --tests '*AndroidClientChromeTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+- Added a generic terminal settings seam backed by Android `SharedPreferences` so the native client restores and remembers the last valid manual endpoint without adding scenario behavior.
+- Hardened the ViewModel connection lifecycle by closing any existing control session before reconnect, starting a periodic heartbeat loop after successful connect, and cancelling the heartbeat on reconnect/failure/clear.
+- Added ViewModel coverage for remembered manual endpoints, reconnect session shutdown, and periodic heartbeat dispatch.
+- Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
 ## Test Plan
 
