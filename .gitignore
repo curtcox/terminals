@@ -25,6 +25,12 @@ terminal_client/pubspec.lock
 .pub-cache/
 /.pub-cache/
 
+# Gradle/Android
+.gradle/
+android_client/.gradle/
+android_client/build/
+android_client/app/build/
+
 # Proto/codegen
 api/gen/
 
