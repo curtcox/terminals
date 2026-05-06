@@ -29,9 +29,19 @@ class AndroidTerminalViewModel(
             } else {
                 false
             }
+            val notificationDelivered = if (response.payloadCase == Control.ConnectResponse.PayloadCase.NOTIFICATION) {
+                runCatching {
+                    dependencies.notificationDelivery.deliver(response.notification.title, response.notification.body)
+                }.isSuccess
+            } else {
+                false
+            }
             mutableState.update {
                 val next = dispatcher.dispatch(it, response)
-                val diagnostics = chrome.formatDiagnostics(parser.parse(next.endpointText), next.connectionState)
+                var diagnostics = chrome.formatDiagnostics(parser.parse(next.endpointText), next.connectionState)
+                if (notificationDelivered) {
+                    diagnostics += "\nlast_notification=${response.notification.title}"
+                }
                 next.copy(
                     diagnosticsText = if (rebaselineSent) {
                         "$diagnostics\nlast_capability_rebaseline=stale-generation"

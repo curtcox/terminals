@@ -789,6 +789,9 @@ make android-client-lint
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 - Wired server-driven Android `FullscreenWidget` and `BrightnessWidget` through the same generic device-control effect path, ViewModel platform seams, and concrete `Window` adapters.
 - Added renderer and ViewModel coverage for fullscreen and brightness effect dispatch.
+- Wired generic server `Notification` responses through the Android response sink to an injected `AndroidNotificationDelivery` platform seam, added a status-bar notification adapter with Android 13 permission gating and an API 26+ notification channel, and covered ViewModel notification delivery in unit tests.
+- Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
 ## Test Plan
 

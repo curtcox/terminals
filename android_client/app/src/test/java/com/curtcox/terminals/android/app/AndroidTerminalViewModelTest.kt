@@ -8,6 +8,7 @@ import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
+import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -85,6 +86,35 @@ class AndroidTerminalViewModelTest {
         )
 
         assertEquals(root, viewModel.state.value.serverRoot)
+    }
+
+    @Test
+    fun serverNotificationIsDeliveredThroughPlatformAdapter() = runTest(dispatcher) {
+        val session = FakeSession()
+        val delivered = mutableListOf<Pair<String, String>>()
+        val viewModel = viewModel(
+            session,
+            notificationDelivery = AndroidNotificationDelivery { title, body -> delivered += title to body },
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setNotification(
+                    Ui.Notification.newBuilder()
+                        .setDeviceId("device-1")
+                        .setTitle("Timer")
+                        .setBody("Done"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("Timer" to "Done"), delivered)
+        assertEquals("Timer", viewModel.state.value.lastNotificationTitle)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_notification=Timer"))
     }
 
     @Test
@@ -199,10 +229,14 @@ class AndroidTerminalViewModelTest {
         assertEquals(listOf(0.25, 1.0), calls)
     }
 
-    private fun viewModel(session: FakeSession): AndroidTerminalViewModel =
+    private fun viewModel(
+        session: FakeSession,
+        notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
+    ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                notificationDelivery = notificationDelivery,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session

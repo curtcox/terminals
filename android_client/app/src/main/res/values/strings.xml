@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Terminals</string>
+    <string name="notification_channel_terminal_events">Terminal events</string>
 </resources>
