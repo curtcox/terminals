@@ -7,3 +7,7 @@ interface AndroidControlClient {
     suspend fun send(request: Control.ConnectRequest)
     suspend fun close()
 }
+
+interface AndroidControlResponseSink {
+    suspend fun onResponse(response: Control.ConnectResponse)
+}

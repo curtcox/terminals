@@ -1,7 +1,7 @@
 ---
 title: "Android Client"
 kind: plan
-status: planned
+status: building
 owner: curtcox
 validation: automated
 last-reviewed: 2026-05-06
@@ -758,6 +758,15 @@ make android-client-build
 make android-client-test
 make android-client-lint
 ```
+
+## Implementation Progress
+
+### 2026-05-06
+
+- Added a dependency-free Android WebSocket control carrier implementation that performs the RFC 6455 upgrade, sends the required transport hello, wraps outgoing `ConnectRequest` messages in protobuf `WireEnvelope` binary frames, tracks session/sequence metadata, handles ping/close frames, and exposes incoming `ConnectResponse` messages through a generic response sink.
+- Added focused WebSocket frame codec tests for masked and extended-length binary frames.
+- Verified Android client boundary scan with `./scripts/check-android-client-boundary.sh`.
+- Gradle Android unit validation is currently blocked on this machine because the only installed JDK is Java 25.0.3, which the Kotlin Gradle DSL cannot parse during settings script compilation.
 
 ## Test Plan
 
