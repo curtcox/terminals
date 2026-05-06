@@ -767,6 +767,9 @@ make android-client-lint
 - Added focused WebSocket frame codec tests for masked and extended-length binary frames.
 - Verified Android client boundary scan with `./scripts/check-android-client-boundary.sh`.
 - Gradle Android unit validation is currently blocked on this machine because the only installed JDK is Java 25.0.3, which the Kotlin Gradle DSL cannot parse during settings script compilation.
+- Added a native Android NSD/mDNS discovery adapter for `_terminals._tcp.` services, including TXT metadata parsing for generic carrier endpoints and priority.
+- Verified Android client boundary scan and boundary test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidNsdDiscoveryTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
 ## Test Plan
 
