@@ -1,0 +1,75 @@
+.sd {
+  min-width: 0;
+}
+
+.sd-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sd-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.sd-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.sd-scroll {
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+.sd-center {
+  display: grid;
+  place-items: center;
+}
+
+.sd-expand {
+  flex: 1 1 auto;
+}
+
+.sd-overlay {
+  display: grid;
+}
+
+.sd-overlay > * {
+  grid-area: 1 / 1;
+}
+
+.sd-text {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+.sd-image,
+.sd-video-surface {
+  max-width: 100%;
+  height: auto;
+}
+
+.sd-button {
+  min-height: 36px;
+  padding: 6px 12px;
+}
+
+.sd-text-input,
+.sd-dropdown {
+  min-height: 36px;
+  width: 100%;
+}
+
+.sd-fallback,
+.sd-fullscreen,
+.sd-keep-awake,
+.sd-brightness,
+.sd-audio-surface {
+  border: 1px solid #9aa4b2;
+  padding: 8px;
+  border-radius: 6px;
+}

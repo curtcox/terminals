@@ -1,0 +1,28 @@
+.client-chrome {
+  padding: 8px 12px;
+  border-bottom: 1px solid #d5dbe3;
+  background: #ffffff;
+}
+
+.client-chrome form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.diagnostics-root {
+  padding: 8px 12px;
+  border-top: 1px solid #d5dbe3;
+  background: #ffffff;
+  font-size: 13px;
+}
+
+.diagnostic {
+  padding: 4px 0;
+}
+
+.diagnostic-warning,
+.diagnostic-error {
+  color: #9b2c2c;
+}

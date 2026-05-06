@@ -11,9 +11,10 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-boundary client-boundary-test client-coverage \
+	web-client-build web-client-test web-client-lint web-client-proto-check run-web-client \
 	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-generate proto-contract-test proto-contract-verify \
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
-	all-lint all-test all-check ci-local stop-server stop-server-test run-server run-client-web \
+	all-lint all-test all-check ci-local stop-server stop-server-test run-server run-client-web run-web-client \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
 	ui-inspect-test
 
@@ -112,6 +113,18 @@ client-boundary-test:
 client-coverage:
 	cd terminal_client && flutter test --coverage
 
+web-client-build:
+	cd web_client && npm run build
+
+web-client-test:
+	cd web_client && npm test
+
+web-client-lint:
+	cd web_client && npm run lint
+
+web-client-proto-check:
+	cd web_client && npm run proto:check
+
 proto-lint:
 	cd api && buf lint
 	cd terminal_server && GOCACHE="$(LOCAL_GO_CACHE)" go test ./internal/transport -run 'TestProtoRoundTrip' -count=1
@@ -160,11 +173,11 @@ pick-next-work:
 next:
 	@python3 ./scripts/next.py
 
-all-lint: server-lint client-lint client-boundary proto-lint
+all-lint: server-lint client-lint client-boundary web-client-lint proto-lint
 
-all-test: server-test client-test client-boundary-test
+all-test: server-test client-test client-boundary-test web-client-test
 
-all-check: all-lint all-test proto-breaking proto-contract-test client-build-all development-docs-test usecases-index validation-matrix
+all-check: all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all web-client-build development-docs-test usecases-index validation-matrix
 
 ci-local: all-check
 
@@ -189,6 +202,9 @@ run-server:
 run-client-web:
 	cd terminal_client && flutter build web --no-wasm-dry-run --pwa-strategy=none --dart-define=TERMINALS_BUILD_SHA=$(BUILD_SHA) --dart-define=TERMINALS_BUILD_DATE=$(BUILD_DATE)
 	cd terminal_client && python3 -m http.server $(CLIENT_WEB_PORT) --bind $(CLIENT_WEB_HOST) --directory build/web
+
+run-web-client:
+	cd web_client && WEB_CLIENT_PORT=$(CLIENT_WEB_PORT) WEB_CLIENT_HOST=$(CLIENT_WEB_HOST) npm run serve
 
 run-local:
 	./scripts/run-local.sh

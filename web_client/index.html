@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="application-name" content="Terminals Web Client">
+    <title>Terminals Web Client</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "@bufbuild/protobuf": "./node_modules/@bufbuild/protobuf/dist/esm/index.js",
+          "@bufbuild/protobuf/codegenv2": "./node_modules/@bufbuild/protobuf/dist/esm/codegenv2/index.js"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="./src/ui/styles/base.css">
+    <link rel="stylesheet" href="./src/ui/styles/renderer.css">
+    <link rel="stylesheet" href="./src/ui/styles/diagnostics.css">
+  </head>
+  <body>
+    <header id="client-chrome" class="client-chrome" aria-label="Client status"></header>
+    <main id="terminal-root" class="terminal-root" aria-label="Server-driven terminal"></main>
+    <aside id="diagnostics-root" class="diagnostics-root" aria-label="Diagnostics"></aside>
+    <div id="modal-root" class="modal-root" aria-live="polite"></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
