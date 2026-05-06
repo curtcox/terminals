@@ -7,6 +7,8 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlResponseDispatcher
 import com.curtcox.terminals.android.connection.ManualEndpointParser
 import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
+import com.curtcox.terminals.android.media.AudioPlaybackResult
+import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,11 +38,28 @@ class AndroidTerminalViewModel(
             } else {
                 false
             }
+            val audioResult = if (response.payloadCase == Control.ConnectResponse.PayloadCase.PLAY_AUDIO) {
+                runCatching { dependencies.mediaEngine.playAudio(response.playAudio) }
+                    .getOrElse { AudioPlaybackResult.Unsupported(it.message ?: it::class.java.simpleName) }
+            } else {
+                null
+            }
+            val mediaResult = if (response.payloadCase == Control.ConnectResponse.PayloadCase.SHOW_MEDIA) {
+                runCatching { dependencies.mediaEngine.showMedia(response.showMedia) }
+                    .getOrElse { MediaDisplayResult.Unsupported(it.message ?: it::class.java.simpleName) }
+            } else {
+                null
+            }
             mutableState.update {
                 val next = dispatcher.dispatch(it, response)
                 var diagnostics = chrome.formatDiagnostics(parser.parse(next.endpointText), next.connectionState)
                 if (notificationDelivered) {
                     diagnostics += "\nlast_notification=${response.notification.title}"
+                }
+                val mediaStatus = audioResult?.toStatus(response.playAudio.requestId)
+                    ?: mediaResult?.toStatus(response.showMedia.requestId)
+                if (mediaStatus != null) {
+                    diagnostics += "\nlast_media=${mediaStatus.first}:${mediaStatus.second}"
                 }
                 next.copy(
                     diagnosticsText = if (rebaselineSent) {
@@ -48,6 +67,8 @@ class AndroidTerminalViewModel(
                     } else {
                         diagnostics
                     },
+                    lastMediaRequestId = mediaStatus?.first ?: next.lastMediaRequestId,
+                    lastMediaStatus = mediaStatus?.second ?: next.lastMediaStatus,
                 )
             }
         }
@@ -193,4 +214,16 @@ class AndroidTerminalViewModel(
         return error.message.contains("stale", ignoreCase = true) &&
             error.message.contains("generation", ignoreCase = true)
     }
+
+    private fun AudioPlaybackResult.toStatus(requestId: String): Pair<String, String> =
+        when (this) {
+            is AudioPlaybackResult.Played -> (this.requestId.ifBlank { requestId }) to "played"
+            is AudioPlaybackResult.Unsupported -> requestId to "unsupported-audio:$reason"
+        }
+
+    private fun MediaDisplayResult.toStatus(requestId: String): Pair<String, String> =
+        when (this) {
+            is MediaDisplayResult.Shown -> (this.requestId.ifBlank { requestId }) to "shown"
+            is MediaDisplayResult.Unsupported -> requestId to "unsupported-media:$reason"
+        }
 }

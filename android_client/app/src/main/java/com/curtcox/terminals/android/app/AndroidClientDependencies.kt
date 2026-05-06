@@ -10,6 +10,7 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.AndroidControlSessionController
 import com.curtcox.terminals.android.connection.WebSocketAndroidControlClient
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
+import com.curtcox.terminals.android.media.AndroidMediaEngine
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
@@ -28,6 +29,7 @@ data class AndroidClientDependencies(
     val fullscreenController: AndroidFullscreenController = AndroidFullscreenController {},
     val brightnessController: AndroidBrightnessController = AndroidBrightnessController {},
     val notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
+    val mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->
         AndroidControlSessionController(
             deviceId = deviceId,

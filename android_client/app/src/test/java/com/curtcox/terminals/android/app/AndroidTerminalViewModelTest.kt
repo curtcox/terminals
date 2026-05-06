@@ -5,6 +5,11 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
+import com.curtcox.terminals.android.media.AndroidAudioPlayback
+import com.curtcox.terminals.android.media.AndroidMediaDisplay
+import com.curtcox.terminals.android.media.AndroidMediaEngine
+import com.curtcox.terminals.android.media.AudioPlaybackResult
+import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
@@ -23,6 +28,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import terminals.control.v1.Control
+import terminals.io.v1.Io
 import terminals.ui.v1.Ui
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -115,6 +121,102 @@ class AndroidTerminalViewModelTest {
         assertEquals(listOf("Timer" to "Done"), delivered)
         assertEquals("Timer", viewModel.state.value.lastNotificationTitle)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_notification=Timer"))
+    }
+
+    @Test
+    fun playAudioResponseIsDelegatedThroughMediaEngine() = runTest(dispatcher) {
+        val session = FakeSession()
+        val played = mutableListOf<Io.PlayAudio>()
+        val viewModel = viewModel(
+            session,
+            mediaEngine = AndroidMediaEngine(
+                audioPlayback = AndroidAudioPlayback { command ->
+                    played += command
+                    AudioPlaybackResult.Played(command.requestId)
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setPlayAudio(
+                    Io.PlayAudio.newBuilder()
+                        .setRequestId("audio-1")
+                        .setDeviceId("device-1")
+                        .setPcmData(com.google.protobuf.ByteString.copyFrom(byteArrayOf(1, 2, 3)))
+                        .setFormat("audio/pcm"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("audio-1", played.single().requestId)
+        assertEquals("audio-1", viewModel.state.value.lastMediaRequestId)
+        assertEquals("played", viewModel.state.value.lastMediaStatus)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_media=audio-1:played"))
+    }
+
+    @Test
+    fun unsupportedShowMediaResponseIsRecordedInDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setShowMedia(
+                    Io.ShowMedia.newBuilder()
+                        .setRequestId("media-1")
+                        .setDeviceId("device-1")
+                        .setMediaUrl("https://example.test/clip.mp4")
+                        .setMediaType("video/mp4"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("media-1", viewModel.state.value.lastMediaRequestId)
+        assertEquals("unsupported-media:video/mp4", viewModel.state.value.lastMediaStatus)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_media=media-1:unsupported-media:video/mp4"))
+    }
+
+    @Test
+    fun showMediaResponseCanBeDelegatedThroughMediaEngine() = runTest(dispatcher) {
+        val session = FakeSession()
+        val shown = mutableListOf<Io.ShowMedia>()
+        val viewModel = viewModel(
+            session,
+            mediaEngine = AndroidMediaEngine(
+                mediaDisplay = AndroidMediaDisplay { command ->
+                    shown += command
+                    MediaDisplayResult.Shown(command.requestId)
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setShowMedia(
+                    Io.ShowMedia.newBuilder()
+                        .setRequestId("media-2")
+                        .setDeviceId("device-1")
+                        .setMediaUrl("https://example.test/image.png")
+                        .setMediaType("image/png"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("media-2", shown.single().requestId)
+        assertEquals("shown", viewModel.state.value.lastMediaStatus)
     }
 
     @Test
@@ -232,11 +334,13 @@ class AndroidTerminalViewModelTest {
     private fun viewModel(
         session: FakeSession,
         notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
+        mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
     ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 notificationDelivery = notificationDelivery,
+                mediaEngine = mediaEngine,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session

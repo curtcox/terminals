@@ -10,6 +10,8 @@ data class AndroidTerminalViewState(
     val serverRoot: Ui.Node? = null,
     val lastNotificationTitle: String? = null,
     val lastNotificationBody: String? = null,
+    val lastMediaRequestId: String? = null,
+    val lastMediaStatus: String? = null,
     val lastTransition: String? = null,
 )
 
