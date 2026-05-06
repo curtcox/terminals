@@ -5,6 +5,7 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
+import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -155,6 +156,19 @@ class AndroidTerminalViewModelTest {
         )
 
         assertEquals(0, session.rebaselineCount)
+    }
+
+    @Test
+    fun keepAwakeDelegatesToPlatformAdapter() {
+        val calls = mutableListOf<Boolean>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(keepAwakeController = AndroidKeepAwakeController { calls.add(it) }),
+        )
+
+        viewModel.setKeepAwake(true)
+        viewModel.setKeepAwake(false)
+
+        assertEquals(listOf(true, false), calls)
     }
 
     private fun viewModel(session: FakeSession): AndroidTerminalViewModel =

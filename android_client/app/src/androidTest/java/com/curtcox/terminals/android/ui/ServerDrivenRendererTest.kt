@@ -73,6 +73,26 @@ class ServerDrivenRendererTest {
         compose.onNodeWithText("Unsupported terminal widget").assertIsDisplayed()
     }
 
+    @Test
+    fun keepAwakeWidgetInvokesInjectedDeviceControlEffect() {
+        val calls = mutableListOf<Boolean>()
+        val root = node("wake") {
+            keepAwake = Ui.KeepAwakeWidget.newBuilder().setEnabled(true).build()
+        }
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                imageLoader = { url, _ -> Text(url) },
+                deviceControlEffects = DeviceControlEffects(setKeepAwake = calls::add),
+            )
+        }
+
+        compose.onNodeWithText("keep_awake=true").assertIsDisplayed()
+        compose.waitUntil { calls == listOf(true) }
+    }
+
     private fun render(
         root: Ui.Node,
         onAction: (ServerDrivenAction) -> Unit = {},

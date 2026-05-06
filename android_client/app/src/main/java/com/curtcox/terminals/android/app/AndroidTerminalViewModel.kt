@@ -140,6 +140,16 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun setKeepAwake(enabled: Boolean) {
+        runCatching {
+            dependencies.keepAwakeController.setKeepAwake(enabled)
+        }.onFailure { error ->
+            mutableState.update {
+                it.copy(lastError = error.message ?: error::class.java.simpleName)
+            }
+        }
+    }
+
     override fun onCleared() {
         val closingSession = session
         session = null

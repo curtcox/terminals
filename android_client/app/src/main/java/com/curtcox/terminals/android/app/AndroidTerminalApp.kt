@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.curtcox.terminals.android.ui.DeviceControlEffects
 import com.curtcox.terminals.android.ui.ServerDrivenRenderer
 import com.curtcox.terminals.android.ui.ServerDrivenRendererPlaceholder
 
@@ -65,6 +66,9 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                         root = root,
                         onAction = viewModel::sendUiAction,
                         imageLoader = { url, _ -> Text(url) },
+                        deviceControlEffects = DeviceControlEffects(
+                            setKeepAwake = viewModel::setKeepAwake,
+                        ),
                     )
                 } ?: ServerDrivenRendererPlaceholder()
             }
