@@ -11,6 +11,16 @@ data class ControlSessionStatus(
     val lastCapabilityGeneration: Long = 0,
 )
 
+interface AndroidControlSession {
+    val status: ControlSessionStatus
+    suspend fun connect(endpoint: EndpointResolution)
+    suspend fun sendHeartbeat()
+    suspend fun sendUiAction(action: ServerDrivenAction)
+    suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean
+    suspend fun rebaselineCapabilitiesAfterStaleGeneration()
+    suspend fun close()
+}
+
 class AndroidControlSessionController(
     private val deviceId: String,
     private val clientVersion: String,
@@ -18,11 +28,11 @@ class AndroidControlSessionController(
     private val capabilities: AndroidCapabilitySession,
     private val builders: ProtocolBuilders = ProtocolBuilders(),
     private val clock: Clock,
-) {
-    var status: ControlSessionStatus = ControlSessionStatus()
+) : AndroidControlSession {
+    override var status: ControlSessionStatus = ControlSessionStatus()
         private set
 
-    suspend fun connect(endpoint: EndpointResolution) {
+    override suspend fun connect(endpoint: EndpointResolution) {
         try {
             client.connect(endpoint)
             sendHelloAndSnapshot()
@@ -43,28 +53,28 @@ class AndroidControlSessionController(
         }
     }
 
-    suspend fun sendHeartbeat() {
+    override suspend fun sendHeartbeat() {
         client.send(builders.heartbeat(deviceId, clock.nowMillis()))
     }
 
-    suspend fun sendUiAction(action: ServerDrivenAction) {
+    override suspend fun sendUiAction(action: ServerDrivenAction) {
         client.send(builders.uiAction(deviceId, action))
     }
 
-    suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
+    override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
         val report = capabilities.deltaIfChanged(reason) ?: return false
         client.send(builders.capabilityDelta(deviceId, report.generation, report.capabilities, report.reason))
         status = status.copy(lastCapabilityGeneration = report.generation)
         return true
     }
 
-    suspend fun rebaselineCapabilitiesAfterStaleGeneration() {
+    override suspend fun rebaselineCapabilitiesAfterStaleGeneration() {
         val report = capabilities.rebaselineAfterStaleGeneration()
         client.send(builders.capabilitySnapshot(deviceId, report.generation, report.capabilities))
         status = status.copy(lastCapabilityGeneration = report.generation)
     }
 
-    suspend fun close() {
+    override suspend fun close() {
         client.close()
         status = status.copy(connected = false)
     }

@@ -770,6 +770,10 @@ make android-client-lint
 - Added a native Android NSD/mDNS discovery adapter for `_terminals._tcp.` services, including TXT metadata parsing for generic carrier endpoints and priority.
 - Verified Android client boundary scan and boundary test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidNsdDiscoveryTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+- Wired the Android terminal ViewModel manual-connect path to the generic control session factory so valid endpoints now create a WebSocket-backed session, send hello/capability snapshot through `AndroidControlSessionController`, dispatch incoming control responses into renderer state, and forward `ServerDrivenAction` values as protobuf UI actions.
+- Added an `AndroidControlSession` interface seam and ViewModel unit tests covering successful connect, connect failure diagnostics, server `SetUI` dispatch, and UI action forwarding.
+- Re-verified Android boundary scan and boundary tests with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
 ## Test Plan
 

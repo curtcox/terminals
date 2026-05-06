@@ -18,4 +18,5 @@ enum class ConnectionState {
     InvalidEndpoint,
     ReadyToConnect,
     Connecting,
+    Connected,
 }
