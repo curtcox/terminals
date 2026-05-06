@@ -44,3 +44,26 @@ test("stores normalized register ack metadata from server messages", () => {
     }
   });
 });
+
+test("diagnoses unresolved endpoint without opening transport", () => {
+  const store = createStore();
+  let connected = false;
+  const app = new TerminalWebClientApp({
+    store,
+    config: {},
+    endpointResolution: {
+      resolve: () => ({ endpoint: "", diagnostics: ["No WebSocket endpoint configured"] })
+    },
+    transport: {
+      connect: () => {
+        connected = true;
+      }
+    },
+    renderer: {},
+    chrome: {}
+  });
+
+  assert.equal(app.connect(""), null);
+  assert.equal(connected, false);
+  assert.deepEqual(store.getState().diagnostics, [{ level: "error", message: "No WebSocket endpoint configured" }]);
+});

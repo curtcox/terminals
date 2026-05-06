@@ -27,6 +27,11 @@ export class TerminalWebClientApp {
 
   connect(endpoint = this.store.getState().endpoint) {
     const resolved = this.endpointResolution.resolve(endpoint);
+    for (const message of resolved.diagnostics ?? []) {
+      this.store.dispatch({ type: "diagnostic.add", entry: { level: "error", message } });
+    }
+    if (!resolved.endpoint) return null;
+    this.endpointResolution.persist?.(resolved.endpoint);
     this.store.dispatch({ type: "endpoint.selected", endpoint: resolved.endpoint });
     return this.transport.connect(resolved.endpoint);
   }
