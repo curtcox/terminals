@@ -1,10 +1,10 @@
 ---
 title: "HTML/JavaScript Web Client"
 kind: plan
-status: planned
+status: implemented
 owner: curtcox
 validation: automated
-last-reviewed: 2026-05-04
+last-reviewed: 2026-05-05
 ---
 
 # HTML/JavaScript Web Client
@@ -520,7 +520,7 @@ Add these rules to the web client README and boundary check:
 
 ### Phase 0: Inventory and Generator Decision
 
-Status: planned
+Status: completed
 
 Tasks:
 
@@ -549,7 +549,7 @@ make proto-contract-test
 
 ### Phase 1: Static Shell and Build/Test Harness
 
-Status: planned
+Status: completed
 
 Tasks:
 
@@ -578,7 +578,7 @@ python3 -m http.server 60740 --directory web_client/dist
 
 ### Phase 2: WebSocket Control Transport
 
-Status: planned
+Status: completed
 
 Tasks:
 
@@ -609,7 +609,7 @@ make proto-contract-test
 
 ### Phase 3: Browser Capability Snapshot and Delta
 
-Status: planned
+Status: completed
 
 Tasks:
 
@@ -636,7 +636,7 @@ make proto-contract-test
 
 ### Phase 4: Server-Driven DOM Renderer
 
-Status: planned
+Status: completed
 
 Tasks:
 
@@ -666,7 +666,7 @@ cd web_client && npm run boundary
 
 ### Phase 5: Action, Metadata, and Protocol Compatibility
 
-Status: planned
+Status: completed
 
 Tasks:
 
@@ -693,7 +693,7 @@ make proto-contract-test
 
 ### Phase 6: Browser Media Bridge
 
-Status: planned
+Status: completed
 
 Tasks:
 
@@ -721,7 +721,7 @@ make server-test
 
 ### Phase 7: Diagnostics, Boundary Guardrails, and Documentation
 
-Status: planned
+Status: completed
 
 Tasks:
 
@@ -751,7 +751,7 @@ python3 ./scripts/generate-plans-index.py --check
 
 ### Phase 8: End-to-End Smoke Flow
 
-Status: planned
+Status: completed
 
 Tasks:
 

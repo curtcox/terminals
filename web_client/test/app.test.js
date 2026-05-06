@@ -80,8 +80,9 @@ test("sends logical hello and capability snapshot after transport hello ack", ()
     keyboard: true,
     pointerType: "mouse"
   });
+  const store = createStore();
   const app = new TerminalWebClientApp({
-    store: createStore(),
+    store,
     config: { build: { sha: "abc123" } },
     endpointResolution: {},
     transport: {
@@ -101,4 +102,5 @@ test("sends logical hello and capability snapshot after transport hello ack", ()
   assert.equal(sent[1].payload.case, "capabilitySnapshot");
   assert.equal(sent[1].payload.value.generation, 1n);
   assert.equal(sent[1].payload.value.capabilities.screen.width, 800);
+  assert.equal(store.getState().capabilities.deviceId, "browser-1");
 });

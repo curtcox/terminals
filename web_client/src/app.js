@@ -79,6 +79,7 @@ export class TerminalWebClientApp {
 
   sendInitialClientHandshake() {
     const capabilities = this.capabilityProvider();
+    this.store.dispatch({ type: "capabilities.snapshot", capabilities });
     const clientVersion = `web-client/${this.config?.build?.sha ?? "dev"}`;
     this.transport.sendConnectRequest(mapCapabilitiesToHelloRequest(capabilities, { clientVersion }));
     this.transport.sendConnectRequest(
