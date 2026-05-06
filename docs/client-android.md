@@ -116,7 +116,7 @@ make run-server
 
 The native Android client validates manual endpoints, manages the generic
 control-session lifecycle, sends protobuf-backed hello/capability/action
-messages, surfaces local diagnostics, and renders server-driven UI primitives.
+messages, surfaces local diagnostics and permission education, and renders server-driven UI primitives.
 Discovery, media, kiosk, and connected-device behavior continue to mature under
 `plans/features/android-client/plan.md`.
 

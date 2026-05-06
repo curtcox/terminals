@@ -26,12 +26,14 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshNetworkDiagnostics("activity-resume")
+        viewModel.refreshPermissionEducation("activity-resume")
         viewModel.refreshCapabilities("activity-resume")
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         viewModel.refreshNetworkDiagnostics("configuration")
+        viewModel.refreshPermissionEducation("configuration")
         viewModel.refreshCapabilities("configuration")
     }
 

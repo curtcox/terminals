@@ -4,6 +4,11 @@ import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
+import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe
+import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
+import com.curtcox.terminals.android.capabilities.AndroidHardwareCapabilities
+import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics
+import com.curtcox.terminals.android.capabilities.PermissionCapabilityState
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.media.AndroidAudioPlayback
 import com.curtcox.terminals.android.media.AndroidMediaDisplay
@@ -91,6 +96,71 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=false"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=true"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_network_refresh=network-change"))
+    }
+
+    @Test
+    fun initialStateIncludesPermissionEducationFromCapabilityProbe() {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                capabilityProbe = FakeCapabilityProbe(
+                    permissions = PermissionCapabilityState(
+                        microphoneGranted = true,
+                        cameraGranted = false,
+                        notificationsGranted = false,
+                    ),
+                    hardware = AndroidHardwareCapabilities(
+                        microphone = true,
+                        frontCamera = true,
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(false, viewModel.state.value.permissionEducation.notificationsGranted)
+        assertEquals(true, viewModel.state.value.permissionEducation.microphonePresent)
+        assertEquals(true, viewModel.state.value.permissionEducation.microphoneAvailable)
+        assertEquals(true, viewModel.state.value.permissionEducation.cameraPresent)
+        assertEquals(false, viewModel.state.value.permissionEducation.cameraAvailable)
+        assertTrue(
+            viewModel.state.value.permissionEducation.messages.any {
+                it.contains("Notifications are disabled")
+            },
+        )
+    }
+
+    @Test
+    fun refreshPermissionEducationSamplesCurrentCapabilityProbe() {
+        val probe = FakeCapabilityProbe(
+            permissions = PermissionCapabilityState(notificationsGranted = true),
+            hardware = AndroidHardwareCapabilities(),
+        )
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                capabilityProbe = probe,
+            ),
+        )
+
+        probe.permissions = PermissionCapabilityState(
+            microphoneGranted = true,
+            cameraGranted = true,
+            notificationsGranted = true,
+        )
+        probe.hardware = AndroidHardwareCapabilities(
+            microphone = true,
+            backCamera = true,
+        )
+        viewModel.refreshPermissionEducation("permission-result")
+
+        assertEquals(true, viewModel.state.value.permissionEducation.notificationsGranted)
+        assertEquals(true, viewModel.state.value.permissionEducation.microphonePresent)
+        assertEquals(true, viewModel.state.value.permissionEducation.microphoneAvailable)
+        assertEquals(true, viewModel.state.value.permissionEducation.cameraPresent)
+        assertEquals(true, viewModel.state.value.permissionEducation.cameraAvailable)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_permission_refresh=permission-result"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("permission_camera_present=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("permission_camera_available=true"))
     }
 
     @Test
@@ -493,5 +563,27 @@ class AndroidTerminalViewModelTest {
         override suspend fun close() {
             closeCount += 1
         }
+    }
+
+    private class FakeCapabilityProbe(
+        var permissions: PermissionCapabilityState = PermissionCapabilityState(),
+        var hardware: AndroidHardwareCapabilities = AndroidHardwareCapabilities(),
+    ) : AndroidCapabilityProbe {
+        override fun current(): AndroidCapabilitySnapshotInput =
+            AndroidCapabilitySnapshotInput(
+                identity = terminals.capabilities.v1.Capabilities.DeviceIdentity.newBuilder()
+                    .setDeviceName("test-terminal")
+                    .setDeviceType("tablet")
+                    .setPlatform("android")
+                    .build(),
+                screenMetrics = AndroidScreenMetrics(
+                    widthPx = 1280,
+                    heightPx = 800,
+                    density = 1.0f,
+                    orientation = "landscape",
+                ),
+                permissions = permissions,
+                hardware = hardware,
+            )
     }
 }

@@ -805,6 +805,11 @@ make android-client-lint
 - Added ViewModel coverage for remembered manual endpoints, reconnect session shutdown, and periodic heartbeat dispatch.
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+- Added generic permission education to Android terminal chrome using the same runtime capability probe that drives advertised capabilities, so notification, microphone, and camera availability are visible without adding scenario behavior.
+- Added a static default Android capability probe implementation for dependency defaults and ViewModel tests.
+- Added ViewModel coverage for initial permission education and lifecycle permission refresh diagnostics.
+- Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
 ## Test Plan
 

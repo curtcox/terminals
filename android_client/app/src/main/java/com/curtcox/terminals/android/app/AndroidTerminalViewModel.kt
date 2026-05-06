@@ -183,6 +183,19 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun refreshPermissionEducation(reason: String) {
+        mutableState.update {
+            val endpoint = parser.parse(it.endpointText)
+            val permissions = permissionEducation()
+            it.copy(
+                permissionEducation = permissions,
+                diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState)}\n" +
+                    "last_permission_refresh=$reason\n" +
+                    permissions.toDiagnostics(),
+            )
+        }
+    }
+
     fun refreshNetworkDiagnostics(reason: String) {
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
@@ -277,7 +290,29 @@ class AndroidTerminalViewModel(
             connectionState = state,
             lastError = if (state == ConnectionState.InvalidEndpoint) "Enter a host:port or http(s) URL." else null,
             diagnosticsText = formatDiagnostics(resolved, state),
+            permissionEducation = permissionEducation(),
         )
+    }
+
+    private fun permissionEducation(): PermissionEducationState {
+        val snapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull()
+            ?: return PermissionEducationState()
+        return PermissionEducationState(
+            notificationsGranted = snapshot.permissions.notificationsGranted,
+            microphonePresent = snapshot.hardware.microphone,
+            microphoneAvailable = snapshot.hardware.microphone && snapshot.permissions.microphoneGranted,
+            cameraPresent = snapshot.hardware.frontCamera || snapshot.hardware.backCamera,
+            cameraAvailable = (snapshot.hardware.frontCamera || snapshot.hardware.backCamera) &&
+                snapshot.permissions.cameraGranted,
+        )
+    }
+
+    private fun PermissionEducationState.toDiagnostics(): String = buildString {
+        appendLine("permission_notifications=$notificationsGranted")
+        appendLine("permission_microphone_present=$microphonePresent")
+        appendLine("permission_microphone_available=$microphoneAvailable")
+        appendLine("permission_camera_present=$cameraPresent")
+        append("permission_camera_available=$cameraAvailable")
     }
 
     private fun AudioPlaybackResult.toStatus(requestId: String): Pair<String, String> =

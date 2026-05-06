@@ -55,6 +55,14 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                     Text(it, color = MaterialTheme.colorScheme.error)
                 }
 
+                if (state.permissionEducation.messages.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        state.permissionEducation.messages.forEach { message ->
+                            Text(message, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
                 Text("Status: ${state.connectionState}", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 SelectionContainer {

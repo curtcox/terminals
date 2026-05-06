@@ -13,6 +13,7 @@ data class AndroidTerminalViewState(
     val lastMediaRequestId: String? = null,
     val lastMediaStatus: String? = null,
     val lastTransition: String? = null,
+    val permissionEducation: PermissionEducationState = PermissionEducationState(),
 )
 
 enum class ConnectionState {
@@ -21,4 +22,25 @@ enum class ConnectionState {
     ReadyToConnect,
     Connecting,
     Connected,
+}
+
+data class PermissionEducationState(
+    val notificationsGranted: Boolean = false,
+    val microphonePresent: Boolean = false,
+    val microphoneAvailable: Boolean = false,
+    val cameraPresent: Boolean = false,
+    val cameraAvailable: Boolean = false,
+) {
+    val messages: List<String>
+        get() = buildList {
+            if (!notificationsGranted) {
+                add("Notifications are disabled; server notifications will stay in terminal diagnostics.")
+            }
+            if (microphonePresent && !microphoneAvailable) {
+                add("Microphone capture is unavailable until hardware and permission are both present.")
+            }
+            if (cameraPresent && !cameraAvailable) {
+                add("Camera capture is unavailable until hardware and permission are both present.")
+            }
+        }
 }
