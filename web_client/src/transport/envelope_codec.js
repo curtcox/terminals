@@ -39,7 +39,7 @@ export class EnvelopeCodec {
     const payload = envelope.payload;
     if (payload.case === "transportHelloAck") {
       this.sessionId = payload.value.sessionId ?? this.sessionId;
-      return { payload: { case: "helloAck", value: payload.value } };
+      return { payload: { case: "transportHelloAck", value: payload.value } };
     }
     if (payload.case === "serverMessage") return payload.value;
     if (payload.case === "transportError") return { payload: { case: "error", value: payload.value } };

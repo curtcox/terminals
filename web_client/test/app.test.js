@@ -4,6 +4,7 @@ import { create } from "@bufbuild/protobuf";
 import { TerminalWebClientApp } from "../src/app.js";
 import { createStore } from "../src/state/store.js";
 import { ConnectResponseSchema } from "../src/protocol/generated/terminals/control/v1/control_pb.js";
+import { mapBrowserProbeToCapabilities } from "../src/protocol/capability_mapper.js";
 
 test("stores normalized register ack metadata from server messages", () => {
   const store = createStore();
@@ -66,4 +67,38 @@ test("diagnoses unresolved endpoint without opening transport", () => {
   assert.equal(app.connect(""), null);
   assert.equal(connected, false);
   assert.deepEqual(store.getState().diagnostics, [{ level: "error", message: "No WebSocket endpoint configured" }]);
+});
+
+test("sends logical hello and capability snapshot after transport hello ack", () => {
+  const sent = [];
+  const capabilities = mapBrowserProbeToCapabilities({
+    deviceId: "browser-1",
+    deviceName: "Test Browser",
+    viewportWidth: 800,
+    viewportHeight: 600,
+    devicePixelRatio: 2,
+    keyboard: true,
+    pointerType: "mouse"
+  });
+  const app = new TerminalWebClientApp({
+    store: createStore(),
+    config: { build: { sha: "abc123" } },
+    endpointResolution: {},
+    transport: {
+      sendConnectRequest: (request) => sent.push(request)
+    },
+    renderer: {},
+    chrome: {},
+    capabilityProvider: () => capabilities
+  });
+
+  app.handleServerMessage({ payload: { case: "transportHelloAck", value: { sessionId: "s1" } } });
+
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0].payload.case, "hello");
+  assert.equal(sent[0].payload.value.deviceId, "browser-1");
+  assert.equal(sent[0].payload.value.clientVersion, "web-client/abc123");
+  assert.equal(sent[1].payload.case, "capabilitySnapshot");
+  assert.equal(sent[1].payload.value.generation, 1n);
+  assert.equal(sent[1].payload.value.capabilities.screen.width, 800);
 });

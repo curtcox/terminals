@@ -1,14 +1,26 @@
 import { mapRendererActionToConnectRequest } from "./protocol/ui_action_mapper.js";
 import { normalizeServerMetadata } from "./protocol/metadata_mapper.js";
+import { createBrowserCapabilitySnapshot } from "./capabilities/browser_capabilities.js";
+import { mapCapabilitiesToHelloRequest, mapCapabilitiesToSnapshotRequest } from "./protocol/capability_mapper.js";
 
 export class TerminalWebClientApp {
-  constructor({ config, store, endpointResolution, transport, renderer, chrome }) {
+  constructor({
+    config,
+    store,
+    endpointResolution,
+    transport,
+    renderer,
+    chrome,
+    capabilityProvider = createBrowserCapabilitySnapshot
+  }) {
     this.config = config;
     this.store = store;
     this.endpointResolution = endpointResolution;
     this.transport = transport;
     this.renderer = renderer;
     this.chrome = chrome;
+    this.capabilityProvider = capabilityProvider;
+    this.capabilityGeneration = 0n;
   }
 
   mount() {
@@ -49,7 +61,9 @@ export class TerminalWebClientApp {
     const payload = message?.payload;
     if (!payload?.case) return;
     const value = payload.value;
-    if (payload.case === "setUi" && value.root) {
+    if (payload.case === "transportHelloAck") {
+      this.sendInitialClientHandshake();
+    } else if (payload.case === "setUi" && value.root) {
       this.store.dispatch({ type: "ui.set", root: value.root });
       this.renderer.render(value.root);
     } else if (payload.case === "updateUi" && value.componentId) {
@@ -61,5 +75,14 @@ export class TerminalWebClientApp {
     } else if (payload.case === "helloAck") {
       this.store.dispatch({ type: "server.metadata", metadata: value });
     }
+  }
+
+  sendInitialClientHandshake() {
+    const capabilities = this.capabilityProvider();
+    const clientVersion = `web-client/${this.config?.build?.sha ?? "dev"}`;
+    this.transport.sendConnectRequest(mapCapabilitiesToHelloRequest(capabilities, { clientVersion }));
+    this.transport.sendConnectRequest(
+      mapCapabilitiesToSnapshotRequest(capabilities, { generation: ++this.capabilityGeneration })
+    );
   }
 }

@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { DeviceCapabilitiesSchema } from "./generated/terminals/capabilities/v1/capabilities_pb.js";
+import { ConnectRequestSchema } from "./generated/terminals/control/v1/control_pb.js";
 
 export function mapBrowserProbeToCapabilities(probe) {
   return create(DeviceCapabilitiesSchema, {
@@ -25,5 +26,37 @@ export function mapBrowserProbeToCapabilities(probe) {
     camera: probe.camera ? { endpoints: [] } : null,
     connectivity: { bluetoothVersion: "", wifiSignalStrength: false, usbHost: false, usbPorts: 0, nfc: false },
     displays: []
+  });
+}
+
+export function mapCapabilitiesToHelloRequest(capabilities, { clientVersion = "web-client/dev" } = {}) {
+  const deviceId = capabilities?.deviceId || "web-client";
+  return create(ConnectRequestSchema, {
+    payload: {
+      case: "hello",
+      value: {
+        deviceId,
+        identity: capabilities?.identity ?? {
+          deviceName: "Browser",
+          deviceType: "browser",
+          platform: "web"
+        },
+        clientVersion
+      }
+    }
+  });
+}
+
+export function mapCapabilitiesToSnapshotRequest(capabilities, { generation = 1n } = {}) {
+  const deviceId = capabilities?.deviceId || "web-client";
+  return create(ConnectRequestSchema, {
+    payload: {
+      case: "capabilitySnapshot",
+      value: {
+        deviceId,
+        generation,
+        capabilities
+      }
+    }
   });
 }
