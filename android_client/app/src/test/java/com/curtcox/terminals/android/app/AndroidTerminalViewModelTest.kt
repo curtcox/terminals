@@ -13,6 +13,8 @@ import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
+import com.curtcox.terminals.android.platform.AndroidNetworkState
+import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +50,12 @@ class AndroidTerminalViewModelTest {
     @Test
     fun connectCreatesSessionAndMarksStateConnected() = runTest(dispatcher) {
         val session = FakeSession()
-        val viewModel = viewModel(session)
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
 
         viewModel.updateEndpoint("10.0.0.8:8080")
         viewModel.connect()
@@ -57,6 +64,30 @@ class AndroidTerminalViewModelTest {
         assertEquals(EndpointResolution("10.0.0.8", 8080), session.connectedEndpoint)
         assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
         assertTrue(viewModel.state.value.diagnosticsText.contains("state=Connected"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=false"))
+    }
+
+    @Test
+    fun refreshNetworkDiagnosticsSamplesCurrentNetworkState() {
+        val states = ArrayDeque(
+            listOf(
+                AndroidNetworkState(connected = true, metered = false),
+                AndroidNetworkState(connected = false, metered = true),
+            ),
+        )
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                networkStateProvider = AndroidNetworkStateProvider { states.removeFirst() },
+            ),
+        )
+
+        viewModel.refreshNetworkDiagnostics("network-change")
+
+        assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=false"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_network_refresh=network-change"))
     }
 
     @Test
@@ -335,12 +366,14 @@ class AndroidTerminalViewModelTest {
         session: FakeSession,
         notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
         mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
+        networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
     ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 notificationDelivery = notificationDelivery,
                 mediaEngine = mediaEngine,
+                networkStateProvider = networkStateProvider,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlResponseDispatcher
+import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.connection.ManualEndpointParser
 import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
 import com.curtcox.terminals.android.media.AudioPlaybackResult
@@ -52,7 +53,7 @@ class AndroidTerminalViewModel(
             }
             mutableState.update {
                 val next = dispatcher.dispatch(it, response)
-                var diagnostics = chrome.formatDiagnostics(parser.parse(next.endpointText), next.connectionState)
+                var diagnostics = formatDiagnostics(parser.parse(next.endpointText), next.connectionState)
                 if (notificationDelivered) {
                     diagnostics += "\nlast_notification=${response.notification.title}"
                 }
@@ -75,7 +76,7 @@ class AndroidTerminalViewModel(
     }
     private var session: AndroidControlSession? = null
     private val mutableState = MutableStateFlow(
-        AndroidTerminalViewState(diagnosticsText = chrome.formatDiagnostics(null, ConnectionState.Disconnected)),
+        AndroidTerminalViewState(diagnosticsText = formatDiagnostics(null, ConnectionState.Disconnected)),
     )
 
     val state: StateFlow<AndroidTerminalViewState> = mutableState
@@ -87,7 +88,7 @@ class AndroidTerminalViewModel(
                 endpointText = text,
                 connectionState = if (resolved == null) ConnectionState.InvalidEndpoint else ConnectionState.ReadyToConnect,
                 lastError = if (resolved == null && text.isNotBlank()) "Enter a host:port or http(s) URL." else null,
-                diagnosticsText = chrome.formatDiagnostics(resolved, if (resolved == null) ConnectionState.InvalidEndpoint else ConnectionState.ReadyToConnect),
+                diagnosticsText = formatDiagnostics(resolved, if (resolved == null) ConnectionState.InvalidEndpoint else ConnectionState.ReadyToConnect),
             )
         }
     }
@@ -105,7 +106,7 @@ class AndroidTerminalViewModel(
             it.copy(
                 connectionState = ConnectionState.Connecting,
                 lastError = null,
-                diagnosticsText = chrome.formatDiagnostics(resolved, ConnectionState.Connecting),
+                diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connecting),
             )
         }
         viewModelScope.launch {
@@ -118,7 +119,7 @@ class AndroidTerminalViewModel(
                     it.copy(
                         connectionState = ConnectionState.Connected,
                         lastError = null,
-                        diagnosticsText = chrome.formatDiagnostics(resolved, ConnectionState.Connected),
+                        diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connected),
                     )
                 }
             }.onFailure { error ->
@@ -128,7 +129,7 @@ class AndroidTerminalViewModel(
                     it.copy(
                         connectionState = ConnectionState.ReadyToConnect,
                         lastError = message,
-                        diagnosticsText = chrome.formatDiagnostics(resolved, ConnectionState.ReadyToConnect) +
+                        diagnosticsText = formatDiagnostics(resolved, ConnectionState.ReadyToConnect) +
                             "\nlast_error=$message",
                     )
                 }
@@ -168,6 +169,13 @@ class AndroidTerminalViewModel(
                     it.copy(lastError = error.message ?: error::class.java.simpleName)
                 }
             }
+        }
+    }
+
+    fun refreshNetworkDiagnostics(reason: String) {
+        mutableState.update {
+            val endpoint = parser.parse(it.endpointText)
+            it.copy(diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState)}\nlast_network_refresh=$reason")
         }
     }
 
@@ -214,6 +222,13 @@ class AndroidTerminalViewModel(
         return error.message.contains("stale", ignoreCase = true) &&
             error.message.contains("generation", ignoreCase = true)
     }
+
+    private fun formatDiagnostics(endpoint: EndpointResolution?, state: ConnectionState): String =
+        chrome.formatDiagnostics(
+            endpoint = endpoint,
+            state = state,
+            networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
+        )
 
     private fun AudioPlaybackResult.toStatus(requestId: String): Pair<String, String> =
         when (this) {

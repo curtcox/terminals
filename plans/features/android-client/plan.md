@@ -796,6 +796,10 @@ make android-client-lint
 - Added ViewModel coverage for delegated audio playback, delegated media display, and unsupported media diagnostics.
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+- Wired Android network-state diagnostics through a platform provider seam and context-backed `ConnectivityManager` adapter, including lifecycle refreshes from `MainActivity` so connection chrome records current connectivity and metered state.
+- Added ViewModel coverage for network diagnostic sampling during connect and explicit network refresh.
+- Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*' --tests '*AndroidClientChromeTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
 ## Test Plan
 

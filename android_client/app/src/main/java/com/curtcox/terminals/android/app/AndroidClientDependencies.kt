@@ -14,7 +14,9 @@ import com.curtcox.terminals.android.media.AndroidMediaEngine
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
+import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
+import com.curtcox.terminals.android.platform.ContextAndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.StatusBarAndroidNotificationDelivery
 import com.curtcox.terminals.android.platform.WindowAndroidBrightnessController
 import com.curtcox.terminals.android.platform.WindowAndroidFullscreenController
@@ -28,6 +30,7 @@ data class AndroidClientDependencies(
     val keepAwakeController: AndroidKeepAwakeController = AndroidKeepAwakeController {},
     val fullscreenController: AndroidFullscreenController = AndroidFullscreenController {},
     val brightnessController: AndroidBrightnessController = AndroidBrightnessController {},
+    val networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
     val notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
     val mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->
@@ -59,6 +62,7 @@ data class AndroidClientDependencies(
                 } else {
                     AndroidBrightnessController {}
                 },
+                networkStateProvider = ContextAndroidNetworkStateProvider(context),
                 notificationDelivery = StatusBarAndroidNotificationDelivery(context.applicationContext),
             )
     }
