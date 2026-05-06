@@ -11,7 +11,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-boundary client-boundary-test client-coverage \
-	web-client-build web-client-test web-client-lint web-client-proto-check run-web-client \
+	web-client-build web-client-test web-client-lint web-client-boundary web-client-proto-check web-client-smoke-test run-web-client \
 	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-generate proto-contract-test proto-contract-verify \
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
 	all-lint all-test all-check ci-local stop-server stop-server-test run-server run-client-web run-web-client \
@@ -122,8 +122,14 @@ web-client-test:
 web-client-lint:
 	cd web_client && npm run lint
 
+web-client-boundary:
+	cd web_client && npm run boundary
+
 web-client-proto-check:
 	cd web_client && npm run proto:check
+
+web-client-smoke-test:
+	./scripts/test-web-client-smoke.sh
 
 proto-lint:
 	cd api && buf lint

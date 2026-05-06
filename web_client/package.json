@@ -7,7 +7,9 @@
     "build": "node scripts/build.mjs",
     "test": "node --test",
     "lint": "node scripts/check-boundary.mjs",
+    "boundary": "node scripts/check-boundary.mjs",
     "serve": "node scripts/serve-dev.mjs",
+    "proto:generate": "sh scripts/generate-protos.sh",
     "proto:check": "sh scripts/generate-protos.sh --check"
   },
   "dependencies": {

@@ -6,10 +6,25 @@ Plain HTML/CSS/JavaScript terminal client for browser-first smoke tests and stat
 
 ```bash
 make web-client-test
+make web-client-boundary
+make web-client-build
 make run-web-client
 ```
 
 The endpoint can come from `?ws=ws://host:port/control`, local storage key `terminals.controlWsEndpoint`, or manual entry in the browser chrome.
+
+## Validate
+
+```bash
+npm test
+npm run boundary
+npm run proto:check
+npm run build
+```
+
+`npm run proto:generate` regenerates `src/protocol/generated/**` from `api/terminals/**` with Buf and `protoc-gen-es`. Generated bindings are committed so CI can run without changing runtime source.
+
+`make web-client-smoke-test` runs a deterministic fixture smoke path: tests, static build, and artifact presence checks. It does not require a real browser or loopback server.
 
 ## Boundary Rules
 
