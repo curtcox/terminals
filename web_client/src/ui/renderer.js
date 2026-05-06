@@ -107,8 +107,8 @@ export class ServerDrivenRenderer {
   }
 
   image(node) {
-    if (this.imageLoader) return this.imageLoader(node.image?.url ?? "");
     const image = widgetValue(node);
+    if (this.imageLoader) return this.imageLoader(image?.url ?? "");
     const el = document.createElement("img");
     el.className = "sd sd-image";
     el.src = image?.url ?? "";
