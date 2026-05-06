@@ -98,6 +98,21 @@ class AndroidTerminalViewModelTest {
         assertEquals(ServerDrivenAction("start", "tap", "pressed"), session.actions.single())
     }
 
+    @Test
+    fun refreshCapabilitiesAsksConnectedSessionForDelta() = runTest(dispatcher) {
+        val session = FakeSession(capabilityDeltaSent = true)
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.refreshCapabilities("configuration")
+        advanceUntilIdle()
+
+        assertEquals(listOf("configuration"), session.capabilityDeltaReasons)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_capability_delta=configuration"))
+    }
+
     private fun viewModel(session: FakeSession): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -111,11 +126,13 @@ class AndroidTerminalViewModelTest {
 
     private class FakeSession(
         private val connectError: Throwable? = null,
+        private val capabilityDeltaSent: Boolean = false,
     ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
         lateinit var sink: AndroidControlResponseSink
         var connectedEndpoint: EndpointResolution? = null
         val actions = mutableListOf<ServerDrivenAction>()
+        val capabilityDeltaReasons = mutableListOf<String>()
 
         override suspend fun connect(endpoint: EndpointResolution) {
             connectError?.let { throw it }
@@ -129,7 +146,10 @@ class AndroidTerminalViewModelTest {
             actions += action
         }
 
-        override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean = false
+        override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
+            capabilityDeltaReasons += reason
+            return capabilityDeltaSent
+        }
 
         override suspend fun rebaselineCapabilitiesAfterStaleGeneration() = Unit
 

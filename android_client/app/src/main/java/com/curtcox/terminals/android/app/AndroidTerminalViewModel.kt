@@ -107,6 +107,25 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun refreshCapabilities(reason: String) {
+        val connectedSession = session ?: return
+        viewModelScope.launch {
+            runCatching {
+                connectedSession.sendCapabilityDeltaIfChanged(reason)
+            }.onSuccess { sent ->
+                if (sent) {
+                    mutableState.update {
+                        it.copy(diagnosticsText = "${it.diagnosticsText}\nlast_capability_delta=$reason")
+                    }
+                }
+            }.onFailure { error ->
+                mutableState.update {
+                    it.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+        }
+    }
+
     override fun onCleared() {
         val closingSession = session
         session = null

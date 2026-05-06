@@ -774,6 +774,11 @@ make android-client-lint
 - Added an `AndroidControlSession` interface seam and ViewModel unit tests covering successful connect, connect failure diagnostics, server `SetUI` dispatch, and UI action forwarding.
 - Re-verified Android boundary scan and boundary tests with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+- Replaced the placeholder static Android capability probe with a context-backed runtime probe that reports device identity, display metrics, orientation, system-bar/display-cutout safe area on API 30+, hardware features, permission-gated microphone/camera/notification state, haptics, and battery/charging state.
+- Wired `MainActivity` to construct the terminal ViewModel with Android runtime dependencies and request capability deltas on activity resume and configuration changes.
+- Added ViewModel coverage for capability delta refresh dispatch through the connected control session seam.
+- Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
 ## Test Plan
 
