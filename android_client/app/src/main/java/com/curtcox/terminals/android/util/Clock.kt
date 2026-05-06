@@ -1,5 +1,5 @@
 package com.curtcox.terminals.android.util
 
-interface Clock {
+fun interface Clock {
     fun nowMillis(): Long
 }
