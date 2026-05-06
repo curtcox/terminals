@@ -2,12 +2,12 @@ package com.curtcox.terminals.android.media
 
 import terminals.io.v1.Io
 
-interface AndroidAudioPlayback {
+fun interface AndroidAudioPlayback {
     fun play(command: Io.PlayAudio): AudioPlaybackResult
 
     companion object {
-        fun unsupported(): AndroidAudioPlayback = AndroidAudioPlayback { command ->
-            AudioPlaybackResult.Unsupported(command.sourceCase.name.lowercase())
+        fun unsupported(): AndroidAudioPlayback = AndroidAudioPlayback { command: Io.PlayAudio ->
+            AudioPlaybackResult.Unsupported(command.getSourceCase().name.lowercase())
         }
     }
 }

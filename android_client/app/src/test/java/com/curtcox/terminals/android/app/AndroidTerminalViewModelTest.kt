@@ -243,6 +243,8 @@ class AndroidTerminalViewModelTest {
         runCurrent()
 
         assertEquals(2, session.heartbeatCount)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test

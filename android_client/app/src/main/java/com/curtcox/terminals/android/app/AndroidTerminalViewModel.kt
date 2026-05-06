@@ -148,6 +148,20 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun disconnect() {
+        val closingSession = session
+        session = null
+        stopHeartbeat()
+        mutableState.update {
+            val endpoint = parser.parse(it.endpointText)
+            it.copy(
+                connectionState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.ReadyToConnect,
+                diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Disconnected),
+            )
+        }
+        viewModelScope.launch { closingSession?.close() }
+    }
+
     fun sendUiAction(action: ServerDrivenAction) {
         viewModelScope.launch {
             runCatching {
@@ -234,10 +248,7 @@ class AndroidTerminalViewModel(
     }
 
     override fun onCleared() {
-        val closingSession = session
-        session = null
-        stopHeartbeat()
-        viewModelScope.launch { closingSession?.close() }
+        disconnect()
         super.onCleared()
     }
 

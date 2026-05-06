@@ -6,6 +6,7 @@ CLIENT_WEB_PORT ?= 60739
 CLIENT_WEB_HOST ?= 0.0.0.0
 BUILD_SHA ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+ANDROID_JAVA_HOME ?= $(shell if [ -d /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ]; then echo /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home; else /usr/libexec/java_home -v 17 2>/dev/null; fi)
 export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
@@ -115,29 +116,29 @@ client-coverage:
 	cd terminal_client && flutter test --coverage
 
 android-client-build:
-	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
-		cd android_client && ./gradlew assembleDebug -PTERMINALS_BUILD_SHA=$(BUILD_SHA) -PTERMINALS_BUILD_DATE=$(BUILD_DATE); \
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
+		cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew assembleDebug -PTERMINALS_BUILD_SHA=$(BUILD_SHA) -PTERMINALS_BUILD_DATE=$(BUILD_DATE); \
 	else \
 		echo "Skipping native Android build: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi
 
 android-client-test:
-	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
-		cd android_client && ./gradlew testDebugUnitTest; \
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
+		cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew testDebugUnitTest; \
 	else \
 		echo "Skipping native Android tests: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi
 
 android-client-lint:
-	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
-		cd android_client && ./gradlew lintDebug; \
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
+		cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew lintDebug; \
 	else \
 		echo "Skipping native Android lint: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi
 
 android-client-connected-test:
-	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ]; then \
-		cd android_client && ./gradlew connectedDebugAndroidTest; \
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
+		cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew connectedDebugAndroidTest; \
 	else \
 		echo "Skipping native Android connected tests: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi

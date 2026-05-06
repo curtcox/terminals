@@ -1,5 +1,6 @@
 import java.time.Instant
 import com.google.protobuf.gradle.id
+import com.google.protobuf.gradle.proto
 
 plugins {
     id("com.android.application")
@@ -47,7 +48,9 @@ android {
 
     sourceSets {
         getByName("main") {
-            proto.srcDir("../../api")
+            proto {
+                srcDir("../../api")
+            }
         }
     }
 }
