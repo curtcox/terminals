@@ -1,7 +1,7 @@
 ---
 title: "Go-Dart Contract Golden Tests"
 kind: plan
-status: implemented
+status: shipped-validated
 owner: copilot
 validation: automated
 last-reviewed: 2026-05-05

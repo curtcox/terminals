@@ -1,7 +1,7 @@
 ---
 title: "HTML/JavaScript Web Client"
 kind: plan
-status: implemented
+status: shipped-validated
 owner: curtcox
 validation: automated
 last-reviewed: 2026-05-05

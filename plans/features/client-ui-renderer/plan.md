@@ -1,7 +1,7 @@
 ---
 title: "Client UI Renderer Refactor"
 kind: plan
-status: completed
+status: shipped-validated
 owner: curtcox
 validation: automated
 last-reviewed: 2026-05-03
