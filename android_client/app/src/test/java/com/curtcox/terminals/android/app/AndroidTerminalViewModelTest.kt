@@ -12,6 +12,8 @@ import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics
 import com.curtcox.terminals.android.capabilities.PermissionCapabilityState
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
+import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery
+import com.curtcox.terminals.android.discovery.DiscoveredServer
 import com.curtcox.terminals.android.media.AndroidAudioPlayback
 import com.curtcox.terminals.android.media.AndroidMediaDisplay
 import com.curtcox.terminals.android.media.AndroidMediaEngine
@@ -134,6 +136,58 @@ class AndroidTerminalViewModelTest {
 
         assertEquals("failed", viewModel.state.value.lastDiagnosticsCopyStatus)
         assertEquals("clipboard unavailable", viewModel.state.value.lastError)
+    }
+
+    @Test
+    fun startDiscoveryRecordsDiscoveredServersAndSelectsEndpoint() {
+        val discovery = FakeDiscovery()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                discovery = discovery,
+            ),
+        )
+
+        viewModel.startDiscovery()
+        discovery.emit(
+            DiscoveredServer(
+                name = "Desk",
+                host = "10.0.0.12",
+                port = 50054,
+                lastSeenMillis = 123,
+                webSocketEndpoint = "ws://10.0.0.12:50054/control",
+            ),
+        )
+
+        assertEquals(true, viewModel.state.value.discoveryState.scanning)
+        assertEquals(1, viewModel.state.value.discoveryState.servers.size)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("discovered_servers=1"))
+
+        viewModel.selectDiscoveredServer(viewModel.state.value.discoveryState.servers.single())
+
+        assertEquals("ws://10.0.0.12:50054/control", viewModel.state.value.endpointText)
+        assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
+        assertEquals(false, viewModel.state.value.discoveryState.scanning)
+        assertEquals(1, discovery.stopCount)
+    }
+
+    @Test
+    fun discoveryErrorsFallbackToManualEndpointDiagnostics() {
+        val discovery = FakeDiscovery()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                discovery = discovery,
+            ),
+        )
+
+        viewModel.startDiscovery()
+        discovery.fail("mDNS blocked by network")
+
+        assertEquals(false, viewModel.state.value.discoveryState.scanning)
+        assertEquals("mDNS blocked by network", viewModel.state.value.discoveryState.lastError)
+        assertTrue(viewModel.state.value.discoveryState.statusText.contains("Discovery unavailable"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("discovery=error"))
     }
 
     @Test
@@ -701,6 +755,29 @@ class AndroidTerminalViewModelTest {
 
         override suspend fun close() {
             closeCount += 1
+        }
+    }
+
+    private class FakeDiscovery : AndroidNsdDiscovery {
+        private var onServer: ((DiscoveredServer) -> Unit)? = null
+        private var onError: ((String) -> Unit)? = null
+        var stopCount = 0
+
+        override fun start(onServer: (DiscoveredServer) -> Unit, onError: (String) -> Unit) {
+            this.onServer = onServer
+            this.onError = onError
+        }
+
+        override fun stop() {
+            stopCount += 1
+        }
+
+        fun emit(server: DiscoveredServer) {
+            onServer?.invoke(server)
+        }
+
+        fun fail(message: String) {
+            onError?.invoke(message)
         }
     }
 

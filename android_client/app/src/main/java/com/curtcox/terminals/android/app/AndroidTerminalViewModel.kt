@@ -8,6 +8,7 @@ import com.curtcox.terminals.android.connection.ControlResponseDispatcher
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.connection.ManualEndpointParser
 import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
+import com.curtcox.terminals.android.discovery.DiscoveredServer
 import com.curtcox.terminals.android.media.AudioPlaybackResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.ui.ServerDrivenAction
@@ -150,6 +151,61 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun startDiscovery() {
+        mutableState.update {
+            it.copy(
+                discoveryState = it.discoveryState.copy(scanning = true, lastError = null),
+                diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\ndiscovery=scanning",
+            )
+        }
+        dependencies.discovery.start(
+            onServer = { server ->
+                mutableState.update {
+                    val current = it.discoveryState.servers
+                    val nextServers = (current.filterNot { existing ->
+                        existing.host == server.host && existing.port == server.port
+                    } + server).sortedWith(compareBy<DiscoveredServer> { discoveredEndpointText(it) }.thenBy { it.name })
+                    it.copy(
+                        discoveryState = it.discoveryState.copy(
+                            scanning = true,
+                            servers = nextServers,
+                            lastError = null,
+                        ),
+                        diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                            "discovery=scanning\n" +
+                            "discovered_servers=${nextServers.size}\n" +
+                            "last_discovered=${server.name}@${discoveredEndpointText(server)}",
+                    )
+                }
+            },
+            onError = { message ->
+                mutableState.update {
+                    it.copy(
+                        discoveryState = it.discoveryState.copy(scanning = false, lastError = message),
+                        diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                            "discovery=error\n" +
+                            "discovery_error=$message",
+                    )
+                }
+            },
+        )
+    }
+
+    fun stopDiscovery() {
+        dependencies.discovery.stop()
+        mutableState.update {
+            it.copy(
+                discoveryState = it.discoveryState.copy(scanning = false),
+                diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\ndiscovery=stopped",
+            )
+        }
+    }
+
+    fun selectDiscoveredServer(server: DiscoveredServer) {
+        updateEndpoint(discoveredEndpointText(server))
+        stopDiscovery()
+    }
+
     fun disconnect() {
         val closingSession = session
         session = null
@@ -272,9 +328,19 @@ class AndroidTerminalViewModel(
     }
 
     override fun onCleared() {
+        dependencies.discovery.stop()
         disconnect()
         super.onCleared()
     }
+
+    private fun discoveredEndpointText(server: DiscoveredServer): String =
+        server.webSocketEndpoint.ifBlank {
+            server.grpcEndpoint.ifBlank {
+                server.httpEndpoint.ifBlank {
+                    "${server.host}:${server.port}"
+                }
+            }
+        }
 
     private fun startHeartbeat(connectedSession: AndroidControlSession) {
         if (dependencies.heartbeatIntervalMillis <= 0) return

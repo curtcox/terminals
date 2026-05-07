@@ -119,6 +119,11 @@ control-session lifecycle, sends protobuf-backed hello/capability/action
 messages, surfaces local diagnostics and permission education, and renders
 server-driven UI primitives.
 
+The client can also start Android NSD/mDNS discovery for `_terminals._tcp.`
+services. Discovered servers are shown as selectable endpoint options when the
+network supports multicast; Fire OS or isolated Wi-Fi networks may still require
+manual endpoint entry.
+
 If the active control session is lost during heartbeat, the client closes the
 failed stream and performs bounded reconnect attempts using exponential backoff.
 Retry attempt, success, and exhaustion status are recorded in local diagnostics.

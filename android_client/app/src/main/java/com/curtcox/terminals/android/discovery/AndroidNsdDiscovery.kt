@@ -8,6 +8,17 @@ import com.curtcox.terminals.android.util.Clock
 interface AndroidNsdDiscovery {
     fun start(onServer: (DiscoveredServer) -> Unit, onError: (String) -> Unit)
     fun stop()
+
+    companion object {
+        fun unavailable(reason: String = "mDNS discovery is unavailable on this device."): AndroidNsdDiscovery =
+            object : AndroidNsdDiscovery {
+                override fun start(onServer: (DiscoveredServer) -> Unit, onError: (String) -> Unit) {
+                    onError(reason)
+                }
+
+                override fun stop() = Unit
+            }
+    }
 }
 
 class NsdAndroidDiscovery(

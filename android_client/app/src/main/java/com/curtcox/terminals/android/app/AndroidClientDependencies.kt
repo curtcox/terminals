@@ -2,6 +2,7 @@ package com.curtcox.terminals.android.app
 
 import android.app.Activity
 import android.content.Context
+import android.net.nsd.NsdManager
 import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySession
 import com.curtcox.terminals.android.capabilities.ContextAndroidCapabilityProbe
@@ -13,6 +14,8 @@ import com.curtcox.terminals.android.connection.WebSocketAndroidControlClient
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.ContextDiagnosticClipboard
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
+import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery
+import com.curtcox.terminals.android.discovery.NsdAndroidDiscovery
 import com.curtcox.terminals.android.media.AndroidMediaEngine
 import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
 import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
@@ -42,6 +45,7 @@ data class AndroidClientDependencies(
     val networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
     val notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
     val diagnosticClipboard: DiagnosticClipboard = DiagnosticClipboard.none(),
+    val discovery: AndroidNsdDiscovery = AndroidNsdDiscovery.unavailable(),
     val mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
     val mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
     val webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter.disabled(),
@@ -81,6 +85,9 @@ data class AndroidClientDependencies(
                 networkStateProvider = ContextAndroidNetworkStateProvider(context),
                 notificationDelivery = StatusBarAndroidNotificationDelivery(context.applicationContext),
                 diagnosticClipboard = ContextDiagnosticClipboard(context.applicationContext),
+                discovery = (context.applicationContext.getSystemService(Context.NSD_SERVICE) as? NsdManager)?.let {
+                    NsdAndroidDiscovery(it, Clock { System.currentTimeMillis() })
+                } ?: AndroidNsdDiscovery.unavailable(),
                 mediaEngine = AndroidMediaEngine(
                     audioPlayback = ContextAndroidAudioPlayback(context.applicationContext),
                 ),

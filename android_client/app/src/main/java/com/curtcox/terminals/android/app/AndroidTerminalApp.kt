@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,6 +56,37 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                         modifier = Modifier.testTag("terminal-connect-button"),
                     ) {
                         Text("Connect")
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = viewModel::startDiscovery,
+                        enabled = !state.discoveryState.scanning,
+                        modifier = Modifier.testTag("terminal-discovery-start-button"),
+                    ) {
+                        Text("Discover")
+                    }
+                    Button(
+                        onClick = viewModel::stopDiscovery,
+                        enabled = state.discoveryState.scanning,
+                        modifier = Modifier.testTag("terminal-discovery-stop-button"),
+                    ) {
+                        Text("Stop")
+                    }
+                    Text(state.discoveryState.statusText, style = MaterialTheme.typography.bodySmall)
+                }
+
+                if (state.discoveryState.servers.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        state.discoveryState.servers.forEach { server ->
+                            TextButton(
+                                onClick = { viewModel.selectDiscoveredServer(server) },
+                                modifier = Modifier.testTag("terminal-discovered-server-${server.host}-${server.port}"),
+                            ) {
+                                Text("${server.name} (${server.host}:${server.port})")
+                            }
+                        }
                     }
                 }
 

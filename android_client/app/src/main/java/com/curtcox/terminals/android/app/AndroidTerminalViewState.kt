@@ -1,5 +1,6 @@
 package com.curtcox.terminals.android.app
 
+import com.curtcox.terminals.android.discovery.DiscoveredServer
 import terminals.ui.v1.Ui
 
 data class AndroidTerminalViewState(
@@ -16,6 +17,7 @@ data class AndroidTerminalViewState(
     val lastTransition: String? = null,
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
     val mediaSupport: MediaSupportState = MediaSupportState(),
+    val discoveryState: DiscoveryState = DiscoveryState(),
 )
 
 enum class ConnectionState {
@@ -59,4 +61,18 @@ data class MediaSupportState(
         appendLine("media_webrtc_supported=$webRtcSupported")
         append("media_webrtc_reason=$webRtcReason")
     }
+}
+
+data class DiscoveryState(
+    val scanning: Boolean = false,
+    val servers: List<DiscoveredServer> = emptyList(),
+    val lastError: String? = null,
+) {
+    val statusText: String
+        get() = when {
+            scanning -> "Scanning for servers"
+            lastError != null -> "Discovery unavailable: $lastError"
+            servers.isEmpty() -> "No discovered servers"
+            else -> "${servers.size} discovered server${if (servers.size == 1) "" else "s"}"
+        }
 }

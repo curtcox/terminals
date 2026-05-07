@@ -839,6 +839,9 @@ make android-client-lint
 - Wired bounded reconnect handling into the native Android control-session lifecycle. Heartbeat loss now closes the failed stream, schedules reconnect attempts through the existing `ReconnectPolicy`, records retry/success/exhaustion diagnostics, and restores the session through the generic session factory without adding scenario behavior.
 - Added ViewModel coverage for heartbeat-triggered reconnect success and exhausted reconnect attempts.
 - Re-verified focused reconnect coverage and the full Android unit suite with `cd android_client && ./gradlew testDebugUnitTest --tests 'com.curtcox.terminals.android.app.AndroidTerminalViewModelTest.heartbeatFailureReconnectsWithBoundedBackoff' --tests 'com.curtcox.terminals.android.app.AndroidTerminalViewModelTest.heartbeatFailureStopsAfterReconnectAttemptsAreExhausted'` and `cd android_client && ./gradlew testDebugUnitTest`.
+- Wired Android NSD/mDNS discovery into the native client chrome through an injected discovery seam. The app can start/stop discovery, list discovered `_terminals._tcp.` servers, select a discovered endpoint, and fall back clearly to manual entry when discovery errors.
+- Added ViewModel coverage for discovered-server selection and discovery error diagnostics.
+- Re-verified Android boundary scan, boundary tests, diff whitespace checks, focused ViewModel unit tests, full Android unit tests, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew testDebugUnitTest`, `cd android_client && ./gradlew lintDebug`, and `cd android_client && ./gradlew assembleDebug`.
 
 ## Test Plan
 
