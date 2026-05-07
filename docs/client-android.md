@@ -116,9 +116,17 @@ make run-server
 
 The native Android client validates manual endpoints, manages the generic
 control-session lifecycle, sends protobuf-backed hello/capability/action
-messages, surfaces local diagnostics and permission education, and renders server-driven UI primitives.
-Discovery, media, kiosk, and connected-device behavior continue to mature under
-`plans/features/android-client/plan.md`.
+messages, surfaces local diagnostics and permission education, and renders
+server-driven UI primitives.
+
+The APK declares microphone and camera permissions so capability reporting and
+future media capture can reflect runtime permission state. WebRTC media
+transport remains explicitly disabled until the dependency compatibility pass is
+complete; the client reports that status in local diagnostics and does not
+advertise unsupported media send/receive behavior.
+
+Discovery, media transport, kiosk, and connected-device behavior continue to
+mature under `plans/features/android-client/plan.md`.
 
 ## Boundary Rules
 

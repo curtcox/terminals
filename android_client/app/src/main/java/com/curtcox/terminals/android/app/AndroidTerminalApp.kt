@@ -60,6 +60,12 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                         state.permissionEducation.messages.forEach { message ->
                             Text(message, style = MaterialTheme.typography.bodySmall)
                         }
+                        if (!state.mediaSupport.webRtcSupported) {
+                            Text(
+                                "Live media transport is unavailable: ${state.mediaSupport.webRtcReason}.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 }
 

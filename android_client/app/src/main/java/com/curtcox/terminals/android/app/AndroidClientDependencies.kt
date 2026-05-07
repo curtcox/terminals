@@ -11,6 +11,9 @@ import com.curtcox.terminals.android.connection.AndroidControlSessionController
 import com.curtcox.terminals.android.connection.WebSocketAndroidControlClient
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.media.AndroidMediaEngine
+import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
+import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
+import com.curtcox.terminals.android.media.ContextAndroidMediaPermissionProbe
 import com.curtcox.terminals.android.media.ContextAndroidAudioPlayback
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
@@ -36,6 +39,8 @@ data class AndroidClientDependencies(
     val networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
     val notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
     val mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
+    val mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
+    val webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter.disabled(),
     val terminalSettings: AndroidTerminalSettings = AndroidTerminalSettings.inMemory(),
     val heartbeatIntervalMillis: Long = 30_000,
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->
@@ -72,6 +77,8 @@ data class AndroidClientDependencies(
                 mediaEngine = AndroidMediaEngine(
                     audioPlayback = ContextAndroidAudioPlayback(context.applicationContext),
                 ),
+                mediaPermissionProbe = ContextAndroidMediaPermissionProbe(context.applicationContext),
+                webRtcAdapter = AndroidWebRtcAdapter.disabled(),
                 terminalSettings = SharedPreferencesAndroidTerminalSettings(context),
             )
     }

@@ -13,6 +13,10 @@ import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.media.AndroidAudioPlayback
 import com.curtcox.terminals.android.media.AndroidMediaDisplay
 import com.curtcox.terminals.android.media.AndroidMediaEngine
+import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
+import com.curtcox.terminals.android.media.AndroidMediaPermissionState
+import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
+import com.curtcox.terminals.android.media.AndroidWebRtcSupport
 import com.curtcox.terminals.android.media.AudioPlaybackResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
@@ -161,6 +165,36 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_permission_refresh=permission-result"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("permission_camera_present=true"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("permission_camera_available=true"))
+    }
+
+    @Test
+    fun refreshPermissionEducationIncludesMediaPermissionAndWebRtcDiagnostics() {
+        var mediaPermissions = AndroidMediaPermissionState(
+            microphoneGranted = false,
+            cameraGranted = true,
+        )
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                mediaPermissionProbe = AndroidMediaPermissionProbe { mediaPermissions },
+                webRtcAdapter = AndroidWebRtcAdapter.disabled("fire-os-webrtc-not-enabled"),
+            ),
+        )
+
+        mediaPermissions = AndroidMediaPermissionState(
+            microphoneGranted = true,
+            cameraGranted = true,
+        )
+        viewModel.refreshPermissionEducation("media-permission-result")
+
+        assertEquals(true, viewModel.state.value.mediaSupport.microphonePermissionGranted)
+        assertEquals(true, viewModel.state.value.mediaSupport.cameraPermissionGranted)
+        assertEquals(false, viewModel.state.value.mediaSupport.webRtcSupported)
+        assertEquals("fire-os-webrtc-not-enabled", viewModel.state.value.mediaSupport.webRtcReason)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("media_microphone_permission=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("media_camera_permission=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("media_webrtc_supported=false"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("media_webrtc_reason=fire-os-webrtc-not-enabled"))
     }
 
     @Test
@@ -510,6 +544,8 @@ class AndroidTerminalViewModelTest {
         notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
         mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
         networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
+        mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
+        webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter { AndroidWebRtcSupport(supported = true) },
         heartbeatIntervalMillis: Long = 0,
     ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
@@ -518,6 +554,8 @@ class AndroidTerminalViewModelTest {
                 notificationDelivery = notificationDelivery,
                 mediaEngine = mediaEngine,
                 networkStateProvider = networkStateProvider,
+                mediaPermissionProbe = mediaPermissionProbe,
+                webRtcAdapter = webRtcAdapter,
                 heartbeatIntervalMillis = heartbeatIntervalMillis,
                 sessionFactory = { sink ->
                     session.sink = sink

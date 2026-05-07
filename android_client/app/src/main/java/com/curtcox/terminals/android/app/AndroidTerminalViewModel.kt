@@ -201,11 +201,14 @@ class AndroidTerminalViewModel(
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
             val permissions = permissionEducation()
+            val mediaSupport = mediaSupport()
             it.copy(
                 permissionEducation = permissions,
+                mediaSupport = mediaSupport,
                 diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState)}\n" +
                     "last_permission_refresh=$reason\n" +
-                    permissions.toDiagnostics(),
+                    permissions.toDiagnostics() + "\n" +
+                    mediaSupport.toDiagnostics(),
             )
         }
     }
@@ -302,6 +305,7 @@ class AndroidTerminalViewModel(
             lastError = if (state == ConnectionState.InvalidEndpoint) "Enter a host:port or http(s) URL." else null,
             diagnosticsText = formatDiagnostics(resolved, state),
             permissionEducation = permissionEducation(),
+            mediaSupport = mediaSupport(),
         )
     }
 
@@ -324,6 +328,17 @@ class AndroidTerminalViewModel(
         appendLine("permission_microphone_available=$microphoneAvailable")
         appendLine("permission_camera_present=$cameraPresent")
         append("permission_camera_available=$cameraAvailable")
+    }
+
+    private fun mediaSupport(): MediaSupportState {
+        val permissions = runCatching { dependencies.mediaPermissionProbe.current() }.getOrNull()
+        val webRtc = runCatching { dependencies.webRtcAdapter.currentSupport() }.getOrNull()
+        return MediaSupportState(
+            microphonePermissionGranted = permissions?.microphoneGranted == true,
+            cameraPermissionGranted = permissions?.cameraGranted == true,
+            webRtcSupported = webRtc?.supported == true,
+            webRtcReason = webRtc?.reason?.ifBlank { "available" } ?: "unavailable",
+        )
     }
 
     private fun AudioPlaybackResult.toStatus(requestId: String): Pair<String, String> =

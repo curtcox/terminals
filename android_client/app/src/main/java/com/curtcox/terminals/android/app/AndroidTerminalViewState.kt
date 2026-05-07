@@ -14,6 +14,7 @@ data class AndroidTerminalViewState(
     val lastMediaStatus: String? = null,
     val lastTransition: String? = null,
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
+    val mediaSupport: MediaSupportState = MediaSupportState(),
 )
 
 enum class ConnectionState {
@@ -43,4 +44,18 @@ data class PermissionEducationState(
                 add("Camera capture is unavailable until hardware and permission are both present.")
             }
         }
+}
+
+data class MediaSupportState(
+    val microphonePermissionGranted: Boolean = false,
+    val cameraPermissionGranted: Boolean = false,
+    val webRtcSupported: Boolean = false,
+    val webRtcReason: String = "unknown",
+) {
+    fun toDiagnostics(): String = buildString {
+        appendLine("media_microphone_permission=$microphonePermissionGranted")
+        appendLine("media_camera_permission=$cameraPermissionGranted")
+        appendLine("media_webrtc_supported=$webRtcSupported")
+        append("media_webrtc_reason=$webRtcReason")
+    }
 }
