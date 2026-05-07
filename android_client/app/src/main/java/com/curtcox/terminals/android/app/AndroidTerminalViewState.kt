@@ -12,6 +12,7 @@ data class AndroidTerminalViewState(
     val lastNotificationBody: String? = null,
     val lastMediaRequestId: String? = null,
     val lastMediaStatus: String? = null,
+    val lastDiagnosticsCopyStatus: String? = null,
     val lastTransition: String? = null,
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
     val mediaSupport: MediaSupportState = MediaSupportState(),

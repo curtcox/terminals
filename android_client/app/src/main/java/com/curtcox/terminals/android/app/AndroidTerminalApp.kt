@@ -78,6 +78,15 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
 
                 Text("Status: ${state.connectionState}", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = viewModel::copyDiagnostics,
+                    modifier = Modifier.testTag("terminal-copy-diagnostics-button"),
+                ) {
+                    Text("Copy diagnostics")
+                }
+                state.lastDiagnosticsCopyStatus?.let {
+                    Text("Diagnostics copy: $it", style = MaterialTheme.typography.bodySmall)
+                }
                 SelectionContainer {
                     Text(state.diagnosticsText, fontFamily = FontFamily.Monospace)
                 }

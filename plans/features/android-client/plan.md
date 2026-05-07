@@ -833,6 +833,9 @@ make android-client-lint
 - Fixed the existing renderer instrumentation helper so the Android test source set compiles, then verified boundary scans, whitespace, instrumentation compilation, unit tests, and lint with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `cd android_client && ./gradlew testDebugUnitTest`, and `cd android_client && ./gradlew lintDebug`.
 - Extended the native Android instrumentation smoke test to cover server-driven `KeepAwakeWidget`, `FullscreenWidget`, and `BrightnessWidget` dispatch through the app-level platform adapter seams, preserving generic terminal behavior for kiosk/device-control effects.
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, and instrumentation compilation with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, and `cd android_client && ./gradlew compileDebugAndroidTestKotlin`.
+- Wired diagnostic copying into the native Android terminal chrome through an injected clipboard adapter seam, with a context-backed Android clipboard implementation and success/failure state surfaced in the app.
+- Added ViewModel and instrumentation smoke coverage for copying the current diagnostics text from terminal chrome.
+- Re-verified Android boundary scan, boundary tests, diff whitespace checks, focused ViewModel unit tests, and instrumentation compilation with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, and `cd android_client && ./gradlew compileDebugAndroidTestKotlin`.
 
 ## Test Plan
 

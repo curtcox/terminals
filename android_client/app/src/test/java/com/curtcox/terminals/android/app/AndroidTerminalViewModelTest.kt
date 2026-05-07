@@ -10,6 +10,7 @@ import com.curtcox.terminals.android.capabilities.AndroidHardwareCapabilities
 import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics
 import com.curtcox.terminals.android.capabilities.PermissionCapabilityState
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
+import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
 import com.curtcox.terminals.android.media.AndroidAudioPlayback
 import com.curtcox.terminals.android.media.AndroidMediaDisplay
 import com.curtcox.terminals.android.media.AndroidMediaEngine
@@ -100,6 +101,38 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=false"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=true"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_network_refresh=network-change"))
+    }
+
+    @Test
+    fun copyDiagnosticsDelegatesCurrentDiagnosticsToClipboard() {
+        var copied: String? = null
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                diagnosticClipboard = DiagnosticClipboard { copied = it },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.copyDiagnostics()
+
+        assertEquals(viewModel.state.value.diagnosticsText, copied)
+        assertEquals("copied", viewModel.state.value.lastDiagnosticsCopyStatus)
+    }
+
+    @Test
+    fun copyDiagnosticsRecordsClipboardFailure() {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                diagnosticClipboard = DiagnosticClipboard { error("clipboard unavailable") },
+            ),
+        )
+
+        viewModel.copyDiagnostics()
+
+        assertEquals("failed", viewModel.state.value.lastDiagnosticsCopyStatus)
+        assertEquals("clipboard unavailable", viewModel.state.value.lastError)
     }
 
     @Test

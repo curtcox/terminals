@@ -10,6 +10,8 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.AndroidControlSessionController
 import com.curtcox.terminals.android.connection.WebSocketAndroidControlClient
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
+import com.curtcox.terminals.android.diagnostics.ContextDiagnosticClipboard
+import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
 import com.curtcox.terminals.android.media.AndroidMediaEngine
 import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
 import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
@@ -38,6 +40,7 @@ data class AndroidClientDependencies(
     val brightnessController: AndroidBrightnessController = AndroidBrightnessController {},
     val networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
     val notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
+    val diagnosticClipboard: DiagnosticClipboard = DiagnosticClipboard.none(),
     val mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
     val mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
     val webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter.disabled(),
@@ -74,6 +77,7 @@ data class AndroidClientDependencies(
                 },
                 networkStateProvider = ContextAndroidNetworkStateProvider(context),
                 notificationDelivery = StatusBarAndroidNotificationDelivery(context.applicationContext),
+                diagnosticClipboard = ContextDiagnosticClipboard(context.applicationContext),
                 mediaEngine = AndroidMediaEngine(
                     audioPlayback = ContextAndroidAudioPlayback(context.applicationContext),
                 ),

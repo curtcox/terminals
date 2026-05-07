@@ -220,6 +220,24 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun copyDiagnostics() {
+        val diagnostics = mutableState.value.diagnosticsText
+        runCatching {
+            dependencies.diagnosticClipboard.copy(diagnostics)
+        }.onSuccess {
+            mutableState.update {
+                it.copy(lastDiagnosticsCopyStatus = "copied")
+            }
+        }.onFailure { error ->
+            mutableState.update {
+                it.copy(
+                    lastDiagnosticsCopyStatus = "failed",
+                    lastError = error.message ?: error::class.java.simpleName,
+                )
+            }
+        }
+    }
+
     fun setKeepAwake(enabled: Boolean) {
         runCatching {
             dependencies.keepAwakeController.setKeepAwake(enabled)

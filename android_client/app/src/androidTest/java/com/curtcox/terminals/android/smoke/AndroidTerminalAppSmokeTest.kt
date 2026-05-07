@@ -15,6 +15,7 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
+import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
@@ -147,6 +148,27 @@ class AndroidTerminalAppSmokeTest {
                 fullscreenValues == listOf(true) &&
                 brightnessValues == listOf(0.42)
         }
+    }
+
+    @Test
+    fun diagnosticsCanBeCopiedFromTerminalChrome() {
+        var copied: String? = null
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                diagnosticClipboard = DiagnosticClipboard { copied = it },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-copy-diagnostics-button").performClick()
+
+        compose.onNodeWithText("Diagnostics copy: copied").assertIsDisplayed()
+        assertEquals(viewModel.state.value.diagnosticsText, copied)
     }
 
     private class FakeSession : AndroidControlSession {
