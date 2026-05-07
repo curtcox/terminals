@@ -811,6 +811,13 @@ make android-client-lint
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
 
+### 2026-05-07
+
+- Added a context-backed Android audio playback adapter for generic server-issued `PlayAudio` commands. URL sources are played with `MediaPlayer`, TTS sources use Android `TextToSpeech`, and raw PCM remains explicitly unsupported with a diagnostic reason until the protocol supplies playback metadata.
+- Wired the real audio adapter into Android runtime dependencies through the existing `AndroidMediaEngine` seam, preserving unsupported media display behavior and avoiding any scenario-specific client behavior.
+- Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+
 ## Test Plan
 
 ### Unit tests

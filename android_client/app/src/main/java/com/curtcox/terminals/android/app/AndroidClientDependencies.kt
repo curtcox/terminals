@@ -11,6 +11,7 @@ import com.curtcox.terminals.android.connection.AndroidControlSessionController
 import com.curtcox.terminals.android.connection.WebSocketAndroidControlClient
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.media.AndroidMediaEngine
+import com.curtcox.terminals.android.media.ContextAndroidAudioPlayback
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
@@ -68,6 +69,9 @@ data class AndroidClientDependencies(
                 },
                 networkStateProvider = ContextAndroidNetworkStateProvider(context),
                 notificationDelivery = StatusBarAndroidNotificationDelivery(context.applicationContext),
+                mediaEngine = AndroidMediaEngine(
+                    audioPlayback = ContextAndroidAudioPlayback(context.applicationContext),
+                ),
                 terminalSettings = SharedPreferencesAndroidTerminalSettings(context),
             )
     }
