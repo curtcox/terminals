@@ -15,6 +15,9 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
+import com.curtcox.terminals.android.platform.AndroidBrightnessController
+import com.curtcox.terminals.android.platform.AndroidFullscreenController
+import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
 import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.runBlocking
@@ -76,6 +79,74 @@ class AndroidTerminalAppSmokeTest {
         compose.waitUntil { session.actions.isNotEmpty() }
 
         assertEquals(listOf(ServerDrivenAction("root", "submit", "pressed")), session.actions)
+    }
+
+    @Test
+    fun serverDrivenDeviceControlsReachPlatformAdapters() {
+        val session = FakeSession()
+        val keepAwakeValues = mutableListOf<Boolean>()
+        val fullscreenValues = mutableListOf<Boolean>()
+        val brightnessValues = mutableListOf<Double>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                keepAwakeController = AndroidKeepAwakeController { keepAwakeValues += it },
+                fullscreenController = AndroidFullscreenController { fullscreenValues += it },
+                brightnessController = AndroidBrightnessController { brightnessValues += it },
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        runBlocking {
+            session.sink.onResponse(
+                Control.ConnectResponse.newBuilder()
+                    .setSetUi(
+                        Ui.SetUI.newBuilder()
+                            .setDeviceId("device-1")
+                            .setRoot(
+                                Ui.Node.newBuilder()
+                                    .setId("root")
+                                    .setStack(Ui.StackWidget.newBuilder())
+                                    .addChildren(
+                                        Ui.Node.newBuilder()
+                                            .setId("keep-awake")
+                                            .setKeepAwake(Ui.KeepAwakeWidget.newBuilder().setEnabled(true)),
+                                    )
+                                    .addChildren(
+                                        Ui.Node.newBuilder()
+                                            .setId("fullscreen")
+                                            .setFullscreen(Ui.FullscreenWidget.newBuilder().setEnabled(true)),
+                                    )
+                                    .addChildren(
+                                        Ui.Node.newBuilder()
+                                            .setId("brightness")
+                                            .setBrightness(Ui.BrightnessWidget.newBuilder().setValue(0.42)),
+                                    ),
+                            ),
+                    )
+                    .build(),
+            )
+        }
+
+        compose.onNodeWithText("keep_awake=true").assertIsDisplayed()
+        compose.onNodeWithText("fullscreen=true").assertIsDisplayed()
+        compose.onNodeWithText("brightness=0.42").assertIsDisplayed()
+        compose.waitUntil {
+            keepAwakeValues == listOf(true) &&
+                fullscreenValues == listOf(true) &&
+                brightnessValues == listOf(0.42)
+        }
     }
 
     private class FakeSession : AndroidControlSession {

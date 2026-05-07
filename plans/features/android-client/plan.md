@@ -831,6 +831,8 @@ make android-client-lint
 - Fixed the documentation index to describe `docs/client-android.md` as the native Android/Kindle Fire client guide rather than the Flutter Android target.
 - Added stable Compose test tags to the native Android manual endpoint and connect controls, then added an instrumentation smoke test for manual endpoint entry, fake-session connection, synthetic server-driven UI render, and UI action dispatch.
 - Fixed the existing renderer instrumentation helper so the Android test source set compiles, then verified boundary scans, whitespace, instrumentation compilation, unit tests, and lint with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `cd android_client && ./gradlew testDebugUnitTest`, and `cd android_client && ./gradlew lintDebug`.
+- Extended the native Android instrumentation smoke test to cover server-driven `KeepAwakeWidget`, `FullscreenWidget`, and `BrightnessWidget` dispatch through the app-level platform adapter seams, preserving generic terminal behavior for kiosk/device-control effects.
+- Re-verified Android boundary scan, boundary tests, diff whitespace checks, and instrumentation compilation with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, and `cd android_client && ./gradlew compileDebugAndroidTestKotlin`.
 
 ## Test Plan
 
