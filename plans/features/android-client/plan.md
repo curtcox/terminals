@@ -822,6 +822,11 @@ make android-client-lint
 - Surfaced media permission and WebRTC support state in ViewModel diagnostics and documentation, with unit coverage for permission/media diagnostics.
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 - Attempted focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; it remains blocked by the local Java 25.0.3 Gradle/Kotlin incompatibility and requires JDK 17.
+- Fixed local Android Gradle validation by configuring user-level Gradle JVM selection in `/Users/curt/.gradle/gradle.properties` to use the existing Homebrew JDK 17 at `/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home`.
+- Re-ran focused Android unit validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`; validation now passes with plain Gradle invocation.
+- Re-ran the full Android unit suite with `cd android_client && ./gradlew testDebugUnitTest`; validation passes.
+- Fixed the native Android theme API boundary by moving `android:windowLightNavigationBar` from base `values/` resources into an API 27-qualified resource, preserving `minSdk 25` compatibility for Fire OS 6 devices.
+- Re-verified Android boundary scan, boundary tests, diff whitespace checks, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, and `cd android_client && ./gradlew lintDebug assembleDebug`.
 
 ## Test Plan
 
