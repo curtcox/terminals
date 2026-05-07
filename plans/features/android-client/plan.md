@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: curtcox
 validation: automated
-last-reviewed: 2026-05-06
+last-reviewed: 2026-05-07
 ---
 
 # Android Client
@@ -829,6 +829,8 @@ make android-client-lint
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, and `cd android_client && ./gradlew lintDebug assembleDebug`.
 - Wired native Android validation into repository-wide gates using the existing SDK-aware Make targets, so `all-lint`, `all-test`, and `all-check` run native Android lint, unit tests, and debug APK assembly when an Android SDK is configured and skip clearly otherwise.
 - Fixed the documentation index to describe `docs/client-android.md` as the native Android/Kindle Fire client guide rather than the Flutter Android target.
+- Added stable Compose test tags to the native Android manual endpoint and connect controls, then added an instrumentation smoke test for manual endpoint entry, fake-session connection, synthetic server-driven UI render, and UI action dispatch.
+- Fixed the existing renderer instrumentation helper so the Android test source set compiles, then verified boundary scans, whitespace, instrumentation compilation, unit tests, and lint with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `cd android_client && ./gradlew testDebugUnitTest`, and `cd android_client && ./gradlew lintDebug`.
 
 ## Test Plan
 

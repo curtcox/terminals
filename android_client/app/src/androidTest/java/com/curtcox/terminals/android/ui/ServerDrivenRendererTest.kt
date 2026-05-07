@@ -1,6 +1,7 @@
 package com.curtcox.terminals.android.ui
 
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -195,6 +196,7 @@ class ServerDrivenRendererTest {
         assertEquals(listOf(ServerDrivenAction("surface", "primary")), actions)
     }
 
+    @Composable
     private fun render(
         root: Ui.Node,
         onAction: (ServerDrivenAction) -> Unit = {},

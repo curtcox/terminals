@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.curtcox.terminals.android.ui.DeviceControlEffects
@@ -44,9 +45,15 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                         onValueChange = viewModel::updateEndpoint,
                         label = { Text("Server endpoint") },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("terminal-endpoint-field"),
                     )
-                    Button(onClick = viewModel::connect, enabled = state.connectionState == ConnectionState.ReadyToConnect) {
+                    Button(
+                        onClick = viewModel::connect,
+                        enabled = state.connectionState == ConnectionState.ReadyToConnect,
+                        modifier = Modifier.testTag("terminal-connect-button"),
+                    ) {
                         Text("Connect")
                     }
                 }
