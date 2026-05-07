@@ -440,7 +440,7 @@ If Fire OS 5 support becomes required, create a follow-up plan to lower `minSdk`
 
 ### Phase 0: Characterization and Scaffolding Decision
 
-Status: planned
+Status: implemented
 
 Tasks:
 
@@ -465,7 +465,7 @@ Validation:
 
 ### Phase 1: Native Android Project Skeleton
 
-Status: planned
+Status: implemented
 
 Tasks:
 
@@ -494,7 +494,7 @@ cd android_client && ./gradlew lintDebug
 
 ### Phase 2: Shared Protobuf and Request Builders
 
-Status: planned
+Status: implemented
 
 Tasks:
 
@@ -518,7 +518,7 @@ cd android_client && ./gradlew testDebugUnitTest --tests '*Protocol*'
 
 ### Phase 3: Connection, Discovery, and Manual Endpoint Flow
 
-Status: planned
+Status: implemented; connected-device validation pending
 
 Tasks:
 
@@ -547,7 +547,7 @@ make run-server
 
 ### Phase 4: Capability Snapshot and Delta Lifecycle
 
-Status: planned
+Status: implemented; connected-device validation pending
 
 Tasks:
 
@@ -574,7 +574,7 @@ cd android_client && ./gradlew connectedDebugAndroidTest --tests '*Capability*'
 
 ### Phase 5: Server-Driven Compose Renderer
 
-Status: planned
+Status: implemented; connected-device validation pending
 
 Tasks:
 
@@ -600,7 +600,7 @@ cd android_client && ./gradlew connectedDebugAndroidTest --tests '*Renderer*'
 
 ### Phase 6: UI Action Dispatch and Response Handling
 
-Status: planned
+Status: implemented; connected-device validation pending
 
 Tasks:
 
@@ -626,7 +626,7 @@ cd android_client && ./gradlew connectedDebugAndroidTest --tests '*UiActionSmoke
 
 ### Phase 7: Fire Tablet Kiosk Hardening
 
-Status: planned
+Status: implemented locally; Fire tablet smoke validation pending
 
 Tasks:
 
@@ -653,7 +653,7 @@ cd android_client && ./gradlew connectedDebugAndroidTest --tests '*Kiosk*'
 
 ### Phase 8: Media and Sensor Integration
 
-Status: planned
+Status: partially implemented; WebRTC compatibility and device validation pending
 
 Tasks:
 
@@ -678,7 +678,7 @@ cd android_client && ./gradlew connectedDebugAndroidTest --tests '*Media*'
 
 ### Phase 9: Boundary Enforcement, CI, and Documentation
 
-Status: planned
+Status: implemented; optional Android SDK gates remain host-dependent
 
 Tasks:
 
@@ -759,6 +759,27 @@ make android-client-test
 make android-client-lint
 ```
 
+## Current Validation Evidence
+
+Last local validation: 2026-05-07.
+
+Passed:
+
+```bash
+cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest
+cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew lintDebug
+cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug
+./scripts/check-android-client-boundary.sh
+./scripts/test-android-client-boundary.sh
+```
+
+Remaining validation:
+
+- Run `cd android_client && ./gradlew connectedDebugAndroidTest` on an emulator or Fire tablet.
+- Smoke-test manual connection to `make run-server` on a physical Fire OS 6+ tablet.
+- Confirm Android NSD discovery behavior on a multicast-capable Wi-Fi network and document Fire OS fallback behavior.
+- Complete the WebRTC dependency compatibility decision before advertising live media send/receive capabilities.
+
 ## Implementation Progress
 
 ### 2026-05-06
@@ -813,6 +834,8 @@ make android-client-lint
 
 ### 2026-05-07
 
+- Updated phase status labels to reflect the native Android implementation now present in `android_client/`, while leaving connected-device, Fire tablet, NSD-on-real-network, and WebRTC compatibility validation explicitly pending.
+- Re-verified the current local Android gate with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest`, `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew lintDebug`, `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
 - Added a context-backed Android audio playback adapter for generic server-issued `PlayAudio` commands. URL sources are played with `MediaPlayer`, TTS sources use Android `TextToSpeech`, and raw PCM remains explicitly unsupported with a diagnostic reason until the protocol supplies playback metadata.
 - Wired the real audio adapter into Android runtime dependencies through the existing `AndroidMediaEngine` seam, preserving unsupported media display behavior and avoiding any scenario-specific client behavior.
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
