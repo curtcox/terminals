@@ -867,6 +867,8 @@ Remaining validation:
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, focused ViewModel unit tests, full Android unit tests, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew testDebugUnitTest`, `cd android_client && ./gradlew lintDebug`, and `cd android_client && ./gradlew assembleDebug`.
 - Extended native Android app smoke coverage for lifecycle/configuration-triggered capability refreshes so a connected fake control session receives the refresh reason and terminal chrome records `last_capability_delta=configuration`.
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, instrumentation test source compilation, and full Android unit tests with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, and `cd android_client && ./gradlew testDebugUnitTest`.
+- Added focused JVM coverage for the Android media seams, including unsupported audio/display reasons, adapter delegation, and the explicit disabled WebRTC compatibility decision.
+- Re-verified focused media coverage, the full Android unit suite, boundary tests, and diff whitespace checks with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidMediaEngineTest*'`, `cd android_client && ./gradlew testDebugUnitTest`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 
 ## Test Plan
 
