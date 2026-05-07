@@ -215,11 +215,11 @@ pick-next-work:
 next:
 	@python3 ./scripts/next.py
 
-all-lint: server-lint client-lint client-boundary android-client-boundary web-client-lint proto-lint
+all-lint: server-lint client-lint client-boundary android-client-boundary android-client-lint web-client-lint proto-lint
 
-all-test: server-test client-test client-boundary-test android-client-boundary-test web-client-test
+all-test: server-test client-test client-boundary-test android-client-boundary-test android-client-test web-client-test
 
-all-check: all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all web-client-build development-docs-test usecases-index validation-matrix
+all-check: all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all android-client-build web-client-build development-docs-test usecases-index validation-matrix
 
 ci-local: all-check
 

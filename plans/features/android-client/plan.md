@@ -827,6 +827,8 @@ make android-client-lint
 - Re-ran the full Android unit suite with `cd android_client && ./gradlew testDebugUnitTest`; validation passes.
 - Fixed the native Android theme API boundary by moving `android:windowLightNavigationBar` from base `values/` resources into an API 27-qualified resource, preserving `minSdk 25` compatibility for Fire OS 6 devices.
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, and `cd android_client && ./gradlew lintDebug assembleDebug`.
+- Wired native Android validation into repository-wide gates using the existing SDK-aware Make targets, so `all-lint`, `all-test`, and `all-check` run native Android lint, unit tests, and debug APK assembly when an Android SDK is configured and skip clearly otherwise.
+- Fixed the documentation index to describe `docs/client-android.md` as the native Android/Kindle Fire client guide rather than the Flutter Android target.
 
 ## Test Plan
 

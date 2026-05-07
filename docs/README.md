@@ -15,7 +15,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | [Client — Web](client-web.md) | Flutter web client |
 | [Client — macOS](client-macos.md) | Flutter macOS desktop client |
 | [Client — iOS](client-ios.md) | Flutter iOS client |
-| [Client — Android](client-android.md) | Flutter Android client |
+| [Client — Android](client-android.md) | Native Android and Kindle Fire client |
 | [Client — Linux](client-linux.md) | Flutter Linux desktop client |
 | [Client — Windows](client-windows.md) | Flutter Windows desktop client |
 | [Event Taxonomy](event-taxonomy.md) | Server event names emitted to JSONL logs |
