@@ -8,6 +8,7 @@ import com.curtcox.terminals.android.capabilities.ContextAndroidCapabilityProbe
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.AndroidControlSessionController
+import com.curtcox.terminals.android.connection.ReconnectPolicy
 import com.curtcox.terminals.android.connection.WebSocketAndroidControlClient
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.ContextDiagnosticClipboard
@@ -46,6 +47,8 @@ data class AndroidClientDependencies(
     val webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter.disabled(),
     val terminalSettings: AndroidTerminalSettings = AndroidTerminalSettings.inMemory(),
     val heartbeatIntervalMillis: Long = 30_000,
+    val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
+    val maxReconnectAttempts: Int = 5,
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->
         AndroidControlSessionController(
             deviceId = deviceId,

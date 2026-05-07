@@ -4,6 +4,7 @@ import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
+import com.curtcox.terminals.android.connection.ReconnectPolicy
 import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
 import com.curtcox.terminals.android.capabilities.AndroidHardwareCapabilities
@@ -315,6 +316,69 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun heartbeatFailureReconnectsWithBoundedBackoff() = runTest(dispatcher) {
+        val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
+        val second = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 100,
+                reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
+                maxReconnectAttempts = 2,
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(100)
+        runCurrent()
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_pending=true"))
+
+        advanceTimeBy(50)
+        runCurrent()
+
+        assertEquals(1, first.closeCount)
+        assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_success_attempt=1"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun heartbeatFailureStopsAfterReconnectAttemptsAreExhausted() = runTest(dispatcher) {
+        val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
+        val second = FakeSession(connectError = IllegalStateException("still offline"))
+        val sessions = ArrayDeque(listOf(first, second))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 100,
+                reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
+                maxReconnectAttempts = 1,
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(150)
+        advanceUntilIdle()
+
+        assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
+        assertEquals("still offline", viewModel.state.value.lastError)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_exhausted=1"))
+    }
+
+    @Test
     fun serverSetUiResponseUpdatesRenderedRoot() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
@@ -600,6 +664,7 @@ class AndroidTerminalViewModelTest {
     private class FakeSession(
         private val connectError: Throwable? = null,
         private val capabilityDeltaSent: Boolean = false,
+        private val heartbeatError: Throwable? = null,
     ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
         lateinit var sink: AndroidControlResponseSink
@@ -617,6 +682,7 @@ class AndroidTerminalViewModelTest {
         }
 
         override suspend fun sendHeartbeat() {
+            heartbeatError?.let { throw it }
             heartbeatCount += 1
         }
 

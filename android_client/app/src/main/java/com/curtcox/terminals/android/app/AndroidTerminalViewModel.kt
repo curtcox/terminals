@@ -78,6 +78,7 @@ class AndroidTerminalViewModel(
     }
     private var session: AndroidControlSession? = null
     private var heartbeatJob: Job? = null
+    private var reconnectJob: Job? = null
     private val mutableState = MutableStateFlow(
         initialState(),
     )
@@ -117,6 +118,7 @@ class AndroidTerminalViewModel(
         }
         viewModelScope.launch {
             runCatching {
+                stopReconnect()
                 stopHeartbeat()
                 session?.close()
                 val nextSession = dependencies.sessionFactory(responseSink)
@@ -152,6 +154,7 @@ class AndroidTerminalViewModel(
         val closingSession = session
         session = null
         stopHeartbeat()
+        stopReconnect()
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
             it.copy(
@@ -281,10 +284,8 @@ class AndroidTerminalViewModel(
                 runCatching {
                     connectedSession.sendHeartbeat()
                 }.onFailure { error ->
-                    mutableState.update {
-                        it.copy(lastError = error.message ?: error::class.java.simpleName)
-                    }
-                    stopHeartbeat()
+                    handleControlLoss(connectedSession, error)
+                    return@launch
                 }
             }
         }
@@ -293,6 +294,78 @@ class AndroidTerminalViewModel(
     private fun stopHeartbeat() {
         heartbeatJob?.cancel()
         heartbeatJob = null
+    }
+
+    private fun stopReconnect() {
+        reconnectJob?.cancel()
+        reconnectJob = null
+    }
+
+    private fun handleControlLoss(failedSession: AndroidControlSession, error: Throwable) {
+        heartbeatJob = null
+        if (session !== failedSession) return
+        session = null
+        val endpoint = parser.parse(mutableState.value.endpointText)
+        val message = error.message ?: error::class.java.simpleName
+        mutableState.update {
+            it.copy(
+                connectionState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.Connecting,
+                lastError = message,
+                diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting) +
+                    "\nlast_error=$message\nreconnect_pending=${endpoint != null}",
+            )
+        }
+        viewModelScope.launch { failedSession.close() }
+        if (endpoint != null) {
+            startReconnect(endpoint, message)
+        }
+    }
+
+    private fun startReconnect(endpoint: EndpointResolution, cause: String) {
+        stopReconnect()
+        reconnectJob = viewModelScope.launch {
+            var lastError = cause
+            for (attempt in 1..dependencies.maxReconnectAttempts) {
+                delay(dependencies.reconnectPolicy.delayForAttempt(attempt))
+                mutableState.update {
+                    it.copy(
+                        connectionState = ConnectionState.Connecting,
+                        diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting) +
+                            "\nlast_error=$lastError\nreconnect_attempt=$attempt",
+                    )
+                }
+                val nextSession = dependencies.sessionFactory(responseSink)
+                val connected = runCatching {
+                    nextSession.connect(endpoint)
+                    session = nextSession
+                    startHeartbeat(nextSession)
+                }.onFailure { error ->
+                    lastError = error.message ?: error::class.java.simpleName
+                    nextSession.close()
+                }.isSuccess
+                if (connected) {
+                    mutableState.update {
+                        it.copy(
+                            connectionState = ConnectionState.Connected,
+                            lastError = null,
+                            diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connected) +
+                                "\nreconnect_success_attempt=$attempt",
+                        )
+                    }
+                    reconnectJob = null
+                    return@launch
+                }
+            }
+            mutableState.update {
+                it.copy(
+                    connectionState = ConnectionState.ReadyToConnect,
+                    lastError = lastError,
+                    diagnosticsText = formatDiagnostics(endpoint, ConnectionState.ReadyToConnect) +
+                        "\nlast_error=$lastError\nreconnect_exhausted=${dependencies.maxReconnectAttempts}",
+                )
+            }
+            reconnectJob = null
+        }
     }
 
     private fun Control.ConnectResponse.requiresCapabilityRebaseline(): Boolean {

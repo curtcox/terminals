@@ -119,6 +119,10 @@ control-session lifecycle, sends protobuf-backed hello/capability/action
 messages, surfaces local diagnostics and permission education, and renders
 server-driven UI primitives.
 
+If the active control session is lost during heartbeat, the client closes the
+failed stream and performs bounded reconnect attempts using exponential backoff.
+Retry attempt, success, and exhaustion status are recorded in local diagnostics.
+
 The APK declares microphone and camera permissions so capability reporting and
 future media capture can reflect runtime permission state. WebRTC media
 transport remains explicitly disabled until the dependency compatibility pass is

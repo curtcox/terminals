@@ -836,6 +836,9 @@ make android-client-lint
 - Wired diagnostic copying into the native Android terminal chrome through an injected clipboard adapter seam, with a context-backed Android clipboard implementation and success/failure state surfaced in the app.
 - Added ViewModel and instrumentation smoke coverage for copying the current diagnostics text from terminal chrome.
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, focused ViewModel unit tests, and instrumentation compilation with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, and `cd android_client && ./gradlew compileDebugAndroidTestKotlin`.
+- Wired bounded reconnect handling into the native Android control-session lifecycle. Heartbeat loss now closes the failed stream, schedules reconnect attempts through the existing `ReconnectPolicy`, records retry/success/exhaustion diagnostics, and restores the session through the generic session factory without adding scenario behavior.
+- Added ViewModel coverage for heartbeat-triggered reconnect success and exhausted reconnect attempts.
+- Re-verified focused reconnect coverage and the full Android unit suite with `cd android_client && ./gradlew testDebugUnitTest --tests 'com.curtcox.terminals.android.app.AndroidTerminalViewModelTest.heartbeatFailureReconnectsWithBoundedBackoff' --tests 'com.curtcox.terminals.android.app.AndroidTerminalViewModelTest.heartbeatFailureStopsAfterReconnectAttemptsAreExhausted'` and `cd android_client && ./gradlew testDebugUnitTest`.
 
 ## Test Plan
 
