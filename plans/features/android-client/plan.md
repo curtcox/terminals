@@ -842,6 +842,8 @@ make android-client-lint
 - Wired Android NSD/mDNS discovery into the native client chrome through an injected discovery seam. The app can start/stop discovery, list discovered `_terminals._tcp.` servers, select a discovered endpoint, and fall back clearly to manual entry when discovery errors.
 - Added ViewModel coverage for discovered-server selection and discovery error diagnostics.
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, focused ViewModel unit tests, full Android unit tests, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew testDebugUnitTest`, `cd android_client && ./gradlew lintDebug`, and `cd android_client && ./gradlew assembleDebug`.
+- Extended native Android app smoke coverage for lifecycle/configuration-triggered capability refreshes so a connected fake control session receives the refresh reason and terminal chrome records `last_capability_delta=configuration`.
+- Re-verified Android boundary scan, boundary tests, diff whitespace checks, instrumentation test source compilation, and full Android unit tests with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, and `cd android_client && ./gradlew testDebugUnitTest`.
 
 ## Test Plan
 

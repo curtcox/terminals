@@ -171,11 +171,41 @@ class AndroidTerminalAppSmokeTest {
         assertEquals(viewModel.state.value.diagnosticsText, copied)
     }
 
-    private class FakeSession : AndroidControlSession {
+    @Test
+    fun lifecycleCapabilityRefreshReachesConnectedSession() {
+        val session = FakeSession(capabilityDeltaResult = true)
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        viewModel.refreshCapabilities("configuration")
+
+        compose.waitUntil { session.capabilityRefreshReasons == listOf("configuration") }
+        compose.onNodeWithText("last_capability_delta=configuration", substring = true).assertIsDisplayed()
+    }
+
+    private class FakeSession(
+        private val capabilityDeltaResult: Boolean = false,
+    ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
         lateinit var sink: AndroidControlResponseSink
         var connectedEndpoint: EndpointResolution? = null
         val actions = mutableListOf<ServerDrivenAction>()
+        val capabilityRefreshReasons = mutableListOf<String>()
 
         override suspend fun connect(endpoint: EndpointResolution) {
             connectedEndpoint = endpoint
@@ -188,7 +218,10 @@ class AndroidTerminalAppSmokeTest {
             actions += action
         }
 
-        override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean = false
+        override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
+            capabilityRefreshReasons += reason
+            return capabilityDeltaResult
+        }
 
         override suspend fun rebaselineCapabilitiesAfterStaleGeneration() = Unit
 
