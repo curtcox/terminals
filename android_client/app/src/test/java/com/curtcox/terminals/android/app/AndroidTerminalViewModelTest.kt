@@ -665,6 +665,39 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun localKeepAwakeSettingIsRestoredAndApplied() {
+        val calls = mutableListOf<Boolean>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = AndroidTerminalSettings.inMemory(initialKeepAwakeEnabled = true),
+                keepAwakeController = AndroidKeepAwakeController { calls.add(it) },
+            ),
+        )
+
+        assertEquals(true, viewModel.state.value.localKeepAwakeEnabled)
+        assertEquals(listOf(true), calls)
+    }
+
+    @Test
+    fun localKeepAwakeTogglePersistsAndUpdatesDiagnostics() {
+        val calls = mutableListOf<Boolean>()
+        val settings = AndroidTerminalSettings.inMemory()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = settings,
+                keepAwakeController = AndroidKeepAwakeController { calls.add(it) },
+            ),
+        )
+
+        viewModel.setLocalKeepAwake(true)
+
+        assertEquals(true, settings.keepAwakeEnabled())
+        assertEquals(true, viewModel.state.value.localKeepAwakeEnabled)
+        assertEquals(listOf(true), calls)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("local_keep_awake=true"))
+    }
+
+    @Test
     fun fullscreenDelegatesToPlatformAdapter() {
         val calls = mutableListOf<Boolean>()
         val viewModel = AndroidTerminalViewModel(

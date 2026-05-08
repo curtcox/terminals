@@ -875,6 +875,9 @@ Remaining validation:
 - Made the native Android terminal chrome always surface the live media transport/WebRTC compatibility status, even when there are no permission education warnings, so Fire OS users can see that live media remains intentionally unavailable until the dependency decision is complete.
 - Added Compose smoke coverage for the no-permission-warning path to ensure the disabled live media status remains visible independently of microphone, camera, or notification permission messages.
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, Android instrumentation test-source compilation, the full Android unit suite, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin testDebugUnitTest`, and `cd android_client && ./gradlew lintDebug assembleDebug`.
+- Added a generic local keep-awake kiosk setting backed by Android terminal settings and the existing keep-awake platform adapter, with terminal chrome to toggle it and restore it on launch.
+- Added ViewModel and instrumentation smoke coverage for restoring, persisting, and toggling the local keep-awake setting.
+- Re-verified focused ViewModel tests, Android instrumentation test-source compilation, the full Android unit suite, boundary scans, diff whitespace checks, lint, and debug APK assembly with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `cd android_client && ./gradlew testDebugUnitTest`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, and `cd android_client && ./gradlew lintDebug assembleDebug`.
 
 ## Test Plan
 

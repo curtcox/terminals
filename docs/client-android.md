@@ -98,6 +98,8 @@ adb install -r android_client/app/build/outputs/apk/debug/app-debug.apk
 
 For kiosk-like smoke tests, also review Fire OS settings for screen timeout,
 battery optimization, Wi-Fi sleep, and app background restrictions.
+The terminal chrome includes a local keep-awake toggle for kiosk-style use; it
+is stored on device and remains generic terminal behavior.
 
 ## Run
 

@@ -307,6 +307,28 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun setLocalKeepAwake(enabled: Boolean) {
+        runCatching {
+            dependencies.keepAwakeController.setKeepAwake(enabled)
+        }.onSuccess {
+            dependencies.terminalSettings.setKeepAwakeEnabled(enabled)
+            mutableState.update {
+                it.copy(
+                    localKeepAwakeEnabled = enabled,
+                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                        "local_keep_awake=$enabled",
+                )
+            }
+        }.onFailure { error ->
+            mutableState.update {
+                it.copy(
+                    lastError = error.message ?: error::class.java.simpleName,
+                    localKeepAwakeEnabled = dependencies.terminalSettings.keepAwakeEnabled(),
+                )
+            }
+        }
+    }
+
     fun setFullscreen(enabled: Boolean) {
         runCatching {
             dependencies.fullscreenController.setFullscreen(enabled)
@@ -450,6 +472,10 @@ class AndroidTerminalViewModel(
 
     private fun initialState(): AndroidTerminalViewState {
         val lastEndpoint = runCatching { dependencies.terminalSettings.lastManualEndpoint() }.getOrDefault("")
+        val keepAwakeEnabled = runCatching { dependencies.terminalSettings.keepAwakeEnabled() }.getOrDefault(false)
+        if (keepAwakeEnabled) {
+            runCatching { dependencies.keepAwakeController.setKeepAwake(true) }
+        }
         val resolved = parser.parse(lastEndpoint)
         val state = when {
             lastEndpoint.isBlank() -> ConnectionState.Disconnected
@@ -461,6 +487,7 @@ class AndroidTerminalViewModel(
             connectionState = state,
             lastError = if (state == ConnectionState.InvalidEndpoint) "Enter a host:port or http(s) URL." else null,
             diagnosticsText = formatDiagnostics(resolved, state),
+            localKeepAwakeEnabled = keepAwakeEnabled,
             permissionEducation = permissionEducation(),
             mediaSupport = mediaSupport(),
         )

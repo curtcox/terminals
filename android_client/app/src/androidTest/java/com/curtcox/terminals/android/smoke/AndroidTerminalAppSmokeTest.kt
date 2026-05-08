@@ -180,6 +180,28 @@ class AndroidTerminalAppSmokeTest {
     }
 
     @Test
+    fun localKeepAwakeCanBeToggledFromTerminalChrome() {
+        val keepAwakeValues = mutableListOf<Boolean>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                keepAwakeController = AndroidKeepAwakeController { keepAwakeValues += it },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithText("Keep awake off").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-local-keep-awake-button").performClick()
+
+        compose.onNodeWithText("Keep awake on").assertIsDisplayed()
+        compose.onNodeWithText("local_keep_awake=true", substring = true).assertIsDisplayed()
+        assertEquals(listOf(true), keepAwakeValues)
+    }
+
+    @Test
     fun liveMediaTransportStatusIsVisibleWithoutPermissionWarnings() {
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(

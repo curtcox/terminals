@@ -112,6 +112,12 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                 Text("Status: ${state.connectionState}", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
+                    onClick = { viewModel.setLocalKeepAwake(!state.localKeepAwakeEnabled) },
+                    modifier = Modifier.testTag("terminal-local-keep-awake-button"),
+                ) {
+                    Text(if (state.localKeepAwakeEnabled) "Keep awake on" else "Keep awake off")
+                }
+                Button(
                     onClick = viewModel::copyDiagnostics,
                     modifier = Modifier.testTag("terminal-copy-diagnostics-button"),
                 ) {

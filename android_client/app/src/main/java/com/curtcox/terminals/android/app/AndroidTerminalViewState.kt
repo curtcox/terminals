@@ -15,6 +15,7 @@ data class AndroidTerminalViewState(
     val lastMediaStatus: String? = null,
     val lastDiagnosticsCopyStatus: String? = null,
     val lastTransition: String? = null,
+    val localKeepAwakeEnabled: Boolean = false,
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
     val mediaSupport: MediaSupportState = MediaSupportState(),
     val discoveryState: DiscoveryState = DiscoveryState(),
