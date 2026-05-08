@@ -926,6 +926,8 @@ Remaining validation:
 - Hardened Android diagnostics composition so permission education and media transport status are now always included in the baseline diagnostics text across connection/discovery/lifecycle transitions, instead of only after explicit permission-refresh actions.
 - Added JVM coverage in `AndroidTerminalViewModelTest.baselineDiagnosticsAlwaysIncludePermissionAndMediaStatus` to lock the baseline diagnostics contract for notification/microphone/camera and WebRTC availability fields.
 - Re-verified focused Android ViewModel JVM coverage with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`.
+- Fixed disconnect-state diagnostics in `AndroidTerminalViewModel` so manual endpoints return to `ReadyToConnect` with matching diagnostics text instead of reporting a stale `Disconnected` status.
+- Added `AndroidTerminalViewModelTest.disconnectWithValidEndpointReturnsToReadyStateDiagnostics` regression coverage and re-verified with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest.disconnectWithValidEndpointReturnsToReadyStateDiagnostics' --tests '*AndroidTerminalViewModelTest.connectCreatesSessionAndMarksStateConnected'`.
 
 ## Test Plan
 

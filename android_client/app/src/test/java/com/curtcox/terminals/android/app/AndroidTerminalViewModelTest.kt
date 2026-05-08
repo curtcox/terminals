@@ -695,6 +695,22 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun disconnectWithValidEndpointReturnsToReadyStateDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session, heartbeatIntervalMillis = 0)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("state=ReadyToConnect"))
+    }
+
+    @Test
     fun connectedSessionSendsPeriodicHeartbeats() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session, heartbeatIntervalMillis = 100)

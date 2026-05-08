@@ -218,9 +218,10 @@ class AndroidTerminalViewModel(
         stopReconnect()
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
+            val nextState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.ReadyToConnect
             it.copy(
-                connectionState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.ReadyToConnect,
-                diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Disconnected),
+                connectionState = nextState,
+                diagnosticsText = formatDiagnostics(endpoint, nextState),
             )
         }
         viewModelScope.launch { closingSession?.close() }
