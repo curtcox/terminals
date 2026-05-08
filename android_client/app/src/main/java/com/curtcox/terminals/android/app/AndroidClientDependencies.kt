@@ -62,6 +62,8 @@ data class AndroidClientDependencies(
     val heartbeatIntervalMillis: Long = 30_000,
     val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
     val maxReconnectAttempts: Int = 5,
+    val discoveryRestartMinIntervalMillis: Long = 1_500,
+    val nowMillis: () -> Long = { System.currentTimeMillis() },
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->
         AndroidControlSessionController(
             deviceId = deviceId,

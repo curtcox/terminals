@@ -921,6 +921,7 @@ Remaining validation:
 - Re-verified focused JVM coverage and Android instrumentation test-source compilation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest.requestMissingPermissionsRequestsNotificationPermissionWhenRuntimePromptIsSupported'` and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 - Wired network-change discovery hardening in `AndroidTerminalViewModel`: when mDNS scanning is active and `AndroidNetworkMonitor` reports a callback, the client now restarts discovery automatically so Wi-Fi transitions recover without manual stop/start.
 - Added focused JVM coverage for network-triggered discovery restart in `AndroidTerminalViewModelTest.networkMonitorRestartsDiscoveryWhenScanning`.
+- Added restart-rate limiting for network-triggered discovery restarts so callback bursts do not thrash NSD scanning; suppressed restarts are recorded in diagnostics and covered by `AndroidTerminalViewModelTest.networkMonitorDebouncesDiscoveryRestartWhenCallbacksBurst`.
 
 ## Test Plan
 

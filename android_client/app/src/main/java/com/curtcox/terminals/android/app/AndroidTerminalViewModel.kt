@@ -82,6 +82,7 @@ class AndroidTerminalViewModel(
     private var session: AndroidControlSession? = null
     private var heartbeatJob: Job? = null
     private var reconnectJob: Job? = null
+    private var lastDiscoveryRestartAtMillis: Long = -1
     private val mutableState = MutableStateFlow(
         initialState(),
     )
@@ -644,6 +645,18 @@ class AndroidTerminalViewModel(
 
     private fun restartDiscoveryIfScanning(reason: String) {
         if (!mutableState.value.discoveryState.scanning) return
+        val now = dependencies.nowMillis()
+        if (lastDiscoveryRestartAtMillis >= 0 &&
+            now - lastDiscoveryRestartAtMillis < dependencies.discoveryRestartMinIntervalMillis
+        ) {
+            mutableState.update {
+                it.copy(
+                    diagnosticsText = "${it.diagnosticsText}\ndiscovery_restart_suppressed=$reason",
+                )
+            }
+            return
+        }
+        lastDiscoveryRestartAtMillis = now
         dependencies.discovery.stop()
         startDiscovery()
         mutableState.update {

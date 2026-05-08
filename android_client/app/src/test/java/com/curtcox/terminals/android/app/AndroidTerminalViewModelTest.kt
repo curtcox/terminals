@@ -195,6 +195,44 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun networkMonitorDebouncesDiscoveryRestartWhenCallbacksBurst() = runTest(dispatcher) {
+        val monitor = FakeNetworkMonitor()
+        val discovery = FakeDiscovery()
+        var now = 1_000L
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                networkMonitor = monitor,
+                discovery = discovery,
+                discoveryRestartMinIntervalMillis = 1_500,
+                nowMillis = { now },
+            ),
+        )
+
+        viewModel.startDiscovery()
+        assertEquals(1, discovery.startCount)
+        viewModel.startNetworkMonitoring()
+
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(1, discovery.stopCount)
+        assertEquals(2, discovery.startCount)
+
+        now += 500
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(1, discovery.stopCount)
+        assertEquals(2, discovery.startCount)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("discovery_restart_suppressed=network-callback"))
+
+        now += 2_000
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(2, discovery.stopCount)
+        assertEquals(3, discovery.startCount)
+    }
+
+    @Test
     fun copyDiagnosticsDelegatesCurrentDiagnosticsToClipboard() {
         var copied: String? = null
         val viewModel = AndroidTerminalViewModel(
