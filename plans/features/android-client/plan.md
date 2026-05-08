@@ -928,6 +928,8 @@ Remaining validation:
 - Re-verified focused Android ViewModel JVM coverage with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`.
 - Fixed disconnect-state diagnostics in `AndroidTerminalViewModel` so manual endpoints return to `ReadyToConnect` with matching diagnostics text instead of reporting a stale `Disconnected` status.
 - Added `AndroidTerminalViewModelTest.disconnectWithValidEndpointReturnsToReadyStateDiagnostics` regression coverage and re-verified with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest.disconnectWithValidEndpointReturnsToReadyStateDiagnostics' --tests '*AndroidTerminalViewModelTest.connectCreatesSessionAndMarksStateConnected'`.
+- Hardened `AndroidTerminalViewModel` network monitoring lifecycle by making `startNetworkMonitoring()` and `stopNetworkMonitoring()` idempotent, preventing duplicate `AndroidNetworkMonitor` callback registration across repeated lifecycle starts.
+- Added `AndroidTerminalViewModelTest.networkMonitoringStartStopIsIdempotent` regression coverage and re-verified focused ViewModel JVM tests with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`.
 
 ## Test Plan
 

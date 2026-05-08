@@ -163,6 +163,25 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun networkMonitoringStartStopIsIdempotent() {
+        val monitor = FakeNetworkMonitor()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                networkMonitor = monitor,
+            ),
+        )
+
+        viewModel.startNetworkMonitoring()
+        viewModel.startNetworkMonitoring()
+        viewModel.stopNetworkMonitoring()
+        viewModel.stopNetworkMonitoring()
+
+        assertEquals(1, monitor.startCount)
+        assertEquals(1, monitor.stopCount)
+    }
+
+    @Test
     fun networkMonitorRestartsDiscoveryWhenScanning() = runTest(dispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val monitor = FakeNetworkMonitor()
@@ -1209,9 +1228,11 @@ class AndroidTerminalViewModelTest {
 
     private class FakeNetworkMonitor : AndroidNetworkMonitor {
         private var onChanged: (() -> Unit)? = null
+        var startCount = 0
         var stopCount = 0
 
         override fun start(onChanged: () -> Unit) {
+            startCount += 1
             this.onChanged = onChanged
         }
 

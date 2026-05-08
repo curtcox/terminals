@@ -86,6 +86,7 @@ class AndroidTerminalViewModel(
     private var connectJob: Job? = null
     private var heartbeatJob: Job? = null
     private var reconnectJob: Job? = null
+    private var networkMonitoringActive: Boolean = false
     private var lastDiscoveryRestartAtMillis: Long = -1
     private var lastNetworkCapabilityRefreshAtMillis: Long = -1
     private val mutableState = MutableStateFlow(
@@ -332,6 +333,8 @@ class AndroidTerminalViewModel(
     }
 
     fun startNetworkMonitoring() {
+        if (networkMonitoringActive) return
+        networkMonitoringActive = true
         dependencies.networkMonitor.start {
             refreshNetworkDiagnostics("network-callback")
             refreshCapabilitiesFromNetworkCallback("network-callback")
@@ -340,6 +343,8 @@ class AndroidTerminalViewModel(
     }
 
     fun stopNetworkMonitoring() {
+        if (!networkMonitoringActive) return
+        networkMonitoringActive = false
         dependencies.networkMonitor.stop()
     }
 
