@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlResponseDispatcher
@@ -269,9 +270,7 @@ class AndroidTerminalViewModel(
                 permissionEducation = permissions,
                 mediaSupport = mediaSupport,
                 diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState)}\n" +
-                    "last_permission_refresh=$reason\n" +
-                    permissions.toDiagnostics() + "\n" +
-                    mediaSupport.toDiagnostics(),
+                    "last_permission_refresh=$reason",
             )
         }
     }
@@ -553,14 +552,25 @@ class AndroidTerminalViewModel(
             error.message.contains("generation", ignoreCase = true)
     }
 
-    private fun formatDiagnostics(endpoint: EndpointResolution?, state: ConnectionState): String =
-        chrome.formatDiagnostics(
-            endpoint = endpoint,
-            state = state,
-            networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
-            fireOsDeviceInfo = runCatching { dependencies.fireOsDeviceInfoProvider.current() }.getOrNull(),
-            capabilitySnapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull(),
-        )
+    private fun formatDiagnostics(endpoint: EndpointResolution?, state: ConnectionState): String {
+        val capabilitySnapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull()
+        val permissions = permissionEducation(capabilitySnapshot)
+        val mediaSupport = mediaSupport()
+        return buildString {
+            append(
+                chrome.formatDiagnostics(
+                    endpoint = endpoint,
+                    state = state,
+                    networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
+                    fireOsDeviceInfo = runCatching { dependencies.fireOsDeviceInfoProvider.current() }.getOrNull(),
+                    capabilitySnapshot = capabilitySnapshot,
+                ),
+            )
+            appendLine()
+            appendLine(permissions.toDiagnostics())
+            append(mediaSupport.toDiagnostics())
+        }
+    }
 
     private fun initialState(): AndroidTerminalViewState {
         val lastEndpoint = runCatching { dependencies.terminalSettings.lastManualEndpoint() }.getOrDefault("")
@@ -595,16 +605,16 @@ class AndroidTerminalViewModel(
         )
     }
 
-    private fun permissionEducation(): PermissionEducationState {
-        val snapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull()
+    private fun permissionEducation(snapshot: AndroidCapabilitySnapshotInput? = null): PermissionEducationState {
+        val capabilitySnapshot = snapshot ?: runCatching { dependencies.capabilityProbe.current() }.getOrNull()
             ?: return PermissionEducationState()
         return PermissionEducationState(
-            notificationsGranted = snapshot.permissions.notificationsGranted,
-            microphonePresent = snapshot.hardware.microphone,
-            microphoneAvailable = snapshot.hardware.microphone && snapshot.permissions.microphoneGranted,
-            cameraPresent = snapshot.hardware.frontCamera || snapshot.hardware.backCamera,
-            cameraAvailable = (snapshot.hardware.frontCamera || snapshot.hardware.backCamera) &&
-                snapshot.permissions.cameraGranted,
+            notificationsGranted = capabilitySnapshot.permissions.notificationsGranted,
+            microphonePresent = capabilitySnapshot.hardware.microphone,
+            microphoneAvailable = capabilitySnapshot.hardware.microphone && capabilitySnapshot.permissions.microphoneGranted,
+            cameraPresent = capabilitySnapshot.hardware.frontCamera || capabilitySnapshot.hardware.backCamera,
+            cameraAvailable = (capabilitySnapshot.hardware.frontCamera || capabilitySnapshot.hardware.backCamera) &&
+                capabilitySnapshot.permissions.cameraGranted,
         )
     }
 

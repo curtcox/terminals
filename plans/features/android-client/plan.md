@@ -923,6 +923,9 @@ Remaining validation:
 - Added focused JVM coverage for network-triggered discovery restart in `AndroidTerminalViewModelTest.networkMonitorRestartsDiscoveryWhenScanning`.
 - Added restart-rate limiting for network-triggered discovery restarts so callback bursts do not thrash NSD scanning; suppressed restarts are recorded in diagnostics and covered by `AndroidTerminalViewModelTest.networkMonitorDebouncesDiscoveryRestartWhenCallbacksBurst`.
 - Added matching rate limiting for network-triggered capability delta refreshes so connectivity callback bursts do not spam control traffic; suppressed refreshes are now recorded in diagnostics and covered by `AndroidTerminalViewModelTest.networkMonitorDebouncesCapabilityRefreshWhenCallbacksBurst`.
+- Hardened Android diagnostics composition so permission education and media transport status are now always included in the baseline diagnostics text across connection/discovery/lifecycle transitions, instead of only after explicit permission-refresh actions.
+- Added JVM coverage in `AndroidTerminalViewModelTest.baselineDiagnosticsAlwaysIncludePermissionAndMediaStatus` to lock the baseline diagnostics contract for notification/microphone/camera and WebRTC availability fields.
+- Re-verified focused Android ViewModel JVM coverage with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`.
 
 ## Test Plan
 

@@ -455,6 +455,29 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun baselineDiagnosticsAlwaysIncludePermissionAndMediaStatus() {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                mediaPermissionProbe = AndroidMediaPermissionProbe {
+                    AndroidMediaPermissionState(
+                        microphoneGranted = false,
+                        cameraGranted = true,
+                    )
+                },
+                webRtcAdapter = AndroidWebRtcAdapter.disabled("fire-os-webrtc-not-enabled"),
+            ),
+        )
+
+        assertTrue(viewModel.state.value.diagnosticsText.contains("permission_notifications="))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("permission_microphone_present="))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("permission_camera_available="))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("media_microphone_permission=false"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("media_camera_permission=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("media_webrtc_reason=fire-os-webrtc-not-enabled"))
+    }
+
+    @Test
     fun requestMicrophonePermissionRefreshesPermissionEducationAndCapabilities() = runTest(dispatcher) {
         val probe = FakeCapabilityProbe(
             permissions = PermissionCapabilityState(
