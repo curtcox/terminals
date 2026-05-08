@@ -70,6 +70,10 @@ class AndroidTerminalViewModel(
                 if (mediaStatus != null) {
                     diagnostics += "\nlast_media=${mediaStatus.first}:${mediaStatus.second}"
                 }
+                val bugReport = next.lastBugReportAckDiagnostics
+                if (!bugReport.isNullOrBlank()) {
+                    diagnostics += "\n$bugReport"
+                }
                 next.copy(
                     diagnosticsText = if (rebaselineSent) {
                         "$diagnostics\nlast_capability_rebaseline=stale-generation"

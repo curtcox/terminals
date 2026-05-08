@@ -53,6 +53,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import terminals.control.v1.Control
+import terminals.diagnostics.v1.Diagnostics.BugReportAck
+import terminals.diagnostics.v1.Diagnostics.BugReportStatus
 import terminals.io.v1.Io
 import terminals.ui.v1.Ui
 
@@ -983,6 +985,35 @@ class AndroidTerminalViewModelTest {
         )
 
         assertEquals(root, viewModel.state.value.serverRoot)
+    }
+
+    @Test
+    fun serverBugReportAckIsSurfacedInDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setBugReportAck(
+                    BugReportAck.newBuilder()
+                        .setReportId("rep-native-1")
+                        .setCorrelationId("cor-2")
+                        .setStatus(BugReportStatus.BUG_REPORT_STATUS_FILED)
+                        .setReportPath("logs/bug_reports/2026-05-08/rep-native-1.json")
+                        .setMessage("stored")
+                        .build(),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.diagnosticsText.contains("bug_report_id=rep-native-1"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("bug_report_status=filed"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("bug_report_message=stored"))
+        assertTrue(viewModel.state.value.lastBugReportAckDiagnostics!!.contains("rep-native-1"))
     }
 
     @Test

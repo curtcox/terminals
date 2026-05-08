@@ -15,6 +15,7 @@ data class AndroidTerminalViewState(
     val lastMediaStatus: String? = null,
     val lastDiagnosticsCopyStatus: String? = null,
     val lastTransition: String? = null,
+    val lastBugReportAckDiagnostics: String? = null,
     val localKeepAwakeEnabled: Boolean = false,
     val localFullscreenEnabled: Boolean = false,
     val localBrightDisplayEnabled: Boolean = false,

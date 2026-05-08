@@ -1,6 +1,7 @@
 package com.curtcox.terminals.android.connection
 
 import com.curtcox.terminals.android.app.AndroidTerminalViewState
+import com.curtcox.terminals.android.diagnostics.AndroidBugReportChrome
 import terminals.control.v1.Control
 import terminals.ui.v1.Ui
 
@@ -21,6 +22,9 @@ class ControlResponseDispatcher {
                 lastNotificationBody = response.notification.body,
             )
             Control.ConnectResponse.PayloadCase.ERROR -> state.copy(lastError = response.error.message)
+            Control.ConnectResponse.PayloadCase.BUG_REPORT_ACK -> state.copy(
+                lastBugReportAckDiagnostics = AndroidBugReportChrome.formatDiagnosticsLines(response.bugReportAck),
+            )
             else -> state
         }
     }

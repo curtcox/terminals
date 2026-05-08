@@ -3,8 +3,11 @@ package com.curtcox.terminals.android.connection
 import com.curtcox.terminals.android.app.AndroidTerminalViewState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import terminals.control.v1.Control
+import terminals.diagnostics.v1.Diagnostics.BugReportAck
+import terminals.diagnostics.v1.Diagnostics.BugReportStatus
 import terminals.ui.v1.Ui
 
 class ControlResponseDispatcherTest {
@@ -57,6 +60,24 @@ class ControlResponseDispatcherTest {
         val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
 
         assertNull(next.serverRoot)
+    }
+
+    @Test
+    fun bugReportAckRecordsDiagnosticsChrome() {
+        val ack = BugReportAck.newBuilder()
+            .setReportId("br-7")
+            .setCorrelationId("c1")
+            .setStatus(BugReportStatus.BUG_REPORT_STATUS_FILED)
+            .setReportPath("logs/bug_reports/x.json")
+            .build()
+        val response = Control.ConnectResponse.newBuilder()
+            .setBugReportAck(ack)
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertTrue(next.lastBugReportAckDiagnostics!!.contains("bug_report_id=br-7"))
+        assertTrue(next.lastBugReportAckDiagnostics.contains("bug_report_status=filed"))
     }
 
     @Test
