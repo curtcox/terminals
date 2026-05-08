@@ -899,6 +899,9 @@ Remaining validation:
 - Added native Android smoke coverage for malformed manual endpoints, verifying that invalid endpoint text keeps the connect action disabled, surfaces endpoint guidance in terminal chrome, and leaves the client in `InvalidEndpoint` state instead of attempting transport setup.
 - Re-verified Android boundary scan and boundary tests with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Attempted Android instrumentation test-source compilation with `cd android_client && ./gradlew compileDebugAndroidTestKotlin`; this shell session did not have `java` available, so Gradle validation remained blocked.
+- Expanded native Android diagnostics chrome to include live capability-summary fields (orientation, display metrics, density, touch support, mic/camera presence and permission state, and notification permission state) so copied diagnostics reflect runtime capability truth instead of only connection/device metadata.
+- Added diagnostics unit coverage for capability-summary rendering in `AndroidClientChromeTest`.
+- Re-verified focused Android JVM validation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidClientChromeTest*' --tests '*AndroidTerminalViewModelTest.diagnosticsIncludeFireOsDeviceInfoWhenAvailable'`, plus boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
 ## Test Plan
 

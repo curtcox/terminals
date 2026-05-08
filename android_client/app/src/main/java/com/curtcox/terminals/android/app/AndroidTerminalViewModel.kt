@@ -525,6 +525,7 @@ class AndroidTerminalViewModel(
             state = state,
             networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
             fireOsDeviceInfo = runCatching { dependencies.fireOsDeviceInfoProvider.current() }.getOrNull(),
+            capabilitySnapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull(),
         )
 
     private fun initialState(): AndroidTerminalViewState {
