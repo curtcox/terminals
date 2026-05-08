@@ -698,6 +698,39 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun localFullscreenSettingIsRestoredAndApplied() {
+        val calls = mutableListOf<Boolean>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = AndroidTerminalSettings.inMemory(initialFullscreenEnabled = true),
+                fullscreenController = AndroidFullscreenController { calls.add(it) },
+            ),
+        )
+
+        assertEquals(true, viewModel.state.value.localFullscreenEnabled)
+        assertEquals(listOf(true), calls)
+    }
+
+    @Test
+    fun localFullscreenTogglePersistsAndUpdatesDiagnostics() {
+        val calls = mutableListOf<Boolean>()
+        val settings = AndroidTerminalSettings.inMemory()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = settings,
+                fullscreenController = AndroidFullscreenController { calls.add(it) },
+            ),
+        )
+
+        viewModel.setLocalFullscreen(true)
+
+        assertEquals(true, settings.fullscreenEnabled())
+        assertEquals(true, viewModel.state.value.localFullscreenEnabled)
+        assertEquals(listOf(true), calls)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("local_fullscreen=true"))
+    }
+
+    @Test
     fun fullscreenDelegatesToPlatformAdapter() {
         val calls = mutableListOf<Boolean>()
         val viewModel = AndroidTerminalViewModel(

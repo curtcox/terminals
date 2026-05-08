@@ -118,6 +118,12 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                     Text(if (state.localKeepAwakeEnabled) "Keep awake on" else "Keep awake off")
                 }
                 Button(
+                    onClick = { viewModel.setLocalFullscreen(!state.localFullscreenEnabled) },
+                    modifier = Modifier.testTag("terminal-local-fullscreen-button"),
+                ) {
+                    Text(if (state.localFullscreenEnabled) "Fullscreen on" else "Fullscreen off")
+                }
+                Button(
                     onClick = viewModel::copyDiagnostics,
                     modifier = Modifier.testTag("terminal-copy-diagnostics-button"),
                 ) {

@@ -339,6 +339,28 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun setLocalFullscreen(enabled: Boolean) {
+        runCatching {
+            dependencies.fullscreenController.setFullscreen(enabled)
+        }.onSuccess {
+            dependencies.terminalSettings.setFullscreenEnabled(enabled)
+            mutableState.update {
+                it.copy(
+                    localFullscreenEnabled = enabled,
+                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                        "local_fullscreen=$enabled",
+                )
+            }
+        }.onFailure { error ->
+            mutableState.update {
+                it.copy(
+                    lastError = error.message ?: error::class.java.simpleName,
+                    localFullscreenEnabled = dependencies.terminalSettings.fullscreenEnabled(),
+                )
+            }
+        }
+    }
+
     fun setBrightness(value: Double) {
         runCatching {
             dependencies.brightnessController.setBrightness(value)
@@ -473,8 +495,12 @@ class AndroidTerminalViewModel(
     private fun initialState(): AndroidTerminalViewState {
         val lastEndpoint = runCatching { dependencies.terminalSettings.lastManualEndpoint() }.getOrDefault("")
         val keepAwakeEnabled = runCatching { dependencies.terminalSettings.keepAwakeEnabled() }.getOrDefault(false)
+        val fullscreenEnabled = runCatching { dependencies.terminalSettings.fullscreenEnabled() }.getOrDefault(false)
         if (keepAwakeEnabled) {
             runCatching { dependencies.keepAwakeController.setKeepAwake(true) }
+        }
+        if (fullscreenEnabled) {
+            runCatching { dependencies.fullscreenController.setFullscreen(true) }
         }
         val resolved = parser.parse(lastEndpoint)
         val state = when {
@@ -488,6 +514,7 @@ class AndroidTerminalViewModel(
             lastError = if (state == ConnectionState.InvalidEndpoint) "Enter a host:port or http(s) URL." else null,
             diagnosticsText = formatDiagnostics(resolved, state),
             localKeepAwakeEnabled = keepAwakeEnabled,
+            localFullscreenEnabled = fullscreenEnabled,
             permissionEducation = permissionEducation(),
             mediaSupport = mediaSupport(),
         )

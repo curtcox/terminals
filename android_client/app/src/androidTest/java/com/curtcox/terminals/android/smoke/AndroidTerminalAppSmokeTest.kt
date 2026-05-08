@@ -202,6 +202,28 @@ class AndroidTerminalAppSmokeTest {
     }
 
     @Test
+    fun localFullscreenCanBeToggledFromTerminalChrome() {
+        val fullscreenValues = mutableListOf<Boolean>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                fullscreenController = AndroidFullscreenController { fullscreenValues += it },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithText("Fullscreen off").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-local-fullscreen-button").performClick()
+
+        compose.onNodeWithText("Fullscreen on").assertIsDisplayed()
+        compose.onNodeWithText("local_fullscreen=true", substring = true).assertIsDisplayed()
+        assertEquals(listOf(true), fullscreenValues)
+    }
+
+    @Test
     fun liveMediaTransportStatusIsVisibleWithoutPermissionWarnings() {
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(

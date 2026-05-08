@@ -878,6 +878,9 @@ Remaining validation:
 - Added a generic local keep-awake kiosk setting backed by Android terminal settings and the existing keep-awake platform adapter, with terminal chrome to toggle it and restore it on launch.
 - Added ViewModel and instrumentation smoke coverage for restoring, persisting, and toggling the local keep-awake setting.
 - Re-verified focused ViewModel tests, Android instrumentation test-source compilation, the full Android unit suite, boundary scans, diff whitespace checks, lint, and debug APK assembly with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `cd android_client && ./gradlew testDebugUnitTest`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, and `cd android_client && ./gradlew lintDebug assembleDebug`.
+- Added a generic local fullscreen kiosk setting backed by Android terminal settings and the existing fullscreen platform adapter, with terminal chrome to toggle it and restore it on launch.
+- Added ViewModel and instrumentation smoke coverage for restoring, persisting, and toggling the local fullscreen setting.
+- Re-verified focused ViewModel tests, Android instrumentation test-source compilation, boundary scans, boundary tests, and diff whitespace checks with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 
 ## Test Plan
 
