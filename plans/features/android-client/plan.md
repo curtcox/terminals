@@ -883,6 +883,8 @@ Remaining validation:
 - Re-verified focused ViewModel tests, Android instrumentation test-source compilation, boundary scans, boundary tests, and diff whitespace checks with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 - Added a generic local bright-display kiosk setting backed by Android terminal settings and the existing brightness platform adapter, with terminal chrome to toggle it and restore full brightness on launch.
 - Added ViewModel and instrumentation smoke coverage for restoring, persisting, and toggling the local bright-display setting.
+- Documented the native Android kiosk chrome controls as keep-awake, fullscreen, and bright-display toggles in `docs/client-android.md`.
+- Re-verified Android unit tests, lint, debug APK assembly, instrumentation test-source compilation, boundary scans, and diff whitespace checks with `make android-client-test`, `make android-client-lint`, `make android-client-build`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 
 ## Test Plan
 
