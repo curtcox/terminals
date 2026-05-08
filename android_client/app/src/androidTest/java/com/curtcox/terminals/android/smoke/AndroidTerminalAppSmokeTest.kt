@@ -530,9 +530,43 @@ class AndroidTerminalAppSmokeTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_success_attempt=1"))
     }
 
+    @Test
+    fun heartbeatFailureStopsAfterReconnectAttemptsAreExhausted() {
+        val firstSession = FakeSession(heartbeatError = IllegalStateException("simulated-network-loss"))
+        val secondSession = FakeSession(connectError = IllegalStateException("reconnect-connect-failed"))
+        var sessionFactoryCalls = 0
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 25,
+                reconnectPolicy = ReconnectPolicy(initialDelayMillis = 1, maxDelayMillis = 1),
+                maxReconnectAttempts = 1,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    sessionFactoryCalls += 1
+                    when (sessionFactoryCalls) {
+                        1 -> firstSession.also { it.sink = sink }
+                        else -> secondSession.also { it.sink = sink }
+                    }
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.ReadyToConnect }
+
+        assertTrue(firstSession.closed)
+        assertTrue(secondSession.closed)
+        assertEquals("reconnect-connect-failed", viewModel.state.value.lastError)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_exhausted=1"))
+    }
+
     private class FakeSession(
         private val capabilityDeltaResult: Boolean = false,
         private val heartbeatError: Throwable? = null,
+        private val connectError: Throwable? = null,
     ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
         lateinit var sink: AndroidControlResponseSink
@@ -542,6 +576,7 @@ class AndroidTerminalAppSmokeTest {
         val capabilityRefreshReasons = mutableListOf<String>()
 
         override suspend fun connect(endpoint: EndpointResolution) {
+            connectError?.let { throw it }
             connectedEndpoint = endpoint
             status = status.copy(connected = true, endpoint = endpoint)
         }

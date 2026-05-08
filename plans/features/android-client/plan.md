@@ -906,6 +906,8 @@ Remaining validation:
 - Re-verified Android instrumentation test-source compilation for the new smoke coverage with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 - Added native Android smoke coverage for heartbeat-loss reconnect flow, verifying that a failed heartbeat closes the failed control session, reconnects through the existing bounded reconnect policy, and records reconnect success diagnostics without adding scenario behavior.
 - Re-verified Android boundary scan/test plus instrumentation test-source compilation with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
+- Added native Android smoke coverage for bounded reconnect exhaustion, verifying that heartbeat-triggered reconnect failures stop after the configured attempt budget, close retry sessions, and surface `reconnect_exhausted` diagnostics.
+- Re-verified reconnect exhaustion behavior and Android test/build gates with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest.heartbeatFailureStopsAfterReconnectAttemptsAreExhausted'`, `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
 
 ## Test Plan
 
