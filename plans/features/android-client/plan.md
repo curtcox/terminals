@@ -885,6 +885,9 @@ Remaining validation:
 - Added ViewModel and instrumentation smoke coverage for restoring, persisting, and toggling the local bright-display setting.
 - Documented the native Android kiosk chrome controls as keep-awake, fullscreen, and bright-display toggles in `docs/client-android.md`.
 - Re-verified Android unit tests, lint, debug APK assembly, instrumentation test-source compilation, boundary scans, and diff whitespace checks with `make android-client-test`, `make android-client-lint`, `make android-client-build`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Added a context-backed Android network monitor using `ConnectivityManager.NetworkCallback` so live network availability/capability changes refresh terminal diagnostics and connected capability deltas without waiting for activity resume/configuration events.
+- Added ViewModel coverage for network-callback diagnostics and capability delta dispatch through the existing generic control-session seam.
+- Re-verified focused ViewModel tests, Android debug compilation, lint, boundary scans, boundary tests, and diff whitespace checks with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew compileDebugKotlin lintDebug`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 
 ## Test Plan
 

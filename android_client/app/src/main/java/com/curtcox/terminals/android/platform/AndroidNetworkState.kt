@@ -2,6 +2,7 @@ package com.curtcox.terminals.android.platform
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
 
 data class AndroidNetworkState(
@@ -15,6 +16,18 @@ fun interface AndroidNetworkStateProvider {
     companion object {
         fun unknown(): AndroidNetworkStateProvider = AndroidNetworkStateProvider {
             AndroidNetworkState(connected = false, metered = false)
+        }
+    }
+}
+
+interface AndroidNetworkMonitor {
+    fun start(onChanged: () -> Unit)
+    fun stop()
+
+    companion object {
+        fun none(): AndroidNetworkMonitor = object : AndroidNetworkMonitor {
+            override fun start(onChanged: () -> Unit) = Unit
+            override fun stop() = Unit
         }
     }
 }
@@ -37,5 +50,38 @@ class ContextAndroidNetworkStateProvider(
             connected = connected,
             metered = connectivityManager.isActiveNetworkMetered,
         )
+    }
+}
+
+class ContextAndroidNetworkMonitor(
+    context: Context,
+) : AndroidNetworkMonitor {
+    private val connectivityManager =
+        context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private var callback: ConnectivityManager.NetworkCallback? = null
+
+    override fun start(onChanged: () -> Unit) {
+        stop()
+        val nextCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                onChanged()
+            }
+
+            override fun onLost(network: Network) {
+                onChanged()
+            }
+
+            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                onChanged()
+            }
+        }
+        connectivityManager.registerDefaultNetworkCallback(nextCallback)
+        callback = nextCallback
+    }
+
+    override fun stop() {
+        val previous = callback ?: return
+        callback = null
+        runCatching { connectivityManager.unregisterNetworkCallback(previous) }
     }
 }

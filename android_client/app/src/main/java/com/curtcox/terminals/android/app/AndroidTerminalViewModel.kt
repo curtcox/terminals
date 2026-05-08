@@ -279,6 +279,17 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun startNetworkMonitoring() {
+        dependencies.networkMonitor.start {
+            refreshNetworkDiagnostics("network-callback")
+            refreshCapabilities("network-callback")
+        }
+    }
+
+    fun stopNetworkMonitoring() {
+        dependencies.networkMonitor.stop()
+    }
+
     fun copyDiagnostics() {
         val diagnostics = mutableState.value.diagnosticsText
         runCatching {
@@ -394,6 +405,7 @@ class AndroidTerminalViewModel(
     }
 
     override fun onCleared() {
+        stopNetworkMonitoring()
         dependencies.discovery.stop()
         disconnect()
         super.onCleared()

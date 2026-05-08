@@ -27,7 +27,9 @@ import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
 import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
 import com.curtcox.terminals.android.platform.AndroidTerminalSettings
+import com.curtcox.terminals.android.platform.ContextAndroidNetworkMonitor
 import com.curtcox.terminals.android.platform.ContextAndroidNetworkStateProvider
+import com.curtcox.terminals.android.platform.AndroidNetworkMonitor
 import com.curtcox.terminals.android.platform.SharedPreferencesAndroidTerminalSettings
 import com.curtcox.terminals.android.platform.StatusBarAndroidNotificationDelivery
 import com.curtcox.terminals.android.platform.WindowAndroidBrightnessController
@@ -43,6 +45,7 @@ data class AndroidClientDependencies(
     val fullscreenController: AndroidFullscreenController = AndroidFullscreenController {},
     val brightnessController: AndroidBrightnessController = AndroidBrightnessController {},
     val networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
+    val networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(),
     val notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
     val diagnosticClipboard: DiagnosticClipboard = DiagnosticClipboard.none(),
     val discovery: AndroidNsdDiscovery = AndroidNsdDiscovery.unavailable(),
@@ -83,6 +86,7 @@ data class AndroidClientDependencies(
                     AndroidBrightnessController {}
                 },
                 networkStateProvider = ContextAndroidNetworkStateProvider(context),
+                networkMonitor = ContextAndroidNetworkMonitor(context),
                 notificationDelivery = StatusBarAndroidNotificationDelivery(context.applicationContext),
                 diagnosticClipboard = ContextDiagnosticClipboard(context.applicationContext),
                 discovery = (context.applicationContext.getSystemService(Context.NSD_SERVICE) as? NsdManager)?.let {

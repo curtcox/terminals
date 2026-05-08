@@ -26,6 +26,7 @@ import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
+import com.curtcox.terminals.android.platform.AndroidNetworkMonitor
 import com.curtcox.terminals.android.platform.AndroidNetworkState
 import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
@@ -104,6 +105,34 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=false"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=true"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_network_refresh=network-change"))
+    }
+
+    @Test
+    fun networkMonitorRefreshesDiagnosticsAndConnectedCapabilities() = runTest(dispatcher) {
+        val session = FakeSession(capabilityDeltaSent = true)
+        val monitor = FakeNetworkMonitor()
+        var networkState = AndroidNetworkState(connected = true, metered = false)
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider { networkState },
+            networkMonitor = monitor,
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.startNetworkMonitoring()
+        networkState = AndroidNetworkState(connected = false, metered = true)
+        monitor.emitChange()
+        advanceUntilIdle()
+
+        assertEquals(listOf("network-callback"), session.capabilityDeltaReasons)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=false"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_capability_delta=network-callback"))
+
+        viewModel.stopNetworkMonitoring()
+        assertEquals(1, monitor.stopCount)
     }
 
     @Test
@@ -796,6 +825,7 @@ class AndroidTerminalViewModelTest {
         networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
         mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
         webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter { AndroidWebRtcSupport(supported = true) },
+        networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(),
         heartbeatIntervalMillis: Long = 0,
     ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
@@ -804,6 +834,7 @@ class AndroidTerminalViewModelTest {
                 notificationDelivery = notificationDelivery,
                 mediaEngine = mediaEngine,
                 networkStateProvider = networkStateProvider,
+                networkMonitor = networkMonitor,
                 mediaPermissionProbe = mediaPermissionProbe,
                 webRtcAdapter = webRtcAdapter,
                 heartbeatIntervalMillis = heartbeatIntervalMillis,
@@ -813,6 +844,24 @@ class AndroidTerminalViewModelTest {
                 },
             ),
         )
+
+    private class FakeNetworkMonitor : AndroidNetworkMonitor {
+        private var onChanged: (() -> Unit)? = null
+        var stopCount = 0
+
+        override fun start(onChanged: () -> Unit) {
+            this.onChanged = onChanged
+        }
+
+        override fun stop() {
+            stopCount += 1
+            onChanged = null
+        }
+
+        fun emitChange() {
+            onChanged?.invoke()
+        }
+    }
 
     private class FakeSession(
         private val connectError: Throwable? = null,
