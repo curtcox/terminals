@@ -233,6 +233,49 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun networkMonitorDebouncesCapabilityRefreshWhenCallbacksBurst() = runTest(dispatcher) {
+        val session = FakeSession(capabilityDeltaSent = true)
+        val monitor = FakeNetworkMonitor()
+        var now = 5_000L
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                networkMonitor = monitor,
+                nowMillis = { now },
+                networkCapabilityRefreshMinIntervalMillis = 1_500,
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.startNetworkMonitoring()
+
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(listOf("network-callback"), session.capabilityDeltaReasons)
+
+        now += 500
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(listOf("network-callback"), session.capabilityDeltaReasons)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("capability_refresh_suppressed=network-callback"))
+
+        now += 2_000
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(
+            listOf("network-callback", "network-callback"),
+            session.capabilityDeltaReasons,
+        )
+    }
+
+    @Test
     fun copyDiagnosticsDelegatesCurrentDiagnosticsToClipboard() {
         var copied: String? = null
         val viewModel = AndroidTerminalViewModel(

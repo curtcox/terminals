@@ -83,6 +83,7 @@ class AndroidTerminalViewModel(
     private var heartbeatJob: Job? = null
     private var reconnectJob: Job? = null
     private var lastDiscoveryRestartAtMillis: Long = -1
+    private var lastNetworkCapabilityRefreshAtMillis: Long = -1
     private val mutableState = MutableStateFlow(
         initialState(),
     )
@@ -314,7 +315,7 @@ class AndroidTerminalViewModel(
     fun startNetworkMonitoring() {
         dependencies.networkMonitor.start {
             refreshNetworkDiagnostics("network-callback")
-            refreshCapabilities("network-callback")
+            refreshCapabilitiesFromNetworkCallback("network-callback")
             restartDiscoveryIfScanning("network-callback")
         }
     }
@@ -664,6 +665,22 @@ class AndroidTerminalViewModel(
                 diagnosticsText = "${it.diagnosticsText}\ndiscovery_restart_reason=$reason",
             )
         }
+    }
+
+    private fun refreshCapabilitiesFromNetworkCallback(reason: String) {
+        val now = dependencies.nowMillis()
+        if (lastNetworkCapabilityRefreshAtMillis >= 0 &&
+            now - lastNetworkCapabilityRefreshAtMillis < dependencies.networkCapabilityRefreshMinIntervalMillis
+        ) {
+            mutableState.update {
+                it.copy(
+                    diagnosticsText = "${it.diagnosticsText}\ncapability_refresh_suppressed=$reason",
+                )
+            }
+            return
+        }
+        lastNetworkCapabilityRefreshAtMillis = now
+        refreshCapabilities(reason)
     }
 
     private fun AudioPlaybackResult.toStatus(requestId: String): Pair<String, String> =
