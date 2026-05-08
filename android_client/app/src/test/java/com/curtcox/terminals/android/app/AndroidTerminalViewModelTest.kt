@@ -45,6 +45,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Assert.assertEquals
@@ -695,6 +696,37 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun secondConnectCancelsInFlightConnectAttemptAndClosesProvisionalSession() = runTest(dispatcher) {
+        val firstConnectGate = CompletableDeferred<Unit>()
+        val first = FakeSession(connectGate = firstConnectGate)
+        val second = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        assertEquals(ConnectionState.Connecting, viewModel.state.value.connectionState)
+
+        viewModel.connect()
+        runCurrent()
+        firstConnectGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, first.closeCount)
+        assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+    }
+
+    @Test
     fun disconnectWithValidEndpointReturnsToReadyStateDiagnostics() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session, heartbeatIntervalMillis = 0)
@@ -1211,6 +1243,7 @@ class AndroidTerminalViewModelTest {
         private val connectError: Throwable? = null,
         private val capabilityDeltaSent: Boolean = false,
         private val heartbeatError: Throwable? = null,
+        private val connectGate: CompletableDeferred<Unit>? = null,
     ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
         lateinit var sink: AndroidControlResponseSink
@@ -1222,6 +1255,7 @@ class AndroidTerminalViewModelTest {
         var closeCount = 0
 
         override suspend fun connect(endpoint: EndpointResolution) {
+            connectGate?.await()
             connectError?.let { throw it }
             connectedEndpoint = endpoint
             status = status.copy(connected = true, endpoint = endpoint)

@@ -15,12 +15,14 @@ import com.curtcox.terminals.android.discovery.DiscoveredServer
 import com.curtcox.terminals.android.media.AudioPlaybackResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.ui.ServerDrivenAction
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.coroutines.coroutineContext
 import terminals.control.v1.Control
 
 class AndroidTerminalViewModel(
@@ -81,6 +83,7 @@ class AndroidTerminalViewModel(
         }
     }
     private var session: AndroidControlSession? = null
+    private var connectJob: Job? = null
     private var heartbeatJob: Job? = null
     private var reconnectJob: Job? = null
     private var lastDiscoveryRestartAtMillis: Long = -1
@@ -122,17 +125,19 @@ class AndroidTerminalViewModel(
                 diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connecting),
             )
         }
-        viewModelScope.launch {
-            runCatching {
+        stopConnect()
+        connectJob = viewModelScope.launch {
+            val thisJob = coroutineContext[Job]
+            var nextSession: AndroidControlSession? = null
+            try {
                 stopReconnect()
                 stopHeartbeat()
                 session?.close()
-                val nextSession = dependencies.sessionFactory(responseSink)
+                nextSession = dependencies.sessionFactory(responseSink)
                 session = nextSession
                 nextSession.connect(resolved)
                 dependencies.terminalSettings.setLastManualEndpoint(mutableState.value.endpointText)
                 startHeartbeat(nextSession)
-            }.onSuccess {
                 mutableState.update {
                     it.copy(
                         connectionState = ConnectionState.Connected,
@@ -140,9 +145,18 @@ class AndroidTerminalViewModel(
                         diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connected),
                     )
                 }
-            }.onFailure { error ->
+            } catch (error: CancellationException) {
+                if (session === nextSession) {
+                    session = null
+                }
+                runCatching { nextSession?.close() }
+                throw error
+            } catch (error: Throwable) {
                 stopHeartbeat()
-                session = null
+                if (session === nextSession) {
+                    session = null
+                }
+                runCatching { nextSession?.close() }
                 mutableState.update {
                     val message = error.message ?: error::class.java.simpleName
                     it.copy(
@@ -151,6 +165,10 @@ class AndroidTerminalViewModel(
                         diagnosticsText = formatDiagnostics(resolved, ConnectionState.ReadyToConnect) +
                             "\nlast_error=$message",
                     )
+                }
+            } finally {
+                if (connectJob === thisJob) {
+                    connectJob = null
                 }
             }
         }
@@ -214,6 +232,7 @@ class AndroidTerminalViewModel(
     fun disconnect() {
         val closingSession = session
         session = null
+        stopConnect()
         stopHeartbeat()
         stopReconnect()
         mutableState.update {
@@ -472,6 +491,11 @@ class AndroidTerminalViewModel(
     private fun stopHeartbeat() {
         heartbeatJob?.cancel()
         heartbeatJob = null
+    }
+
+    private fun stopConnect() {
+        connectJob?.cancel()
+        connectJob = null
     }
 
     private fun stopReconnect() {
