@@ -870,6 +870,12 @@ Remaining validation:
 - Added focused JVM coverage for the Android media seams, including unsupported audio/display reasons, adapter delegation, and the explicit disabled WebRTC compatibility decision.
 - Re-verified focused media coverage, the full Android unit suite, boundary tests, and diff whitespace checks with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidMediaEngineTest*'`, `cd android_client && ./gradlew testDebugUnitTest`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 
+### 2026-05-08
+
+- Made the native Android terminal chrome always surface the live media transport/WebRTC compatibility status, even when there are no permission education warnings, so Fire OS users can see that live media remains intentionally unavailable until the dependency decision is complete.
+- Added Compose smoke coverage for the no-permission-warning path to ensure the disabled live media status remains visible independently of microphone, camera, or notification permission messages.
+- Re-verified Android boundary scan, boundary tests, diff whitespace checks, Android instrumentation test-source compilation, the full Android unit suite, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin testDebugUnitTest`, and `cd android_client && ./gradlew lintDebug assembleDebug`.
+
 ## Test Plan
 
 ### Unit tests

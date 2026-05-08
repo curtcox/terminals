@@ -10,12 +10,19 @@ import com.curtcox.terminals.android.app.AndroidClientDependencies
 import com.curtcox.terminals.android.app.AndroidTerminalApp
 import com.curtcox.terminals.android.app.AndroidTerminalViewModel
 import com.curtcox.terminals.android.app.ConnectionState
+import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe
+import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
+import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics
+import com.curtcox.terminals.android.capabilities.PermissionCapabilityState
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
+import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
+import com.curtcox.terminals.android.media.AndroidMediaPermissionState
+import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
@@ -25,6 +32,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import terminals.capabilities.v1.Capabilities
 import terminals.control.v1.Control
 import terminals.ui.v1.Ui
 
@@ -169,6 +177,46 @@ class AndroidTerminalAppSmokeTest {
 
         compose.onNodeWithText("Diagnostics copy: copied").assertIsDisplayed()
         assertEquals(viewModel.state.value.diagnosticsText, copied)
+    }
+
+    @Test
+    fun liveMediaTransportStatusIsVisibleWithoutPermissionWarnings() {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                capabilityProbe = object : AndroidCapabilityProbe {
+                    override fun current(): AndroidCapabilitySnapshotInput =
+                        AndroidCapabilitySnapshotInput(
+                            identity = Capabilities.DeviceIdentity.newBuilder()
+                                .setDeviceName("test-tablet")
+                                .setDeviceType("tablet")
+                                .setPlatform("android")
+                                .build(),
+                            screenMetrics = AndroidScreenMetrics(
+                                widthPx = 1280,
+                                heightPx = 800,
+                                density = 1f,
+                                orientation = "landscape",
+                            ),
+                            permissions = PermissionCapabilityState(notificationsGranted = true),
+                        )
+                },
+                mediaPermissionProbe = AndroidMediaPermissionProbe {
+                    AndroidMediaPermissionState(
+                        microphoneGranted = true,
+                        cameraGranted = true,
+                    )
+                },
+                webRtcAdapter = AndroidWebRtcAdapter.disabled("fire-os-webrtc-not-enabled"),
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithTag("terminal-live-media-status").assertIsDisplayed()
+        compose.onNodeWithText("Live media transport is unavailable: fire-os-webrtc-not-enabled.").assertIsDisplayed()
     }
 
     @Test
