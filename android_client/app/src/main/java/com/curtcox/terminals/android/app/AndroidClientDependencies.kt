@@ -64,6 +64,7 @@ data class AndroidClientDependencies(
     val maxReconnectAttempts: Int = 5,
     val discoveryRestartMinIntervalMillis: Long = 1_500,
     val networkCapabilityRefreshMinIntervalMillis: Long = 1_500,
+    val networkReconnectRestoreMinIntervalMillis: Long = 5_000,
     val nowMillis: () -> Long = { System.currentTimeMillis() },
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->
         AndroidControlSessionController(

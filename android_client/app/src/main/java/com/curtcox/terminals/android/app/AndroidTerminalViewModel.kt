@@ -89,6 +89,8 @@ class AndroidTerminalViewModel(
     private var networkMonitoringActive: Boolean = false
     private var lastDiscoveryRestartAtMillis: Long = -1
     private var lastNetworkCapabilityRefreshAtMillis: Long = -1
+    private var lastNetworkReconnectRestoreAtMillis: Long = -1
+    private var reconnectExhausted: Boolean = false
     private val mutableState = MutableStateFlow(
         initialState(),
     )
@@ -100,6 +102,7 @@ class AndroidTerminalViewModel(
         if (resolved != null) {
             dependencies.terminalSettings.setLastManualEndpoint(text)
         }
+        reconnectExhausted = false
         mutableState.update {
             it.copy(
                 endpointText = text,
@@ -118,6 +121,7 @@ class AndroidTerminalViewModel(
             }
             return
         }
+        reconnectExhausted = false
 
         mutableState.update {
             it.copy(
@@ -236,6 +240,7 @@ class AndroidTerminalViewModel(
         stopConnect()
         stopHeartbeat()
         stopReconnect()
+        reconnectExhausted = false
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
             val nextState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.ReadyToConnect
@@ -339,6 +344,7 @@ class AndroidTerminalViewModel(
             refreshNetworkDiagnostics("network-callback")
             refreshCapabilitiesFromNetworkCallback("network-callback")
             restartDiscoveryIfScanning("network-callback")
+            retryConnectIfReconnectExhausted("network-callback")
         }
     }
 
@@ -528,17 +534,17 @@ class AndroidTerminalViewModel(
         }
     }
 
-    private fun startReconnect(endpoint: EndpointResolution, cause: String) {
+    private fun startReconnect(endpoint: EndpointResolution, errorContext: String, reconnectCause: String = errorContext) {
         stopReconnect()
         reconnectJob = viewModelScope.launch {
-            var lastError = cause
+            var lastError = errorContext
             for (attempt in 1..dependencies.maxReconnectAttempts) {
                 delay(dependencies.reconnectPolicy.delayForAttempt(attempt))
                 mutableState.update {
                     it.copy(
                         connectionState = ConnectionState.Connecting,
                         diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting) +
-                            "\nlast_error=$lastError\nreconnect_attempt=$attempt",
+                            "\nlast_error=$lastError\nreconnect_attempt=$attempt\nreconnect_cause=$reconnectCause",
                     )
                 }
                 val nextSession = dependencies.sessionFactory(responseSink)
@@ -556,9 +562,10 @@ class AndroidTerminalViewModel(
                             connectionState = ConnectionState.Connected,
                             lastError = null,
                             diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connected) +
-                                "\nreconnect_success_attempt=$attempt",
+                                "\nreconnect_success_attempt=$attempt\nreconnect_cause=$reconnectCause",
                         )
                     }
+                    reconnectExhausted = false
                     reconnectJob = null
                     return@launch
                 }
@@ -568,9 +575,10 @@ class AndroidTerminalViewModel(
                     connectionState = ConnectionState.ReadyToConnect,
                     lastError = lastError,
                     diagnosticsText = formatDiagnostics(endpoint, ConnectionState.ReadyToConnect) +
-                        "\nlast_error=$lastError\nreconnect_exhausted=${dependencies.maxReconnectAttempts}",
+                        "\nlast_error=$lastError\nreconnect_exhausted=${dependencies.maxReconnectAttempts}\nreconnect_cause=$reconnectCause",
                 )
             }
+            reconnectExhausted = true
             reconnectJob = null
         }
     }
@@ -710,6 +718,31 @@ class AndroidTerminalViewModel(
                 diagnosticsText = "${it.diagnosticsText}\ndiscovery_restart_reason=$reason",
             )
         }
+    }
+
+    private fun retryConnectIfReconnectExhausted(reason: String) {
+        if (!reconnectExhausted) return
+        if (mutableState.value.connectionState != ConnectionState.ReadyToConnect) return
+        val resolved = parser.parse(mutableState.value.endpointText) ?: return
+        if (connectJob != null || reconnectJob != null) return
+        val now = dependencies.nowMillis()
+        if (lastNetworkReconnectRestoreAtMillis >= 0 &&
+            now - lastNetworkReconnectRestoreAtMillis < dependencies.networkReconnectRestoreMinIntervalMillis
+        ) {
+            mutableState.update {
+                it.copy(
+                    diagnosticsText = "${it.diagnosticsText}\nnetwork_reconnect_restore_suppressed=$reason",
+                )
+            }
+            return
+        }
+        lastNetworkReconnectRestoreAtMillis = now
+        val lastError = mutableState.value.lastError ?: "reconnect exhausted"
+        startReconnect(
+            resolved,
+            errorContext = lastError,
+            reconnectCause = "network-restore:$reason",
+        )
     }
 
     private fun refreshCapabilitiesFromNetworkCallback(reason: String) {

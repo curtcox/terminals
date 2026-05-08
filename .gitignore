@@ -28,6 +28,8 @@ terminal_client/pubspec.lock
 # Gradle/Android
 .gradle/
 android_client/.gradle/
+android_client/.kotlin/
+.kotlin/
 android_client/local.properties
 android_client/build/
 android_client/app/build/

@@ -844,6 +844,127 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun networkRestoreRetriesConnectAfterReconnectIsExhausted() = runTest(dispatcher) {
+        val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
+        val second = FakeSession(connectError = IllegalStateException("still offline"))
+        val third = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second, third))
+        val monitor = FakeNetworkMonitor()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 100,
+                reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
+                maxReconnectAttempts = 1,
+                networkMonitor = monitor,
+                networkReconnectRestoreMinIntervalMillis = 0,
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(150)
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_exhausted=1"))
+
+        viewModel.startNetworkMonitoring()
+        monitor.emitChange()
+        advanceUntilIdle()
+
+        assertEquals(EndpointResolution("10.0.0.8", 8080), third.connectedEndpoint)
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_cause=network-restore:network-callback"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun networkRestoreDoesNotRetryAfterUserDisconnect() = runTest(dispatcher) {
+        val session = FakeSession()
+        val sessions = ArrayDeque(listOf(session))
+        val monitor = FakeNetworkMonitor()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                networkMonitor = monitor,
+                networkReconnectRestoreMinIntervalMillis = 0,
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.disconnect()
+        advanceUntilIdle()
+        viewModel.startNetworkMonitoring()
+        monitor.emitChange()
+        advanceUntilIdle()
+
+        assertEquals(1, session.closeCount)
+        assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
+        assertTrue(!viewModel.state.value.diagnosticsText.contains("network-restore:"))
+    }
+
+    @Test
+    fun networkRestoreDebouncesReconnectAttempts() = runTest(dispatcher) {
+        val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
+        val second = FakeSession(connectError = IllegalStateException("still offline"))
+        val third = FakeSession(connectError = IllegalStateException("still offline"))
+        val fourth = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second, third, fourth))
+        val monitor = FakeNetworkMonitor()
+        var now = 1_000L
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 100,
+                reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
+                maxReconnectAttempts = 1,
+                networkMonitor = monitor,
+                networkReconnectRestoreMinIntervalMillis = 5_000,
+                nowMillis = { now },
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(150)
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_exhausted=1"))
+
+        viewModel.startNetworkMonitoring()
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_cause=network-restore:network-callback"))
+
+        now += 1_000
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.diagnosticsText.contains("network_reconnect_restore_suppressed=network-callback"))
+        assertEquals(true, sessions.size == 1)
+
+        now += 5_000
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(EndpointResolution("10.0.0.8", 8080), fourth.connectedEndpoint)
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun serverSetUiResponseUpdatesRenderedRoot() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
