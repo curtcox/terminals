@@ -87,6 +87,8 @@ class AndroidTerminalViewModelTest {
         assertEquals(EndpointResolution("10.0.0.8", 8080), session.connectedEndpoint)
         assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
         assertTrue(viewModel.state.value.diagnosticsText.contains("state=Connected"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("control_connected=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("control_endpoint=http://10.0.0.8:8080"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=true"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=false"))
     }
@@ -658,6 +660,7 @@ class AndroidTerminalViewModelTest {
         assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
         assertEquals("no route", viewModel.state.value.lastError)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_error=no route"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("control_connected=false"))
     }
 
     @Test

@@ -586,6 +586,7 @@ class AndroidTerminalViewModel(
         val capabilitySnapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull()
         val permissions = permissionEducation(capabilitySnapshot)
         val mediaSupport = mediaSupport()
+        val controlStatus = session?.status
         return buildString {
             append(
                 chrome.formatDiagnostics(
@@ -597,6 +598,10 @@ class AndroidTerminalViewModel(
                 ),
             )
             appendLine()
+            appendLine("control_connected=${controlStatus?.connected ?: false}")
+            appendLine("control_endpoint=${controlStatus?.endpoint?.displayName ?: "none"}")
+            appendLine("control_last_error=${controlStatus?.lastError ?: "none"}")
+            appendLine("control_last_capability_generation=${controlStatus?.lastCapabilityGeneration ?: 0}")
             appendLine(permissions.toDiagnostics())
             append(mediaSupport.toDiagnostics())
         }
