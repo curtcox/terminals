@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: curtcox
 validation: automated
-last-reviewed: 2026-05-07
+last-reviewed: 2026-05-08
 ---
 
 # Android Client
@@ -930,6 +930,8 @@ Remaining validation:
 - Added `AndroidTerminalViewModelTest.disconnectWithValidEndpointReturnsToReadyStateDiagnostics` regression coverage and re-verified with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest.disconnectWithValidEndpointReturnsToReadyStateDiagnostics' --tests '*AndroidTerminalViewModelTest.connectCreatesSessionAndMarksStateConnected'`.
 - Hardened `AndroidTerminalViewModel` network monitoring lifecycle by making `startNetworkMonitoring()` and `stopNetworkMonitoring()` idempotent, preventing duplicate `AndroidNetworkMonitor` callback registration across repeated lifecycle starts.
 - Added `AndroidTerminalViewModelTest.networkMonitoringStartStopIsIdempotent` regression coverage and re-verified focused ViewModel JVM tests with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`.
+- Implemented generic server `BugReportAck` handling: `AndroidBugReportChrome` formats copyable diagnostics lines, `ControlResponseDispatcher` records `lastBugReportAckDiagnostics` on `AndroidTerminalViewState`, and `AndroidTerminalViewModel` appends them to live diagnostics when acknowledgements arrive over the control stream (no scenario branching).
+- Added JVM coverage in `AndroidBugReportChromeTest`, `ControlResponseDispatcherTest.bugReportAckRecordsDiagnosticsChrome`, and `AndroidTerminalViewModelTest.serverBugReportAckIsSurfacedInDiagnostics`, plus re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
 ## Test Plan
 
