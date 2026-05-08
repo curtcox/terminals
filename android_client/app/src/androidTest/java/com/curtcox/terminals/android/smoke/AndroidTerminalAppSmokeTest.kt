@@ -38,6 +38,7 @@ import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import terminals.capabilities.v1.Capabilities
@@ -558,6 +559,64 @@ class AndroidTerminalAppSmokeTest {
         permissions = permissions.copy(microphoneGranted = true, cameraGranted = true)
         viewModel.refreshPermissionEducation("instrumentation-test")
         compose.onNodeWithText("last_permission_refresh=instrumentation-test", substring = true).assertIsDisplayed()
+        assertTrue(permissionRequester.requests.contains(Manifest.permission.RECORD_AUDIO))
+        assertTrue(permissionRequester.requests.contains(Manifest.permission.CAMERA))
+    }
+
+    @Test
+    fun requestMissingPermissionsButtonRequestsNotificationPermissionWhenSupported() {
+        assumeTrue(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
+        var permissions = PermissionCapabilityState(
+            microphoneGranted = false,
+            cameraGranted = false,
+            notificationsGranted = false,
+        )
+        val permissionRequester = FakePermissionRequester()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                capabilityProbe = object : AndroidCapabilityProbe {
+                    override fun current(): AndroidCapabilitySnapshotInput =
+                        AndroidCapabilitySnapshotInput(
+                            identity = Capabilities.DeviceIdentity.newBuilder()
+                                .setDeviceName("test-tablet")
+                                .setDeviceType("tablet")
+                                .setPlatform("android")
+                                .build(),
+                            screenMetrics = AndroidScreenMetrics(
+                                widthPx = 1280,
+                                heightPx = 800,
+                                density = 1f,
+                                orientation = "landscape",
+                            ),
+                            permissions = permissions,
+                            hardware = AndroidHardwareCapabilities(
+                                touchSupported = true,
+                                microphone = true,
+                                frontCamera = true,
+                            ),
+                        )
+                },
+                permissionRequester = permissionRequester,
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-request-missing-permissions-button").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-request-missing-permissions-button").performClick()
+        compose.waitUntil { permissionRequester.requests.size >= 3 }
+
+        permissions = permissions.copy(
+            microphoneGranted = true,
+            cameraGranted = true,
+            notificationsGranted = true,
+        )
+        viewModel.refreshPermissionEducation("instrumentation-test")
+
+        compose.onNodeWithText("last_permission_refresh=instrumentation-test", substring = true).assertIsDisplayed()
+        assertTrue(permissionRequester.requests.contains(Manifest.permission.POST_NOTIFICATIONS))
         assertTrue(permissionRequester.requests.contains(Manifest.permission.RECORD_AUDIO))
         assertTrue(permissionRequester.requests.contains(Manifest.permission.CAMERA))
     }

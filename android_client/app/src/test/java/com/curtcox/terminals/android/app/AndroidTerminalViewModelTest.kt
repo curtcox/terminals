@@ -46,6 +46,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assume.assumeTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -436,6 +437,56 @@ class AndroidTerminalViewModelTest {
             listOf("microphone-permission", "camera-permission"),
             session.capabilityDeltaReasons,
         )
+    }
+
+    @Test
+    fun requestMissingPermissionsRequestsNotificationPermissionWhenRuntimePromptIsSupported() = runTest(dispatcher) {
+        assumeTrue(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
+        val probe = FakeCapabilityProbe(
+            permissions = PermissionCapabilityState(
+                microphoneGranted = false,
+                cameraGranted = false,
+                notificationsGranted = false,
+            ),
+            hardware = AndroidHardwareCapabilities(
+                microphone = true,
+                frontCamera = true,
+            ),
+        )
+        val permissionRequester = FakePermissionRequester(
+            grantedPermissions = mutableSetOf(),
+        )
+        val session = FakeSession(capabilityDeltaSent = true)
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                capabilityProbe = probe,
+                permissionRequester = permissionRequester,
+                heartbeatIntervalMillis = 0,
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        permissionRequester.nextGrant = true
+        probe.permissions = PermissionCapabilityState(
+            microphoneGranted = true,
+            cameraGranted = true,
+            notificationsGranted = true,
+        )
+        viewModel.requestMissingPermissions()
+        advanceUntilIdle()
+
+        assertTrue(permissionRequester.requests.contains(Manifest.permission.POST_NOTIFICATIONS))
+        assertTrue(permissionRequester.requests.contains(Manifest.permission.RECORD_AUDIO))
+        assertTrue(permissionRequester.requests.contains(Manifest.permission.CAMERA))
+        assertTrue(session.capabilityDeltaReasons.contains("notification-permission"))
     }
 
     @Test

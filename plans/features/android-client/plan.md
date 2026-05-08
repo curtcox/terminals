@@ -917,6 +917,8 @@ Remaining validation:
 - Added JVM and Compose smoke coverage for the new permission-request flow, then re-verified `make android-client-test`, `make android-client-lint`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 - Added a terminal-chrome "Enable missing permissions" action that requests every currently-missing runtime permission through the existing platform adapter seam, while preserving generic terminal behavior and permission-specific controls.
 - Added JVM and Compose smoke coverage for grouped missing-permission requests (microphone/camera), then re-verified `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest` and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
+- Added explicit notification-permission coverage for the grouped "Enable missing permissions" path so Android 13+ runtime notification prompts are validated alongside microphone and camera prompts in both ViewModel JVM tests and Compose smoke tests.
+- Re-verified focused JVM coverage and Android instrumentation test-source compilation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest.requestMissingPermissionsRequestsNotificationPermissionWhenRuntimePromptIsSupported'` and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 
 ## Test Plan
 
