@@ -653,7 +653,7 @@ cd android_client && ./gradlew connectedDebugAndroidTest --tests '*Kiosk*'
 
 ### Phase 8: Media and Sensor Integration
 
-Status: partially implemented; WebRTC compatibility and device validation pending
+Status: implemented locally; WebRTC compatibility and device validation pending
 
 Tasks:
 
@@ -872,6 +872,8 @@ Remaining validation:
 
 ### 2026-05-08
 
+- Added native Android instrumentation smoke coverage for server-issued `PlayAudio` and `ShowMedia` control responses, verifying media commands dispatch through the `AndroidMediaEngine` seam and that terminal diagnostics/state capture the resulting media status.
+- Attempted Android instrumentation test-source compilation with `cd android_client && ./gradlew compileDebugAndroidTestKotlin`; this shell session did not have `java` available, so Gradle validation was blocked.
 - Made the native Android terminal chrome always surface the live media transport/WebRTC compatibility status, even when there are no permission education warnings, so Fire OS users can see that live media remains intentionally unavailable until the dependency decision is complete.
 - Added Compose smoke coverage for the no-permission-warning path to ensure the disabled live media status remains visible independently of microphone, camera, or notification permission messages.
 - Re-verified Android boundary scan, boundary tests, diff whitespace checks, Android instrumentation test-source compilation, the full Android unit suite, lint, and debug APK assembly with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, `git diff --check`, `cd android_client && ./gradlew compileDebugAndroidTestKotlin testDebugUnitTest`, and `cd android_client && ./gradlew lintDebug assembleDebug`.
