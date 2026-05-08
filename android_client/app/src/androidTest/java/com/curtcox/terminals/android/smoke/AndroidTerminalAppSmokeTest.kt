@@ -224,6 +224,28 @@ class AndroidTerminalAppSmokeTest {
     }
 
     @Test
+    fun localBrightDisplayCanBeToggledFromTerminalChrome() {
+        val brightnessValues = mutableListOf<Double>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                brightnessController = AndroidBrightnessController { brightnessValues += it },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithText("Bright display off").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-local-bright-display-button").performClick()
+
+        compose.onNodeWithText("Bright display on").assertIsDisplayed()
+        compose.onNodeWithText("local_bright_display=true", substring = true).assertIsDisplayed()
+        assertEquals(listOf(1.0), brightnessValues)
+    }
+
+    @Test
     fun liveMediaTransportStatusIsVisibleWithoutPermissionWarnings() {
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(

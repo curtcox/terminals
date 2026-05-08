@@ -371,6 +371,28 @@ class AndroidTerminalViewModel(
         }
     }
 
+    fun setLocalBrightDisplay(enabled: Boolean) {
+        runCatching {
+            dependencies.brightnessController.setBrightness(if (enabled) 1.0 else 0.5)
+        }.onSuccess {
+            dependencies.terminalSettings.setBrightDisplayEnabled(enabled)
+            mutableState.update {
+                it.copy(
+                    localBrightDisplayEnabled = enabled,
+                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                        "local_bright_display=$enabled",
+                )
+            }
+        }.onFailure { error ->
+            mutableState.update {
+                it.copy(
+                    lastError = error.message ?: error::class.java.simpleName,
+                    localBrightDisplayEnabled = dependencies.terminalSettings.brightDisplayEnabled(),
+                )
+            }
+        }
+    }
+
     override fun onCleared() {
         dependencies.discovery.stop()
         disconnect()
@@ -496,11 +518,15 @@ class AndroidTerminalViewModel(
         val lastEndpoint = runCatching { dependencies.terminalSettings.lastManualEndpoint() }.getOrDefault("")
         val keepAwakeEnabled = runCatching { dependencies.terminalSettings.keepAwakeEnabled() }.getOrDefault(false)
         val fullscreenEnabled = runCatching { dependencies.terminalSettings.fullscreenEnabled() }.getOrDefault(false)
+        val brightDisplayEnabled = runCatching { dependencies.terminalSettings.brightDisplayEnabled() }.getOrDefault(false)
         if (keepAwakeEnabled) {
             runCatching { dependencies.keepAwakeController.setKeepAwake(true) }
         }
         if (fullscreenEnabled) {
             runCatching { dependencies.fullscreenController.setFullscreen(true) }
+        }
+        if (brightDisplayEnabled) {
+            runCatching { dependencies.brightnessController.setBrightness(1.0) }
         }
         val resolved = parser.parse(lastEndpoint)
         val state = when {
@@ -515,6 +541,7 @@ class AndroidTerminalViewModel(
             diagnosticsText = formatDiagnostics(resolved, state),
             localKeepAwakeEnabled = keepAwakeEnabled,
             localFullscreenEnabled = fullscreenEnabled,
+            localBrightDisplayEnabled = brightDisplayEnabled,
             permissionEducation = permissionEducation(),
             mediaSupport = mediaSupport(),
         )

@@ -756,6 +756,39 @@ class AndroidTerminalViewModelTest {
         assertEquals(listOf(0.25, 1.0), calls)
     }
 
+    @Test
+    fun localBrightDisplaySettingIsRestoredAndApplied() {
+        val calls = mutableListOf<Double>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = AndroidTerminalSettings.inMemory(initialBrightDisplayEnabled = true),
+                brightnessController = AndroidBrightnessController { calls.add(it) },
+            ),
+        )
+
+        assertEquals(true, viewModel.state.value.localBrightDisplayEnabled)
+        assertEquals(listOf(1.0), calls)
+    }
+
+    @Test
+    fun localBrightDisplayTogglePersistsAndUpdatesDiagnostics() {
+        val calls = mutableListOf<Double>()
+        val settings = AndroidTerminalSettings.inMemory()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = settings,
+                brightnessController = AndroidBrightnessController { calls.add(it) },
+            ),
+        )
+
+        viewModel.setLocalBrightDisplay(true)
+
+        assertEquals(true, settings.brightDisplayEnabled())
+        assertEquals(true, viewModel.state.value.localBrightDisplayEnabled)
+        assertEquals(listOf(1.0), calls)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("local_bright_display=true"))
+    }
+
     private fun viewModel(
         session: FakeSession,
         notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
