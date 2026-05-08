@@ -910,6 +910,8 @@ Remaining validation:
 - Re-verified reconnect exhaustion behavior and Android test/build gates with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest.heartbeatFailureStopsAfterReconnectAttemptsAreExhausted'`, `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
 - Attempted connected-device validation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew connectedDebugAndroidTest`; Android instrumentation build/test APK packaging succeeded but execution failed with `No connected devices!`.
 - Attempted `adb devices` in this shell session, but `adb` was not available in PATH (`command not found: adb`), so connected-device smoke remains blocked on host/device setup rather than Android client code.
+- Hardened `make android-client-connected-test` to preflight `adb` availability and attached devices before invoking Gradle instrumentation, so host/device setup gaps now skip with deterministic guidance instead of surfacing as Android client failures.
+- Documented the connected-test preflight skip behavior and `platform-tools` PATH guidance in `docs/client-android.md`.
 
 ## Test Plan
 

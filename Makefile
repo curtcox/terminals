@@ -138,7 +138,13 @@ android-client-lint:
 
 android-client-connected-test:
 	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
-		cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew connectedDebugAndroidTest; \
+		if ! command -v adb >/dev/null 2>&1; then \
+			echo "Skipping native Android connected tests: adb is not available in PATH."; \
+		elif ! adb devices | awk 'NR>1 && $$2=="device" {found=1} END {exit found ? 0 : 1}'; then \
+			echo "Skipping native Android connected tests: no connected Android device/emulator found."; \
+		else \
+			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew connectedDebugAndroidTest; \
+		fi; \
 	else \
 		echo "Skipping native Android connected tests: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi

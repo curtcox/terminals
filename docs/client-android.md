@@ -77,6 +77,9 @@ adb devices
 make android-client-connected-test
 ```
 
+If `adb` is missing or no device is attached, the Make target skips with a clear
+message instead of failing Android client validation.
+
 ## Fire Tablet Setup
 
 1. Open Fire tablet settings.
@@ -159,6 +162,9 @@ Run:
 
 If `adb devices` shows no device, reconnect USB, approve the tablet prompt, and
 verify platform tools are from the configured Android SDK.
+
+If `adb` is not found, add Android platform tools to `PATH` (for example:
+`$ANDROID_SDK_ROOT/platform-tools`).
 
 If install fails, remove any existing incompatible package:
 
