@@ -20,6 +20,8 @@ import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
+import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery
+import com.curtcox.terminals.android.discovery.DiscoveredServer
 import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
 import com.curtcox.terminals.android.media.AndroidMediaPermissionState
 import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
@@ -30,6 +32,7 @@ import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import terminals.capabilities.v1.Capabilities
@@ -312,6 +315,44 @@ class AndroidTerminalAppSmokeTest {
         compose.onNodeWithText("last_capability_delta=configuration", substring = true).assertIsDisplayed()
     }
 
+    @Test
+    fun discoveryErrorFallsBackToManualAndDiscoveredServerSelectionUpdatesEndpoint() {
+        val discovery = FakeDiscovery()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                discovery = discovery,
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithTag("terminal-discovery-start-button").performClick()
+        compose.waitUntil { viewModel.state.value.discoveryState.lastError != null }
+        compose.onNodeWithText("Discovery unavailable: multicast blocked").assertIsDisplayed()
+
+        discovery.publish(
+            DiscoveredServer(
+                name = "Kitchen Screen",
+                host = "192.168.1.25",
+                port = 8443,
+                lastSeenMillis = 1L,
+                webSocketEndpoint = "ws://192.168.1.25:8443/connect",
+            ),
+        )
+
+        compose.waitUntil { viewModel.state.value.discoveryState.servers.isNotEmpty() }
+        compose.onNodeWithTag("terminal-discovered-server-192.168.1.25-8443").performClick()
+        compose.waitUntil { viewModel.state.value.endpointText == "ws://192.168.1.25:8443/connect" }
+
+        compose.onNodeWithText("No discovered servers").assertIsDisplayed()
+        assertEquals("ws://192.168.1.25:8443/connect", viewModel.state.value.endpointText)
+        assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
+        assertTrue(discovery.stopped)
+    }
+
     private class FakeSession(
         private val capabilityDeltaResult: Boolean = false,
     ) : AndroidControlSession {
@@ -340,5 +381,28 @@ class AndroidTerminalAppSmokeTest {
         override suspend fun rebaselineCapabilitiesAfterStaleGeneration() = Unit
 
         override suspend fun close() = Unit
+    }
+
+    private class FakeDiscovery : AndroidNsdDiscovery {
+        private var onServer: ((DiscoveredServer) -> Unit)? = null
+        private var onError: ((String) -> Unit)? = null
+        var stopped: Boolean = false
+
+        override fun start(onServer: (DiscoveredServer) -> Unit, onError: (String) -> Unit) {
+            stopped = false
+            this.onServer = onServer
+            this.onError = onError
+            onError("multicast blocked")
+        }
+
+        override fun stop() {
+            stopped = true
+            onServer = null
+            onError = null
+        }
+
+        fun publish(server: DiscoveredServer) {
+            onServer?.invoke(server)
+        }
     }
 }

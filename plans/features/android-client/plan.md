@@ -893,6 +893,9 @@ Remaining validation:
 - Wired runtime Fire OS device metadata through a dedicated platform adapter seam so diagnostics now report manufacturer, model, SDK level, and whether the device is likely Fire OS instead of only static target assumptions.
 - Added diagnostics/unit coverage for Fire OS metadata in both `AndroidClientChromeTest` and `AndroidTerminalViewModelTest`.
 - Re-verified Android boundary scan and boundary tests with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`; focused Gradle unit tests were not runnable in this session because `java` was unavailable in the shell environment.
+- Added native Android smoke coverage for discovery fallback and discovered-server endpoint selection, verifying that discovery errors are surfaced as manual-connect guidance and that selecting a discovered server applies its endpoint and returns the client to manual connect mode.
+- Re-verified Android boundary scan with `./scripts/check-android-client-boundary.sh`.
+- Attempted Android instrumentation test-source compilation with `cd android_client && ./gradlew compileDebugAndroidTestKotlin`; this shell session did not have `java` available, so Gradle validation was blocked.
 
 ## Test Plan
 
