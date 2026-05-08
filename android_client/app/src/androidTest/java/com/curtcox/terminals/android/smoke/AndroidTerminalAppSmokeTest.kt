@@ -13,6 +13,7 @@ import com.curtcox.terminals.android.app.AndroidTerminalViewModel
 import com.curtcox.terminals.android.app.ConnectionState
 import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
+import com.curtcox.terminals.android.capabilities.AndroidHardwareCapabilities
 import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics
 import com.curtcox.terminals.android.capabilities.PermissionCapabilityState
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
@@ -332,6 +333,129 @@ class AndroidTerminalAppSmokeTest {
 
         compose.waitUntil { session.capabilityRefreshReasons == listOf("configuration") }
         compose.onNodeWithText("last_capability_delta=configuration", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun capabilityRefreshReflectsUpdatedDisplayOrientationDiagnostics() {
+        val session = FakeSession(capabilityDeltaResult = true)
+        var currentMetrics = AndroidScreenMetrics(
+            widthPx = 1280,
+            heightPx = 800,
+            density = 2f,
+            orientation = "landscape",
+        )
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                capabilityProbe = object : AndroidCapabilityProbe {
+                    override fun current(): AndroidCapabilitySnapshotInput =
+                        AndroidCapabilitySnapshotInput(
+                            identity = Capabilities.DeviceIdentity.newBuilder()
+                                .setDeviceName("test-tablet")
+                                .setDeviceType("tablet")
+                                .setPlatform("android")
+                                .build(),
+                            screenMetrics = currentMetrics,
+                            permissions = PermissionCapabilityState(
+                                notificationsGranted = true,
+                            ),
+                            hardware = AndroidHardwareCapabilities(touchSupported = true),
+                        )
+                },
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        currentMetrics = AndroidScreenMetrics(
+            widthPx = 800,
+            heightPx = 1280,
+            density = 2f,
+            orientation = "portrait",
+        )
+        viewModel.refreshCapabilities("configuration")
+
+        compose.waitUntil { session.capabilityRefreshReasons == listOf("configuration") }
+        compose.onNodeWithText("cap_orientation=portrait", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("cap_display_px=800x1280", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun permissionRefreshShowsWarningsAfterRuntimePermissionLoss() {
+        var snapshotPermissions = PermissionCapabilityState(
+            microphoneGranted = true,
+            cameraGranted = true,
+            notificationsGranted = true,
+        )
+        var mediaPermissions = AndroidMediaPermissionState(
+            microphoneGranted = true,
+            cameraGranted = true,
+        )
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                capabilityProbe = object : AndroidCapabilityProbe {
+                    override fun current(): AndroidCapabilitySnapshotInput =
+                        AndroidCapabilitySnapshotInput(
+                            identity = Capabilities.DeviceIdentity.newBuilder()
+                                .setDeviceName("test-tablet")
+                                .setDeviceType("tablet")
+                                .setPlatform("android")
+                                .build(),
+                            screenMetrics = AndroidScreenMetrics(
+                                widthPx = 1280,
+                                heightPx = 800,
+                                density = 1f,
+                                orientation = "landscape",
+                            ),
+                            permissions = snapshotPermissions,
+                            hardware = AndroidHardwareCapabilities(
+                                touchSupported = true,
+                                microphone = true,
+                                frontCamera = true,
+                            ),
+                        )
+                },
+                mediaPermissionProbe = AndroidMediaPermissionProbe { mediaPermissions },
+                webRtcAdapter = AndroidWebRtcAdapter.disabled("fire-os-webrtc-not-enabled"),
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-live-media-status").assertIsDisplayed()
+
+        snapshotPermissions = PermissionCapabilityState(
+            microphoneGranted = false,
+            cameraGranted = false,
+            notificationsGranted = false,
+        )
+        mediaPermissions = AndroidMediaPermissionState(
+            microphoneGranted = false,
+            cameraGranted = false,
+        )
+        viewModel.refreshPermissionEducation("runtime-permission-change")
+
+        compose.onNodeWithText(
+            "Notifications are disabled; server notifications will stay in terminal diagnostics.",
+        ).assertIsDisplayed()
+        compose.onNodeWithText(
+            "Microphone capture is unavailable until hardware and permission are both present.",
+        ).assertIsDisplayed()
+        compose.onNodeWithText(
+            "Camera capture is unavailable until hardware and permission are both present.",
+        ).assertIsDisplayed()
+        compose.onNodeWithText("last_permission_refresh=runtime-permission-change", substring = true).assertIsDisplayed()
     }
 
     @Test

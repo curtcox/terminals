@@ -902,6 +902,8 @@ Remaining validation:
 - Expanded native Android diagnostics chrome to include live capability-summary fields (orientation, display metrics, density, touch support, mic/camera presence and permission state, and notification permission state) so copied diagnostics reflect runtime capability truth instead of only connection/device metadata.
 - Added diagnostics unit coverage for capability-summary rendering in `AndroidClientChromeTest`.
 - Re-verified focused Android JVM validation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidClientChromeTest*' --tests '*AndroidTerminalViewModelTest.diagnosticsIncludeFireOsDeviceInfoWhenAvailable'`, plus boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Added native Android smoke coverage for runtime capability transitions: orientation/display diagnostics now update under configuration-driven capability refresh, and runtime permission-loss refresh now surfaces notification/microphone/camera guidance while preserving generic terminal behavior.
+- Re-verified Android instrumentation test-source compilation for the new smoke coverage with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 
 ## Test Plan
 
