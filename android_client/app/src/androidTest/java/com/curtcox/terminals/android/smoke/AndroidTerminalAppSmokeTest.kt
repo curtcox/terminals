@@ -31,6 +31,7 @@ import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
+import com.curtcox.terminals.android.platform.AndroidPermissionRequester
 import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.runBlocking
@@ -460,6 +461,56 @@ class AndroidTerminalAppSmokeTest {
     }
 
     @Test
+    fun permissionButtonsRequestRuntimePermissionThroughAdapter() {
+        var permissions = PermissionCapabilityState(
+            microphoneGranted = false,
+            cameraGranted = true,
+            notificationsGranted = true,
+        )
+        val permissionRequester = FakePermissionRequester()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                capabilityProbe = object : AndroidCapabilityProbe {
+                    override fun current(): AndroidCapabilitySnapshotInput =
+                        AndroidCapabilitySnapshotInput(
+                            identity = Capabilities.DeviceIdentity.newBuilder()
+                                .setDeviceName("test-tablet")
+                                .setDeviceType("tablet")
+                                .setPlatform("android")
+                                .build(),
+                            screenMetrics = AndroidScreenMetrics(
+                                widthPx = 1280,
+                                heightPx = 800,
+                                density = 1f,
+                                orientation = "landscape",
+                            ),
+                            permissions = permissions,
+                            hardware = AndroidHardwareCapabilities(
+                                touchSupported = true,
+                                microphone = true,
+                            ),
+                        )
+                },
+                permissionRequester = permissionRequester,
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-request-microphone-permission-button").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-request-microphone-permission-button").performClick()
+        compose.waitUntil { permissionRequester.requests.isNotEmpty() }
+
+        permissions = permissions.copy(microphoneGranted = true)
+        viewModel.refreshPermissionEducation("instrumentation-test")
+
+        compose.onNodeWithText("last_permission_refresh=instrumentation-test", substring = true).assertIsDisplayed()
+        assertEquals(listOf("android.permission.RECORD_AUDIO"), permissionRequester.requests)
+    }
+
+    @Test
     fun discoveryErrorFallsBackToManualAndDiscoveredServerSelectionUpdatesEndpoint() {
         val discovery = FakeDiscovery()
         val viewModel = AndroidTerminalViewModel(
@@ -621,6 +672,17 @@ class AndroidTerminalAppSmokeTest {
 
         fun publish(server: DiscoveredServer) {
             onServer?.invoke(server)
+        }
+    }
+
+    private class FakePermissionRequester : AndroidPermissionRequester {
+        val requests = mutableListOf<String>()
+
+        override fun hasPermission(permission: String): Boolean = false
+
+        override fun requestPermission(permission: String, onResult: (Boolean) -> Unit) {
+            requests += permission
+            onResult(true)
         }
     }
 }

@@ -101,6 +101,30 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                         }
                     }
                 }
+                if (!state.permissionEducation.notificationsGranted) {
+                    Button(
+                        onClick = viewModel::requestNotificationPermission,
+                        modifier = Modifier.testTag("terminal-request-notification-permission-button"),
+                    ) {
+                        Text("Enable notifications")
+                    }
+                }
+                if (state.permissionEducation.microphonePresent && !state.permissionEducation.microphoneAvailable) {
+                    Button(
+                        onClick = viewModel::requestMicrophonePermission,
+                        modifier = Modifier.testTag("terminal-request-microphone-permission-button"),
+                    ) {
+                        Text("Enable microphone")
+                    }
+                }
+                if (state.permissionEducation.cameraPresent && !state.permissionEducation.cameraAvailable) {
+                    Button(
+                        onClick = viewModel::requestCameraPermission,
+                        modifier = Modifier.testTag("terminal-request-camera-permission-button"),
+                    ) {
+                        Text("Enable camera")
+                    }
+                }
                 if (!state.mediaSupport.webRtcSupported) {
                     Text(
                         "Live media transport is unavailable: ${state.mediaSupport.webRtcReason}.",

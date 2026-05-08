@@ -10,10 +10,15 @@ import androidx.lifecycle.ViewModelProvider
 import com.curtcox.terminals.android.app.AndroidClientDependencies
 import com.curtcox.terminals.android.app.AndroidTerminalApp
 import com.curtcox.terminals.android.app.AndroidTerminalViewModel
+import com.curtcox.terminals.android.platform.ActivityAndroidPermissionRequester
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AndroidTerminalViewModel by viewModels {
-        AndroidTerminalViewModelFactory(AndroidClientDependencies.fromContext(this))
+        AndroidTerminalViewModelFactory(
+            AndroidClientDependencies.fromContext(this).copy(
+                permissionRequester = ActivityAndroidPermissionRequester(this),
+            ),
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -1,5 +1,7 @@
 package com.curtcox.terminals.android.app
 
+import android.Manifest
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
@@ -270,6 +272,22 @@ class AndroidTerminalViewModel(
                     mediaSupport.toDiagnostics(),
             )
         }
+    }
+
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            refreshPermissionEducation("notification-permission-not-required")
+            return
+        }
+        requestPermission(Manifest.permission.POST_NOTIFICATIONS, "notification-permission")
+    }
+
+    fun requestMicrophonePermission() {
+        requestPermission(Manifest.permission.RECORD_AUDIO, "microphone-permission")
+    }
+
+    fun requestCameraPermission() {
+        requestPermission(Manifest.permission.CAMERA, "camera-permission")
     }
 
     fun refreshNetworkDiagnostics(reason: String) {
@@ -591,6 +609,23 @@ class AndroidTerminalViewModel(
             webRtcSupported = webRtc?.supported == true,
             webRtcReason = webRtc?.reason?.ifBlank { "available" } ?: "unavailable",
         )
+    }
+
+    private fun requestPermission(permission: String, reason: String) {
+        if (dependencies.permissionRequester.hasPermission(permission)) {
+            refreshPermissionEducation("$reason-already-granted")
+            refreshCapabilities(reason)
+            return
+        }
+        dependencies.permissionRequester.requestPermission(permission) { granted ->
+            viewModelScope.launch {
+                mutableState.update {
+                    it.copy(diagnosticsText = "${it.diagnosticsText}\n$reason-granted=$granted")
+                }
+                refreshPermissionEducation("$reason-result")
+                refreshCapabilities(reason)
+            }
+        }
     }
 
     private fun AudioPlaybackResult.toStatus(requestId: String): Pair<String, String> =

@@ -912,6 +912,9 @@ Remaining validation:
 - Attempted `adb devices` in this shell session, but `adb` was not available in PATH (`command not found: adb`), so connected-device smoke remains blocked on host/device setup rather than Android client code.
 - Hardened `make android-client-connected-test` to preflight `adb` availability and attached devices before invoking Gradle instrumentation, so host/device setup gaps now skip with deterministic guidance instead of surfacing as Android client failures.
 - Documented the connected-test preflight skip behavior and `platform-tools` PATH guidance in `docs/client-android.md`.
+- Wired a real Android runtime permission-request seam into the native client using an activity-backed requester adapter, and threaded it through `MainActivity` plus the Android dependency graph so permission handling remains behind a platform adapter.
+- Added terminal chrome controls for notification, microphone, and camera permission requests, and wired ViewModel callbacks to refresh permission education plus capability deltas after request results.
+- Added JVM and Compose smoke coverage for the new permission-request flow, then re-verified `make android-client-test`, `make android-client-lint`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 
 ## Test Plan
 

@@ -27,6 +27,7 @@ import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
 import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
+import com.curtcox.terminals.android.platform.AndroidPermissionRequester
 import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.platform.ContextAndroidNetworkMonitor
 import com.curtcox.terminals.android.platform.ContextAndroidNetworkStateProvider
@@ -55,6 +56,7 @@ data class AndroidClientDependencies(
     val mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
     val mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
     val webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter.disabled(),
+    val permissionRequester: AndroidPermissionRequester = AndroidPermissionRequester.none(),
     val terminalSettings: AndroidTerminalSettings = AndroidTerminalSettings.inMemory(),
     val fireOsDeviceInfoProvider: FireOsDeviceInfoProvider = FireOsDeviceInfoProvider.unknown(),
     val heartbeatIntervalMillis: Long = 30_000,

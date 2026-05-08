@@ -30,6 +30,7 @@ import com.curtcox.terminals.android.platform.AndroidNetworkMonitor
 import com.curtcox.terminals.android.platform.AndroidNetworkState
 import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
+import com.curtcox.terminals.android.platform.AndroidPermissionRequester
 import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.platform.FireOsDeviceInfo
 import com.curtcox.terminals.android.platform.FireOsDeviceInfoProvider
@@ -335,6 +336,54 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("media_camera_permission=true"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("media_webrtc_supported=false"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("media_webrtc_reason=fire-os-webrtc-not-enabled"))
+    }
+
+    @Test
+    fun requestMicrophonePermissionRefreshesPermissionEducationAndCapabilities() = runTest(dispatcher) {
+        val probe = FakeCapabilityProbe(
+            permissions = PermissionCapabilityState(
+                microphoneGranted = false,
+                cameraGranted = true,
+                notificationsGranted = true,
+            ),
+            hardware = AndroidHardwareCapabilities(
+                microphone = true,
+            ),
+        )
+        val permissionRequester = FakePermissionRequester(
+            grantedPermissions = mutableSetOf(),
+        )
+        val session = FakeSession(capabilityDeltaSent = true)
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                capabilityProbe = probe,
+                permissionRequester = permissionRequester,
+                heartbeatIntervalMillis = 0,
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        permissionRequester.nextGrant = true
+        probe.permissions = PermissionCapabilityState(
+            microphoneGranted = true,
+            cameraGranted = true,
+            notificationsGranted = true,
+        )
+        viewModel.requestMicrophonePermission()
+        advanceUntilIdle()
+
+        assertEquals(listOf("android.permission.RECORD_AUDIO"), permissionRequester.requests)
+        assertEquals(true, viewModel.state.value.permissionEducation.microphoneAvailable)
+        assertEquals(listOf("microphone-permission"), session.capabilityDeltaReasons)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_permission_refresh=microphone-permission-result"))
     }
 
     @Test
@@ -848,6 +897,7 @@ class AndroidTerminalViewModelTest {
         networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
         mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
         webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter { AndroidWebRtcSupport(supported = true) },
+        permissionRequester: AndroidPermissionRequester = AndroidPermissionRequester.none(),
         networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(),
         heartbeatIntervalMillis: Long = 0,
     ): AndroidTerminalViewModel =
@@ -860,6 +910,7 @@ class AndroidTerminalViewModelTest {
                 networkMonitor = networkMonitor,
                 mediaPermissionProbe = mediaPermissionProbe,
                 webRtcAdapter = webRtcAdapter,
+                permissionRequester = permissionRequester,
                 heartbeatIntervalMillis = heartbeatIntervalMillis,
                 sessionFactory = { sink ->
                     session.sink = sink
@@ -883,6 +934,20 @@ class AndroidTerminalViewModelTest {
 
         fun emitChange() {
             onChanged?.invoke()
+        }
+    }
+
+    private class FakePermissionRequester(
+        val grantedPermissions: MutableSet<String> = mutableSetOf(),
+    ) : AndroidPermissionRequester {
+        val requests = mutableListOf<String>()
+        var nextGrant: Boolean = false
+
+        override fun hasPermission(permission: String): Boolean = grantedPermissions.contains(permission)
+
+        override fun requestPermission(permission: String, onResult: (Boolean) -> Unit) {
+            requests += permission
+            onResult(nextGrant)
         }
     }
 
