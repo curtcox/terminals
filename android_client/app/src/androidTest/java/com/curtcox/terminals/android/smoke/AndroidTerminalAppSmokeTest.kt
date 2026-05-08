@@ -20,6 +20,7 @@ import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
+import com.curtcox.terminals.android.connection.ReconnectPolicy
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
 import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery
@@ -496,12 +497,47 @@ class AndroidTerminalAppSmokeTest {
         assertTrue(discovery.stopped)
     }
 
+    @Test
+    fun heartbeatFailureReconnectsAndUpdatesDiagnostics() {
+        val firstSession = FakeSession(heartbeatError = IllegalStateException("simulated-network-loss"))
+        val secondSession = FakeSession()
+        var sessionFactoryCalls = 0
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 25,
+                reconnectPolicy = ReconnectPolicy(initialDelayMillis = 1, maxDelayMillis = 1),
+                maxReconnectAttempts = 1,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    sessionFactoryCalls += 1
+                    when (sessionFactoryCalls) {
+                        1 -> firstSession.also { it.sink = sink }
+                        else -> secondSession.also { it.sink = sink }
+                    }
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+        compose.waitUntil { secondSession.connectedEndpoint != null }
+
+        assertTrue(firstSession.closed)
+        assertEquals(EndpointResolution("10.0.2.2", 8080), secondSession.connectedEndpoint)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_success_attempt=1"))
+    }
+
     private class FakeSession(
         private val capabilityDeltaResult: Boolean = false,
+        private val heartbeatError: Throwable? = null,
     ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
         lateinit var sink: AndroidControlResponseSink
         var connectedEndpoint: EndpointResolution? = null
+        var closed: Boolean = false
         val actions = mutableListOf<ServerDrivenAction>()
         val capabilityRefreshReasons = mutableListOf<String>()
 
@@ -510,7 +546,9 @@ class AndroidTerminalAppSmokeTest {
             status = status.copy(connected = true, endpoint = endpoint)
         }
 
-        override suspend fun sendHeartbeat() = Unit
+        override suspend fun sendHeartbeat() {
+            heartbeatError?.let { throw it }
+        }
 
         override suspend fun sendUiAction(action: ServerDrivenAction) {
             actions += action
@@ -523,7 +561,9 @@ class AndroidTerminalAppSmokeTest {
 
         override suspend fun rebaselineCapabilitiesAfterStaleGeneration() = Unit
 
-        override suspend fun close() = Unit
+        override suspend fun close() {
+            closed = true
+        }
     }
 
     private class FakeDiscovery : AndroidNsdDiscovery {

@@ -904,6 +904,8 @@ Remaining validation:
 - Re-verified focused Android JVM validation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidClientChromeTest*' --tests '*AndroidTerminalViewModelTest.diagnosticsIncludeFireOsDeviceInfoWhenAvailable'`, plus boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Added native Android smoke coverage for runtime capability transitions: orientation/display diagnostics now update under configuration-driven capability refresh, and runtime permission-loss refresh now surfaces notification/microphone/camera guidance while preserving generic terminal behavior.
 - Re-verified Android instrumentation test-source compilation for the new smoke coverage with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
+- Added native Android smoke coverage for heartbeat-loss reconnect flow, verifying that a failed heartbeat closes the failed control session, reconnects through the existing bounded reconnect policy, and records reconnect success diagnostics without adding scenario behavior.
+- Re-verified Android boundary scan/test plus instrumentation test-source compilation with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 
 ## Test Plan
 
