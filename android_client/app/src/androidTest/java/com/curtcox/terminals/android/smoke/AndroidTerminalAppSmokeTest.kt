@@ -1,6 +1,7 @@
 package com.curtcox.terminals.android.smoke
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -42,6 +43,24 @@ import terminals.ui.v1.Ui
 class AndroidTerminalAppSmokeTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun invalidManualEndpointIsRejectedLocally() {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("not-a-valid-endpoint")
+        compose.onNodeWithTag("terminal-connect-button").assertIsNotEnabled()
+        compose.onNodeWithText("Enter a host:port or http(s) URL.").assertIsDisplayed()
+        assertEquals(ConnectionState.InvalidEndpoint, viewModel.state.value.connectionState)
+    }
 
     @Test
     fun manualEndpointConnectsRendersServerUiAndDispatchesAction() {

@@ -896,6 +896,9 @@ Remaining validation:
 - Added native Android smoke coverage for discovery fallback and discovered-server endpoint selection, verifying that discovery errors are surfaced as manual-connect guidance and that selecting a discovered server applies its endpoint and returns the client to manual connect mode.
 - Re-verified Android boundary scan with `./scripts/check-android-client-boundary.sh`.
 - Attempted Android instrumentation test-source compilation with `cd android_client && ./gradlew compileDebugAndroidTestKotlin`; this shell session did not have `java` available, so Gradle validation was blocked.
+- Added native Android smoke coverage for malformed manual endpoints, verifying that invalid endpoint text keeps the connect action disabled, surfaces endpoint guidance in terminal chrome, and leaves the client in `InvalidEndpoint` state instead of attempting transport setup.
+- Re-verified Android boundary scan and boundary tests with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Attempted Android instrumentation test-source compilation with `cd android_client && ./gradlew compileDebugAndroidTestKotlin`; this shell session did not have `java` available, so Gradle validation remained blocked.
 
 ## Test Plan
 
