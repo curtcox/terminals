@@ -908,6 +908,8 @@ Remaining validation:
 - Re-verified Android boundary scan/test plus instrumentation test-source compilation with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 - Added native Android smoke coverage for bounded reconnect exhaustion, verifying that heartbeat-triggered reconnect failures stop after the configured attempt budget, close retry sessions, and surface `reconnect_exhausted` diagnostics.
 - Re-verified reconnect exhaustion behavior and Android test/build gates with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest.heartbeatFailureStopsAfterReconnectAttemptsAreExhausted'`, `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
+- Attempted connected-device validation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew connectedDebugAndroidTest`; Android instrumentation build/test APK packaging succeeded but execution failed with `No connected devices!`.
+- Attempted `adb devices` in this shell session, but `adb` was not available in PATH (`command not found: adb`), so connected-device smoke remains blocked on host/device setup rather than Android client code.
 
 ## Test Plan
 
