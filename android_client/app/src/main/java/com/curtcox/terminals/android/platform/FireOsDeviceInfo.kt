@@ -8,3 +8,17 @@ data class FireOsDeviceInfo(
     val isLikelyFireOs: Boolean
         get() = manufacturer.equals("Amazon", ignoreCase = true)
 }
+
+fun interface FireOsDeviceInfoProvider {
+    fun current(): FireOsDeviceInfo
+
+    companion object {
+        fun unknown(): FireOsDeviceInfoProvider = FireOsDeviceInfoProvider {
+            FireOsDeviceInfo(
+                manufacturer = "unknown",
+                model = "unknown",
+                sdkInt = 0,
+            )
+        }
+    }
+}

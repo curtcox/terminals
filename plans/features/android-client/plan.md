@@ -888,6 +888,9 @@ Remaining validation:
 - Added a context-backed Android network monitor using `ConnectivityManager.NetworkCallback` so live network availability/capability changes refresh terminal diagnostics and connected capability deltas without waiting for activity resume/configuration events.
 - Added ViewModel coverage for network-callback diagnostics and capability delta dispatch through the existing generic control-session seam.
 - Re-verified focused ViewModel tests, Android debug compilation, lint, boundary scans, boundary tests, and diff whitespace checks with `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`, `cd android_client && ./gradlew compileDebugKotlin lintDebug`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+- Wired runtime Fire OS device metadata through a dedicated platform adapter seam so diagnostics now report manufacturer, model, SDK level, and whether the device is likely Fire OS instead of only static target assumptions.
+- Added diagnostics/unit coverage for Fire OS metadata in both `AndroidClientChromeTest` and `AndroidTerminalViewModelTest`.
+- Re-verified Android boundary scan and boundary tests with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`; focused Gradle unit tests were not runnable in this session because `java` was unavailable in the shell environment.
 
 ## Test Plan
 

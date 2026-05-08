@@ -524,6 +524,7 @@ class AndroidTerminalViewModel(
             endpoint = endpoint,
             state = state,
             networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
+            fireOsDeviceInfo = runCatching { dependencies.fireOsDeviceInfoProvider.current() }.getOrNull(),
         )
 
     private fun initialState(): AndroidTerminalViewState {

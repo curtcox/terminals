@@ -3,6 +3,7 @@ package com.curtcox.terminals.android.app
 import android.app.Activity
 import android.content.Context
 import android.net.nsd.NsdManager
+import android.os.Build
 import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySession
 import com.curtcox.terminals.android.capabilities.ContextAndroidCapabilityProbe
@@ -30,6 +31,8 @@ import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.platform.ContextAndroidNetworkMonitor
 import com.curtcox.terminals.android.platform.ContextAndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNetworkMonitor
+import com.curtcox.terminals.android.platform.FireOsDeviceInfo
+import com.curtcox.terminals.android.platform.FireOsDeviceInfoProvider
 import com.curtcox.terminals.android.platform.SharedPreferencesAndroidTerminalSettings
 import com.curtcox.terminals.android.platform.StatusBarAndroidNotificationDelivery
 import com.curtcox.terminals.android.platform.WindowAndroidBrightnessController
@@ -53,6 +56,7 @@ data class AndroidClientDependencies(
     val mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
     val webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter.disabled(),
     val terminalSettings: AndroidTerminalSettings = AndroidTerminalSettings.inMemory(),
+    val fireOsDeviceInfoProvider: FireOsDeviceInfoProvider = FireOsDeviceInfoProvider.unknown(),
     val heartbeatIntervalMillis: Long = 30_000,
     val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
     val maxReconnectAttempts: Int = 5,
@@ -98,6 +102,13 @@ data class AndroidClientDependencies(
                 mediaPermissionProbe = ContextAndroidMediaPermissionProbe(context.applicationContext),
                 webRtcAdapter = AndroidWebRtcAdapter.disabled(),
                 terminalSettings = SharedPreferencesAndroidTerminalSettings(context),
+                fireOsDeviceInfoProvider = FireOsDeviceInfoProvider {
+                    FireOsDeviceInfo(
+                        manufacturer = Build.MANUFACTURER,
+                        model = Build.MODEL,
+                        sdkInt = Build.VERSION.SDK_INT,
+                    )
+                },
             )
     }
 }

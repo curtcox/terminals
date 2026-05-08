@@ -31,6 +31,8 @@ import com.curtcox.terminals.android.platform.AndroidNetworkState
 import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
 import com.curtcox.terminals.android.platform.AndroidTerminalSettings
+import com.curtcox.terminals.android.platform.FireOsDeviceInfo
+import com.curtcox.terminals.android.platform.FireOsDeviceInfoProvider
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -105,6 +107,27 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=false"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=true"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_network_refresh=network-change"))
+    }
+
+    @Test
+    fun diagnosticsIncludeFireOsDeviceInfoWhenAvailable() {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                fireOsDeviceInfoProvider = FireOsDeviceInfoProvider {
+                    FireOsDeviceInfo(
+                        manufacturer = "Amazon",
+                        model = "KFSUWI",
+                        sdkInt = 28,
+                    )
+                },
+            ),
+        )
+
+        assertTrue(viewModel.state.value.diagnosticsText.contains("device_manufacturer=Amazon"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("device_model=KFSUWI"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("device_sdk=28"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("device_likely_fire_os=true"))
     }
 
     @Test
