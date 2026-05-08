@@ -915,6 +915,8 @@ Remaining validation:
 - Wired a real Android runtime permission-request seam into the native client using an activity-backed requester adapter, and threaded it through `MainActivity` plus the Android dependency graph so permission handling remains behind a platform adapter.
 - Added terminal chrome controls for notification, microphone, and camera permission requests, and wired ViewModel callbacks to refresh permission education plus capability deltas after request results.
 - Added JVM and Compose smoke coverage for the new permission-request flow, then re-verified `make android-client-test`, `make android-client-lint`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
+- Added a terminal-chrome "Enable missing permissions" action that requests every currently-missing runtime permission through the existing platform adapter seam, while preserving generic terminal behavior and permission-specific controls.
+- Added JVM and Compose smoke coverage for grouped missing-permission requests (microphone/camera), then re-verified `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest` and `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`.
 
 ## Test Plan
 

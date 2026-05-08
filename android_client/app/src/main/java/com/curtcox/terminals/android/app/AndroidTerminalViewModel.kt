@@ -290,6 +290,19 @@ class AndroidTerminalViewModel(
         requestPermission(Manifest.permission.CAMERA, "camera-permission")
     }
 
+    fun requestMissingPermissions() {
+        val permissions = mutableState.value.permissionEducation
+        if (!permissions.notificationsGranted) {
+            requestNotificationPermission()
+        }
+        if (permissions.microphonePresent && !permissions.microphoneAvailable) {
+            requestMicrophonePermission()
+        }
+        if (permissions.cameraPresent && !permissions.cameraAvailable) {
+            requestCameraPermission()
+        }
+    }
+
     fun refreshNetworkDiagnostics(reason: String) {
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)

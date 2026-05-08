@@ -1,5 +1,6 @@
 package com.curtcox.terminals.android.app
 
+import android.Manifest
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlSessionStatus
@@ -384,6 +385,57 @@ class AndroidTerminalViewModelTest {
         assertEquals(true, viewModel.state.value.permissionEducation.microphoneAvailable)
         assertEquals(listOf("microphone-permission"), session.capabilityDeltaReasons)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_permission_refresh=microphone-permission-result"))
+    }
+
+    @Test
+    fun requestMissingPermissionsRequestsPresentMissingMediaPermissions() = runTest(dispatcher) {
+        val probe = FakeCapabilityProbe(
+            permissions = PermissionCapabilityState(
+                microphoneGranted = false,
+                cameraGranted = false,
+                notificationsGranted = true,
+            ),
+            hardware = AndroidHardwareCapabilities(
+                microphone = true,
+                frontCamera = true,
+            ),
+        )
+        val permissionRequester = FakePermissionRequester(
+            grantedPermissions = mutableSetOf(),
+        )
+        val session = FakeSession(capabilityDeltaSent = true)
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                capabilityProbe = probe,
+                permissionRequester = permissionRequester,
+                heartbeatIntervalMillis = 0,
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        permissionRequester.nextGrant = true
+        probe.permissions = PermissionCapabilityState(
+            microphoneGranted = true,
+            cameraGranted = true,
+            notificationsGranted = true,
+        )
+        viewModel.requestMissingPermissions()
+        advanceUntilIdle()
+
+        assertTrue(permissionRequester.requests.contains(Manifest.permission.RECORD_AUDIO))
+        assertTrue(permissionRequester.requests.contains(Manifest.permission.CAMERA))
+        assertEquals(
+            listOf("microphone-permission", "camera-permission"),
+            session.capabilityDeltaReasons,
+        )
     }
 
     @Test

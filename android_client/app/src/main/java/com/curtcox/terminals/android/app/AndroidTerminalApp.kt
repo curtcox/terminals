@@ -101,6 +101,17 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                         }
                     }
                 }
+                if (!state.permissionEducation.notificationsGranted ||
+                    (state.permissionEducation.microphonePresent && !state.permissionEducation.microphoneAvailable) ||
+                    (state.permissionEducation.cameraPresent && !state.permissionEducation.cameraAvailable)
+                ) {
+                    Button(
+                        onClick = viewModel::requestMissingPermissions,
+                        modifier = Modifier.testTag("terminal-request-missing-permissions-button"),
+                    ) {
+                        Text("Enable missing permissions")
+                    }
+                }
                 if (!state.permissionEducation.notificationsGranted) {
                     Button(
                         onClick = viewModel::requestNotificationPermission,
