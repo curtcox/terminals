@@ -314,6 +314,7 @@ class AndroidTerminalViewModel(
         dependencies.networkMonitor.start {
             refreshNetworkDiagnostics("network-callback")
             refreshCapabilities("network-callback")
+            restartDiscoveryIfScanning("network-callback")
         }
     }
 
@@ -638,6 +639,17 @@ class AndroidTerminalViewModel(
                 refreshPermissionEducation("$reason-result")
                 refreshCapabilities(reason)
             }
+        }
+    }
+
+    private fun restartDiscoveryIfScanning(reason: String) {
+        if (!mutableState.value.discoveryState.scanning) return
+        dependencies.discovery.stop()
+        startDiscovery()
+        mutableState.update {
+            it.copy(
+                diagnosticsText = "${it.diagnosticsText}\ndiscovery_restart_reason=$reason",
+            )
         }
     }
 

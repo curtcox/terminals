@@ -162,6 +162,39 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun networkMonitorRestartsDiscoveryWhenScanning() = runTest(dispatcher) {
+        val session = FakeSession(capabilityDeltaSent = true)
+        val monitor = FakeNetworkMonitor()
+        val discovery = FakeDiscovery()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                networkMonitor = monitor,
+                discovery = discovery,
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.startDiscovery()
+        assertEquals(1, discovery.startCount)
+
+        viewModel.startNetworkMonitoring()
+        monitor.emitChange()
+        advanceUntilIdle()
+
+        assertEquals(1, discovery.stopCount)
+        assertEquals(2, discovery.startCount)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("discovery_restart_reason=network-callback"))
+    }
+
+    @Test
     fun copyDiagnosticsDelegatesCurrentDiagnosticsToClipboard() {
         var copied: String? = null
         val viewModel = AndroidTerminalViewModel(
@@ -1100,9 +1133,11 @@ class AndroidTerminalViewModelTest {
     private class FakeDiscovery : AndroidNsdDiscovery {
         private var onServer: ((DiscoveredServer) -> Unit)? = null
         private var onError: ((String) -> Unit)? = null
+        var startCount = 0
         var stopCount = 0
 
         override fun start(onServer: (DiscoveredServer) -> Unit, onError: (String) -> Unit) {
+            startCount += 1
             this.onServer = onServer
             this.onError = onError
         }
