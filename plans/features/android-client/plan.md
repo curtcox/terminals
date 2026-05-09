@@ -1152,6 +1152,11 @@ Remaining validation:
 - Network-monitor capability refreshes are skipped while the activity is stopped (`capability_refresh_suppressed=app-background` in diagnostics) so background connectivity churn does not spam capability traffic.
 - JVM coverage: `AndroidTerminalViewModelTest.appLifecycleChangeSendsCapabilityDeltaWhenConnected`, `networkMonitorSkipsCapabilityRefreshWhenBackgrounded`. Docs updated in `docs/client-android.md`.
 
+### 2026-05-09 (background suppression: discovery restart)
+
+- Suppressed network-triggered NSD discovery restarts while the activity is stopped (`discovery_restart_suppressed=app-background`), matching the existing network-callback capability refresh suppression and avoiding background NSD churn.
+- JVM coverage: `AndroidTerminalViewModelTest.networkMonitorSkipsDiscoveryRestartWhenBackgrounded`. Docs updated in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests

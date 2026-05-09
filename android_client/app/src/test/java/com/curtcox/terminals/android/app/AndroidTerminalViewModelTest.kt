@@ -954,6 +954,41 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun networkMonitorSkipsDiscoveryRestartWhenBackgrounded() = runTest(dispatcher) {
+        val monitor = FakeNetworkMonitor()
+        val discovery = FakeDiscovery()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                networkMonitor = monitor,
+                discovery = discovery,
+            ),
+        )
+
+        viewModel.startDiscovery()
+        assertEquals(1, discovery.startCount)
+        viewModel.startNetworkMonitoring()
+
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(1, discovery.stopCount)
+        assertEquals(2, discovery.startCount)
+
+        viewModel.setAppForegrounded(false)
+        advanceUntilIdle()
+        monitor.emitChange()
+        advanceUntilIdle()
+
+        assertEquals(1, discovery.stopCount)
+        assertEquals(2, discovery.startCount)
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("discovery_restart_suppressed=app-background"),
+        )
+    }
+
+    @Test
     fun heartbeatFailureReconnectsWithBoundedBackoff() = runTest(dispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
         val second = FakeSession()

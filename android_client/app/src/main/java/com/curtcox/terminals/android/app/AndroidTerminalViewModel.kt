@@ -871,6 +871,14 @@ class AndroidTerminalViewModel(
 
     private fun restartDiscoveryIfScanning(reason: String) {
         if (!mutableState.value.discoveryState.scanning) return
+        if (!appInForeground) {
+            mutableState.update {
+                it.copy(
+                    diagnosticsText = "${it.diagnosticsText}\ndiscovery_restart_suppressed=app-background",
+                )
+            }
+            return
+        }
         val now = dependencies.nowMillis()
         if (lastDiscoveryRestartAtMillis >= 0 &&
             now - lastDiscoveryRestartAtMillis < dependencies.discoveryRestartMinIntervalMillis

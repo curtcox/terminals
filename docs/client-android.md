@@ -143,8 +143,8 @@ heartbeat and sensor telemetry pause while the activity is stopped (app not
 visible); the control session stays open. On each foreground/background
 transition, the client sends a capability delta with reason `app-lifecycle-change`
 (matching Flutter `app_lifecycle_change`). Network-callback capability refreshes
-are suppressed while stopped so background network flapping does not spam the
-control stream.
+and automatic discovery restarts are suppressed while stopped so background
+network flapping does not spam the control stream or thrash NSD.
 
 The APK declares microphone and camera permissions so capability reporting and
 future media capture can reflect runtime permission state. WebRTC media
