@@ -462,7 +462,7 @@ private fun TerminalTextInput(node: Ui.Node, props: PrimitiveProps, onAction: (S
         modifier = props.modifier().focusRequester(focusRequester),
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = onDone),
+        keyboardActions = KeyboardActions(onDone = { onDone() }),
     )
 }
 

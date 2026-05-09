@@ -1189,6 +1189,10 @@ Remaining validation:
 - Documented shell bug reporting, queueing, `bug_report*` actions, and `BugReportAck` diagnostics in `docs/client-android.md`.
 - Added `AndroidTerminalViewModelTest` coverage for queued bug-report flush when multiple reports are pending (`chromeBugReportFlushMultipleQueuedAllSucceed`), when the first send fails and a later one succeeds (`chromeBugReportFlushPartialFailureSummarizesCounts`), and when every queued send fails (`chromeBugReportFlushAllFailRecordsFailure`), using a `FakeSession` per-attempt failure pattern.
 
+### 2026-05-09 (Compose KeyboardActions API)
+
+- Fixed `ServerDrivenRenderer` `OutlinedTextField` IME Done handling for Compose BOM `2025.10.00`: `KeyboardActions.onDone` expects `(KeyboardActionScope) -> Unit`, so the handler is now wrapped as `{ onDone() }` instead of passing a `() -> Unit` reference. Unblocks `compileDebugKotlin` / `make android-client-test`.
+
 ## Test Plan
 
 ### Unit tests
