@@ -135,10 +135,23 @@ class ControlResponseDispatcher {
                 lastOpaqueControlIoSummary = "type=unhandled_payload payload_case=${response.payloadCase.name}",
             )
         }
+        // After a server ControlError, a later successful payload means the session moved on — clear
+        // server error fields so copyable diagnostics don't imply the client is still in an error state.
+        // Local transport errors keep lastControlErrorCode null and are not cleared here.
+        val recovered =
+            if (
+                response.payloadCase != Control.ConnectResponse.PayloadCase.PAYLOAD_NOT_SET &&
+                response.payloadCase != Control.ConnectResponse.PayloadCase.ERROR &&
+                state.lastControlErrorCode != null
+            ) {
+                next.copy(lastError = null, lastControlErrorCode = null)
+            } else {
+                next
+            }
         return if (response.payloadCase == Control.ConnectResponse.PayloadCase.PAYLOAD_NOT_SET) {
-            next
+            recovered
         } else {
-            next.copy(lastControlResponseActivity = connectResponseActivityStatus(response))
+            recovered.copy(lastControlResponseActivity = connectResponseActivityStatus(response))
         }
     }
 

@@ -1428,6 +1428,46 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun serverControlErrorClearsAfterSuccessfulSetUi() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setError(
+                    Control.ControlError.newBuilder()
+                        .setCode(Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION)
+                        .setMessage("stale generation"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setText(Ui.TextWidget.newBuilder().setValue("Recovered"))
+            .build()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setSetUi(Ui.SetUI.newBuilder().setDeviceId("device-1").setRoot(root))
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(root, viewModel.state.value.serverRoot)
+        assertNull(viewModel.state.value.lastError)
+        assertNull(viewModel.state.value.lastControlErrorCode)
+        val text = viewModel.state.value.diagnosticsText
+        assertTrue(!text.contains("last_error=stale generation"))
+        assertTrue(!text.contains("last_control_error_code="))
+        assertEquals("UI updated", viewModel.state.value.lastControlResponseActivity)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun capabilityAckInvalidationsAndSnapshotAppliedAreSurfacedInDiagnostics() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)

@@ -733,6 +733,51 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun setUiAfterControlErrorClearsServerErrorFields() {
+        val error = Control.ConnectResponse.newBuilder()
+            .setError(
+                Control.ControlError.newBuilder()
+                    .setCode(Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION)
+                    .setMessage("stale generation"),
+            )
+            .build()
+        val root = textNode("r", "ok")
+        val setUi = Control.ConnectResponse.newBuilder()
+            .setSetUi(Ui.SetUI.newBuilder().setDeviceId("d").setRoot(root))
+            .build()
+
+        val afterError = dispatcher.dispatch(AndroidTerminalViewState(), error)
+        assertEquals("stale generation", afterError.lastError)
+        assertEquals(
+            Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION.name,
+            afterError.lastControlErrorCode,
+        )
+
+        val afterSetUi = dispatcher.dispatch(afterError, setUi)
+        assertEquals(root, afterSetUi.serverRoot)
+        assertNull(afterSetUi.lastError)
+        assertNull(afterSetUi.lastControlErrorCode)
+        assertEquals("UI updated", afterSetUi.lastControlResponseActivity)
+    }
+
+    @Test
+    fun setUiDoesNotClearLocalLastErrorWhenNoControlErrorCode() {
+        val root = textNode("r", "ok")
+        val setUi = Control.ConnectResponse.newBuilder()
+            .setSetUi(Ui.SetUI.newBuilder().setDeviceId("d").setRoot(root))
+            .build()
+        val seeded = AndroidTerminalViewState(
+            lastError = "connection reset",
+            lastControlErrorCode = null,
+        )
+
+        val next = dispatcher.dispatch(seeded, setUi)
+        assertEquals(root, next.serverRoot)
+        assertEquals("connection reset", next.lastError)
+        assertNull(next.lastControlErrorCode)
+    }
+
+    @Test
     fun dispatchRecordsControlResponseActivityForOpaqueIoAndHandshake() {
         val start = Control.ConnectResponse.newBuilder()
             .setStartStream(Io.StartStream.newBuilder().setStreamId("s1"))
