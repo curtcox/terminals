@@ -933,6 +933,9 @@ Remaining validation:
 - Implemented generic server `BugReportAck` handling: `AndroidBugReportChrome` formats copyable diagnostics lines, `ControlResponseDispatcher` records `lastBugReportAckDiagnostics` on `AndroidTerminalViewState`, and `AndroidTerminalViewModel` appends them to live diagnostics when acknowledgements arrive over the control stream (no scenario branching).
 - Added JVM coverage in `AndroidBugReportChromeTest`, `ControlResponseDispatcherTest.bugReportAckRecordsDiagnosticsChrome`, and `AndroidTerminalViewModelTest.serverBugReportAckIsSurfacedInDiagnostics`, plus re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Surfaced generic server `TransitionUI` responses in copyable terminal diagnostics (`last_transition`, optional `last_transition_duration_ms` when non-zero), fixed `UpdateUI` subtree merge to detect child replacements with protobuf value equality, and added dispatcher/ViewModel coverage.
+- Wired server `HelloAck` into native Android terminal state and heartbeat pacing (restart heartbeat when the server supplies a positive `heartbeat_interval_ms`), surfaced handshake lines in copyable diagnostics, and cleared handshake metadata on connect failure, disconnect, and fresh connect attempts.
+- Wired server `RegisterAck` typed `ServerMetadata` plus legacy `metadata` map fallback (`server_build_sha` / `server_build_date`) into terminal diagnostics, preserving generic terminal semantics without scenario branching.
+- Record server `CapabilityAck.accepted_generation` in terminal state and diagnostics for protocol debugging; extended `ControlResponseDispatcherTest` for hello/register/capability acknowledgement paths.
 
 ## Test Plan
 

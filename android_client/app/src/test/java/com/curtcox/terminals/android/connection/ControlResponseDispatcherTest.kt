@@ -97,6 +97,72 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun helloAckRecordsHandshakeFields() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setHelloAck(
+                Control.HelloAck.newBuilder()
+                    .setServerId("srv-1")
+                    .setSessionId("sess-9")
+                    .setHeartbeatIntervalMs(12_000),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("srv-1", next.controlServerId)
+        assertEquals("sess-9", next.controlSessionId)
+        assertEquals(12_000L, next.serverHeartbeatIntervalMs)
+    }
+
+    @Test
+    fun registerAckPrefersTypedServerMetadataAndFallsBackToMetadataMap() {
+        val responseTyped = Control.ConnectResponse.newBuilder()
+            .setRegisterAck(
+                Control.RegisterAck.newBuilder()
+                    .setServerMetadata(
+                        Control.ServerMetadata.newBuilder()
+                            .setBuild(
+                                Control.BuildMetadata.newBuilder()
+                                    .setSha("abc")
+                                    .setDateRfc3339("2026-05-08T12:00:00Z"),
+                            )
+                            .setPhotoFrameAssetBaseUrl("https://example/static/"),
+                    ),
+            )
+            .build()
+        val afterTyped = dispatcher.dispatch(AndroidTerminalViewState(), responseTyped)
+        assertEquals("abc", afterTyped.serverBuildSha)
+        assertEquals("2026-05-08T12:00:00Z", afterTyped.serverBuildDate)
+        assertEquals("https://example/static/", afterTyped.registerAckAssetBaseUrl)
+
+        val responseMap = Control.ConnectResponse.newBuilder()
+            .setRegisterAck(
+                Control.RegisterAck.newBuilder()
+                    .putMetadata("server_build_sha", "from-map")
+                    .putMetadata("server_build_date", "2026-01-01T00:00:00Z"),
+            )
+            .build()
+        val afterMap = dispatcher.dispatch(AndroidTerminalViewState(), responseMap)
+        assertEquals("from-map", afterMap.serverBuildSha)
+        assertEquals("2026-01-01T00:00:00Z", afterMap.serverBuildDate)
+    }
+
+    @Test
+    fun capabilityAckRecordsAcceptedGeneration() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setCapabilityAck(
+                Control.CapabilityAck.newBuilder()
+                    .setDeviceId("device-1")
+                    .setAcceptedGeneration(42),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals(42L, next.lastCapabilityAckGeneration)
+    }
+
+    @Test
     fun notificationAndErrorUpdateGenericTerminalState() {
         val notification = Control.ConnectResponse.newBuilder()
             .setNotification(

@@ -11,6 +11,17 @@ class ControlResponseDispatcher {
         response: Control.ConnectResponse,
     ): AndroidTerminalViewState {
         return when (response.payloadCase) {
+            Control.ConnectResponse.PayloadCase.HELLO_ACK -> {
+                val ack = response.helloAck
+                state.copy(
+                    controlServerId = ack.serverId.takeIf { it.isNotBlank() },
+                    controlSessionId = ack.sessionId.takeIf { it.isNotBlank() },
+                    serverHeartbeatIntervalMs = ack.heartbeatIntervalMs.takeIf { it > 0 },
+                )
+            }
+            Control.ConnectResponse.PayloadCase.CAPABILITY_ACK ->
+                state.copy(lastCapabilityAckGeneration = response.capabilityAck.acceptedGeneration)
+            Control.ConnectResponse.PayloadCase.REGISTER_ACK -> mergeRegisterAck(state, response)
             Control.ConnectResponse.PayloadCase.SET_UI -> state.copy(serverRoot = response.setUi.root)
             Control.ConnectResponse.PayloadCase.UPDATE_UI -> {
                 val root = state.serverRoot ?: return state
@@ -27,6 +38,23 @@ class ControlResponseDispatcher {
             )
             else -> state
         }
+    }
+
+    private fun mergeRegisterAck(state: AndroidTerminalViewState, response: Control.ConnectResponse): AndroidTerminalViewState {
+        val ack = response.registerAck
+        val metaMap = ack.metadataMap
+        val serverMeta = if (ack.hasServerMetadata()) ack.serverMetadata else null
+        val build = serverMeta?.takeIf { it.hasBuild() }?.build
+        val sha = build?.sha?.takeIf { it.isNotBlank() }
+            ?: metaMap["server_build_sha"]?.takeIf { it.isNotBlank() }
+        val date = build?.dateRfc3339?.takeIf { it.isNotBlank() }
+            ?: metaMap["server_build_date"]?.takeIf { it.isNotBlank() }
+        val assetBase = serverMeta?.photoFrameAssetBaseUrl?.takeIf { it.isNotBlank() }
+        return state.copy(
+            serverBuildSha = sha ?: state.serverBuildSha,
+            serverBuildDate = date ?: state.serverBuildDate,
+            registerAckAssetBaseUrl = assetBase ?: state.registerAckAssetBaseUrl,
+        )
     }
 
     private fun replaceNode(root: Ui.Node, componentId: String, replacement: Ui.Node): Ui.Node {

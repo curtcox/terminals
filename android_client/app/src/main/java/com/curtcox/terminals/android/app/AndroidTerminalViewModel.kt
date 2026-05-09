@@ -61,7 +61,7 @@ class AndroidTerminalViewModel(
             }
             mutableState.update {
                 val next = dispatcher.dispatch(it, response)
-                var diagnostics = formatDiagnostics(parser.parse(next.endpointText), next.connectionState)
+                var diagnostics = formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next)
                 if (notificationDelivered) {
                     diagnostics += "\nlast_notification=${response.notification.title}"
                 }
@@ -94,6 +94,17 @@ class AndroidTerminalViewModel(
                     lastMediaStatus = mediaStatus?.second ?: next.lastMediaStatus,
                 )
             }
+            if (response.payloadCase == Control.ConnectResponse.PayloadCase.HELLO_ACK) {
+                val ms = response.helloAck.heartbeatIntervalMs
+                if (ms > 0) {
+                    effectiveHeartbeatMillis = ms
+                    val connectedSession = session
+                    if (connectedSession != null) {
+                        stopHeartbeat()
+                        startHeartbeat(connectedSession)
+                    }
+                }
+            }
         }
     }
     private var session: AndroidControlSession? = null
@@ -105,6 +116,7 @@ class AndroidTerminalViewModel(
     private var lastNetworkCapabilityRefreshAtMillis: Long = -1
     private var lastNetworkReconnectRestoreAtMillis: Long = -1
     private var reconnectExhausted: Boolean = false
+    private var effectiveHeartbeatMillis: Long = dependencies.heartbeatIntervalMillis
     private val mutableState = MutableStateFlow(
         initialState(),
     )
@@ -122,7 +134,11 @@ class AndroidTerminalViewModel(
                 endpointText = text,
                 connectionState = if (resolved == null) ConnectionState.InvalidEndpoint else ConnectionState.ReadyToConnect,
                 lastError = if (resolved == null && text.isNotBlank()) "Enter a host:port or http(s) URL." else null,
-                diagnosticsText = formatDiagnostics(resolved, if (resolved == null) ConnectionState.InvalidEndpoint else ConnectionState.ReadyToConnect),
+                diagnosticsText = formatDiagnostics(
+                    resolved,
+                    if (resolved == null) ConnectionState.InvalidEndpoint else ConnectionState.ReadyToConnect,
+                    it,
+                ),
             )
         }
     }
@@ -136,12 +152,13 @@ class AndroidTerminalViewModel(
             return
         }
         reconnectExhausted = false
+        effectiveHeartbeatMillis = dependencies.heartbeatIntervalMillis
 
         mutableState.update {
-            it.copy(
+            withoutHandshake(it).copy(
                 connectionState = ConnectionState.Connecting,
                 lastError = null,
-                diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connecting),
+                diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connecting, withoutHandshake(it)),
             )
         }
         stopConnect()
@@ -161,7 +178,7 @@ class AndroidTerminalViewModel(
                     it.copy(
                         connectionState = ConnectionState.Connected,
                         lastError = null,
-                        diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connected),
+                        diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connected, it),
                     )
                 }
             } catch (error: CancellationException) {
@@ -178,10 +195,10 @@ class AndroidTerminalViewModel(
                 runCatching { nextSession?.close() }
                 mutableState.update {
                     val message = error.message ?: error::class.java.simpleName
-                    it.copy(
+                    withoutHandshake(it).copy(
                         connectionState = ConnectionState.ReadyToConnect,
                         lastError = message,
-                        diagnosticsText = formatDiagnostics(resolved, ConnectionState.ReadyToConnect) +
+                        diagnosticsText = formatDiagnostics(resolved, ConnectionState.ReadyToConnect, withoutHandshake(it)) +
                             "\nlast_error=$message",
                     )
                 }
@@ -197,7 +214,7 @@ class AndroidTerminalViewModel(
         mutableState.update {
             it.copy(
                 discoveryState = it.discoveryState.copy(scanning = true, lastError = null),
-                diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\ndiscovery=scanning",
+                diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\ndiscovery=scanning",
             )
         }
         dependencies.discovery.start(
@@ -213,7 +230,7 @@ class AndroidTerminalViewModel(
                             servers = nextServers,
                             lastError = null,
                         ),
-                        diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                        diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\n" +
                             "discovery=scanning\n" +
                             "discovered_servers=${nextServers.size}\n" +
                             "last_discovered=${server.name}@${discoveredEndpointText(server)}",
@@ -224,7 +241,7 @@ class AndroidTerminalViewModel(
                 mutableState.update {
                     it.copy(
                         discoveryState = it.discoveryState.copy(scanning = false, lastError = message),
-                        diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                        diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\n" +
                             "discovery=error\n" +
                             "discovery_error=$message",
                     )
@@ -238,7 +255,7 @@ class AndroidTerminalViewModel(
         mutableState.update {
             it.copy(
                 discoveryState = it.discoveryState.copy(scanning = false),
-                diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\ndiscovery=stopped",
+                diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\ndiscovery=stopped",
             )
         }
     }
@@ -255,12 +272,13 @@ class AndroidTerminalViewModel(
         stopHeartbeat()
         stopReconnect()
         reconnectExhausted = false
+        effectiveHeartbeatMillis = dependencies.heartbeatIntervalMillis
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
             val nextState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.ReadyToConnect
-            it.copy(
+            withoutHandshake(it).copy(
                 connectionState = nextState,
-                diagnosticsText = formatDiagnostics(endpoint, nextState),
+                diagnosticsText = formatDiagnostics(endpoint, nextState, withoutHandshake(it)),
             )
         }
         viewModelScope.launch { closingSession?.close() }
@@ -309,7 +327,7 @@ class AndroidTerminalViewModel(
             it.copy(
                 permissionEducation = permissions,
                 mediaSupport = mediaSupport,
-                diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState)}\n" +
+                diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState, it)}\n" +
                     "last_permission_refresh=$reason",
             )
         }
@@ -347,7 +365,7 @@ class AndroidTerminalViewModel(
     fun refreshNetworkDiagnostics(reason: String) {
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
-            it.copy(diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState)}\nlast_network_refresh=$reason")
+            it.copy(diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState, it)}\nlast_network_refresh=$reason")
         }
     }
 
@@ -404,7 +422,7 @@ class AndroidTerminalViewModel(
             mutableState.update {
                 it.copy(
                     localKeepAwakeEnabled = enabled,
-                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\n" +
                         "local_keep_awake=$enabled",
                 )
             }
@@ -436,7 +454,7 @@ class AndroidTerminalViewModel(
             mutableState.update {
                 it.copy(
                     localFullscreenEnabled = enabled,
-                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\n" +
                         "local_fullscreen=$enabled",
                 )
             }
@@ -468,7 +486,7 @@ class AndroidTerminalViewModel(
             mutableState.update {
                 it.copy(
                     localBrightDisplayEnabled = enabled,
-                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState)}\n" +
+                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\n" +
                         "local_bright_display=$enabled",
                 )
             }
@@ -499,10 +517,14 @@ class AndroidTerminalViewModel(
         }
 
     private fun startHeartbeat(connectedSession: AndroidControlSession) {
-        if (dependencies.heartbeatIntervalMillis <= 0) return
+        val intervalMs = when {
+            effectiveHeartbeatMillis > 0 -> effectiveHeartbeatMillis
+            else -> dependencies.heartbeatIntervalMillis
+        }
+        if (intervalMs <= 0) return
         heartbeatJob = viewModelScope.launch {
             while (true) {
-                delay(dependencies.heartbeatIntervalMillis)
+                delay(intervalMs)
                 runCatching {
                     connectedSession.sendHeartbeat()
                 }.onFailure { error ->
@@ -538,7 +560,7 @@ class AndroidTerminalViewModel(
             it.copy(
                 connectionState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.Connecting,
                 lastError = message,
-                diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting) +
+                diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting, it) +
                     "\nlast_error=$message\nreconnect_pending=${endpoint != null}",
             )
         }
@@ -557,7 +579,7 @@ class AndroidTerminalViewModel(
                 mutableState.update {
                     it.copy(
                         connectionState = ConnectionState.Connecting,
-                        diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting) +
+                        diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting, it) +
                             "\nlast_error=$lastError\nreconnect_attempt=$attempt\nreconnect_cause=$reconnectCause",
                     )
                 }
@@ -575,7 +597,7 @@ class AndroidTerminalViewModel(
                         it.copy(
                             connectionState = ConnectionState.Connected,
                             lastError = null,
-                            diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connected) +
+                            diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connected, it) +
                                 "\nreconnect_success_attempt=$attempt\nreconnect_cause=$reconnectCause",
                         )
                     }
@@ -588,7 +610,7 @@ class AndroidTerminalViewModel(
                 it.copy(
                     connectionState = ConnectionState.ReadyToConnect,
                     lastError = lastError,
-                    diagnosticsText = formatDiagnostics(endpoint, ConnectionState.ReadyToConnect) +
+                    diagnosticsText = formatDiagnostics(endpoint, ConnectionState.ReadyToConnect, it) +
                         "\nlast_error=$lastError\nreconnect_exhausted=${dependencies.maxReconnectAttempts}\nreconnect_cause=$reconnectCause",
                 )
             }
@@ -604,7 +626,22 @@ class AndroidTerminalViewModel(
             error.message.contains("generation", ignoreCase = true)
     }
 
-    private fun formatDiagnostics(endpoint: EndpointResolution?, state: ConnectionState): String {
+    private fun withoutHandshake(state: AndroidTerminalViewState): AndroidTerminalViewState =
+        state.copy(
+            controlServerId = null,
+            controlSessionId = null,
+            serverHeartbeatIntervalMs = null,
+            serverBuildSha = null,
+            serverBuildDate = null,
+            registerAckAssetBaseUrl = null,
+            lastCapabilityAckGeneration = 0L,
+        )
+
+    private fun formatDiagnostics(
+        endpoint: EndpointResolution?,
+        state: ConnectionState,
+        handshakeSource: AndroidTerminalViewState? = null,
+    ): String {
         val capabilitySnapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull()
         val permissions = permissionEducation(capabilitySnapshot)
         val mediaSupport = mediaSupport()
@@ -626,6 +663,28 @@ class AndroidTerminalViewModel(
             appendLine("control_last_capability_generation=${controlStatus?.lastCapabilityGeneration ?: 0}")
             appendLine(permissions.toDiagnostics())
             append(mediaSupport.toDiagnostics())
+            handshakeSource?.controlServerId?.takeIf { it.isNotBlank() }?.let {
+                appendLine()
+                appendLine("hello_server_id=$it")
+            }
+            handshakeSource?.controlSessionId?.takeIf { it.isNotBlank() }?.let {
+                appendLine("hello_session_id=$it")
+            }
+            handshakeSource?.serverHeartbeatIntervalMs?.takeIf { it > 0 }?.let {
+                appendLine("hello_heartbeat_interval_ms=$it")
+            }
+            handshakeSource?.serverBuildSha?.takeIf { it.isNotBlank() }?.let {
+                appendLine("server_build_sha=$it")
+            }
+            handshakeSource?.serverBuildDate?.takeIf { it.isNotBlank() }?.let {
+                appendLine("server_build_date=$it")
+            }
+            handshakeSource?.registerAckAssetBaseUrl?.takeIf { it.isNotBlank() }?.let {
+                appendLine("register_ack_asset_base_url=$it")
+            }
+            handshakeSource?.takeIf { it.lastCapabilityAckGeneration > 0L }?.let {
+                appendLine("last_capability_ack_generation=${it.lastCapabilityAckGeneration}")
+            }
         }
     }
 
@@ -653,7 +712,7 @@ class AndroidTerminalViewModel(
             endpointText = lastEndpoint,
             connectionState = state,
             lastError = if (state == ConnectionState.InvalidEndpoint) "Enter a host:port or http(s) URL." else null,
-            diagnosticsText = formatDiagnostics(resolved, state),
+            diagnosticsText = formatDiagnostics(resolved, state, null),
             localKeepAwakeEnabled = keepAwakeEnabled,
             localFullscreenEnabled = fullscreenEnabled,
             localBrightDisplayEnabled = brightDisplayEnabled,
