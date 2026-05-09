@@ -79,6 +79,33 @@ class ProtocolBuilders(
             )
             .build()
 
+    /**
+     * Matches Flutter `buildSensorTelemetryRequest`: only battery fields from the last registered
+     * capabilities snapshot; returns null when there is nothing to send.
+     */
+    fun sensorTelemetryFromCapabilities(
+        deviceId: String,
+        capabilities: Capabilities.DeviceCapabilities?,
+        unixMs: Long,
+    ): Control.ConnectRequest? {
+        if (deviceId.isEmpty() || capabilities == null || !capabilities.hasBattery()) {
+            return null
+        }
+        val values =
+            mapOf(
+                "battery.level" to capabilities.battery.level.toDouble(),
+                "battery.charging" to if (capabilities.battery.charging) 1.0 else 0.0,
+            )
+        return Control.ConnectRequest.newBuilder()
+            .setSensor(
+                Io.SensorData.newBuilder()
+                    .setDeviceId(deviceId)
+                    .setUnixMs(unixMs)
+                    .putAllValues(values),
+            )
+            .build()
+    }
+
     fun uiAction(deviceId: String, action: ServerDrivenAction): Control.ConnectRequest =
         Control.ConnectRequest.newBuilder()
             .setInput(

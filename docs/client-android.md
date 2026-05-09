@@ -136,6 +136,10 @@ If the active control session is lost during heartbeat, the client closes the
 failed stream and performs bounded reconnect attempts using exponential backoff.
 Retry attempt, success, and exhaustion status are recorded in local diagnostics.
 
+While connected, the client also sends periodic battery sensor telemetry on the
+control stream (same fields and pacing as the Flutter reference client: about
+every 15 seconds when battery capability is present).
+
 The APK declares microphone and camera permissions so capability reporting and
 future media capture can reflect runtime permission state. WebRTC media
 transport remains explicitly disabled until the dependency compatibility pass is

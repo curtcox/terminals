@@ -199,6 +199,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 networkMonitor = monitor,
                 discovery = discovery,
                 sessionFactory = { sink ->
@@ -272,6 +273,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 networkMonitor = monitor,
                 nowMillis = { now },
                 networkCapabilityRefreshMinIntervalMillis = 1_500,
@@ -532,6 +534,7 @@ class AndroidTerminalViewModelTest {
                 capabilityProbe = probe,
                 permissionRequester = permissionRequester,
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session
@@ -583,6 +586,7 @@ class AndroidTerminalViewModelTest {
                 capabilityProbe = probe,
                 permissionRequester = permissionRequester,
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session
@@ -637,6 +641,7 @@ class AndroidTerminalViewModelTest {
                 capabilityProbe = probe,
                 permissionRequester = permissionRequester,
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session
@@ -717,6 +722,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 sessionFactory = { sink ->
                     sessions.removeFirst().also { it.sink = sink }
                 },
@@ -746,6 +752,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 sessionFactory = { sink ->
                     sessions.removeFirst().also { it.sink = sink }
                 },
@@ -802,6 +809,22 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun connectedSessionSendsPeriodicSensorTelemetry() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session, sensorTelemetryIntervalMillis = 100)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(250)
+        runCurrent()
+
+        assertEquals(2, session.sensorTelemetryCount)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun heartbeatFailureReconnectsWithBoundedBackoff() = runTest(dispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
         val second = FakeSession()
@@ -810,6 +833,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 100,
+                sensorTelemetryIntervalMillis = 0,
                 reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
                 maxReconnectAttempts = 2,
                 sessionFactory = { sink ->
@@ -845,6 +869,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 100,
+                sensorTelemetryIntervalMillis = 0,
                 reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
                 maxReconnectAttempts = 1,
                 sessionFactory = { sink ->
@@ -877,6 +902,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 100,
+                sensorTelemetryIntervalMillis = 0,
                 reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
                 maxReconnectAttempts = 1,
                 networkMonitor = monitor,
@@ -914,6 +940,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 networkMonitor = monitor,
                 networkReconnectRestoreMinIntervalMillis = 0,
                 sessionFactory = { sink ->
@@ -949,6 +976,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 100,
+                sensorTelemetryIntervalMillis = 0,
                 reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
                 maxReconnectAttempts = 1,
                 networkMonitor = monitor,
@@ -1140,6 +1168,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 sessionFactory = { sink ->
                     sessions.removeFirst().also { it.sink = sink }
                 },
@@ -1181,6 +1210,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 sessionFactory = { sink ->
                     sessions.removeFirst().also { it.sink = sink }
                 },
@@ -1225,6 +1255,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 sessionFactory = { sink ->
                     sessions.removeFirst().also { it.sink = sink }
                 },
@@ -1911,6 +1942,7 @@ class AndroidTerminalViewModelTest {
         permissionRequester: AndroidPermissionRequester = AndroidPermissionRequester.none(),
         networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(),
         heartbeatIntervalMillis: Long = 0,
+        sensorTelemetryIntervalMillis: Long = 0,
     ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -1923,6 +1955,7 @@ class AndroidTerminalViewModelTest {
                 webRtcAdapter = webRtcAdapter,
                 permissionRequester = permissionRequester,
                 heartbeatIntervalMillis = heartbeatIntervalMillis,
+                sensorTelemetryIntervalMillis = sensorTelemetryIntervalMillis,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session
@@ -1968,6 +2001,7 @@ class AndroidTerminalViewModelTest {
         private val connectError: Throwable? = null,
         private val capabilityDeltaSent: Boolean = false,
         private val heartbeatError: Throwable? = null,
+        private val sensorTelemetryError: Throwable? = null,
         private val connectGate: CompletableDeferred<Unit>? = null,
     ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
@@ -1977,6 +2011,7 @@ class AndroidTerminalViewModelTest {
         val capabilityDeltaReasons = mutableListOf<String>()
         var rebaselineCount = 0
         var heartbeatCount = 0
+        var sensorTelemetryCount = 0
         var closeCount = 0
 
         override suspend fun connect(endpoint: EndpointResolution) {
@@ -1989,6 +2024,11 @@ class AndroidTerminalViewModelTest {
         override suspend fun sendHeartbeat() {
             heartbeatError?.let { throw it }
             heartbeatCount += 1
+        }
+
+        override suspend fun sendSensorTelemetry() {
+            sensorTelemetryError?.let { throw it }
+            sensorTelemetryCount += 1
         }
 
         override suspend fun sendUiAction(action: ServerDrivenAction) {

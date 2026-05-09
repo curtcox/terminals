@@ -1138,6 +1138,10 @@ Remaining validation:
 - Extended JVM coverage in `AndroidNsdDiscoveryTest` for known codes and unknown codes.
 - Documented discovery/NSD quirks and Fire OS fallback expectations under `docs/client-android.md` (“Discovery (NSD / mDNS) quirks”), closing the plan’s documentation gap for LAN multicast behavior without requiring a physical tablet run in this session.
 
+### 2026-05-09 (sensor telemetry parity)
+
+- Implemented periodic control-stream sensor telemetry aligned with Flutter `buildSensorTelemetryRequest`: `battery.level` and `battery.charging` from the last registered capability snapshot, default interval 15 seconds (`AndroidClientDependencies.sensorTelemetryIntervalMillis`), wired through `ProtocolBuilders.sensorTelemetryFromCapabilities`, `AndroidControlSession.sendSensorTelemetry`, and `AndroidTerminalViewModel` alongside the heartbeat loop (including reconnect and HelloAck restart behavior). Added JVM coverage (`ProtocolBuildersTest`, `AndroidControlSessionControllerTest`, `AndroidTerminalViewModelTest.connectedSessionSendsPeriodicSensorTelemetry`); instrumentation fakes set `sensorTelemetryIntervalMillis = 0` where heartbeats are disabled. Documented behavior in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests

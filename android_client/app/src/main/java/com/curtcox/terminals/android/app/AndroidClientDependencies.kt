@@ -60,6 +60,8 @@ data class AndroidClientDependencies(
     val terminalSettings: AndroidTerminalSettings = AndroidTerminalSettings.inMemory(),
     val fireOsDeviceInfoProvider: FireOsDeviceInfoProvider = FireOsDeviceInfoProvider.unknown(),
     val heartbeatIntervalMillis: Long = 30_000,
+    /** Matches Flutter [TerminalClientApp] default `sensorTelemetryInterval` (15 seconds). */
+    val sensorTelemetryIntervalMillis: Long = 15_000,
     val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
     val maxReconnectAttempts: Int = 5,
     val discoveryRestartMinIntervalMillis: Long = 1_500,

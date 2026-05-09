@@ -2,6 +2,7 @@ package com.curtcox.terminals.android.connection
 
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import terminals.capabilities.v1.Capabilities
@@ -101,5 +102,46 @@ class ProtocolBuildersTest {
         assertEquals("start", request.input.uiAction.componentId)
         assertEquals("tap", request.input.uiAction.action)
         assertEquals("", request.input.uiAction.value)
+    }
+
+    @Test
+    fun sensorTelemetryFromCapabilitiesMatchesFlutterBatteryKeys() {
+        val caps =
+            Capabilities.DeviceCapabilities.newBuilder()
+                .setDeviceId("device-1")
+                .setBattery(
+                    Capabilities.BatteryCapability.newBuilder()
+                        .setLevel(0.77f)
+                        .setCharging(true),
+                )
+                .build()
+
+        val request = builders.sensorTelemetryFromCapabilities("device-1", caps, 9_001L)
+
+        assertTrue(request!!.hasSensor())
+        assertEquals("device-1", request.sensor.deviceId)
+        assertEquals(9_001L, request.sensor.unixMs)
+        assertEquals(0.77, request.sensor.valuesMap["battery.level"]!!, 0.0001)
+        assertEquals(1.0, request.sensor.valuesMap["battery.charging"]!!, 0.0001)
+    }
+
+    @Test
+    fun sensorTelemetryFromCapabilitiesReturnsNullWithoutBattery() {
+        val caps =
+            Capabilities.DeviceCapabilities.newBuilder()
+                .setDeviceId("device-1")
+                .build()
+
+        assertNull(builders.sensorTelemetryFromCapabilities("device-1", caps, 1L))
+    }
+
+    @Test
+    fun sensorTelemetryFromCapabilitiesReturnsNullForEmptyDeviceId() {
+        val caps =
+            Capabilities.DeviceCapabilities.newBuilder()
+                .setBattery(Capabilities.BatteryCapability.newBuilder().setLevel(0.5f))
+                .build()
+
+        assertNull(builders.sensorTelemetryFromCapabilities("", caps, 1L))
     }
 }

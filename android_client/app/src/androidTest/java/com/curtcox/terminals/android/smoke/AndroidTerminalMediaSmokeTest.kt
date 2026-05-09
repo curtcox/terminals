@@ -41,6 +41,7 @@ class AndroidTerminalMediaSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 mediaEngine = AndroidMediaEngine(
                     audioPlayback = AndroidAudioPlayback { command ->
@@ -107,6 +108,8 @@ class AndroidTerminalMediaSmokeTest {
         }
 
         override suspend fun sendHeartbeat() = Unit
+
+        override suspend fun sendSensorTelemetry() = Unit
 
         override suspend fun sendUiAction(action: ServerDrivenAction) = Unit
 

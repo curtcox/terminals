@@ -55,6 +55,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
             ),
         )
@@ -74,6 +75,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 sessionFactory = { sink ->
                     session.sink = sink
@@ -127,6 +129,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 keepAwakeController = AndroidKeepAwakeController { keepAwakeValues += it },
                 fullscreenController = AndroidFullscreenController { fullscreenValues += it },
@@ -193,6 +196,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 diagnosticClipboard = DiagnosticClipboard { copied = it },
             ),
@@ -214,6 +218,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 keepAwakeController = AndroidKeepAwakeController { keepAwakeValues += it },
             ),
@@ -236,6 +241,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 fullscreenController = AndroidFullscreenController { fullscreenValues += it },
             ),
@@ -258,6 +264,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 brightnessController = AndroidBrightnessController { brightnessValues += it },
             ),
@@ -279,6 +286,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 capabilityProbe = object : AndroidCapabilityProbe {
                     override fun current(): AndroidCapabilitySnapshotInput =
@@ -320,6 +328,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 sessionFactory = { sink ->
                     session.sink = sink
@@ -353,6 +362,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 capabilityProbe = object : AndroidCapabilityProbe {
                     override fun current(): AndroidCapabilitySnapshotInput =
@@ -409,6 +419,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 capabilityProbe = object : AndroidCapabilityProbe {
                     override fun current(): AndroidCapabilitySnapshotInput =
@@ -475,6 +486,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 capabilityProbe = object : AndroidCapabilityProbe {
                     override fun current(): AndroidCapabilitySnapshotInput =
@@ -525,6 +537,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 capabilityProbe = object : AndroidCapabilityProbe {
                     override fun current(): AndroidCapabilitySnapshotInput =
@@ -577,6 +590,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 capabilityProbe = object : AndroidCapabilityProbe {
                     override fun current(): AndroidCapabilitySnapshotInput =
@@ -629,6 +643,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 discovery = discovery,
             ),
@@ -669,6 +684,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 25,
+                sensorTelemetryIntervalMillis = 0,
                 reconnectPolicy = ReconnectPolicy(initialDelayMillis = 1, maxDelayMillis = 1),
                 maxReconnectAttempts = 1,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
@@ -702,6 +718,7 @@ class AndroidTerminalAppSmokeTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 25,
+                sensorTelemetryIntervalMillis = 0,
                 reconnectPolicy = ReconnectPolicy(initialDelayMillis = 1, maxDelayMillis = 1),
                 maxReconnectAttempts = 1,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
@@ -747,6 +764,8 @@ class AndroidTerminalAppSmokeTest {
         override suspend fun sendHeartbeat() {
             heartbeatError?.let { throw it }
         }
+
+        override suspend fun sendSensorTelemetry() = Unit
 
         override suspend fun sendUiAction(action: ServerDrivenAction) {
             actions += action

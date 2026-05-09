@@ -40,14 +40,19 @@ class AndroidControlSessionControllerTest {
         val controller = controller(client = client)
 
         controller.sendHeartbeat()
+        controller.sendSensorTelemetry()
         controller.sendUiAction(ServerDrivenAction(componentId = "start", action = "tap", value = "go"))
 
         assertTrue(client.sent[0].hasHeartbeat())
         assertEquals(4242, client.sent[0].heartbeat.unixMs)
-        assertTrue(client.sent[1].hasInput())
-        assertEquals("start", client.sent[1].input.uiAction.componentId)
-        assertEquals("tap", client.sent[1].input.uiAction.action)
-        assertEquals("go", client.sent[1].input.uiAction.value)
+        assertTrue(client.sent[1].hasSensor())
+        assertEquals(4242, client.sent[1].sensor.unixMs)
+        assertEquals(0.0, client.sent[1].sensor.valuesMap["battery.level"]!!, 0.001)
+        assertEquals(0.0, client.sent[1].sensor.valuesMap["battery.charging"]!!, 0.001)
+        assertTrue(client.sent[2].hasInput())
+        assertEquals("start", client.sent[2].input.uiAction.componentId)
+        assertEquals("tap", client.sent[2].input.uiAction.action)
+        assertEquals("go", client.sent[2].input.uiAction.value)
     }
 
     @Test

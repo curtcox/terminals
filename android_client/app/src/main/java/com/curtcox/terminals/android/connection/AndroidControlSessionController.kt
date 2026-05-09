@@ -15,6 +15,7 @@ interface AndroidControlSession {
     val status: ControlSessionStatus
     suspend fun connect(endpoint: EndpointResolution)
     suspend fun sendHeartbeat()
+    suspend fun sendSensorTelemetry()
     suspend fun sendUiAction(action: ServerDrivenAction)
     suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean
     suspend fun rebaselineCapabilitiesAfterStaleGeneration()
@@ -55,6 +56,16 @@ class AndroidControlSessionController(
 
     override suspend fun sendHeartbeat() {
         client.send(builders.heartbeat(deviceId, clock.nowMillis()))
+    }
+
+    override suspend fun sendSensorTelemetry() {
+        val request =
+            builders.sensorTelemetryFromCapabilities(
+                deviceId,
+                capabilities.lastRegisteredCapabilities,
+                clock.nowMillis(),
+            ) ?: return
+        client.send(request)
     }
 
     override suspend fun sendUiAction(action: ServerDrivenAction) {

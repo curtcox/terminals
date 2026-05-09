@@ -16,6 +16,10 @@ class AndroidCapabilitySession(
     private var generation: Long = 0
     private var lastCapabilities: Capabilities.DeviceCapabilities? = null
 
+    /** Last capabilities sent on the control stream (snapshot or delta), for sensor telemetry parity. */
+    val lastRegisteredCapabilities: Capabilities.DeviceCapabilities?
+        get() = lastCapabilities
+
     fun snapshot(reason: String = "initial"): AndroidCapabilityReport {
         generation += 1
         val capabilities = buildCapabilities(deviceId, probe.current())
