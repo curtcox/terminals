@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
         super.onConfigurationChanged(newConfig)
         viewModel.refreshNetworkDiagnostics("configuration")
         viewModel.refreshPermissionEducation("configuration")
-        viewModel.refreshCapabilities("configuration")
+        viewModel.refreshCapabilities("display_geometry_change")
     }
 
     private class AndroidTerminalViewModelFactory(

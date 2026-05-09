@@ -141,8 +141,10 @@ control stream (same fields and pacing as the Flutter reference client: about
 every 15 seconds when battery capability is present). As with Flutter, periodic
 heartbeat and sensor telemetry pause while the activity is stopped (app not
 visible); the control session stays open. On each foreground/background
-transition, the client sends a capability delta with reason `app-lifecycle-change`
-(matching Flutter `app_lifecycle_change`). Network-callback capability refreshes
+transition, the client sends a capability delta with reason `app_lifecycle_change`
+(same string as the Flutter reference client). On `Activity` configuration changes
+that affect display metrics, capability refresh uses `display_geometry_change`,
+also matching Flutter. Network-callback capability refreshes
 and automatic discovery restarts are suppressed while stopped so background
 network flapping does not spam the control stream or thrash NSD.
 

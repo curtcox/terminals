@@ -908,12 +908,12 @@ class AndroidTerminalViewModelTest {
 
         viewModel.setAppForegrounded(false)
         advanceUntilIdle()
-        assertEquals(listOf("app-lifecycle-change"), session.capabilityDeltaReasons)
+        assertEquals(listOf("app_lifecycle_change"), session.capabilityDeltaReasons)
 
         viewModel.setAppForegrounded(true)
         advanceUntilIdle()
         assertEquals(
-            listOf("app-lifecycle-change", "app-lifecycle-change"),
+            listOf("app_lifecycle_change", "app_lifecycle_change"),
             session.capabilityDeltaReasons,
         )
         viewModel.disconnect()
@@ -1901,11 +1901,11 @@ class AndroidTerminalViewModelTest {
         viewModel.updateEndpoint("10.0.0.8:8080")
         viewModel.connect()
         advanceUntilIdle()
-        viewModel.refreshCapabilities("configuration")
+        viewModel.refreshCapabilities("display_geometry_change")
         advanceUntilIdle()
 
-        assertEquals(listOf("configuration"), session.capabilityDeltaReasons)
-        assertTrue(viewModel.state.value.diagnosticsText.contains("last_capability_delta=configuration"))
+        assertEquals(listOf("display_geometry_change"), session.capabilityDeltaReasons)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_capability_delta=display_geometry_change"))
         viewModel.disconnect()
         advanceUntilIdle()
     }

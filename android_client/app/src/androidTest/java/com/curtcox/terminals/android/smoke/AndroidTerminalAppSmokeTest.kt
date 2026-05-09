@@ -322,7 +322,7 @@ class AndroidTerminalAppSmokeTest {
     }
 
     @Test
-    fun lifecycleCapabilityRefreshReachesConnectedSession() {
+    fun displayGeometryCapabilityRefreshReachesConnectedSession() {
         val session = FakeSession(capabilityDeltaResult = true)
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -343,10 +343,10 @@ class AndroidTerminalAppSmokeTest {
         compose.onNodeWithTag("terminal-connect-button").performClick()
         compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
 
-        viewModel.refreshCapabilities("configuration")
+        viewModel.refreshCapabilities("display_geometry_change")
 
-        compose.waitUntil { session.capabilityRefreshReasons == listOf("configuration") }
-        compose.onNodeWithText("last_capability_delta=configuration", substring = true).assertIsDisplayed()
+        compose.waitUntil { session.capabilityRefreshReasons == listOf("display_geometry_change") }
+        compose.onNodeWithText("last_capability_delta=display_geometry_change", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -397,9 +397,9 @@ class AndroidTerminalAppSmokeTest {
             density = 2f,
             orientation = "portrait",
         )
-        viewModel.refreshCapabilities("configuration")
+        viewModel.refreshCapabilities("display_geometry_change")
 
-        compose.waitUntil { session.capabilityRefreshReasons == listOf("configuration") }
+        compose.waitUntil { session.capabilityRefreshReasons == listOf("display_geometry_change") }
         compose.onNodeWithText("cap_orientation=portrait", substring = true).assertIsDisplayed()
         compose.onNodeWithText("cap_display_px=800x1280", substring = true).assertIsDisplayed()
     }

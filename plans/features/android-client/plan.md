@@ -1125,6 +1125,10 @@ Remaining validation:
 - Added instrumentation coverage in `ServerDrivenRendererTest`: brightness clamp for negative values, device-control children rendering for keep-awake/fullscreen/brightness, and multi-child padding rendering as a `Column`.
 - Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Gradle was not runnable on this agent host (no Java runtime).
 
+### 2026-05-09 (Flutter parity: capability delta reason strings)
+
+- Aligned native Android capability delta reasons with the Flutter reference client: lifecycle transitions now use `app_lifecycle_change` (underscores, not `app-lifecycle-change`); `MainActivity.onConfigurationChanged` capability refresh now uses `display_geometry_change` instead of `configuration`. Updated JVM and instrumentation expectations, `docs/client-android.md`, and smoke test naming.
+
 ### 2026-05-09 (renderer instrumentation: toggle, surfaces, image a11y)
 
 - Added instrumentation coverage for `ToggleWidget` action `componentId` fallback to `toggle` when protobuf/props ids are absent (parity with `ButtonWidget` fallback tests).
@@ -1148,7 +1152,7 @@ Remaining validation:
 
 ### 2026-05-09 (Flutter lifecycle parity: capability delta + network suppression)
 
-- On each foreground/background transition while connected, Android now sends a capability delta with reason `app-lifecycle-change`, matching Flutter `_sendLifecycleCapabilityUpdate(reason: 'app_lifecycle_change')`.
+- On each foreground/background transition while connected, Android sends a capability delta with reason `app_lifecycle_change`, matching Flutter `_sendLifecycleCapabilityUpdate(reason: 'app_lifecycle_change')`. Configuration-driven display refreshes use `display_geometry_change`, matching Flutter display-metric updates.
 - Network-monitor capability refreshes are skipped while the activity is stopped (`capability_refresh_suppressed=app-background` in diagnostics) so background connectivity churn does not spam capability traffic.
 - JVM coverage: `AndroidTerminalViewModelTest.appLifecycleChangeSendsCapabilityDeltaWhenConnected`, `networkMonitorSkipsCapabilityRefreshWhenBackgrounded`. Docs updated in `docs/client-android.md`.
 

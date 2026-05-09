@@ -120,14 +120,14 @@ class AndroidTerminalViewModel(
         if (!foregrounded) {
             stopHeartbeat()
             stopSensorTelemetry()
-            refreshCapabilitiesIfConnected("app-lifecycle-change")
+            refreshCapabilitiesIfConnected("app_lifecycle_change")
             return
         }
         val connectedSession = session ?: return
         if (mutableState.value.connectionState != ConnectionState.Connected) return
         startHeartbeat(connectedSession)
         startSensorTelemetry(connectedSession)
-        refreshCapabilitiesIfConnected("app-lifecycle-change")
+        refreshCapabilitiesIfConnected("app_lifecycle_change")
     }
 
     fun updateEndpoint(text: String) {
@@ -949,7 +949,7 @@ class AndroidTerminalViewModel(
         refreshCapabilities(reason)
     }
 
-    /** Matches Flutter shell lifecycle: capability delta on foreground/background transitions. */
+    /** Matches Flutter shell lifecycle: capability delta on foreground/background transitions (`app_lifecycle_change`). */
     private fun refreshCapabilitiesIfConnected(reason: String) {
         if (session == null) return
         if (mutableState.value.connectionState != ConnectionState.Connected) return
