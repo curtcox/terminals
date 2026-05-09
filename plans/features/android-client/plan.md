@@ -1022,6 +1022,11 @@ Remaining validation:
 - Added `ControlResponseDispatcherTest.registerAckBlankAssetBaseUrlPreservesPriorUrl` so a follow-up `RegisterAck` without `ServerMetadata.photo_frame_asset_base_url` keeps the prior asset base URL (same merge pattern as `register_ack_message` / `register_ack_server_id`).
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
+### 2026-05-08 (activity status ordering parity)
+
+- Reordered `connectResponseActivityStatus` in `ControlResponseDispatcher.kt` so explicit payload branches follow the same sequence as Flutter `statusFromConnectResponse` (notably `NOTIFICATION` immediately after `ROUTE_STREAM`), keeping cross-client diagnostics conventions easy to diff by eye.
+- Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Gradle unit tests were not run on this host (no JRE installed).
+
 ## Test Plan
 
 ### Unit tests

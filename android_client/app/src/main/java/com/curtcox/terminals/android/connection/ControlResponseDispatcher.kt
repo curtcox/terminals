@@ -15,6 +15,7 @@ fun connectResponseActivityStatus(response: Control.ConnectResponse): String =
         Control.ConnectResponse.PayloadCase.START_STREAM -> "Stream started"
         Control.ConnectResponse.PayloadCase.STOP_STREAM -> "Stream stopped"
         Control.ConnectResponse.PayloadCase.ROUTE_STREAM -> "Route updated"
+        Control.ConnectResponse.PayloadCase.NOTIFICATION -> "Notification"
         Control.ConnectResponse.PayloadCase.WEBRTC_SIGNAL -> "WebRTC signal"
         Control.ConnectResponse.PayloadCase.PLAY_AUDIO -> "Play audio"
         Control.ConnectResponse.PayloadCase.SHOW_MEDIA -> "Show media"
@@ -29,7 +30,6 @@ fun connectResponseActivityStatus(response: Control.ConnectResponse): String =
         Control.ConnectResponse.PayloadCase.REGISTER_ACK -> "Registered"
         Control.ConnectResponse.PayloadCase.COMMAND_RESULT -> "Command response"
         Control.ConnectResponse.PayloadCase.SET_UI -> "UI updated"
-        Control.ConnectResponse.PayloadCase.NOTIFICATION -> "Notification"
         Control.ConnectResponse.PayloadCase.HELLO_ACK,
         Control.ConnectResponse.PayloadCase.CAPABILITY_ACK,
         Control.ConnectResponse.PayloadCase.HEARTBEAT,
