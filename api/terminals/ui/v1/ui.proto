@@ -12,7 +12,8 @@ message SetUI {
 message UpdateUI {
   string device_id = 1;
   string component_id = 2;
-  Node node = 3;
+  // Presence tracks whether a node patch is included (wire-compatible with proto3 implicit presence).
+  optional Node node = 3;
 }
 
 message TransitionUI {

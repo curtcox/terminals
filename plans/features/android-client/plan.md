@@ -990,6 +990,13 @@ Remaining validation:
 
 - Extended Flutter `statusFromConnectResponse` to return `Show media` and `Notification` for the corresponding `ConnectResponse` payloads (matching native Android `connectResponseActivityStatus` and avoiding a misleading `Connected` status). Added `control_response_dispatcher` unit expectations; `flutter test test/connection/control_response_dispatcher_test.dart` passes.
 
+### 2026-05-08 (UpdateUI parity: optional node + Android dispatch)
+
+- Marked `terminals.ui.v1.UpdateUI.node` as `optional` in `api/terminals/ui/v1/ui.proto` so generated bindings track presence on the wire (compatible with existing clients; `buf breaking` clean).
+- Regenerated protobufs (`make proto-generate`); Go suite and Flutter `control_response_dispatcher` tests pass.
+- Aligned native Android `ControlResponseDispatcher` `UpdateUI` handling with Flutter `applyUpdateUi`: no `node` leaves the tree unchanged; blank `component_id` replaces the entire root (including establishing a root when it was previously absent).
+- Extended `ControlResponseDispatcherTest` for blank component id, null-root bootstrap, and missing-node no-ops.
+
 ## Test Plan
 
 ### Unit tests

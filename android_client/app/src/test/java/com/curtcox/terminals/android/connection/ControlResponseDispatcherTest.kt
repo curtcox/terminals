@@ -78,6 +78,59 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun updateUiWithBlankComponentIdReplacesEntireRoot() {
+        val oldRoot = textNode("root", "Old")
+        val fresh = textNode("root", "New")
+        val response = Control.ConnectResponse.newBuilder()
+            .setUpdateUi(
+                Ui.UpdateUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setComponentId("   ")
+                    .setNode(fresh),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(serverRoot = oldRoot), response)
+
+        assertEquals(fresh, next.serverRoot)
+    }
+
+    @Test
+    fun updateUiWithBlankComponentIdSetsRootWhenPreviouslyNull() {
+        val fresh = textNode("solo", "Only")
+        val response = Control.ConnectResponse.newBuilder()
+            .setUpdateUi(
+                Ui.UpdateUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setComponentId("")
+                    .setNode(fresh),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals(fresh, next.serverRoot)
+        assertEquals("UI patched", next.lastControlResponseActivity)
+    }
+
+    @Test
+    fun updateUiWithoutNodeLeavesExistingRootUnchanged() {
+        val root = textNode("keep", "Value")
+        val response = Control.ConnectResponse.newBuilder()
+            .setUpdateUi(
+                Ui.UpdateUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setComponentId("any"),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(serverRoot = root), response)
+
+        assertEquals(root, next.serverRoot)
+        assertEquals("UI patched", next.lastControlResponseActivity)
+    }
+
+    @Test
     fun bugReportAckRecordsDiagnosticsChrome() {
         val ack = BugReportAck.newBuilder()
             .setReportId("br-7")

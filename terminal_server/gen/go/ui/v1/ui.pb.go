@@ -123,10 +123,11 @@ func (x *SetUI) GetRoot() *Node {
 }
 
 type UpdateUI struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	ComponentId   string                 `protobuf:"bytes,2,opt,name=component_id,json=componentId,proto3" json:"component_id,omitempty"`
-	Node          *Node                  `protobuf:"bytes,3,opt,name=node,proto3" json:"node,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId    string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	ComponentId string                 `protobuf:"bytes,2,opt,name=component_id,json=componentId,proto3" json:"component_id,omitempty"`
+	// Presence tracks whether a node patch is included (wire-compatible with proto3 implicit presence).
+	Node          *Node `protobuf:"bytes,3,opt,name=node,proto3,oneof" json:"node,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2352,11 +2353,12 @@ const file_terminals_ui_v1_ui_proto_rawDesc = "" +
 	"\x18terminals/ui/v1/ui.proto\x12\x0fterminals.ui.v1\"O\n" +
 	"\x05SetUI\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12)\n" +
-	"\x04root\x18\x02 \x01(\v2\x15.terminals.ui.v1.NodeR\x04root\"u\n" +
+	"\x04root\x18\x02 \x01(\v2\x15.terminals.ui.v1.NodeR\x04root\"\x83\x01\n" +
 	"\bUpdateUI\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12!\n" +
-	"\fcomponent_id\x18\x02 \x01(\tR\vcomponentId\x12)\n" +
-	"\x04node\x18\x03 \x01(\v2\x15.terminals.ui.v1.NodeR\x04node\"l\n" +
+	"\fcomponent_id\x18\x02 \x01(\tR\vcomponentId\x12.\n" +
+	"\x04node\x18\x03 \x01(\v2\x15.terminals.ui.v1.NodeH\x00R\x04node\x88\x01\x01B\a\n" +
+	"\x05_node\"l\n" +
 	"\fTransitionUI\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x1e\n" +
 	"\n" +
@@ -2607,6 +2609,7 @@ func file_terminals_ui_v1_ui_proto_init() {
 	if File_terminals_ui_v1_ui_proto != nil {
 		return
 	}
+	file_terminals_ui_v1_ui_proto_msgTypes[1].OneofWrappers = []any{}
 	file_terminals_ui_v1_ui_proto_msgTypes[4].OneofWrappers = []any{
 		(*Node_Stack)(nil),
 		(*Node_Row)(nil),

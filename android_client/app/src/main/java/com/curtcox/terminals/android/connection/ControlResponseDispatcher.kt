@@ -62,11 +62,18 @@ class ControlResponseDispatcher {
             Control.ConnectResponse.PayloadCase.REGISTER_ACK -> mergeRegisterAck(state, response)
             Control.ConnectResponse.PayloadCase.SET_UI -> state.copy(serverRoot = response.setUi.root)
             Control.ConnectResponse.PayloadCase.UPDATE_UI -> {
-                val root = state.serverRoot
-                if (root == null) {
+                val update = response.updateUi
+                if (!update.hasNode()) {
                     state
                 } else {
-                    state.copy(serverRoot = replaceNode(root, response.updateUi.componentId, response.updateUi.node))
+                    val replacement = update.node
+                    val targetId = update.componentId.trim()
+                    val root = state.serverRoot
+                    when {
+                        targetId.isEmpty() -> state.copy(serverRoot = replacement)
+                        root == null -> state
+                        else -> state.copy(serverRoot = replaceNode(root, targetId, replacement))
+                    }
                 }
             }
             Control.ConnectResponse.PayloadCase.TRANSITION_UI -> {
