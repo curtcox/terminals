@@ -187,6 +187,87 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun chromeBugReportFlushMultipleQueuedAllSucceed() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
+
+        viewModel.submitChromeBugReport()
+        viewModel.submitChromeBugReport()
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.lastBugReportSubmitStatus!!.contains("Queued"))
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        assertEquals(2, session.bugReports.size)
+        assertTrue(viewModel.state.value.lastBugReportSubmitStatus!!.contains("Sent 2 queued bug reports"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun chromeBugReportFlushPartialFailureSummarizesCounts() = runTest(dispatcher) {
+        val session =
+            FakeSession().apply {
+                bugReportFailurePattern = listOf(true, false)
+            }
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
+
+        viewModel.submitChromeBugReport()
+        viewModel.submitChromeBugReport()
+        advanceUntilIdle()
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        assertEquals(1, session.bugReports.size)
+        val status = viewModel.state.value.lastBugReportSubmitStatus!!
+        assertTrue(status.contains("1 of 2"))
+        assertTrue(status.contains("failed"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun chromeBugReportFlushAllFailRecordsFailure() = runTest(dispatcher) {
+        val session =
+            FakeSession().apply {
+                bugReportFailurePattern = listOf(true, true)
+            }
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
+
+        viewModel.submitChromeBugReport()
+        viewModel.submitChromeBugReport()
+        advanceUntilIdle()
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        assertEquals(0, session.bugReports.size)
+        assertTrue(viewModel.state.value.lastBugReportSubmitStatus!!.contains("failed to send"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun refreshNetworkDiagnosticsSamplesCurrentNetworkState() {
         val states = ArrayDeque(
             listOf(
@@ -2278,6 +2359,9 @@ class AndroidTerminalViewModelTest {
         var connectedEndpoint: EndpointResolution? = null
         val actions = mutableListOf<ServerDrivenAction>()
         val bugReports = mutableListOf<Diagnostics.BugReport>()
+        /** Per-call: `true` means [sendBugReport] throws for that attempt (flush continues). */
+        var bugReportFailurePattern: List<Boolean> = emptyList()
+        private var bugReportAttemptIndex = 0
         val keyTexts = mutableListOf<String>()
         val capabilityDeltaReasons = mutableListOf<String>()
         var rebaselineCount = 0
@@ -2311,6 +2395,13 @@ class AndroidTerminalViewModelTest {
         }
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) {
+            if (bugReportFailurePattern.isNotEmpty()) {
+                val fail = bugReportFailurePattern.getOrElse(bugReportAttemptIndex) { false }
+                bugReportAttemptIndex++
+                if (fail) {
+                    throw IllegalStateException("simulated-bug-report-send-failure")
+                }
+            }
             bugReports += report
         }
 

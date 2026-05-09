@@ -1187,6 +1187,7 @@ Remaining validation:
 - `flushQueuedBugReports` now updates `lastBugReportSubmitStatus` after sending queued reports (initial connect and reconnect), including multi-report and partial-failure summaries.
 - Added `AndroidBugReportBuilderTest`, `AndroidTerminalViewModelTest.chromeBugReportQueuedThenFlushedOnConnect`, and `MainActivityLaunchSmokeTest.reportBugWhileOfflineShowsQueuedStatus`.
 - Documented shell bug reporting, queueing, `bug_report*` actions, and `BugReportAck` diagnostics in `docs/client-android.md`.
+- Added `AndroidTerminalViewModelTest` coverage for queued bug-report flush when multiple reports are pending (`chromeBugReportFlushMultipleQueuedAllSucceed`), when the first send fails and a later one succeeds (`chromeBugReportFlushPartialFailureSummarizesCounts`), and when every queued send fails (`chromeBugReportFlushAllFailRecordsFailure`), using a `FakeSession` per-attempt failure pattern.
 
 ## Test Plan
 
