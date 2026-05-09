@@ -276,6 +276,20 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun gestureAreaWithNoChildrenExposesMinimumTapTarget() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = Ui.Node.newBuilder()
+            .setId("tap-target")
+            .setGestureArea(Ui.GestureAreaWidget.newBuilder().setAction("tap-empty").build())
+            .build()
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithTag("terminal-node-tap-target").performClick()
+
+        assertEquals(listOf(ServerDrivenAction("tap-target", "tap-empty")), actions)
+    }
+
+    @Test
     fun stackPreservesChildOrderAndStableTags() {
         val root = Ui.Node.newBuilder()
             .setId("root")

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.ColumnScope
@@ -159,7 +160,8 @@ private fun RenderNode(
         }
         Ui.Node.WidgetCase.TEXT -> Text(
             text = node.text.value,
-            modifier = props.modifier(),
+            // Match Flutter `server_driven_renderer.dart`: symmetric vertical padding around text.
+            modifier = props.modifier().padding(vertical = 4.dp),
             color = parseColorOrUnspecified(node.text.color),
             fontFamily = if (node.text.style == "monospace") FontFamily.Monospace else null,
         )
@@ -169,7 +171,8 @@ private fun RenderNode(
         Ui.Node.WidgetCase.CANVAS -> TerminalCanvas(node, props.modifier().fillMaxSize())
         Ui.Node.WidgetCase.TEXT_INPUT -> TerminalTextInput(node, props, onAction)
         Ui.Node.WidgetCase.BUTTON -> Button(
-            modifier = props.modifier(),
+            // Match Flutter: Padding(vertical: 4) around the button.
+            modifier = props.modifier().padding(vertical = 4.dp),
             onClick = {
                 onAction(
                     ServerDrivenAction(
@@ -211,8 +214,8 @@ private fun RenderNode(
             modifier = props.modifier(),
         )
         Ui.Node.WidgetCase.DROPDOWN -> TerminalDropdown(node, props, onAction)
-        Ui.Node.WidgetCase.GESTURE_AREA -> Box(
-            props.modifier().pointerInput(node.id) {
+        Ui.Node.WidgetCase.GESTURE_AREA -> {
+            val tapModifier = Modifier.pointerInput(node.id) {
                 detectTapGestures {
                     onAction(
                         ServerDrivenAction(
@@ -221,8 +224,16 @@ private fun RenderNode(
                         ),
                     )
                 }
-            },
-        ) { RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
+            }
+            // Match Flutter: empty gesture areas use a 48×48 minimum hit target.
+            if (node.childrenList.isEmpty()) {
+                Box(props.modifier().then(tapModifier).size(48.dp)) {}
+            } else {
+                Box(props.modifier().then(tapModifier)) {
+                    RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                }
+            }
+        }
         Ui.Node.WidgetCase.OVERLAY -> Box(props.modifier()) {
             RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
         }

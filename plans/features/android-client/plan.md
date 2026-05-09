@@ -1086,6 +1086,9 @@ Remaining validation:
 - Added renderer instrumentation coverage for invalid dropdown values, empty dropdown options, and `Expand` inside `Stack`.
 - Matched Flutter `GridWidget` layout: replaced `LazyVerticalGrid` with `BoxWithConstraints` + `FlowRow`, 8dp horizontal/vertical gaps, and the same per-cell width formula as Flutter (`Wrap` + `SizedBox`) so column counts and wrapping match the reference client.
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Gradle tasks were not executed on this host (no Java runtime).
+- Matched Flutter `TextWidget` / `ButtonWidget` spacing: 4dp vertical padding on native `Text` and `Button` nodes.
+- Matched Flutter `GestureAreaWidget` empty-child behavior: 48×48 dp minimum hit target; added `ServerDrivenRendererTest.gestureAreaWithNoChildrenExposesMinimumTapTarget`.
+- Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh` after renderer parity tweaks (Gradle not run on this host: no Java runtime).
 
 ## Test Plan
 
