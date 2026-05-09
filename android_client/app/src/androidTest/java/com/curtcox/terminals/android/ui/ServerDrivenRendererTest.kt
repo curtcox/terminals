@@ -3,8 +3,10 @@ package com.curtcox.terminals.android.ui
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.fetchSemanticsNode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -13,6 +15,7 @@ import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import terminals.ui.v1.Ui
@@ -534,6 +537,36 @@ class ServerDrivenRendererTest {
         compose.setContent { render(root) }
 
         compose.onNodeWithTag("terminal-node-prog").assertIsDisplayed()
+    }
+
+    @Test
+    fun progressWidgetClampsValueAboveOneToMatchFlutter() {
+        val root = node("prog") {
+            progress = Ui.ProgressWidget.newBuilder().setValue(1.8).build()
+        }
+
+        compose.setContent { render(root) }
+
+        val rangeInfo =
+            compose.onNodeWithTag("terminal-node-prog").fetchSemanticsNode()
+                .config[SemanticsProperties.ProgressBarRangeInfo]
+        assertNotNull(rangeInfo)
+        assertEquals(1f, rangeInfo!!.current, 0.001f)
+    }
+
+    @Test
+    fun progressWidgetClampsNegativeValueToMatchFlutter() {
+        val root = node("prog") {
+            progress = Ui.ProgressWidget.newBuilder().setValue(-0.5).build()
+        }
+
+        compose.setContent { render(root) }
+
+        val rangeInfo =
+            compose.onNodeWithTag("terminal-node-prog").fetchSemanticsNode()
+                .config[SemanticsProperties.ProgressBarRangeInfo]
+        assertNotNull(rangeInfo)
+        assertEquals(0f, rangeInfo!!.current, 0.001f)
     }
 
     @Test

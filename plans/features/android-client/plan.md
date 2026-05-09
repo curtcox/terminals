@@ -1089,6 +1089,7 @@ Remaining validation:
 - Matched Flutter `TextWidget` / `ButtonWidget` spacing: 4dp vertical padding on native `Text` and `Button` nodes.
 - Matched Flutter `GestureAreaWidget` empty-child behavior: 48×48 dp minimum hit target; added `ServerDrivenRendererTest.gestureAreaWithNoChildrenExposesMinimumTapTarget`.
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh` after renderer parity tweaks (Gradle not run on this host: no Java runtime).
+- Added Compose instrumentation coverage for `ProgressWidget` value clamping to `[0, 1]` via semantics (`ProgressBarRangeInfo`), matching Flutter `LinearProgressIndicator` clamp behavior for out-of-range server values.
 
 ## Test Plan
 
