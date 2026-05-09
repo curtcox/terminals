@@ -825,6 +825,75 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun backgroundPausesHeartbeatAndSensorTelemetryLoops() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            heartbeatIntervalMillis = 100,
+            sensorTelemetryIntervalMillis = 100,
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(250)
+        runCurrent()
+
+        val heartbeatBefore = session.heartbeatCount
+        val sensorBefore = session.sensorTelemetryCount
+        assertTrue(heartbeatBefore >= 1)
+        assertTrue(sensorBefore >= 1)
+
+        viewModel.setAppForegrounded(false)
+        runCurrent()
+        advanceTimeBy(400)
+        runCurrent()
+
+        assertEquals(heartbeatBefore, session.heartbeatCount)
+        assertEquals(sensorBefore, session.sensorTelemetryCount)
+
+        viewModel.setAppForegrounded(true)
+        runCurrent()
+        advanceTimeBy(250)
+        runCurrent()
+
+        assertTrue(session.heartbeatCount > heartbeatBefore)
+        assertTrue(session.sensorTelemetryCount > sensorBefore)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun connectWhileBackgroundedDoesNotStartLoopsUntilForegrounded() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            heartbeatIntervalMillis = 100,
+            sensorTelemetryIntervalMillis = 100,
+        )
+
+        viewModel.setAppForegrounded(false)
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals(0, session.heartbeatCount)
+        assertEquals(0, session.sensorTelemetryCount)
+
+        viewModel.setAppForegrounded(true)
+        runCurrent()
+        advanceTimeBy(250)
+        runCurrent()
+        assertTrue(session.heartbeatCount >= 1)
+        assertTrue(session.sensorTelemetryCount >= 1)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun heartbeatFailureReconnectsWithBoundedBackoff() = runTest(dispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
         val second = FakeSession()

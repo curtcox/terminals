@@ -138,7 +138,9 @@ Retry attempt, success, and exhaustion status are recorded in local diagnostics.
 
 While connected, the client also sends periodic battery sensor telemetry on the
 control stream (same fields and pacing as the Flutter reference client: about
-every 15 seconds when battery capability is present).
+every 15 seconds when battery capability is present). As with Flutter, periodic
+heartbeat and sensor telemetry pause while the activity is stopped (app not
+visible); the control session stays open.
 
 The APK declares microphone and camera permissions so capability reporting and
 future media capture can reflect runtime permission state. WebRTC media

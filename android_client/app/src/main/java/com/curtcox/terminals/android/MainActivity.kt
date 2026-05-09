@@ -29,6 +29,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        viewModel.setAppForegrounded(true)
+    }
+
+    override fun onStop() {
+        viewModel.setAppForegrounded(false)
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
         viewModel.refreshNetworkDiagnostics("activity-resume")

@@ -85,8 +85,6 @@ class AndroidTerminalViewModel(
                 effectiveHeartbeatMillis = if (ms > 0) ms else dependencies.heartbeatIntervalMillis
                 val connectedSession = session
                 if (connectedSession != null) {
-                    stopHeartbeat()
-                    stopSensorTelemetry()
                     startHeartbeat(connectedSession)
                     startSensorTelemetry(connectedSession)
                 }
@@ -104,11 +102,31 @@ class AndroidTerminalViewModel(
     private var lastNetworkReconnectRestoreAtMillis: Long = -1
     private var reconnectExhausted: Boolean = false
     private var effectiveHeartbeatMillis: Long = dependencies.heartbeatIntervalMillis
+    /** When false, periodic heartbeat and sensor telemetry are paused (Flutter `AppLifecycle` parity). */
+    private var appInForeground: Boolean = true
     private val mutableState = MutableStateFlow(
         initialState(),
     )
 
     val state: StateFlow<AndroidTerminalViewState> = mutableState
+
+    /**
+     * Mirrors Flutter terminal shell behavior: outbound heartbeat and sensor telemetry loops run only
+     * while the app is foregrounded (`Activity.onStart` / `Activity.onStop`).
+     */
+    fun setAppForegrounded(foregrounded: Boolean) {
+        if (appInForeground == foregrounded) return
+        appInForeground = foregrounded
+        if (!foregrounded) {
+            stopHeartbeat()
+            stopSensorTelemetry()
+            return
+        }
+        val connectedSession = session ?: return
+        if (mutableState.value.connectionState != ConnectionState.Connected) return
+        startHeartbeat(connectedSession)
+        startSensorTelemetry(connectedSession)
+    }
 
     fun updateEndpoint(text: String) {
         val resolved = parser.parse(text)
@@ -516,11 +534,12 @@ class AndroidTerminalViewModel(
         }
 
     private fun startHeartbeat(connectedSession: AndroidControlSession) {
+        stopHeartbeat()
         val intervalMs = when {
             effectiveHeartbeatMillis > 0 -> effectiveHeartbeatMillis
             else -> dependencies.heartbeatIntervalMillis
         }
-        if (intervalMs <= 0) return
+        if (intervalMs <= 0 || !appInForeground) return
         heartbeatJob = viewModelScope.launch {
             while (true) {
                 delay(intervalMs)
@@ -535,8 +554,9 @@ class AndroidTerminalViewModel(
     }
 
     private fun startSensorTelemetry(connectedSession: AndroidControlSession) {
+        stopSensorTelemetry()
         val intervalMs = dependencies.sensorTelemetryIntervalMillis
-        if (intervalMs <= 0) return
+        if (intervalMs <= 0 || !appInForeground) return
         sensorTelemetryJob = viewModelScope.launch {
             while (true) {
                 delay(intervalMs)

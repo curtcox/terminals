@@ -1142,6 +1142,10 @@ Remaining validation:
 
 - Implemented periodic control-stream sensor telemetry aligned with Flutter `buildSensorTelemetryRequest`: `battery.level` and `battery.charging` from the last registered capability snapshot, default interval 15 seconds (`AndroidClientDependencies.sensorTelemetryIntervalMillis`), wired through `ProtocolBuilders.sensorTelemetryFromCapabilities`, `AndroidControlSession.sendSensorTelemetry`, and `AndroidTerminalViewModel` alongside the heartbeat loop (including reconnect and HelloAck restart behavior). Added JVM coverage (`ProtocolBuildersTest`, `AndroidControlSessionControllerTest`, `AndroidTerminalViewModelTest.connectedSessionSendsPeriodicSensorTelemetry`); instrumentation fakes set `sensorTelemetryIntervalMillis = 0` where heartbeats are disabled. Documented behavior in `docs/client-android.md`.
 
+### 2026-05-09 (Flutter lifecycle parity: pause heartbeat/sensor)
+
+- Paused periodic heartbeat and battery sensor telemetry while the activity is stopped (`MainActivity.onStop`), matching Flutter shell behavior when `AppLifecycleState` is not `resumed`. Added `AndroidTerminalViewModel.setAppForegrounded`, made `startHeartbeat` / `startSensorTelemetry` idempotent and foreground-gated, and JVM tests (`backgroundPausesHeartbeatAndSensorTelemetryLoops`, `connectWhileBackgroundedDoesNotStartLoopsUntilForegrounded`). Documented pause semantics in `docs/client-android.md`. Agent host had no JRE; run `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'` locally.
+
 ## Test Plan
 
 ### Unit tests
