@@ -163,6 +163,49 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun serverHeartbeatRecordsLastServerUnixMs() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setHeartbeat(
+                Control.Heartbeat.newBuilder()
+                    .setDeviceId("device-1")
+                    .setUnixMs(1_700_000_000_000L),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals(1_700_000_000_000L, next.lastServerHeartbeatUnixMs)
+    }
+
+    @Test
+    fun serverHeartbeatWithoutTimestampClearsRecordedValue() {
+        val seeded = AndroidTerminalViewState(lastServerHeartbeatUnixMs = 42L)
+        val response = Control.ConnectResponse.newBuilder()
+            .setHeartbeat(Control.Heartbeat.newBuilder().setDeviceId("device-1"))
+            .build()
+
+        val next = dispatcher.dispatch(seeded, response)
+
+        assertNull(next.lastServerHeartbeatUnixMs)
+    }
+
+    @Test
+    fun commandResultRecordsRequestIdAndNotification() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setCommandResult(
+                Control.CommandResult.newBuilder()
+                    .setRequestId("cmd-7")
+                    .setNotification("Started timer"),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("cmd-7", next.lastCommandResultRequestId)
+        assertEquals("Started timer", next.lastCommandResultNotification)
+    }
+
+    @Test
     fun notificationAndErrorUpdateGenericTerminalState() {
         val notification = Control.ConnectResponse.newBuilder()
             .setNotification(

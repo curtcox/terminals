@@ -1068,6 +1068,64 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun serverHeartbeatIsSurfacedInDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setHeartbeat(
+                    Control.Heartbeat.newBuilder()
+                        .setDeviceId("device-1")
+                        .setUnixMs(1_700_000_000_000L),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(1_700_000_000_000L, viewModel.state.value.lastServerHeartbeatUnixMs)
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_server_heartbeat_unix_ms=1700000000000"),
+        )
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun serverCommandResultIsSurfacedInDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setCommandResult(
+                    Control.CommandResult.newBuilder()
+                        .setRequestId("cmd-7")
+                        .setNotification("Started timer"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("cmd-7", viewModel.state.value.lastCommandResultRequestId)
+        assertEquals("Started timer", viewModel.state.value.lastCommandResultNotification)
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_command_result_request_id=cmd-7"),
+        )
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_command_result_notification=Started timer"),
+        )
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun serverNotificationIsDeliveredThroughPlatformAdapter() = runTest(dispatcher) {
         val session = FakeSession()
         val delivered = mutableListOf<Pair<String, String>>()

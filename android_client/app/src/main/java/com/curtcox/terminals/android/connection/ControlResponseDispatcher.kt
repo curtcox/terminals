@@ -36,6 +36,16 @@ class ControlResponseDispatcher {
             Control.ConnectResponse.PayloadCase.BUG_REPORT_ACK -> state.copy(
                 lastBugReportAckDiagnostics = AndroidBugReportChrome.formatDiagnosticsLines(response.bugReportAck),
             )
+            Control.ConnectResponse.PayloadCase.HEARTBEAT -> state.copy(
+                lastServerHeartbeatUnixMs = response.heartbeat.unixMs.takeIf { it > 0 },
+            )
+            Control.ConnectResponse.PayloadCase.COMMAND_RESULT -> {
+                val result = response.commandResult
+                state.copy(
+                    lastCommandResultRequestId = result.requestId.takeIf { it.isNotBlank() },
+                    lastCommandResultNotification = result.notification.takeIf { it.isNotBlank() },
+                )
+            }
             else -> state
         }
     }

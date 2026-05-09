@@ -635,6 +635,9 @@ class AndroidTerminalViewModel(
             serverBuildDate = null,
             registerAckAssetBaseUrl = null,
             lastCapabilityAckGeneration = 0L,
+            lastServerHeartbeatUnixMs = null,
+            lastCommandResultRequestId = null,
+            lastCommandResultNotification = null,
         )
 
     private fun formatDiagnostics(
@@ -684,6 +687,15 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.takeIf { it.lastCapabilityAckGeneration > 0L }?.let {
                 appendLine("last_capability_ack_generation=${it.lastCapabilityAckGeneration}")
+            }
+            handshakeSource?.lastServerHeartbeatUnixMs?.takeIf { it > 0 }?.let {
+                appendLine("last_server_heartbeat_unix_ms=$it")
+            }
+            handshakeSource?.lastCommandResultRequestId?.takeIf { it.isNotBlank() }?.let {
+                appendLine("last_command_result_request_id=$it")
+            }
+            handshakeSource?.lastCommandResultNotification?.takeIf { it.isNotBlank() }?.let {
+                appendLine("last_command_result_notification=$it")
             }
         }
     }
