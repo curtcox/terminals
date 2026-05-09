@@ -980,6 +980,12 @@ Remaining validation:
 
 - Recorded non-blank `RegisterAck.server_id` as `registerAckServerId`, merged with blank follow-up preserving the prior id (same pattern as `register_ack_message`), surfaced as `register_ack_server_id` in copyable diagnostics, cleared on `withoutHandshake`, and preserved across disconnect together with `register_ack_asset_base_url` (previously cleared from state on disconnect even when still useful for support paste). Extended dispatcher and ViewModel JVM coverage. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
+### 2026-05-08 (last control activity / Flutter status parity)
+
+- Added `connectResponseActivityStatus` labels aligned with Flutter `statusFromConnectResponse` (plus explicit `Show media` and `Notification`), stored as `lastControlResponseActivity` on `AndroidTerminalViewState`, merged by `ControlResponseDispatcher` for every non–`PAYLOAD_NOT_SET` response, surfaced as `last_control_activity` in copyable diagnostics and a small terminal-chrome line (`terminal-last-server-activity` test tag).
+- Cleared activity on `withoutHandshake` for new sessions; preserved across disconnect for support paste (same pattern as register ack / command result metadata). Refactored `UpdateUI` dispatch to avoid an early return so activity labeling still applies when the UI root is absent.
+- Extended dispatcher and ViewModel JVM coverage. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Full Gradle unit tests require a host JDK (not verified in this session).
+
 ## Test Plan
 
 ### Unit tests

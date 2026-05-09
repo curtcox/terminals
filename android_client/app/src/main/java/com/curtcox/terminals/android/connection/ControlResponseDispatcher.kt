@@ -6,12 +6,43 @@ import terminals.control.v1.Control
 import terminals.io.v1.Io
 import terminals.ui.v1.Ui
 
+/** Human-readable last-message label; order matches Flutter `statusFromConnectResponse` where applicable. */
+fun connectResponseActivityStatus(response: Control.ConnectResponse): String =
+    when (response.payloadCase) {
+        Control.ConnectResponse.PayloadCase.ERROR -> "Server error"
+        Control.ConnectResponse.PayloadCase.TRANSITION_UI -> "UI transition"
+        Control.ConnectResponse.PayloadCase.START_STREAM -> "Stream started"
+        Control.ConnectResponse.PayloadCase.STOP_STREAM -> "Stream stopped"
+        Control.ConnectResponse.PayloadCase.ROUTE_STREAM -> "Route updated"
+        Control.ConnectResponse.PayloadCase.WEBRTC_SIGNAL -> "WebRTC signal"
+        Control.ConnectResponse.PayloadCase.PLAY_AUDIO -> "Play audio"
+        Control.ConnectResponse.PayloadCase.SHOW_MEDIA -> "Show media"
+        Control.ConnectResponse.PayloadCase.INSTALL_BUNDLE -> "Bundle install requested"
+        Control.ConnectResponse.PayloadCase.REMOVE_BUNDLE -> "Bundle removal requested"
+        Control.ConnectResponse.PayloadCase.START_FLOW -> "Flow start requested"
+        Control.ConnectResponse.PayloadCase.PATCH_FLOW -> "Flow patch requested"
+        Control.ConnectResponse.PayloadCase.STOP_FLOW -> "Flow stop requested"
+        Control.ConnectResponse.PayloadCase.REQUEST_ARTIFACT -> "Artifact requested"
+        Control.ConnectResponse.PayloadCase.BUG_REPORT_ACK -> "Bug report filed"
+        Control.ConnectResponse.PayloadCase.UPDATE_UI -> "UI patched"
+        Control.ConnectResponse.PayloadCase.REGISTER_ACK -> "Registered"
+        Control.ConnectResponse.PayloadCase.COMMAND_RESULT -> "Command response"
+        Control.ConnectResponse.PayloadCase.SET_UI -> "UI updated"
+        Control.ConnectResponse.PayloadCase.NOTIFICATION -> "Notification"
+        Control.ConnectResponse.PayloadCase.HELLO_ACK,
+        Control.ConnectResponse.PayloadCase.CAPABILITY_ACK,
+        Control.ConnectResponse.PayloadCase.HEARTBEAT,
+        Control.ConnectResponse.PayloadCase.PAYLOAD_NOT_SET,
+        -> "Connected"
+        else -> "Control payload (${response.payloadCase.name})"
+    }
+
 class ControlResponseDispatcher {
     fun dispatch(
         state: AndroidTerminalViewState,
         response: Control.ConnectResponse,
     ): AndroidTerminalViewState {
-        return when (response.payloadCase) {
+        val next = when (response.payloadCase) {
             Control.ConnectResponse.PayloadCase.HELLO_ACK -> {
                 val ack = response.helloAck
                 state.copy(
@@ -31,8 +62,12 @@ class ControlResponseDispatcher {
             Control.ConnectResponse.PayloadCase.REGISTER_ACK -> mergeRegisterAck(state, response)
             Control.ConnectResponse.PayloadCase.SET_UI -> state.copy(serverRoot = response.setUi.root)
             Control.ConnectResponse.PayloadCase.UPDATE_UI -> {
-                val root = state.serverRoot ?: return state
-                state.copy(serverRoot = replaceNode(root, response.updateUi.componentId, response.updateUi.node))
+                val root = state.serverRoot
+                if (root == null) {
+                    state
+                } else {
+                    state.copy(serverRoot = replaceNode(root, response.updateUi.componentId, response.updateUi.node))
+                }
             }
             Control.ConnectResponse.PayloadCase.TRANSITION_UI -> {
                 val tu = response.transitionUi
@@ -89,6 +124,11 @@ class ControlResponseDispatcher {
             else -> state.copy(
                 lastOpaqueControlIoSummary = "type=unhandled_payload payload_case=${response.payloadCase.name}",
             )
+        }
+        return if (response.payloadCase == Control.ConnectResponse.PayloadCase.PAYLOAD_NOT_SET) {
+            next
+        } else {
+            next.copy(lastControlResponseActivity = connectResponseActivityStatus(response))
         }
     }
 

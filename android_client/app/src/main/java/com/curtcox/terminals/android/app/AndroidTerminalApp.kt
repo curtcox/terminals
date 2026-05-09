@@ -145,6 +145,11 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                 }
 
                 Text("Status: ${state.connectionState}", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Last server activity: ${state.lastControlResponseActivity ?: "—"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("terminal-last-server-activity"),
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { viewModel.setLocalKeepAwake(!state.localKeepAwakeEnabled) },

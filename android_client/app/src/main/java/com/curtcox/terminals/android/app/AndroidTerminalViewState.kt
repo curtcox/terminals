@@ -40,6 +40,8 @@ data class AndroidTerminalViewState(
     val lastControlErrorCode: String? = null,
     /** Opaque summary for server IO/control messages not yet executed natively (streams, flows, WebRTC, bundles). */
     val lastOpaqueControlIoSummary: String? = null,
+    /** Short label for the last inbound control message (aligned with Flutter `statusFromConnectResponse`). */
+    val lastControlResponseActivity: String? = null,
     val localKeepAwakeEnabled: Boolean = false,
     val localFullscreenEnabled: Boolean = false,
     val localBrightDisplayEnabled: Boolean = false,

@@ -266,6 +266,7 @@ class AndroidTerminalViewModel(
                 registerAckMessage = it.registerAckMessage,
                 registerAckServerId = it.registerAckServerId,
                 registerAckAssetBaseUrl = it.registerAckAssetBaseUrl,
+                lastControlResponseActivity = it.lastControlResponseActivity,
             )
             diagnosticsSource.copy(
                 connectionState = nextState,
@@ -639,6 +640,7 @@ class AndroidTerminalViewModel(
             lastTransitionDurationMs = null,
             lastBugReportAckDiagnostics = null,
             lastControlErrorCode = null,
+            lastControlResponseActivity = null,
         )
 
     private fun formatDiagnostics(
@@ -710,6 +712,9 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.lastOpaqueControlIoSummary?.takeIf { it.isNotBlank() }?.let {
                 appendLine("last_opaque_control_io=$it")
+            }
+            handshakeSource?.lastControlResponseActivity?.takeIf { it.isNotBlank() }?.let {
+                appendLine("last_control_activity=$it")
             }
             handshakeSource?.lastTransition?.takeIf { it.isNotBlank() }?.let {
                 appendLine("last_transition=$it")

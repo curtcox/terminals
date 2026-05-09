@@ -74,6 +74,7 @@ class ControlResponseDispatcherTest {
         val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
 
         assertNull(next.serverRoot)
+        assertEquals("UI patched", next.lastControlResponseActivity)
     }
 
     @Test
@@ -547,6 +548,7 @@ class ControlResponseDispatcherTest {
         val next = dispatcher.dispatch(seeded, response)
 
         assertNull(next.lastOpaqueControlIoSummary)
+        assertEquals("Play audio", next.lastControlResponseActivity)
     }
 
     @Test
@@ -565,6 +567,28 @@ class ControlResponseDispatcherTest {
         val next = dispatcher.dispatch(seeded, response)
 
         assertNull(next.lastOpaqueControlIoSummary)
+        assertEquals("Show media", next.lastControlResponseActivity)
+    }
+
+    @Test
+    fun dispatchRecordsControlResponseActivityForOpaqueIoAndHandshake() {
+        val start = Control.ConnectResponse.newBuilder()
+            .setStartStream(Io.StartStream.newBuilder().setStreamId("s1"))
+            .build()
+        val hello = Control.ConnectResponse.newBuilder()
+            .setHelloAck(
+                Control.HelloAck.newBuilder()
+                    .setServerId("srv")
+                    .setSessionId("sess")
+                    .setHeartbeatIntervalMs(5_000),
+            )
+            .build()
+
+        val afterStart = dispatcher.dispatch(AndroidTerminalViewState(), start)
+        assertEquals("Stream started", afterStart.lastControlResponseActivity)
+
+        val afterHello = dispatcher.dispatch(afterStart, hello)
+        assertEquals("Connected", afterHello.lastControlResponseActivity)
     }
 
     @Test
@@ -595,6 +619,8 @@ class ControlResponseDispatcherTest {
             Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION.name,
             afterError.lastControlErrorCode,
         )
+        assertEquals("Notification", afterNotification.lastControlResponseActivity)
+        assertEquals("Server error", afterError.lastControlResponseActivity)
     }
 
     @Test

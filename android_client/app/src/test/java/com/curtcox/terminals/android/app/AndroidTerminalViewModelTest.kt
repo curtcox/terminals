@@ -1006,6 +1006,8 @@ class AndroidTerminalViewModelTest {
         )
 
         assertEquals(root, viewModel.state.value.serverRoot)
+        assertEquals("UI updated", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=UI updated"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1207,6 +1209,74 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun newConnectClearsControlActivityFromPriorSession() = runTest(dispatcher) {
+        val first = FakeSession()
+        val second = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        first.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setSetUi(
+                    Ui.SetUI.newBuilder()
+                        .setDeviceId("device-1")
+                        .setRoot(
+                            Ui.Node.newBuilder()
+                                .setId("root")
+                                .setText(Ui.TextWidget.newBuilder().setValue("v1")),
+                        ),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        assertEquals("UI updated", viewModel.state.value.lastControlResponseActivity)
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+
+        viewModel.connect()
+        advanceUntilIdle()
+        assertNull(viewModel.state.value.lastControlResponseActivity)
+        assertTrue(!viewModel.state.value.diagnosticsText.contains("last_control_activity=UI updated"))
+    }
+
+    @Test
+    fun controlActivityRemainsInDiagnosticsAfterDisconnect() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setCommandResult(
+                    Control.CommandResult.newBuilder()
+                        .setRequestId("req-1")
+                        .setNotification("done"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        assertEquals("Command response", viewModel.state.value.lastControlResponseActivity)
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Command response"))
+    }
+
+    @Test
     fun serverTransitionUiIsSurfacedInDiagnostics() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
@@ -1315,6 +1385,8 @@ class AndroidTerminalViewModelTest {
         assertTrue(
             viewModel.state.value.diagnosticsText.contains("last_command_result_notification=Started timer"),
         )
+        assertEquals("Command response", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Command response"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1349,6 +1421,8 @@ class AndroidTerminalViewModelTest {
                 "last_control_error_code=${Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION.name}",
             ),
         )
+        assertEquals("Server error", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Server error"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1382,6 +1456,8 @@ class AndroidTerminalViewModelTest {
         assertTrue(text.contains("last_capability_ack_generation=9"))
         assertTrue(text.contains("capability_ack_snapshot_applied=true"))
         assertTrue(text.contains("last_capability_invalidations=mic.capture:capability_lost"))
+        assertEquals("Connected", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(text.contains("last_control_activity=Connected"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1407,6 +1483,8 @@ class AndroidTerminalViewModelTest {
 
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_opaque_control_io="))
         assertTrue(viewModel.state.value.diagnosticsText.contains("stream_id=s-out"))
+        assertEquals("Stream started", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Stream started"))
         viewModel.disconnect()
         advanceUntilIdle()
         assertNull(viewModel.state.value.lastOpaqueControlIoSummary)
@@ -1439,6 +1517,8 @@ class AndroidTerminalViewModelTest {
         assertEquals(listOf("Timer" to "Done"), delivered)
         assertEquals("Timer", viewModel.state.value.lastNotificationTitle)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_notification=Timer"))
+        assertEquals("Notification", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Notification"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1477,6 +1557,8 @@ class AndroidTerminalViewModelTest {
         assertEquals("audio-1", viewModel.state.value.lastMediaRequestId)
         assertEquals("played", viewModel.state.value.lastMediaStatus)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_media=audio-1:played"))
+        assertEquals("Play audio", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Play audio"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1505,6 +1587,8 @@ class AndroidTerminalViewModelTest {
         assertEquals("media-1", viewModel.state.value.lastMediaRequestId)
         assertEquals("unsupported-media:video/mp4", viewModel.state.value.lastMediaStatus)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_media=media-1:unsupported-media:video/mp4"))
+        assertEquals("Show media", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Show media"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1541,6 +1625,8 @@ class AndroidTerminalViewModelTest {
 
         assertEquals("media-2", shown.single().requestId)
         assertEquals("shown", viewModel.state.value.lastMediaStatus)
+        assertEquals("Show media", viewModel.state.value.lastControlResponseActivity)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Show media"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
