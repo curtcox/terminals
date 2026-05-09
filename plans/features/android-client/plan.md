@@ -761,17 +761,17 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-07.
+Last local validation: 2026-05-09 (boundary scripts on agent host).
 
 Passed:
 
 ```bash
-cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest
-cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew lintDebug
-cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew assembleDebug
 ./scripts/check-android-client-boundary.sh
 ./scripts/test-android-client-boundary.sh
+git diff --check
 ```
+
+Gradle (`make android-client-test`, `lintDebug`, `assembleDebug`) should be re-run on a host with JDK 17 and `ANDROID_SDK_ROOT` configured; plain `./gradlew` without `JAVA_HOME` may fail on macOS stubs.
 
 Remaining validation:
 
@@ -1090,6 +1090,13 @@ Remaining validation:
 - Matched Flutter `GestureAreaWidget` empty-child behavior: 48×48 dp minimum hit target; added `ServerDrivenRendererTest.gestureAreaWithNoChildrenExposesMinimumTapTarget`.
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh` after renderer parity tweaks (Gradle not run on this host: no Java runtime).
 - Added Compose instrumentation coverage for `ProgressWidget` value clamping to `[0, 1]` via semantics (`ProgressBarRangeInfo`), matching Flutter `LinearProgressIndicator` clamp behavior for out-of-range server values.
+
+### 2026-05-09 (Flutter media surface parity)
+
+- Aligned native Android with Flutter’s split between generic renderer placeholders and shell chrome: `ServerDrivenRenderer` now takes optional `mediaSurface` and `audioVisualizerSurface` (audio falls back to `mediaSurface` for the existing single-lambda tests). When both are null for a node type, video/audio use `TerminalMediaPlaceholder`, matching Flutter `server_driven_renderer` `_placeholderPrimitive` titles (`Video surface` / `Audio level`) and trimmed track/stream ids.
+- Added `TerminalShellVideoSurface` and `TerminalShellAudioVisualizer` composables mirroring Flutter `terminal_client_shell` `_buildVideoSurface` / `_buildAudioVisualizer` chrome (waiting copy, layout, and indeterminate audio level bar until stream attach is wired).
+- Wired `AndroidTerminalApp` to pass those shell composables so production manual-connect UI matches the Flutter app’s media presentation instead of rendering empty nodes.
+- Added instrumentation tests for the null-builder placeholder paths. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
 ## Test Plan
 

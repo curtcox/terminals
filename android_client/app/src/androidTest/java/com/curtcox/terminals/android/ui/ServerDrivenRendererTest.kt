@@ -1,5 +1,6 @@
 package com.curtcox.terminals.android.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
@@ -86,6 +87,42 @@ class ServerDrivenRendererTest {
 
         compose.onNodeWithText("image:https://example.test/image.png").assertIsDisplayed()
         compose.onNodeWithText("media:track-1").assertIsDisplayed()
+    }
+
+    @Test
+    fun videoSurfaceWithoutBuilderUsesFlutterStylePlaceholder() {
+        val root = node("cam") {
+            videoSurface = Ui.VideoSurfaceWidget.newBuilder().setTrackId("track-z").build()
+        }
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                imageLoader = { _, _ -> Box {} },
+            )
+        }
+
+        compose.onNodeWithText("Video surface").assertIsDisplayed()
+        compose.onNodeWithText("track-z").assertIsDisplayed()
+    }
+
+    @Test
+    fun audioVisualizerWithoutBuilderUsesFlutterStylePlaceholder() {
+        val root = node("viz") {
+            audioVisualizer = Ui.AudioVisualizerWidget.newBuilder().setStreamId("s9").build()
+        }
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                imageLoader = { _, _ -> Box {} },
+            )
+        }
+
+        compose.onNodeWithText("Audio level").assertIsDisplayed()
+        compose.onNodeWithText("s9").assertIsDisplayed()
     }
 
     @Test

@@ -48,7 +48,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.curtcox.terminals.android.ui.widgets.TerminalMediaPlaceholder
 import terminals.ui.v1.Ui
+
+private class MediaSurfaces(
+    val video: (@Composable (String) -> Unit)?,
+    val audioVisualizer: (@Composable (String) -> Unit)?,
+) {
+    val audio: (@Composable (String) -> Unit)?
+        get() = audioVisualizer ?: video
+}
 
 @Composable
 fun ServerDrivenRendererPlaceholder() {
@@ -59,19 +68,21 @@ fun ServerDrivenRendererPlaceholder() {
 fun ServerDrivenRenderer(
     root: Ui.Node,
     onAction: (ServerDrivenAction) -> Unit,
-    mediaSurface: @Composable (trackId: String) -> Unit = {},
+    mediaSurface: (@Composable (trackId: String) -> Unit)? = null,
+    audioVisualizerSurface: (@Composable (streamId: String) -> Unit)? = null,
     imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
     deviceControlEffects: DeviceControlEffects = DeviceControlEffects.none(),
     policy: RendererPolicy = RendererPolicy.default(),
 ) {
-    RenderNode(root, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+    val media = MediaSurfaces(mediaSurface, audioVisualizerSurface)
+    RenderNode(root, onAction, media, imageLoader, deviceControlEffects, policy)
 }
 
 @Composable
 private fun RenderNode(
     node: Ui.Node,
     onAction: (ServerDrivenAction) -> Unit,
-    mediaSurface: @Composable (trackId: String) -> Unit,
+    media: MediaSurfaces,
     imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
     deviceControlEffects: DeviceControlEffects,
     policy: RendererPolicy,
@@ -87,11 +98,11 @@ private fun RenderNode(
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.Start,
             ) {
-                RenderFlexColumnChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                RenderFlexColumnChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
             }
         }
         Ui.Node.WidgetCase.ROW -> Row(props.modifier()) {
-            RenderFlexRowChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderFlexRowChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.GRID -> {
             // Match Flutter `server_driven_renderer.dart` grid: LayoutBuilder + Wrap with 8dp gaps
@@ -119,7 +130,7 @@ private fun RenderNode(
                 ) {
                     for (child in node.childrenList) {
                         Box(Modifier.width(itemWidth)) {
-                            RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                            RenderNode(child, onAction, media, imageLoader, deviceControlEffects, policy)
                         }
                     }
                 }
@@ -137,25 +148,25 @@ private fun RenderNode(
                     modifier = props.modifier().horizontalScroll(scrollState),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RenderFlexRowChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                    RenderFlexRowChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
                 }
             } else {
                 Column(
                     modifier = props.modifier().verticalScroll(scrollState),
                     horizontalAlignment = Alignment.Start,
                 ) {
-                    RenderFlexColumnChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                    RenderFlexColumnChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
                 }
             }
         }
         Ui.Node.WidgetCase.PADDING -> Box(props.modifier().padding(node.padding.all.dp)) {
-            RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.CENTER -> Box(props.modifier().fillMaxWidth(), contentAlignment = Alignment.Center) {
-            RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.EXPAND -> Box(Modifier.fillMaxWidth().then(props.modifier())) {
-            RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.TEXT -> Text(
             text = node.text.value,
@@ -165,8 +176,24 @@ private fun RenderNode(
             fontFamily = if (node.text.style == "monospace") FontFamily.Monospace else null,
         )
         Ui.Node.WidgetCase.IMAGE -> imageLoader(node.image.url, node.propsMap["contentDescription"])
-        Ui.Node.WidgetCase.VIDEO_SURFACE -> mediaSurface(node.videoSurface.trackId)
-        Ui.Node.WidgetCase.AUDIO_VISUALIZER -> mediaSurface(node.audioVisualizer.streamId)
+        Ui.Node.WidgetCase.VIDEO_SURFACE -> {
+            val trackId = node.videoSurface.trackId.trim()
+            val builder = media.video
+            if (builder != null) {
+                Box(props.modifier()) { builder(trackId) }
+            } else {
+                TerminalMediaPlaceholder(props, "Video surface", trackId)
+            }
+        }
+        Ui.Node.WidgetCase.AUDIO_VISUALIZER -> {
+            val streamId = node.audioVisualizer.streamId.trim()
+            val builder = media.audio
+            if (builder != null) {
+                Box(props.modifier()) { builder(streamId) }
+            } else {
+                TerminalMediaPlaceholder(props, "Audio level", streamId)
+            }
+        }
         Ui.Node.WidgetCase.CANVAS -> TerminalCanvas(node, props.modifier().fillMaxSize())
         Ui.Node.WidgetCase.TEXT_INPUT -> TerminalTextInput(node, props, onAction)
         Ui.Node.WidgetCase.BUTTON -> Button(
@@ -229,12 +256,12 @@ private fun RenderNode(
                 Box(props.modifier().then(tapModifier).size(48.dp)) {}
             } else {
                 Box(props.modifier().then(tapModifier)) {
-                    RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                    RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
                 }
             }
         }
         Ui.Node.WidgetCase.OVERLAY -> Box(props.modifier()) {
-            RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.PROGRESS -> LinearProgressIndicator(
             progress = { node.progress.value.toFloat().coerceIn(0f, 1f) },
@@ -258,13 +285,13 @@ private fun RenderNode(
 private fun RenderPlainChildren(
     node: Ui.Node,
     onAction: (ServerDrivenAction) -> Unit,
-    mediaSurface: @Composable (trackId: String) -> Unit,
+    media: MediaSurfaces,
     imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
     deviceControlEffects: DeviceControlEffects,
     policy: RendererPolicy,
 ) {
     for (child in node.childrenList) {
-        RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+        RenderNode(child, onAction, media, imageLoader, deviceControlEffects, policy)
     }
 }
 
@@ -273,7 +300,7 @@ private fun RenderPlainChildren(
 private fun RowScope.RenderFlexRowChildren(
     node: Ui.Node,
     onAction: (ServerDrivenAction) -> Unit,
-    mediaSurface: @Composable (trackId: String) -> Unit,
+    media: MediaSurfaces,
     imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
     deviceControlEffects: DeviceControlEffects,
     policy: RendererPolicy,
@@ -282,10 +309,10 @@ private fun RowScope.RenderFlexRowChildren(
         if (child.widgetCase == Ui.Node.WidgetCase.EXPAND) {
             val expandProps = PrimitiveProps.from(child)
             Box(Modifier.weight(1f).then(expandProps.modifier())) {
-                RenderPlainChildren(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                RenderPlainChildren(child, onAction, media, imageLoader, deviceControlEffects, policy)
             }
         } else {
-            RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderNode(child, onAction, media, imageLoader, deviceControlEffects, policy)
         }
     }
 }
@@ -295,7 +322,7 @@ private fun RowScope.RenderFlexRowChildren(
 private fun ColumnScope.RenderFlexColumnChildren(
     node: Ui.Node,
     onAction: (ServerDrivenAction) -> Unit,
-    mediaSurface: @Composable (trackId: String) -> Unit,
+    media: MediaSurfaces,
     imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
     deviceControlEffects: DeviceControlEffects,
     policy: RendererPolicy,
@@ -304,10 +331,10 @@ private fun ColumnScope.RenderFlexColumnChildren(
         if (child.widgetCase == Ui.Node.WidgetCase.EXPAND) {
             val expandProps = PrimitiveProps.from(child)
             Box(Modifier.weight(1f).then(expandProps.modifier())) {
-                RenderPlainChildren(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                RenderPlainChildren(child, onAction, media, imageLoader, deviceControlEffects, policy)
             }
         } else {
-            RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderNode(child, onAction, media, imageLoader, deviceControlEffects, policy)
         }
     }
 }

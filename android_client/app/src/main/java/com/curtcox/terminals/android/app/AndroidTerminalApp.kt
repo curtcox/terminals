@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import com.curtcox.terminals.android.ui.DeviceControlEffects
 import com.curtcox.terminals.android.ui.ServerDrivenRenderer
 import com.curtcox.terminals.android.ui.ServerDrivenRendererPlaceholder
+import com.curtcox.terminals.android.ui.widgets.TerminalShellAudioVisualizer
+import com.curtcox.terminals.android.ui.widgets.TerminalShellVideoSurface
 
 @Composable
 fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
@@ -186,6 +188,10 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                     ServerDrivenRenderer(
                         root = root,
                         onAction = viewModel::sendUiAction,
+                        mediaSurface = { trackId -> TerminalShellVideoSurface(trackId = trackId) },
+                        audioVisualizerSurface = { streamId ->
+                            TerminalShellAudioVisualizer(streamId = streamId)
+                        },
                         imageLoader = { url, _ -> Text(url) },
                         deviceControlEffects = DeviceControlEffects(
                             setKeepAwake = viewModel::setKeepAwake,
