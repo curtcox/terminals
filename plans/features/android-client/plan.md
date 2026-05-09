@@ -1003,6 +1003,10 @@ Remaining validation:
 - Centralized the same rule in `util/ServerDrivenNodeId.kt` and used it from `PrimitiveProps` and `NodeKey.testTag` so widget actions, default Compose tags, and `UpdateUI` patch targets stay aligned.
 - Added JVM coverage for props-id patching, unknown-target no-ops, and direct unit tests for `serverDrivenNodeId`.
 
+### 2026-05-08 (serverDrivenNodeId wire parity)
+
+- Aligned Kotlin `serverDrivenNodeId` with Flutter `server_driven_node_key.dart` (no trimming of protobuf `id` or `props["id"]`; same `isNotEmpty` / empty-string fallback semantics) so action `componentId` values and `UpdateUI` targeting stay cross-client consistent.
+
 ## Test Plan
 
 ### Unit tests
