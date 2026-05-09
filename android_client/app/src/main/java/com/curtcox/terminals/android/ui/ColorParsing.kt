@@ -2,6 +2,7 @@ package com.curtcox.terminals.android.ui
 
 import androidx.compose.ui.graphics.Color
 
+/** Matches Flutter parseHexColor: optional `#`, RGB->ARGB expansion, null on invalid input. */
 internal fun parseHexColor(raw: String?): Color? {
     if (raw.isNullOrBlank()) return null
     var value = raw.trim()
@@ -12,4 +13,5 @@ internal fun parseHexColor(raw: String?): Color? {
     return Color(parsed)
 }
 
+/** Returns parsed color or Color.Unspecified for malformed/absent values. */
 internal fun parseColorOrUnspecified(raw: String?): Color = parseHexColor(raw) ?: Color.Unspecified

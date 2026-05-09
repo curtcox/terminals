@@ -38,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -74,7 +73,7 @@ private fun RenderNode(
     val props = PrimitiveProps.from(node)
     when (node.widgetCase) {
         Ui.Node.WidgetCase.STACK -> {
-            val stackMod = parseHexColorForBackground(node.propsMap["background"])
+            val stackMod = parseHexColor(node.propsMap["background"])
                 ?.let { props.modifier().background(it) }
                 ?: props.modifier()
             Column(
@@ -266,7 +265,3 @@ private fun TerminalCanvas(node: Ui.Node, modifier: Modifier) {
     }
 }
 
-/** Matches Flutter [parseHexColor]: optional `#`, expands 6-digit RGB to ARGB. */
-private fun parseHexColorForBackground(raw: String?): Color? {
-    return parseHexColor(raw)
-}

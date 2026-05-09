@@ -7,8 +7,20 @@ import org.junit.Test
 
 class ColorParsingTest {
     @Test
+    fun parseHexColorReturnsNullForNullOrBlank() {
+        assertNull(parseHexColor(null))
+        assertNull(parseHexColor(""))
+        assertNull(parseHexColor("   "))
+    }
+
+    @Test
     fun parseHexColorAcceptsRgbWithoutHash() {
         assertEquals(Color(0xFF112233), parseHexColor("112233"))
+    }
+
+    @Test
+    fun parseHexColorAcceptsRgbWithWhitespaceAndHash() {
+        assertEquals(Color(0xFF445566), parseHexColor("  #445566  "))
     }
 
     @Test
@@ -24,6 +36,7 @@ class ColorParsingTest {
 
     @Test
     fun parseColorOrUnspecifiedFallsBackWhenInvalid() {
+        assertEquals(Color.Unspecified, parseColorOrUnspecified(null))
         assertEquals(Color.Unspecified, parseColorOrUnspecified("invalid"))
     }
 }

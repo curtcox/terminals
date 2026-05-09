@@ -1051,6 +1051,13 @@ Remaining validation:
 - Added focused JVM coverage in `ColorParsingTest` for RGB/ARGB parsing and invalid-value fallback.
 - Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
 
+### 2026-05-08 (color parsing hardening follow-up)
+
+- Removed the renderer-only color wrapper and called shared `parseHexColor` directly for stack backgrounds so all color parsing behavior stays centralized in `ui/ColorParsing.kt`.
+- Expanded `ColorParsingTest` with null/blank input and whitespace-wrapped `#RRGGBB` coverage, plus explicit `parseColorOrUnspecified(null)` fallback coverage, to lock Flutter parity semantics around trimming and absent values.
+- Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Attempted focused Gradle JVM validation for `ColorParsingTest`, but this shell session has no installed Java runtime (`JAVA_HOME` path missing and `/usr/libexec/java_home -V` reports no JRE), so Gradle execution is host-blocked.
+
 ## Test Plan
 
 ### Unit tests
