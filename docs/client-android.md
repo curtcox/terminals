@@ -178,4 +178,19 @@ adb install -r android_client/app/build/outputs/apk/debug/app-debug.apk
 If discovery later fails on Fire OS, use manual endpoint entry first. Some Wi-Fi
 networks block multicast or isolate clients.
 
+### Discovery (NSD / mDNS) quirks
+
+The client scans for `_terminals._tcp.` via Android `NsdManager`. Copyable
+diagnostics include a short hint for known failure codes (for example
+`internal_error`, `already_active`, `max_limit`). Typical causes:
+
+- **Guest or “client isolation” Wi‑Fi** — APs often block mDNS between devices;
+  connect the tablet and server to the same non-isolated LAN or use manual
+  endpoint.
+- **Multicast filtering** — some mesh or corporate networks drop multicast;
+  manual endpoint still works when TCP to the server is allowed.
+- **Fire OS** — NSD can be flaky depending on OS build and power state; manual
+  endpoint is the supported fallback and matches the generic-terminal contract
+  (discovery is optional convenience, not required for operation).
+
 If Gradle cannot find the SDK, set `ANDROID_SDK_ROOT` or `ANDROID_HOME`.

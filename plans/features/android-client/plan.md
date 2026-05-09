@@ -1132,6 +1132,12 @@ Remaining validation:
 - Added instrumentation coverage that `ImageWidget` forwards `props["contentDescription"]` to the injected `imageLoader`.
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Host Gradle/instrumentation execution was not run here (no Java runtime).
 
+### 2026-05-09 (NSD diagnostics + Fire OS discovery doc)
+
+- Added `formatNsdFailureDetail` so `NsdAndroidDiscovery` maps Android `NsdManager` failure codes to generic, copyable hints (multicast/Wi‑Fi isolation, already-active discovery, max listener limit) that always steer toward manual endpoint fallback—terminal chrome only, no scenario branching.
+- Extended JVM coverage in `AndroidNsdDiscoveryTest` for known codes and unknown codes.
+- Documented discovery/NSD quirks and Fire OS fallback expectations under `docs/client-android.md` (“Discovery (NSD / mDNS) quirks”), closing the plan’s documentation gap for LAN multicast behavior without requiring a physical tablet run in this session.
+
 ## Test Plan
 
 ### Unit tests

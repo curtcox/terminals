@@ -39,7 +39,10 @@ class NsdAndroidDiscovery(
                     serviceInfo,
                     object : NsdManager.ResolveListener {
                         override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-                            onError("mDNS resolve failed for ${serviceInfo.serviceName}: $errorCode")
+                            onError(
+                                "mDNS resolve failed for ${serviceInfo.serviceName}: " +
+                                    formatNsdFailureDetail("resolve", errorCode),
+                            )
                         }
 
                         override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
@@ -55,12 +58,18 @@ class NsdAndroidDiscovery(
             override fun onDiscoveryStopped(serviceType: String) = Unit
 
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-                onError("mDNS discovery failed to start for $serviceType: $errorCode")
+                onError(
+                    "mDNS discovery failed to start for $serviceType: " +
+                        formatNsdFailureDetail("start_discovery", errorCode),
+                )
                 stop()
             }
 
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
-                onError("mDNS discovery failed to stop for $serviceType: $errorCode")
+                onError(
+                    "mDNS discovery failed to stop for $serviceType: " +
+                        formatNsdFailureDetail("stop_discovery", errorCode),
+                )
                 stop()
             }
         }
@@ -76,6 +85,27 @@ class NsdAndroidDiscovery(
 }
 
 internal const val TerminalsServiceType = "_terminals._tcp."
+
+/**
+ * Maps [NsdManager] failure codes into copyable diagnostics. Hints stay generic (manual endpoint
+ * fallback) so this remains terminal chrome, not scenario behavior.
+ */
+internal fun formatNsdFailureDetail(operation: String, errorCode: Int): String {
+    val (name, hint) = when (errorCode) {
+        NsdManager.FAILURE_INTERNAL_ERROR ->
+            "internal_error" to
+                " Often caused by multicast-restricted Wi‑Fi, guest/isolated APs, or device NSD quirks (common on Fire OS); use manual endpoint."
+        NsdManager.FAILURE_ALREADY_ACTIVE ->
+            "already_active" to
+                " Another NSD discovery may already be running; stop scanning and retry, or use manual endpoint."
+        NsdManager.FAILURE_MAX_LIMIT ->
+            "max_limit" to
+                " The system hit its NSD listener limit; reboot the device or use manual endpoint."
+        else ->
+            "unknown" to " If discovery keeps failing, use manual endpoint."
+    }
+    return "$operation: $name (code=$errorCode).$hint"
+}
 
 internal fun NsdServiceInfo.toDiscoveredServer(nowMillis: Long): DiscoveredServer? {
     val resolvedHost = host?.hostAddress ?: return null
