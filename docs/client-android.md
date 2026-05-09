@@ -29,6 +29,8 @@ Android code without a follow-up plan.
 | Gradle | wrapper included | `android_client/gradlew` downloads Gradle 8.13 when needed |
 | ADB | current platform tools | Needed for Fire tablet install/smoke tests |
 
+`make android-client-build` (and test/lint) resolve a JDK automatically in this order: a working `JAVA_HOME` if set, Homebrew `openjdk@17`, Android Studio’s JBR under `Applications` or `~/Applications`, common Linux OpenJDK 17 paths, then macOS `/usr/libexec/java_home`. If no JDK is found, those targets skip with an explicit message instead of invoking Gradle with an empty `JAVA_HOME`.
+
 Set one SDK environment variable:
 
 ```bash

@@ -6,7 +6,20 @@ CLIENT_WEB_PORT ?= 60739
 CLIENT_WEB_HOST ?= 0.0.0.0
 BUILD_SHA ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-ANDROID_JAVA_HOME ?= $(shell if [ -d /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ]; then echo /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home; else /usr/libexec/java_home -v 17 2>/dev/null; fi)
+# Prefer explicit JAVA_HOME, then common JDK 17 installs (Homebrew, Android Studio JBR, Linux packages), then macOS java_home.
+ANDROID_JAVA_HOME ?= $(shell \
+	jh=""; \
+	if [ -n "$$JAVA_HOME" ] && [ -x "$$JAVA_HOME/bin/java" ] && "$$JAVA_HOME/bin/java" -version >/dev/null 2>&1; then jh="$$JAVA_HOME"; \
+	elif [ -d /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ]; then jh=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home; \
+	elif [ -d /usr/local/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ]; then jh=/usr/local/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home; \
+	elif [ -d "$$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then jh="$$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home"; \
+	elif [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]; then jh="/Applications/Android Studio.app/Contents/jbr/Contents/Home"; \
+	elif [ -d "/Applications/Android Studio Preview.app/Contents/jbr/Contents/Home" ]; then jh="/Applications/Android Studio Preview.app/Contents/jbr/Contents/Home"; \
+	elif [ -d /usr/lib/jvm/java-17-openjdk-amd64 ]; then jh=/usr/lib/jvm/java-17-openjdk-amd64; \
+	elif [ -d /usr/lib/jvm/java-17-openjdk ]; then jh=/usr/lib/jvm/java-17-openjdk; \
+	elif [ -x /usr/libexec/java_home ]; then jh="$$(/usr/libexec/java_home -v 17 2>/dev/null || /usr/libexec/java_home -v 21 2>/dev/null || /usr/libexec/java_home 2>/dev/null || true)"; \
+	fi; \
+	printf '%s' "$$jh")
 export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
@@ -117,28 +130,42 @@ client-coverage:
 
 android-client-build:
 	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
-		cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew assembleDebug -PTERMINALS_BUILD_SHA=$(BUILD_SHA) -PTERMINALS_BUILD_DATE=$(BUILD_DATE); \
+		if [ -z "$(ANDROID_JAVA_HOME)" ] || [ ! -x "$(ANDROID_JAVA_HOME)/bin/java" ]; then \
+			echo "Skipping native Android build: JDK not found (need a working Java 17+). Set JAVA_HOME, install openjdk@17, or rely on Android Studio's bundled JBR under Applications."; \
+		else \
+			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew assembleDebug -PTERMINALS_BUILD_SHA=$(BUILD_SHA) -PTERMINALS_BUILD_DATE=$(BUILD_DATE); \
+		fi; \
 	else \
 		echo "Skipping native Android build: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi
 
 android-client-test:
 	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
-		cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew testDebugUnitTest; \
+		if [ -z "$(ANDROID_JAVA_HOME)" ] || [ ! -x "$(ANDROID_JAVA_HOME)/bin/java" ]; then \
+			echo "Skipping native Android tests: JDK not found (need a working Java 17+). Set JAVA_HOME, install openjdk@17, or rely on Android Studio's bundled JBR under Applications."; \
+		else \
+			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew testDebugUnitTest; \
+		fi; \
 	else \
 		echo "Skipping native Android tests: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi
 
 android-client-lint:
 	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
-		cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew lintDebug; \
+		if [ -z "$(ANDROID_JAVA_HOME)" ] || [ ! -x "$(ANDROID_JAVA_HOME)/bin/java" ]; then \
+			echo "Skipping native Android lint: JDK not found (need a working Java 17+). Set JAVA_HOME, install openjdk@17, or rely on Android Studio's bundled JBR under Applications."; \
+		else \
+			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew lintDebug; \
+		fi; \
 	else \
 		echo "Skipping native Android lint: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi
 
 android-client-connected-test:
 	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
-		if ! command -v adb >/dev/null 2>&1; then \
+		if [ -z "$(ANDROID_JAVA_HOME)" ] || [ ! -x "$(ANDROID_JAVA_HOME)/bin/java" ]; then \
+			echo "Skipping native Android connected tests: JDK not found (need a working Java 17+). Set JAVA_HOME, install openjdk@17, or rely on Android Studio's bundled JBR under Applications."; \
+		elif ! command -v adb >/dev/null 2>&1; then \
 			echo "Skipping native Android connected tests: adb is not available in PATH."; \
 		elif ! adb devices | awk 'NR>1 && $$2=="device" {found=1} END {exit found ? 0 : 1}'; then \
 			echo "Skipping native Android connected tests: no connected Android device/emulator found."; \
