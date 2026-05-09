@@ -2,6 +2,7 @@ package com.curtcox.terminals.android.ui
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.curtcox.terminals.android.util.serverDrivenNodeId
 import terminals.ui.v1.Ui
 
 data class PrimitiveProps(
@@ -13,7 +14,7 @@ data class PrimitiveProps(
     companion object {
         fun from(node: Ui.Node): PrimitiveProps {
             val tag = node.propsMap["testTag"] ?: node.propsMap["test_tag"] ?: NodeKey.testTag(node)
-            return PrimitiveProps(componentId = node.id, testTag = tag)
+            return PrimitiveProps(componentId = serverDrivenNodeId(node), testTag = tag)
         }
     }
 }

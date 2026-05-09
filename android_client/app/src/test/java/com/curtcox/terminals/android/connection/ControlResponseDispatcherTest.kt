@@ -131,6 +131,60 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun updateUiPatchesChildTargetedByPropsIdWhenProtobufIdBlank() {
+        val target = Ui.Node.newBuilder()
+            .putProps("id", "target")
+            .setText(Ui.TextWidget.newBuilder().setValue("Old").build())
+            .build()
+        val keep = textNode("keep", "Keep")
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setStack(Ui.StackWidget.getDefaultInstance())
+            .addChildren(keep)
+            .addChildren(target)
+            .build()
+        val fresh = Ui.Node.newBuilder()
+            .putProps("id", "target")
+            .setText(Ui.TextWidget.newBuilder().setValue("New").build())
+            .build()
+        val response = Control.ConnectResponse.newBuilder()
+            .setUpdateUi(
+                Ui.UpdateUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setComponentId("target")
+                    .setNode(fresh),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(serverRoot = root), response)
+
+        assertEquals(keep, next.serverRoot!!.childrenList[0])
+        assertEquals(fresh, next.serverRoot.childrenList[1])
+    }
+
+    @Test
+    fun updateUiWithUnknownTargetLeavesTreeUnchanged() {
+        val keep = textNode("keep", "Keep")
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setStack(Ui.StackWidget.getDefaultInstance())
+            .addChildren(keep)
+            .build()
+        val response = Control.ConnectResponse.newBuilder()
+            .setUpdateUi(
+                Ui.UpdateUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setComponentId("ghost")
+                    .setNode(textNode("ghost", "Ignored")),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(serverRoot = root), response)
+
+        assertEquals(root, next.serverRoot)
+    }
+
+    @Test
     fun bugReportAckRecordsDiagnosticsChrome() {
         val ack = BugReportAck.newBuilder()
             .setReportId("br-7")

@@ -997,6 +997,12 @@ Remaining validation:
 - Aligned native Android `ControlResponseDispatcher` `UpdateUI` handling with Flutter `applyUpdateUi`: no `node` leaves the tree unchanged; blank `component_id` replaces the entire root (including establishing a root when it was previously absent).
 - Extended `ControlResponseDispatcherTest` for blank component id, null-root bootstrap, and missing-node no-ops.
 
+### 2026-05-08 (UpdateUI target id parity with Flutter)
+
+- Matched Flutter `serverDrivenNodeId` in `ControlResponseDispatcher.replaceNode`: resolve targets by protobuf `id` when non-empty, otherwise `props["id"]`, so `UpdateUI` patches nested nodes that only identify via props.
+- Centralized the same rule in `util/ServerDrivenNodeId.kt` and used it from `PrimitiveProps` and `NodeKey.testTag` so widget actions, default Compose tags, and `UpdateUI` patch targets stay aligned.
+- Added JVM coverage for props-id patching, unknown-target no-ops, and direct unit tests for `serverDrivenNodeId`.
+
 ## Test Plan
 
 ### Unit tests

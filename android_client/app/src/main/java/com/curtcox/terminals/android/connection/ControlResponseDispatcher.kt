@@ -2,6 +2,7 @@ package com.curtcox.terminals.android.connection
 
 import com.curtcox.terminals.android.app.AndroidTerminalViewState
 import com.curtcox.terminals.android.diagnostics.AndroidBugReportChrome
+import com.curtcox.terminals.android.util.serverDrivenNodeId
 import terminals.control.v1.Control
 import terminals.io.v1.Io
 import terminals.ui.v1.Ui
@@ -178,7 +179,7 @@ class ControlResponseDispatcher {
     }
 
     private fun replaceNode(root: Ui.Node, componentId: String, replacement: Ui.Node): Ui.Node {
-        if (root.id == componentId) return replacement
+        if (serverDrivenNodeId(root) == componentId) return replacement
         if (root.childrenCount == 0) return root
 
         var changed = false
