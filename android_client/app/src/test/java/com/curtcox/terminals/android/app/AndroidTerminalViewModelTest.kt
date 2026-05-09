@@ -1030,7 +1030,9 @@ class AndroidTerminalViewModelTest {
         advanceUntilIdle()
 
         assertEquals("capabilities accepted", viewModel.state.value.registerAckMessage)
+        assertEquals("srv-reg", viewModel.state.value.registerAckServerId)
         assertTrue(viewModel.state.value.diagnosticsText.contains("register_ack_message=capabilities accepted"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("register_ack_server_id=srv-reg"))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1047,6 +1049,7 @@ class AndroidTerminalViewModelTest {
             Control.ConnectResponse.newBuilder()
                 .setRegisterAck(
                     Control.RegisterAck.newBuilder()
+                        .setServerId("srv-once")
                         .setMessage("registered once"),
                 )
                 .build(),
@@ -1058,6 +1061,7 @@ class AndroidTerminalViewModelTest {
 
         assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
         assertTrue(viewModel.state.value.diagnosticsText.contains("register_ack_message=registered once"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("register_ack_server_id=srv-once"))
     }
 
     @Test
@@ -1182,12 +1186,14 @@ class AndroidTerminalViewModelTest {
             Control.ConnectResponse.newBuilder()
                 .setRegisterAck(
                     Control.RegisterAck.newBuilder()
+                        .setServerId("srv-first")
                         .setMessage("first session ack"),
                 )
                 .build(),
         )
         advanceUntilIdle()
         assertEquals("first session ack", viewModel.state.value.registerAckMessage)
+        assertEquals("srv-first", viewModel.state.value.registerAckServerId)
 
         viewModel.disconnect()
         advanceUntilIdle()
@@ -1195,7 +1201,9 @@ class AndroidTerminalViewModelTest {
         viewModel.connect()
         advanceUntilIdle()
         assertNull(viewModel.state.value.registerAckMessage)
+        assertNull(viewModel.state.value.registerAckServerId)
         assertTrue(!viewModel.state.value.diagnosticsText.contains("register_ack_message=first session ack"))
+        assertTrue(!viewModel.state.value.diagnosticsText.contains("register_ack_server_id=srv-first"))
     }
 
     @Test

@@ -976,6 +976,10 @@ Remaining validation:
 
 - Recorded non-empty `RegisterAck.message` on `AndroidTerminalViewState`, merged in `ControlResponseDispatcher` (blank follow-up ack preserves the prior message), surfaced as `register_ack_message` in copyable diagnostics, cleared on `withoutHandshake` for new sessions, preserved across disconnect for support copy/paste (same pattern as bug-report ack), and added dispatcher/ViewModel JVM coverage. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
+### 2026-05-08 (RegisterAck server id diagnostics)
+
+- Recorded non-blank `RegisterAck.server_id` as `registerAckServerId`, merged with blank follow-up preserving the prior id (same pattern as `register_ack_message`), surfaced as `register_ack_server_id` in copyable diagnostics, cleared on `withoutHandshake`, and preserved across disconnect together with `register_ack_asset_base_url` (previously cleared from state on disconnect even when still useful for support paste). Extended dispatcher and ViewModel JVM coverage. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+
 ## Test Plan
 
 ### Unit tests

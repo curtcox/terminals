@@ -173,6 +173,7 @@ class ControlResponseDispatcherTest {
         val responseTyped = Control.ConnectResponse.newBuilder()
             .setRegisterAck(
                 Control.RegisterAck.newBuilder()
+                    .setServerId("reg-srv-typed")
                     .setMessage("device registered")
                     .setServerMetadata(
                         Control.ServerMetadata.newBuilder()
@@ -189,6 +190,7 @@ class ControlResponseDispatcherTest {
         assertEquals("abc", afterTyped.serverBuildSha)
         assertEquals("2026-05-08T12:00:00Z", afterTyped.serverBuildDate)
         assertEquals("device registered", afterTyped.registerAckMessage)
+        assertEquals("reg-srv-typed", afterTyped.registerAckServerId)
         assertEquals("https://example/static/", afterTyped.registerAckAssetBaseUrl)
 
         val responseMap = Control.ConnectResponse.newBuilder()
@@ -219,6 +221,25 @@ class ControlResponseDispatcherTest {
             .build()
         val afterSecond = dispatcher.dispatch(afterFirst, second)
         assertEquals("first ack", afterSecond.registerAckMessage)
+    }
+
+    @Test
+    fun registerAckBlankServerIdPreservesPriorServerId() {
+        val first = Control.ConnectResponse.newBuilder()
+            .setRegisterAck(
+                Control.RegisterAck.newBuilder()
+                    .setServerId("srv-a"),
+            )
+            .build()
+        val afterFirst = dispatcher.dispatch(AndroidTerminalViewState(), first)
+        assertEquals("srv-a", afterFirst.registerAckServerId)
+
+        val second = Control.ConnectResponse.newBuilder()
+            .setRegisterAck(Control.RegisterAck.newBuilder().setMessage("follow-up"))
+            .build()
+        val afterSecond = dispatcher.dispatch(afterFirst, second)
+        assertEquals("srv-a", afterSecond.registerAckServerId)
+        assertEquals("follow-up", afterSecond.registerAckMessage)
     }
 
     @Test

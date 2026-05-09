@@ -264,6 +264,8 @@ class AndroidTerminalViewModel(
                 lastBugReportAckDiagnostics = it.lastBugReportAckDiagnostics,
                 lastControlErrorCode = it.lastControlErrorCode,
                 registerAckMessage = it.registerAckMessage,
+                registerAckServerId = it.registerAckServerId,
+                registerAckAssetBaseUrl = it.registerAckAssetBaseUrl,
             )
             diagnosticsSource.copy(
                 connectionState = nextState,
@@ -624,6 +626,7 @@ class AndroidTerminalViewModel(
             serverBuildSha = null,
             serverBuildDate = null,
             registerAckMessage = null,
+            registerAckServerId = null,
             registerAckAssetBaseUrl = null,
             lastCapabilityAckGeneration = 0L,
             lastCapabilityAckSnapshotApplied = false,
@@ -682,6 +685,9 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.registerAckMessage?.takeIf { it.isNotBlank() }?.let {
                 appendLine("register_ack_message=$it")
+            }
+            handshakeSource?.registerAckServerId?.takeIf { it.isNotBlank() }?.let {
+                appendLine("register_ack_server_id=$it")
             }
             handshakeSource?.registerAckAssetBaseUrl?.takeIf { it.isNotBlank() }?.let {
                 appendLine("register_ack_asset_base_url=$it")

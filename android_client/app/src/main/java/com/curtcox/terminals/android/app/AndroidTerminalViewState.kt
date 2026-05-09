@@ -25,6 +25,8 @@ data class AndroidTerminalViewState(
     val serverBuildDate: String? = null,
     /** Non-empty `RegisterAck.message` from the server, for generic copyable diagnostics. */
     val registerAckMessage: String? = null,
+    /** Non-empty `RegisterAck.server_id` from the server (may differ from HelloAck server id). */
+    val registerAckServerId: String? = null,
     val registerAckAssetBaseUrl: String? = null,
     val lastCapabilityAckGeneration: Long = 0L,
     /** From the last server `CapabilityAck.snapshot_applied`. */
