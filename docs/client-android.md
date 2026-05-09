@@ -116,11 +116,18 @@ make run-server
 ```
 
 2. Open Terminals on the Android device.
-3. Enter a manual endpoint such as:
+3. Enter a manual endpoint. Use an explicit scheme so the client picks the right
+   transport:
 
 ```text
-192.168.1.50:50051
+grpc://192.168.1.50:50051
+http://192.168.1.50:50054/control
 ```
+
+Bare `host:port` defaults to HTTP and the WebSocket upgrade (same as before).
+`grpc://` / `grpcs://` use the gRPC control stream (plaintext / TLS). Discovery
+metadata that only advertises `grpc=host:port` is normalized to `grpc://…` when
+you select the server.
 
 The native Android client validates manual endpoints, manages the generic
 control-session lifecycle, sends protobuf-backed hello/capability/action

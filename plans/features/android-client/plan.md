@@ -1193,6 +1193,14 @@ Remaining validation:
 
 - Fixed `ServerDrivenRenderer` `OutlinedTextField` IME Done handling for Compose BOM `2025.10.00`: `KeyboardActions.onDone` expects `(KeyboardActionScope) -> Unit`, so the handler is now wrapped as `{ onDone() }` instead of passing a `() -> Unit` reference. Unblocks `compileDebugKotlin` / `make android-client-test`.
 
+### 2026-05-09 (gRPC control transport)
+
+- Implemented real `GrpcAndroidControlClient` using `io.grpc:grpc-okhttp` + generated `TerminalControlServiceGrpc` stubs (protobuf codegen `protoc-gen-grpc-java` with `lite`), replacing the previous stub that threw.
+- Added `EndpointResolution.carrier` (`CarrierPreference`), `CarrierSelectingAndroidControlClient` in the default session factory, and `grpc://` / `grpcs://` support in `ManualEndpointParser` with JVM tests.
+- Normalized discovery-only gRPC TXT values (`grpc=host:port`) to `grpc://…` in `AndroidTerminalViewModel` so selecting a discovered server no longer mis-routes through the WebSocket upgrade on the gRPC port.
+- Updated `docs/client-android.md` manual endpoint examples (explicit gRPC vs WebSocket URLs).
+- Fixed `AndroidControlSessionControllerTest.heartbeatAndUiActionUseProtocolBuilders` to `connect()` first so `sendSensorTelemetry` aligns with the “last registered capability snapshot” contract.
+
 ## Test Plan
 
 ### Unit tests

@@ -5,7 +5,14 @@ data class EndpointResolution(
     val port: Int,
     val secure: Boolean = false,
     val path: String = "",
+    val carrier: CarrierPreference = CarrierPreference.WebSocket,
 ) {
     val displayName: String
-        get() = "${if (secure) "https" else "http"}://$host:$port$path"
+        get() =
+            when (carrier) {
+                CarrierPreference.Grpc ->
+                    "${if (secure) "grpcs" else "grpc"}://$host:$port"
+                CarrierPreference.WebSocket ->
+                    "${if (secure) "https" else "http"}://$host:$port$path"
+            }
 }

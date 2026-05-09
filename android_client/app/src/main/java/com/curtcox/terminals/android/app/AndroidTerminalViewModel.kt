@@ -690,14 +690,17 @@ class AndroidTerminalViewModel(
         super.onCleared()
     }
 
-    private fun discoveredEndpointText(server: DiscoveredServer): String =
-        server.webSocketEndpoint.ifBlank {
-            server.grpcEndpoint.ifBlank {
-                server.httpEndpoint.ifBlank {
-                    "${server.host}:${server.port}"
-                }
-            }
+    private fun discoveredEndpointText(server: DiscoveredServer): String {
+        val ws = server.webSocketEndpoint.trim()
+        if (ws.isNotEmpty()) return ws
+        val grpc = server.grpcEndpoint.trim()
+        if (grpc.isNotEmpty()) {
+            return if (grpc.contains("://")) grpc else "grpc://$grpc"
         }
+        val http = server.httpEndpoint.trim()
+        if (http.isNotEmpty()) return http
+        return "${server.host}:${server.port}"
+    }
 
     private fun startHeartbeat(connectedSession: AndroidControlSession) {
         stopHeartbeat()

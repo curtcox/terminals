@@ -39,6 +39,8 @@ class AndroidControlSessionControllerTest {
     fun heartbeatAndUiActionUseProtocolBuilders() = runTest {
         val client = FakeControlClient()
         val controller = controller(client = client)
+        controller.connect(EndpointResolution("10.0.0.8", 8080))
+        client.sent.clear()
 
         controller.sendHeartbeat()
         controller.sendSensorTelemetry()

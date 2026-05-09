@@ -74,10 +74,20 @@ protobuf {
     protoc {
         artifact = "com.google.protobuf:protoc:4.29.3"
     }
+    plugins {
+        create("grpc") {
+            artifact = "io.grpc:protoc-gen-grpc-java:1.68.3"
+        }
+    }
     generateProtoTasks {
         all().configureEach {
             builtins {
                 id("java") {
+                    option("lite")
+                }
+            }
+            plugins {
+                create("grpc") {
                     option("lite")
                 }
             }
@@ -98,7 +108,12 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("com.google.protobuf:protobuf-javalite:4.29.3")
+    implementation(platform("io.grpc:grpc-bom:1.68.3"))
+    implementation("io.grpc:grpc-okhttp")
+    implementation("io.grpc:grpc-protobuf-lite")
+    implementation("io.grpc:grpc-stub")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    compileOnly("javax.annotation:javax.annotation-api:1.3.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

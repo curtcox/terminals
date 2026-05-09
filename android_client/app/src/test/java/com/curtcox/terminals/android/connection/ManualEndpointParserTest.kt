@@ -13,6 +13,33 @@ class ManualEndpointParserTest {
         assertEquals("192.168.1.20", endpoint?.host)
         assertEquals(50051, endpoint?.port)
         assertEquals(false, endpoint?.secure)
+        assertEquals(CarrierPreference.WebSocket, endpoint?.carrier)
+    }
+
+    @Test
+    fun parsesGrpcUrl() {
+        val endpoint = parser.parse("grpc://192.168.1.20:50051")
+        assertEquals("192.168.1.20", endpoint?.host)
+        assertEquals(50051, endpoint?.port)
+        assertEquals(false, endpoint?.secure)
+        assertEquals(CarrierPreference.Grpc, endpoint?.carrier)
+    }
+
+    @Test
+    fun parsesGrpcUrlDefaultPort() {
+        val endpoint = parser.parse("grpc://192.168.1.20")
+        assertEquals("192.168.1.20", endpoint?.host)
+        assertEquals(50051, endpoint?.port)
+        assertEquals(CarrierPreference.Grpc, endpoint?.carrier)
+    }
+
+    @Test
+    fun parsesGrpcsUrl() {
+        val endpoint = parser.parse("grpcs://terminal.example:443")
+        assertEquals("terminal.example", endpoint?.host)
+        assertEquals(443, endpoint?.port)
+        assertEquals(true, endpoint?.secure)
+        assertEquals(CarrierPreference.Grpc, endpoint?.carrier)
     }
 
     @Test

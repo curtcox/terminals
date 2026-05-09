@@ -10,8 +10,8 @@ import com.curtcox.terminals.android.capabilities.ContextAndroidCapabilityProbe
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.AndroidControlSessionController
+import com.curtcox.terminals.android.connection.CarrierSelectingAndroidControlClient
 import com.curtcox.terminals.android.connection.ReconnectPolicy
-import com.curtcox.terminals.android.connection.WebSocketAndroidControlClient
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.ContextDiagnosticClipboard
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
@@ -72,7 +72,7 @@ data class AndroidClientDependencies(
         AndroidControlSessionController(
             deviceId = deviceId,
             clientVersion = buildMetadata.versionName,
-            client = WebSocketAndroidControlClient(deviceId = deviceId, responseSink = sink),
+            client = CarrierSelectingAndroidControlClient(deviceId = deviceId, responseSink = sink),
             capabilities = AndroidCapabilitySession(deviceId, capabilityProbe),
             clock = Clock { System.currentTimeMillis() },
         )
