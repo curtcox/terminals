@@ -953,6 +953,10 @@ Remaining validation:
 - Extended dispatcher and ViewModel tests (`serverTransitionUiRemainsInDiagnosticsAfterNetworkRefresh`).
 - Hardened bug-report acknowledgement diagnostics across disconnect and reconnect: `lastBugReportAckDiagnostics` is cleared in `withoutHandshake` so a new connect does not show a prior session’s ack, while disconnect rebuilds copyable diagnostics with the last ack preserved for support copy/paste; centralized ack lines in `formatDiagnostics` (removed duplicate append from the control response sink). Added ViewModel coverage (`serverBugReportAckRemainsInDiagnosticsAfterDisconnect`, `newConnectClearsBugReportAckFromPriorSession`).
 
+### 2026-05-08 (capability ack diagnostics)
+
+- Surfaced server `CapabilityAck.snapshot_applied` and a compact `invalidations` summary in copyable terminal diagnostics (aligned with server capability-lifecycle invalidation signaling). Extended `ControlResponseDispatcher` state, `withoutHandshake` clearing, dispatcher/ViewModel tests.
+
 ## Test Plan
 
 ### Unit tests

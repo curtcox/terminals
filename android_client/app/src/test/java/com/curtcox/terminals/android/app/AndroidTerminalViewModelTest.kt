@@ -1225,6 +1225,39 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun capabilityAckInvalidationsAndSnapshotAppliedAreSurfacedInDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setCapabilityAck(
+                    Control.CapabilityAck.newBuilder()
+                        .setDeviceId("device-1")
+                        .setAcceptedGeneration(9)
+                        .setSnapshotApplied(true)
+                        .addInvalidations(
+                            Control.ResourceInvalidation.newBuilder()
+                                .setResource("mic.capture")
+                                .setReason("capability_lost"),
+                        ),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        val text = viewModel.state.value.diagnosticsText
+        assertTrue(text.contains("last_capability_ack_generation=9"))
+        assertTrue(text.contains("capability_ack_snapshot_applied=true"))
+        assertTrue(text.contains("last_capability_invalidations=mic.capture:capability_lost"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun opaqueStartStreamSummaryIsSurfacedInDiagnosticsAndClearsOnDisconnect() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)

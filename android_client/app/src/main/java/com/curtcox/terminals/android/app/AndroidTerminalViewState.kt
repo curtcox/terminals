@@ -25,6 +25,10 @@ data class AndroidTerminalViewState(
     val serverBuildDate: String? = null,
     val registerAckAssetBaseUrl: String? = null,
     val lastCapabilityAckGeneration: Long = 0L,
+    /** From the last server `CapabilityAck.snapshot_applied`. */
+    val lastCapabilityAckSnapshotApplied: Boolean = false,
+    /** Compact summary of `CapabilityAck.invalidations` for copyable diagnostics. */
+    val lastCapabilityInvalidationsSummary: String? = null,
     val lastServerHeartbeatUnixMs: Long? = null,
     val lastCommandResultRequestId: String? = null,
     val lastCommandResultNotification: String? = null,

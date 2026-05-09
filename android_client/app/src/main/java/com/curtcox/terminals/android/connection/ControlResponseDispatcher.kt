@@ -20,8 +20,14 @@ class ControlResponseDispatcher {
                     serverHeartbeatIntervalMs = ack.heartbeatIntervalMs.takeIf { it > 0 },
                 )
             }
-            Control.ConnectResponse.PayloadCase.CAPABILITY_ACK ->
-                state.copy(lastCapabilityAckGeneration = response.capabilityAck.acceptedGeneration)
+            Control.ConnectResponse.PayloadCase.CAPABILITY_ACK -> {
+                val ack = response.capabilityAck
+                state.copy(
+                    lastCapabilityAckGeneration = ack.acceptedGeneration,
+                    lastCapabilityAckSnapshotApplied = ack.snapshotApplied,
+                    lastCapabilityInvalidationsSummary = summarizeCapabilityInvalidations(ack),
+                )
+            }
             Control.ConnectResponse.PayloadCase.REGISTER_ACK -> mergeRegisterAck(state, response)
             Control.ConnectResponse.PayloadCase.SET_UI -> state.copy(serverRoot = response.setUi.root)
             Control.ConnectResponse.PayloadCase.UPDATE_UI -> {
@@ -80,6 +86,23 @@ class ControlResponseDispatcher {
             else -> state.copy(
                 lastOpaqueControlIoSummary = "type=unhandled_payload payload_case=${response.payloadCase.name}",
             )
+        }
+    }
+
+    private fun summarizeCapabilityInvalidations(ack: Control.CapabilityAck): String? {
+        if (ack.invalidationsCount == 0) return null
+        val list = ack.invalidationsList
+        val maxShown = 4
+        return buildString {
+            list.take(maxShown).forEachIndexed { index, inv ->
+                if (index > 0) append("; ")
+                val resource = inv.resource.takeIf { it.isNotBlank() } ?: "?"
+                val reason = inv.reason.takeIf { it.isNotBlank() } ?: "-"
+                append(resource).append(':').append(reason)
+            }
+            if (list.size > maxShown) {
+                append("; +").append(list.size - maxShown).append(" more")
+            }
         }
     }
 

@@ -163,6 +163,59 @@ class ControlResponseDispatcherTest {
         val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
 
         assertEquals(42L, next.lastCapabilityAckGeneration)
+        assertEquals(false, next.lastCapabilityAckSnapshotApplied)
+        assertNull(next.lastCapabilityInvalidationsSummary)
+    }
+
+    @Test
+    fun capabilityAckRecordsSnapshotAppliedAndInvalidationsSummary() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setCapabilityAck(
+                Control.CapabilityAck.newBuilder()
+                    .setDeviceId("device-1")
+                    .setAcceptedGeneration(3)
+                    .setSnapshotApplied(true)
+                    .addInvalidations(
+                        Control.ResourceInvalidation.newBuilder()
+                            .setResource("mic.capture")
+                            .setReason("capability_lost"),
+                    )
+                    .addInvalidations(
+                        Control.ResourceInvalidation.newBuilder()
+                            .setResource("camera.capture")
+                            .setReason("capability_lost"),
+                    ),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals(3L, next.lastCapabilityAckGeneration)
+        assertTrue(next.lastCapabilityAckSnapshotApplied)
+        assertEquals(
+            "mic.capture:capability_lost; camera.capture:capability_lost",
+            next.lastCapabilityInvalidationsSummary,
+        )
+    }
+
+    @Test
+    fun capabilityAckInvalidationsSummaryTruncatesLongLists() {
+        val builder = Control.CapabilityAck.newBuilder()
+            .setDeviceId("device-1")
+            .setAcceptedGeneration(1)
+        repeat(6) { i ->
+            builder.addInvalidations(
+                Control.ResourceInvalidation.newBuilder()
+                    .setResource("res-$i")
+                    .setReason("gone"),
+            )
+        }
+        val response = Control.ConnectResponse.newBuilder().setCapabilityAck(builder).build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertTrue(next.lastCapabilityInvalidationsSummary!!.contains("res-0:gone"))
+        assertTrue(next.lastCapabilityInvalidationsSummary.contains("+2 more"))
     }
 
     @Test

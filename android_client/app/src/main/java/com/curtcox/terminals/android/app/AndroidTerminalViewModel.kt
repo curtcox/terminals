@@ -625,6 +625,8 @@ class AndroidTerminalViewModel(
             serverBuildDate = null,
             registerAckAssetBaseUrl = null,
             lastCapabilityAckGeneration = 0L,
+            lastCapabilityAckSnapshotApplied = false,
+            lastCapabilityInvalidationsSummary = null,
             lastServerHeartbeatUnixMs = null,
             lastCommandResultRequestId = null,
             lastCommandResultNotification = null,
@@ -681,6 +683,10 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.takeIf { it.lastCapabilityAckGeneration > 0L }?.let {
                 appendLine("last_capability_ack_generation=${it.lastCapabilityAckGeneration}")
+                appendLine("capability_ack_snapshot_applied=${it.lastCapabilityAckSnapshotApplied}")
+                it.lastCapabilityInvalidationsSummary?.takeIf { summary -> summary.isNotBlank() }?.let { summary ->
+                    appendLine("last_capability_invalidations=$summary")
+                }
             }
             handshakeSource?.lastServerHeartbeatUnixMs?.takeIf { it > 0 }?.let {
                 appendLine("last_server_heartbeat_unix_ms=$it")
