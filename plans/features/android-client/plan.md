@@ -1032,6 +1032,11 @@ Remaining validation:
 - Extended `ServerDrivenRendererTest` with instrumentation coverage for `StackWidget`, `RowWidget`, `GridWidget`, `ScrollWidget`, `PaddingWidget`, `CenterWidget`, `ExpandWidget` (inside a row), `OverlayWidget`, `ProgressWidget`, `SliderWidget` (display smoke), `CanvasWidget` with a `DrawLine` op, and `AudioVisualizerWidget` media-surface delegation, closing gaps against the Phase 5 “Compose tests for all primitives” table for layout and canvas/audio-visualizer paths.
 - Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Full Gradle validation was not run in this environment (no JDK on the agent host).
 
+### 2026-05-08 (ScrollWidget parity with Flutter)
+
+- Fixed native Android `ScrollWidget` rendering to match Flutter `server_driven_renderer.dart`: horizontal scrolling uses a `Row` inside `horizontalScroll` (instead of a `Column`), vertical scrolling uses a `Column` with `verticalScroll` and start horizontal alignment; when `direction_enum` is unset, the deprecated `direction` string still selects horizontal (case-insensitive `"horizontal"`), matching the Flutter fallback.
+- Added instrumentation coverage for horizontal scroll (deprecated string + enum), and for slider drag emitting a `change` action with an updated value.
+
 ## Test Plan
 
 ### Unit tests

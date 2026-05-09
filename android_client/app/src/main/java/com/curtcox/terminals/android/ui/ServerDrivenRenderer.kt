@@ -79,12 +79,27 @@ private fun RenderNode(
             items(node.childrenList) { child -> RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
         }
         Ui.Node.WidgetCase.SCROLL -> {
-            val modifier = if (node.scroll.directionEnum == Ui.ScrollDirection.SCROLL_DIRECTION_HORIZONTAL) {
-                props.modifier().horizontalScroll(rememberScrollState())
-            } else {
-                props.modifier().verticalScroll(rememberScrollState())
+            val scrollState = rememberScrollState()
+            val isHorizontal = when (node.scroll.directionEnum) {
+                Ui.ScrollDirection.SCROLL_DIRECTION_HORIZONTAL -> true
+                Ui.ScrollDirection.SCROLL_DIRECTION_VERTICAL -> false
+                else -> node.scroll.direction.trim().lowercase() == "horizontal"
             }
-            Column(modifier) { RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
+            if (isHorizontal) {
+                Row(
+                    modifier = props.modifier().horizontalScroll(scrollState),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                }
+            } else {
+                Column(
+                    modifier = props.modifier().verticalScroll(scrollState),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                }
+            }
         }
         Ui.Node.WidgetCase.PADDING -> Box(props.modifier().padding(node.padding.all.dp)) {
             RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)

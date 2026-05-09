@@ -2,12 +2,14 @@ package com.curtcox.terminals.android.ui
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -277,6 +279,48 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun horizontalScrollDeprecatedStringDirectionRendersChildrenInRow() {
+        val root = Ui.Node.newBuilder()
+            .setId("scroll")
+            .setScroll(Ui.ScrollWidget.newBuilder().setDirection("horizontal").build())
+            .addChildren(node("a") {
+                text = Ui.TextWidget.newBuilder().setValue("One").build()
+            })
+            .addChildren(node("b") {
+                text = Ui.TextWidget.newBuilder().setValue("Two").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("One").assertIsDisplayed()
+        compose.onNodeWithText("Two").assertIsDisplayed()
+    }
+
+    @Test
+    fun horizontalScrollEnumDirectionRendersChildrenInRow() {
+        val root = Ui.Node.newBuilder()
+            .setId("scroll")
+            .setScroll(
+                Ui.ScrollWidget.newBuilder()
+                    .setDirectionEnum(Ui.ScrollDirection.SCROLL_DIRECTION_HORIZONTAL)
+                    .build(),
+            )
+            .addChildren(node("a") {
+                text = Ui.TextWidget.newBuilder().setValue("East").build()
+            })
+            .addChildren(node("b") {
+                text = Ui.TextWidget.newBuilder().setValue("West").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("East").assertIsDisplayed()
+        compose.onNodeWithText("West").assertIsDisplayed()
+    }
+
+    @Test
     fun paddingWrapsChildWithTag() {
         val root = Ui.Node.newBuilder()
             .setId("root")
@@ -364,6 +408,26 @@ class ServerDrivenRendererTest {
         compose.setContent { render(root) }
 
         compose.onNodeWithTag("terminal-node-level").assertIsDisplayed()
+    }
+
+    @Test
+    fun sliderEmitsChangeActionWhenAdjusted() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = node("level") {
+            slider = Ui.SliderWidget.newBuilder().setMin(0.0).setMax(100.0).setValue(50.0).build()
+        }
+
+        compose.setContent { render(root, actions::add) }
+
+        compose.onNodeWithTag("terminal-node-level").performTouchInput {
+            down(center)
+            moveTo(center + Offset(160f, 0f))
+            up()
+        }
+
+        compose.waitUntil(timeoutMillis = 5_000) {
+            actions.any { it.componentId == "level" && it.action == "change" && it.value != "50.0" }
+        }
     }
 
     @Test
