@@ -638,6 +638,7 @@ class AndroidTerminalViewModel(
             lastServerHeartbeatUnixMs = null,
             lastCommandResultRequestId = null,
             lastCommandResultNotification = null,
+            lastOpaqueControlIoSummary = null,
         )
 
     private fun formatDiagnostics(
@@ -696,6 +697,9 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.lastCommandResultNotification?.takeIf { it.isNotBlank() }?.let {
                 appendLine("last_command_result_notification=$it")
+            }
+            handshakeSource?.lastOpaqueControlIoSummary?.takeIf { it.isNotBlank() }?.let {
+                appendLine("last_opaque_control_io=$it")
             }
         }
     }

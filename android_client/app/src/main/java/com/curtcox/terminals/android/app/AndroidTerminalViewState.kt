@@ -26,6 +26,8 @@ data class AndroidTerminalViewState(
     val lastServerHeartbeatUnixMs: Long? = null,
     val lastCommandResultRequestId: String? = null,
     val lastCommandResultNotification: String? = null,
+    /** Opaque summary for server IO/control messages not yet executed natively (streams, flows, WebRTC, bundles). */
+    val lastOpaqueControlIoSummary: String? = null,
     val localKeepAwakeEnabled: Boolean = false,
     val localFullscreenEnabled: Boolean = false,
     val localBrightDisplayEnabled: Boolean = false,

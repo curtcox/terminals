@@ -49,6 +49,7 @@ import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -1123,6 +1124,32 @@ class AndroidTerminalViewModelTest {
         )
         viewModel.disconnect()
         advanceUntilIdle()
+    }
+
+    @Test
+    fun opaqueStartStreamSummaryIsSurfacedInDiagnosticsAndClearsOnDisconnect() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setStartStream(
+                    Io.StartStream.newBuilder()
+                        .setStreamId("s-out")
+                        .setStreamKind(Io.StreamKind.STREAM_KIND_AUDIO),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_opaque_control_io="))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("stream_id=s-out"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+        assertNull(viewModel.state.value.lastOpaqueControlIoSummary)
     }
 
     @Test

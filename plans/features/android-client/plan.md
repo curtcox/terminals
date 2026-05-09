@@ -941,6 +941,12 @@ Remaining validation:
 - Cleared the new server-heartbeat and command-result fields alongside the existing handshake reset path in `AndroidTerminalViewModel.withoutHandshake`, so reconnect/disconnect transitions do not leak previous server protocol activity into fresh sessions.
 - Re-verified Android boundary scan, boundary tests, and diff whitespace checks with `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Local Gradle unit/lint validation remained host-skipped because the Android SDK is not configured (`ANDROID_SDK_ROOT`/`ANDROID_HOME` unset, no `android_client/local.properties`) and JDK 17 is not present on this machine; `make android-client-test` reports the documented skip.
 
+### 2026-05-08 (opaque IO diagnostics)
+
+- Surfaced server `ConnectResponse` payloads that were previously ignored by `ControlResponseDispatcher` (`StartStream`, `StopStream`, `RouteStream`, `WebRTCSignal`, `InstallBundle`, `RemoveBundle`, `StartFlow`, `PatchFlow`, `StopFlow`, `RequestArtifact`) as generic `last_opaque_control_io` lines in copyable diagnostics; WebRTC summaries omit SDP payloads; bundle installs record bundle id/version/sha prefix/tar byte length without dumping artifact bytes.
+- Cleared opaque summaries on media commands (`PlayAudio`/`ShowMedia`) and on session teardown via `withoutHandshake`; forward-unknown payload cases still record `payload_case` for protocol debugging.
+- Added dispatcher and ViewModel regression coverage for opaque IO summaries.
+
 ## Test Plan
 
 ### Unit tests

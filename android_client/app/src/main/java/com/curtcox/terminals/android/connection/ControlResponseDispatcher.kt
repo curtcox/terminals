@@ -3,6 +3,7 @@ package com.curtcox.terminals.android.connection
 import com.curtcox.terminals.android.app.AndroidTerminalViewState
 import com.curtcox.terminals.android.diagnostics.AndroidBugReportChrome
 import terminals.control.v1.Control
+import terminals.io.v1.Io
 import terminals.ui.v1.Ui
 
 class ControlResponseDispatcher {
@@ -46,7 +47,33 @@ class ControlResponseDispatcher {
                     lastCommandResultNotification = result.notification.takeIf { it.isNotBlank() },
                 )
             }
-            else -> state
+            Control.ConnectResponse.PayloadCase.START_STREAM ->
+                state.copy(lastOpaqueControlIoSummary = summarizeStartStream(response.startStream))
+            Control.ConnectResponse.PayloadCase.STOP_STREAM ->
+                state.copy(lastOpaqueControlIoSummary = summarizeStopStream(response.stopStream))
+            Control.ConnectResponse.PayloadCase.ROUTE_STREAM ->
+                state.copy(lastOpaqueControlIoSummary = summarizeRouteStream(response.routeStream))
+            Control.ConnectResponse.PayloadCase.WEBRTC_SIGNAL ->
+                state.copy(lastOpaqueControlIoSummary = summarizeWebRtcSignal(response.webrtcSignal))
+            Control.ConnectResponse.PayloadCase.INSTALL_BUNDLE ->
+                state.copy(lastOpaqueControlIoSummary = summarizeInstallBundle(response.installBundle))
+            Control.ConnectResponse.PayloadCase.REMOVE_BUNDLE ->
+                state.copy(lastOpaqueControlIoSummary = summarizeRemoveBundle(response.removeBundle))
+            Control.ConnectResponse.PayloadCase.START_FLOW ->
+                state.copy(lastOpaqueControlIoSummary = summarizeStartFlow(response.startFlow))
+            Control.ConnectResponse.PayloadCase.PATCH_FLOW ->
+                state.copy(lastOpaqueControlIoSummary = summarizePatchFlow(response.patchFlow))
+            Control.ConnectResponse.PayloadCase.STOP_FLOW ->
+                state.copy(lastOpaqueControlIoSummary = summarizeStopFlow(response.stopFlow))
+            Control.ConnectResponse.PayloadCase.REQUEST_ARTIFACT ->
+                state.copy(lastOpaqueControlIoSummary = summarizeRequestArtifact(response.requestArtifact))
+            Control.ConnectResponse.PayloadCase.PLAY_AUDIO,
+            Control.ConnectResponse.PayloadCase.SHOW_MEDIA,
+            -> state.copy(lastOpaqueControlIoSummary = null)
+            Control.ConnectResponse.PayloadCase.PAYLOAD_NOT_SET -> state
+            else -> state.copy(
+                lastOpaqueControlIoSummary = "type=unhandled_payload payload_case=${response.payloadCase.name}",
+            )
         }
     }
 
@@ -84,4 +111,73 @@ class ControlResponseDispatcher {
             .addAllChildren(children)
             .build()
     }
+
+    private fun summarizeStartStream(stream: Io.StartStream): String = buildString {
+        append("type=start_stream")
+        append(" stream_id=").append(stream.streamId.takeIf { it.isNotBlank() } ?: "none")
+        if (stream.streamKind != Io.StreamKind.STREAM_KIND_UNSPECIFIED) {
+            append(" stream_kind=").append(stream.streamKind.name)
+        }
+        if (stream.kind.isNotBlank()) {
+            append(" kind=").append(stream.kind)
+        }
+    }
+
+    private fun summarizeStopStream(stream: Io.StopStream): String =
+        "type=stop_stream stream_id=${stream.streamId.takeIf { it.isNotBlank() } ?: "none"}"
+
+    private fun summarizeRouteStream(route: Io.RouteStream): String = buildString {
+        append("type=route_stream")
+        append(" stream_id=").append(route.streamId.takeIf { it.isNotBlank() } ?: "none")
+        if (route.streamKind != Io.StreamKind.STREAM_KIND_UNSPECIFIED) {
+            append(" stream_kind=").append(route.streamKind.name)
+        }
+        if (route.kind.isNotBlank()) {
+            append(" kind=").append(route.kind)
+        }
+    }
+
+    private fun summarizeWebRtcSignal(signal: Control.WebRTCSignal): String = buildString {
+        append("type=webrtc_signal")
+        append(" stream_id=").append(signal.streamId.takeIf { it.isNotBlank() } ?: "none")
+        when {
+            signal.signalTypeEnum != Control.WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_UNSPECIFIED ->
+                append(" signal_type=").append(signal.signalTypeEnum.name)
+            signal.signalType.isNotBlank() -> append(" signal_type=").append(signal.signalType)
+            else -> Unit
+        }
+    }
+
+    private fun summarizeInstallBundle(bundle: Io.InstallBundle): String = buildString {
+        append("type=install_bundle bundle_id=").append(bundle.bundleId.takeIf { it.isNotBlank() } ?: "none")
+        if (bundle.version.isNotBlank()) {
+            append(" version=").append(bundle.version)
+        }
+        if (bundle.sha256.isNotBlank()) {
+            val sha = bundle.sha256
+            val short = if (sha.length > 12) sha.take(12) + "..." else sha
+            append(" sha256_prefix=").append(short)
+        }
+        val tarLen = bundle.tarGz.size()
+        if (tarLen > 0) {
+            append(" tar_gz_bytes=").append(tarLen)
+        }
+    }
+
+    private fun summarizeRemoveBundle(bundle: Io.RemoveBundle): String =
+        "type=remove_bundle bundle_id=${bundle.bundleId.takeIf { it.isNotBlank() } ?: "none"}"
+
+    private fun summarizeStartFlow(flow: Io.StartFlow): String =
+        "type=start_flow flow_id=${flow.flowId.takeIf { it.isNotBlank() } ?: "none"} " +
+            "nodes=${flow.plan.nodesCount} edges=${flow.plan.edgesCount}"
+
+    private fun summarizePatchFlow(flow: Io.PatchFlow): String =
+        "type=patch_flow flow_id=${flow.flowId.takeIf { it.isNotBlank() } ?: "none"} " +
+            "nodes=${flow.plan.nodesCount} edges=${flow.plan.edgesCount}"
+
+    private fun summarizeStopFlow(flow: Io.StopFlow): String =
+        "type=stop_flow flow_id=${flow.flowId.takeIf { it.isNotBlank() } ?: "none"}"
+
+    private fun summarizeRequestArtifact(request: Io.RequestArtifact): String =
+        "type=request_artifact artifact_id=${request.artifactId.takeIf { it.isNotBlank() } ?: "none"}"
 }

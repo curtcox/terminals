@@ -5,9 +5,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.google.protobuf.ByteString
 import terminals.control.v1.Control
 import terminals.diagnostics.v1.Diagnostics.BugReportAck
 import terminals.diagnostics.v1.Diagnostics.BugReportStatus
+import terminals.io.v1.Io
 import terminals.ui.v1.Ui
 
 class ControlResponseDispatcherTest {
@@ -203,6 +205,90 @@ class ControlResponseDispatcherTest {
 
         assertEquals("cmd-7", next.lastCommandResultRequestId)
         assertEquals("Started timer", next.lastCommandResultNotification)
+    }
+
+    @Test
+    fun startStreamRecordsOpaqueSummary() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setStartStream(
+                Io.StartStream.newBuilder()
+                    .setStreamId("stream-1")
+                    .setStreamKind(Io.StreamKind.STREAM_KIND_VIDEO)
+                    .setKind("custom"),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertTrue(next.lastOpaqueControlIoSummary!!.contains("type=start_stream"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("stream_id=stream-1"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("STREAM_KIND_VIDEO"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("kind=custom"))
+    }
+
+    @Test
+    fun stopStreamRecordsOpaqueSummary() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setStopStream(Io.StopStream.newBuilder().setStreamId("s9"))
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("type=stop_stream stream_id=s9", next.lastOpaqueControlIoSummary)
+    }
+
+    @Test
+    fun webRtcSignalRecordsOpaqueSummaryWithoutPayloadBody() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setWebrtcSignal(
+                Control.WebRTCSignal.newBuilder()
+                    .setStreamId("webrtc-1")
+                    .setSignalTypeEnum(Control.WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_OFFER)
+                    .setPayload("secret-sdp-should-not-appear-in-summary"),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertTrue(next.lastOpaqueControlIoSummary!!.contains("type=webrtc_signal"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("stream_id=webrtc-1"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("WEB_RTC_SIGNAL_TYPE_OFFER"))
+        assertTrue(!next.lastOpaqueControlIoSummary.contains("secret-sdp"))
+    }
+
+    @Test
+    fun installBundleRecordsOpaqueSummaryWithTarSize() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setInstallBundle(
+                Io.InstallBundle.newBuilder()
+                    .setBundleId("b1")
+                    .setVersion("1.0.0")
+                    .setSha256("abcdef0123456789abcdef0123456789")
+                    .setTarGz(ByteString.copyFrom(ByteArray(500))),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertTrue(next.lastOpaqueControlIoSummary!!.contains("type=install_bundle"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("bundle_id=b1"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("version=1.0.0"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("sha256_prefix=abcdef012345..."))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("tar_gz_bytes=500"))
+    }
+
+    @Test
+    fun playAudioClearsOpaqueSummary() {
+        val seeded = AndroidTerminalViewState(
+            lastOpaqueControlIoSummary = "type=start_stream stream_id=x",
+        )
+        val response = Control.ConnectResponse.newBuilder()
+            .setPlayAudio(Io.PlayAudio.newBuilder().setRequestId("a1").setUrl("https://example/a.mp3"))
+            .build()
+
+        val next = dispatcher.dispatch(seeded, response)
+
+        assertNull(next.lastOpaqueControlIoSummary)
     }
 
     @Test
