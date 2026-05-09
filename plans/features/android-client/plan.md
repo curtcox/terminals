@@ -1044,6 +1044,13 @@ Remaining validation:
 - Aligned control actions with Flutter: button taps omit a synthetic `pressed` value; toggle uses action `toggle`; dropdown selection uses `select`; text fields emit `submit` on IME Done (and clear local text), not per-keystroke `change`.
 - Updated JVM and instrumentation expectations (`ProtocolBuildersTest`, `AndroidTerminalViewModelTest`, `ServerDrivenRendererTest`, `AndroidTerminalAppSmokeTest`).
 
+### 2026-05-08 (TextWidget style/color parity helper)
+
+- Added shared Android UI color parsing helpers (`ui/ColorParsing.kt`) aligned with Flutter `parseHexColor`: optional `#`, 6-digit RGB expansion to ARGB, and deterministic `Color.Unspecified` fallback.
+- Updated `ServerDrivenRenderer` text rendering to honor `TextWidget.style == "monospace"` via `FontFamily.Monospace`, and switched text/canvas/background color parsing to the shared helper for consistent behavior across text and draw ops.
+- Added focused JVM coverage in `ColorParsingTest` for RGB/ARGB parsing and invalid-value fallback.
+- Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`.
+
 ## Test Plan
 
 ### Unit tests

@@ -40,6 +40,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import terminals.ui.v1.Ui
@@ -125,7 +126,12 @@ private fun RenderNode(
         Ui.Node.WidgetCase.EXPAND -> Box(props.modifier().fillMaxWidth()) {
             RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
         }
-        Ui.Node.WidgetCase.TEXT -> Text(node.text.value, modifier = props.modifier(), color = parseColor(node.text.color))
+        Ui.Node.WidgetCase.TEXT -> Text(
+            text = node.text.value,
+            modifier = props.modifier(),
+            color = parseColorOrUnspecified(node.text.color),
+            fontFamily = if (node.text.style == "monospace") FontFamily.Monospace else null,
+        )
         Ui.Node.WidgetCase.IMAGE -> imageLoader(node.image.url, node.propsMap["contentDescription"])
         Ui.Node.WidgetCase.VIDEO_SURFACE -> mediaSurface(node.videoSurface.trackId)
         Ui.Node.WidgetCase.AUDIO_VISUALIZER -> mediaSurface(node.audioVisualizer.streamId)
@@ -239,18 +245,18 @@ private fun TerminalCanvas(node: Ui.Node, modifier: Modifier) {
         node.canvas.drawOpsList.forEach { op ->
             when (op.opCase) {
                 Ui.DrawOp.OpCase.LINE -> drawLine(
-                    color = parseColor(op.line.stroke),
+                    color = parseColorOrUnspecified(op.line.stroke),
                     start = Offset(op.line.x1.toFloat(), op.line.y1.toFloat()),
                     end = Offset(op.line.x2.toFloat(), op.line.y2.toFloat()),
                     strokeWidth = op.line.strokeWidth.toFloat().coerceAtLeast(1f),
                 )
                 Ui.DrawOp.OpCase.RECT -> drawRect(
-                    color = parseColor(op.rect.fill),
+                    color = parseColorOrUnspecified(op.rect.fill),
                     topLeft = Offset(op.rect.x.toFloat(), op.rect.y.toFloat()),
                     size = Size(op.rect.width.toFloat(), op.rect.height.toFloat()),
                 )
                 Ui.DrawOp.OpCase.CIRCLE -> drawCircle(
-                    color = parseColor(op.circle.fill),
+                    color = parseColorOrUnspecified(op.circle.fill),
                     radius = op.circle.radius.toFloat(),
                     center = Offset(op.circle.cx.toFloat(), op.circle.cy.toFloat()),
                 )
@@ -260,21 +266,7 @@ private fun TerminalCanvas(node: Ui.Node, modifier: Modifier) {
     }
 }
 
-private fun parseColor(raw: String): Color {
-    if (!raw.startsWith("#")) return Color.Unspecified
-    return runCatching {
-        val normalized = if (raw.length == 7) "#FF${raw.drop(1)}" else raw
-        Color(normalized.removePrefix("#").toLong(16))
-    }.getOrDefault(Color.Unspecified)
-}
-
 /** Matches Flutter [parseHexColor]: optional `#`, expands 6-digit RGB to ARGB. */
 private fun parseHexColorForBackground(raw: String?): Color? {
-    if (raw.isNullOrBlank()) return null
-    var value = raw.trim()
-    if (value.startsWith("#")) value = value.drop(1)
-    if (value.length == 6) value = "FF$value"
-    if (value.length != 8) return null
-    val parsed = value.toLongOrNull(16) ?: return null
-    return Color(parsed)
+    return parseHexColor(raw)
 }
