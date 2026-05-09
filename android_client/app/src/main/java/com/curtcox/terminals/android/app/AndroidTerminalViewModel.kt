@@ -74,16 +74,6 @@ class AndroidTerminalViewModel(
                 if (!bugReport.isNullOrBlank()) {
                     diagnostics += "\n$bugReport"
                 }
-                if (response.payloadCase == Control.ConnectResponse.PayloadCase.TRANSITION_UI) {
-                    val transition = response.transitionUi.transition
-                    if (transition.isNotBlank()) {
-                        diagnostics += "\nlast_transition=$transition"
-                    }
-                    val durationMs = response.transitionUi.durationMs
-                    if (durationMs != 0) {
-                        diagnostics += "\nlast_transition_duration_ms=$durationMs"
-                    }
-                }
                 next.copy(
                     diagnosticsText = if (rebaselineSent) {
                         "$diagnostics\nlast_capability_rebaseline=stale-generation"
@@ -639,6 +629,8 @@ class AndroidTerminalViewModel(
             lastCommandResultRequestId = null,
             lastCommandResultNotification = null,
             lastOpaqueControlIoSummary = null,
+            lastTransition = null,
+            lastTransitionDurationMs = null,
         )
 
     private fun formatDiagnostics(
@@ -700,6 +692,12 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.lastOpaqueControlIoSummary?.takeIf { it.isNotBlank() }?.let {
                 appendLine("last_opaque_control_io=$it")
+            }
+            handshakeSource?.lastTransition?.takeIf { it.isNotBlank() }?.let {
+                appendLine("last_transition=$it")
+            }
+            handshakeSource?.lastTransitionDurationMs?.takeIf { it > 0 }?.let {
+                appendLine("last_transition_duration_ms=$it")
             }
         }
     }

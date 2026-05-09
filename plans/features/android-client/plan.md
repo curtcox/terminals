@@ -947,6 +947,11 @@ Remaining validation:
 - Cleared opaque summaries on media commands (`PlayAudio`/`ShowMedia`) and on session teardown via `withoutHandshake`; forward-unknown payload cases still record `payload_case` for protocol debugging.
 - Added dispatcher and ViewModel regression coverage for opaque IO summaries.
 
+### 2026-05-08 (transition diagnostics persistence)
+
+- Persisted `TransitionUI` transition name and non-zero duration in `AndroidTerminalViewState`, cleared on `withoutHandshake`, and included both in baseline `formatDiagnostics` so copyable diagnostics keep the last transition after network-driven refreshes instead of only on the inbound response tick.
+- Extended dispatcher and ViewModel tests (`serverTransitionUiRemainsInDiagnosticsAfterNetworkRefresh`).
+
 ## Test Plan
 
 ### Unit tests

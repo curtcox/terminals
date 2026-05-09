@@ -15,6 +15,8 @@ data class AndroidTerminalViewState(
     val lastMediaStatus: String? = null,
     val lastDiagnosticsCopyStatus: String? = null,
     val lastTransition: String? = null,
+    /** Non-zero duration from the last server TransitionUI, for copyable diagnostics. */
+    val lastTransitionDurationMs: Long? = null,
     val lastBugReportAckDiagnostics: String? = null,
     val controlServerId: String? = null,
     val controlSessionId: String? = null,

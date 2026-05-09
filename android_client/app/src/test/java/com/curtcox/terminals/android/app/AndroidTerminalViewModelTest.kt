@@ -1069,6 +1069,34 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun serverTransitionUiRemainsInDiagnosticsAfterNetworkRefresh() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setTransitionUi(
+                    Ui.TransitionUI.newBuilder()
+                        .setDeviceId("device-1")
+                        .setTransition("slide_left")
+                        .setDurationMs(200),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        viewModel.refreshNetworkDiagnostics("network-change")
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_transition=slide_left"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_transition_duration_ms=200"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_network_refresh=network-change"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun serverHeartbeatIsSurfacedInDiagnostics() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)

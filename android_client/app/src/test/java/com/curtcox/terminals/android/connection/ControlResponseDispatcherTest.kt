@@ -96,6 +96,7 @@ class ControlResponseDispatcherTest {
         val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
 
         assertEquals("fade", next.lastTransition)
+        assertEquals(120L, next.lastTransitionDurationMs)
     }
 
     @Test

@@ -28,7 +28,13 @@ class ControlResponseDispatcher {
                 val root = state.serverRoot ?: return state
                 state.copy(serverRoot = replaceNode(root, response.updateUi.componentId, response.updateUi.node))
             }
-            Control.ConnectResponse.PayloadCase.TRANSITION_UI -> state.copy(lastTransition = response.transitionUi.transition)
+            Control.ConnectResponse.PayloadCase.TRANSITION_UI -> {
+                val tu = response.transitionUi
+                state.copy(
+                    lastTransition = tu.transition.takeIf { it.isNotBlank() },
+                    lastTransitionDurationMs = tu.durationMs.takeIf { it > 0 },
+                )
+            }
             Control.ConnectResponse.PayloadCase.NOTIFICATION -> state.copy(
                 lastNotificationTitle = response.notification.title,
                 lastNotificationBody = response.notification.body,
