@@ -143,11 +143,17 @@ String statusFromConnectResponse(ConnectResponse response) {
   if (response.hasRouteStream()) {
     return 'Route updated';
   }
+  if (response.hasNotification()) {
+    return 'Notification';
+  }
   if (response.hasWebrtcSignal()) {
     return 'WebRTC signal';
   }
   if (response.hasPlayAudio()) {
     return 'Play audio';
+  }
+  if (response.hasShowMedia()) {
+    return 'Show media';
   }
   if (response.hasInstallBundle()) {
     return 'Bundle install requested';

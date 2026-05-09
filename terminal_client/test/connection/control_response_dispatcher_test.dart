@@ -43,6 +43,22 @@ void main() {
         ),
         'Server error',
       );
+      expect(
+        statusFromConnectResponse(
+          ConnectResponse()
+            ..notification = (uiv1.Notification()
+              ..title = 'T'
+              ..body = 'B'),
+        ),
+        'Notification',
+      );
+      expect(
+        statusFromConnectResponse(
+          ConnectResponse()
+            ..showMedia = (iov1.ShowMedia()..requestId = 'm1'),
+        ),
+        'Show media',
+      );
     });
 
     test('prefers typed command result data over legacy map', () {

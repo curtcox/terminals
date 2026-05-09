@@ -986,6 +986,10 @@ Remaining validation:
 - Cleared activity on `withoutHandshake` for new sessions; preserved across disconnect for support paste (same pattern as register ack / command result metadata). Refactored `UpdateUI` dispatch to avoid an early return so activity labeling still applies when the UI root is absent.
 - Extended dispatcher and ViewModel JVM coverage. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Full Gradle unit tests require a host JDK (not verified in this session).
 
+### 2026-05-08 (Flutter status labels for show media / notification)
+
+- Extended Flutter `statusFromConnectResponse` to return `Show media` and `Notification` for the corresponding `ConnectResponse` payloads (matching native Android `connectResponseActivityStatus` and avoiding a misleading `Connected` status). Added `control_response_dispatcher` unit expectations; `flutter test test/connection/control_response_dispatcher_test.dart` passes.
+
 ## Test Plan
 
 ### Unit tests
