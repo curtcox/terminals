@@ -162,6 +162,31 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun chromeBugReportQueuedThenFlushedOnConnect() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
+
+        viewModel.submitChromeBugReport()
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.lastBugReportSubmitStatus!!.contains("Queued"))
+        assertEquals(0, session.bugReports.size)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        assertEquals(1, session.bugReports.size)
+        assertTrue(viewModel.state.value.lastBugReportSubmitStatus!!.contains("Sent queued bug report"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun refreshNetworkDiagnosticsSamplesCurrentNetworkState() {
         val states = ArrayDeque(
             listOf(

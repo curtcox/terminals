@@ -132,6 +132,14 @@ backspaces, and IME newline to the server as protobuf `InputEvent.key` payloads
 (the same shell convention as the Flutter client’s `terminal_input` binding),
 rather than emitting a `submit` UI action on Done.
 
+The shell **Report bug** control files an on-device bug report on the control
+stream as protobuf `Diagnostics.BugReport` (same token-word scheme as the
+Flutter client). Reports filed while disconnected are queued and sent after the
+next successful connect. Server-driven actions whose `action` starts with
+`bug_report` (optional `bug_report:<subject-device-id>`) file a report instead of
+emitting a `UIAction`. `BugReportAck` responses are merged into copyable
+diagnostics like other terminal chrome.
+
 The client can also start Android NSD/mDNS discovery for `_terminals._tcp.`
 services. Discovered servers are shown as selectable endpoint options when the
 network supports multicast; Fire OS or isolated Wi-Fi networks may still require

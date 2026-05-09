@@ -439,10 +439,31 @@ class AndroidTerminalViewModel(
     }
 
     private suspend fun flushQueuedBugReports(target: AndroidControlSession) {
+        val pending = bugReportQueue.size
+        if (pending == 0) return
+        var sent = 0
+        var lastWord = ""
+        var lastFailure: String? = null
         while (bugReportQueue.isNotEmpty()) {
             val report = bugReportQueue.removeFirst()
             runCatching { target.sendBugReport(report) }
+                .onSuccess {
+                    sent++
+                    lastWord = report.sourceHintsMap["bug_token_word"] ?: ""
+                }
+                .onFailure { e ->
+                    lastFailure = e.message ?: e.javaClass.simpleName
+                }
         }
+        val status =
+            when {
+                sent == pending && sent == 1 -> "Sent queued bug report (word=$lastWord)."
+                sent == pending && sent > 1 -> "Sent $sent queued bug reports (last word=$lastWord)."
+                sent > 0 ->
+                    "Sent $sent of $pending queued bug reports (last word=$lastWord). Remainder failed: $lastFailure"
+                else -> "Queued bug reports failed to send: $lastFailure"
+            }
+        mutableState.update { it.copy(lastBugReportSubmitStatus = status) }
     }
 
     /**

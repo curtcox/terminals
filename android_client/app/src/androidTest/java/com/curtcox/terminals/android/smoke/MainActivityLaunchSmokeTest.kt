@@ -1,8 +1,11 @@
 package com.curtcox.terminals.android.smoke
 
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.curtcox.terminals.android.MainActivity
 import org.junit.Rule
@@ -26,5 +29,12 @@ class MainActivityLaunchSmokeTest {
         rule.onNodeWithTag("terminal-live-media-status").assertIsDisplayed()
         rule.onNodeWithTag("terminal-last-server-activity").assertIsDisplayed()
         rule.onNodeWithTag("terminal-report-bug-button").assertIsDisplayed()
+    }
+
+    @Test
+    fun reportBugWhileOfflineShowsQueuedStatus() {
+        rule.onNodeWithTag("terminal-report-bug-button").performClick()
+        rule.onNodeWithTag("terminal-bug-report-status").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-bug-report-status").assert(hasText("Queued", substring = true))
     }
 }

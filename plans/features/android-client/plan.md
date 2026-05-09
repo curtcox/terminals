@@ -1182,6 +1182,12 @@ Remaining validation:
 
 - Implemented Flutter-aligned on-device bug reporting for the native shell: shared `bugTokenWords` + `buildBugIdentifier` / `buildLocalBugReportId` (Calendar/TimeZone for API 25), `AndroidBugReportBuilder` for `Diagnostics.BugReport` + `ClientContext`, `ProtocolBuilders.bugReport`, `AndroidControlSession.sendBugReport`, ViewModel interception of `bug_report*` UI actions (no spurious `UIAction` to the server), shell **Report bug** chrome with queue-until-connect + flush after connect/reconnect, and JVM/instrumentation coverage. Re-run `make android-client-test` on a JDK 17 host.
 
+### 2026-05-09 (bug report polish)
+
+- `flushQueuedBugReports` now updates `lastBugReportSubmitStatus` after sending queued reports (initial connect and reconnect), including multi-report and partial-failure summaries.
+- Added `AndroidBugReportBuilderTest`, `AndroidTerminalViewModelTest.chromeBugReportQueuedThenFlushedOnConnect`, and `MainActivityLaunchSmokeTest.reportBugWhileOfflineShowsQueuedStatus`.
+- Documented shell bug reporting, queueing, `bug_report*` actions, and `BugReportAck` diagnostics in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests
