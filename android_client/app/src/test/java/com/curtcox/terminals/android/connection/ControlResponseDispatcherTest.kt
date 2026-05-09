@@ -262,6 +262,22 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun commandResultWithEmptyFieldsClearsPriorDiagnosticsFields() {
+        val seeded = AndroidTerminalViewState(
+            lastCommandResultRequestId = "old",
+            lastCommandResultNotification = "old-note",
+        )
+        val response = Control.ConnectResponse.newBuilder()
+            .setCommandResult(Control.CommandResult.newBuilder())
+            .build()
+
+        val next = dispatcher.dispatch(seeded, response)
+
+        assertNull(next.lastCommandResultRequestId)
+        assertNull(next.lastCommandResultNotification)
+    }
+
+    @Test
     fun startStreamRecordsOpaqueSummary() {
         val response = Control.ConnectResponse.newBuilder()
             .setStartStream(
@@ -289,6 +305,102 @@ class ControlResponseDispatcherTest {
         val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
 
         assertEquals("type=stop_stream stream_id=s9", next.lastOpaqueControlIoSummary)
+    }
+
+    @Test
+    fun routeStreamRecordsOpaqueSummary() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setRouteStream(
+                Io.RouteStream.newBuilder()
+                    .setStreamId("r1")
+                    .setStreamKind(Io.StreamKind.STREAM_KIND_AUDIO)
+                    .setKind("upstream"),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertTrue(next.lastOpaqueControlIoSummary!!.contains("type=route_stream"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("stream_id=r1"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("STREAM_KIND_AUDIO"))
+        assertTrue(next.lastOpaqueControlIoSummary.contains("kind=upstream"))
+    }
+
+    @Test
+    fun removeBundleRecordsOpaqueSummary() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setRemoveBundle(Io.RemoveBundle.newBuilder().setBundleId("bundle-z"))
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("type=remove_bundle bundle_id=bundle-z", next.lastOpaqueControlIoSummary)
+    }
+
+    @Test
+    fun startFlowRecordsOpaqueSummaryWithPlanCounts() {
+        val plan = Io.FlowPlan.newBuilder()
+            .addNodes(Io.FlowNode.newBuilder().setId("n1"))
+            .addEdges(Io.FlowEdge.newBuilder().setFrom("n1").setTo("n2"))
+            .build()
+        val response = Control.ConnectResponse.newBuilder()
+            .setStartFlow(
+                Io.StartFlow.newBuilder()
+                    .setFlowId("flow-a")
+                    .setPlan(plan),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals(
+            "type=start_flow flow_id=flow-a nodes=1 edges=1",
+            next.lastOpaqueControlIoSummary,
+        )
+    }
+
+    @Test
+    fun patchFlowRecordsOpaqueSummaryWithPlanCounts() {
+        val plan = Io.FlowPlan.newBuilder()
+            .addNodes(Io.FlowNode.newBuilder().setId("a"))
+            .addNodes(Io.FlowNode.newBuilder().setId("b"))
+            .build()
+        val response = Control.ConnectResponse.newBuilder()
+            .setPatchFlow(
+                Io.PatchFlow.newBuilder()
+                    .setFlowId("flow-b")
+                    .setPlan(plan),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals(
+            "type=patch_flow flow_id=flow-b nodes=2 edges=0",
+            next.lastOpaqueControlIoSummary,
+        )
+    }
+
+    @Test
+    fun stopFlowRecordsOpaqueSummary() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setStopFlow(Io.StopFlow.newBuilder().setFlowId("flow-c"))
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("type=stop_flow flow_id=flow-c", next.lastOpaqueControlIoSummary)
+    }
+
+    @Test
+    fun requestArtifactRecordsOpaqueSummary() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setRequestArtifact(Io.RequestArtifact.newBuilder().setArtifactId("art-99"))
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("type=request_artifact artifact_id=art-99", next.lastOpaqueControlIoSummary)
     }
 
     @Test
@@ -338,6 +450,24 @@ class ControlResponseDispatcherTest {
         )
         val response = Control.ConnectResponse.newBuilder()
             .setPlayAudio(Io.PlayAudio.newBuilder().setRequestId("a1").setUrl("https://example/a.mp3"))
+            .build()
+
+        val next = dispatcher.dispatch(seeded, response)
+
+        assertNull(next.lastOpaqueControlIoSummary)
+    }
+
+    @Test
+    fun showMediaClearsOpaqueSummary() {
+        val seeded = AndroidTerminalViewState(
+            lastOpaqueControlIoSummary = "type=webrtc_signal stream_id=x",
+        )
+        val response = Control.ConnectResponse.newBuilder()
+            .setShowMedia(
+                Io.ShowMedia.newBuilder()
+                    .setRequestId("m1")
+                    .setMediaUrl("https://example/v.mp4"),
+            )
             .build()
 
         val next = dispatcher.dispatch(seeded, response)

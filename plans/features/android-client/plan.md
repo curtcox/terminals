@@ -964,6 +964,10 @@ Remaining validation:
 - On `HelloAck`, treat non-positive `heartbeat_interval_ms` as “use client default”: reset `effectiveHeartbeatMillis` and restart the heartbeat loop.
 - Extended `ControlResponseDispatcherTest` and `AndroidTerminalViewModelTest`; re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Full Gradle unit tests require a host JDK (not available in this session).
 
+### 2026-05-08 (opaque IO dispatcher JVM coverage)
+
+- Extended `ControlResponseDispatcherTest` with coverage for `RouteStream`, `RemoveBundle`, `StartFlow`, `PatchFlow`, `StopFlow`, and `RequestArtifact` opaque diagnostic summaries; added regression tests for `CommandResult` field clearing, `ShowMedia` clearing `last_opaque_control_io`, and re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+
 ## Test Plan
 
 ### Unit tests
