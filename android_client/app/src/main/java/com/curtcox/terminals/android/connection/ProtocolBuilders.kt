@@ -3,6 +3,7 @@ package com.curtcox.terminals.android.connection
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import terminals.capabilities.v1.Capabilities
 import terminals.control.v1.Control
+import terminals.diagnostics.v1.Diagnostics
 import terminals.io.v1.Io
 
 const val AndroidWireProtocolVersion: Int = 1
@@ -129,4 +130,7 @@ class ProtocolBuilders(
                     .setKey(Io.KeyEvent.newBuilder().setText(text)),
             )
             .build()
+
+    fun bugReport(report: Diagnostics.BugReport): Control.ConnectRequest =
+        Control.ConnectRequest.newBuilder().setBugReport(report).build()
 }

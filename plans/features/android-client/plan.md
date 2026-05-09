@@ -1178,6 +1178,10 @@ Remaining validation:
 
 - Matched Flutter shell `terminal_input` behavior: `TextInputWidget` nodes with that component id stream insertions, backspaces (`\b` repeats), and IME newline as protobuf `InputEvent.key.text` on the control stream (`ProtocolBuilders.keyInput`, `AndroidControlSession.sendKeyText`, `AndroidTerminalViewModel.sendTerminalKeyText`, `ServerDrivenRenderer` composition-local sink from `AndroidTerminalApp`). Regular text inputs still emit `submit` UI actions on Done. Added JVM and renderer instrumentation tests; documented in `docs/client-android.md`.
 
+### 2026-05-09 (client bug report filing parity)
+
+- Implemented Flutter-aligned on-device bug reporting for the native shell: shared `bugTokenWords` + `buildBugIdentifier` / `buildLocalBugReportId` (Calendar/TimeZone for API 25), `AndroidBugReportBuilder` for `Diagnostics.BugReport` + `ClientContext`, `ProtocolBuilders.bugReport`, `AndroidControlSession.sendBugReport`, ViewModel interception of `bug_report*` UI actions (no spurious `UIAction` to the server), shell **Report bug** chrome with queue-until-connect + flush after connect/reconnect, and JVM/instrumentation coverage. Re-run `make android-client-test` on a JDK 17 host.
+
 ## Test Plan
 
 ### Unit tests

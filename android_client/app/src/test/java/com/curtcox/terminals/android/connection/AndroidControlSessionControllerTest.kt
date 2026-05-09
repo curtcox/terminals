@@ -13,6 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import terminals.capabilities.v1.Capabilities
 import terminals.control.v1.Control
+import terminals.diagnostics.v1.Diagnostics
 
 class AndroidControlSessionControllerTest {
     @Test
@@ -106,6 +107,19 @@ class AndroidControlSessionControllerTest {
 
         assertTrue(result.isFailure)
         assertEquals(1, controller.status.lastCapabilityGeneration)
+    }
+
+    @Test
+    fun sendBugReportUsesProtocolBuilder() = runTest {
+        val client = FakeControlClient()
+        val controller = controller(client = client)
+        val report = Diagnostics.BugReport.newBuilder().setReportId("br-9").setDescription("d").build()
+
+        controller.connect(EndpointResolution("10.0.0.8", 8080))
+        controller.sendBugReport(report)
+
+        assertTrue(client.sent.last().hasBugReport())
+        assertEquals("br-9", client.sent.last().bugReport.reportId)
     }
 
     @Test

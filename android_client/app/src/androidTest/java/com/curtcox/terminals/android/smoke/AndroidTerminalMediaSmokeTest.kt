@@ -10,6 +10,8 @@ import com.curtcox.terminals.android.app.AndroidTerminalViewModel
 import com.curtcox.terminals.android.app.ConnectionState
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
+import terminals.capabilities.v1.Capabilities
+import terminals.diagnostics.v1.Diagnostics
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
@@ -101,6 +103,7 @@ class AndroidTerminalMediaSmokeTest {
 
     private class FakeSession : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
+        override val lastRegisteredCapabilities: Capabilities.DeviceCapabilities? = null
         lateinit var sink: AndroidControlResponseSink
 
         override suspend fun connect(endpoint: EndpointResolution) {
@@ -114,6 +117,8 @@ class AndroidTerminalMediaSmokeTest {
         override suspend fun sendUiAction(action: ServerDrivenAction) = Unit
 
         override suspend fun sendKeyText(text: String) = Unit
+
+        override suspend fun sendBugReport(report: Diagnostics.BugReport) = Unit
 
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean = false
 

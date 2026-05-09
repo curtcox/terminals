@@ -19,6 +19,8 @@ import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics
 import com.curtcox.terminals.android.capabilities.PermissionCapabilityState
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
+import terminals.capabilities.v1.Capabilities
+import terminals.diagnostics.v1.Diagnostics
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.connection.ReconnectPolicy
@@ -749,6 +751,7 @@ class AndroidTerminalAppSmokeTest {
         private val connectError: Throwable? = null,
     ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
+        override val lastRegisteredCapabilities: Capabilities.DeviceCapabilities? = null
         lateinit var sink: AndroidControlResponseSink
         var connectedEndpoint: EndpointResolution? = null
         var closed: Boolean = false
@@ -772,6 +775,8 @@ class AndroidTerminalAppSmokeTest {
         }
 
         override suspend fun sendKeyText(text: String) = Unit
+
+        override suspend fun sendBugReport(report: Diagnostics.BugReport) = Unit
 
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
             capabilityRefreshReasons += reason

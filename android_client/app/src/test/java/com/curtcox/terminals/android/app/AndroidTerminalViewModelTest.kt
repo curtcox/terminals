@@ -53,7 +53,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import terminals.capabilities.v1.Capabilities
 import terminals.control.v1.Control
+import terminals.diagnostics.v1.Diagnostics
 import terminals.diagnostics.v1.Diagnostics.BugReportAck
 import terminals.diagnostics.v1.Diagnostics.BugReportStatus
 import terminals.io.v1.Io
@@ -96,6 +98,67 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=false"))
         viewModel.disconnect()
         advanceUntilIdle()
+    }
+
+    @Test
+    fun bugReportServerDrivenActionSendsBugReportNotUiAction() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.sendUiAction(ServerDrivenAction("btn", "bug_report:other-device", ""))
+        advanceUntilIdle()
+
+        assertTrue(session.actions.isEmpty())
+        assertEquals(1, session.bugReports.size)
+        assertEquals("other-device", session.bugReports.first().subjectDeviceId)
+        assertTrue(session.bugReports.first().description.contains("on-device"))
+    }
+
+    @Test
+    fun chromeBugReportQueuedWhenOffline() = runTest(dispatcher) {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                deviceId = "dev-1",
+                sessionFactory = { sink ->
+                    FakeSession().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.submitChromeBugReport()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.lastBugReportSubmitStatus!!.contains("Queued"))
+    }
+
+    @Test
+    fun chromeBugReportSendsWhenConnected() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.submitChromeBugReport()
+        advanceUntilIdle()
+
+        assertEquals(1, session.bugReports.size)
+        assertTrue(viewModel.state.value.lastBugReportSubmitStatus!!.contains("Sent"))
+        assertEquals("android-native-terminal", session.bugReports.first().subjectDeviceId)
     }
 
     @Test
@@ -2183,11 +2246,13 @@ class AndroidTerminalViewModelTest {
         private val heartbeatError: Throwable? = null,
         private val sensorTelemetryError: Throwable? = null,
         private val connectGate: CompletableDeferred<Unit>? = null,
+        override val lastRegisteredCapabilities: Capabilities.DeviceCapabilities? = null,
     ) : AndroidControlSession {
         override var status: ControlSessionStatus = ControlSessionStatus()
         lateinit var sink: AndroidControlResponseSink
         var connectedEndpoint: EndpointResolution? = null
         val actions = mutableListOf<ServerDrivenAction>()
+        val bugReports = mutableListOf<Diagnostics.BugReport>()
         val keyTexts = mutableListOf<String>()
         val capabilityDeltaReasons = mutableListOf<String>()
         var rebaselineCount = 0
@@ -2218,6 +2283,10 @@ class AndroidTerminalViewModelTest {
 
         override suspend fun sendKeyText(text: String) {
             keyTexts += text
+        }
+
+        override suspend fun sendBugReport(report: Diagnostics.BugReport) {
+            bugReports += report
         }
 
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {

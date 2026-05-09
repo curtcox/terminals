@@ -10,11 +10,16 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.ControlResponseDispatcher
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.connection.ManualEndpointParser
+import com.curtcox.terminals.android.diagnostics.AndroidBugReportActions
+import com.curtcox.terminals.android.diagnostics.AndroidBugReportBuilder
 import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
 import com.curtcox.terminals.android.discovery.DiscoveredServer
 import com.curtcox.terminals.android.media.AudioPlaybackResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.ui.ServerDrivenAction
+import com.curtcox.terminals.android.util.Clock
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlin.coroutines.coroutineContext
 import terminals.control.v1.Control
+import terminals.diagnostics.v1.Diagnostics
 
 class AndroidTerminalViewModel(
     private val dependencies: AndroidClientDependencies = AndroidClientDependencies(),
@@ -104,6 +110,8 @@ class AndroidTerminalViewModel(
     private var effectiveHeartbeatMillis: Long = dependencies.heartbeatIntervalMillis
     /** When false, periodic heartbeat and sensor telemetry are paused (Flutter `AppLifecycle` parity). */
     private var appInForeground: Boolean = true
+    private val bugReportClock: Clock = Clock(dependencies.nowMillis)
+    private val bugReportQueue: ArrayDeque<Diagnostics.BugReport> = ArrayDeque()
     private val mutableState = MutableStateFlow(
         initialState(),
     )
@@ -190,6 +198,7 @@ class AndroidTerminalViewModel(
                         diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connected, it),
                     )
                 }
+                flushQueuedBugReports(nextSession)
             } catch (error: CancellationException) {
                 if (session === nextSession) {
                     session = null
@@ -304,6 +313,10 @@ class AndroidTerminalViewModel(
     }
 
     fun sendUiAction(action: ServerDrivenAction) {
+        if (action.action.startsWith(AndroidBugReportActions.PREFIX)) {
+            submitBugReportFromServerDrivenAction(action)
+            return
+        }
         viewModelScope.launch {
             runCatching {
                 session?.sendUiAction(action) ?: error("Control stream is not connected.")
@@ -316,6 +329,119 @@ class AndroidTerminalViewModel(
                     it.copy(lastError = error.message ?: error::class.java.simpleName)
                 }
             }
+        }
+    }
+
+    /** Flutter `BugReportButton` / shell filing parity — sends [Diagnostics.BugReport] on the control stream. */
+    fun submitChromeBugReport() {
+        val report =
+            buildShellBugReport(
+                description = "Filed from native Android terminal shell",
+                source = Diagnostics.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
+                subjectDeviceId = dependencies.deviceId,
+                extraHints = mapOf("entry_point" to "native_android_shell"),
+            )
+        queueOrSendBugReport(report)
+    }
+
+    private fun submitBugReportFromServerDrivenAction(action: ServerDrivenAction) {
+        val subject = resolveBugReportSubject(action)
+        val report =
+            buildShellBugReport(
+                description = "Filed from on-device bug report button",
+                source = Diagnostics.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
+                subjectDeviceId = subject,
+                extraHints =
+                    mapOf(
+                        "component_id" to action.componentId,
+                        "action" to action.action,
+                    ),
+            )
+        queueOrSendBugReport(report)
+    }
+
+    private fun resolveBugReportSubject(action: ServerDrivenAction): String {
+        if (action.action.startsWith(AndroidBugReportActions.PREFIX)) {
+            val explicit =
+                action.action
+                    .removePrefix(AndroidBugReportActions.PREFIX)
+                    .removePrefix(":")
+                    .trim()
+            if (explicit.isNotEmpty()) {
+                return explicit
+            }
+        }
+        val v = action.value.trim()
+        if (v.isNotEmpty()) {
+            return v
+        }
+        return dependencies.deviceId
+    }
+
+    private fun buildShellBugReport(
+        description: String,
+        source: Diagnostics.BugReportSource,
+        subjectDeviceId: String,
+        extraHints: Map<String, String>,
+    ): Diagnostics.BugReport {
+        val s = mutableState.value
+        return AndroidBugReportBuilder.build(
+            description = description,
+            source = source,
+            reporterDeviceId = dependencies.deviceId,
+            subjectDeviceId = subjectDeviceId,
+            extraSourceHints = extraHints,
+            clock = bugReportClock,
+            buildMetadata = dependencies.buildMetadata,
+            serverRoot = s.serverRoot,
+            connectionState = s.connectionState,
+            lastServerHeartbeatUnixMs = s.lastServerHeartbeatUnixMs,
+            registeredCapabilities = session?.lastRegisteredCapabilities,
+            localeTag = Locale.getDefault().toLanguageTag(),
+            timezoneId = TimeZone.getDefault().id,
+            osVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+        )
+    }
+
+    private fun queueOrSendBugReport(report: Diagnostics.BugReport) {
+        viewModelScope.launch {
+            val currentSession = session
+            val connected = mutableState.value.connectionState == ConnectionState.Connected
+            if (currentSession != null && connected) {
+                runCatching { currentSession.sendBugReport(report) }
+                    .onSuccess {
+                        val word = report.sourceHintsMap["bug_token_word"] ?: ""
+                        mutableState.update {
+                            it.copy(
+                                lastBugReportSubmitStatus = "Sent bug report ${report.reportId} (word=$word).",
+                                lastError = null,
+                            )
+                        }
+                    }
+                    .onFailure { e ->
+                        mutableState.update {
+                            it.copy(
+                                lastBugReportSubmitStatus =
+                                    "Bug report send failed: ${e.message ?: e.javaClass.simpleName}",
+                            )
+                        }
+                    }
+            } else {
+                bugReportQueue.addLast(report)
+                val word = report.sourceHintsMap["bug_token_word"] ?: ""
+                mutableState.update {
+                    it.copy(
+                        lastBugReportSubmitStatus = "Queued bug report (word=$word) until connected.",
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun flushQueuedBugReports(target: AndroidControlSession) {
+        while (bugReportQueue.isNotEmpty()) {
+            val report = bugReportQueue.removeFirst()
+            runCatching { target.sendBugReport(report) }
         }
     }
 
@@ -664,6 +790,7 @@ class AndroidTerminalViewModel(
                                 "\nreconnect_success_attempt=$attempt\nreconnect_cause=$reconnectCause",
                         )
                     }
+                    flushQueuedBugReports(nextSession)
                     reconnectExhausted = false
                     reconnectJob = null
                     return@launch

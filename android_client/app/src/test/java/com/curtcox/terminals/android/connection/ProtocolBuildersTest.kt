@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import terminals.capabilities.v1.Capabilities
 import terminals.control.v1.Control
+import terminals.diagnostics.v1.Diagnostics
 
 class ProtocolBuildersTest {
     private val builders = ProtocolBuilders()
@@ -153,5 +154,19 @@ class ProtocolBuildersTest {
                 .build()
 
         assertNull(builders.sensorTelemetryFromCapabilities("", caps, 1L))
+    }
+
+    @Test
+    fun bugReportWrapsDiagnosticsPayload() {
+        val report =
+            Diagnostics.BugReport.newBuilder()
+                .setReportId("rep-1")
+                .setDescription("test")
+                .build()
+        val request = builders.bugReport(report)
+
+        assertTrue(request.hasBugReport())
+        assertEquals("rep-1", request.bugReport.reportId)
+        assertEquals("test", request.bugReport.description)
     }
 }

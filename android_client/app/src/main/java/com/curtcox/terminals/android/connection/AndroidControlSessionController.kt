@@ -3,6 +3,8 @@ package com.curtcox.terminals.android.connection
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySession
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import com.curtcox.terminals.android.util.Clock
+import terminals.capabilities.v1.Capabilities
+import terminals.diagnostics.v1.Diagnostics
 
 data class ControlSessionStatus(
     val connected: Boolean = false,
@@ -13,11 +15,13 @@ data class ControlSessionStatus(
 
 interface AndroidControlSession {
     val status: ControlSessionStatus
+    val lastRegisteredCapabilities: Capabilities.DeviceCapabilities?
     suspend fun connect(endpoint: EndpointResolution)
     suspend fun sendHeartbeat()
     suspend fun sendSensorTelemetry()
     suspend fun sendUiAction(action: ServerDrivenAction)
     suspend fun sendKeyText(text: String)
+    suspend fun sendBugReport(report: Diagnostics.BugReport)
     suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean
     suspend fun rebaselineCapabilitiesAfterStaleGeneration()
     suspend fun close()
@@ -33,6 +37,9 @@ class AndroidControlSessionController(
 ) : AndroidControlSession {
     override var status: ControlSessionStatus = ControlSessionStatus()
         private set
+
+    override val lastRegisteredCapabilities: Capabilities.DeviceCapabilities?
+        get() = capabilities.lastRegisteredCapabilities
 
     override suspend fun connect(endpoint: EndpointResolution) {
         try {
@@ -76,6 +83,10 @@ class AndroidControlSessionController(
     override suspend fun sendKeyText(text: String) {
         if (deviceId.isEmpty() || text.isEmpty()) return
         client.send(builders.keyInput(deviceId, text))
+    }
+
+    override suspend fun sendBugReport(report: Diagnostics.BugReport) {
+        client.send(builders.bugReport(report))
     }
 
     override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {

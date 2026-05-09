@@ -177,6 +177,15 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                 ) {
                     Text("Copy diagnostics")
                 }
+                Button(
+                    onClick = viewModel::submitChromeBugReport,
+                    modifier = Modifier.testTag("terminal-report-bug-button"),
+                ) {
+                    Text("Report bug")
+                }
+                state.lastBugReportSubmitStatus?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("terminal-bug-report-status"))
+                }
                 state.lastDiagnosticsCopyStatus?.let {
                     Text("Diagnostics copy: $it", style = MaterialTheme.typography.bodySmall)
                 }
