@@ -1165,6 +1165,10 @@ Remaining validation:
 
 - Fixed `ServerDrivenRenderer` Kotlin compile against Compose BOM `2025.10.00`: `drawContext.canvas.nativeCanvas` requires the explicit extension import `androidx.compose.ui.graphics.nativeCanvas` (otherwise `nativeCanvas` is an unresolved reference).
 
+### 2026-05-09 (real MainActivity launch instrumentation)
+
+- Added `MainActivityLaunchSmokeTest` using `createAndroidComposeRule<MainActivity>()` so connected-device runs exercise production startup (`AndroidClientDependencies.fromContext`, default session factory, activity permission requester) rather than only Compose-isolated smoke tests with injected factories. Asserts manual-connect chrome (`terminal-endpoint-field`, `terminal-connect-button`) is visible after launch.
+
 ## Test Plan
 
 ### Unit tests
