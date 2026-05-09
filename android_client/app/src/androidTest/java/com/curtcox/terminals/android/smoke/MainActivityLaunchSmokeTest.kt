@@ -22,5 +22,8 @@ class MainActivityLaunchSmokeTest {
     fun mainActivityLaunchesAndShowsManualConnectChrome() {
         rule.onNodeWithTag("terminal-endpoint-field").assertIsDisplayed()
         rule.onNodeWithTag("terminal-connect-button").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-discovery-start-button").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-live-media-status").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-last-server-activity").assertIsDisplayed()
     }
 }

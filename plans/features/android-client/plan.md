@@ -1169,6 +1169,11 @@ Remaining validation:
 
 - Added `MainActivityLaunchSmokeTest` using `createAndroidComposeRule<MainActivity>()` so connected-device runs exercise production startup (`AndroidClientDependencies.fromContext`, default session factory, activity permission requester) rather than only Compose-isolated smoke tests with injected factories. Asserts manual-connect chrome (`terminal-endpoint-field`, `terminal-connect-button`) is visible after launch.
 
+### 2026-05-09 (launch smoke + dead code)
+
+- Removed the unused `PowerCapabilityMonitor` holder class; battery snapshots remain `PowerCapabilityState` used by `ContextAndroidCapabilityProbe` and capability session tests.
+- Extended `MainActivityLaunchSmokeTest` to assert discovery controls, live-media status chrome, and last-server-activity diagnostics are visible on real `MainActivity` launch (production deps). Re-run `cd android_client && ./gradlew compileDebugAndroidTestKotlin` / `connectedDebugAndroidTest` on a JDK 17 host with the Android SDK.
+
 ## Test Plan
 
 ### Unit tests
