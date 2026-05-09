@@ -1134,9 +1134,12 @@ class AndroidTerminalViewModelTest {
         val first = FakeSession()
         val second = FakeSession()
         val sessions = ArrayDeque(listOf(first, second))
+        // Heartbeat must be off: a connected session runs an infinite delay loop that never leaves the
+        // StandardTestDispatcher idle, so advanceUntilIdle() would run until the process is killed.
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
                 sessionFactory = { sink ->
                     sessions.removeFirst().also { it.sink = sink }
                 },
@@ -1175,6 +1178,7 @@ class AndroidTerminalViewModelTest {
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
                 sessionFactory = { sink ->
                     sessions.removeFirst().also { it.sink = sink }
                 },
@@ -1216,6 +1220,7 @@ class AndroidTerminalViewModelTest {
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
                 sessionFactory = { sink ->
                     sessions.removeFirst().also { it.sink = sink }
                 },
