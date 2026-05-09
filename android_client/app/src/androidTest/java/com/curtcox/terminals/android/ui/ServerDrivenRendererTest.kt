@@ -47,6 +47,19 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun buttonWithoutComponentIdFallsBackToWidgetName() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = Ui.Node.newBuilder()
+            .setButton(Ui.ButtonWidget.newBuilder().setLabel("Tap").build())
+            .build()
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithText("Tap").performClick()
+
+        assertEquals(listOf(ServerDrivenAction("button", "tap")), actions)
+    }
+
+    @Test
     fun delegatesImageAndMediaSurfaces() {
         val root = Ui.Node.newBuilder()
             .setId("root")
@@ -214,6 +227,22 @@ class ServerDrivenRendererTest {
         compose.onNodeWithText("Tap target").performClick()
 
         assertEquals(listOf(ServerDrivenAction("surface", "primary")), actions)
+    }
+
+    @Test
+    fun gestureAreaWithoutComponentIdFallsBackToWidgetName() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = Ui.Node.newBuilder()
+            .setGestureArea(Ui.GestureAreaWidget.newBuilder().setAction("tap-anywhere"))
+            .addChildren(node("label") {
+                text = Ui.TextWidget.newBuilder().setValue("Tap area").build()
+            })
+            .build()
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithText("Tap area").performClick()
+
+        assertEquals(listOf(ServerDrivenAction("gesture_area", "tap-anywhere")), actions)
     }
 
     @Test

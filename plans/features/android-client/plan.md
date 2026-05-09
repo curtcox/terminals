@@ -1065,6 +1065,13 @@ Remaining validation:
 - Re-verified Android boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Attempted Android instrumentation source validation with `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, but this shell session has no Java runtime configured (`Unable to locate a Java Runtime`), so Gradle validation remains host-blocked.
 
+### 2026-05-08 (action component-id fallback parity)
+
+- Aligned native Android action component-id fallback with Flutter `server_driven_renderer.dart`: when `serverDrivenNodeId(node)` is blank, interactive widgets now emit stable fallback IDs (`button`, `slider`, `toggle`, `dropdown`, `text_input`, `gesture_area`) instead of an empty string.
+- Added renderer instrumentation coverage for fallback component IDs on button taps and gesture-area taps with nodes that omit `id`/`props.id`.
+- Re-verified Android boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Attempted Android instrumentation source validation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`, but this host currently has no Java runtime at that path (and `/usr/libexec/java_home -V` reports none), so Gradle validation remains host-blocked.
+
 ## Test Plan
 
 ### Unit tests

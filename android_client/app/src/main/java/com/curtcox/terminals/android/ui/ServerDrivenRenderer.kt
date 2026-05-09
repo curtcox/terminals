@@ -140,27 +140,57 @@ private fun RenderNode(
         Ui.Node.WidgetCase.TEXT_INPUT -> TerminalTextInput(node, props, onAction)
         Ui.Node.WidgetCase.BUTTON -> Button(
             modifier = props.modifier(),
-            onClick = { onAction(ServerDrivenAction(props.componentId, node.button.action.ifBlank { "tap" })) },
+            onClick = {
+                onAction(
+                    ServerDrivenAction(
+                        actionComponentId(props.componentId, "button"),
+                        node.button.action.ifBlank { "tap" },
+                    ),
+                )
+            },
         ) { Text(node.button.label) }
         Ui.Node.WidgetCase.SLIDER -> {
             val min = node.slider.min.toFloat()
             val max = node.slider.max.toFloat().takeIf { it > min } ?: min + 1f
             Slider(
                 value = node.slider.value.toFloat().coerceIn(min, max),
-                onValueChange = { onAction(ServerDrivenAction(props.componentId, "change", it.toString())) },
+                onValueChange = {
+                    onAction(
+                        ServerDrivenAction(
+                            actionComponentId(props.componentId, "slider"),
+                            "change",
+                            it.toString(),
+                        ),
+                    )
+                },
                 valueRange = min..max,
                 modifier = props.modifier(),
             )
         }
         Ui.Node.WidgetCase.TOGGLE -> Switch(
             checked = node.toggle.value,
-            onCheckedChange = { onAction(ServerDrivenAction(props.componentId, "toggle", it.toString())) },
+            onCheckedChange = {
+                onAction(
+                    ServerDrivenAction(
+                        actionComponentId(props.componentId, "toggle"),
+                        "toggle",
+                        it.toString(),
+                    ),
+                )
+            },
             modifier = props.modifier(),
         )
         Ui.Node.WidgetCase.DROPDOWN -> TerminalDropdown(node, props, onAction)
         Ui.Node.WidgetCase.GESTURE_AREA -> Box(
             props.modifier().pointerInput(node.id) {
-                detectTapGestures { onAction(ServerDrivenAction(props.componentId, node.gestureArea.action.ifBlank { "tap" })) }
+                detectTapGestures {
+                    onAction(
+                        ServerDrivenAction(
+                            actionComponentId(props.componentId, "gesture_area"),
+                            node.gestureArea.action.ifBlank { "tap" },
+                        ),
+                    )
+                }
             },
         ) { RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
         Ui.Node.WidgetCase.OVERLAY -> Box(props.modifier()) { RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
@@ -212,7 +242,7 @@ private fun TerminalTextInput(node: Ui.Node, props: PrimitiveProps, onAction: (S
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(
             onDone = {
-                onAction(ServerDrivenAction(props.componentId, "submit", value))
+                onAction(ServerDrivenAction(actionComponentId(props.componentId, "text_input"), "submit", value))
                 value = ""
             },
         ),
@@ -230,13 +260,15 @@ private fun TerminalDropdown(node: Ui.Node, props: PrimitiveProps, onAction: (Se
                     text = { Text(option) },
                     onClick = {
                         expanded = false
-                        onAction(ServerDrivenAction(props.componentId, "select", option))
+                        onAction(ServerDrivenAction(actionComponentId(props.componentId, "dropdown"), "select", option))
                     },
                 )
             }
         }
     }
 }
+
+private fun actionComponentId(componentId: String, fallback: String): String = componentId.ifBlank { fallback }
 
 @Composable
 private fun DeviceControlNode(props: PrimitiveProps, label: String, apply: () -> Unit) {
