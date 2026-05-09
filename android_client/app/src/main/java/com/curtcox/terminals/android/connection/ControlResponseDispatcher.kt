@@ -45,7 +45,10 @@ class ControlResponseDispatcher {
                 lastNotificationTitle = response.notification.title,
                 lastNotificationBody = response.notification.body,
             )
-            Control.ConnectResponse.PayloadCase.ERROR -> state.copy(lastError = response.error.message)
+            Control.ConnectResponse.PayloadCase.ERROR -> state.copy(
+                lastError = response.error.message.takeIf { it.isNotBlank() },
+                lastControlErrorCode = response.error.code.name,
+            )
             Control.ConnectResponse.PayloadCase.BUG_REPORT_ACK -> state.copy(
                 lastBugReportAckDiagnostics = AndroidBugReportChrome.formatDiagnosticsLines(response.bugReportAck),
             )

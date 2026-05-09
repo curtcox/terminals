@@ -1225,6 +1225,40 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun serverControlErrorIsSurfacedInDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setError(
+                    Control.ControlError.newBuilder()
+                        .setCode(Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION)
+                        .setMessage("stale generation"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("stale generation", viewModel.state.value.lastError)
+        assertEquals(
+            Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION.name,
+            viewModel.state.value.lastControlErrorCode,
+        )
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_error=stale generation"))
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains(
+                "last_control_error_code=${Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION.name}",
+            ),
+        )
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun capabilityAckInvalidationsAndSnapshotAppliedAreSurfacedInDiagnostics() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)

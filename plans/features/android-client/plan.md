@@ -957,6 +957,13 @@ Remaining validation:
 
 - Surfaced server `CapabilityAck.snapshot_applied` and a compact `invalidations` summary in copyable terminal diagnostics (aligned with server capability-lifecycle invalidation signaling). Extended `ControlResponseDispatcher` state, `withoutHandshake` clearing, dispatcher/ViewModel tests.
 
+### 2026-05-08 (server control error diagnostics)
+
+- Record `ControlError.code` as `lastControlErrorCode` on `AndroidTerminalViewState`, include `last_error` and `last_control_error_code` in baseline `formatDiagnostics`, preserve error code across disconnect (like bug-report ack), and clear it on `withoutHandshake` for new sessions.
+- Refactored connect failure, heartbeat loss, and reconnect diagnostics to rely on `formatDiagnostics` for `last_error` instead of ad-hoc suffixes (avoids stale or duplicate lines).
+- On `HelloAck`, treat non-positive `heartbeat_interval_ms` as “use client default”: reset `effectiveHeartbeatMillis` and restart the heartbeat loop.
+- Extended `ControlResponseDispatcherTest` and `AndroidTerminalViewModelTest`; re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Full Gradle unit tests require a host JDK (not available in this session).
+
 ## Test Plan
 
 ### Unit tests

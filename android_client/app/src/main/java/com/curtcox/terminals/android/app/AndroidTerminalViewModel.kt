@@ -82,13 +82,11 @@ class AndroidTerminalViewModel(
             }
             if (response.payloadCase == Control.ConnectResponse.PayloadCase.HELLO_ACK) {
                 val ms = response.helloAck.heartbeatIntervalMs
-                if (ms > 0) {
-                    effectiveHeartbeatMillis = ms
-                    val connectedSession = session
-                    if (connectedSession != null) {
-                        stopHeartbeat()
-                        startHeartbeat(connectedSession)
-                    }
+                effectiveHeartbeatMillis = if (ms > 0) ms else dependencies.heartbeatIntervalMillis
+                val connectedSession = session
+                if (connectedSession != null) {
+                    stopHeartbeat()
+                    startHeartbeat(connectedSession)
                 }
             }
         }
@@ -181,11 +179,10 @@ class AndroidTerminalViewModel(
                 runCatching { nextSession?.close() }
                 mutableState.update {
                     val message = error.message ?: error::class.java.simpleName
-                    withoutHandshake(it).copy(
+                    val cleared = withoutHandshake(it).copy(lastError = message)
+                    cleared.copy(
                         connectionState = ConnectionState.ReadyToConnect,
-                        lastError = message,
-                        diagnosticsText = formatDiagnostics(resolved, ConnectionState.ReadyToConnect, withoutHandshake(it)) +
-                            "\nlast_error=$message",
+                        diagnosticsText = formatDiagnostics(resolved, ConnectionState.ReadyToConnect, cleared),
                     )
                 }
             } finally {
@@ -265,6 +262,7 @@ class AndroidTerminalViewModel(
             val clearedHandshake = withoutHandshake(it)
             val diagnosticsSource = clearedHandshake.copy(
                 lastBugReportAckDiagnostics = it.lastBugReportAckDiagnostics,
+                lastControlErrorCode = it.lastControlErrorCode,
             )
             diagnosticsSource.copy(
                 connectionState = nextState,
@@ -547,11 +545,13 @@ class AndroidTerminalViewModel(
         val endpoint = parser.parse(mutableState.value.endpointText)
         val message = error.message ?: error::class.java.simpleName
         mutableState.update {
-            it.copy(
+            val next = it.copy(
                 connectionState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.Connecting,
                 lastError = message,
-                diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting, it) +
-                    "\nlast_error=$message\nreconnect_pending=${endpoint != null}",
+            )
+            next.copy(
+                diagnosticsText = formatDiagnostics(endpoint, next.connectionState, next) +
+                    "\nreconnect_pending=${endpoint != null}",
             )
         }
         viewModelScope.launch { failedSession.close() }
@@ -567,10 +567,10 @@ class AndroidTerminalViewModel(
             for (attempt in 1..dependencies.maxReconnectAttempts) {
                 delay(dependencies.reconnectPolicy.delayForAttempt(attempt))
                 mutableState.update {
-                    it.copy(
-                        connectionState = ConnectionState.Connecting,
-                        diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting, it) +
-                            "\nlast_error=$lastError\nreconnect_attempt=$attempt\nreconnect_cause=$reconnectCause",
+                    val basis = it.copy(connectionState = ConnectionState.Connecting, lastError = lastError)
+                    basis.copy(
+                        diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting, basis) +
+                            "\nreconnect_attempt=$attempt\nreconnect_cause=$reconnectCause",
                     )
                 }
                 val nextSession = dependencies.sessionFactory(responseSink)
@@ -597,11 +597,10 @@ class AndroidTerminalViewModel(
                 }
             }
             mutableState.update {
-                it.copy(
-                    connectionState = ConnectionState.ReadyToConnect,
-                    lastError = lastError,
-                    diagnosticsText = formatDiagnostics(endpoint, ConnectionState.ReadyToConnect, it) +
-                        "\nlast_error=$lastError\nreconnect_exhausted=${dependencies.maxReconnectAttempts}\nreconnect_cause=$reconnectCause",
+                val basis = it.copy(connectionState = ConnectionState.ReadyToConnect, lastError = lastError)
+                basis.copy(
+                    diagnosticsText = formatDiagnostics(endpoint, ConnectionState.ReadyToConnect, basis) +
+                        "\nreconnect_exhausted=${dependencies.maxReconnectAttempts}\nreconnect_cause=$reconnectCause",
                 )
             }
             reconnectExhausted = true
@@ -634,6 +633,7 @@ class AndroidTerminalViewModel(
             lastTransition = null,
             lastTransitionDurationMs = null,
             lastBugReportAckDiagnostics = null,
+            lastControlErrorCode = null,
         )
 
     private fun formatDiagnostics(
@@ -705,6 +705,12 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.lastTransitionDurationMs?.takeIf { it > 0 }?.let {
                 appendLine("last_transition_duration_ms=$it")
+            }
+            handshakeSource?.lastError?.takeIf { it.isNotBlank() }?.let { err ->
+                appendLine("last_error=$err")
+            }
+            handshakeSource?.lastControlErrorCode?.takeIf { it.isNotBlank() }?.let { code ->
+                appendLine("last_control_error_code=$code")
             }
             handshakeSource?.lastBugReportAckDiagnostics?.takeIf { it.isNotBlank() }?.let { bug ->
                 appendLine()

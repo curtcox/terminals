@@ -356,7 +356,11 @@ class ControlResponseDispatcherTest {
             )
             .build()
         val error = Control.ConnectResponse.newBuilder()
-            .setError(Control.ControlError.newBuilder().setMessage("protocol violation"))
+            .setError(
+                Control.ControlError.newBuilder()
+                    .setCode(Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION)
+                    .setMessage("protocol violation"),
+            )
             .build()
 
         val afterNotification = dispatcher.dispatch(AndroidTerminalViewState(), notification)
@@ -365,6 +369,25 @@ class ControlResponseDispatcherTest {
         assertEquals("Timer", afterError.lastNotificationTitle)
         assertEquals("Done", afterError.lastNotificationBody)
         assertEquals("protocol violation", afterError.lastError)
+        assertEquals(
+            Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION.name,
+            afterError.lastControlErrorCode,
+        )
+    }
+
+    @Test
+    fun errorWithEmptyMessageStillRecordsControlErrorCode() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setError(
+                Control.ControlError.newBuilder()
+                    .setCode(Control.ControlErrorCode.CONTROL_ERROR_CODE_UNKNOWN),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertNull(next.lastError)
+        assertEquals(Control.ControlErrorCode.CONTROL_ERROR_CODE_UNKNOWN.name, next.lastControlErrorCode)
     }
 
     private fun textNode(id: String, value: String): Ui.Node =
