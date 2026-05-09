@@ -193,6 +193,98 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun brightnessWidgetClampsValueToFlutterRangeForLabelAndEffect() {
+        val calls = mutableListOf<Double>()
+        val root = node("brightness") {
+            brightness = Ui.BrightnessWidget.newBuilder().setValue(-0.5).build()
+        }
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                imageLoader = { url, _ -> Text(url) },
+                deviceControlEffects = DeviceControlEffects(setBrightness = calls::add),
+            )
+        }
+
+        compose.onNodeWithText("brightness=0.0").assertIsDisplayed()
+        compose.waitUntil { calls == listOf(0.0) }
+    }
+
+    @Test
+    fun keepAwakeWidgetRendersChildContentLikeFlutter() {
+        val root = Ui.Node.newBuilder()
+            .setId("wake")
+            .setKeepAwake(Ui.KeepAwakeWidget.newBuilder().setEnabled(true).build())
+            .addChildren(node("kiosk-banner") {
+                text = Ui.TextWidget.newBuilder().setValue("Kiosk active").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("keep_awake=true").assertIsDisplayed()
+        compose.onNodeWithText("Kiosk active").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-kiosk-banner").assertIsDisplayed()
+    }
+
+    @Test
+    fun fullscreenWidgetRendersChildContentLikeFlutter() {
+        val root = Ui.Node.newBuilder()
+            .setId("full")
+            .setFullscreen(Ui.FullscreenWidget.newBuilder().setEnabled(true).build())
+            .addChildren(node("immersive-label") {
+                text = Ui.TextWidget.newBuilder().setValue("Immersive content").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("fullscreen=true").assertIsDisplayed()
+        compose.onNodeWithText("Immersive content").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-immersive-label").assertIsDisplayed()
+    }
+
+    @Test
+    fun brightnessWidgetRendersChildContentLikeFlutter() {
+        val root = Ui.Node.newBuilder()
+            .setId("brightness")
+            .setBrightness(Ui.BrightnessWidget.newBuilder().setValue(0.6).build())
+            .addChildren(node("brightness-hint") {
+                text = Ui.TextWidget.newBuilder().setValue("Bright wall mode").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("brightness=0.6").assertIsDisplayed()
+        compose.onNodeWithText("Bright wall mode").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-brightness-hint").assertIsDisplayed()
+    }
+
+    @Test
+    fun paddingWithMultipleChildrenRendersThemAsColumnLikeFlutter() {
+        val root = Ui.Node.newBuilder()
+            .setId("padded")
+            .setPadding(Ui.PaddingWidget.newBuilder().setAll(8).build())
+            .addChildren(node("first-line") {
+                text = Ui.TextWidget.newBuilder().setValue("First line").build()
+            })
+            .addChildren(node("second-line") {
+                text = Ui.TextWidget.newBuilder().setValue("Second line").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("First line").assertIsDisplayed()
+        compose.onNodeWithText("Second line").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-first-line").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-second-line").assertIsDisplayed()
+    }
+
+    @Test
     fun textInputSubmitsOnImeDone() {
         val actions = mutableListOf<ServerDrivenAction>()
         val root = node("name") {

@@ -1110,6 +1110,14 @@ Remaining validation:
 - Wrapped server-driven `TextWidget` in Compose `SelectionContainer` for Flutter `SelectableText`-style selection parity.
 - Added instrumentation coverage for draw-text, draw-path, and malformed path data (no crash). Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Gradle compile not run on this agent host (no JDK).
 
+### 2026-05-09 (single-child wrapper + device-control parity)
+
+- Added a `WrappedChild` helper in `ServerDrivenRenderer.kt` mirroring Flutter `_renderNodeChildren` semantics (empty → render nothing, 1 child → render directly, >1 children → start-aligned `Column`) and routed `PaddingWidget`, `CenterWidget`, `ExpandWidget` (non-flex parents), and `GestureAreaWidget` (with children) through it so multi-child wrappers no longer overlap inside a `Box`.
+- Updated `FullscreenWidget`, `KeepAwakeWidget`, and `BrightnessWidget` to render their wrapped children below the device-control hint label via `DeviceControlNode` content slot (matching Flutter `_placeholderPrimitive` which renders `_renderNodeChildren` alongside the title), and clamped the displayed `brightness=` label value plus the forwarded effect call to `[0, 1]` to match Flutter `node.brightness.value.clamp(0.0, 1.0)`.
+- Annotated the `OverlayWidget` `Box` to make its `Stack(fit: StackFit.loose)` parity intent explicit (still uses `RenderPlainChildren`).
+- Added instrumentation coverage in `ServerDrivenRendererTest`: brightness clamp for negative values, device-control children rendering for keep-awake/fullscreen/brightness, and multi-child padding rendering as a `Column`.
+- Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Gradle was not runnable on this agent host (no Java runtime).
+
 ## Test Plan
 
 ### Unit tests

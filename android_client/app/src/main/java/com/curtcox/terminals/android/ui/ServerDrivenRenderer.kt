@@ -166,13 +166,13 @@ private fun RenderNode(
             }
         }
         Ui.Node.WidgetCase.PADDING -> Box(props.modifier().padding(node.padding.all.dp)) {
-            RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
+            WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.CENTER -> Box(props.modifier().fillMaxWidth(), contentAlignment = Alignment.Center) {
-            RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
+            WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.EXPAND -> Box(Modifier.fillMaxWidth().then(props.modifier())) {
-            RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
+            WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.TEXT -> SelectionContainer {
             Text(
@@ -264,25 +264,43 @@ private fun RenderNode(
                 Box(props.modifier().then(tapModifier).size(48.dp)) {}
             } else {
                 Box(props.modifier().then(tapModifier)) {
-                    RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
+                    WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
                 }
             }
         }
         Ui.Node.WidgetCase.OVERLAY -> Box(props.modifier()) {
+            // Match Flutter `Stack(fit: StackFit.loose)`: children stack atop each other.
             RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.PROGRESS -> LinearProgressIndicator(
             progress = { node.progress.value.toFloat().coerceIn(0f, 1f) },
             modifier = props.modifier(),
         )
-        Ui.Node.WidgetCase.FULLSCREEN -> DeviceControlNode(props, "fullscreen=${node.fullscreen.enabled}") {
-            deviceControlEffects.setFullscreen(node.fullscreen.enabled)
+        Ui.Node.WidgetCase.FULLSCREEN -> DeviceControlNode(
+            props,
+            "fullscreen=${node.fullscreen.enabled}",
+            apply = { deviceControlEffects.setFullscreen(node.fullscreen.enabled) },
+        ) {
+            WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
-        Ui.Node.WidgetCase.KEEP_AWAKE -> DeviceControlNode(props, "keep_awake=${node.keepAwake.enabled}") {
-            deviceControlEffects.setKeepAwake(node.keepAwake.enabled)
+        Ui.Node.WidgetCase.KEEP_AWAKE -> DeviceControlNode(
+            props,
+            "keep_awake=${node.keepAwake.enabled}",
+            apply = { deviceControlEffects.setKeepAwake(node.keepAwake.enabled) },
+        ) {
+            WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
-        Ui.Node.WidgetCase.BRIGHTNESS -> DeviceControlNode(props, "brightness=${node.brightness.value}") {
-            deviceControlEffects.setBrightness(node.brightness.value)
+        Ui.Node.WidgetCase.BRIGHTNESS -> {
+            // Match Flutter: clamp displayed brightness to [0, 1] before showing the hint
+            // and forwarding to the device-control effect.
+            val brightness = node.brightness.value.coerceIn(0.0, 1.0)
+            DeviceControlNode(
+                props,
+                "brightness=$brightness",
+                apply = { deviceControlEffects.setBrightness(brightness) },
+            ) {
+                WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
+            }
         }
         Ui.Node.WidgetCase.WIDGET_NOT_SET -> if (policy.showUnsupportedFallback) Text(policy.unsupportedText, modifier = props.modifier())
         null -> if (policy.showUnsupportedFallback) Text(policy.unsupportedText, modifier = props.modifier())
@@ -300,6 +318,33 @@ private fun RenderPlainChildren(
 ) {
     for (child in node.childrenList) {
         RenderNode(child, onAction, media, imageLoader, deviceControlEffects, policy)
+    }
+}
+
+/**
+ * Renders the children of a single-child wrapper to match Flutter
+ * `_renderNodeChildren` in `terminal_client/lib/ui/server_driven_renderer.dart`:
+ * empty children render nothing, a single child is rendered directly, and
+ * multiple children are stacked vertically in a start-aligned [Column].
+ */
+@Composable
+private fun WrappedChild(
+    node: Ui.Node,
+    onAction: (ServerDrivenAction) -> Unit,
+    media: MediaSurfaces,
+    imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
+    deviceControlEffects: DeviceControlEffects,
+    policy: RendererPolicy,
+) {
+    val children = node.childrenList
+    when {
+        children.isEmpty() -> Unit
+        children.size == 1 -> RenderNode(children.first(), onAction, media, imageLoader, deviceControlEffects, policy)
+        else -> Column(horizontalAlignment = Alignment.Start) {
+            for (child in children) {
+                RenderNode(child, onAction, media, imageLoader, deviceControlEffects, policy)
+            }
+        }
     }
 }
 
@@ -400,12 +445,26 @@ private fun TerminalDropdown(node: Ui.Node, props: PrimitiveProps, onAction: (Se
 
 private fun actionComponentId(componentId: String, fallback: String): String = componentId.ifBlank { fallback }
 
+/**
+ * Renders the device-control hint label and applies the platform effect, then
+ * renders any wrapped children below. Matches Flutter `_placeholderPrimitive`
+ * for `Fullscreen`/`KeepAwake`/`Brightness` which renders both the title and
+ * `_renderNodeChildren(...)` together.
+ */
 @Composable
-private fun DeviceControlNode(props: PrimitiveProps, label: String, apply: () -> Unit) {
+private fun DeviceControlNode(
+    props: PrimitiveProps,
+    label: String,
+    apply: () -> Unit,
+    content: @Composable () -> Unit = {},
+) {
     LaunchedEffect(label) {
         apply()
     }
-    Text(label, modifier = props.modifier())
+    Column(modifier = props.modifier(), horizontalAlignment = Alignment.Start) {
+        Text(label)
+        content()
+    }
 }
 
 @Composable
