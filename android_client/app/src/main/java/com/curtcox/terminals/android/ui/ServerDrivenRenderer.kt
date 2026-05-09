@@ -194,7 +194,9 @@ private fun RenderNode(
                 fontFamily = if (node.text.style == "monospace") FontFamily.Monospace else null,
             )
         }
-        Ui.Node.WidgetCase.IMAGE -> imageLoader(node.image.url, node.propsMap["contentDescription"])
+        Ui.Node.WidgetCase.IMAGE -> Box(props.modifier()) {
+            imageLoader(node.image.url, node.propsMap["contentDescription"])
+        }
         Ui.Node.WidgetCase.VIDEO_SURFACE -> {
             val trackId = node.videoSurface.trackId.trim()
             val builder = media.video

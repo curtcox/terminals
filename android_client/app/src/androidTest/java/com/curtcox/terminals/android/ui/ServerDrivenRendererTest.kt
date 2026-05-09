@@ -137,6 +137,24 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun imageWidgetAppliesStableTestTag() {
+        val root = node("hero") {
+            image = Ui.ImageWidget.newBuilder().setUrl("https://example.test/hero.png").build()
+        }
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                imageLoader = { url, _ -> Text(url) },
+            )
+        }
+
+        compose.onNodeWithText("https://example.test/hero.png").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-hero").assertIsDisplayed()
+    }
+
+    @Test
     fun videoSurfaceWithoutBuilderUsesFlutterStylePlaceholder() {
         val root = node("cam") {
             videoSurface = Ui.VideoSurfaceWidget.newBuilder().setTrackId("track-z").build()
