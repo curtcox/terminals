@@ -932,6 +932,7 @@ Remaining validation:
 - Added `AndroidTerminalViewModelTest.networkMonitoringStartStopIsIdempotent` regression coverage and re-verified focused ViewModel JVM tests with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'`.
 - Implemented generic server `BugReportAck` handling: `AndroidBugReportChrome` formats copyable diagnostics lines, `ControlResponseDispatcher` records `lastBugReportAckDiagnostics` on `AndroidTerminalViewState`, and `AndroidTerminalViewModel` appends them to live diagnostics when acknowledgements arrive over the control stream (no scenario branching).
 - Added JVM coverage in `AndroidBugReportChromeTest`, `ControlResponseDispatcherTest.bugReportAckRecordsDiagnosticsChrome`, and `AndroidTerminalViewModelTest.serverBugReportAckIsSurfacedInDiagnostics`, plus re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Surfaced generic server `TransitionUI` responses in copyable terminal diagnostics (`last_transition`, optional `last_transition_duration_ms` when non-zero), fixed `UpdateUI` subtree merge to detect child replacements with protobuf value equality, and added dispatcher/ViewModel coverage.
 
 ## Test Plan
 

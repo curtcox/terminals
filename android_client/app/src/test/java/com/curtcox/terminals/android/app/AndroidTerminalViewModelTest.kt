@@ -93,6 +93,8 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("control_endpoint=http://10.0.0.8:8080"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_connected=true"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_metered=false"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -164,6 +166,8 @@ class AndroidTerminalViewModelTest {
 
         viewModel.stopNetworkMonitoring()
         assertEquals(1, monitor.stopCount)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -216,6 +220,8 @@ class AndroidTerminalViewModelTest {
         assertEquals(1, discovery.stopCount)
         assertEquals(2, discovery.startCount)
         assertTrue(viewModel.state.value.diagnosticsText.contains("discovery_restart_reason=network-callback"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -297,6 +303,8 @@ class AndroidTerminalViewModelTest {
             listOf("network-callback", "network-callback"),
             session.capabilityDeltaReasons,
         )
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -547,6 +555,8 @@ class AndroidTerminalViewModelTest {
         assertEquals(true, viewModel.state.value.permissionEducation.microphoneAvailable)
         assertEquals(listOf("microphone-permission"), session.capabilityDeltaReasons)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_permission_refresh=microphone-permission-result"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -598,6 +608,8 @@ class AndroidTerminalViewModelTest {
             listOf("microphone-permission", "camera-permission"),
             session.capabilityDeltaReasons,
         )
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -648,6 +660,8 @@ class AndroidTerminalViewModelTest {
         assertTrue(permissionRequester.requests.contains(Manifest.permission.RECORD_AUDIO))
         assertTrue(permissionRequester.requests.contains(Manifest.permission.CAMERA))
         assertTrue(session.capabilityDeltaReasons.contains("notification-permission"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -717,6 +731,8 @@ class AndroidTerminalViewModelTest {
         assertEquals(1, first.closeCount)
         assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
         assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -748,6 +764,8 @@ class AndroidTerminalViewModelTest {
         assertEquals(1, first.closeCount)
         assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
         assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -843,6 +861,8 @@ class AndroidTerminalViewModelTest {
         assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
         assertEquals("still offline", viewModel.state.value.lastError)
         assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_exhausted=1"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -985,6 +1005,8 @@ class AndroidTerminalViewModelTest {
         )
 
         assertEquals(root, viewModel.state.value.serverRoot)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1014,6 +1036,35 @@ class AndroidTerminalViewModelTest {
         assertTrue(viewModel.state.value.diagnosticsText.contains("bug_report_status=filed"))
         assertTrue(viewModel.state.value.diagnosticsText.contains("bug_report_message=stored"))
         assertTrue(viewModel.state.value.lastBugReportAckDiagnostics!!.contains("rep-native-1"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun serverTransitionUiIsSurfacedInDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setTransitionUi(
+                    Ui.TransitionUI.newBuilder()
+                        .setDeviceId("device-1")
+                        .setTransition("slide_left")
+                        .setDurationMs(200),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("slide_left", viewModel.state.value.lastTransition)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_transition=slide_left"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_transition_duration_ms=200"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1043,6 +1094,8 @@ class AndroidTerminalViewModelTest {
         assertEquals(listOf("Timer" to "Done"), delivered)
         assertEquals("Timer", viewModel.state.value.lastNotificationTitle)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_notification=Timer"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1079,6 +1132,8 @@ class AndroidTerminalViewModelTest {
         assertEquals("audio-1", viewModel.state.value.lastMediaRequestId)
         assertEquals("played", viewModel.state.value.lastMediaStatus)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_media=audio-1:played"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1105,6 +1160,8 @@ class AndroidTerminalViewModelTest {
         assertEquals("media-1", viewModel.state.value.lastMediaRequestId)
         assertEquals("unsupported-media:video/mp4", viewModel.state.value.lastMediaStatus)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_media=media-1:unsupported-media:video/mp4"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1139,6 +1196,8 @@ class AndroidTerminalViewModelTest {
 
         assertEquals("media-2", shown.single().requestId)
         assertEquals("shown", viewModel.state.value.lastMediaStatus)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1153,6 +1212,8 @@ class AndroidTerminalViewModelTest {
         advanceUntilIdle()
 
         assertEquals(ServerDrivenAction("start", "tap", "pressed"), session.actions.single())
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1168,6 +1229,8 @@ class AndroidTerminalViewModelTest {
 
         assertEquals(listOf("configuration"), session.capabilityDeltaReasons)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_capability_delta=configuration"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1191,6 +1254,8 @@ class AndroidTerminalViewModelTest {
 
         assertEquals(1, session.rebaselineCount)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_capability_rebaseline=stale-generation"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1212,6 +1277,8 @@ class AndroidTerminalViewModelTest {
         )
 
         assertEquals(0, session.rebaselineCount)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test

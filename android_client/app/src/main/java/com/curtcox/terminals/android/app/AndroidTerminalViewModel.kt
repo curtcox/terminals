@@ -74,6 +74,16 @@ class AndroidTerminalViewModel(
                 if (!bugReport.isNullOrBlank()) {
                     diagnostics += "\n$bugReport"
                 }
+                if (response.payloadCase == Control.ConnectResponse.PayloadCase.TRANSITION_UI) {
+                    val transition = response.transitionUi.transition
+                    if (transition.isNotBlank()) {
+                        diagnostics += "\nlast_transition=$transition"
+                    }
+                    val durationMs = response.transitionUi.durationMs
+                    if (durationMs != 0) {
+                        diagnostics += "\nlast_transition_duration_ms=$durationMs"
+                    }
+                }
                 next.copy(
                     diagnosticsText = if (rebaselineSent) {
                         "$diagnostics\nlast_capability_rebaseline=stale-generation"

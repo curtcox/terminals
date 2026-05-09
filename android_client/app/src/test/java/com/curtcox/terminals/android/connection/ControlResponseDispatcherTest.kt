@@ -81,6 +81,22 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun transitionUiRecordsLastTransition() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setTransitionUi(
+                Ui.TransitionUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setTransition("fade")
+                    .setDurationMs(120),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("fade", next.lastTransition)
+    }
+
+    @Test
     fun notificationAndErrorUpdateGenericTerminalState() {
         val notification = Control.ConnectResponse.newBuilder()
             .setNotification(

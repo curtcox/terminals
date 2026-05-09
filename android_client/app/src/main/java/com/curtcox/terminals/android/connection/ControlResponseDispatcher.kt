@@ -36,7 +36,7 @@ class ControlResponseDispatcher {
         var changed = false
         val children = root.childrenList.map { child ->
             val next = replaceNode(child, componentId, replacement)
-            if (next !== child && next != child) changed = true
+            if (next != child) changed = true
             next
         }
         if (!changed) return root
