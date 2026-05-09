@@ -1091,6 +1091,12 @@ Remaining validation:
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh` after renderer parity tweaks (Gradle not run on this host: no Java runtime).
 - Added Compose instrumentation coverage for `ProgressWidget` value clamping to `[0, 1]` via semantics (`ProgressBarRangeInfo`), matching Flutter `LinearProgressIndicator` clamp behavior for out-of-range server values.
 
+### 2026-05-09 (unit test visibility + session teardown)
+
+- Enabled Gradle `testLogEvent` output for debug unit tests so `testDebugUnitTest` prints **PASSED/SKIPPED/FAILED** per method (default Gradle output stops at the task line, which looks “stuck” for long JVM suites).
+- Added explicit `disconnect()` + `advanceUntilIdle()` at the end of the three `newConnectClears*` ViewModel tests that intentionally finished while still **Connected**, so `viewModelScope` work is torn down before `runTest` returns (kotlinx `runTest` will not finish while the shared `TestCoroutineScheduler` still has unfinished work scheduled on `Dispatchers.Main`).
+- Re-run: `make android-client-test` (or `cd android_client && ./gradlew testDebugUnitTest`); use `./gradlew --stop` if workers misbehave.
+
 ### 2026-05-09 (Flutter media surface parity)
 
 - Aligned native Android with Flutter’s split between generic renderer placeholders and shell chrome: `ServerDrivenRenderer` now takes optional `mediaSurface` and `audioVisualizerSurface` (audio falls back to `mediaSurface` for the existing single-lambda tests). When both are null for a node type, video/audio use `TerminalMediaPlaceholder`, matching Flutter `server_driven_renderer` `_placeholderPrimitive` titles (`Video surface` / `Audio level`) and trimmed track/stream ids.

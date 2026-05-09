@@ -1168,6 +1168,8 @@ class AndroidTerminalViewModelTest {
         viewModel.connect()
         advanceUntilIdle()
         assertNull(viewModel.state.value.lastBugReportAckDiagnostics)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1210,6 +1212,8 @@ class AndroidTerminalViewModelTest {
         assertNull(viewModel.state.value.registerAckServerId)
         assertTrue(!viewModel.state.value.diagnosticsText.contains("register_ack_message=first session ack"))
         assertTrue(!viewModel.state.value.diagnosticsText.contains("register_ack_server_id=srv-first"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -1253,6 +1257,8 @@ class AndroidTerminalViewModelTest {
         advanceUntilIdle()
         assertNull(viewModel.state.value.lastControlResponseActivity)
         assertTrue(!viewModel.state.value.diagnosticsText.contains("last_control_activity=UI updated"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test

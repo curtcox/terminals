@@ -1,6 +1,7 @@
 import java.time.Instant
 import com.google.protobuf.gradle.id
 import com.google.protobuf.gradle.proto
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     id("com.android.application")
@@ -50,6 +51,20 @@ android {
         getByName("main") {
             proto {
                 srcDir("../../api")
+            }
+        }
+    }
+
+    testOptions {
+        unitTests {
+            all {
+                it.testLogging {
+                    events(
+                        TestLogEvent.PASSED,
+                        TestLogEvent.SKIPPED,
+                        TestLogEvent.FAILED,
+                    )
+                }
             }
         }
     }
