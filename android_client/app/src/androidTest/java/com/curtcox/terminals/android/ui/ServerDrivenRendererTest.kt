@@ -337,6 +337,30 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun gridWithMoreChildrenThanColumnsRendersAllCells() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setGrid(Ui.GridWidget.newBuilder().setColumns(2).build())
+            .addChildren(node("c0") {
+                text = Ui.TextWidget.newBuilder().setValue("Cell0").build()
+            })
+            .addChildren(node("c1") {
+                text = Ui.TextWidget.newBuilder().setValue("Cell1").build()
+            })
+            .addChildren(node("c2") {
+                text = Ui.TextWidget.newBuilder().setValue("Cell2").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("Cell0").assertIsDisplayed()
+        compose.onNodeWithText("Cell1").assertIsDisplayed()
+        compose.onNodeWithText("Cell2").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-c2").assertIsDisplayed()
+    }
+
+    @Test
     fun verticalScrollRendersChild() {
         val root = Ui.Node.newBuilder()
             .setId("root")

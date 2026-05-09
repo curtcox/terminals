@@ -1084,6 +1084,7 @@ Remaining validation:
 - Matched Flutter `DropdownWidget` selection rules: when the server `value` is missing from `options`, the visible selection falls back to the first option; empty option lists show the same `Select option` hint as Flutter.
 - Matched Flutter `Expanded` behavior for `ExpandWidget`: direct children of `Row` and `Column` (including stack’s column, scroll row/column, and flex rows/columns) now use `RowScope`/`ColumnScope` helpers so `Expand` applies `Modifier.weight(1f)` in the correct flex scope; non-flex parents keep `fillMaxWidth` on `Expand` via `RenderPlainChildren`.
 - Added renderer instrumentation coverage for invalid dropdown values, empty dropdown options, and `Expand` inside `Stack`.
+- Matched Flutter `GridWidget` layout: replaced `LazyVerticalGrid` with `BoxWithConstraints` + `FlowRow`, 8dp horizontal/vertical gaps, and the same per-cell width formula as Flutter (`Wrap` + `SizedBox`) so column counts and wrapping match the reference client.
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Gradle tasks were not executed on this host (no Java runtime).
 
 ## Test Plan

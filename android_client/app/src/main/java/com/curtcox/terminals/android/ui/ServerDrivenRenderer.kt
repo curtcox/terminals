@@ -8,16 +8,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -92,12 +93,36 @@ private fun RenderNode(
         Ui.Node.WidgetCase.ROW -> Row(props.modifier()) {
             RenderFlexRowChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
         }
-        Ui.Node.WidgetCase.GRID -> LazyVerticalGrid(
-            columns = GridCells.Fixed(node.grid.columns.coerceAtLeast(1)),
-            modifier = props.modifier(),
-        ) {
-            items(node.childrenList) { child ->
-                RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+        Ui.Node.WidgetCase.GRID -> {
+            // Match Flutter `server_driven_renderer.dart` grid: LayoutBuilder + Wrap with 8dp gaps
+            // and fixed cell width so `columns` items fit per row.
+            val columns = node.grid.columns.coerceAtLeast(1)
+            val spacing = 8.dp
+            BoxWithConstraints(modifier = props.modifier()) {
+                val maxW =
+                    if (maxWidth.value.isFinite() && maxWidth > 0.dp) {
+                        maxWidth
+                    } else {
+                        LocalConfiguration.current.screenWidthDp.dp
+                    }
+                val totalSpacing = spacing * (columns - 1).coerceAtLeast(0)
+                val itemWidth =
+                    if (columns <= 1) {
+                        maxW
+                    } else {
+                        ((maxW - totalSpacing) / columns).coerceAtLeast(0.dp)
+                    }
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                    verticalArrangement = Arrangement.spacedBy(spacing),
+                ) {
+                    for (child in node.childrenList) {
+                        Box(Modifier.width(itemWidth)) {
+                            RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                        }
+                    }
+                }
             }
         }
         Ui.Node.WidgetCase.SCROLL -> {
