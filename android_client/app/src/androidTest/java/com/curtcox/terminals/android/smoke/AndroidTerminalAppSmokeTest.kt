@@ -175,9 +175,10 @@ class AndroidTerminalAppSmokeTest {
             )
         }
 
-        compose.onNodeWithText("keep_awake=true").assertIsDisplayed()
-        compose.onNodeWithText("fullscreen=true").assertIsDisplayed()
-        compose.onNodeWithText("brightness=0.42").assertIsDisplayed()
+        compose.onNodeWithText("Keep awake enabled").assertIsDisplayed()
+        compose.onNodeWithText("Fullscreen enabled").assertIsDisplayed()
+        compose.onNodeWithText("Brightness hint").assertIsDisplayed()
+        compose.onNodeWithText("0.42").assertIsDisplayed()
         compose.waitUntil {
             keepAwakeValues == listOf(true) &&
                 fullscreenValues == listOf(true) &&

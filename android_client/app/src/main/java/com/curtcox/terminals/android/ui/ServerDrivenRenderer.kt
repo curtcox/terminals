@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.curtcox.terminals.android.ui.widgets.TerminalMediaPlaceholder
+import java.util.Locale
 import androidx.core.graphics.PathParser
 import terminals.ui.v1.Ui
 
@@ -278,14 +280,16 @@ private fun RenderNode(
         )
         Ui.Node.WidgetCase.FULLSCREEN -> DeviceControlNode(
             props,
-            "fullscreen=${node.fullscreen.enabled}",
+            effectKey = node.fullscreen.enabled,
+            headline = if (node.fullscreen.enabled) "Fullscreen enabled" else "Fullscreen disabled",
             apply = { deviceControlEffects.setFullscreen(node.fullscreen.enabled) },
         ) {
             WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.KEEP_AWAKE -> DeviceControlNode(
             props,
-            "keep_awake=${node.keepAwake.enabled}",
+            effectKey = node.keepAwake.enabled,
+            headline = if (node.keepAwake.enabled) "Keep awake enabled" else "Keep awake disabled",
             apply = { deviceControlEffects.setKeepAwake(node.keepAwake.enabled) },
         ) {
             WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
@@ -296,7 +300,9 @@ private fun RenderNode(
             val brightness = node.brightness.value.coerceIn(0.0, 1.0)
             DeviceControlNode(
                 props,
-                "brightness=$brightness",
+                effectKey = brightness,
+                headline = "Brightness hint",
+                detail = String.format(Locale.US, "%.2f", brightness),
                 apply = { deviceControlEffects.setBrightness(brightness) },
             ) {
                 WrappedChild(node, onAction, media, imageLoader, deviceControlEffects, policy)
@@ -454,15 +460,20 @@ private fun actionComponentId(componentId: String, fallback: String): String = c
 @Composable
 private fun DeviceControlNode(
     props: PrimitiveProps,
-    label: String,
+    effectKey: Any?,
+    headline: String,
+    detail: String? = null,
     apply: () -> Unit,
     content: @Composable () -> Unit = {},
 ) {
-    LaunchedEffect(label) {
+    LaunchedEffect(effectKey) {
         apply()
     }
     Column(modifier = props.modifier(), horizontalAlignment = Alignment.Start) {
-        Text(label)
+        Text(headline)
+        if (!detail.isNullOrEmpty()) {
+            Text(detail, style = MaterialTheme.typography.bodySmall)
+        }
         content()
     }
 }

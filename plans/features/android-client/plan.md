@@ -1091,6 +1091,13 @@ Remaining validation:
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh` after renderer parity tweaks (Gradle not run on this host: no Java runtime).
 - Added Compose instrumentation coverage for `ProgressWidget` value clamping to `[0, 1]` via semantics (`ProgressBarRangeInfo`), matching Flutter `LinearProgressIndicator` clamp behavior for out-of-range server values.
 
+### 2026-05-09 (Flutter parity: fallback + device-control copy)
+
+- Aligned native Android unsupported-node fallback copy with Flutter (`RendererPolicy.unsupportedText` → `Unsupported UI node`).
+- Aligned server-driven `FullscreenWidget` / `KeepAwakeWidget` labels with Flutter `_placeholderPrimitive` titles (`Fullscreen enabled` / `disabled`, `Keep awake enabled` / `disabled`).
+- Aligned `BrightnessWidget` with Flutter title `Brightness hint` plus two-decimal detail (`%.2f`) on a secondary line; `DeviceControlNode` now keys `LaunchedEffect` on typed effect state instead of the full label string.
+- Updated renderer and app smoke instrumentation expectations. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Gradle not run on this agent host (no JRE).
+
 ### 2026-05-09 (unit test visibility + session teardown)
 
 - Enabled Gradle `testLogEvent` output for debug unit tests so `testDebugUnitTest` prints **PASSED/SKIPPED/FAILED** per method (default Gradle output stops at the task line, which looks “stuck” for long JVM suites).

@@ -129,7 +129,7 @@ class ServerDrivenRendererTest {
     fun malformedNodeUsesFallbackPolicy() {
         compose.setContent { render(Ui.Node.newBuilder().setId("unknown").build()) }
 
-        compose.onNodeWithText("Unsupported terminal widget").assertIsDisplayed()
+        compose.onNodeWithText("Unsupported UI node").assertIsDisplayed()
     }
 
     @Test
@@ -148,7 +148,7 @@ class ServerDrivenRendererTest {
             )
         }
 
-        compose.onNodeWithText("keep_awake=true").assertIsDisplayed()
+        compose.onNodeWithText("Keep awake enabled").assertIsDisplayed()
         compose.waitUntil { calls == listOf(true) }
     }
 
@@ -168,7 +168,7 @@ class ServerDrivenRendererTest {
             )
         }
 
-        compose.onNodeWithText("fullscreen=true").assertIsDisplayed()
+        compose.onNodeWithText("Fullscreen enabled").assertIsDisplayed()
         compose.waitUntil { calls == listOf(true) }
     }
 
@@ -188,7 +188,8 @@ class ServerDrivenRendererTest {
             )
         }
 
-        compose.onNodeWithText("brightness=0.42").assertIsDisplayed()
+        compose.onNodeWithText("Brightness hint").assertIsDisplayed()
+        compose.onNodeWithText("0.42").assertIsDisplayed()
         compose.waitUntil { calls == listOf(0.42) }
     }
 
@@ -208,7 +209,8 @@ class ServerDrivenRendererTest {
             )
         }
 
-        compose.onNodeWithText("brightness=0.0").assertIsDisplayed()
+        compose.onNodeWithText("Brightness hint").assertIsDisplayed()
+        compose.onNodeWithText("0.00").assertIsDisplayed()
         compose.waitUntil { calls == listOf(0.0) }
     }
 
@@ -224,7 +226,7 @@ class ServerDrivenRendererTest {
 
         compose.setContent { render(root) }
 
-        compose.onNodeWithText("keep_awake=true").assertIsDisplayed()
+        compose.onNodeWithText("Keep awake enabled").assertIsDisplayed()
         compose.onNodeWithText("Kiosk active").assertIsDisplayed()
         compose.onNodeWithTag("terminal-node-kiosk-banner").assertIsDisplayed()
     }
@@ -241,7 +243,7 @@ class ServerDrivenRendererTest {
 
         compose.setContent { render(root) }
 
-        compose.onNodeWithText("fullscreen=true").assertIsDisplayed()
+        compose.onNodeWithText("Fullscreen enabled").assertIsDisplayed()
         compose.onNodeWithText("Immersive content").assertIsDisplayed()
         compose.onNodeWithTag("terminal-node-immersive-label").assertIsDisplayed()
     }
@@ -258,7 +260,8 @@ class ServerDrivenRendererTest {
 
         compose.setContent { render(root) }
 
-        compose.onNodeWithText("brightness=0.6").assertIsDisplayed()
+        compose.onNodeWithText("Brightness hint").assertIsDisplayed()
+        compose.onNodeWithText("0.60").assertIsDisplayed()
         compose.onNodeWithText("Bright wall mode").assertIsDisplayed()
         compose.onNodeWithTag("terminal-node-brightness-hint").assertIsDisplayed()
     }
