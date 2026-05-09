@@ -1161,6 +1161,10 @@ Remaining validation:
 - Suppressed network-triggered NSD discovery restarts while the activity is stopped (`discovery_restart_suppressed=app-background`), matching the existing network-callback capability refresh suppression and avoiding background NSD churn.
 - JVM coverage: `AndroidTerminalViewModelTest.networkMonitorSkipsDiscoveryRestartWhenBackgrounded`. Docs updated in `docs/client-android.md`.
 
+### 2026-05-09 (Compose `nativeCanvas` import)
+
+- Fixed `ServerDrivenRenderer` Kotlin compile against Compose BOM `2025.10.00`: `drawContext.canvas.nativeCanvas` requires the explicit extension import `androidx.compose.ui.graphics.nativeCanvas` (otherwise `nativeCanvas` is an unresolved reference).
+
 ## Test Plan
 
 ### Unit tests
