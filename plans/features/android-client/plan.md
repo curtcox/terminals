@@ -1007,6 +1007,10 @@ Remaining validation:
 
 - Aligned Kotlin `serverDrivenNodeId` with Flutter `server_driven_node_key.dart` (no trimming of protobuf `id` or `props["id"]`; same `isNotEmpty` / empty-string fallback semantics) so action `componentId` values and `UpdateUI` targeting stay cross-client consistent.
 
+### 2026-05-08 (Flutter activity-label JVM parity)
+
+- Added `ConnectResponseActivityStatusTest` to lock every `connectResponseActivityStatus` label against Flutter `statusFromConnectResponse`, including handshake payloads that intentionally map to `Connected`.
+
 ## Test Plan
 
 ### Unit tests
