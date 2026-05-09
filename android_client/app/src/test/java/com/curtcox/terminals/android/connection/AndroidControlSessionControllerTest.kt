@@ -42,6 +42,7 @@ class AndroidControlSessionControllerTest {
         controller.sendHeartbeat()
         controller.sendSensorTelemetry()
         controller.sendUiAction(ServerDrivenAction(componentId = "start", action = "tap", value = "go"))
+        controller.sendKeyText("x")
 
         assertTrue(client.sent[0].hasHeartbeat())
         assertEquals(4242, client.sent[0].heartbeat.unixMs)
@@ -53,6 +54,9 @@ class AndroidControlSessionControllerTest {
         assertEquals("start", client.sent[2].input.uiAction.componentId)
         assertEquals("tap", client.sent[2].input.uiAction.action)
         assertEquals("go", client.sent[2].input.uiAction.value)
+        assertTrue(client.sent[3].hasInput())
+        assertTrue(client.sent[3].input.hasKey())
+        assertEquals("x", client.sent[3].input.key.text)
     }
 
     @Test

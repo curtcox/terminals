@@ -771,6 +771,8 @@ class AndroidTerminalAppSmokeTest {
             actions += action
         }
 
+        override suspend fun sendKeyText(text: String) = Unit
+
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
             capabilityRefreshReasons += reason
             return capabilityDeltaResult

@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import terminals.ui.v1.Ui
@@ -345,6 +346,23 @@ class ServerDrivenRendererTest {
         compose.onNodeWithTag("terminal-node-name").performImeAction()
 
         assertEquals(ServerDrivenAction("name", "submit", "Ada"), actions.last())
+    }
+
+    @Test
+    fun terminalInputStreamsKeyTextAndNewlineWithoutSubmitUiAction() {
+        val keys = mutableListOf<String>()
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = node("terminal_input") {
+            textInput = Ui.TextInputWidget.newBuilder().setPlaceholder(">").build()
+        }
+
+        compose.setContent { render(root, actions::add, keys::add) }
+        compose.onNodeWithTag("terminal-node-terminal_input").performTextInput("a")
+        compose.onNodeWithTag("terminal-node-terminal_input").performTextInput("ab")
+        compose.onNodeWithTag("terminal-node-terminal_input").performImeAction()
+
+        assertEquals(listOf("a", "b", "\n"), keys)
+        assertTrue(actions.isEmpty())
     }
 
     @Test
@@ -901,10 +919,12 @@ class ServerDrivenRendererTest {
     private fun render(
         root: Ui.Node,
         onAction: (ServerDrivenAction) -> Unit = {},
+        onTerminalKeyText: (String) -> Unit = {},
     ) {
         ServerDrivenRenderer(
             root = root,
             onAction = onAction,
+            onTerminalKeyText = onTerminalKeyText,
             imageLoader = { url, _ -> Text(url) },
         )
     }

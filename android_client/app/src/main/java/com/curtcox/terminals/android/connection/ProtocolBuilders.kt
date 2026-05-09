@@ -119,4 +119,14 @@ class ProtocolBuilders(
                     ),
             )
             .build()
+
+    /** Matches Flutter `buildKeyInputRequest` for shell `terminal_input` streaming. */
+    fun keyInput(deviceId: String, text: String): Control.ConnectRequest =
+        Control.ConnectRequest.newBuilder()
+            .setInput(
+                Io.InputEvent.newBuilder()
+                    .setDeviceId(deviceId)
+                    .setKey(Io.KeyEvent.newBuilder().setText(text)),
+            )
+            .build()
 }

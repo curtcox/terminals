@@ -113,6 +113,8 @@ class AndroidTerminalMediaSmokeTest {
 
         override suspend fun sendUiAction(action: ServerDrivenAction) = Unit
 
+        override suspend fun sendKeyText(text: String) = Unit
+
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean = false
 
         override suspend fun rebaselineCapabilitiesAfterStaleGeneration() = Unit

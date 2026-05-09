@@ -36,7 +36,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +70,9 @@ private class MediaSurfaces(
         get() = audioVisualizer ?: video
 }
 
+/** Streams [terminals.io.v1.KeyEvent] text for shell `terminal_input` (Flutter `terminal_input` binding). */
+private val LocalTerminalKeyTextSink = compositionLocalOf<(String) -> Unit> { { _ -> } }
+
 @Composable
 fun ServerDrivenRendererPlaceholder() {
     Text("Waiting for server-driven UI")
@@ -77,6 +82,7 @@ fun ServerDrivenRendererPlaceholder() {
 fun ServerDrivenRenderer(
     root: Ui.Node,
     onAction: (ServerDrivenAction) -> Unit,
+    onTerminalKeyText: (String) -> Unit = {},
     mediaSurface: (@Composable (trackId: String) -> Unit)? = null,
     audioVisualizerSurface: (@Composable (streamId: String) -> Unit)? = null,
     imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
@@ -84,7 +90,9 @@ fun ServerDrivenRenderer(
     policy: RendererPolicy = RendererPolicy.default(),
 ) {
     val media = MediaSurfaces(mediaSurface, audioVisualizerSurface)
-    RenderNode(root, onAction, media, imageLoader, deviceControlEffects, policy)
+    CompositionLocalProvider(LocalTerminalKeyTextSink provides onTerminalKeyText) {
+        RenderNode(root, onAction, media, imageLoader, deviceControlEffects, policy)
+    }
 }
 
 @Composable
@@ -401,26 +409,58 @@ private fun ColumnScope.RenderFlexColumnChildren(
 
 @Composable
 private fun TerminalTextInput(node: Ui.Node, props: PrimitiveProps, onAction: (ServerDrivenAction) -> Unit) {
+    val keySink = LocalTerminalKeyTextSink.current
+    val terminalShellInput = props.componentId == "terminal_input"
     var value by remember(node.id) { mutableStateOf(node.propsMap["value"].orEmpty()) }
+    var shadow by remember(node.id) { mutableStateOf(node.propsMap["value"].orEmpty()) }
     val focusRequester = remember(node.id) { FocusRequester() }
     if (node.textInput.autofocus) {
         LaunchedEffect(node.id) {
             focusRequester.requestFocus()
         }
     }
+    val onValueChange: (String) -> Unit =
+        if (terminalShellInput) {
+            { newValue ->
+                val prev = shadow
+                when {
+                    newValue.startsWith(prev) && newValue.length > prev.length -> {
+                        val inserted = newValue.substring(prev.length)
+                        if (inserted.isNotEmpty()) keySink(inserted)
+                    }
+                    prev.startsWith(newValue) && prev.length > newValue.length -> {
+                        val removed = prev.length - newValue.length
+                        if (removed > 0) keySink("\b".repeat(removed))
+                    }
+                    newValue != prev -> Unit
+                }
+                shadow = newValue
+                value = newValue
+            }
+        } else {
+            { value = it }
+        }
+    val onDone: () -> Unit =
+        if (terminalShellInput) {
+            {
+                keySink("\n")
+                value = ""
+                shadow = ""
+            }
+        } else {
+            {
+                onAction(ServerDrivenAction(actionComponentId(props.componentId, "text_input"), "submit", value))
+                value = ""
+            }
+        }
     OutlinedTextField(
         value = value,
-        onValueChange = { value = it },
+        onValueChange = onValueChange,
         placeholder = { Text(node.textInput.placeholder) },
         modifier = props.modifier().focusRequester(focusRequester),
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(
-            onDone = {
-                onAction(ServerDrivenAction(actionComponentId(props.componentId, "text_input"), "submit", value))
-                value = ""
-            },
-        ),
+        keyboardActions = KeyboardActions(onDone = onDone),
     )
 }
 

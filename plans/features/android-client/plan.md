@@ -1174,6 +1174,10 @@ Remaining validation:
 - Removed the unused `PowerCapabilityMonitor` holder class; battery snapshots remain `PowerCapabilityState` used by `ContextAndroidCapabilityProbe` and capability session tests.
 - Extended `MainActivityLaunchSmokeTest` to assert discovery controls, live-media status chrome, and last-server-activity diagnostics are visible on real `MainActivity` launch (production deps). Re-run `cd android_client && ./gradlew compileDebugAndroidTestKotlin` / `connectedDebugAndroidTest` on a JDK 17 host with the Android SDK.
 
+### 2026-05-09 (terminal_input key streaming)
+
+- Matched Flutter shell `terminal_input` behavior: `TextInputWidget` nodes with that component id stream insertions, backspaces (`\b` repeats), and IME newline as protobuf `InputEvent.key.text` on the control stream (`ProtocolBuilders.keyInput`, `AndroidControlSession.sendKeyText`, `AndroidTerminalViewModel.sendTerminalKeyText`, `ServerDrivenRenderer` composition-local sink from `AndroidTerminalApp`). Regular text inputs still emit `submit` UI actions on Done. Added JVM and renderer instrumentation tests; documented in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests

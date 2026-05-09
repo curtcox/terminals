@@ -105,6 +105,16 @@ class ProtocolBuildersTest {
     }
 
     @Test
+    fun keyInputMatchesFlutterShellKeyEventText() {
+        val request = builders.keyInput("device-1", "a\n")
+
+        assertTrue(request.hasInput())
+        assertEquals("device-1", request.input.deviceId)
+        assertTrue(request.input.hasKey())
+        assertEquals("a\n", request.input.key.text)
+    }
+
+    @Test
     fun sensorTelemetryFromCapabilitiesMatchesFlutterBatteryKeys() {
         val caps =
             Capabilities.DeviceCapabilities.newBuilder()

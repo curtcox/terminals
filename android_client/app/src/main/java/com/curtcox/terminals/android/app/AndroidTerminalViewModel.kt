@@ -319,6 +319,23 @@ class AndroidTerminalViewModel(
         }
     }
 
+    /**
+     * Shell `terminal_input` parity with Flutter `_sendKeyText`: streams UTF-16 text chunks (including
+     * `"\b"` backspace repeats and `"\n"` on IME done) as protobuf `InputEvent.key.text`.
+     */
+    fun sendTerminalKeyText(text: String) {
+        if (text.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                session?.sendKeyText(text) ?: return@launch
+            }.onFailure { error ->
+                mutableState.update {
+                    it.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+        }
+    }
+
     fun refreshCapabilities(reason: String) {
         val connectedSession = session ?: return
         viewModelScope.launch {

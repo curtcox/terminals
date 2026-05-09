@@ -17,6 +17,7 @@ interface AndroidControlSession {
     suspend fun sendHeartbeat()
     suspend fun sendSensorTelemetry()
     suspend fun sendUiAction(action: ServerDrivenAction)
+    suspend fun sendKeyText(text: String)
     suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean
     suspend fun rebaselineCapabilitiesAfterStaleGeneration()
     suspend fun close()
@@ -70,6 +71,11 @@ class AndroidControlSessionController(
 
     override suspend fun sendUiAction(action: ServerDrivenAction) {
         client.send(builders.uiAction(deviceId, action))
+    }
+
+    override suspend fun sendKeyText(text: String) {
+        if (deviceId.isEmpty() || text.isEmpty()) return
+        client.send(builders.keyInput(deviceId, text))
     }
 
     override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {

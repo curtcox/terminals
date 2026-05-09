@@ -1894,6 +1894,22 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun terminalKeyTextIsSentThroughConnectedSession() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.sendTerminalKeyText("ab")
+        advanceUntilIdle()
+
+        assertEquals(listOf("ab"), session.keyTexts)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun refreshCapabilitiesAsksConnectedSessionForDelta() = runTest(dispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val viewModel = viewModel(session)
@@ -2172,6 +2188,7 @@ class AndroidTerminalViewModelTest {
         lateinit var sink: AndroidControlResponseSink
         var connectedEndpoint: EndpointResolution? = null
         val actions = mutableListOf<ServerDrivenAction>()
+        val keyTexts = mutableListOf<String>()
         val capabilityDeltaReasons = mutableListOf<String>()
         var rebaselineCount = 0
         var heartbeatCount = 0
@@ -2197,6 +2214,10 @@ class AndroidTerminalViewModelTest {
 
         override suspend fun sendUiAction(action: ServerDrivenAction) {
             actions += action
+        }
+
+        override suspend fun sendKeyText(text: String) {
+            keyTexts += text
         }
 
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {

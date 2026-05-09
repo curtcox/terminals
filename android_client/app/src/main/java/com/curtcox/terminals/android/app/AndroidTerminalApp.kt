@@ -188,6 +188,7 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                     ServerDrivenRenderer(
                         root = root,
                         onAction = viewModel::sendUiAction,
+                        onTerminalKeyText = viewModel::sendTerminalKeyText,
                         mediaSurface = { trackId -> TerminalShellVideoSurface(trackId = trackId) },
                         audioVisualizerSurface = { streamId ->
                             TerminalShellAudioVisualizer(streamId = streamId)

@@ -127,6 +127,11 @@ control-session lifecycle, sends protobuf-backed hello/capability/action
 messages, surfaces local diagnostics and permission education, and renders
 server-driven UI primitives.
 
+A `TextInputWidget` with component id `terminal_input` streams insertions,
+backspaces, and IME newline to the server as protobuf `InputEvent.key` payloads
+(the same shell convention as the Flutter client’s `terminal_input` binding),
+rather than emitting a `submit` UI action on Done.
+
 The client can also start Android NSD/mDNS discovery for `_terminals._tcp.`
 services. Discovered servers are shown as selectable endpoint options when the
 network supports multicast; Fire OS or isolated Wi-Fi networks may still require
