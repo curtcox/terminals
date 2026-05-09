@@ -1072,6 +1072,13 @@ Remaining validation:
 - Re-verified Android boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Attempted Android instrumentation source validation with `cd android_client && JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew compileDebugAndroidTestKotlin`, but this host currently has no Java runtime at that path (and `/usr/libexec/java_home -V` reports none), so Gradle validation remains host-blocked.
 
+### 2026-05-08 (fullscreen API modernization)
+
+- Updated `WindowAndroidFullscreenController` to use `WindowInsetsControllerCompat` + `WindowCompat.setDecorFitsSystemWindows` on API 30+ and keep the existing immersive-flag behavior only as the API 29-and-lower fallback, preserving Fire OS 6 compatibility while removing the deprecated-only path from modern Android/Fire builds.
+- Added JVM regression coverage in `WindowAndroidFullscreenControllerTest` for the legacy fallback bitmask contract (`enabled` immersive flags and `disabled` stable-layout-only flags).
+- Re-verified Android boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Attempted focused Gradle JVM validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*WindowAndroidFullscreenControllerTest*'`, but this shell session has no Java runtime configured (`Unable to locate a Java Runtime`), so host-side Gradle validation remains blocked.
+
 ## Test Plan
 
 ### Unit tests
