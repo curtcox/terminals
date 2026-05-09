@@ -1125,6 +1125,13 @@ Remaining validation:
 - Added instrumentation coverage in `ServerDrivenRendererTest`: brightness clamp for negative values, device-control children rendering for keep-awake/fullscreen/brightness, and multi-child padding rendering as a `Column`.
 - Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Gradle was not runnable on this agent host (no Java runtime).
 
+### 2026-05-09 (renderer instrumentation: toggle, surfaces, image a11y)
+
+- Added instrumentation coverage for `ToggleWidget` action `componentId` fallback to `toggle` when protobuf/props ids are absent (parity with `ButtonWidget` fallback tests).
+- Added instrumentation coverage that `VideoSurfaceWidget` and `AudioVisualizerWidget` call distinct `mediaSurface` vs `audioVisualizerSurface` lambdas when both are supplied (shell chrome split).
+- Added instrumentation coverage that `ImageWidget` forwards `props["contentDescription"]` to the injected `imageLoader`.
+- Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Host Gradle/instrumentation execution was not run here (no Java runtime).
+
 ## Test Plan
 
 ### Unit tests

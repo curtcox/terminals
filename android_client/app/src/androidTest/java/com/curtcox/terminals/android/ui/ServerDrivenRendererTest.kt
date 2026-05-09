@@ -90,6 +90,52 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun videoAndAudioVisualizerUseSeparateShellSurfacesWhenBothProvided() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setStack(Ui.StackWidget.getDefaultInstance())
+            .addChildren(node("cam") {
+                videoSurface = Ui.VideoSurfaceWidget.newBuilder().setTrackId("track-a").build()
+            })
+            .addChildren(node("meter") {
+                audioVisualizer = Ui.AudioVisualizerWidget.newBuilder().setStreamId("stream-b").build()
+            })
+            .build()
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                mediaSurface = { Text("video:$it") },
+                audioVisualizerSurface = { Text("audio:$it") },
+                imageLoader = { _, _ -> Box {} },
+            )
+        }
+
+        compose.onNodeWithText("video:track-a").assertIsDisplayed()
+        compose.onNodeWithText("audio:stream-b").assertIsDisplayed()
+    }
+
+    @Test
+    fun imageLoaderReceivesContentDescriptionFromProps() {
+        val root = Ui.Node.newBuilder()
+            .setId("hero")
+            .putProps("contentDescription", "Terminal logo")
+            .setImage(Ui.ImageWidget.newBuilder().setUrl("https://example.test/logo.svg").build())
+            .build()
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                imageLoader = { url, desc -> Text("image:$url|alt:${desc ?: "null"}") },
+            )
+        }
+
+        compose.onNodeWithText("image:https://example.test/logo.svg|alt:Terminal logo").assertIsDisplayed()
+    }
+
+    @Test
     fun videoSurfaceWithoutBuilderUsesFlutterStylePlaceholder() {
         val root = node("cam") {
             videoSurface = Ui.VideoSurfaceWidget.newBuilder().setTrackId("track-z").build()
@@ -327,6 +373,19 @@ class ServerDrivenRendererTest {
         compose.onNodeWithTag("terminal-node-enabled").performClick()
 
         assertEquals(listOf(ServerDrivenAction("enabled", "toggle", "true")), actions)
+    }
+
+    @Test
+    fun toggleWithoutComponentIdFallsBackToWidgetName() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = Ui.Node.newBuilder()
+            .setToggle(Ui.ToggleWidget.newBuilder().setValue(true).build())
+            .build()
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithTag("terminal-node-toggle").performClick()
+
+        assertEquals(listOf(ServerDrivenAction("toggle", "toggle", "false")), actions)
     }
 
     @Test
