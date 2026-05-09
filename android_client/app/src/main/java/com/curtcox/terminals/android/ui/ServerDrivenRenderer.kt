@@ -1,5 +1,7 @@
 package com.curtcox.terminals.android.ui
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -31,6 +33,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,10 +48,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.curtcox.terminals.android.ui.widgets.TerminalMediaPlaceholder
+import androidx.core.graphics.PathParser
 import terminals.ui.v1.Ui
 
 private class MediaSurfaces(
@@ -168,13 +174,15 @@ private fun RenderNode(
         Ui.Node.WidgetCase.EXPAND -> Box(Modifier.fillMaxWidth().then(props.modifier())) {
             RenderPlainChildren(node, onAction, media, imageLoader, deviceControlEffects, policy)
         }
-        Ui.Node.WidgetCase.TEXT -> Text(
-            text = node.text.value,
-            // Match Flutter `server_driven_renderer.dart`: symmetric vertical padding around text.
-            modifier = props.modifier().padding(vertical = 4.dp),
-            color = parseColorOrUnspecified(node.text.color),
-            fontFamily = if (node.text.style == "monospace") FontFamily.Monospace else null,
-        )
+        Ui.Node.WidgetCase.TEXT -> SelectionContainer {
+            Text(
+                text = node.text.value,
+                // Match Flutter `server_driven_renderer.dart`: symmetric vertical padding around text.
+                modifier = props.modifier().padding(vertical = 4.dp),
+                color = parseColorOrUnspecified(node.text.color),
+                fontFamily = if (node.text.style == "monospace") FontFamily.Monospace else null,
+            )
+        }
         Ui.Node.WidgetCase.IMAGE -> imageLoader(node.image.url, node.propsMap["contentDescription"])
         Ui.Node.WidgetCase.VIDEO_SURFACE -> {
             val trackId = node.videoSurface.trackId.trim()
@@ -421,6 +429,63 @@ private fun TerminalCanvas(node: Ui.Node, modifier: Modifier) {
                     radius = op.circle.radius.toFloat(),
                     center = Offset(op.circle.cx.toFloat(), op.circle.cy.toFloat()),
                 )
+                Ui.DrawOp.OpCase.TEXT -> {
+                    val t = op.text
+                    val fill = parseColorOrUnspecified(t.fill)
+                    val paint =
+                        Paint().apply {
+                            isAntiAlias = true
+                            color =
+                                (if (fill == Color.Unspecified) Color.Black else fill).toArgb()
+                            textSize =
+                                t.fontSize.toFloat().takeIf { it > 0f } ?: 42f
+                            typeface =
+                                when (t.fontFamily.lowercase()) {
+                                    "monospace" -> Typeface.MONOSPACE
+                                    else -> Typeface.DEFAULT
+                                }
+                        }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        t.text,
+                        t.x.toFloat(),
+                        t.y.toFloat(),
+                        paint,
+                    )
+                }
+                Ui.DrawOp.OpCase.PATH -> {
+                    val p = op.path
+                    if (p.d.isBlank()) return@forEach
+                    val path =
+                        try {
+                            PathParser.createPathFromPathData(p.d)
+                        } catch (_: Throwable) {
+                            null
+                        } ?: return@forEach
+                    val nc = drawContext.canvas.nativeCanvas
+                    val fill = parseColorOrUnspecified(p.fill)
+                    if (fill != Color.Unspecified) {
+                        nc.drawPath(
+                            path,
+                            Paint().apply {
+                                isAntiAlias = true
+                                style = Paint.Style.FILL
+                                color = fill.toArgb()
+                            },
+                        )
+                    }
+                    val stroke = parseColorOrUnspecified(p.stroke)
+                    if (stroke != Color.Unspecified) {
+                        nc.drawPath(
+                            path,
+                            Paint().apply {
+                                isAntiAlias = true
+                                style = Paint.Style.STROKE
+                                strokeWidth = p.strokeWidth.toFloat().coerceAtLeast(1f)
+                                color = stroke.toArgb()
+                            },
+                        )
+                    }
+                }
                 else -> Unit
             }
         }

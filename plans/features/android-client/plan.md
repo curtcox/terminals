@@ -1104,6 +1104,12 @@ Remaining validation:
 - Wired `AndroidTerminalApp` to pass those shell composables so production manual-connect UI matches the Flutter app’s media presentation instead of rendering empty nodes.
 - Added instrumentation tests for the null-builder placeholder paths. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
+### 2026-05-09 (canvas TEXT/PATH + selectable TextWidget)
+
+- Implemented `DrawText` and `DrawPath` in native `TerminalCanvas` via `nativeCanvas` (fill/stroke for paths, `PathParser.createPathFromPathData` with safe skip on invalid `d`), closing the gap where proto `DrawOp` variants were no-ops beyond line/rect/circle.
+- Wrapped server-driven `TextWidget` in Compose `SelectionContainer` for Flutter `SelectableText`-style selection parity.
+- Added instrumentation coverage for draw-text, draw-path, and malformed path data (no crash). Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Gradle compile not run on this agent host (no JDK).
+
 ## Test Plan
 
 ### Unit tests

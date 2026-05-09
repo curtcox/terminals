@@ -661,6 +661,71 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun canvasWithDrawTextRendersWithoutCrash() {
+        val textOp =
+            Ui.DrawOp.newBuilder()
+                .setText(
+                    Ui.DrawText.newBuilder()
+                        .setX(4.0)
+                        .setY(24.0)
+                        .setText("hi")
+                        .setFill("#FF000000")
+                        .setFontSize(14.0)
+                        .setFontFamily("monospace")
+                        .build(),
+                )
+                .build()
+        val root = node("canvas") {
+            canvas = Ui.CanvasWidget.newBuilder().addDrawOps(textOp).build()
+        }
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-canvas").assertExists()
+    }
+
+    @Test
+    fun canvasWithDrawPathRendersWithoutCrash() {
+        val pathOp =
+            Ui.DrawOp.newBuilder()
+                .setPath(
+                    Ui.DrawPath.newBuilder()
+                        .setD("M10,10 L50,50")
+                        .setStroke("#FF0000FF")
+                        .setStrokeWidth(2.0)
+                        .build(),
+                )
+                .build()
+        val root = node("canvas") {
+            canvas = Ui.CanvasWidget.newBuilder().addDrawOps(pathOp).build()
+        }
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-canvas").assertExists()
+    }
+
+    @Test
+    fun canvasWithMalformedDrawPathDoesNotCrash() {
+        val pathOp =
+            Ui.DrawOp.newBuilder()
+                .setPath(
+                    Ui.DrawPath.newBuilder()
+                        .setD("this is not valid path data")
+                        .setStroke("#FF0000FF")
+                        .build(),
+                )
+                .build()
+        val root = node("canvas") {
+            canvas = Ui.CanvasWidget.newBuilder().addDrawOps(pathOp).build()
+        }
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-canvas").assertExists()
+    }
+
+    @Test
     fun audioVisualizerDelegatesToMediaSurface() {
         val root = node("viz") {
             audioVisualizer = Ui.AudioVisualizerWidget.newBuilder().setStreamId("pcm-1").build()
