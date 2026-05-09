@@ -196,6 +196,217 @@ class ServerDrivenRendererTest {
         assertEquals(listOf(ServerDrivenAction("surface", "primary")), actions)
     }
 
+    @Test
+    fun stackPreservesChildOrderAndStableTags() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setStack(Ui.StackWidget.getDefaultInstance())
+            .addChildren(node("first") {
+                text = Ui.TextWidget.newBuilder().setValue("Alpha").build()
+            })
+            .addChildren(node("second") {
+                text = Ui.TextWidget.newBuilder().setValue("Beta").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-first").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-second").assertIsDisplayed()
+        compose.onNodeWithText("Alpha").assertIsDisplayed()
+        compose.onNodeWithText("Beta").assertIsDisplayed()
+    }
+
+    @Test
+    fun rowRendersChildrenWithStableTags() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setRow(Ui.RowWidget.getDefaultInstance())
+            .addChildren(node("left") {
+                text = Ui.TextWidget.newBuilder().setValue("Left").build()
+            })
+            .addChildren(node("right") {
+                text = Ui.TextWidget.newBuilder().setValue("Right").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-left").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-right").assertIsDisplayed()
+        compose.onNodeWithText("Left").assertIsDisplayed()
+        compose.onNodeWithText("Right").assertIsDisplayed()
+    }
+
+    @Test
+    fun gridRendersChildrenWithStableTags() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setGrid(Ui.GridWidget.newBuilder().setColumns(2).build())
+            .addChildren(node("c0") {
+                text = Ui.TextWidget.newBuilder().setValue("Cell0").build()
+            })
+            .addChildren(node("c1") {
+                text = Ui.TextWidget.newBuilder().setValue("Cell1").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-c0").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-c1").assertIsDisplayed()
+    }
+
+    @Test
+    fun verticalScrollRendersChild() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setScroll(
+                Ui.ScrollWidget.newBuilder()
+                    .setDirectionEnum(Ui.ScrollDirection.SCROLL_DIRECTION_VERTICAL)
+                    .build(),
+            )
+            .addChildren(node("body") {
+                text = Ui.TextWidget.newBuilder().setValue("Scrollable content").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("Scrollable content").assertIsDisplayed()
+    }
+
+    @Test
+    fun paddingWrapsChildWithTag() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setPadding(Ui.PaddingWidget.newBuilder().setAll(12).build())
+            .addChildren(node("inner") {
+                text = Ui.TextWidget.newBuilder().setValue("Inset").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-inner").assertIsDisplayed()
+        compose.onNodeWithText("Inset").assertIsDisplayed()
+    }
+
+    @Test
+    fun centerWrapsChild() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setCenter(Ui.CenterWidget.getDefaultInstance())
+            .addChildren(node("mid") {
+                text = Ui.TextWidget.newBuilder().setValue("Centered").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("Centered").assertIsDisplayed()
+    }
+
+    @Test
+    fun expandWrapsChildInsideRow() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setRow(Ui.RowWidget.getDefaultInstance())
+            .addChildren(
+                Ui.Node.newBuilder()
+                    .setId("grow")
+                    .setExpand(Ui.ExpandWidget.getDefaultInstance())
+                    .addChildren(node("inner") {
+                        text = Ui.TextWidget.newBuilder().setValue("Flexible").build()
+                    })
+                    .build(),
+            )
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-inner").assertIsDisplayed()
+        compose.onNodeWithText("Flexible").assertIsDisplayed()
+    }
+
+    @Test
+    fun overlayRendersChild() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setOverlay(Ui.OverlayWidget.getDefaultInstance())
+            .addChildren(node("layer") {
+                text = Ui.TextWidget.newBuilder().setValue("Overlay text").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("Overlay text").assertIsDisplayed()
+    }
+
+    @Test
+    fun progressWidgetRenders() {
+        val root = node("prog") {
+            progress = Ui.ProgressWidget.newBuilder().setValue(0.35).build()
+        }
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-prog").assertIsDisplayed()
+    }
+
+    @Test
+    fun sliderWidgetIsDisplayedWithStableTag() {
+        val root = node("level") {
+            slider = Ui.SliderWidget.newBuilder().setMin(0.0).setMax(10.0).setValue(3.0).build()
+        }
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-level").assertIsDisplayed()
+    }
+
+    @Test
+    fun canvasWithDrawLineRendersWithoutCrash() {
+        val lineOp = Ui.DrawOp.newBuilder()
+            .setLine(
+                Ui.DrawLine.newBuilder()
+                    .setX1(0.0)
+                    .setY1(0.0)
+                    .setX2(20.0)
+                    .setY2(20.0)
+                    .setStroke("#FF000000")
+                    .setStrokeWidth(2.0)
+                    .build(),
+            )
+            .build()
+        val root = node("canvas") {
+            canvas = Ui.CanvasWidget.newBuilder().addDrawOps(lineOp).build()
+        }
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithTag("terminal-node-canvas").assertExists()
+    }
+
+    @Test
+    fun audioVisualizerDelegatesToMediaSurface() {
+        val root = node("viz") {
+            audioVisualizer = Ui.AudioVisualizerWidget.newBuilder().setStreamId("pcm-1").build()
+        }
+
+        compose.setContent {
+            ServerDrivenRenderer(
+                root = root,
+                onAction = {},
+                mediaSurface = { track -> Text("audio:$track") },
+                imageLoader = { url, _ -> Text(url) },
+            )
+        }
+
+        compose.onNodeWithText("audio:pcm-1").assertIsDisplayed()
+    }
+
     @Composable
     private fun render(
         root: Ui.Node,

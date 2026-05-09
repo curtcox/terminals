@@ -1027,6 +1027,11 @@ Remaining validation:
 - Reordered `connectResponseActivityStatus` in `ControlResponseDispatcher.kt` so explicit payload branches follow the same sequence as Flutter `statusFromConnectResponse` (notably `NOTIFICATION` immediately after `ROUTE_STREAM`), keeping cross-client diagnostics conventions easy to diff by eye.
 - Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Gradle unit tests were not run on this host (no JRE installed).
 
+### 2026-05-08 (renderer instrumentation: layout primitives)
+
+- Extended `ServerDrivenRendererTest` with instrumentation coverage for `StackWidget`, `RowWidget`, `GridWidget`, `ScrollWidget`, `PaddingWidget`, `CenterWidget`, `ExpandWidget` (inside a row), `OverlayWidget`, `ProgressWidget`, `SliderWidget` (display smoke), `CanvasWidget` with a `DrawLine` op, and `AudioVisualizerWidget` media-surface delegation, closing gaps against the Phase 5 “Compose tests for all primitives” table for layout and canvas/audio-visualizer paths.
+- Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Full Gradle validation was not run in this environment (no JDK on the agent host).
+
 ## Test Plan
 
 ### Unit tests
