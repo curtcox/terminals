@@ -1,0 +1,61 @@
+name: Android client CI
+
+on:
+  push:
+    paths:
+      - "android_client/**"
+      - "api/**"
+      - "scripts/check-android-client-boundary.sh"
+      - "scripts/test-android-client-boundary.sh"
+      - "Makefile"
+      - ".github/workflows/android-client-ci.yml"
+  pull_request:
+    paths:
+      - "android_client/**"
+      - "api/**"
+      - "scripts/check-android-client-boundary.sh"
+      - "scripts/test-android-client-boundary.sh"
+      - "Makefile"
+      - ".github/workflows/android-client-ci.yml"
+
+jobs:
+  android-client-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install ripgrep (boundary scripts)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          log-accepted-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-android-gradle-${{ hashFiles('android_client/**/*.gradle.kts', 'android_client/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-android-gradle-
+
+      - name: Android client boundary scan
+        run: ./scripts/check-android-client-boundary.sh
+
+      - name: Android client boundary tests
+        run: ./scripts/test-android-client-boundary.sh
+
+      - name: Unit tests, lint, debug assemble
+        working-directory: android_client
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
