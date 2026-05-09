@@ -16,6 +16,18 @@ class ControlResponseDispatcherTest {
     private val dispatcher = ControlResponseDispatcher()
 
     @Test
+    fun payloadNotSetLeavesStateUnchanged() {
+        val seeded = AndroidTerminalViewState(
+            serverRoot = textNode("x", "y"),
+            lastTransition = "hold",
+            lastOpaqueControlIoSummary = "type=stop_stream stream_id=z",
+        )
+        val next = dispatcher.dispatch(seeded, Control.ConnectResponse.getDefaultInstance())
+
+        assertEquals(seeded, next)
+    }
+
+    @Test
     fun setUiReplacesRoot() {
         val root = textNode("title", "Ready")
         val response = Control.ConnectResponse.newBuilder()
@@ -100,6 +112,27 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun transitionUiWithBlankTransitionClearsPriorTransition() {
+        val seeded = AndroidTerminalViewState(
+            lastTransition = "fade",
+            lastTransitionDurationMs = 99L,
+        )
+        val response = Control.ConnectResponse.newBuilder()
+            .setTransitionUi(
+                Ui.TransitionUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setTransition("")
+                    .setDurationMs(0),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(seeded, response)
+
+        assertNull(next.lastTransition)
+        assertNull(next.lastTransitionDurationMs)
+    }
+
+    @Test
     fun helloAckRecordsHandshakeFields() {
         val response = Control.ConnectResponse.newBuilder()
             .setHelloAck(
@@ -115,6 +148,24 @@ class ControlResponseDispatcherTest {
         assertEquals("srv-1", next.controlServerId)
         assertEquals("sess-9", next.controlSessionId)
         assertEquals(12_000L, next.serverHeartbeatIntervalMs)
+    }
+
+    @Test
+    fun helloAckWithNonPositiveHeartbeatDoesNotRecordServerInterval() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setHelloAck(
+                Control.HelloAck.newBuilder()
+                    .setServerId("srv-2")
+                    .setSessionId("sess-2")
+                    .setHeartbeatIntervalMs(0),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("srv-2", next.controlServerId)
+        assertEquals("sess-2", next.controlSessionId)
+        assertNull(next.serverHeartbeatIntervalMs)
     }
 
     @Test

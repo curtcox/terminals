@@ -968,6 +968,10 @@ Remaining validation:
 
 - Extended `ControlResponseDispatcherTest` with coverage for `RouteStream`, `RemoveBundle`, `StartFlow`, `PatchFlow`, `StopFlow`, and `RequestArtifact` opaque diagnostic summaries; added regression tests for `CommandResult` field clearing, `ShowMedia` clearing `last_opaque_control_io`, and re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
+### 2026-05-08 (dispatcher edge-case JVM coverage)
+
+- Added `ControlResponseDispatcherTest` coverage for `ConnectResponse` with no payload (`getDefaultInstance()`), `HelloAck` with non-positive `heartbeat_interval_ms` (client default pacing), and `TransitionUI` with blank transition and zero duration clearing prior transition metadata. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+
 ## Test Plan
 
 ### Unit tests
