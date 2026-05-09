@@ -1679,10 +1679,10 @@ class AndroidTerminalViewModelTest {
         viewModel.updateEndpoint("10.0.0.8:8080")
         viewModel.connect()
         advanceUntilIdle()
-        viewModel.sendUiAction(ServerDrivenAction("start", "tap", "pressed"))
+        viewModel.sendUiAction(ServerDrivenAction("start", "tap"))
         advanceUntilIdle()
 
-        assertEquals(ServerDrivenAction("start", "tap", "pressed"), session.actions.single())
+        assertEquals(ServerDrivenAction("start", "tap"), session.actions.single())
         viewModel.disconnect()
         advanceUntilIdle()
     }

@@ -1037,6 +1037,13 @@ Remaining validation:
 - Fixed native Android `ScrollWidget` rendering to match Flutter `server_driven_renderer.dart`: horizontal scrolling uses a `Row` inside `horizontalScroll` (instead of a `Column`), vertical scrolling uses a `Column` with `verticalScroll` and start horizontal alignment; when `direction_enum` is unset, the deprecated `direction` string still selects horizontal (case-insensitive `"horizontal"`), matching the Flutter fallback.
 - Added instrumentation coverage for horizontal scroll (deprecated string + enum), and for slider drag emitting a `change` action with an updated value.
 
+### 2026-05-08 (renderer / UI-action parity with Flutter)
+
+- Matched Flutter `stack` layout: `StackWidget` now uses a top-start `Column` of children (not overlapping `Box` children) and applies `background` from the same `props["background"]` hex rules as Flutter `parseHexColor` (optional `#`, 6-digit RGB expands to ARGB).
+- Removed extra `Row` spacing so `RowWidget` matches Flutter’s tight `Row`.
+- Aligned control actions with Flutter: button taps omit a synthetic `pressed` value; toggle uses action `toggle`; dropdown selection uses `select`; text fields emit `submit` on IME Done (and clear local text), not per-keystroke `change`.
+- Updated JVM and instrumentation expectations (`ProtocolBuildersTest`, `AndroidTerminalViewModelTest`, `ServerDrivenRendererTest`, `AndroidTerminalAppSmokeTest`).
+
 ## Test Plan
 
 ### Unit tests

@@ -92,7 +92,6 @@ class ProtocolBuildersTest {
             action = ServerDrivenAction(
                 componentId = "start",
                 action = "tap",
-                value = "pressed",
             ),
         )
 
@@ -101,6 +100,6 @@ class ProtocolBuildersTest {
         assertTrue(request.input.hasUiAction())
         assertEquals("start", request.input.uiAction.componentId)
         assertEquals("tap", request.input.uiAction.action)
-        assertEquals("pressed", request.input.uiAction.value)
+        assertEquals("", request.input.uiAction.value)
     }
 }

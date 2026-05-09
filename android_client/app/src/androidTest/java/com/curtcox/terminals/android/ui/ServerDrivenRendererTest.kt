@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import org.junit.Assert.assertEquals
@@ -41,7 +42,7 @@ class ServerDrivenRendererTest {
         compose.setContent { render(root, actions::add) }
         compose.onNodeWithText("Start").performClick()
 
-        assertEquals(listOf(ServerDrivenAction("start", "begin", "pressed")), actions)
+        assertEquals(listOf(ServerDrivenAction("start", "begin")), actions)
     }
 
     @Test
@@ -138,16 +139,17 @@ class ServerDrivenRendererTest {
     }
 
     @Test
-    fun textInputEmitsValueChanges() {
+    fun textInputSubmitsOnImeDone() {
         val actions = mutableListOf<ServerDrivenAction>()
         val root = node("name") {
             textInput = Ui.TextInputWidget.newBuilder().setPlaceholder("Name").build()
         }
 
         compose.setContent { render(root, actions::add) }
-        compose.onNodeWithText("Name").performTextInput("Ada")
+        compose.onNodeWithTag("terminal-node-name").performTextInput("Ada")
+        compose.onNodeWithTag("terminal-node-name").performImeAction()
 
-        assertEquals(ServerDrivenAction("name", "change", "Ada"), actions.last())
+        assertEquals(ServerDrivenAction("name", "submit", "Ada"), actions.last())
     }
 
     @Test
@@ -160,7 +162,7 @@ class ServerDrivenRendererTest {
         compose.setContent { render(root, actions::add) }
         compose.onNodeWithTag("terminal-node-enabled").performClick()
 
-        assertEquals(listOf(ServerDrivenAction("enabled", "change", "true")), actions)
+        assertEquals(listOf(ServerDrivenAction("enabled", "toggle", "true")), actions)
     }
 
     @Test
@@ -178,7 +180,7 @@ class ServerDrivenRendererTest {
         compose.onNodeWithText("Manual").performClick()
         compose.onNodeWithText("Auto").performClick()
 
-        assertEquals(listOf(ServerDrivenAction("mode", "change", "Auto")), actions)
+        assertEquals(listOf(ServerDrivenAction("mode", "select", "Auto")), actions)
     }
 
     @Test

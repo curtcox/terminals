@@ -114,7 +114,7 @@ class AndroidTerminalAppSmokeTest {
         compose.onNodeWithText("Server action").performClick()
         compose.waitUntil { session.actions.isNotEmpty() }
 
-        assertEquals(listOf(ServerDrivenAction("root", "submit", "pressed")), session.actions)
+        assertEquals(listOf(ServerDrivenAction("root", "submit")), session.actions)
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.curtcox.terminals.android.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +40,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import terminals.ui.v1.Ui
 
@@ -68,8 +72,19 @@ private fun RenderNode(
 ) {
     val props = PrimitiveProps.from(node)
     when (node.widgetCase) {
-        Ui.Node.WidgetCase.STACK -> Box(props.modifier()) { RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
-        Ui.Node.WidgetCase.ROW -> Row(props.modifier(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Ui.Node.WidgetCase.STACK -> {
+            val stackMod = parseHexColorForBackground(node.propsMap["background"])
+                ?.let { props.modifier().background(it) }
+                ?: props.modifier()
+            Column(
+                modifier = stackMod,
+                verticalArrangement = Arrangement.Top,
+                horizontalAlignment = Alignment.Start,
+            ) {
+                RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            }
+        }
+        Ui.Node.WidgetCase.ROW -> Row(props.modifier()) {
             RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.GRID -> LazyVerticalGrid(
@@ -118,7 +133,7 @@ private fun RenderNode(
         Ui.Node.WidgetCase.TEXT_INPUT -> TerminalTextInput(node, props, onAction)
         Ui.Node.WidgetCase.BUTTON -> Button(
             modifier = props.modifier(),
-            onClick = { onAction(ServerDrivenAction(props.componentId, node.button.action.ifBlank { "tap" }, "pressed")) },
+            onClick = { onAction(ServerDrivenAction(props.componentId, node.button.action.ifBlank { "tap" })) },
         ) { Text(node.button.label) }
         Ui.Node.WidgetCase.SLIDER -> {
             val min = node.slider.min.toFloat()
@@ -132,7 +147,7 @@ private fun RenderNode(
         }
         Ui.Node.WidgetCase.TOGGLE -> Switch(
             checked = node.toggle.value,
-            onCheckedChange = { onAction(ServerDrivenAction(props.componentId, "change", it.toString())) },
+            onCheckedChange = { onAction(ServerDrivenAction(props.componentId, "toggle", it.toString())) },
             modifier = props.modifier(),
         )
         Ui.Node.WidgetCase.DROPDOWN -> TerminalDropdown(node, props, onAction)
@@ -177,13 +192,17 @@ private fun TerminalTextInput(node: Ui.Node, props: PrimitiveProps, onAction: (S
     var value by remember(node.id) { mutableStateOf(node.propsMap["value"].orEmpty()) }
     OutlinedTextField(
         value = value,
-        onValueChange = {
-            value = it
-            onAction(ServerDrivenAction(props.componentId, "change", it))
-        },
+        onValueChange = { value = it },
         placeholder = { Text(node.textInput.placeholder) },
         modifier = props.modifier(),
         singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(
+            onDone = {
+                onAction(ServerDrivenAction(props.componentId, "submit", value))
+                value = ""
+            },
+        ),
     )
 }
 
@@ -198,7 +217,7 @@ private fun TerminalDropdown(node: Ui.Node, props: PrimitiveProps, onAction: (Se
                     text = { Text(option) },
                     onClick = {
                         expanded = false
-                        onAction(ServerDrivenAction(props.componentId, "change", option))
+                        onAction(ServerDrivenAction(props.componentId, "select", option))
                     },
                 )
             }
@@ -247,4 +266,15 @@ private fun parseColor(raw: String): Color {
         val normalized = if (raw.length == 7) "#FF${raw.drop(1)}" else raw
         Color(normalized.removePrefix("#").toLong(16))
     }.getOrDefault(Color.Unspecified)
+}
+
+/** Matches Flutter [parseHexColor]: optional `#`, expands 6-digit RGB to ARGB. */
+private fun parseHexColorForBackground(raw: String?): Color? {
+    if (raw.isNullOrBlank()) return null
+    var value = raw.trim()
+    if (value.startsWith("#")) value = value.drop(1)
+    if (value.length == 6) value = "FF$value"
+    if (value.length != 8) return null
+    val parsed = value.toLongOrNull(16) ?: return null
+    return Color(parsed)
 }
