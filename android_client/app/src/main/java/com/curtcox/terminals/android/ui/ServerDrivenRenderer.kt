@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -83,17 +86,19 @@ private fun RenderNode(
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.Start,
             ) {
-                RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                RenderFlexColumnChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
             }
         }
         Ui.Node.WidgetCase.ROW -> Row(props.modifier()) {
-            RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderFlexRowChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.GRID -> LazyVerticalGrid(
             columns = GridCells.Fixed(node.grid.columns.coerceAtLeast(1)),
             modifier = props.modifier(),
         ) {
-            items(node.childrenList) { child -> RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
+            items(node.childrenList) { child ->
+                RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            }
         }
         Ui.Node.WidgetCase.SCROLL -> {
             val scrollState = rememberScrollState()
@@ -107,25 +112,25 @@ private fun RenderNode(
                     modifier = props.modifier().horizontalScroll(scrollState),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                    RenderFlexRowChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
                 }
             } else {
                 Column(
                     modifier = props.modifier().verticalScroll(scrollState),
                     horizontalAlignment = Alignment.Start,
                 ) {
-                    RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+                    RenderFlexColumnChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
                 }
             }
         }
         Ui.Node.WidgetCase.PADDING -> Box(props.modifier().padding(node.padding.all.dp)) {
-            RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.CENTER -> Box(props.modifier().fillMaxWidth(), contentAlignment = Alignment.Center) {
-            RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
         }
-        Ui.Node.WidgetCase.EXPAND -> Box(props.modifier().fillMaxWidth()) {
-            RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+        Ui.Node.WidgetCase.EXPAND -> Box(Modifier.fillMaxWidth().then(props.modifier())) {
+            RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
         }
         Ui.Node.WidgetCase.TEXT -> Text(
             text = node.text.value,
@@ -192,8 +197,10 @@ private fun RenderNode(
                     )
                 }
             },
-        ) { RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
-        Ui.Node.WidgetCase.OVERLAY -> Box(props.modifier()) { RenderChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
+        ) { RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
+        Ui.Node.WidgetCase.OVERLAY -> Box(props.modifier()) {
+            RenderPlainChildren(node, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+        }
         Ui.Node.WidgetCase.PROGRESS -> LinearProgressIndicator(
             progress = { node.progress.value.toFloat().coerceIn(0f, 1f) },
             modifier = props.modifier(),
@@ -213,7 +220,7 @@ private fun RenderNode(
 }
 
 @Composable
-private fun RenderChildren(
+private fun RenderPlainChildren(
     node: Ui.Node,
     onAction: (ServerDrivenAction) -> Unit,
     mediaSurface: @Composable (trackId: String) -> Unit,
@@ -221,7 +228,53 @@ private fun RenderChildren(
     deviceControlEffects: DeviceControlEffects,
     policy: RendererPolicy,
 ) {
-    node.childrenList.forEach { child -> RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy) }
+    for (child in node.childrenList) {
+        RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+    }
+}
+
+/** Applies [Modifier.weight] to direct [EXPAND] children, matching Flutter [Expanded] inside [Row]. */
+@Composable
+private fun RowScope.RenderFlexRowChildren(
+    node: Ui.Node,
+    onAction: (ServerDrivenAction) -> Unit,
+    mediaSurface: @Composable (trackId: String) -> Unit,
+    imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
+    deviceControlEffects: DeviceControlEffects,
+    policy: RendererPolicy,
+) {
+    for (child in node.childrenList) {
+        if (child.widgetCase == Ui.Node.WidgetCase.EXPAND) {
+            val expandProps = PrimitiveProps.from(child)
+            Box(Modifier.weight(1f).then(expandProps.modifier())) {
+                RenderPlainChildren(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            }
+        } else {
+            RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+        }
+    }
+}
+
+/** Applies [Modifier.weight] to direct [EXPAND] children, matching Flutter [Expanded] inside [Column]. */
+@Composable
+private fun ColumnScope.RenderFlexColumnChildren(
+    node: Ui.Node,
+    onAction: (ServerDrivenAction) -> Unit,
+    mediaSurface: @Composable (trackId: String) -> Unit,
+    imageLoader: @Composable (url: String, contentDescription: String?) -> Unit,
+    deviceControlEffects: DeviceControlEffects,
+    policy: RendererPolicy,
+) {
+    for (child in node.childrenList) {
+        if (child.widgetCase == Ui.Node.WidgetCase.EXPAND) {
+            val expandProps = PrimitiveProps.from(child)
+            Box(Modifier.weight(1f).then(expandProps.modifier())) {
+                RenderPlainChildren(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+            }
+        } else {
+            RenderNode(child, onAction, mediaSurface, imageLoader, deviceControlEffects, policy)
+        }
+    }
 }
 
 @Composable
@@ -252,8 +305,15 @@ private fun TerminalTextInput(node: Ui.Node, props: PrimitiveProps, onAction: (S
 @Composable
 private fun TerminalDropdown(node: Ui.Node, props: PrimitiveProps, onAction: (ServerDrivenAction) -> Unit) {
     var expanded by remember(node.id) { mutableStateOf(false) }
+    val options = node.dropdown.optionsList
+    val selected = when {
+        options.isEmpty() -> null
+        options.contains(node.dropdown.value) -> node.dropdown.value
+        else -> options.first()
+    }
+    val label = selected?.takeIf { it.isNotEmpty() } ?: "Select option"
     Box(props.modifier().wrapContentSize(Alignment.TopStart)) {
-        OutlinedButton(onClick = { expanded = true }) { Text(node.dropdown.value.ifBlank { "Select" }) }
+        OutlinedButton(onClick = { expanded = true }) { Text(label) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             node.dropdown.optionsList.forEach { option ->
                 DropdownMenuItem(

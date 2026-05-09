@@ -213,6 +213,36 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun dropdownValueNotInOptionsShowsFirstOptionLikeFlutter() {
+        val actions = mutableListOf<ServerDrivenAction>()
+        val root = node("mode") {
+            dropdown = Ui.DropdownWidget.newBuilder()
+                .setValue("Unknown")
+                .addOptions("Alpha")
+                .addOptions("Beta")
+                .build()
+        }
+
+        compose.setContent { render(root, actions::add) }
+        compose.onNodeWithText("Alpha").assertIsDisplayed()
+        compose.onNodeWithText("Alpha").performClick()
+        compose.onNodeWithText("Beta").performClick()
+
+        assertEquals(listOf(ServerDrivenAction("mode", "select", "Beta")), actions)
+    }
+
+    @Test
+    fun dropdownWithNoOptionsShowsSelectHint() {
+        val root = node("empty") {
+            dropdown = Ui.DropdownWidget.newBuilder().setValue("x").build()
+        }
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("Select option").assertIsDisplayed()
+    }
+
+    @Test
     fun gestureAreaEmitsConfiguredAction() {
         val actions = mutableListOf<ServerDrivenAction>()
         val root = Ui.Node.newBuilder()
@@ -418,6 +448,28 @@ class ServerDrivenRendererTest {
 
         compose.onNodeWithTag("terminal-node-inner").assertIsDisplayed()
         compose.onNodeWithText("Flexible").assertIsDisplayed()
+    }
+
+    @Test
+    fun expandInsideStackColumnUsesWeightLikeFlutterExpanded() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setStack(Ui.StackWidget.getDefaultInstance())
+            .addChildren(
+                Ui.Node.newBuilder()
+                    .setId("grow")
+                    .setExpand(Ui.ExpandWidget.getDefaultInstance())
+                    .addChildren(node("inner") {
+                        text = Ui.TextWidget.newBuilder().setValue("StackExpand").build()
+                    })
+                    .build(),
+            )
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("StackExpand").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-inner").assertIsDisplayed()
     }
 
     @Test

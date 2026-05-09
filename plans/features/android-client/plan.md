@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: curtcox
 validation: automated
-last-reviewed: 2026-05-08
+last-reviewed: 2026-05-09
 ---
 
 # Android Client
@@ -1078,6 +1078,13 @@ Remaining validation:
 - Added JVM regression coverage in `WindowAndroidFullscreenControllerTest` for the legacy fallback bitmask contract (`enabled` immersive flags and `disabled` stable-layout-only flags).
 - Re-verified Android boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Attempted focused Gradle JVM validation with `cd android_client && ./gradlew testDebugUnitTest --tests '*WindowAndroidFullscreenControllerTest*'`, but this shell session has no Java runtime configured (`Unable to locate a Java Runtime`), so host-side Gradle validation remains blocked.
+
+### 2026-05-09
+
+- Matched Flutter `DropdownWidget` selection rules: when the server `value` is missing from `options`, the visible selection falls back to the first option; empty option lists show the same `Select option` hint as Flutter.
+- Matched Flutter `Expanded` behavior for `ExpandWidget`: direct children of `Row` and `Column` (including stack’s column, scroll row/column, and flex rows/columns) now use `RowScope`/`ColumnScope` helpers so `Expand` applies `Modifier.weight(1f)` in the correct flex scope; non-flex parents keep `fillMaxWidth` on `Expand` via `RenderPlainChildren`.
+- Added renderer instrumentation coverage for invalid dropdown values, empty dropdown options, and `Expand` inside `Stack`.
+- Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`. Gradle tasks were not executed on this host (no Java runtime).
 
 ## Test Plan
 
