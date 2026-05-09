@@ -36,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
@@ -195,11 +197,17 @@ private fun RenderChildren(
 @Composable
 private fun TerminalTextInput(node: Ui.Node, props: PrimitiveProps, onAction: (ServerDrivenAction) -> Unit) {
     var value by remember(node.id) { mutableStateOf(node.propsMap["value"].orEmpty()) }
+    val focusRequester = remember(node.id) { FocusRequester() }
+    if (node.textInput.autofocus) {
+        LaunchedEffect(node.id) {
+            focusRequester.requestFocus()
+        }
+    }
     OutlinedTextField(
         value = value,
         onValueChange = { value = it },
         placeholder = { Text(node.textInput.placeholder) },
-        modifier = props.modifier(),
+        modifier = props.modifier().focusRequester(focusRequester),
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(

@@ -4,6 +4,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -150,6 +151,21 @@ class ServerDrivenRendererTest {
         compose.onNodeWithTag("terminal-node-name").performImeAction()
 
         assertEquals(ServerDrivenAction("name", "submit", "Ada"), actions.last())
+    }
+
+    @Test
+    fun textInputAutofocusRequestsFocus() {
+        val root = node("focus") {
+            textInput = Ui.TextInputWidget.newBuilder()
+                .setPlaceholder("Endpoint")
+                .setAutofocus(true)
+                .build()
+        }
+
+        compose.setContent { render(root) }
+
+        compose.waitForIdle()
+        compose.onNodeWithTag("terminal-node-focus").assertIsFocused()
     }
 
     @Test

@@ -1058,6 +1058,13 @@ Remaining validation:
 - Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 - Attempted focused Gradle JVM validation for `ColorParsingTest`, but this shell session has no installed Java runtime (`JAVA_HOME` path missing and `/usr/libexec/java_home -V` reports no JRE), so Gradle execution is host-blocked.
 
+### 2026-05-08 (TextInput autofocus parity)
+
+- Wired native Android `TextInputWidget.autofocus` in `ServerDrivenRenderer` via a Compose `FocusRequester`, so server-driven text inputs can request focus on initial render like Flutter.
+- Added renderer instrumentation coverage in `ServerDrivenRendererTest.textInputAutofocusRequestsFocus`.
+- Re-verified Android boundary scan/test with `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+- Attempted Android instrumentation source validation with `cd android_client && ./gradlew compileDebugAndroidTestKotlin`, but this shell session has no Java runtime configured (`Unable to locate a Java Runtime`), so Gradle validation remains host-blocked.
+
 ## Test Plan
 
 ### Unit tests
