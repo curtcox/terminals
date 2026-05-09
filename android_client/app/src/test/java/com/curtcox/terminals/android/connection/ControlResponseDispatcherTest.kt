@@ -241,6 +241,61 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun transitionUiTrimsAndLowercasesForCrossClientParity() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setTransitionUi(
+                Ui.TransitionUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setTransition("  Fade  ")
+                    .setDurationMs(150),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("fade", next.lastTransition)
+        assertEquals(150L, next.lastTransitionDurationMs)
+    }
+
+    @Test
+    fun transitionUiWithNoneTransitionIsTreatedAsNoTransition() {
+        val seeded = AndroidTerminalViewState(
+            lastTransition = "fade",
+            lastTransitionDurationMs = 99L,
+        )
+        val response = Control.ConnectResponse.newBuilder()
+            .setTransitionUi(
+                Ui.TransitionUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setTransition("None")
+                    .setDurationMs(150),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(seeded, response)
+
+        assertNull(next.lastTransition)
+        assertNull(next.lastTransitionDurationMs)
+    }
+
+    @Test
+    fun transitionUiDefaultsDurationWhenMeaningfulTransitionHasZeroDuration() {
+        val response = Control.ConnectResponse.newBuilder()
+            .setTransitionUi(
+                Ui.TransitionUI.newBuilder()
+                    .setDeviceId("device-1")
+                    .setTransition("slide_left")
+                    .setDurationMs(0),
+            )
+            .build()
+
+        val next = dispatcher.dispatch(AndroidTerminalViewState(), response)
+
+        assertEquals("slide_left", next.lastTransition)
+        assertEquals(250L, next.lastTransitionDurationMs)
+    }
+
+    @Test
     fun helloAckRecordsHandshakeFields() {
         val response = Control.ConnectResponse.newBuilder()
             .setHelloAck(

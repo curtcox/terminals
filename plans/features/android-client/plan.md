@@ -1011,6 +1011,12 @@ Remaining validation:
 
 - Added `ConnectResponseActivityStatusTest` to lock every `connectResponseActivityStatus` label against Flutter `statusFromConnectResponse`, including handshake payloads that intentionally map to `Connected`.
 
+### 2026-05-08 (TransitionUI normalization parity)
+
+- Aligned `ControlResponseDispatcher` `TRANSITION_UI` handling with Flutter `transitionHintFromResponse` in `terminal_client/lib/connection/control_response_dispatcher.dart`: trim and lowercase the `transition` string, treat blank or `"none"` (case-insensitive) as no transition (clearing both `lastTransition` and `lastTransitionDurationMs`), and default `lastTransitionDurationMs` to 250 ms when the transition is meaningful but the server omitted `duration_ms`.
+- Added `ControlResponseDispatcherTest` coverage for whitespace/uppercase normalization (`"  Fade  "` → `"fade"`), `"None"` clearing prior transition, and the 250 ms default for meaningful transitions with zero duration.
+- Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Full Gradle unit tests were host-skipped (`make android-client-test` reports `Skipping native Android tests: Android SDK path is not configured`); JDK was unavailable in this shell.
+
 ## Test Plan
 
 ### Unit tests

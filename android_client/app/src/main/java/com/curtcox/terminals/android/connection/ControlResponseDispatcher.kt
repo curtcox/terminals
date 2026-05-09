@@ -79,9 +79,11 @@ class ControlResponseDispatcher {
             }
             Control.ConnectResponse.PayloadCase.TRANSITION_UI -> {
                 val tu = response.transitionUi
+                val normalized = normalizeTransition(tu.transition)
+                val duration = effectiveTransitionDurationMs(normalized, tu.durationMs)
                 state.copy(
-                    lastTransition = tu.transition.takeIf { it.isNotBlank() },
-                    lastTransitionDurationMs = tu.durationMs.takeIf { it > 0 },
+                    lastTransition = normalized,
+                    lastTransitionDurationMs = duration,
                 )
             }
             Control.ConnectResponse.PayloadCase.NOTIFICATION -> state.copy(
@@ -264,4 +266,19 @@ class ControlResponseDispatcher {
 
     private fun summarizeRequestArtifact(request: Io.RequestArtifact): String =
         "type=request_artifact artifact_id=${request.artifactId.takeIf { it.isNotBlank() } ?: "none"}"
+
+    private fun normalizeTransition(raw: String): String? {
+        val trimmed = raw.trim().lowercase()
+        return if (trimmed.isEmpty() || trimmed == "none") null else trimmed
+    }
+
+    private fun effectiveTransitionDurationMs(normalized: String?, durationMs: Int): Long? {
+        if (normalized == null) return null
+        if (durationMs > 0) return durationMs.toLong()
+        return DEFAULT_TRANSITION_DURATION_MS
+    }
+
+    private companion object {
+        const val DEFAULT_TRANSITION_DURATION_MS: Long = 250
+    }
 }
