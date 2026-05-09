@@ -972,6 +972,10 @@ Remaining validation:
 
 - Added `ControlResponseDispatcherTest` coverage for `ConnectResponse` with no payload (`getDefaultInstance()`), `HelloAck` with non-positive `heartbeat_interval_ms` (client default pacing), and `TransitionUI` with blank transition and zero duration clearing prior transition metadata. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
 
+### 2026-05-08 (RegisterAck message diagnostics)
+
+- Recorded non-empty `RegisterAck.message` on `AndroidTerminalViewState`, merged in `ControlResponseDispatcher` (blank follow-up ack preserves the prior message), surfaced as `register_ack_message` in copyable diagnostics, cleared on `withoutHandshake` for new sessions, preserved across disconnect for support copy/paste (same pattern as bug-report ack), and added dispatcher/ViewModel JVM coverage. Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+
 ## Test Plan
 
 ### Unit tests

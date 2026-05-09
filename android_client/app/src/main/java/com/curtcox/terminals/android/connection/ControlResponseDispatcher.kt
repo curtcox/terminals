@@ -119,9 +119,11 @@ class ControlResponseDispatcher {
         val date = build?.dateRfc3339?.takeIf { it.isNotBlank() }
             ?: metaMap["server_build_date"]?.takeIf { it.isNotBlank() }
         val assetBase = serverMeta?.photoFrameAssetBaseUrl?.takeIf { it.isNotBlank() }
+        val message = ack.message.takeIf { it.isNotBlank() }
         return state.copy(
             serverBuildSha = sha ?: state.serverBuildSha,
             serverBuildDate = date ?: state.serverBuildDate,
+            registerAckMessage = message ?: state.registerAckMessage,
             registerAckAssetBaseUrl = assetBase ?: state.registerAckAssetBaseUrl,
         )
     }

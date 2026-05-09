@@ -23,6 +23,8 @@ data class AndroidTerminalViewState(
     val serverHeartbeatIntervalMs: Long? = null,
     val serverBuildSha: String? = null,
     val serverBuildDate: String? = null,
+    /** Non-empty `RegisterAck.message` from the server, for generic copyable diagnostics. */
+    val registerAckMessage: String? = null,
     val registerAckAssetBaseUrl: String? = null,
     val lastCapabilityAckGeneration: Long = 0L,
     /** From the last server `CapabilityAck.snapshot_applied`. */

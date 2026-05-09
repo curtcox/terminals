@@ -1011,6 +1011,56 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun serverRegisterAckMessageIsSurfacedInDiagnostics() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setRegisterAck(
+                    Control.RegisterAck.newBuilder()
+                        .setServerId("srv-reg")
+                        .setMessage("capabilities accepted"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("capabilities accepted", viewModel.state.value.registerAckMessage)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("register_ack_message=capabilities accepted"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun registerAckMessageRemainsInDiagnosticsAfterDisconnect() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setRegisterAck(
+                    Control.RegisterAck.newBuilder()
+                        .setMessage("registered once"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("register_ack_message=registered once"))
+    }
+
+    @Test
     fun serverBugReportAckIsSurfacedInDiagnostics() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
@@ -1109,6 +1159,43 @@ class AndroidTerminalViewModelTest {
         viewModel.connect()
         advanceUntilIdle()
         assertNull(viewModel.state.value.lastBugReportAckDiagnostics)
+    }
+
+    @Test
+    fun newConnectClearsRegisterAckMessageFromPriorSession() = runTest(dispatcher) {
+        val first = FakeSession()
+        val second = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        first.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setRegisterAck(
+                    Control.RegisterAck.newBuilder()
+                        .setMessage("first session ack"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        assertEquals("first session ack", viewModel.state.value.registerAckMessage)
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+
+        viewModel.connect()
+        advanceUntilIdle()
+        assertNull(viewModel.state.value.registerAckMessage)
+        assertTrue(!viewModel.state.value.diagnosticsText.contains("register_ack_message=first session ack"))
     }
 
     @Test

@@ -263,6 +263,7 @@ class AndroidTerminalViewModel(
             val diagnosticsSource = clearedHandshake.copy(
                 lastBugReportAckDiagnostics = it.lastBugReportAckDiagnostics,
                 lastControlErrorCode = it.lastControlErrorCode,
+                registerAckMessage = it.registerAckMessage,
             )
             diagnosticsSource.copy(
                 connectionState = nextState,
@@ -622,6 +623,7 @@ class AndroidTerminalViewModel(
             serverHeartbeatIntervalMs = null,
             serverBuildSha = null,
             serverBuildDate = null,
+            registerAckMessage = null,
             registerAckAssetBaseUrl = null,
             lastCapabilityAckGeneration = 0L,
             lastCapabilityAckSnapshotApplied = false,
@@ -677,6 +679,9 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.serverBuildDate?.takeIf { it.isNotBlank() }?.let {
                 appendLine("server_build_date=$it")
+            }
+            handshakeSource?.registerAckMessage?.takeIf { it.isNotBlank() }?.let {
+                appendLine("register_ack_message=$it")
             }
             handshakeSource?.registerAckAssetBaseUrl?.takeIf { it.isNotBlank() }?.let {
                 appendLine("register_ack_asset_base_url=$it")
