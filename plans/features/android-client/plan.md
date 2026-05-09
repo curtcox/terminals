@@ -1146,6 +1146,12 @@ Remaining validation:
 
 - Paused periodic heartbeat and battery sensor telemetry while the activity is stopped (`MainActivity.onStop`), matching Flutter shell behavior when `AppLifecycleState` is not `resumed`. Added `AndroidTerminalViewModel.setAppForegrounded`, made `startHeartbeat` / `startSensorTelemetry` idempotent and foreground-gated, and JVM tests (`backgroundPausesHeartbeatAndSensorTelemetryLoops`, `connectWhileBackgroundedDoesNotStartLoopsUntilForegrounded`). Documented pause semantics in `docs/client-android.md`. Agent host had no JRE; run `cd android_client && ./gradlew testDebugUnitTest --tests '*AndroidTerminalViewModelTest*'` locally.
 
+### 2026-05-09 (Flutter lifecycle parity: capability delta + network suppression)
+
+- On each foreground/background transition while connected, Android now sends a capability delta with reason `app-lifecycle-change`, matching Flutter `_sendLifecycleCapabilityUpdate(reason: 'app_lifecycle_change')`.
+- Network-monitor capability refreshes are skipped while the activity is stopped (`capability_refresh_suppressed=app-background` in diagnostics) so background connectivity churn does not spam capability traffic.
+- JVM coverage: `AndroidTerminalViewModelTest.appLifecycleChangeSendsCapabilityDeltaWhenConnected`, `networkMonitorSkipsCapabilityRefreshWhenBackgrounded`. Docs updated in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests

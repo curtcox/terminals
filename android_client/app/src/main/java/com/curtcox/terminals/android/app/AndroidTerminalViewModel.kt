@@ -120,12 +120,14 @@ class AndroidTerminalViewModel(
         if (!foregrounded) {
             stopHeartbeat()
             stopSensorTelemetry()
+            refreshCapabilitiesIfConnected("app-lifecycle-change")
             return
         }
         val connectedSession = session ?: return
         if (mutableState.value.connectionState != ConnectionState.Connected) return
         startHeartbeat(connectedSession)
         startSensorTelemetry(connectedSession)
+        refreshCapabilitiesIfConnected("app-lifecycle-change")
     }
 
     fun updateEndpoint(text: String) {
@@ -916,6 +918,14 @@ class AndroidTerminalViewModel(
     }
 
     private fun refreshCapabilitiesFromNetworkCallback(reason: String) {
+        if (!appInForeground) {
+            mutableState.update {
+                it.copy(
+                    diagnosticsText = "${it.diagnosticsText}\ncapability_refresh_suppressed=app-background",
+                )
+            }
+            return
+        }
         val now = dependencies.nowMillis()
         if (lastNetworkCapabilityRefreshAtMillis >= 0 &&
             now - lastNetworkCapabilityRefreshAtMillis < dependencies.networkCapabilityRefreshMinIntervalMillis
@@ -928,6 +938,13 @@ class AndroidTerminalViewModel(
             return
         }
         lastNetworkCapabilityRefreshAtMillis = now
+        refreshCapabilities(reason)
+    }
+
+    /** Matches Flutter shell lifecycle: capability delta on foreground/background transitions. */
+    private fun refreshCapabilitiesIfConnected(reason: String) {
+        if (session == null) return
+        if (mutableState.value.connectionState != ConnectionState.Connected) return
         refreshCapabilities(reason)
     }
 

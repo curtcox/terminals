@@ -140,7 +140,11 @@ While connected, the client also sends periodic battery sensor telemetry on the
 control stream (same fields and pacing as the Flutter reference client: about
 every 15 seconds when battery capability is present). As with Flutter, periodic
 heartbeat and sensor telemetry pause while the activity is stopped (app not
-visible); the control session stays open.
+visible); the control session stays open. On each foreground/background
+transition, the client sends a capability delta with reason `app-lifecycle-change`
+(matching Flutter `app_lifecycle_change`). Network-callback capability refreshes
+are suppressed while stopped so background network flapping does not spam the
+control stream.
 
 The APK declares microphone and camera permissions so capability reporting and
 future media capture can reflect runtime permission state. WebRTC media

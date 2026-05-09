@@ -894,6 +894,66 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun appLifecycleChangeSendsCapabilityDeltaWhenConnected() = runTest(dispatcher) {
+        val session = FakeSession(capabilityDeltaSent = true)
+        val viewModel = viewModel(
+            session,
+            heartbeatIntervalMillis = 100,
+            sensorTelemetryIntervalMillis = 100,
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        viewModel.setAppForegrounded(false)
+        advanceUntilIdle()
+        assertEquals(listOf("app-lifecycle-change"), session.capabilityDeltaReasons)
+
+        viewModel.setAppForegrounded(true)
+        advanceUntilIdle()
+        assertEquals(
+            listOf("app-lifecycle-change", "app-lifecycle-change"),
+            session.capabilityDeltaReasons,
+        )
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun networkMonitorSkipsCapabilityRefreshWhenBackgrounded() = runTest(dispatcher) {
+        val session = FakeSession(capabilityDeltaSent = true)
+        val monitor = FakeNetworkMonitor()
+        val viewModel = viewModel(
+            session,
+            heartbeatIntervalMillis = 0,
+            sensorTelemetryIntervalMillis = 0,
+            networkMonitor = monitor,
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.startNetworkMonitoring()
+
+        monitor.emitChange()
+        advanceUntilIdle()
+        assertEquals(listOf("network-callback"), session.capabilityDeltaReasons)
+
+        viewModel.setAppForegrounded(false)
+        advanceUntilIdle()
+        monitor.emitChange()
+        advanceUntilIdle()
+
+        assertEquals(listOf("network-callback"), session.capabilityDeltaReasons)
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("capability_refresh_suppressed=app-background"),
+        )
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun heartbeatFailureReconnectsWithBoundedBackoff() = runTest(dispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
         val second = FakeSession()
