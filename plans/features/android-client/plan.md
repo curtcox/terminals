@@ -1017,6 +1017,11 @@ Remaining validation:
 - Added `ControlResponseDispatcherTest` coverage for whitespace/uppercase normalization (`"  Fade  "` → `"fade"`), `"None"` clearing prior transition, and the 250 ms default for meaningful transitions with zero duration.
 - Re-verified `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`, and `git diff --check`. Full Gradle unit tests were host-skipped (`make android-client-test` reports `Skipping native Android tests: Android SDK path is not configured`); JDK was unavailable in this shell.
 
+### 2026-05-08 (RegisterAck asset URL merge JVM coverage)
+
+- Added `ControlResponseDispatcherTest.registerAckBlankAssetBaseUrlPreservesPriorUrl` so a follow-up `RegisterAck` without `ServerMetadata.photo_frame_asset_base_url` keeps the prior asset base URL (same merge pattern as `register_ack_message` / `register_ack_server_id`).
+- Re-verified `./scripts/check-android-client-boundary.sh` and `./scripts/test-android-client-boundary.sh`.
+
 ## Test Plan
 
 ### Unit tests

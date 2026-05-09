@@ -406,6 +406,28 @@ class ControlResponseDispatcherTest {
     }
 
     @Test
+    fun registerAckBlankAssetBaseUrlPreservesPriorUrl() {
+        val first = Control.ConnectResponse.newBuilder()
+            .setRegisterAck(
+                Control.RegisterAck.newBuilder()
+                    .setServerMetadata(
+                        Control.ServerMetadata.newBuilder()
+                            .setPhotoFrameAssetBaseUrl("https://cdn.example/assets/"),
+                    ),
+            )
+            .build()
+        val afterFirst = dispatcher.dispatch(AndroidTerminalViewState(), first)
+        assertEquals("https://cdn.example/assets/", afterFirst.registerAckAssetBaseUrl)
+
+        val second = Control.ConnectResponse.newBuilder()
+            .setRegisterAck(Control.RegisterAck.newBuilder().setMessage("follow-up"))
+            .build()
+        val afterSecond = dispatcher.dispatch(afterFirst, second)
+        assertEquals("https://cdn.example/assets/", afterSecond.registerAckAssetBaseUrl)
+        assertEquals("follow-up", afterSecond.registerAckMessage)
+    }
+
+    @Test
     fun capabilityAckRecordsAcceptedGeneration() {
         val response = Control.ConnectResponse.newBuilder()
             .setCapabilityAck(
