@@ -70,10 +70,6 @@ class AndroidTerminalViewModel(
                 if (mediaStatus != null) {
                     diagnostics += "\nlast_media=${mediaStatus.first}:${mediaStatus.second}"
                 }
-                val bugReport = next.lastBugReportAckDiagnostics
-                if (!bugReport.isNullOrBlank()) {
-                    diagnostics += "\n$bugReport"
-                }
                 next.copy(
                     diagnosticsText = if (rebaselineSent) {
                         "$diagnostics\nlast_capability_rebaseline=stale-generation"
@@ -266,9 +262,13 @@ class AndroidTerminalViewModel(
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
             val nextState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.ReadyToConnect
-            withoutHandshake(it).copy(
+            val clearedHandshake = withoutHandshake(it)
+            val diagnosticsSource = clearedHandshake.copy(
+                lastBugReportAckDiagnostics = it.lastBugReportAckDiagnostics,
+            )
+            diagnosticsSource.copy(
                 connectionState = nextState,
-                diagnosticsText = formatDiagnostics(endpoint, nextState, withoutHandshake(it)),
+                diagnosticsText = formatDiagnostics(endpoint, nextState, diagnosticsSource),
             )
         }
         viewModelScope.launch { closingSession?.close() }
@@ -631,6 +631,7 @@ class AndroidTerminalViewModel(
             lastOpaqueControlIoSummary = null,
             lastTransition = null,
             lastTransitionDurationMs = null,
+            lastBugReportAckDiagnostics = null,
         )
 
     private fun formatDiagnostics(
@@ -698,6 +699,10 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.lastTransitionDurationMs?.takeIf { it > 0 }?.let {
                 appendLine("last_transition_duration_ms=$it")
+            }
+            handshakeSource?.lastBugReportAckDiagnostics?.takeIf { it.isNotBlank() }?.let { bug ->
+                appendLine()
+                append(bug)
             }
         }
     }

@@ -1042,6 +1042,76 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun serverBugReportAckRemainsInDiagnosticsAfterDisconnect() = runTest(dispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setBugReportAck(
+                    BugReportAck.newBuilder()
+                        .setReportId("rep-native-1")
+                        .setCorrelationId("cor-2")
+                        .setStatus(BugReportStatus.BUG_REPORT_STATUS_FILED)
+                        .setReportPath("logs/bug_reports/2026-05-08/rep-native-1.json")
+                        .setMessage("stored")
+                        .build(),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionState.ReadyToConnect, viewModel.state.value.connectionState)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("bug_report_id=rep-native-1"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("bug_report_status=filed"))
+        assertTrue(viewModel.state.value.lastBugReportAckDiagnostics!!.contains("rep-native-1"))
+    }
+
+    @Test
+    fun newConnectClearsBugReportAckFromPriorSession() = runTest(dispatcher) {
+        val first = FakeSession()
+        val second = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        first.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setBugReportAck(
+                    BugReportAck.newBuilder()
+                        .setReportId("rep-native-1")
+                        .setStatus(BugReportStatus.BUG_REPORT_STATUS_FILED)
+                        .build(),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.lastBugReportAckDiagnostics!!.contains("rep-native-1"))
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+
+        viewModel.connect()
+        advanceUntilIdle()
+        assertNull(viewModel.state.value.lastBugReportAckDiagnostics)
+    }
+
+    @Test
     fun serverTransitionUiIsSurfacedInDiagnostics() = runTest(dispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)

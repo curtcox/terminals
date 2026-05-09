@@ -951,6 +951,7 @@ Remaining validation:
 
 - Persisted `TransitionUI` transition name and non-zero duration in `AndroidTerminalViewState`, cleared on `withoutHandshake`, and included both in baseline `formatDiagnostics` so copyable diagnostics keep the last transition after network-driven refreshes instead of only on the inbound response tick.
 - Extended dispatcher and ViewModel tests (`serverTransitionUiRemainsInDiagnosticsAfterNetworkRefresh`).
+- Hardened bug-report acknowledgement diagnostics across disconnect and reconnect: `lastBugReportAckDiagnostics` is cleared in `withoutHandshake` so a new connect does not show a prior session’s ack, while disconnect rebuilds copyable diagnostics with the last ack preserved for support copy/paste; centralized ack lines in `formatDiagnostics` (removed duplicate append from the control response sink). Added ViewModel coverage (`serverBugReportAckRemainsInDiagnosticsAfterDisconnect`, `newConnectClearsBugReportAckFromPriorSession`).
 
 ## Test Plan
 
