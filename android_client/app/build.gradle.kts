@@ -4,6 +4,8 @@ import java.util.Properties
 import com.google.protobuf.gradle.id
 import com.google.protobuf.gradle.proto
 import org.gradle.api.tasks.testing.logging.TestLogEvent
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 // Maven Central `protoc-gen-grpc-java` artifacts for macOS are x86_64 binaries (often labeled
 // osx-aarch_64). On Apple Silicon without Rosetta they fail at codegen time; prefer a host
@@ -37,6 +39,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.protobuf")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 android {
@@ -68,10 +71,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -96,6 +95,17 @@ android {
                 }
             }
         }
+    }
+
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        checkDependencies = true
+        warningsAsErrors = false
+        enable += setOf(
+            "GradleDependency",
+            "RtlHardcoded",
+        )
     }
 }
 
@@ -158,4 +168,35 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
+    detektPlugins("ru.kode:detekt-rules-compose:1.4.0")
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    parallel = true
+    config.setFrom("$rootDir/config/detekt.yml")
+    baseline = file("detekt-baseline.xml")
+}
+
+tasks.named("detekt") {
+    mustRunAfter(tasks.named("detektBaseline"))
+}
+
+tasks.named("check") {
+    dependsOn("detekt")
+}
+
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
 }

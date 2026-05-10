@@ -25,7 +25,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 .PHONY: server-build server-test server-test-sandbox server-test-network-probe server-test-network-probe-assert server-lint server-coverage \
 	client-build client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos client-build-all \
 	client-test client-lint client-boundary client-boundary-test client-coverage \
-	android-client-build android-client-test android-client-lint android-client-compile-android-test android-client-connected-test android-client-gradle-stop android-client-boundary android-client-boundary-test \
+	android-client-build android-client-test android-client-lint android-client-deps android-client-compile-android-test android-client-connected-test android-client-gradle-stop android-client-boundary android-client-boundary-test \
 	web-client-build web-client-test web-client-lint web-client-boundary web-client-proto-check web-client-smoke-test run-web-client \
 	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-generate proto-contract-test proto-contract-verify \
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
@@ -169,10 +169,22 @@ android-client-lint:
 		if [ -z "$(ANDROID_JAVA_HOME)" ] || [ ! -x "$(ANDROID_JAVA_HOME)/bin/java" ]; then \
 			echo "Skipping native Android lint: JDK not found (need a working Java 17+). Set JAVA_HOME, install openjdk@17, or rely on Android Studio's bundled JBR under Applications."; \
 		else \
-			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew lintDebug; \
+			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew lintDebug detekt; \
 		fi; \
 	else \
 		echo "Skipping native Android lint: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
+	fi
+
+# Reports dependency updates (does not modify build files). Optional; not part of all-lint.
+android-client-deps:
+	@if [ -n "$$ANDROID_SDK_ROOT" ] || [ -n "$$ANDROID_HOME" ] || [ -f android_client/local.properties ]; then \
+		if [ -z "$(ANDROID_JAVA_HOME)" ] || [ ! -x "$(ANDROID_JAVA_HOME)/bin/java" ]; then \
+			echo "Skipping Android dependency report: JDK not found (need a working Java 17+)."; \
+		else \
+			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew dependencyUpdates --no-daemon; \
+		fi; \
+	else \
+		echo "Skipping Android dependency report: Android SDK path is not configured (ANDROID_SDK_ROOT/ANDROID_HOME)."; \
 	fi
 
 android-client-compile-android-test:

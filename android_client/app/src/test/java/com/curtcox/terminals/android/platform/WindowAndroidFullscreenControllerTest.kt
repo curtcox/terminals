@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.curtcox.terminals.android.platform
 
 import android.view.View

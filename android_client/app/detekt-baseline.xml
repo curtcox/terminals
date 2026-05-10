@@ -1,0 +1,226 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ArgumentListWrapping:AndroidBugReportBuilder.kt$AndroidBugReportBuilder$(identity(reporterDeviceId, buildMetadata, registeredCapabilities, localeTag, timezoneId, osVersion))</ID>
+    <ID>ArgumentListWrapping:AndroidBugReportBuilder.kt$AndroidBugReportBuilder$(reporterDeviceId, buildMetadata, registeredCapabilities, localeTag, timezoneId, osVersion)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalApp.kt$("terminal-bug-report-status")</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalApp.kt$(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("terminal-bug-report-status"))</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(compareBy&lt;DiscoveredServer&gt; { discoveredEndpointText(it) }.thenBy { it.name })</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState, it)}\nlast_network_refresh=$reason")</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(diagnosticsText = "${it.diagnosticsText}\nlast_ui_action=${action.componentId}:${action.action}:${action.value}")</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(endpoint, it.connectionState, it)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(false)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(it)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(it.endpointText)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(parser.parse(it.endpointText), it.connectionState, it)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(true)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel.&lt;no name provided&gt;$(next.endpointText)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel.&lt;no name provided&gt;$(parser.parse(next.endpointText), next.connectionState, next)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$("last_permission_refresh=microphone-permission-result")</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$("last_system_command=device_status:debug-device-status-2")</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$("last_system_command=runtime_status:debug-runtime-status-1")</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$("network_reconnect_restore_suppressed=network-callback")</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$(testDispatcher)</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$(viewModel.state.value.diagnosticsText.contains("last_permission_refresh=microphone-permission-result"))</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$(viewModel.state.value.diagnosticsText.contains("last_system_command=device_status:debug-device-status-2"))</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$(viewModel.state.value.diagnosticsText.contains("last_system_command=runtime_status:debug-runtime-status-1"))</ID>
+    <ID>ArgumentListWrapping:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$(viewModel.state.value.diagnosticsText.contains("network_reconnect_restore_suppressed=network-callback"))</ID>
+    <ID>ArgumentListWrapping:ServerDrivenRenderer.kt$(policy.unsupportedText, modifier = props.modifier())</ID>
+    <ID>ComplexCondition:AndroidTerminalApp.kt$!state.permissionEducation.notificationsGranted || (state.permissionEducation.microphonePresent &amp;&amp; !state.permissionEducation.microphoneAvailable) || (state.permissionEducation.cameraPresent &amp;&amp; !state.permissionEducation.cameraAvailable)</ID>
+    <ID>ComplexCondition:ManualEndpointParser.kt$ManualEndpointParser$scheme != "http" &amp;&amp; scheme != "https" &amp;&amp; scheme != "ws" &amp;&amp; scheme != "wss"</ID>
+    <ID>ComplexCondition:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$bytes.size &gt;= 4 &amp;&amp; bytes[bytes.size - 4] == '\r'.code.toByte() &amp;&amp; bytes[bytes.size - 3] == '\n'.code.toByte() &amp;&amp; bytes[bytes.size - 2] == '\r'.code.toByte() &amp;&amp; bytes[bytes.size - 1] == '\n'.code.toByte()</ID>
+    <ID>ComposableEventParameterNaming:ServerDrivenRenderer.kt$apply: () -&gt; Unit</ID>
+    <ID>ComposableParametersOrdering:ServerDrivenRenderer.kt$imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit</ID>
+    <ID>ComposableParametersOrdering:ServerDrivenRenderer.kt$onTerminalKeyText: (String) -&gt; Unit = {}</ID>
+    <ID>CyclomaticComplexMethod:AndroidClientChrome.kt$AndroidClientChrome$fun formatDiagnostics( endpoint: EndpointResolution?, state: ConnectionState, networkState: AndroidNetworkState? = null, fireOsDeviceInfo: FireOsDeviceInfo? = null, capabilitySnapshot: AndroidCapabilitySnapshotInput? = null, ): String</ID>
+    <ID>CyclomaticComplexMethod:AndroidTerminalApp.kt$@Composable fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel)</ID>
+    <ID>CyclomaticComplexMethod:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private fun formatDiagnostics( endpoint: EndpointResolution?, state: ConnectionState, handshakeSource: AndroidTerminalViewState? = null, ): String</ID>
+    <ID>CyclomaticComplexMethod:ControlResponseDispatcher.kt$ControlResponseDispatcher$fun dispatch( state: AndroidTerminalViewState, response: Control.ConnectResponse, ): AndroidTerminalViewState</ID>
+    <ID>CyclomaticComplexMethod:ControlResponseDispatcher.kt$fun connectResponseActivityStatus(response: Control.ConnectResponse): String</ID>
+    <ID>CyclomaticComplexMethod:ManualEndpointParser.kt$ManualEndpointParser$fun parse(raw: String): EndpointResolution?</ID>
+    <ID>CyclomaticComplexMethod:ServerDrivenRenderer.kt$@Composable private fun RenderNode( node: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, media: MediaSurfaces, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects, policy: RendererPolicy, )</ID>
+    <ID>CyclomaticComplexMethod:ServerDrivenRenderer.kt$@Composable private fun TerminalCanvas(node: Ui.Node, modifier: Modifier)</ID>
+    <ID>Filename:PowerCapabilityMonitor.kt$com.curtcox.terminals.android.capabilities.PowerCapabilityMonitor.kt</ID>
+    <ID>FunctionNaming:AndroidTerminalApp.kt$@Composable fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel)</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable fun ServerDrivenRenderer( root: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, onTerminalKeyText: (String) -&gt; Unit = {}, mediaSurface: (@Composable (trackId: String) -&gt; Unit)? = null, audioVisualizerSurface: (@Composable (streamId: String) -&gt; Unit)? = null, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects = DeviceControlEffects.none(), policy: RendererPolicy = RendererPolicy.default(), )</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable fun ServerDrivenRendererPlaceholder()</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun ColumnScope.RenderFlexColumnChildren( node: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, media: MediaSurfaces, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects, policy: RendererPolicy, )</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun DeviceControlNode( props: PrimitiveProps, effectKey: Any?, headline: String, detail: String? = null, apply: () -&gt; Unit, content: @Composable () -&gt; Unit = {}, )</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun RenderNode( node: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, media: MediaSurfaces, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects, policy: RendererPolicy, )</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun RenderPlainChildren( node: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, media: MediaSurfaces, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects, policy: RendererPolicy, )</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun RowScope.RenderFlexRowChildren( node: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, media: MediaSurfaces, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects, policy: RendererPolicy, )</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun TerminalCanvas(node: Ui.Node, modifier: Modifier)</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun TerminalDropdown(node: Ui.Node, props: PrimitiveProps, onAction: (ServerDrivenAction) -&gt; Unit)</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun TerminalTextInput(node: Ui.Node, props: PrimitiveProps, onAction: (ServerDrivenAction) -&gt; Unit)</ID>
+    <ID>FunctionNaming:ServerDrivenRenderer.kt$@Composable private fun WrappedChild( node: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, media: MediaSurfaces, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects, policy: RendererPolicy, )</ID>
+    <ID>FunctionNaming:TerminalMediaPlaceholder.kt$@Composable fun TerminalMediaPlaceholder( props: PrimitiveProps, title: String, detail: String, )</ID>
+    <ID>FunctionNaming:TerminalShellMediaSurfaces.kt$@Composable fun TerminalShellAudioVisualizer(streamId: String)</ID>
+    <ID>FunctionNaming:TerminalShellMediaSurfaces.kt$@Composable fun TerminalShellVideoSurface(trackId: String)</ID>
+    <ID>ImportOrdering:AndroidAudioPlayback.kt$import android.content.Context import android.media.AudioAttributes import android.media.MediaPlayer import android.speech.tts.TextToSpeech import java.util.Locale import terminals.io.v1.Io</ID>
+    <ID>ImportOrdering:AndroidBugReportBuilderTest.kt$import com.curtcox.terminals.android.app.ConnectionState import com.curtcox.terminals.android.util.Clock import com.google.protobuf.ByteString import java.util.TimeZone import org.junit.After import org.junit.Assert.assertEquals import org.junit.Assert.assertTrue import org.junit.Before import org.junit.Test import terminals.capabilities.v1.Capabilities import terminals.diagnostics.v1.Diagnostics import terminals.ui.v1.Ui</ID>
+    <ID>ImportOrdering:AndroidClientDependencies.kt$import android.app.Activity import android.content.Context import android.net.nsd.NsdManager import android.os.Build import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe import com.curtcox.terminals.android.capabilities.AndroidCapabilitySession import com.curtcox.terminals.android.capabilities.ContextAndroidCapabilityProbe import com.curtcox.terminals.android.connection.AndroidControlResponseSink import com.curtcox.terminals.android.connection.AndroidControlSession import com.curtcox.terminals.android.connection.AndroidControlSessionController import com.curtcox.terminals.android.connection.CarrierSelectingAndroidControlClient import com.curtcox.terminals.android.connection.ReconnectPolicy import com.curtcox.terminals.android.connection.TransportResumeTokenStore import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata import com.curtcox.terminals.android.diagnostics.ContextDiagnosticClipboard import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery import com.curtcox.terminals.android.discovery.NsdAndroidDiscovery import com.curtcox.terminals.android.media.AndroidLiveMediaSession import com.curtcox.terminals.android.media.AndroidMediaEngine import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe import com.curtcox.terminals.android.media.AndroidWebRtcAdapter import com.curtcox.terminals.android.media.ContextAndroidMediaPermissionProbe import com.curtcox.terminals.android.media.ContextAndroidAudioPlayback import com.curtcox.terminals.android.platform.AndroidBrightnessController import com.curtcox.terminals.android.platform.AndroidFullscreenController import com.curtcox.terminals.android.platform.AndroidKeepAwakeController import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider import com.curtcox.terminals.android.platform.AndroidNotificationDelivery import com.curtcox.terminals.android.platform.AndroidPermissionRequester import com.curtcox.terminals.android.platform.AndroidTerminalSpeech import com.curtcox.terminals.android.platform.ContextAndroidTerminalSpeech import com.curtcox.terminals.android.platform.AndroidTerminalSettings import com.curtcox.terminals.android.platform.ContextAndroidNetworkMonitor import com.curtcox.terminals.android.platform.ContextAndroidNetworkStateProvider import com.curtcox.terminals.android.platform.AndroidNetworkMonitor import com.curtcox.terminals.android.platform.FireOsDeviceInfo import com.curtcox.terminals.android.platform.FireOsDeviceInfoProvider import com.curtcox.terminals.android.platform.SharedPreferencesAndroidTerminalSettings import com.curtcox.terminals.android.platform.StatusBarAndroidNotificationDelivery import com.curtcox.terminals.android.platform.WindowAndroidBrightnessController import com.curtcox.terminals.android.platform.WindowAndroidFullscreenController import com.curtcox.terminals.android.platform.WindowAndroidKeepAwakeController import com.curtcox.terminals.android.util.Clock</ID>
+    <ID>ImportOrdering:AndroidNotificationDelivery.kt$import android.annotation.SuppressLint import android.Manifest import android.app.NotificationChannel import android.app.NotificationManager import android.content.Context import android.content.pm.PackageManager import android.os.Build import androidx.core.app.NotificationCompat import androidx.core.app.NotificationManagerCompat import androidx.core.content.ContextCompat import com.curtcox.terminals.android.R</ID>
+    <ID>ImportOrdering:AndroidTerminalViewModel.kt$import android.Manifest import android.os.Build import androidx.lifecycle.ViewModel import androidx.lifecycle.viewModelScope import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput import com.curtcox.terminals.android.connection.AndroidControlResponseSink import com.curtcox.terminals.android.connection.AndroidControlSession import com.curtcox.terminals.android.connection.ControlResponseDispatcher import com.curtcox.terminals.android.connection.EndpointResolution import com.curtcox.terminals.android.connection.ManualEndpointParser import com.curtcox.terminals.android.diagnostics.AndroidBugReportActions import com.curtcox.terminals.android.diagnostics.AndroidBugReportBuilder import com.curtcox.terminals.android.diagnostics.AndroidClientChrome import com.curtcox.terminals.android.discovery.DiscoveredServer import com.curtcox.terminals.android.media.AudioPlaybackResult import com.curtcox.terminals.android.media.LiveMediaSessionResult import com.curtcox.terminals.android.media.MediaDisplayResult import com.curtcox.terminals.android.ui.ServerDrivenAction import com.curtcox.terminals.android.util.Clock import java.io.EOFException import java.util.Locale import java.util.TimeZone import kotlinx.coroutines.CancellationException import kotlinx.coroutines.Job import kotlinx.coroutines.delay import kotlinx.coroutines.launch import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.update import kotlin.coroutines.coroutineContext import terminals.control.v1.Control import terminals.diagnostics.v1.Diagnostics</ID>
+    <ID>ImportOrdering:AndroidTerminalViewModelTest.kt$import android.Manifest import com.curtcox.terminals.android.connection.AndroidControlResponseSink import com.curtcox.terminals.android.connection.AndroidControlSession import com.curtcox.terminals.android.connection.ControlSessionStatus import com.curtcox.terminals.android.connection.EndpointResolution import com.curtcox.terminals.android.connection.ReconnectPolicy import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput import com.curtcox.terminals.android.capabilities.AndroidHardwareCapabilities import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics import com.curtcox.terminals.android.capabilities.PermissionCapabilityState import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery import com.curtcox.terminals.android.discovery.DiscoveredServer import com.curtcox.terminals.android.media.AndroidAudioPlayback import com.curtcox.terminals.android.media.AndroidLiveMediaSession import com.curtcox.terminals.android.media.AndroidMediaDisplay import com.curtcox.terminals.android.media.AndroidMediaEngine import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe import com.curtcox.terminals.android.media.AndroidMediaPermissionState import com.curtcox.terminals.android.media.AndroidWebRtcAdapter import com.curtcox.terminals.android.media.AndroidWebRtcSupport import com.curtcox.terminals.android.media.AudioPlaybackResult import com.curtcox.terminals.android.media.MediaDisplayResult import com.curtcox.terminals.android.platform.AndroidBrightnessController import com.curtcox.terminals.android.platform.AndroidFullscreenController import com.curtcox.terminals.android.platform.AndroidKeepAwakeController import com.curtcox.terminals.android.platform.AndroidNetworkMonitor import com.curtcox.terminals.android.platform.AndroidNetworkState import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider import com.curtcox.terminals.android.platform.AndroidNotificationDelivery import com.curtcox.terminals.android.platform.AndroidTerminalSpeech import com.curtcox.terminals.android.platform.AndroidPermissionRequester import com.curtcox.terminals.android.platform.AndroidTerminalSettings import com.curtcox.terminals.android.platform.FireOsDeviceInfo import com.curtcox.terminals.android.platform.FireOsDeviceInfoProvider import com.curtcox.terminals.android.ui.ServerDrivenAction import com.google.protobuf.ByteString import java.io.IOException import kotlinx.coroutines.Dispatchers import kotlinx.coroutines.ExperimentalCoroutinesApi import kotlinx.coroutines.test.StandardTestDispatcher import kotlinx.coroutines.test.advanceTimeBy import kotlinx.coroutines.test.advanceUntilIdle import kotlinx.coroutines.test.resetMain import kotlinx.coroutines.test.runTest import kotlinx.coroutines.test.runCurrent import kotlinx.coroutines.test.setMain import kotlinx.coroutines.CompletableDeferred import org.junit.After import org.junit.Assert.assertEquals import org.junit.Assert.assertFalse import org.junit.Assert.assertNull import org.junit.Assert.assertTrue import org.junit.Before import org.junit.Test import terminals.capabilities.v1.Capabilities import terminals.control.v1.Control import terminals.diagnostics.v1.Diagnostics import terminals.diagnostics.v1.Diagnostics.BugReportAck import terminals.diagnostics.v1.Diagnostics.BugReportStatus import terminals.io.v1.Io import terminals.ui.v1.Ui</ID>
+    <ID>ImportOrdering:ControlResponseDispatcherTest.kt$import com.curtcox.terminals.android.app.AndroidTerminalViewState import org.junit.Assert.assertEquals import org.junit.Assert.assertNull import org.junit.Assert.assertTrue import org.junit.Test import com.google.protobuf.ByteString import terminals.control.v1.Control import terminals.diagnostics.v1.Diagnostics.BugReportAck import terminals.diagnostics.v1.Diagnostics.BugReportStatus import terminals.io.v1.Io import terminals.ui.v1.Ui</ID>
+    <ID>ImportOrdering:GrpcAndroidControlClient.kt$import io.grpc.ManagedChannel import io.grpc.okhttp.OkHttpChannelBuilder import io.grpc.stub.StreamObserver import java.io.IOException import java.util.concurrent.atomic.AtomicBoolean import java.util.concurrent.TimeUnit import kotlinx.coroutines.CoroutineScope import kotlinx.coroutines.Dispatchers import kotlinx.coroutines.SupervisorJob import kotlinx.coroutines.launch import kotlinx.coroutines.withContext import terminals.control.v1.Control import terminals.control.v1.TerminalControlServiceGrpc</ID>
+    <ID>ImportOrdering:ServerDrivenRenderer.kt$import android.graphics.Paint import android.graphics.Typeface import androidx.compose.foundation.Canvas import androidx.compose.foundation.background import androidx.compose.foundation.gestures.detectTapGestures import androidx.compose.foundation.horizontalScroll import androidx.compose.foundation.layout.Arrangement import androidx.compose.foundation.layout.Box import androidx.compose.foundation.layout.Column import androidx.compose.foundation.layout.Row import androidx.compose.foundation.layout.BoxWithConstraints import androidx.compose.foundation.layout.FlowRow import androidx.compose.foundation.layout.fillMaxSize import androidx.compose.foundation.layout.fillMaxWidth import androidx.compose.foundation.layout.padding import androidx.compose.foundation.layout.size import androidx.compose.foundation.layout.width import androidx.compose.foundation.layout.ColumnScope import androidx.compose.foundation.layout.RowScope import androidx.compose.foundation.layout.wrapContentSize import androidx.compose.foundation.rememberScrollState import androidx.compose.foundation.verticalScroll import androidx.compose.material3.Button import androidx.compose.material3.MaterialTheme import androidx.compose.material3.DropdownMenu import androidx.compose.material3.DropdownMenuItem import androidx.compose.material3.LinearProgressIndicator import androidx.compose.material3.OutlinedButton import androidx.compose.material3.OutlinedTextField import androidx.compose.material3.Slider import androidx.compose.material3.Switch import androidx.compose.material3.Text import androidx.compose.foundation.text.KeyboardActions import androidx.compose.foundation.text.KeyboardOptions import androidx.compose.foundation.text.selection.SelectionContainer import androidx.compose.runtime.Composable import androidx.compose.runtime.CompositionLocalProvider import androidx.compose.runtime.LaunchedEffect import androidx.compose.runtime.compositionLocalOf import androidx.compose.runtime.getValue import androidx.compose.runtime.mutableStateOf import androidx.compose.runtime.remember import androidx.compose.runtime.setValue import androidx.compose.ui.Alignment import androidx.compose.ui.Modifier import androidx.compose.ui.platform.LocalConfiguration import androidx.compose.ui.focus.FocusRequester import androidx.compose.ui.focus.focusRequester import androidx.compose.ui.geometry.Offset import androidx.compose.ui.geometry.Size import androidx.compose.ui.input.pointer.pointerInput import androidx.compose.ui.graphics.Color import androidx.compose.ui.graphics.nativeCanvas import androidx.compose.ui.graphics.toArgb import androidx.compose.ui.text.font.FontFamily import androidx.compose.ui.text.input.ImeAction import androidx.compose.ui.unit.dp import com.curtcox.terminals.android.ui.widgets.TerminalMediaPlaceholder import java.util.Locale import androidx.core.graphics.PathParser import terminals.ui.v1.Ui</ID>
+    <ID>ImportOrdering:WebSocketAndroidControlClient.kt$import android.util.Base64 import com.google.protobuf.InvalidProtocolBufferException import java.io.BufferedInputStream import java.io.BufferedOutputStream import java.io.Closeable import java.io.EOFException import java.io.IOException import java.net.Socket import java.security.MessageDigest import java.security.SecureRandom import javax.net.ssl.SSLSocketFactory import kotlinx.coroutines.CoroutineScope import kotlinx.coroutines.Dispatchers import kotlinx.coroutines.Job import kotlinx.coroutines.SupervisorJob import kotlinx.coroutines.CancellationException import kotlinx.coroutines.launch import kotlinx.coroutines.withContext import terminals.control.v1.Control</ID>
+    <ID>ImportOrdering:WebSocketFrameCodecTest.kt$import java.io.BufferedInputStream import java.io.BufferedOutputStream import java.io.ByteArrayInputStream import java.io.ByteArrayOutputStream import org.junit.Assert.assertArrayEquals import org.junit.Assert.assertEquals import org.junit.Test</ID>
+    <ID>Indentation:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$ </ID>
+    <ID>Indentation:AndroidTerminalViewModel.kt$AndroidTerminalViewModel.&lt;no name provided&gt;$ </ID>
+    <ID>Indentation:TerminalMediaPlaceholder.kt$ </ID>
+    <ID>Indentation:TerminalShellMediaSurfaces.kt$ </ID>
+    <ID>LargeClass:AndroidTerminalViewModel.kt$AndroidTerminalViewModel : ViewModel</ID>
+    <ID>LargeClass:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest</ID>
+    <ID>LargeClass:ControlResponseDispatcherTest.kt$ControlResponseDispatcherTest</ID>
+    <ID>LongMethod:AndroidCapabilitySession.kt$AndroidCapabilitySession.Companion$fun buildCapabilities( deviceId: String, input: AndroidCapabilitySnapshotInput, ): Capabilities.DeviceCapabilities</ID>
+    <ID>LongMethod:AndroidTerminalApp.kt$@Composable fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel)</ID>
+    <ID>LongMethod:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$fun connect()</ID>
+    <ID>LongMethod:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private fun formatDiagnostics( endpoint: EndpointResolution?, state: ConnectionState, handshakeSource: AndroidTerminalViewState? = null, ): String</ID>
+    <ID>LongMethod:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private fun startReconnect(endpoint: EndpointResolution, errorContext: String, reconnectCause: String = errorContext)</ID>
+    <ID>LongMethod:AndroidTerminalViewModel.kt$AndroidTerminalViewModel.&lt;no name provided&gt;$override suspend fun onResponse(response: Control.ConnectResponse)</ID>
+    <ID>LongMethod:ConnectResponseActivityStatusTest.kt$ConnectResponseActivityStatusTest$@Test fun flutterOrderedStatusLabels()</ID>
+    <ID>LongMethod:ControlResponseDispatcher.kt$ControlResponseDispatcher$fun dispatch( state: AndroidTerminalViewState, response: Control.ConnectResponse, ): AndroidTerminalViewState</ID>
+    <ID>LongMethod:ServerDrivenRenderer.kt$@Composable private fun RenderNode( node: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, media: MediaSurfaces, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects, policy: RendererPolicy, )</ID>
+    <ID>LongMethod:ServerDrivenRenderer.kt$@Composable private fun TerminalCanvas(node: Ui.Node, modifier: Modifier)</ID>
+    <ID>LongParameterList:AndroidBugReportBuilder.kt$AndroidBugReportBuilder$( description: String, source: Diagnostics.BugReportSource, reporterDeviceId: String, subjectDeviceId: String, extraSourceHints: Map&lt;String, String&gt;, clock: Clock, buildMetadata: AndroidBuildMetadata, serverRoot: Ui.Node?, connectionState: ConnectionState, lastServerHeartbeatUnixMs: Long?, registeredCapabilities: Capabilities.DeviceCapabilities?, localeTag: String, timezoneId: String, osVersion: String, reconnectAttempt: Int = 0, lastStatus: String? = null, screenshotPng: ByteArray? = null, )</ID>
+    <ID>LongParameterList:AndroidBugReportBuilder.kt$AndroidBugReportBuilder$( reporterDeviceId: String, buildMetadata: AndroidBuildMetadata, registeredCapabilities: Capabilities.DeviceCapabilities?, localeTag: String, timezoneId: String, osVersion: String, )</ID>
+    <ID>LongParameterList:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$( session: FakeSession, notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(), speechDelivery: AndroidTerminalSpeech = AndroidTerminalSpeech.none(), webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter { AndroidWebRtcSupport(supported = true) }, mediaEngine: AndroidMediaEngine = AndroidMediaEngine( liveMedia = AndroidLiveMediaSession.fromAdapter(webRtcAdapter), ), networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(), mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(), permissionRequester: AndroidPermissionRequester = AndroidPermissionRequester.none(), networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(), heartbeatIntervalMillis: Long = 0, sensorTelemetryIntervalMillis: Long = 0, capabilityMonitorIntervalMillis: Long = 0, bugReportScreenshotCapture: () -&gt; ByteArray? = { null }, )</ID>
+    <ID>LongParameterList:ServerDrivenRenderer.kt$( node: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, media: MediaSurfaces, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects, policy: RendererPolicy, )</ID>
+    <ID>LongParameterList:ServerDrivenRenderer.kt$( props: PrimitiveProps, effectKey: Any?, headline: String, detail: String? = null, apply: () -&gt; Unit, content: @Composable () -&gt; Unit = {}, )</ID>
+    <ID>LongParameterList:ServerDrivenRenderer.kt$( root: Ui.Node, onAction: (ServerDrivenAction) -&gt; Unit, onTerminalKeyText: (String) -&gt; Unit = {}, mediaSurface: (@Composable (trackId: String) -&gt; Unit)? = null, audioVisualizerSurface: (@Composable (streamId: String) -&gt; Unit)? = null, imageLoader: @Composable (url: String, contentDescription: String?) -&gt; Unit, deviceControlEffects: DeviceControlEffects = DeviceControlEffects.none(), policy: RendererPolicy = RendererPolicy.default(), )</ID>
+    <ID>MagicNumber:AndroidCapabilitySession.kt$AndroidCapabilitySession.Companion$1280</ID>
+    <ID>MagicNumber:AndroidCapabilitySession.kt$AndroidCapabilitySession.Companion$16000</ID>
+    <ID>MagicNumber:AndroidCapabilitySession.kt$AndroidCapabilitySession.Companion$30</ID>
+    <ID>MagicNumber:AndroidCapabilitySession.kt$AndroidCapabilitySession.Companion$44100</ID>
+    <ID>MagicNumber:AndroidCapabilitySession.kt$AndroidCapabilitySession.Companion$48000</ID>
+    <ID>MagicNumber:AndroidCapabilitySession.kt$AndroidCapabilitySession.Companion$720</ID>
+    <ID>MagicNumber:AndroidNotificationDelivery.kt$StatusBarAndroidNotificationDelivery$0x7FFFFFFF</ID>
+    <ID>MagicNumber:AndroidNotificationDelivery.kt$StatusBarAndroidNotificationDelivery$26</ID>
+    <ID>MagicNumber:AndroidNotificationDelivery.kt$StatusBarAndroidNotificationDelivery$33</ID>
+    <ID>MagicNumber:AndroidNsdDiscovery.kt$65535</ID>
+    <ID>MagicNumber:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$0.5</ID>
+    <ID>MagicNumber:BugReportIdentifiers.kt$100</ID>
+    <ID>MagicNumber:BugReportIdentifiers.kt$10000</ID>
+    <ID>MagicNumber:BugReportIdentifiers.kt$17</ID>
+    <ID>MagicNumber:BugReportIdentifiers.kt$3600</ID>
+    <ID>MagicNumber:BugReportIdentifiers.kt$60</ID>
+    <ID>MagicNumber:ColorParsing.kt$16</ID>
+    <ID>MagicNumber:ColorParsing.kt$6</ID>
+    <ID>MagicNumber:ColorParsing.kt$8</ID>
+    <ID>MagicNumber:ContextAndroidCapabilityProbe.kt$ContextAndroidCapabilityProbe$5</ID>
+    <ID>MagicNumber:ControlResponseDispatcher.kt$ControlResponseDispatcher$12</ID>
+    <ID>MagicNumber:ControlResponseDispatcher.kt$ControlResponseDispatcher$4</ID>
+    <ID>MagicNumber:GrpcAndroidControlClient.kt$GrpcAndroidControlClient$5</ID>
+    <ID>MagicNumber:ManualEndpointParser.kt$ManualEndpointParser$443</ID>
+    <ID>MagicNumber:ManualEndpointParser.kt$ManualEndpointParser$50051</ID>
+    <ID>MagicNumber:ManualEndpointParser.kt$ManualEndpointParser$65535</ID>
+    <ID>MagicNumber:ManualEndpointParser.kt$ManualEndpointParser$80</ID>
+    <ID>MagicNumber:ServerDrivenRenderer.kt$42f</ID>
+    <ID>MagicNumber:TerminalMediaPlaceholder.kt$0xFFB0BEC5</ID>
+    <ID>MagicNumber:TerminalShellMediaSurfaces.kt$0x8A000000</ID>
+    <ID>MagicNumber:TerminalShellMediaSurfaces.kt$0xFF455A64</ID>
+    <ID>MagicNumber:TerminalShellMediaSurfaces.kt$0xFFB0BEC5</ID>
+    <ID>MagicNumber:TerminalShellMediaSurfaces.kt$0xFFECEFF1</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$0x7F</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$0x80</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$0xFF</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$0xFFFF</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$125</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$126</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$127</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$4</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$56</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$8</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$16</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$3</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$4</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$443</ID>
+    <ID>MagicNumber:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$80</ID>
+    <ID>MagicNumber:WindowBugReportScreenshotCapture.kt$WindowBugReportScreenshotCapture$100</ID>
+    <ID>MagicNumber:WindowBugReportScreenshotCapture.kt$WindowBugReportScreenshotCapture$16_384</ID>
+    <ID>MatchingDeclarationName:PowerCapabilityMonitor.kt$PowerCapabilityState</ID>
+    <ID>MaxLineLength:AndroidBugReportBuilder.kt$AndroidBugReportBuilder$.</ID>
+    <ID>MaxLineLength:AndroidClientDependencies.kt$AndroidClientDependencies$/** WebSocket transport hello resume token; shared across sessions like Flutter [ControlClientTransportHint.resumeToken]. */</ID>
+    <ID>MaxLineLength:AndroidControlSessionControllerTest.kt$AndroidControlSessionControllerTest$screenMetrics = AndroidScreenMetrics(widthPx = 800, heightPx = 1280, density = 2f, orientation = "portrait")</ID>
+    <ID>MaxLineLength:AndroidFullscreenController.kt$AndroidFullscreenController$* @param immersiveStickyWhenEnabled When [enabled] is false, callers may pass `false`; the implementation ignores it.</ID>
+    <ID>MaxLineLength:AndroidNotificationDelivery.kt$StatusBarAndroidNotificationDelivery$ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED</ID>
+    <ID>MaxLineLength:AndroidNsdDiscovery.kt$" Often caused by multicast-restricted Wi‑Fi, guest/isolated APs, or device NSD quirks (common on Fire OS); use manual endpoint."</ID>
+    <ID>MaxLineLength:AndroidTerminalApp.kt$Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("terminal-bug-report-status"))</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$/** Matches Flutter shell lifecycle: capability delta on foreground/background transitions (`app_lifecycle_change`). */</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$connectionState = if (resolved == null) ConnectionState.InvalidEndpoint else ConnectionState.ReadyToConnect</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$diagnosticsText</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\ndiscovery=scanning"</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\ndiscovery=stopped"</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$it.copy(diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState, it)}\nlast_network_refresh=$reason")</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$it.copy(diagnosticsText = "${it.diagnosticsText}\nlast_capability_delta=runtime_monitor_poll")</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$it.copy(diagnosticsText = "${it.diagnosticsText}\nlast_ui_action=${action.componentId}:${action.action}:${action.value}")</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$microphoneAvailable = capabilitySnapshot.hardware.microphone &amp;&amp; capabilitySnapshot.permissions.microphoneGranted</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$val brightDisplayEnabled = runCatching { dependencies.terminalSettings.brightDisplayEnabled() }.getOrDefault(false)</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$val immersiveStickyEnabled = runCatching { dependencies.terminalSettings.immersiveStickyEnabled() }.getOrDefault(true)</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$}</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel.&lt;no name provided&gt;$formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next)</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$assertTrue(viewModel.state.value.diagnosticsText.contains("last_permission_refresh=microphone-permission-result"))</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$assertTrue(viewModel.state.value.diagnosticsText.contains("last_system_command=device_status:debug-device-status-2"))</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$assertTrue(viewModel.state.value.diagnosticsText.contains("last_system_command=runtime_status:debug-runtime-status-1"))</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$assertTrue(viewModel.state.value.diagnosticsText.contains("network_reconnect_restore_suppressed=network-callback"))</ID>
+    <ID>MaxLineLength:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$fun</ID>
+    <ID>MaxLineLength:ControlResponseDispatcher.kt$ControlResponseDispatcher$private</ID>
+    <ID>MaxLineLength:ServerDrivenRenderer.kt$Ui.Node.WidgetCase.WIDGET_NOT_SET -&gt; if (policy.showUnsupportedFallback) Text(policy.unsupportedText, modifier = props.modifier())</ID>
+    <ID>MaxLineLength:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$val host = if (endpoint.port == 80 || endpoint.port == 443) endpoint.host else "${endpoint.host}:${endpoint.port}"</ID>
+    <ID>MaximumLineLength:AndroidBugReportBuilder.kt$AndroidBugReportBuilder$ </ID>
+    <ID>MaximumLineLength:AndroidControlSessionControllerTest.kt$AndroidControlSessionControllerTest$ </ID>
+    <ID>MaximumLineLength:AndroidNotificationDelivery.kt$StatusBarAndroidNotificationDelivery$ </ID>
+    <ID>MaximumLineLength:AndroidNsdDiscovery.kt$ </ID>
+    <ID>MaximumLineLength:AndroidTerminalApp.kt$ </ID>
+    <ID>MaximumLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$ </ID>
+    <ID>MaximumLineLength:AndroidTerminalViewModel.kt$AndroidTerminalViewModel.&lt;no name provided&gt;$ </ID>
+    <ID>MaximumLineLength:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest$ </ID>
+    <ID>MaximumLineLength:ControlResponseDispatcher.kt$ControlResponseDispatcher$ </ID>
+    <ID>MaximumLineLength:ServerDrivenRenderer.kt$ </ID>
+    <ID>MaximumLineLength:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$ </ID>
+    <ID>MissingModifierDefaultValue:ServerDrivenRenderer.kt$modifier: Modifier</ID>
+    <ID>NoConsecutiveBlankLines:ServerDrivenRenderer.kt$ </ID>
+    <ID>ReturnCount:AndroidNsdDiscovery.kt$internal fun NsdServiceInfo.toDiscoveredServer(nowMillis: Long): DiscoveredServer?</ID>
+    <ID>ReturnCount:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$fun setAppForegrounded(foregrounded: Boolean)</ID>
+    <ID>ReturnCount:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private fun Control.ConnectResponse.requiresCapabilityRebaseline(): Boolean</ID>
+    <ID>ReturnCount:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private fun discoveredEndpointText(server: DiscoveredServer): String</ID>
+    <ID>ReturnCount:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private fun resolveBugReportSubject(action: ServerDrivenAction): String</ID>
+    <ID>ReturnCount:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private fun restartDiscoveryIfScanning(reason: String)</ID>
+    <ID>ReturnCount:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$private fun retryConnectIfReconnectExhausted(reason: String)</ID>
+    <ID>ReturnCount:ColorParsing.kt$internal fun parseHexColor(raw: String?): Color?</ID>
+    <ID>ReturnCount:ControlResponseDispatcher.kt$ControlResponseDispatcher$private fun effectiveTransitionDurationMs(normalized: String?, durationMs: Int): Long?</ID>
+    <ID>ReturnCount:ControlResponseDispatcher.kt$ControlResponseDispatcher$private fun replaceNode(root: Ui.Node, componentId: String, replacement: Ui.Node): Ui.Node</ID>
+    <ID>ReturnCount:ManualEndpointParser.kt$ManualEndpointParser$fun parse(raw: String): EndpointResolution?</ID>
+    <ID>ReturnCount:WindowBugReportScreenshotCapture.kt$WindowBugReportScreenshotCapture$fun capturePngOrNull(window: Window): ByteArray?</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:AndroidControlSessionController.kt$AndroidControlSession$/** @return true when a sensor payload was sent (Flutter `buildSensorTelemetryRequest` non-null). */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:AndroidTerminalSettings.kt$AndroidTerminalSettings$/** * When local fullscreen is on (or server-driven fullscreen is applied), use immersive-sticky behavior * (transient system bars) vs plain immersive (bars stay until dismissed). */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$/** When false, periodic heartbeat and sensor telemetry are paused (Flutter `AppLifecycle` parity). */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest.FakeSession$/** Per-call: `true` means [sendBugReport] throws for that attempt (flush continues). */</ID>
+    <ID>ThrowsCount:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$private fun readEnvelope(): Control.WireEnvelope</ID>
+    <ID>ThrowsCount:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$private fun verifyUpgradeResponse(input: BufferedInputStream, key: String)</ID>
+    <ID>ThrowsCount:WebSocketAndroidControlClient.kt$internal fun readFrame(input: BufferedInputStream): WebSocketFrame</ID>
+    <ID>TooGenericExceptionCaught:AndroidControlSessionController.kt$AndroidControlSessionController$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient$error: Throwable</ID>
+    <ID>TooManyFunctions:AndroidControlSessionController.kt$AndroidControlSession</ID>
+    <ID>TooManyFunctions:AndroidControlSessionController.kt$AndroidControlSessionController : AndroidControlSession</ID>
+    <ID>TooManyFunctions:AndroidTerminalViewModel.kt$AndroidTerminalViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:ControlResponseDispatcher.kt$ControlResponseDispatcher</ID>
+    <ID>TooManyFunctions:ProtocolBuilders.kt$ProtocolBuilders</ID>
+    <ID>TooManyFunctions:ServerDrivenRenderer.kt$com.curtcox.terminals.android.ui.ServerDrivenRenderer.kt</ID>
+    <ID>TooManyFunctions:WebSocketAndroidControlClient.kt$WebSocketAndroidControlClient : AndroidControlClient</ID>
+    <ID>TopLevelPropertyNaming:AndroidNsdDiscovery.kt$internal const val TerminalsServiceType = "_terminals._tcp."</ID>
+    <ID>TopLevelPropertyNaming:ProtocolBuilders.kt$const val AndroidWireProtocolVersion: Int = 1</ID>
+    <ID>TopLevelPropertyNaming:WebSocketAndroidControlClient.kt$internal const val BinaryOpcode = 0x2</ID>
+    <ID>TopLevelPropertyNaming:WebSocketAndroidControlClient.kt$internal const val PongOpcode = 0xA</ID>
+    <ID>TopLevelPropertyNaming:WebSocketAndroidControlClient.kt$private const val CloseOpcode = 0x8</ID>
+    <ID>TopLevelPropertyNaming:WebSocketAndroidControlClient.kt$private const val PingOpcode = 0x9</ID>
+    <ID>TopLevelPropertyNaming:WebSocketAndroidControlClient.kt$private const val WebSocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"</ID>
+    <ID>UseCheckOrError:AndroidTerminalViewModelTest.kt$AndroidTerminalViewModelTest.FakeSession$throw IllegalStateException("simulated-bug-report-send-failure")</ID>
+    <ID>Wrapping:AndroidTerminalViewModel.kt$AndroidTerminalViewModel$(</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -4,6 +4,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import com.curtcox.terminals.android.util.Clock
+import java.util.concurrent.Executors
 
 interface AndroidNsdDiscovery {
     fun start(onServer: (DiscoveredServer) -> Unit, onError: (String) -> Unit)
@@ -35,22 +36,66 @@ class NsdAndroidDiscovery(
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 if (serviceInfo.serviceType != serviceType) return
-                nsdManager.resolveService(
-                    serviceInfo,
-                    object : NsdManager.ResolveListener {
-                        override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    val callback = object : NsdManager.ServiceInfoCallback {
+                        override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {
+                            nsdManager.unregisterServiceInfoCallback(this)
                             onError(
                                 "mDNS resolve failed for ${serviceInfo.serviceName}: " +
                                     formatNsdFailureDetail("resolve", errorCode),
                             )
                         }
 
-                        override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-                            serviceInfo.toDiscoveredServer(clock.nowMillis())?.let(onServer)
-                                ?: onError("mDNS resolved service without usable host/port: ${serviceInfo.serviceName}")
+                        override fun onServiceInfoCallbackUnregistered() = Unit
+
+                        override fun onServiceUpdated(updated: NsdServiceInfo) {
+                            nsdManager.unregisterServiceInfoCallback(this)
+                            val server = updated.toDiscoveredServer(clock.nowMillis())
+                            if (server != null) {
+                                onServer(server)
+                            } else {
+                                onError(
+                                    "mDNS resolved service without usable host/port: ${updated.serviceName}",
+                                )
+                            }
                         }
-                    },
-                )
+
+                        override fun onServiceLost() {
+                            nsdManager.unregisterServiceInfoCallback(this)
+                            onError("mDNS service lost before resolve: ${serviceInfo.serviceName}")
+                        }
+                    }
+                    nsdManager.registerServiceInfoCallback(
+                        serviceInfo,
+                        Executors.newSingleThreadExecutor(),
+                        callback,
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    nsdManager.resolveService(
+                        serviceInfo,
+                        object : NsdManager.ResolveListener {
+                            override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+                                onError(
+                                    "mDNS resolve failed for ${serviceInfo.serviceName}: " +
+                                        formatNsdFailureDetail("resolve", errorCode),
+                                )
+                            }
+
+                            override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                                val server = serviceInfo.toDiscoveredServer(clock.nowMillis())
+                                if (server != null) {
+                                    onServer(server)
+                                } else {
+                                    onError(
+                                        "mDNS resolved service without usable host/port: " +
+                                            serviceInfo.serviceName,
+                                    )
+                                }
+                            }
+                        },
+                    )
+                }
             }
 
             override fun onServiceLost(serviceInfo: NsdServiceInfo) = Unit
@@ -108,7 +153,12 @@ internal fun formatNsdFailureDetail(operation: String, errorCode: Int): String {
 }
 
 internal fun NsdServiceInfo.toDiscoveredServer(nowMillis: Long): DiscoveredServer? {
-    val resolvedHost = host?.hostAddress ?: return null
+    val resolvedHost = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        hostAddresses.firstNotNullOfOrNull { it.hostAddress } ?: return null
+    } else {
+        @Suppress("DEPRECATION")
+        host?.hostAddress ?: return null
+    }
     if (port !in 1..65535) return null
     val metadata = terminalTxtMetadata()
     return DiscoveredServer(

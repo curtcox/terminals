@@ -62,6 +62,11 @@ import java.util.Locale
 import androidx.core.graphics.PathParser
 import terminals.ui.v1.Ui
 
+/** Proto `direction` string is deprecated; kept for server payloads that omit `direction_enum`. */
+@Suppress("DEPRECATION")
+private fun Ui.ScrollWidget.isHorizontalFromLegacyString(): Boolean =
+    direction.trim().lowercase(Locale.US) == "horizontal"
+
 private class MediaSurfaces(
     val video: (@Composable (String) -> Unit)?,
     val audioVisualizer: (@Composable (String) -> Unit)?,
@@ -158,7 +163,8 @@ private fun RenderNode(
             val isHorizontal = when (node.scroll.directionEnum) {
                 Ui.ScrollDirection.SCROLL_DIRECTION_HORIZONTAL -> true
                 Ui.ScrollDirection.SCROLL_DIRECTION_VERTICAL -> false
-                else -> node.scroll.direction.trim().lowercase() == "horizontal"
+                Ui.ScrollDirection.SCROLL_DIRECTION_UNSPECIFIED,
+                Ui.ScrollDirection.UNRECOGNIZED -> node.scroll.isHorizontalFromLegacyString()
             }
             if (isHorizontal) {
                 Row(
