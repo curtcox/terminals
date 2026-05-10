@@ -1269,6 +1269,10 @@ Remaining validation:
 - Added `AndroidClientDependencies.capabilityMonitorIntervalMillis` (default 0 for deterministic JVM tests; `fromContext` sets 2000 ms to match Flutter `_capabilityMonitorInterval`). While connected and foregrounded, `AndroidTerminalViewModel` periodically calls `sendCapabilityDeltaIfChanged("runtime_monitor_poll")`, paused in background like heartbeat/sensor telemetry.
 - Extended `AndroidTerminalViewModelTest` (periodic poll, lifecycle pause/resume). Documented in `docs/client-android.md`.
 
+### 2026-05-09 (plan continuation: automated gates)
+
+- Confirmed the native client matches the plan’s automated scope: `make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh` all pass on a JDK 17 + Android SDK host. Code-complete items under **Remaining validation** remain physical/network smoke (connected instrumentation, Fire tablet manual connect, real LAN NSD, WebRTC dependency follow-up).
+
 ## Test Plan
 
 ### Unit tests
