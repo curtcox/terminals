@@ -31,6 +31,7 @@ import com.curtcox.terminals.android.platform.AndroidNetworkMonitor
 import com.curtcox.terminals.android.platform.AndroidNetworkState
 import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
+import com.curtcox.terminals.android.platform.AndroidTerminalSpeech
 import com.curtcox.terminals.android.platform.AndroidPermissionRequester
 import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.platform.FireOsDeviceInfo
@@ -49,6 +50,7 @@ import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -1924,9 +1926,11 @@ class AndroidTerminalViewModelTest {
     fun serverNotificationIsDeliveredThroughPlatformAdapter() = runTest(testDispatcher) {
         val session = FakeSession()
         val delivered = mutableListOf<Pair<String, String>>()
+        val spoken = mutableListOf<String>()
         val viewModel = viewModel(
             session,
             notificationDelivery = AndroidNotificationDelivery { title, body -> delivered += title to body },
+            speechDelivery = AndroidTerminalSpeech { spoken += it },
         )
 
         viewModel.updateEndpoint("10.0.0.8:8080")
@@ -1945,10 +1949,76 @@ class AndroidTerminalViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("Timer" to "Done"), delivered)
+        assertEquals(listOf("Done"), spoken)
         assertEquals("Timer", viewModel.state.value.lastNotificationTitle)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_notification=Timer"))
         assertEquals("Notification", viewModel.state.value.lastControlResponseActivity)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Notification"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun serverNotificationTitleOnlySpeaksTitle() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val delivered = mutableListOf<Pair<String, String>>()
+        val spoken = mutableListOf<String>()
+        val viewModel = viewModel(
+            session,
+            notificationDelivery = AndroidNotificationDelivery { title, body -> delivered += title to body },
+            speechDelivery = AndroidTerminalSpeech { spoken += it },
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setNotification(
+                    Ui.Notification.newBuilder()
+                        .setDeviceId("device-1")
+                        .setTitle("Alert")
+                        .setBody(""),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("Alert" to ""), delivered)
+        assertEquals(listOf("Alert"), spoken)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun serverNotificationBlankDoesNotDeliverOrSpeak() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val delivered = mutableListOf<Pair<String, String>>()
+        val spoken = mutableListOf<String>()
+        val viewModel = viewModel(
+            session,
+            notificationDelivery = AndroidNotificationDelivery { title, body -> delivered += title to body },
+            speechDelivery = AndroidTerminalSpeech { spoken += it },
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setNotification(
+                    Ui.Notification.newBuilder()
+                        .setDeviceId("device-1")
+                        .setTitle("   ")
+                        .setBody("\t"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(delivered.isEmpty())
+        assertTrue(spoken.isEmpty())
+        assertFalse(viewModel.state.value.diagnosticsText.contains("last_notification="))
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -2299,6 +2369,7 @@ class AndroidTerminalViewModelTest {
     private fun viewModel(
         session: FakeSession,
         notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
+        speechDelivery: AndroidTerminalSpeech = AndroidTerminalSpeech.none(),
         mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
         networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
         mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
@@ -2312,6 +2383,7 @@ class AndroidTerminalViewModelTest {
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 notificationDelivery = notificationDelivery,
+                speechDelivery = speechDelivery,
                 mediaEngine = mediaEngine,
                 networkStateProvider = networkStateProvider,
                 networkMonitor = networkMonitor,

@@ -28,6 +28,8 @@ import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
 import com.curtcox.terminals.android.platform.AndroidNetworkStateProvider
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
 import com.curtcox.terminals.android.platform.AndroidPermissionRequester
+import com.curtcox.terminals.android.platform.AndroidTerminalSpeech
+import com.curtcox.terminals.android.platform.ContextAndroidTerminalSpeech
 import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.platform.ContextAndroidNetworkMonitor
 import com.curtcox.terminals.android.platform.ContextAndroidNetworkStateProvider
@@ -51,6 +53,7 @@ data class AndroidClientDependencies(
     val networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
     val networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(),
     val notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
+    val speechDelivery: AndroidTerminalSpeech = AndroidTerminalSpeech.none(),
     val diagnosticClipboard: DiagnosticClipboard = DiagnosticClipboard.none(),
     val discovery: AndroidNsdDiscovery = AndroidNsdDiscovery.unavailable(),
     val mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
@@ -100,6 +103,7 @@ data class AndroidClientDependencies(
                 networkStateProvider = ContextAndroidNetworkStateProvider(context),
                 networkMonitor = ContextAndroidNetworkMonitor(context),
                 notificationDelivery = StatusBarAndroidNotificationDelivery(context.applicationContext),
+                speechDelivery = ContextAndroidTerminalSpeech(context.applicationContext),
                 diagnosticClipboard = ContextDiagnosticClipboard(context.applicationContext),
                 discovery = (context.applicationContext.getSystemService(Context.NSD_SERVICE) as? NsdManager)?.let {
                     NsdAndroidDiscovery(it, Clock { System.currentTimeMillis() })

@@ -147,6 +147,11 @@ next successful connect. Server-driven actions whose `action` starts with
 emitting a `UIAction`. `BugReportAck` responses are merged into copyable
 diagnostics like other terminal chrome.
 
+Server `Notification` control responses post a status-bar notification when
+`POST_NOTIFICATIONS` is granted (Android 13+) and speak the message with
+on-device TTS, matching the Flutter client’s notification-plus-speech alert
+path (body if non-empty, otherwise title). Blank title and body are ignored.
+
 The client can also start Android NSD/mDNS discovery for `_terminals._tcp.`
 services. Discovered servers are shown as selectable endpoint options when the
 network supports multicast; Fire OS or isolated Wi-Fi networks may still require

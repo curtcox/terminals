@@ -1210,6 +1210,12 @@ Remaining validation:
 - For network-restore debouncing tests, replaced `advanceUntilIdle()` after reconnect with bounded `advanceTimeBy(400)` + `runCurrent()` so async reconnect settles without draining an infinite heartbeat loop; aligned `networkMonitorSkipsCapabilityRefreshWhenBackgrounded` with lifecycle capability deltas after backgrounding (`app_lifecycle_change`).
 - Pinned JVM default `TimeZone` in `AndroidBugReportBuilderTest` so `buildBugIdentifier` (uses `TimeZone.getDefault()`) matches expected bug-token hints on any host.
 
+### 2026-05-09 (server notification TTS / Flutter alert parity)
+
+- Added `AndroidTerminalSpeech` + `ContextAndroidTerminalSpeech` so explicit server `Notification` responses speak the same text the Flutter `AlertDeliveryService` chooses (trimmed body if non-empty, else trimmed title), after attempting status-bar delivery.
+- Skipped delivery and speech when both title and body trim empty; tightened `last_notification` diagnostics to prefer trimmed title, else trimmed body.
+- Documented behavior in `docs/client-android.md`; extended `AndroidTerminalViewModelTest`.
+
 ## Test Plan
 
 ### Unit tests

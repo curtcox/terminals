@@ -47,9 +47,18 @@ class AndroidTerminalViewModel(
                 false
             }
             val notificationDelivered = if (response.payloadCase == Control.ConnectResponse.PayloadCase.NOTIFICATION) {
-                runCatching {
-                    dependencies.notificationDelivery.deliver(response.notification.title, response.notification.body)
-                }.isSuccess
+                val title = response.notification.title.trim()
+                val body = response.notification.body.trim()
+                if (title.isEmpty() && body.isEmpty()) {
+                    false
+                } else {
+                    val notificationOk = runCatching {
+                        dependencies.notificationDelivery.deliver(title, body)
+                    }.isSuccess
+                    val spoken = if (body.isNotEmpty()) body else title
+                    runCatching { dependencies.speechDelivery.speak(spoken) }
+                    notificationOk
+                }
             } else {
                 false
             }
@@ -69,7 +78,9 @@ class AndroidTerminalViewModel(
                 val next = dispatcher.dispatch(it, response)
                 var diagnostics = formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next)
                 if (notificationDelivered) {
-                    diagnostics += "\nlast_notification=${response.notification.title}"
+                    val head = response.notification.title.trim()
+                        .ifEmpty { response.notification.body.trim() }
+                    diagnostics += "\nlast_notification=$head"
                 }
                 val mediaStatus = audioResult?.toStatus(response.playAudio.requestId)
                     ?: mediaResult?.toStatus(response.showMedia.requestId)
