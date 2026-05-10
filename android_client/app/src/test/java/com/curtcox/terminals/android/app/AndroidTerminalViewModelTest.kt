@@ -1913,6 +1913,7 @@ class AndroidTerminalViewModelTest {
         )
         advanceUntilIdle()
 
+        assertEquals(listOf("s-out"), session.streamReadyIds)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_opaque_control_io="))
         assertTrue(viewModel.state.value.diagnosticsText.contains("stream_id=s-out"))
         assertEquals("Stream started", viewModel.state.value.lastControlResponseActivity)
@@ -1920,6 +1921,30 @@ class AndroidTerminalViewModelTest {
         viewModel.disconnect()
         advanceUntilIdle()
         assertNull(viewModel.state.value.lastOpaqueControlIoSummary)
+    }
+
+    @Test
+    fun startStreamWithBlankIdDoesNotSendStreamReady() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setStartStream(
+                    Io.StartStream.newBuilder()
+                        .setStreamId("  ")
+                        .setStreamKind(Io.StreamKind.STREAM_KIND_VIDEO),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(session.streamReadyIds.isEmpty())
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -2450,6 +2475,7 @@ class AndroidTerminalViewModelTest {
         var bugReportFailurePattern: List<Boolean> = emptyList()
         private var bugReportAttemptIndex = 0
         val keyTexts = mutableListOf<String>()
+        val streamReadyIds = mutableListOf<String>()
         val capabilityDeltaReasons = mutableListOf<String>()
         var rebaselineCount = 0
         var heartbeatCount = 0
@@ -2475,6 +2501,10 @@ class AndroidTerminalViewModelTest {
 
         override suspend fun sendUiAction(action: ServerDrivenAction) {
             actions += action
+        }
+
+        override suspend fun sendStreamReady(streamId: String) {
+            streamReadyIds += streamId
         }
 
         override suspend fun sendKeyText(text: String) {

@@ -1234,6 +1234,11 @@ Remaining validation:
 - Wired the target into `make all-test` so CI and `make all-check` catch instrumentation-only Kotlin compile regressions without requiring a connected device.
 - Documented the target alongside existing Android validation commands in `docs/client-android.md` and in this plan’s required-validation block.
 
+### 2026-05-09 (StartStream StreamReady control parity)
+
+- Matched Flutter shell streaming handshake: on inbound `ConnectResponse.start_stream` with non-blank `stream_id`, `AndroidTerminalViewModel` now calls `AndroidControlSession.sendStreamReady` (trimmed id) before merging dispatcher state; send failures route through `handleControlLoss` like heartbeat errors.
+- Added `ProtocolBuilders.streamReady`, `AndroidControlSessionController.sendStreamReady`, JVM coverage (`ProtocolBuildersTest`, `AndroidControlSessionControllerTest`, extended `opaqueStartStreamSummary…` / blank-id regression), and documented the behavior in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests

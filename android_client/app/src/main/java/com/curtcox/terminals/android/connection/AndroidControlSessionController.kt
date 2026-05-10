@@ -20,6 +20,7 @@ interface AndroidControlSession {
     suspend fun sendHeartbeat()
     suspend fun sendSensorTelemetry()
     suspend fun sendUiAction(action: ServerDrivenAction)
+    suspend fun sendStreamReady(streamId: String)
     suspend fun sendKeyText(text: String)
     suspend fun sendBugReport(report: Diagnostics.BugReport)
     suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean
@@ -78,6 +79,12 @@ class AndroidControlSessionController(
 
     override suspend fun sendUiAction(action: ServerDrivenAction) {
         client.send(builders.uiAction(deviceId, action))
+    }
+
+    override suspend fun sendStreamReady(streamId: String) {
+        val trimmed = streamId.trim()
+        if (trimmed.isEmpty()) return
+        client.send(builders.streamReady(trimmed))
     }
 
     override suspend fun sendKeyText(text: String) {

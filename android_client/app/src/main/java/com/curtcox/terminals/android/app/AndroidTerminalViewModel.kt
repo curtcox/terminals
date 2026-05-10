@@ -74,6 +74,16 @@ class AndroidTerminalViewModel(
             } else {
                 null
             }
+            if (response.payloadCase == Control.ConnectResponse.PayloadCase.START_STREAM) {
+                val streamId = response.startStream.streamId.trim()
+                if (streamId.isNotEmpty()) {
+                    val connectedSession = session
+                    if (connectedSession != null) {
+                        runCatching { connectedSession.sendStreamReady(streamId) }
+                            .onFailure { handleControlLoss(connectedSession, it) }
+                    }
+                }
+            }
             mutableState.update {
                 val next = dispatcher.dispatch(it, response)
                 var diagnostics = formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next)

@@ -773,6 +773,8 @@ class AndroidTerminalAppSmokeTest {
             actions += action
         }
 
+        override suspend fun sendStreamReady(streamId: String) = Unit
+
         override suspend fun sendKeyText(text: String) = Unit
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) = Unit

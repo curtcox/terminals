@@ -125,6 +125,31 @@ class AndroidControlSessionControllerTest {
     }
 
     @Test
+    fun sendStreamReadyUsesProtocolBuilder() = runTest {
+        val client = FakeControlClient()
+        val controller = controller(client = client)
+        controller.connect(EndpointResolution("10.0.0.8", 8080))
+        client.sent.clear()
+
+        controller.sendStreamReady("  stream-a  ")
+
+        assertTrue(client.sent.single().hasStreamReady())
+        assertEquals("stream-a", client.sent.single().streamReady.streamId)
+    }
+
+    @Test
+    fun sendStreamReadyNoOpsWhenBlank() = runTest {
+        val client = FakeControlClient()
+        val controller = controller(client = client)
+        controller.connect(EndpointResolution("10.0.0.8", 8080))
+        client.sent.clear()
+
+        controller.sendStreamReady("   ")
+
+        assertTrue(client.sent.isEmpty())
+    }
+
+    @Test
     fun failedConnectClosesClientAndRecordsError() = runTest {
         val client = FakeControlClient(connectError = IllegalStateException("no route"))
         val controller = controller(client = client)

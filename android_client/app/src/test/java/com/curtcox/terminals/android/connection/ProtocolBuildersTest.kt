@@ -88,6 +88,14 @@ class ProtocolBuildersTest {
     }
 
     @Test
+    fun streamReadyMatchesFlutterShellEnvelope() {
+        val request = builders.streamReady("cam-1")
+
+        assertTrue(request.hasStreamReady())
+        assertEquals("cam-1", request.streamReady.streamId)
+    }
+
+    @Test
     fun uiActionMapsRendererActionToInputEvent() {
         val request = builders.uiAction(
             deviceId = "device-1",

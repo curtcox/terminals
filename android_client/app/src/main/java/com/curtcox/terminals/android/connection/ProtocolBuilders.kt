@@ -80,6 +80,14 @@ class ProtocolBuilders(
             )
             .build()
 
+    /** Matches Flutter shell `ConnectRequest.streamReady` after `StartStream` with non-empty stream id. */
+    fun streamReady(streamId: String): Control.ConnectRequest =
+        Control.ConnectRequest.newBuilder()
+            .setStreamReady(
+                Control.StreamReady.newBuilder().setStreamId(streamId),
+            )
+            .build()
+
     /**
      * Matches Flutter `buildSensorTelemetryRequest`: only battery fields from the last registered
      * capabilities snapshot; returns null when there is nothing to send.
