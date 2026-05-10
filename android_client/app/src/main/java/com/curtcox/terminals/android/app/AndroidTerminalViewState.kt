@@ -63,6 +63,8 @@ data class AndroidTerminalViewState(
     /** Local kiosk preference: transient vs sticky immersive behavior when fullscreen is applied. */
     val localImmersiveStickyEnabled: Boolean = true,
     val localBrightDisplayEnabled: Boolean = false,
+    /** Withdraws microphone/camera from advertised capabilities until toggled off (Flutter `privacy.toggle` parity). */
+    val privacyModeEnabled: Boolean = false,
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
     val mediaSupport: MediaSupportState = MediaSupportState(),
     val discoveryState: DiscoveryState = DiscoveryState(),

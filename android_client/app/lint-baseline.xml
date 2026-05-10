@@ -8,7 +8,7 @@
         errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/com/curtcox/terminals/android/app/AndroidTerminalViewModel.kt"
-            line="686"
+            line="691"
             column="27"/>
     </issue>
 
@@ -142,17 +142,6 @@
             file="src/main/AndroidManifest.xml"
             line="14"
             column="30"/>
-    </issue>
-
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is never &lt; 25"
-        errorLine1="    if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.LOLLIPOP) return emptyMap()"
-        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/curtcox/terminals/android/discovery/AndroidNsdDiscovery.kt"
-            line="181"
-            column="9"/>
     </issue>
 
     <issue

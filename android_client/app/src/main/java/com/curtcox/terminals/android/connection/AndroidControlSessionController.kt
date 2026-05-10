@@ -16,6 +16,7 @@ data class ControlSessionStatus(
 interface AndroidControlSession {
     val status: ControlSessionStatus
     val lastRegisteredCapabilities: Capabilities.DeviceCapabilities?
+    fun setPrivacyMode(enabled: Boolean)
     suspend fun connect(endpoint: EndpointResolution)
     suspend fun sendHeartbeat()
     /** @return true when a sensor payload was sent (Flutter `buildSensorTelemetryRequest` non-null). */
@@ -43,6 +44,10 @@ class AndroidControlSessionController(
 
     override val lastRegisteredCapabilities: Capabilities.DeviceCapabilities?
         get() = capabilities.lastRegisteredCapabilities
+
+    override fun setPrivacyMode(enabled: Boolean) {
+        capabilities.setPrivacyMode(enabled)
+    }
 
     override suspend fun connect(endpoint: EndpointResolution) {
         try {

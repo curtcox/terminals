@@ -183,6 +183,12 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                 ) {
                     Text(if (state.localBrightDisplayEnabled) "Bright display on" else "Bright display off")
                 }
+                Button(
+                    onClick = viewModel::togglePrivacyMode,
+                    modifier = Modifier.testTag("terminal-privacy-toggle-button"),
+                ) {
+                    Text(if (state.privacyModeEnabled) "Privacy on" else "Privacy off")
+                }
                 if (state.connectionState == ConnectionState.Connected) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),

@@ -16,6 +16,11 @@ interface AndroidLiveMediaSession {
 
     fun applyWebRtcSignal(signal: Control.WebRTCSignal): LiveMediaSessionResult
 
+    /**
+     * Stops local A/V capture when privacy is enabled (Flutter capture-stop parity).
+     */
+    fun stopLocalCaptureStreamsForPrivacy()
+
     companion object {
         fun disabled(reason: String = "webrtc-dependency-not-enabled"): AndroidLiveMediaSession =
             object : AndroidLiveMediaSession {
@@ -28,6 +33,8 @@ interface AndroidLiveMediaSession {
 
                 override fun applyWebRtcSignal(signal: Control.WebRTCSignal) =
                     LiveMediaSessionResult.Applied
+
+                override fun stopLocalCaptureStreamsForPrivacy() = Unit
             }
 
         fun fromAdapter(adapter: AndroidWebRtcAdapter): AndroidLiveMediaSession =
@@ -60,4 +67,6 @@ private class WebRtcGatedLiveMediaSession(
         if (!s.supported) return LiveMediaSessionResult.Applied
         return LiveMediaSessionResult.Unsupported("live-media-session-not-implemented")
     }
+
+    override fun stopLocalCaptureStreamsForPrivacy() = Unit
 }

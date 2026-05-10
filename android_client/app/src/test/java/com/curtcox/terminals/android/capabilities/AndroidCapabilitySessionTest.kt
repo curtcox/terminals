@@ -102,6 +102,53 @@ class AndroidCapabilitySessionTest {
     }
 
     @Test
+    fun privacyModeStripsMicAndCameraFromSnapshot() {
+        val session =
+            AndroidCapabilitySession(
+                "device-1",
+                MutableProbe(
+                    baseInput().copy(
+                        hardware = baseHardware.copy(microphone = true, frontCamera = true),
+                        permissions =
+                            PermissionCapabilityState(
+                                microphoneGranted = true,
+                                cameraGranted = true,
+                            ),
+                    ),
+                ),
+            )
+        session.setPrivacyMode(true)
+        val report = session.snapshot()
+
+        assertFalse(report.capabilities.hasMicrophone())
+        assertFalse(report.capabilities.hasCamera())
+    }
+
+    @Test
+    fun privacyToggleProducesDeltaWhenHardwareWouldAdvertiseMic() {
+        val probe =
+            MutableProbe(
+                baseInput().copy(
+                    hardware = baseHardware.copy(microphone = true, frontCamera = true),
+                    permissions =
+                        PermissionCapabilityState(
+                            microphoneGranted = true,
+                            cameraGranted = true,
+                        ),
+                ),
+            )
+        val session = AndroidCapabilitySession("device-1", probe)
+        session.snapshot()
+        session.setPrivacyMode(true)
+        val delta = session.deltaIfChanged("privacy.toggle")
+
+        assertNotNull(delta)
+        assertFalse(delta!!.capabilities.hasMicrophone())
+        assertFalse(delta.capabilities.hasCamera())
+        assertEquals("privacy.toggle", delta.reason)
+    }
+
+    @Test
     fun staleGenerationRebaselineProducesFullSnapshot() {
         val probe = MutableProbe(baseInput())
         val session = AndroidCapabilitySession("device-1", probe)

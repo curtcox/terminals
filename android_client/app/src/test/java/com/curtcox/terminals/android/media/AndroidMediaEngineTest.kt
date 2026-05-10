@@ -175,5 +175,7 @@ class AndroidMediaEngineTest {
             signals += signal
             return LiveMediaSessionResult.Applied
         }
+
+        override fun stopLocalCaptureStreamsForPrivacy() = Unit
     }
 }

@@ -177,10 +177,8 @@ internal fun NsdServiceInfo.toDiscoveredServer(nowMillis: Long): DiscoveredServe
     )
 }
 
-internal fun NsdServiceInfo.terminalTxtMetadata(): Map<String, String> {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return emptyMap()
-    return parseTerminalTxtAttributes(attributes)
-}
+internal fun NsdServiceInfo.terminalTxtMetadata(): Map<String, String> =
+    parseTerminalTxtAttributes(attributes)
 
 internal fun parseTerminalTxtAttributes(attributes: Map<String, ByteArray>): Map<String, String> =
     attributes.mapNotNull { (key, value) ->

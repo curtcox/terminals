@@ -1355,6 +1355,10 @@ Remaining validation:
 - Added `AndroidUiLayeringKonsistTest` (`com.lemonappdev:konsist`) to assert `com.curtcox.terminals.android.ui` production files do not import `connection`, `discovery`, `media`, or `platform` packages — a JVM mirror of the `ui` subtree check in `scripts/check-android-client-boundary.sh`.
 - Fixed `compileDebugAndroidTestKotlin` under `allWarningsAsErrors`: legacy-scroll parity tests that call deprecated protobuf `ScrollWidget.setDirection(String)` now use `@Suppress("DEPRECATION")` on the test methods so intentional Flutter/string-direction coverage does not fail the instrumentation compile gate.
 
+### 2026-05-10 (Flutter `privacy.toggle` parity)
+
+- Added privacy mode to `AndroidCapabilitySession` (masks microphone/camera in snapshots and deltas), `AndroidControlSession.setPrivacyMode`, connect/reconnect handshake application from `AndroidTerminalViewState.privacyModeEnabled`, and `AndroidTerminalViewModel.togglePrivacyMode` / interception of server-driven `privacy.toggle` (no spurious `UIAction`). Wired `AndroidMediaEngine.stopLocalCaptureStreamsForPrivacy` through `AndroidLiveMediaSession` (no-op until real live capture tracks streams). Shell **Privacy** button + `privacy_mode` diagnostics; documented in `docs/client-android.md`. JVM: `AndroidCapabilitySessionTest`, `AndroidControlSessionControllerTest.privacyModeStripsMicAndCameraFromCapabilityDelta`, `AndroidTerminalViewModelTest` privacy cases; instrumentation fakes implement `setPrivacyMode`; `MainActivityLaunchSmokeTest` asserts `terminal-privacy-toggle-button`. Minor lint hygiene: removed redundant pre-Lollipop branch in `AndroidNsdDiscovery.terminalTxtMetadata` (minSdk 25), `ManualEndpointParser` path `orEmpty()`, ViewModel `compareBy`/`mutableState.update` clarity; lint baseline line drift. Re-verified `make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, and boundary scripts.
+
 ## Test Plan
 
 ### Unit tests

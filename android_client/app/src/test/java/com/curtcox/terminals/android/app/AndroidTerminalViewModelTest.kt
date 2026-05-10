@@ -131,6 +131,59 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun privacyToggleServerDrivenActionDoesNotSendUiAction() = runTest(testDispatcher) {
+        val session = FakeSession(capabilityDeltaSent = true)
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.sendUiAction(ServerDrivenAction("act:main/privacy_toggle", "privacy.toggle", ""))
+        advanceUntilIdle()
+
+        assertTrue(session.actions.isEmpty())
+        assertTrue(session.capabilityDeltaReasons.contains("privacy.toggle"))
+        assertEquals(listOf(false, true), session.privacyModeCalls)
+        assertTrue(viewModel.state.value.privacyModeEnabled)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("privacy_mode=true"))
+
+        viewModel.sendUiAction(ServerDrivenAction("act:main/privacy_toggle", "privacy.toggle", ""))
+        advanceUntilIdle()
+        assertFalse(viewModel.state.value.privacyModeEnabled)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("privacy_mode=false"))
+        assertEquals(listOf(false, true, false), session.privacyModeCalls)
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun connectAppliesPrivacyModeFromStateBeforeHandshake() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            networkStateProvider = AndroidNetworkStateProvider {
+                AndroidNetworkState(connected = true, metered = false)
+            },
+        )
+
+        viewModel.togglePrivacyMode()
+        advanceUntilIdle()
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        assertEquals(listOf(true), session.privacyModeCalls)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun chromeBugReportQueuedWhenOffline() = runTest(testDispatcher) {
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -2786,10 +2839,15 @@ class AndroidTerminalViewModelTest {
         val streamReadyIds = mutableListOf<String>()
         val systemCommands = mutableListOf<Pair<String, String>>()
         val capabilityDeltaReasons = mutableListOf<String>()
+        val privacyModeCalls = mutableListOf<Boolean>()
         var rebaselineCount = 0
         var heartbeatCount = 0
         var sensorTelemetryCount = 0
         var closeCount = 0
+
+        override fun setPrivacyMode(enabled: Boolean) {
+            privacyModeCalls += enabled
+        }
 
         override suspend fun connect(endpoint: EndpointResolution) {
             connectGate?.await()

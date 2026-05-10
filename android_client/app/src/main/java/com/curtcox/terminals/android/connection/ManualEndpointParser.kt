@@ -40,7 +40,7 @@ class ManualEndpointParser {
                 scheme == "https" || scheme == "wss" -> 443
                 else -> 80
             }
-        val path = uri.rawPath.takeUnless { it.isNullOrBlank() || it == "/" } ?: ""
+        val path = uri.rawPath.takeUnless { p -> p.isNullOrBlank() || p == "/" }.orEmpty()
         return EndpointResolution(
             host = host,
             port = port,

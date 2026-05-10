@@ -3,7 +3,9 @@ package com.curtcox.terminals.android.connection
 import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySession
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
+import com.curtcox.terminals.android.capabilities.AndroidHardwareCapabilities
 import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics
+import com.curtcox.terminals.android.capabilities.PermissionCapabilityState
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import com.curtcox.terminals.android.util.Clock
 import kotlinx.coroutines.test.runTest
@@ -60,6 +62,25 @@ class AndroidControlSessionControllerTest {
         assertTrue(client.sent[3].hasInput())
         assertTrue(client.sent[3].input.hasKey())
         assertEquals("x", client.sent[3].input.key.text)
+    }
+
+    @Test
+    fun privacyModeStripsMicAndCameraFromCapabilityDelta() = runTest {
+        val client = FakeControlClient()
+        val probe = MutableProbe(baseInputWithMicAndCamera())
+        val controller = controller(client = client, probe = probe)
+
+        controller.connect(EndpointResolution("terminal.local", 8080))
+        assertTrue(client.sent[1].capabilitySnapshot.capabilities.hasMicrophone())
+        assertTrue(client.sent[1].capabilitySnapshot.capabilities.hasCamera())
+        client.sent.clear()
+
+        controller.setPrivacyMode(true)
+        assertTrue(controller.sendCapabilityDeltaIfChanged("privacy.toggle"))
+        assertTrue(client.sent.last().hasCapabilityDelta())
+        assertEquals("privacy.toggle", client.sent.last().capabilityDelta.reason)
+        assertFalse(client.sent.last().capabilityDelta.capabilities.hasMicrophone())
+        assertFalse(client.sent.last().capabilityDelta.capabilities.hasCamera())
     }
 
     @Test
@@ -253,6 +274,20 @@ class AndroidControlSessionControllerTest {
                     density = 2f,
                     orientation = "landscape",
                 ),
+            )
+
+        fun baseInputWithMicAndCamera(): AndroidCapabilitySnapshotInput =
+            baseInput().copy(
+                hardware =
+                    AndroidHardwareCapabilities(
+                        microphone = true,
+                        frontCamera = true,
+                    ),
+                permissions =
+                    PermissionCapabilityState(
+                        microphoneGranted = true,
+                        cameraGranted = true,
+                    ),
             )
     }
 }

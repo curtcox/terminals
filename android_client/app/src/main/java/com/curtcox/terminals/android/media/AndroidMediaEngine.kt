@@ -21,6 +21,8 @@ class AndroidMediaEngine(
     fun applyWebRtcSignal(signal: Control.WebRTCSignal): LiveMediaSessionResult =
         liveMedia.applyWebRtcSignal(signal)
 
+    fun stopLocalCaptureStreamsForPrivacy() = liveMedia.stopLocalCaptureStreamsForPrivacy()
+
     companion object {
         fun unsupported(): AndroidMediaEngine = AndroidMediaEngine()
     }

@@ -106,6 +106,8 @@ class AndroidTerminalMediaSmokeTest {
         override val lastRegisteredCapabilities: Capabilities.DeviceCapabilities? = null
         lateinit var sink: AndroidControlResponseSink
 
+        override fun setPrivacyMode(enabled: Boolean) = Unit
+
         override suspend fun connect(endpoint: EndpointResolution) {
             status = status.copy(connected = true, endpoint = endpoint)
         }

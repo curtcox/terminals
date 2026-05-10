@@ -28,6 +28,7 @@ class MainActivityLaunchSmokeTest {
         rule.onNodeWithTag("terminal-discovery-start-button").assertIsDisplayed()
         rule.onNodeWithTag("terminal-live-media-status").assertIsDisplayed()
         rule.onNodeWithTag("terminal-last-server-activity").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-privacy-toggle-button").assertIsDisplayed()
         rule.onNodeWithTag("terminal-report-bug-button").assertIsDisplayed()
     }
 

@@ -194,6 +194,13 @@ next successful connect. Server-driven actions whose `action` starts with
 emitting a `UIAction`. `BugReportAck` responses are merged into copyable
 diagnostics like other terminal chrome.
 
+**Privacy** (Flutter `privacy.toggle` parity): the shell **Privacy** button and
+any server-driven action with `action` `privacy.toggle` toggle local privacy mode
+(withdraws microphone and camera from the next capability snapshot/delta, stops
+local capture via the live-media seam, and does not send a `UIAction`). Toggles
+while connected request a capability delta with reason `privacy.toggle`.
+Copyable diagnostics include `privacy_mode=true|false`.
+
 While connected, the shell exposes **Runtime status** and **Device status**
 actions (Flutter shell parity). Each sends a protobuf `ConnectRequest` with
 `CommandRequest` kind `COMMAND_KIND_SYSTEM` and intent `runtime_status` or

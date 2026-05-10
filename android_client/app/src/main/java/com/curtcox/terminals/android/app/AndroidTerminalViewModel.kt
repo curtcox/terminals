@@ -84,8 +84,8 @@ class AndroidTerminalViewModel(
                     if (connectedSession != null) {
                         runCatching { connectedSession.sendStreamReady(streamId) }
                             .onSuccess {
-                                mutableState.update {
-                                    val next = it.copy(streamReadySendCount = it.streamReadySendCount + 1)
+                                mutableState.update { state ->
+                                    val next = state.copy(streamReadySendCount = state.streamReadySendCount + 1)
                                     next.copy(
                                         diagnosticsText =
                                             formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next),
@@ -131,7 +131,7 @@ class AndroidTerminalViewModel(
                     diagnostics += "\nlast_media=${mediaStatus.first}:${mediaStatus.second}"
                 }
                 val resolvedLiveMediaLine = liveMediaLine ?: next.lastLiveMediaLine
-                resolvedLiveMediaLine?.takeIf { it.isNotBlank() }?.let { line ->
+                resolvedLiveMediaLine?.takeIf(String::isNotBlank)?.let { line ->
                     diagnostics += "\nlast_live_media=$line"
                 }
                 next.copy(
@@ -256,6 +256,7 @@ class AndroidTerminalViewModel(
                 stopCapabilityMonitor()
                 session?.close()
                 nextSession = dependencies.sessionFactory(responseSink)
+                nextSession.setPrivacyMode(mutableState.value.privacyModeEnabled)
                 session = nextSession
                 nextSession.connect(resolved)
                 dependencies.terminalSettings.setLastManualEndpoint(mutableState.value.endpointText)
@@ -324,7 +325,9 @@ class AndroidTerminalViewModel(
                     val current = it.discoveryState.servers
                     val nextServers = (current.filterNot { existing ->
                         existing.host == server.host && existing.port == server.port
-                    } + server).sortedWith(compareBy<DiscoveredServer> { discoveredEndpointText(it) }.thenBy { it.name })
+                    } + server).sortedWith(
+                        compareBy<DiscoveredServer>({ s -> discoveredEndpointText(s) }, { s -> s.name }),
+                    )
                     it.copy(
                         discoveryState = it.discoveryState.copy(
                             scanning = true,
@@ -401,12 +404,19 @@ class AndroidTerminalViewModel(
             submitBugReportFromServerDrivenAction(action)
             return
         }
+        if (action.action == "privacy.toggle") {
+            togglePrivacyMode()
+            return
+        }
         viewModelScope.launch {
             runCatching {
                 session?.sendUiAction(action) ?: error("Control stream is not connected.")
             }.onSuccess {
-                mutableState.update {
-                    it.copy(diagnosticsText = "${it.diagnosticsText}\nlast_ui_action=${action.componentId}:${action.action}:${action.value}")
+                mutableState.update { st ->
+                    val actionLine =
+                        "${st.diagnosticsText}\nlast_ui_action=" +
+                            "${action.componentId}:${action.action}:${action.value}"
+                    st.copy(diagnosticsText = actionLine)
                 }
             }.onFailure { error ->
                 mutableState.update {
@@ -460,6 +470,27 @@ class AndroidTerminalViewModel(
     private fun nextDebugRequestId(prefix: String): String {
         debugCommandSeq += 1
         return "$prefix-$debugCommandSeq"
+    }
+
+    /**
+     * Flutter shell **Privacy** / `privacy.toggle` UI action: stops local capture, toggles privacy mode,
+     * and sends a capability delta with reason `privacy.toggle` when connected.
+     */
+    fun togglePrivacyMode() {
+        dependencies.mediaEngine.stopLocalCaptureStreamsForPrivacy()
+        val nextPrivacy = !mutableState.value.privacyModeEnabled
+        session?.setPrivacyMode(nextPrivacy)
+        mutableState.update { st ->
+            val updated = st.copy(privacyModeEnabled = nextPrivacy)
+            updated.copy(
+                diagnosticsText = formatDiagnostics(
+                    parser.parse(updated.endpointText),
+                    updated.connectionState,
+                    updated,
+                ),
+            )
+        }
+        refreshCapabilities("privacy.toggle")
     }
 
     /** Flutter `BugReportButton` / shell filing parity — sends [Diagnostics.BugReport] on the control stream. */
@@ -547,9 +578,9 @@ class AndroidTerminalViewModel(
             if (currentSession != null && connected) {
                 runCatching { currentSession.sendBugReport(report) }
                     .onSuccess {
-                        val word = report.sourceHintsMap["bug_token_word"] ?: ""
-                        mutableState.update {
-                            it.copy(
+                        val word = report.sourceHintsMap["bug_token_word"].orEmpty()
+                        mutableState.update { st ->
+                            st.copy(
                                 lastBugReportSubmitStatus = "Sent bug report ${report.reportId} (word=$word).",
                                 lastError = null,
                             )
@@ -565,7 +596,7 @@ class AndroidTerminalViewModel(
                     }
             } else {
                 bugReportQueue.addLast(report)
-                val word = report.sourceHintsMap["bug_token_word"] ?: ""
+                val word = report.sourceHintsMap["bug_token_word"].orEmpty()
                 mutableState.update {
                     it.copy(
                         lastBugReportSubmitStatus = "Queued bug report (word=$word) until connected.",
@@ -586,7 +617,7 @@ class AndroidTerminalViewModel(
             runCatching { target.sendBugReport(report) }
                 .onSuccess {
                     sent++
-                    lastWord = report.sourceHintsMap["bug_token_word"] ?: ""
+                    lastWord = report.sourceHintsMap["bug_token_word"].orEmpty()
                 }
                 .onFailure { e ->
                     lastFailure = e.message ?: e.javaClass.simpleName
@@ -736,8 +767,8 @@ class AndroidTerminalViewModel(
         runCatching {
             dependencies.diagnosticClipboard.copy(diagnostics)
         }.onSuccess {
-            mutableState.update {
-                it.copy(lastDiagnosticsCopyStatus = "copied")
+            mutableState.update { st ->
+                st.copy(lastDiagnosticsCopyStatus = "copied")
             }
         }.onFailure { error ->
             mutableState.update {
@@ -764,8 +795,8 @@ class AndroidTerminalViewModel(
             dependencies.keepAwakeController.setKeepAwake(enabled)
         }.onSuccess {
             dependencies.terminalSettings.setKeepAwakeEnabled(enabled)
-            mutableState.update {
-                val next = it.copy(localKeepAwakeEnabled = enabled)
+            mutableState.update { st ->
+                val next = st.copy(localKeepAwakeEnabled = enabled)
                 next.copy(
                     diagnosticsText = formatDiagnostics(
                         parser.parse(next.endpointText),
@@ -801,8 +832,8 @@ class AndroidTerminalViewModel(
             dependencies.fullscreenController.setFullscreen(enabled, sticky)
         }.onSuccess {
             dependencies.terminalSettings.setFullscreenEnabled(enabled)
-            mutableState.update {
-                val next = it.copy(localFullscreenEnabled = enabled)
+            mutableState.update { st ->
+                val next = st.copy(localFullscreenEnabled = enabled)
                 next.copy(
                     diagnosticsText = formatDiagnostics(
                         parser.parse(next.endpointText),
@@ -858,8 +889,8 @@ class AndroidTerminalViewModel(
             dependencies.brightnessController.setBrightness(if (enabled) 1.0 else 0.5)
         }.onSuccess {
             dependencies.terminalSettings.setBrightDisplayEnabled(enabled)
-            mutableState.update {
-                val next = it.copy(localBrightDisplayEnabled = enabled)
+            mutableState.update { st ->
+                val next = st.copy(localBrightDisplayEnabled = enabled)
                 next.copy(
                     diagnosticsText = formatDiagnostics(
                         parser.parse(next.endpointText),
@@ -1024,6 +1055,7 @@ class AndroidTerminalViewModel(
                     )
                 }
                 val nextSession = dependencies.sessionFactory(responseSink)
+                nextSession.setPrivacyMode(mutableState.value.privacyModeEnabled)
                 val connected = runCatching {
                     nextSession.connect(endpoint)
                     mutableState.update {
@@ -1249,6 +1281,7 @@ class AndroidTerminalViewModel(
                 appendLine("local_fullscreen=${src.localFullscreenEnabled}")
                 appendLine("local_immersive_sticky=${src.localImmersiveStickyEnabled}")
                 appendLine("local_bright_display=${src.localBrightDisplayEnabled}")
+                appendLine("privacy_mode=${src.privacyModeEnabled}")
             }
         }
     }

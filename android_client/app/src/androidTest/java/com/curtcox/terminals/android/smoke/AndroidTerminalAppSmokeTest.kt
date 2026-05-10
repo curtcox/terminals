@@ -758,6 +758,8 @@ class AndroidTerminalAppSmokeTest {
         override val lastRegisteredCapabilities: Capabilities.DeviceCapabilities? = null
         lateinit var sink: AndroidControlResponseSink
         var connectedEndpoint: EndpointResolution? = null
+
+        override fun setPrivacyMode(enabled: Boolean) = Unit
         var closed: Boolean = false
         val actions = mutableListOf<ServerDrivenAction>()
         val capabilityRefreshReasons = mutableListOf<String>()

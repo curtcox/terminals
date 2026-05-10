@@ -16,19 +16,26 @@ class AndroidCapabilitySession(
     private var generation: Long = 0
     private var lastCapabilities: Capabilities.DeviceCapabilities? = null
 
+    /** When true, advertised capabilities omit microphone and camera (Flutter `privacy.toggle` parity). */
+    private var privacyModeEnabled: Boolean = false
+
+    fun setPrivacyMode(enabled: Boolean) {
+        privacyModeEnabled = enabled
+    }
+
     /** Last capabilities sent on the control stream (snapshot or delta), for sensor telemetry parity. */
     val lastRegisteredCapabilities: Capabilities.DeviceCapabilities?
         get() = lastCapabilities
 
     fun snapshot(reason: String = "initial"): AndroidCapabilityReport {
         generation += 1
-        val capabilities = buildCapabilities(deviceId, probe.current())
+        val capabilities = effectiveCapabilities(deviceId, probe.current())
         lastCapabilities = capabilities
         return AndroidCapabilityReport(generation, capabilities, reason, fullSnapshot = true)
     }
 
     fun deltaIfChanged(reason: String): AndroidCapabilityReport? {
-        val capabilities = buildCapabilities(deviceId, probe.current())
+        val capabilities = effectiveCapabilities(deviceId, probe.current())
         if (capabilities == lastCapabilities) {
             return null
         }
@@ -38,6 +45,15 @@ class AndroidCapabilitySession(
     }
 
     fun rebaselineAfterStaleGeneration(): AndroidCapabilityReport = snapshot("stale-generation")
+
+    private fun effectiveCapabilities(
+        deviceId: String,
+        input: AndroidCapabilitySnapshotInput,
+    ): Capabilities.DeviceCapabilities {
+        val built = buildCapabilities(deviceId, input)
+        if (!privacyModeEnabled) return built
+        return built.toBuilder().clearMicrophone().clearCamera().build()
+    }
 
     companion object {
         fun buildCapabilities(
