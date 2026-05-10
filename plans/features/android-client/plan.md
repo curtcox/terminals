@@ -782,7 +782,7 @@ Gradle (`make android-client-test`, `lintDebug`, `assembleDebug`) should be re-r
 
 Remaining validation:
 
-- Run `cd android_client && ./gradlew connectedDebugAndroidTest` on an emulator or Fire tablet.
+- GitHub Actions runs `connectedDebugAndroidTest` on an API 30 emulator for qualifying PRs (see `.github/workflows/android-client-ci.yml`). Locally, still run `cd android_client && ./gradlew connectedDebugAndroidTest` on a Fire tablet or different emulator/API when changing instrumentation-sensitive behavior.
 - Smoke-test manual connection to `make run-server` on a physical Fire OS 6+ tablet.
 - Confirm Android NSD discovery behavior on a multicast-capable Wi-Fi network (Fire OS fallback is documented under **Discovery (NSD / mDNS) quirks** in `docs/client-android.md`).
 - Live WebRTC send/receive remains **explicitly disabled** via `AndroidWebRtcAdapter.disabled(...)` until a follow-up selects Fire‑OS‑compatible dependencies; diagnostics surface the reason and capabilities must not falsely advertise transport (`docs/client-android.md`).
@@ -1294,6 +1294,11 @@ Remaining validation:
 
 - Clarified in `docs/client-android.md` that envelope resume hints apply to WebSocket (and similar transports), not the `grpc://` / `grpcs://` carrier.
 - Re-ran `make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
+
+### 2026-05-09 (CI: emulator instrumentation)
+
+- Added parallel job `android-client-instrumentation` to `.github/workflows/android-client-ci.yml` using `reactivecircus/android-emulator-runner@v2` (API 30, `google_apis`, x86_64) to run `./gradlew connectedDebugAndroidTest`, so instrumentation smoke runs on every qualifying push/PR without a physical tablet.
+- Documented PR emulator coverage in `docs/client-android.md` and clarified **Remaining validation** above (CI emulator vs local/Fire tablet smoke).
 
 ### 2026-05-09 (Phase 7: immersive/sticky kiosk preference)
 

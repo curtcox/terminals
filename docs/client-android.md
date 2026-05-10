@@ -84,6 +84,11 @@ make android-client-connected-test
 If `adb` is missing or no device is attached, the Make target skips with a clear
 message instead of failing Android client validation.
 
+Pull requests that touch `android_client/` (and related paths) also run
+`connectedDebugAndroidTest` on an API 30 emulator in GitHub Actions (see
+`.github/workflows/android-client-ci.yml`), in addition to JVM unit tests and
+instrumentation compile checks.
+
 ## Fire Tablet Setup
 
 1. Open Fire tablet settings.
