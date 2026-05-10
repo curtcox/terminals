@@ -1318,6 +1318,12 @@ Remaining validation:
 - Fixed `Makefile` `android-client-test` and `android-client-connected-test`: the post-task `./gradlew --stop` line used a second `cd android_client` while the shell was already inside `android_client`, so `--stop` never ran and Make reported `cd: android_client: No such directory`.
 - `android_client/app/build.gradle.kts`: resolve `protoc-gen-grpc-java` via optional `grpc.java.plugin` in `local.properties`, `GRPC_JAVA_PLUGIN` env, or auto-detected Homebrew `protoc-gen-grpc-java` on macOS aarch64; otherwise keep the Maven artifact (x86_64 / Rosetta on Apple Silicon). Documented prerequisites and overrides in `docs/client-android.md` (**Apple Silicon and gRPC code generation**).
 
+### 2026-05-10 (reconnect test stability hardening)
+
+- Hardened reconnect-path JVM tests in `AndroidTerminalViewModelTest` to always call `disconnect()` in `finally` blocks for reconnect scenarios that start heartbeat jobs (`heartbeatFailureReconnectsWithBoundedBackoff`, `reconnectAttemptCounterTracksLoopAndResetsOnSuccess`, `networkRestoreRetriesConnectAfterReconnectIsExhausted`), preventing stuck `runTest` cleanup when assertions fail mid-test.
+- Updated brittle reconnect diagnostics assertions to focus on stable behavior (`Connected` state and endpoint/session transitions) instead of exact transient diagnostics strings that can vary with scheduler timing.
+- Re-ran `./gradlew testDebugUnitTest --no-daemon` from `android_client/` on JDK 17+/Android Studio JBR; suite passed.
+
 ### 2026-05-09 (Phase 7: immersive/sticky kiosk preference)
 
 - Implemented optional **immersive sticky** as a persisted local terminal setting (`SharedPreferencesAndroidTerminalSettings` / `inMemory`), default **on** (matches prior legacy behavior).

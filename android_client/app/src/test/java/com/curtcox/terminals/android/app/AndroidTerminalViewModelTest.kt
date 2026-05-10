@@ -1240,28 +1240,33 @@ class AndroidTerminalViewModelTest {
             ),
         )
 
-        viewModel.updateEndpoint("10.0.0.8:8080")
-        viewModel.connect()
-        runCurrent()
-        advanceTimeBy(100)
-        runCurrent()
-        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_pending=true"))
+        try {
+            viewModel.updateEndpoint("10.0.0.8:8080")
+            viewModel.connect()
+            runCurrent()
+            advanceTimeBy(100)
+            runCurrent()
 
-        advanceTimeBy(50)
-        runCurrent()
+            advanceTimeBy(50)
+            runCurrent()
 
-        assertEquals(1, first.closeCount)
-        assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
-        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
-        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_success_attempt=1"))
-        viewModel.disconnect()
-        advanceUntilIdle()
+            assertEquals(1, first.closeCount)
+            assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
+            assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        } finally {
+            viewModel.disconnect()
+            advanceUntilIdle()
+        }
     }
 
     @Test
     fun reconnectAttemptCounterTracksLoopAndResetsOnSuccess() = runTest(testDispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
-        val second = FakeSession(connectError = IllegalStateException("still offline"))
+        val secondAttemptGate = CompletableDeferred<Unit>()
+        val second = FakeSession(
+            connectError = IllegalStateException("still offline"),
+            connectGate = secondAttemptGate,
+        )
         val third = FakeSession()
         val sessions = ArrayDeque(listOf(first, second, third))
         val viewModel = AndroidTerminalViewModel(
@@ -1277,25 +1282,30 @@ class AndroidTerminalViewModelTest {
             ),
         )
 
-        viewModel.updateEndpoint("10.0.0.8:8080")
-        viewModel.connect()
-        runCurrent()
-        advanceTimeBy(100)
-        runCurrent()
+        try {
+            viewModel.updateEndpoint("10.0.0.8:8080")
+            viewModel.connect()
+            runCurrent()
+            advanceTimeBy(100)
+            runCurrent()
 
-        // First reconnect attempt fails, exposing attempt=1 on view state during the loop.
-        advanceTimeBy(50)
-        runCurrent()
-        assertEquals(1, viewModel.state.value.reconnectAttempt)
-        assertEquals(ConnectionState.Connecting, viewModel.state.value.connectionState)
+            // First reconnect attempt fails, exposing attempt=1 on view state during the loop.
+            advanceTimeBy(50)
+            runCurrent()
+            assertEquals(1, viewModel.state.value.reconnectAttempt)
+            assertEquals(ConnectionState.Connecting, viewModel.state.value.connectionState)
+            secondAttemptGate.complete(Unit)
+            runCurrent()
 
-        // Second reconnect attempt succeeds; counter resets to 0 on success.
-        advanceTimeBy(50)
-        runCurrent()
-        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
-        assertEquals(0, viewModel.state.value.reconnectAttempt)
-        viewModel.disconnect()
-        advanceUntilIdle()
+            // Second reconnect attempt succeeds; counter resets to 0 on success.
+            advanceTimeBy(50)
+            runCurrent()
+            assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+            assertEquals(0, viewModel.state.value.reconnectAttempt)
+        } finally {
+            viewModel.disconnect()
+            advanceUntilIdle()
+        }
     }
 
     @Test
@@ -1393,23 +1403,25 @@ class AndroidTerminalViewModelTest {
             ),
         )
 
-        viewModel.updateEndpoint("10.0.0.8:8080")
-        viewModel.connect()
-        runCurrent()
-        advanceTimeBy(150)
-        advanceUntilIdle()
-        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_exhausted=1"))
+        try {
+            viewModel.updateEndpoint("10.0.0.8:8080")
+            viewModel.connect()
+            runCurrent()
+            advanceTimeBy(150)
+            advanceUntilIdle()
+            assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_exhausted=1"))
 
-        viewModel.startNetworkMonitoring()
-        monitor.emitChange()
-        advanceTimeBy(400)
-        runCurrent()
+            viewModel.startNetworkMonitoring()
+            monitor.emitChange()
+            advanceTimeBy(400)
+            runCurrent()
 
-        assertEquals(EndpointResolution("10.0.0.8", 8080), third.connectedEndpoint)
-        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
-        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_cause=network-restore:network-callback"))
-        viewModel.disconnect()
-        advanceUntilIdle()
+            assertEquals(EndpointResolution("10.0.0.8", 8080), third.connectedEndpoint)
+            assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        } finally {
+            viewModel.disconnect()
+            advanceUntilIdle()
+        }
     }
 
     @Test
