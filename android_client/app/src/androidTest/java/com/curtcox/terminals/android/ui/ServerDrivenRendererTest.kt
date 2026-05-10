@@ -623,6 +623,7 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    @Suppress("DEPRECATION") // Exercises legacy protobuf string `direction` (Flutter parity); prefer direction_enum for new trees.
     fun verticalScrollDeprecatedStringDirectionRendersChildrenInColumn() {
         val root = Ui.Node.newBuilder()
             .setId("root")
@@ -644,6 +645,7 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    @Suppress("DEPRECATION") // Exercises legacy protobuf string `direction` (Flutter parity); prefer direction_enum for new trees.
     fun horizontalScrollDeprecatedStringDirectionRendersChildrenInRow() {
         val root = Ui.Node.newBuilder()
             .setId("scroll")

@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-10 (`make android-client-test`, `make android-client-compile-android-test`, boundary scripts; `connectedDebugAndroidTest` not re-run in this session after the combined refresh change).
+Last local validation: 2026-05-10 (`make android-client-test`, `make android-client-compile-android-test`, boundary scripts; `connectedDebugAndroidTest` not re-run in this session after Konsist + instrumentation deprecation-suppress fix).
 
 Passed:
 
@@ -1349,6 +1349,11 @@ Remaining validation:
 - `AndroidTerminalViewModel` exposes `sendRuntimeStatusQuery` and `sendDeviceStatusQuery` with the same intents as the Flutter shell (`runtime_status`, `device_status <deviceId>`); terminal chrome shows the actions when connected.
 - JVM coverage: `ProtocolBuildersTest`, `AndroidControlSessionControllerTest`, `AndroidTerminalViewModelTest.debugSystemQueriesAreSentThroughConnectedSession`; instrumentation fakes updated for the new session method.
 - Documented in `docs/client-android.md`. Re-run `make android-client-test`, `make android-client-compile-android-test`, and boundary scripts on a JDK 17 + Android SDK host.
+
+### 2026-05-10 (Phase 9: Konsist UI layering + instrumentation Werror)
+
+- Added `AndroidUiLayeringKonsistTest` (`com.lemonappdev:konsist`) to assert `com.curtcox.terminals.android.ui` production files do not import `connection`, `discovery`, `media`, or `platform` packages — a JVM mirror of the `ui` subtree check in `scripts/check-android-client-boundary.sh`.
+- Fixed `compileDebugAndroidTestKotlin` under `allWarningsAsErrors`: legacy-scroll parity tests that call deprecated protobuf `ScrollWidget.setDirection(String)` now use `@Suppress("DEPRECATION")` on the test methods so intentional Flutter/string-direction coverage does not fail the instrumentation compile gate.
 
 ## Test Plan
 
