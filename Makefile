@@ -155,7 +155,7 @@ android-client-test:
 		else \
 			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew testDebugUnitTest; \
 			ec=$$?; \
-			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew --stop || true; \
+			JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew --stop || true; \
 			exit $$ec; \
 		fi; \
 	else \
@@ -195,7 +195,7 @@ android-client-connected-test:
 		else \
 			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew connectedDebugAndroidTest; \
 			ec=$$?; \
-			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew --stop || true; \
+			JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew --stop || true; \
 			exit $$ec; \
 		fi; \
 	else \

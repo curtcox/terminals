@@ -1308,6 +1308,11 @@ Remaining validation:
 
 - Matched Flutter shell bug-report attachments: `AndroidBugReportBuilder` sets protobuf `screenshot_png` and `screenshot_byte_count` when non-empty bytes are supplied; `AndroidTerminalViewModel` captures via `AndroidClientDependencies.bugReportScreenshotCapture` (production `MainActivity` wires `WindowBugReportScreenshotCapture.capturePngOrNull` on the activity window). Failures or zero-size views omit the field. Added JVM coverage (`AndroidBugReportBuilderTest`, `AndroidTerminalViewModelTest`). Documented in `docs/client-android.md`. Re-run `make android-client-test`, `make android-client-lint`, and boundary scripts on a JDK 17 + Android SDK host.
 
+### 2026-05-10 (Makefile Gradle stop + Apple Silicon gRPC codegen)
+
+- Fixed `Makefile` `android-client-test` and `android-client-connected-test`: the post-task `./gradlew --stop` line used a second `cd android_client` while the shell was already inside `android_client`, so `--stop` never ran and Make reported `cd: android_client: No such directory`.
+- `android_client/app/build.gradle.kts`: resolve `protoc-gen-grpc-java` via optional `grpc.java.plugin` in `local.properties`, `GRPC_JAVA_PLUGIN` env, or auto-detected Homebrew `protoc-gen-grpc-java` on macOS aarch64; otherwise keep the Maven artifact (x86_64 / Rosetta on Apple Silicon). Documented prerequisites and overrides in `docs/client-android.md` (**Apple Silicon and gRPC code generation**).
+
 ### 2026-05-09 (Phase 7: immersive/sticky kiosk preference)
 
 - Implemented optional **immersive sticky** as a persisted local terminal setting (`SharedPreferencesAndroidTerminalSettings` / `inMemory`), default **on** (matches prior legacy behavior).

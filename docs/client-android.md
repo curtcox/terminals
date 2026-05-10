@@ -31,6 +31,19 @@ Android code without a follow-up plan.
 
 `make android-client-build`, `android-client-test`, `android-client-lint`, and `android-client-compile-android-test` resolve a JDK automatically in this order: a working `JAVA_HOME` if set, Homebrew `openjdk@17`, Android Studio’s JBR under `Applications` or `~/Applications`, common Linux OpenJDK 17 paths, then macOS `/usr/libexec/java_home`. If no JDK is found, those targets skip with an explicit message instead of invoking Gradle with an empty `JAVA_HOME`.
 
+### Apple Silicon and gRPC code generation
+
+The protobuf Gradle task uses `io.grpc:protoc-gen-grpc-java` from Maven Central. Those macOS plugin binaries are **x86_64** (they rely on Rosetta on Apple Silicon). If `./gradlew` fails during `:app:generateDebugProto` with `bad CPU type` / `program not found or is not executable`, use one of:
+
+1. **Rosetta 2** (no repo config): `softwareupdate --install-rosetta` (or install any x86 app and accept the Rosetta prompt), then re-run Gradle.
+2. **Native plugin from Homebrew**: `brew install protoc-gen-grpc-java`, then either rely on auto-detection of `/opt/homebrew/bin/protoc-gen-grpc-java` (and `/usr/local/bin/protoc-gen-grpc-java` on Intel Homebrew), or set an explicit path in `android_client/local.properties`:
+   ```properties
+   grpc.java.plugin=/opt/homebrew/bin/protoc-gen-grpc-java
+   ```
+3. **Environment override** (CI or custom installs): `export GRPC_JAVA_PLUGIN=/absolute/path/to/protoc-gen-grpc-java`
+
+Keep the Homebrew plugin reasonably close to the `io.grpc:grpc-bom` version in `app/build.gradle.kts` (same minor series is usually fine). Linux CI hosts use the Maven artifact as-is.
+
 Set one SDK environment variable:
 
 ```bash

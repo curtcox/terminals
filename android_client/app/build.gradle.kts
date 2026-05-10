@@ -1,7 +1,36 @@
+import java.io.File
 import java.time.Instant
+import java.util.Properties
 import com.google.protobuf.gradle.id
 import com.google.protobuf.gradle.proto
 import org.gradle.api.tasks.testing.logging.TestLogEvent
+
+// Maven Central `protoc-gen-grpc-java` artifacts for macOS are x86_64 binaries (often labeled
+// osx-aarch_64). On Apple Silicon without Rosetta they fail at codegen time; prefer a host
+// `protoc-gen-grpc-java` when available (Homebrew formula `protoc-gen-grpc-java`, or any path
+// via local.properties / env).
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) {
+        f.inputStream().use { load(it) }
+    }
+}
+
+fun resolveGrpcJavaProtocPluginPath(): String? {
+    localProperties.getProperty("grpc.java.plugin")?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    System.getenv("GRPC_JAVA_PLUGIN")?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    val osName = System.getProperty("os.name", "")
+    val osArch = System.getProperty("os.arch", "")
+    if (osName.contains("Mac", ignoreCase = true) && osArch == "aarch64") {
+        listOf(
+            File("/opt/homebrew/bin/protoc-gen-grpc-java"),
+            File("/usr/local/bin/protoc-gen-grpc-java"),
+        ).firstOrNull { it.isFile }?.let { return it.absolutePath }
+    }
+    return null
+}
+
+val grpcJavaProtocPluginPath = resolveGrpcJavaProtocPluginPath()
 
 plugins {
     id("com.android.application")
@@ -76,7 +105,13 @@ protobuf {
     }
     plugins {
         create("grpc") {
-            artifact = "io.grpc:protoc-gen-grpc-java:1.68.3"
+            val hostPlugin = grpcJavaProtocPluginPath
+            if (hostPlugin != null) {
+                path = hostPlugin
+            } else {
+                // Keep in sync with `io.grpc:grpc-bom` below so generated stubs match runtime.
+                artifact = "io.grpc:protoc-gen-grpc-java:1.81.0"
+            }
         }
     }
     generateProtoTasks {
@@ -108,7 +143,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("com.google.protobuf:protobuf-javalite:4.29.3")
-    implementation(platform("io.grpc:grpc-bom:1.68.3"))
+    implementation(platform("io.grpc:grpc-bom:1.81.0"))
     implementation("io.grpc:grpc-okhttp")
     implementation("io.grpc:grpc-protobuf-lite")
     implementation("io.grpc:grpc-stub")
