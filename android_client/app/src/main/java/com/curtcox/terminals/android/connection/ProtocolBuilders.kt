@@ -141,4 +141,18 @@ class ProtocolBuilders(
 
     fun bugReport(report: Diagnostics.BugReport): Control.ConnectRequest =
         Control.ConnectRequest.newBuilder().setBugReport(report).build()
+
+    /** Matches Flutter `buildSystemCommandRequest` (system kind, intent only). */
+    fun systemCommand(
+        requestId: String,
+        intent: String,
+    ): Control.ConnectRequest =
+        Control.ConnectRequest.newBuilder()
+            .setCommand(
+                Control.CommandRequest.newBuilder()
+                    .setRequestId(requestId)
+                    .setKind(Control.CommandKind.COMMAND_KIND_SYSTEM)
+                    .setIntent(intent),
+            )
+            .build()
 }

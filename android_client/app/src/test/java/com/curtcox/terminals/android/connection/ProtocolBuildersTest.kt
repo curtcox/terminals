@@ -177,4 +177,18 @@ class ProtocolBuildersTest {
         assertEquals("rep-1", request.bugReport.reportId)
         assertEquals("test", request.bugReport.description)
     }
+
+    @Test
+    fun systemCommandMatchesFlutterShellSystemQueries() {
+        val runtime = builders.systemCommand("runtime-1", "runtime_status")
+        assertTrue(runtime.hasCommand())
+        assertEquals("runtime-1", runtime.command.requestId)
+        assertEquals(Control.CommandKind.COMMAND_KIND_SYSTEM, runtime.command.kind)
+        assertEquals("runtime_status", runtime.command.intent)
+
+        val device = builders.systemCommand("dev-2", "device_status tablet-abc")
+        assertTrue(device.hasCommand())
+        assertEquals("dev-2", device.command.requestId)
+        assertEquals("device_status tablet-abc", device.command.intent)
+    }
 }

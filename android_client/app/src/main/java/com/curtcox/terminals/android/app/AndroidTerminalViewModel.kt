@@ -176,6 +176,7 @@ class AndroidTerminalViewModel(
     private var effectiveHeartbeatMillis: Long = dependencies.heartbeatIntervalMillis
     /** When false, periodic heartbeat and sensor telemetry are paused (Flutter `AppLifecycle` parity). */
     private var appInForeground: Boolean = true
+    private var debugCommandSeq: Int = 0
     private val bugReportClock: Clock = Clock(dependencies.nowMillis)
     private val bugReportQueue: ArrayDeque<Diagnostics.BugReport> = ArrayDeque()
     private val mutableState = MutableStateFlow(
@@ -413,6 +414,52 @@ class AndroidTerminalViewModel(
                 }
             }
         }
+    }
+
+    /** Flutter shell **Runtime Status** — `COMMAND_KIND_SYSTEM` / `runtime_status`. */
+    fun sendRuntimeStatusQuery() {
+        if (mutableState.value.connectionState != ConnectionState.Connected) return
+        viewModelScope.launch {
+            val id = nextDebugRequestId("debug-runtime-status")
+            runCatching {
+                session?.sendSystemCommand(id, "runtime_status")
+                    ?: error("Control stream is not connected.")
+            }.onSuccess {
+                mutableState.update { st ->
+                    st.copy(diagnosticsText = "${st.diagnosticsText}\nlast_system_command=runtime_status:$id")
+                }
+            }.onFailure { error ->
+                mutableState.update {
+                    it.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+        }
+    }
+
+    /** Flutter shell **Device Status** — `COMMAND_KIND_SYSTEM` / `device_status <deviceId>`. */
+    fun sendDeviceStatusQuery() {
+        if (mutableState.value.connectionState != ConnectionState.Connected) return
+        viewModelScope.launch {
+            val id = nextDebugRequestId("debug-device-status")
+            val intent = "device_status ${dependencies.deviceId}"
+            runCatching {
+                session?.sendSystemCommand(id, intent)
+                    ?: error("Control stream is not connected.")
+            }.onSuccess {
+                mutableState.update { st ->
+                    st.copy(diagnosticsText = "${st.diagnosticsText}\nlast_system_command=device_status:$id")
+                }
+            }.onFailure { error ->
+                mutableState.update {
+                    it.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+        }
+    }
+
+    private fun nextDebugRequestId(prefix: String): String {
+        debugCommandSeq += 1
+        return "$prefix-$debugCommandSeq"
     }
 
     /** Flutter `BugReportButton` / shell filing parity — sends [Diagnostics.BugReport] on the control stream. */

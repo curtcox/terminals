@@ -784,6 +784,8 @@ class AndroidTerminalAppSmokeTest {
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) = Unit
 
+        override suspend fun sendSystemCommand(requestId: String, intent: String) = Unit
+
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
             capabilityRefreshReasons += reason
             return capabilityDeltaResult

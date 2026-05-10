@@ -2397,6 +2397,31 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun debugSystemQueriesAreSentThroughConnectedSession() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.sendRuntimeStatusQuery()
+        viewModel.sendDeviceStatusQuery()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                "debug-runtime-status-1" to "runtime_status",
+                "debug-device-status-2" to "device_status android-native-terminal",
+            ),
+            session.systemCommands,
+        )
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_system_command=runtime_status:debug-runtime-status-1"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_system_command=device_status:debug-device-status-2"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun refreshCapabilitiesAsksConnectedSessionForDelta() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val viewModel = viewModel(session)
@@ -2759,6 +2784,7 @@ class AndroidTerminalViewModelTest {
         private var bugReportAttemptIndex = 0
         val keyTexts = mutableListOf<String>()
         val streamReadyIds = mutableListOf<String>()
+        val systemCommands = mutableListOf<Pair<String, String>>()
         val capabilityDeltaReasons = mutableListOf<String>()
         var rebaselineCount = 0
         var heartbeatCount = 0
@@ -2793,6 +2819,10 @@ class AndroidTerminalViewModelTest {
 
         override suspend fun sendKeyText(text: String) {
             keyTexts += text
+        }
+
+        override suspend fun sendSystemCommand(requestId: String, intent: String) {
+            systemCommands += requestId to intent
         }
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) {

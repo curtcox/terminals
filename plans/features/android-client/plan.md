@@ -1343,6 +1343,13 @@ Remaining validation:
 - Fixed `MainActivity` `onResume` / `onConfigurationChanged` ordering: `refreshPermissionEducation` rebuilt diagnostics and dropped the prior `last_network_refresh` line from `refreshNetworkDiagnostics`. Added `AndroidTerminalViewModel.refreshShellDiagnosticsAndCapabilities` to refresh permission/media education and append both `last_network_refresh` and `last_permission_refresh` in one update, then call `refreshCapabilities` with the lifecycle reason (`activity-resume` vs `display_geometry_change`).
 - Extended `MainActivityConfigurationSmokeTest` and JVM coverage (`refreshShellDiagnosticsAndCapabilitiesKeepsNetworkAndPermissionRefreshLines`). Documented in `docs/client-android.md`.
 
+### 2026-05-10 (Flutter shell debug system-query parity)
+
+- Added `ProtocolBuilders.systemCommand` and `AndroidControlSession.sendSystemCommand` / controller wiring for `COMMAND_KIND_SYSTEM` intents (matches Flutter `buildSystemCommandRequest`).
+- `AndroidTerminalViewModel` exposes `sendRuntimeStatusQuery` and `sendDeviceStatusQuery` with the same intents as the Flutter shell (`runtime_status`, `device_status <deviceId>`); terminal chrome shows the actions when connected.
+- JVM coverage: `ProtocolBuildersTest`, `AndroidControlSessionControllerTest`, `AndroidTerminalViewModelTest.debugSystemQueriesAreSentThroughConnectedSession`; instrumentation fakes updated for the new session method.
+- Documented in `docs/client-android.md`. Re-run `make android-client-test`, `make android-client-compile-android-test`, and boundary scripts on a JDK 17 + Android SDK host.
+
 ## Test Plan
 
 ### Unit tests

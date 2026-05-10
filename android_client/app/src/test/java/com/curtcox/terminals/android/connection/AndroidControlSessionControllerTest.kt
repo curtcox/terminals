@@ -125,6 +125,33 @@ class AndroidControlSessionControllerTest {
     }
 
     @Test
+    fun sendSystemCommandUsesProtocolBuilder() = runTest {
+        val client = FakeControlClient()
+        val controller = controller(client = client)
+        controller.connect(EndpointResolution("10.0.0.8", 8080))
+        client.sent.clear()
+
+        controller.sendSystemCommand("q-1", "runtime_status")
+
+        assertTrue(client.sent.single().hasCommand())
+        assertEquals("q-1", client.sent.single().command.requestId)
+        assertEquals(Control.CommandKind.COMMAND_KIND_SYSTEM, client.sent.single().command.kind)
+        assertEquals("runtime_status", client.sent.single().command.intent)
+    }
+
+    @Test
+    fun sendSystemCommandNoOpsWhenRequestIdBlank() = runTest {
+        val client = FakeControlClient()
+        val controller = controller(client = client)
+        controller.connect(EndpointResolution("10.0.0.8", 8080))
+        client.sent.clear()
+
+        controller.sendSystemCommand("", "runtime_status")
+
+        assertTrue(client.sent.isEmpty())
+    }
+
+    @Test
     fun sendStreamReadyUsesProtocolBuilder() = runTest {
         val client = FakeControlClient()
         val controller = controller(client = client)

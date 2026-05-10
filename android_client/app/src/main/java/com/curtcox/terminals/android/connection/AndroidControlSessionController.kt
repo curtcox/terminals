@@ -24,6 +24,7 @@ interface AndroidControlSession {
     suspend fun sendStreamReady(streamId: String)
     suspend fun sendKeyText(text: String)
     suspend fun sendBugReport(report: Diagnostics.BugReport)
+    suspend fun sendSystemCommand(requestId: String, intent: String)
     suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean
     suspend fun rebaselineCapabilitiesAfterStaleGeneration()
     suspend fun close()
@@ -96,6 +97,11 @@ class AndroidControlSessionController(
 
     override suspend fun sendBugReport(report: Diagnostics.BugReport) {
         client.send(builders.bugReport(report))
+    }
+
+    override suspend fun sendSystemCommand(requestId: String, intent: String) {
+        if (requestId.isEmpty() || intent.isEmpty()) return
+        client.send(builders.systemCommand(requestId, intent))
     }
 
     override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {

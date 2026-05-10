@@ -194,6 +194,13 @@ next successful connect. Server-driven actions whose `action` starts with
 emitting a `UIAction`. `BugReportAck` responses are merged into copyable
 diagnostics like other terminal chrome.
 
+While connected, the shell exposes **Runtime status** and **Device status**
+actions (Flutter shell parity). Each sends a protobuf `ConnectRequest` with
+`CommandRequest` kind `COMMAND_KIND_SYSTEM` and intent `runtime_status` or
+`device_status <deviceId>` (generic operator diagnostics, not scenario logic).
+Successful sends append a `last_system_command=` line to copyable diagnostics;
+server replies surface through existing `CommandResult` diagnostics when present.
+
 Server `Notification` control responses post a status-bar notification when
 `POST_NOTIFICATIONS` is granted (Android 13+) and speak the message with
 on-device TTS, matching the Flutter client’s notification-plus-speech alert

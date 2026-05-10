@@ -183,6 +183,25 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                 ) {
                     Text(if (state.localBrightDisplayEnabled) "Bright display on" else "Bright display off")
                 }
+                if (state.connectionState == ConnectionState.Connected) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        TextButton(
+                            onClick = viewModel::sendRuntimeStatusQuery,
+                            modifier = Modifier.testTag("terminal-debug-runtime-status-button"),
+                        ) {
+                            Text("Runtime status")
+                        }
+                        TextButton(
+                            onClick = viewModel::sendDeviceStatusQuery,
+                            modifier = Modifier.testTag("terminal-debug-device-status-button"),
+                        ) {
+                            Text("Device status")
+                        }
+                    }
+                }
                 Button(
                     onClick = viewModel::copyDiagnostics,
                     modifier = Modifier.testTag("terminal-copy-diagnostics-button"),
