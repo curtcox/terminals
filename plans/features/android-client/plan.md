@@ -651,6 +651,8 @@ Validation:
 cd android_client && ./gradlew connectedDebugAndroidTest --tests '*Kiosk*'
 ```
 
+(`AndroidTerminalKioskSmokeTest` matches this filter.)
+
 ### Phase 8: Media and Sensor Integration
 
 Status: implemented locally; WebRTC compatibility and device validation pending
@@ -1276,6 +1278,10 @@ Remaining validation:
 ### 2026-05-09 (GitHub Actions instrumentation compile parity)
 
 - Extended `.github/workflows/android-client-ci.yml` so PR/push checks run `./gradlew compileDebugAndroidTestKotlin` alongside `testDebugUnitTest`, `lintDebug`, and `assembleDebug`, matching `make android-client-compile-android-test` / `make all-test` without requiring a connected device or emulator.
+
+### 2026-05-09 (MainActivity kiosk instrumentation)
+
+- Added `AndroidTerminalKioskSmokeTest` (`smoke/AndroidTerminalKioskSmokeTest.kt`) so `./gradlew connectedDebugAndroidTest --tests '*Kiosk*'` exercises production `MainActivity` chrome: local keep-awake, fullscreen, and bright-display toggles and labels.
 
 ## Test Plan
 
