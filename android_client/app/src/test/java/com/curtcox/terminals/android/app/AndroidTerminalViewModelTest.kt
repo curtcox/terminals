@@ -1001,12 +1001,29 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun backgroundPausesHeartbeatAndSensorTelemetryLoops() = runTest(testDispatcher) {
+    fun connectedSessionSendsPeriodicRuntimeMonitorPollCapabilityProbe() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session, capabilityMonitorIntervalMillis = 100)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(250)
+        runCurrent()
+
+        assertEquals(2, session.capabilityDeltaReasons.count { it == "runtime_monitor_poll" })
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun backgroundPausesHeartbeatSensorTelemetryAndCapabilityMonitorLoops() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(
             session,
             heartbeatIntervalMillis = 100,
             sensorTelemetryIntervalMillis = 100,
+            capabilityMonitorIntervalMillis = 100,
         )
 
         viewModel.updateEndpoint("10.0.0.8:8080")
@@ -1017,8 +1034,10 @@ class AndroidTerminalViewModelTest {
 
         val heartbeatBefore = session.heartbeatCount
         val sensorBefore = session.sensorTelemetryCount
+        val pollBefore = session.capabilityDeltaReasons.count { it == "runtime_monitor_poll" }
         assertTrue(heartbeatBefore >= 1)
         assertTrue(sensorBefore >= 1)
+        assertTrue(pollBefore >= 1)
 
         viewModel.setAppForegrounded(false)
         runCurrent()
@@ -1027,6 +1046,7 @@ class AndroidTerminalViewModelTest {
 
         assertEquals(heartbeatBefore, session.heartbeatCount)
         assertEquals(sensorBefore, session.sensorTelemetryCount)
+        assertEquals(pollBefore, session.capabilityDeltaReasons.count { it == "runtime_monitor_poll" })
 
         viewModel.setAppForegrounded(true)
         runCurrent()
@@ -1035,6 +1055,7 @@ class AndroidTerminalViewModelTest {
 
         assertTrue(session.heartbeatCount > heartbeatBefore)
         assertTrue(session.sensorTelemetryCount > sensorBefore)
+        assertTrue(session.capabilityDeltaReasons.count { it == "runtime_monitor_poll" } > pollBefore)
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -1046,6 +1067,7 @@ class AndroidTerminalViewModelTest {
             session,
             heartbeatIntervalMillis = 100,
             sensorTelemetryIntervalMillis = 100,
+            capabilityMonitorIntervalMillis = 100,
         )
 
         viewModel.setAppForegrounded(false)
@@ -1058,6 +1080,7 @@ class AndroidTerminalViewModelTest {
         runCurrent()
         assertEquals(0, session.heartbeatCount)
         assertEquals(0, session.sensorTelemetryCount)
+        assertEquals(0, session.capabilityDeltaReasons.count { it == "runtime_monitor_poll" })
 
         viewModel.setAppForegrounded(true)
         runCurrent()
@@ -1065,6 +1088,7 @@ class AndroidTerminalViewModelTest {
         runCurrent()
         assertTrue(session.heartbeatCount >= 1)
         assertTrue(session.sensorTelemetryCount >= 1)
+        assertTrue(session.capabilityDeltaReasons.count { it == "runtime_monitor_poll" } >= 1)
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -2489,6 +2513,7 @@ class AndroidTerminalViewModelTest {
         networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(),
         heartbeatIntervalMillis: Long = 0,
         sensorTelemetryIntervalMillis: Long = 0,
+        capabilityMonitorIntervalMillis: Long = 0,
     ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -2503,6 +2528,7 @@ class AndroidTerminalViewModelTest {
                 permissionRequester = permissionRequester,
                 heartbeatIntervalMillis = heartbeatIntervalMillis,
                 sensorTelemetryIntervalMillis = sensorTelemetryIntervalMillis,
+                capabilityMonitorIntervalMillis = capabilityMonitorIntervalMillis,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session

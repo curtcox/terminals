@@ -66,6 +66,13 @@ data class AndroidClientDependencies(
     val heartbeatIntervalMillis: Long = 30_000,
     /** Matches Flutter [TerminalClientApp] default `sensorTelemetryInterval` (15 seconds). */
     val sensorTelemetryIntervalMillis: Long = 15_000,
+    /**
+     * Matches Flutter `terminal_client_shell` `_capabilityMonitorInterval` (2 seconds) in production
+     * ([fromContext] supplies this). When > 0 and the app is foregrounded while connected,
+     * [AndroidTerminalViewModel] probes capabilities on this interval and sends `runtime_monitor_poll`
+     * deltas when changed. Default 0 keeps JVM tests deterministic unless they opt in.
+     */
+    val capabilityMonitorIntervalMillis: Long = 0,
     val reconnectPolicy: ReconnectPolicy = ReconnectPolicy(),
     val maxReconnectAttempts: Int = 5,
     val discoveryRestartMinIntervalMillis: Long = 1_500,
@@ -92,6 +99,7 @@ data class AndroidClientDependencies(
         fun fromContext(context: Context): AndroidClientDependencies {
             val webRtcAdapter = AndroidWebRtcAdapter.disabled()
             return AndroidClientDependencies(
+                capabilityMonitorIntervalMillis = 2_000,
                 capabilityProbe = ContextAndroidCapabilityProbe(context),
                 keepAwakeController = if (context is Activity) {
                     WindowAndroidKeepAwakeController(context.window)

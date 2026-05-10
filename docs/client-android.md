@@ -167,7 +167,12 @@ Retry attempt, success, and exhaustion status are recorded in local diagnostics.
 
 While connected, the client also sends periodic battery sensor telemetry on the
 control stream (same fields and pacing as the Flutter reference client: about
-every 15 seconds when battery capability is present). When the server sends
+every 15 seconds when battery capability is present). While foregrounded, it
+also mirrors Flutter’s `terminal_client_shell` capability monitor timer (about
+every 2 seconds from production dependencies): each tick probes the capability
+session and sends a `capability_delta` with reason `runtime_monitor_poll` when
+the snapshot changed (permission drift, battery, etc.), without waiting for an
+`Activity` lifecycle callback. When the server sends
 `StartStream` with a non-empty `stream_id`, the client acknowledges with the same
 `StreamReady` control payload as the Flutter shell so generic streaming hooks can
 progress. It then forwards `StartStream`, `StopStream`, `RouteStream`, and

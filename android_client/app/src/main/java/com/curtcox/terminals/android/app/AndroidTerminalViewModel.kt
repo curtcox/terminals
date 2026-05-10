@@ -143,6 +143,7 @@ class AndroidTerminalViewModel(
                 if (connectedSession != null) {
                     startHeartbeat(connectedSession)
                     startSensorTelemetry(connectedSession)
+                    startCapabilityMonitor(connectedSession)
                 }
             }
         }
@@ -156,6 +157,7 @@ class AndroidTerminalViewModel(
     private var connectJob: Job? = null
     private var heartbeatJob: Job? = null
     private var sensorTelemetryJob: Job? = null
+    private var capabilityMonitorJob: Job? = null
     private var reconnectJob: Job? = null
     private var networkMonitoringActive: Boolean = false
     private var lastDiscoveryRestartAtMillis: Long = -1
@@ -183,6 +185,7 @@ class AndroidTerminalViewModel(
         if (!foregrounded) {
             stopHeartbeat()
             stopSensorTelemetry()
+            stopCapabilityMonitor()
             refreshCapabilitiesIfConnected("app_lifecycle_change")
             return
         }
@@ -190,6 +193,7 @@ class AndroidTerminalViewModel(
         if (mutableState.value.connectionState != ConnectionState.Connected) return
         startHeartbeat(connectedSession)
         startSensorTelemetry(connectedSession)
+        startCapabilityMonitor(connectedSession)
         refreshCapabilitiesIfConnected("app_lifecycle_change")
     }
 
@@ -239,6 +243,7 @@ class AndroidTerminalViewModel(
                 stopReconnect()
                 stopHeartbeat()
                 stopSensorTelemetry()
+                stopCapabilityMonitor()
                 session?.close()
                 nextSession = dependencies.sessionFactory(responseSink)
                 session = nextSession
@@ -246,6 +251,7 @@ class AndroidTerminalViewModel(
                 dependencies.terminalSettings.setLastManualEndpoint(mutableState.value.endpointText)
                 startHeartbeat(nextSession)
                 startSensorTelemetry(nextSession)
+                startCapabilityMonitor(nextSession)
                 mutableState.update {
                     it.copy(
                         connectionState = ConnectionState.Connected,
@@ -263,6 +269,7 @@ class AndroidTerminalViewModel(
             } catch (error: Throwable) {
                 stopHeartbeat()
                 stopSensorTelemetry()
+                stopCapabilityMonitor()
                 if (session === nextSession) {
                     session = null
                 }
@@ -344,6 +351,7 @@ class AndroidTerminalViewModel(
         stopConnect()
         stopHeartbeat()
         stopSensorTelemetry()
+        stopCapabilityMonitor()
         stopReconnect()
         reconnectExhausted = false
         effectiveHeartbeatMillis = dependencies.heartbeatIntervalMillis
@@ -804,6 +812,34 @@ class AndroidTerminalViewModel(
         sensorTelemetryJob = null
     }
 
+    private fun startCapabilityMonitor(connectedSession: AndroidControlSession) {
+        stopCapabilityMonitor()
+        val intervalMs = dependencies.capabilityMonitorIntervalMillis
+        if (intervalMs <= 0 || !appInForeground) return
+        capabilityMonitorJob = viewModelScope.launch {
+            while (true) {
+                delay(intervalMs)
+                runCatching {
+                    connectedSession.sendCapabilityDeltaIfChanged("runtime_monitor_poll")
+                }.onSuccess { sent ->
+                    if (sent) {
+                        mutableState.update {
+                            it.copy(diagnosticsText = "${it.diagnosticsText}\nlast_capability_delta=runtime_monitor_poll")
+                        }
+                    }
+                }.onFailure { error ->
+                    handleControlLoss(connectedSession, error)
+                    return@launch
+                }
+            }
+        }
+    }
+
+    private fun stopCapabilityMonitor() {
+        capabilityMonitorJob?.cancel()
+        capabilityMonitorJob = null
+    }
+
     private fun stopConnect() {
         connectJob?.cancel()
         connectJob = null
@@ -817,6 +853,7 @@ class AndroidTerminalViewModel(
     private fun handleControlLoss(failedSession: AndroidControlSession, error: Throwable) {
         stopHeartbeat()
         stopSensorTelemetry()
+        stopCapabilityMonitor()
         if (session !== failedSession) return
         session = null
         val endpoint = parser.parse(mutableState.value.endpointText)
@@ -856,6 +893,7 @@ class AndroidTerminalViewModel(
                     session = nextSession
                     startHeartbeat(nextSession)
                     startSensorTelemetry(nextSession)
+                    startCapabilityMonitor(nextSession)
                 }.onFailure { error ->
                     lastError = error.message ?: error::class.java.simpleName
                     nextSession.close()

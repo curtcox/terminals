@@ -1264,6 +1264,11 @@ Remaining validation:
 - `AndroidTerminalViewModelTest.requestMissingPermissionsRequestsNotificationPermissionWhenRuntimePromptIsSupported` now runs as **PASSED** instead of skipping via `assumeTrue`.
 - Re-ran `make android-client-test`.
 
+### 2026-05-09 (Flutter runtime capability monitor parity)
+
+- Added `AndroidClientDependencies.capabilityMonitorIntervalMillis` (default 0 for deterministic JVM tests; `fromContext` sets 2000 ms to match Flutter `_capabilityMonitorInterval`). While connected and foregrounded, `AndroidTerminalViewModel` periodically calls `sendCapabilityDeltaIfChanged("runtime_monitor_poll")`, paused in background like heartbeat/sensor telemetry.
+- Extended `AndroidTerminalViewModelTest` (periodic poll, lifecycle pause/resume). Documented in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests
