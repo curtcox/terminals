@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-09 (`make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, `JAVA_HOME` from Makefile → Android Studio JBR; boundary scripts).
+Last local validation: 2026-05-10 (`make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, boundary scripts; connected-device instrumentation not re-run in this session).
 
 Passed:
 
@@ -1324,10 +1324,6 @@ Remaining validation:
 - Updated brittle reconnect diagnostics assertions to focus on stable behavior (`Connected` state and endpoint/session transitions) instead of exact transient diagnostics strings that can vary with scheduler timing.
 - Re-ran `./gradlew testDebugUnitTest --no-daemon` from `android_client/` on JDK 17+/Android Studio JBR; suite passed.
 
-### 2026-05-10 (MainActivity configuration / orientation smoke)
-
-- Added `MainActivityConfigurationSmokeTest` so production `MainActivity` exercises manifest `configChanges` orientation handling: toggling `requestedOrientation` triggers `onConfigurationChanged`, and terminal chrome shows `last_permission_refresh=configuration` (wires through to `refreshPermissionEducation` alongside network + capability refresh). Resets orientation after the test. Filter: `./gradlew connectedDebugAndroidTest --tests '*MainActivityConfiguration*'`. Re-ran `make android-client-compile-android-test`.
-
 ### 2026-05-09 (Phase 7: immersive/sticky kiosk preference)
 
 - Implemented optional **immersive sticky** as a persisted local terminal setting (`SharedPreferencesAndroidTerminalSettings` / `inMemory`), default **on** (matches prior legacy behavior).
@@ -1335,6 +1331,12 @@ Remaining validation:
 - ViewModel applies the preference for local fullscreen, startup restore, server-driven `FullscreenWidget`, and re-applies when toggling sticky while fullscreen is already on; copyable diagnostics include `local_immersive_sticky` alongside other kiosk lines (fixed stale `it` usage when rebuilding diagnostics after local kiosk toggles).
 - Terminal chrome: `terminal-local-immersive-sticky-button`; `AndroidTerminalKioskSmokeTest.localImmersiveStickyToggleUpdatesChromeLabel`; JVM and Compose smoke updates.
 - Documented in `docs/client-android.md`. Re-verified `make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, and boundary scripts.
+
+### 2026-05-10 (MainActivity configuration / orientation smoke)
+
+- Added `MainActivityConfigurationSmokeTest` for production `MainActivity` with manifest `configChanges`: toggling `requestedOrientation` runs `onConfigurationChanged` and terminal chrome shows `last_permission_refresh=configuration` (`refreshPermissionEducation` alongside network + capability refresh). `@After` resets orientation. Assertion uses `ComposeTestRule.waitUntil` so slower emulators stay stable. Filter: `./gradlew connectedDebugAndroidTest --tests '*MainActivityConfiguration*'`.
+- Documented example focused `--tests` filters in `docs/client-android.md` (launch, configuration, kiosk, media).
+- Re-ran `make android-client-test`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
 
 ## Test Plan
 

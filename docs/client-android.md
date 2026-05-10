@@ -107,6 +107,16 @@ Pull requests that touch `android_client/` (and related paths) also run
 `.github/workflows/android-client-ci.yml`), in addition to JVM unit tests and
 instrumentation compile checks.
 
+Focused instrumentation runs (examples):
+
+```bash
+cd android_client
+./gradlew connectedDebugAndroidTest --tests '*MainActivityLaunch*'
+./gradlew connectedDebugAndroidTest --tests '*MainActivityConfiguration*'
+./gradlew connectedDebugAndroidTest --tests '*Kiosk*'
+./gradlew connectedDebugAndroidTest --tests '*Media*'
+```
+
 ## Fire Tablet Setup
 
 1. Open Fire tablet settings.

@@ -3,6 +3,7 @@ package com.curtcox.terminals.android.smoke
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.curtcox.terminals.android.MainActivity
@@ -35,7 +36,11 @@ class MainActivityConfigurationSmokeTest {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
 
-        rule.waitForIdle()
+        rule.waitUntil(timeoutMillis = 10_000) {
+            rule.onAllNodesWithText("last_permission_refresh=configuration", substring = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         rule.onNodeWithText("last_permission_refresh=configuration", substring = true).assertExists()
     }
 }
