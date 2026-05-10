@@ -93,6 +93,62 @@ class AndroidBugReportBuilderTest {
     }
 
     @Test
+    fun buildPropagatesReconnectAttemptAndLastStatusIntoConnectionHealth() {
+        val report =
+            AndroidBugReportBuilder.build(
+                description = "d",
+                source = Diagnostics.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
+                reporterDeviceId = "r",
+                subjectDeviceId = "s",
+                extraSourceHints = emptyMap(),
+                clock = fixedClock,
+                buildMetadata = buildMeta,
+                serverRoot = null,
+                connectionState = ConnectionState.Connecting,
+                lastServerHeartbeatUnixMs = null,
+                registeredCapabilities = null,
+                localeTag = "en",
+                timezoneId = "UTC",
+                osVersion = "1",
+                reconnectAttempt = 3,
+                lastStatus = "UI updated",
+            )
+
+        val connection = report.clientContext.connection
+        assertEquals(3, connection.reconnectAttempt)
+        assertEquals("UI updated", connection.lastStatus)
+        assertEquals(false, connection.online)
+    }
+
+    @Test
+    fun buildOmitsReconnectAttemptWhenZeroAndBlankLastStatus() {
+        val report =
+            AndroidBugReportBuilder.build(
+                description = "d",
+                source = Diagnostics.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
+                reporterDeviceId = "r",
+                subjectDeviceId = "s",
+                extraSourceHints = emptyMap(),
+                clock = fixedClock,
+                buildMetadata = buildMeta,
+                serverRoot = null,
+                connectionState = ConnectionState.Connected,
+                lastServerHeartbeatUnixMs = null,
+                registeredCapabilities = null,
+                localeTag = "en",
+                timezoneId = "UTC",
+                osVersion = "1",
+                reconnectAttempt = 0,
+                lastStatus = "  ",
+            )
+
+        val connection = report.clientContext.connection
+        assertEquals(0, connection.reconnectAttempt)
+        assertEquals("", connection.lastStatus)
+        assertEquals(true, connection.online)
+    }
+
+    @Test
     fun buildEmbedsActiveUiRootWhenPresent() {
         val root =
             Ui.Node.newBuilder()

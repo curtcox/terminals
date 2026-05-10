@@ -46,6 +46,12 @@ data class AndroidTerminalViewState(
     val lastOpaqueControlIoSummary: String? = null,
     /** Short label for the last inbound control message (aligned with Flutter `statusFromConnectResponse`). */
     val lastControlResponseActivity: String? = null,
+    /**
+     * Current reconnect attempt counter. Incremented in [AndroidTerminalViewModel.startReconnect]
+     * for every reconnect iteration; reset to `0` on user disconnect and on successful (re)connect.
+     * Surfaced in bug-report `ConnectionHealth.reconnect_attempt` for Flutter parity.
+     */
+    val reconnectAttempt: Int = 0,
     /** Outbound control-stream telemetry (Flutter debug panel parity for smoke tests / copyable diagnostics). */
     val outboundHeartbeatCount: Int = 0,
     val lastOutboundHeartbeatUnixMs: Long = 0L,

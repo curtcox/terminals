@@ -275,6 +275,7 @@ class AndroidTerminalViewModel(
                     it.copy(
                         connectionState = ConnectionState.Connected,
                         lastError = null,
+                        reconnectAttempt = 0,
                         diagnosticsText = formatDiagnostics(resolved, ConnectionState.Connected, it),
                     )
                 }
@@ -482,6 +483,8 @@ class AndroidTerminalViewModel(
             localeTag = Locale.getDefault().toLanguageTag(),
             timezoneId = TimeZone.getDefault().id,
             osVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+            reconnectAttempt = s.reconnectAttempt,
+            lastStatus = s.lastControlResponseActivity,
         )
     }
 
@@ -933,7 +936,11 @@ class AndroidTerminalViewModel(
             for (attempt in 1..dependencies.maxReconnectAttempts) {
                 delay(dependencies.reconnectPolicy.delayForAttempt(attempt))
                 mutableState.update {
-                    val basis = it.copy(connectionState = ConnectionState.Connecting, lastError = lastError)
+                    val basis = it.copy(
+                        connectionState = ConnectionState.Connecting,
+                        lastError = lastError,
+                        reconnectAttempt = attempt,
+                    )
                     basis.copy(
                         diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting, basis) +
                             "\nreconnect_attempt=$attempt\nreconnect_cause=$reconnectCause",
@@ -968,6 +975,7 @@ class AndroidTerminalViewModel(
                         it.copy(
                             connectionState = ConnectionState.Connected,
                             lastError = null,
+                            reconnectAttempt = 0,
                             diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connected, it) +
                                 "\nreconnect_success_attempt=$attempt\nreconnect_cause=$reconnectCause",
                         )
@@ -1020,6 +1028,7 @@ class AndroidTerminalViewModel(
             lastControlErrorCode = null,
             lastControlResponseActivity = null,
             lastLiveMediaLine = null,
+            reconnectAttempt = 0,
             outboundHeartbeatCount = 0,
             lastOutboundHeartbeatUnixMs = 0L,
             outboundSensorSendCount = 0,

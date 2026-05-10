@@ -26,6 +26,8 @@ object AndroidBugReportBuilder {
         localeTag: String,
         timezoneId: String,
         osVersion: String,
+        reconnectAttempt: Int = 0,
+        lastStatus: String? = null,
     ): Diagnostics.BugReport {
         val nowMillis = clock.nowMillis()
         val identifier = buildBugIdentifier(nowMillis)
@@ -40,7 +42,14 @@ object AndroidBugReportBuilder {
             Diagnostics.ClientContext.newBuilder()
                 .setIdentity(identity(reporterDeviceId, buildMetadata, registeredCapabilities, localeTag, timezoneId, osVersion))
                 .setRuntime(runtimeState(serverRoot))
-                .setConnection(connectionState(connectionState, lastServerHeartbeatUnixMs))
+                .setConnection(
+                    connectionState(
+                        connectionState,
+                        lastServerHeartbeatUnixMs,
+                        reconnectAttempt,
+                        lastStatus,
+                    ),
+                )
                 .setHardware(hardwareFrom(registeredCapabilities))
                 .setErrorCapture(Diagnostics.ErrorCapture.getDefaultInstance())
                 .apply {
@@ -108,12 +117,18 @@ object AndroidBugReportBuilder {
     private fun connectionState(
         state: ConnectionState,
         lastServerHeartbeatUnixMs: Long?,
+        reconnectAttempt: Int,
+        lastStatus: String?,
     ): Diagnostics.ConnectionHealth {
         val online = state == ConnectionState.Connected
         val b =
             Diagnostics.ConnectionHealth.newBuilder()
                 .setOnline(online)
         lastServerHeartbeatUnixMs?.takeIf { it > 0 }?.let { b.setLastHeartbeatUnixMs(it) }
+        if (reconnectAttempt > 0) {
+            b.reconnectAttempt = reconnectAttempt
+        }
+        lastStatus?.takeIf { it.isNotBlank() }?.let { b.lastStatus = it }
         return b.build()
     }
 

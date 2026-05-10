@@ -1232,6 +1232,46 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun reconnectAttemptCounterTracksLoopAndResetsOnSuccess() = runTest(testDispatcher) {
+        val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
+        val second = FakeSession(connectError = IllegalStateException("still offline"))
+        val third = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second, third))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 100,
+                sensorTelemetryIntervalMillis = 0,
+                reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
+                maxReconnectAttempts = 5,
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        runCurrent()
+        advanceTimeBy(100)
+        runCurrent()
+
+        // First reconnect attempt fails, exposing attempt=1 on view state during the loop.
+        advanceTimeBy(50)
+        runCurrent()
+        assertEquals(1, viewModel.state.value.reconnectAttempt)
+        assertEquals(ConnectionState.Connecting, viewModel.state.value.connectionState)
+
+        // Second reconnect attempt succeeds; counter resets to 0 on success.
+        advanceTimeBy(50)
+        runCurrent()
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        assertEquals(0, viewModel.state.value.reconnectAttempt)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun transportTerminationTriggersReconnectWithBackoff() = runTest(testDispatcher) {
         val first = FakeSession()
         val second = FakeSession()
