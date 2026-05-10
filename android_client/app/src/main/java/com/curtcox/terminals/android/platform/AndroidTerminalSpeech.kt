@@ -23,11 +23,17 @@ class ContextAndroidTerminalSpeech(
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
         try {
-            val tts = textToSpeech ?: TextToSpeech(appContext) { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    textToSpeech?.language = Locale.getDefault()
+            val tts = textToSpeech ?: run {
+                // OnInit may run before [holder] is assigned; set locale when the instance is already reachable.
+                val holder = arrayOfNulls<TextToSpeech>(1)
+                val created = TextToSpeech(appContext) { status ->
+                    if (status == TextToSpeech.SUCCESS) {
+                        holder[0]?.language = Locale.getDefault()
+                    }
                 }
-            }.also { textToSpeech = it }
+                holder[0] = created
+                created.also { textToSpeech = it }
+            }
             tts.speak(trimmed, TextToSpeech.QUEUE_FLUSH, null, "terminal-alert-${System.nanoTime()}")
         } catch (_: RuntimeException) {
             // Match Flutter alert delivery: speech is best-effort if TTS init fails.

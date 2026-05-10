@@ -1215,6 +1215,7 @@ Remaining validation:
 - Added `AndroidTerminalSpeech` + `ContextAndroidTerminalSpeech` so explicit server `Notification` responses speak the same text the Flutter `AlertDeliveryService` chooses (trimmed body if non-empty, else trimmed title), after attempting status-bar delivery.
 - Skipped delivery and speech when both title and body trim empty; tightened `last_notification` diagnostics to prefer trimmed title, else trimmed body.
 - Documented behavior in `docs/client-android.md`; extended `AndroidTerminalViewModelTest`.
+- Hardened `ContextAndroidTerminalSpeech` engine creation so `OnInit` applies `Locale.getDefault()` using an instance reachable from a one-element holder populated immediately after the `TextToSpeech` constructor returns (typical async `OnInit` always sees `holder[0]`; synchronous init callbacks may still skip locale and rely on the platform default).
 
 ## Test Plan
 
