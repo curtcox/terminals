@@ -29,7 +29,7 @@ Android code without a follow-up plan.
 | Gradle | wrapper included | `android_client/gradlew` downloads Gradle 8.13 when needed |
 | ADB | current platform tools | Needed for Fire tablet install/smoke tests |
 
-`make android-client-build` (and test/lint) resolve a JDK automatically in this order: a working `JAVA_HOME` if set, Homebrew `openjdk@17`, Android Studio’s JBR under `Applications` or `~/Applications`, common Linux OpenJDK 17 paths, then macOS `/usr/libexec/java_home`. If no JDK is found, those targets skip with an explicit message instead of invoking Gradle with an empty `JAVA_HOME`.
+`make android-client-build`, `android-client-test`, `android-client-lint`, and `android-client-compile-android-test` resolve a JDK automatically in this order: a working `JAVA_HOME` if set, Homebrew `openjdk@17`, Android Studio’s JBR under `Applications` or `~/Applications`, common Linux OpenJDK 17 paths, then macOS `/usr/libexec/java_home`. If no JDK is found, those targets skip with an explicit message instead of invoking Gradle with an empty `JAVA_HOME`.
 
 Set one SDK environment variable:
 
@@ -61,6 +61,7 @@ android_client/app/build/outputs/apk/debug/app-debug.apk
 ```bash
 make android-client-test
 make android-client-lint
+make android-client-compile-android-test
 make android-client-boundary
 ```
 
@@ -70,6 +71,7 @@ Direct Gradle commands:
 cd android_client
 ./gradlew testDebugUnitTest
 ./gradlew lintDebug
+./gradlew compileDebugAndroidTestKotlin
 ```
 
 Connected-device tests require an emulator or physical device:

@@ -730,6 +730,7 @@ Required local validation for Android-only PRs:
 cd android_client && ./gradlew testDebugUnitTest
 cd android_client && ./gradlew lintDebug
 cd android_client && ./gradlew assembleDebug
+make android-client-compile-android-test
 ./scripts/check-android-client-boundary.sh
 ```
 
@@ -761,7 +762,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-09 (`make android-client-test`, `make android-client-lint`, `make android-client-build`, `JAVA_HOME` from Makefile → Android Studio JBR; boundary scripts; `compileDebugAndroidTestKotlin`).
+Last local validation: 2026-05-09 (`make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, `JAVA_HOME` from Makefile → Android Studio JBR; boundary scripts).
 
 Passed:
 
@@ -772,7 +773,7 @@ git diff --check
 make android-client-test
 make android-client-lint
 make android-client-build
-cd android_client && JAVA_HOME="<Android Studio JBR>" ./gradlew compileDebugAndroidTestKotlin
+make android-client-compile-android-test
 ```
 
 Gradle (`make android-client-test`, `lintDebug`, `assembleDebug`) should be re-run on a host with JDK 17+ and `ANDROID_SDK_ROOT` configured; plain `./gradlew` without `JAVA_HOME` may fail on macOS stubs.
@@ -1226,6 +1227,12 @@ Remaining validation:
 - Re-ran `make android-client-test`, `make android-client-lint`, `make android-client-build`, and `./gradlew compileDebugAndroidTestKotlin` with Makefile-resolved JDK.
 - Refreshed **Current Validation Evidence** and clarified remaining checks (NSD doc location, explicit WebRTC-disabled posture via `AndroidWebRtcAdapter`).
 - Updated `docs/client-architecture.md` to describe `android_client/` as the shipped native thin client (not only a scaffold).
+
+### 2026-05-09 (Makefile instrumentation compile gate)
+
+- Added `make android-client-compile-android-test`, which runs `./gradlew compileDebugAndroidTestKotlin` with the same Android SDK / JDK discovery rules as the other native Android Make targets (skips with guidance when SDK or JDK is missing).
+- Wired the target into `make all-test` so CI and `make all-check` catch instrumentation-only Kotlin compile regressions without requiring a connected device.
+- Documented the target alongside existing Android validation commands in `docs/client-android.md` and in this plan’s required-validation block.
 
 ## Test Plan
 
