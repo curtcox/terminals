@@ -1283,6 +1283,13 @@ Remaining validation:
 
 - Added `AndroidTerminalKioskSmokeTest` (`smoke/AndroidTerminalKioskSmokeTest.kt`) so `./gradlew connectedDebugAndroidTest --tests '*Kiosk*'` exercises production `MainActivity` chrome: local keep-awake, fullscreen, and bright-display toggles and labels.
 
+### 2026-05-09 (WebSocket transport resume token parity)
+
+- Added shared `TransportResumeTokenStore` on `AndroidClientDependencies`, threaded through `CarrierSelectingAndroidControlClient` into `WebSocketAndroidControlClient`.
+- WebSocket handshake now sends `TransportHello.resume_token` from the store and captures non-empty `TransportHelloAck.resume_token` after acknowledgement (Flutter `ControlClientTransportHint` parity).
+- Re-used `ProtocolBuilders.transportHello` for the opening envelope; added `TransportResumeTokenStoreTest`.
+- Documented resume behavior in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests

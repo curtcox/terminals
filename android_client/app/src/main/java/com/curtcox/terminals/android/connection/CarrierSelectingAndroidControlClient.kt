@@ -11,6 +11,7 @@ import terminals.control.v1.Control
  */
 class CarrierSelectingAndroidControlClient(
     private val deviceId: String,
+    private val websocketResumeTokenStore: TransportResumeTokenStore,
     private val responseSink: AndroidControlResponseSink?,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : AndroidControlClient {
@@ -22,7 +23,12 @@ class CarrierSelectingAndroidControlClient(
             when (endpoint.carrier) {
                 CarrierPreference.Grpc -> GrpcAndroidControlClient(responseSink, scope)
                 CarrierPreference.WebSocket ->
-                    WebSocketAndroidControlClient(deviceId = deviceId, responseSink = responseSink, scope = scope)
+                    WebSocketAndroidControlClient(
+                        deviceId = deviceId,
+                        resumeTokenStore = websocketResumeTokenStore,
+                        responseSink = responseSink,
+                        scope = scope,
+                    )
             }
         delegate = next
         next.connect(endpoint)

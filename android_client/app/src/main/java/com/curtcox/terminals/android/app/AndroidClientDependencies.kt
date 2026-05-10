@@ -12,6 +12,7 @@ import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.AndroidControlSessionController
 import com.curtcox.terminals.android.connection.CarrierSelectingAndroidControlClient
 import com.curtcox.terminals.android.connection.ReconnectPolicy
+import com.curtcox.terminals.android.connection.TransportResumeTokenStore
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.ContextDiagnosticClipboard
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
@@ -85,11 +86,17 @@ data class AndroidClientDependencies(
     val runtimeNotificationPermissionPromptSupported: Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
     val nowMillis: () -> Long = { System.currentTimeMillis() },
+    /** WebSocket transport hello resume token; shared across sessions like Flutter [ControlClientTransportHint.resumeToken]. */
+    val websocketResumeTokenStore: TransportResumeTokenStore = TransportResumeTokenStore(),
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->
         AndroidControlSessionController(
             deviceId = deviceId,
             clientVersion = buildMetadata.versionName,
-            client = CarrierSelectingAndroidControlClient(deviceId = deviceId, responseSink = sink),
+            client = CarrierSelectingAndroidControlClient(
+                deviceId = deviceId,
+                websocketResumeTokenStore = websocketResumeTokenStore,
+                responseSink = sink,
+            ),
             capabilities = AndroidCapabilitySession(deviceId, capabilityProbe),
             clock = Clock { System.currentTimeMillis() },
         )

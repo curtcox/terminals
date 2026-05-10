@@ -28,8 +28,10 @@ internal const val PongOpcode = 0xA
 
 class WebSocketAndroidControlClient(
     private val deviceId: String,
+    private val resumeTokenStore: TransportResumeTokenStore,
     private val responseSink: AndroidControlResponseSink? = null,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val protocolBuilders: ProtocolBuilders = ProtocolBuilders(),
 ) : AndroidControlClient {
     private val random = SecureRandom()
     private var socket: Socket? = null
@@ -66,20 +68,17 @@ class WebSocketAndroidControlClient(
         sessionId = ""
 
         writeEnvelope(
-            Control.WireEnvelope.newBuilder()
-                .setProtocolVersion(AndroidWireProtocolVersion)
-                .setTransportHello(
-                    Control.TransportHello.newBuilder()
-                        .setProtocolVersion(AndroidWireProtocolVersion)
-                        .setDesiredDeviceId(deviceId)
-                        .addSupportedCarriers(Control.CarrierKind.CARRIER_KIND_WEBSOCKET),
-                )
-                .build(),
+            protocolBuilders.transportHello(
+                desiredDeviceId = deviceId,
+                resumeToken = resumeTokenStore.current(),
+                supportedCarriers = listOf(Control.CarrierKind.CARRIER_KIND_WEBSOCKET),
+            ),
         )
         val ack = readEnvelope()
         if (!ack.hasTransportHelloAck()) {
             throw IOException("websocket transport hello was not acknowledged")
         }
+        resumeTokenStore.captureFromAck(ack.transportHelloAck.resumeToken)
         sessionId = ack.transportHelloAck.sessionId
         closingSocket = false
         readJob = scope.launch { readResponses() }

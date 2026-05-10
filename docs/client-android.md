@@ -131,6 +131,10 @@ Bare `host:port` defaults to HTTP and the WebSocket upgrade (same as before).
 metadata that only advertises `grpc=host:port` is normalized to `grpc://…` when
 you select the server.
 
+WebSocket connects send `TransportHello.resume_token` from the last successful
+transport hello acknowledgement (same resume semantics as the Flutter web shell),
+so brief reconnects can offer session resumption when the server supports it.
+
 The native Android client validates manual endpoints, manages the generic
 control-session lifecycle, sends protobuf-backed hello/capability/action
 messages, surfaces local diagnostics and permission education, and renders

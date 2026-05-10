@@ -9,7 +9,12 @@ import terminals.control.v1.Control
 class CarrierSelectingAndroidControlClientTest {
     @Test
     fun sendWithoutConnectFails() = runTest {
-        val client = CarrierSelectingAndroidControlClient(deviceId = "unit-test-device", responseSink = null)
+        val client =
+            CarrierSelectingAndroidControlClient(
+                deviceId = "unit-test-device",
+                websocketResumeTokenStore = TransportResumeTokenStore(),
+                responseSink = null,
+            )
         try {
             client.send(Control.ConnectRequest.getDefaultInstance())
             fail("expected error when transport was never connected")
