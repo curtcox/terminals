@@ -205,9 +205,6 @@ dependencyCheck {
     formats.set(listOf("HTML", "JSON"))
     // Fail the build on high+ CVEs (7–10). Tune suppressions in config/dependency-check-suppressions.xml.
     failBuildOnCVSS.set(7f)
-    // Allow NVD API update failures (e.g. rate-limiting without an API key) without failing the build.
-    // CVE findings at CVSS 7+ still fail via failBuildOnCVSS above.
-    failOnError.set(false)
     suppressionFile.set(rootProject.file("config/dependency-check-suppressions.xml").absolutePath)
     scanConfigurations.set(
         listOf(
