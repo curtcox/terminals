@@ -473,11 +473,15 @@ class AndroidTerminalViewModel(
     }
 
     /**
-     * Flutter shell **Privacy** / `privacy.toggle` UI action: stops local capture, toggles privacy mode,
-     * and sends a capability delta with reason `privacy.toggle` when connected.
+     * Flutter shell **Privacy** / `privacy.toggle` UI action: when turning privacy **on**, stops local
+     * capture via the live-media seam first; toggles privacy mode; then sends a capability delta with
+     * reason `privacy.toggle` when connected (Flutter does not stop capture when turning privacy off).
      */
     fun togglePrivacyMode() {
-        dependencies.mediaEngine.stopLocalCaptureStreamsForPrivacy()
+        val wasOff = !mutableState.value.privacyModeEnabled
+        if (wasOff) {
+            dependencies.mediaEngine.stopLocalCaptureStreamsForPrivacy()
+        }
         val nextPrivacy = !mutableState.value.privacyModeEnabled
         session?.setPrivacyMode(nextPrivacy)
         mutableState.update { st ->

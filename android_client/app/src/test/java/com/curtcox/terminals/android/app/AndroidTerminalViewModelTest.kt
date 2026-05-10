@@ -163,6 +163,54 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun privacyToggleStopsLocalCaptureOnlyWhenEnablingPrivacy() = runTest(testDispatcher) {
+        val disabledLive = AndroidLiveMediaSession.disabled()
+        val countingLive =
+            object : AndroidLiveMediaSession {
+                var stopPrivacyCalls = 0
+
+                override fun applyStartStream(start: Io.StartStream) = disabledLive.applyStartStream(start)
+
+                override fun applyStopStream(streamId: String) = disabledLive.applyStopStream(streamId)
+
+                override fun applyRouteStream(route: Io.RouteStream) = disabledLive.applyRouteStream(route)
+
+                override fun applyWebRtcSignal(signal: Control.WebRTCSignal) =
+                    disabledLive.applyWebRtcSignal(signal)
+
+                override fun stopLocalCaptureStreamsForPrivacy() {
+                    stopPrivacyCalls += 1
+                    disabledLive.stopLocalCaptureStreamsForPrivacy()
+                }
+            }
+        val session = FakeSession(capabilityDeltaSent = true)
+        val viewModel =
+            viewModel(
+                session,
+                networkStateProvider = AndroidNetworkStateProvider {
+                    AndroidNetworkState(connected = true, metered = false)
+                },
+                mediaEngine = AndroidMediaEngine(liveMedia = countingLive),
+            )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        assertEquals(0, countingLive.stopPrivacyCalls)
+
+        viewModel.togglePrivacyMode()
+        advanceUntilIdle()
+        assertEquals(1, countingLive.stopPrivacyCalls)
+
+        viewModel.togglePrivacyMode()
+        advanceUntilIdle()
+        assertEquals(1, countingLive.stopPrivacyCalls)
+
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun connectAppliesPrivacyModeFromStateBeforeHandshake() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(

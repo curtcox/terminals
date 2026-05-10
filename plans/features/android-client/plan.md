@@ -1359,6 +1359,10 @@ Remaining validation:
 
 - Added privacy mode to `AndroidCapabilitySession` (masks microphone/camera in snapshots and deltas), `AndroidControlSession.setPrivacyMode`, connect/reconnect handshake application from `AndroidTerminalViewState.privacyModeEnabled`, and `AndroidTerminalViewModel.togglePrivacyMode` / interception of server-driven `privacy.toggle` (no spurious `UIAction`). Wired `AndroidMediaEngine.stopLocalCaptureStreamsForPrivacy` through `AndroidLiveMediaSession` (no-op until real live capture tracks streams). Shell **Privacy** button + `privacy_mode` diagnostics; documented in `docs/client-android.md`. JVM: `AndroidCapabilitySessionTest`, `AndroidControlSessionControllerTest.privacyModeStripsMicAndCameraFromCapabilityDelta`, `AndroidTerminalViewModelTest` privacy cases; instrumentation fakes implement `setPrivacyMode`; `MainActivityLaunchSmokeTest` asserts `terminal-privacy-toggle-button`. Minor lint hygiene: removed redundant pre-Lollipop branch in `AndroidNsdDiscovery.terminalTxtMetadata` (minSdk 25), `ManualEndpointParser` path `orEmpty()`, ViewModel `compareBy`/`mutableState.update` clarity; lint baseline line drift. Re-verified `make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, and boundary scripts.
 
+### 2026-05-10 (privacy toggle: stop capture only when enabling)
+
+- Matched Flutter `_handlePrivacyToggleAction`: `stopLocalCaptureStreamsForPrivacy` runs only when turning privacy **on** (not when turning it off). JVM: `AndroidTerminalViewModelTest.privacyToggleStopsLocalCaptureOnlyWhenEnablingPrivacy`. Doc tweak in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests

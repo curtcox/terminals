@@ -196,8 +196,9 @@ diagnostics like other terminal chrome.
 
 **Privacy** (Flutter `privacy.toggle` parity): the shell **Privacy** button and
 any server-driven action with `action` `privacy.toggle` toggle local privacy mode
-(withdraws microphone and camera from the next capability snapshot/delta, stops
-local capture via the live-media seam, and does not send a `UIAction`). Toggles
+(withdraws microphone and camera from the next capability snapshot/delta; when
+**enabling** privacy, stops local capture via the live-media seam first; does not
+send a `UIAction`). Toggles
 while connected request a capability delta with reason `privacy.toggle`.
 Copyable diagnostics include `privacy_mode=true|false`.
 
