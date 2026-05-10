@@ -979,7 +979,7 @@ class AndroidTerminalViewModelTest {
         advanceTimeBy(250)
         runCurrent()
 
-        assertEquals(2, session.heartbeatCount)
+        assertEquals(3, session.heartbeatCount)
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -995,7 +995,7 @@ class AndroidTerminalViewModelTest {
         advanceTimeBy(250)
         runCurrent()
 
-        assertEquals(2, session.sensorTelemetryCount)
+        assertEquals(3, session.sensorTelemetryCount)
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -2675,9 +2675,10 @@ class AndroidTerminalViewModelTest {
             heartbeatCount += 1
         }
 
-        override suspend fun sendSensorTelemetry() {
+        override suspend fun sendSensorTelemetry(): Boolean {
             sensorTelemetryError?.let { throw it }
             sensorTelemetryCount += 1
+            return true
         }
 
         override suspend fun sendUiAction(action: ServerDrivenAction) {

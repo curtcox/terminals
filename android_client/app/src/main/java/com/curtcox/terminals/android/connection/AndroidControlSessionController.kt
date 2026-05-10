@@ -18,7 +18,8 @@ interface AndroidControlSession {
     val lastRegisteredCapabilities: Capabilities.DeviceCapabilities?
     suspend fun connect(endpoint: EndpointResolution)
     suspend fun sendHeartbeat()
-    suspend fun sendSensorTelemetry()
+    /** @return true when a sensor payload was sent (Flutter `buildSensorTelemetryRequest` non-null). */
+    suspend fun sendSensorTelemetry(): Boolean
     suspend fun sendUiAction(action: ServerDrivenAction)
     suspend fun sendStreamReady(streamId: String)
     suspend fun sendKeyText(text: String)
@@ -67,14 +68,15 @@ class AndroidControlSessionController(
         client.send(builders.heartbeat(deviceId, clock.nowMillis()))
     }
 
-    override suspend fun sendSensorTelemetry() {
+    override suspend fun sendSensorTelemetry(): Boolean {
         val request =
             builders.sensorTelemetryFromCapabilities(
                 deviceId,
                 capabilities.lastRegisteredCapabilities,
                 clock.nowMillis(),
-            ) ?: return
+            ) ?: return false
         client.send(request)
+        return true
     }
 
     override suspend fun sendUiAction(action: ServerDrivenAction) {

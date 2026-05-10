@@ -43,7 +43,7 @@ class AndroidControlSessionControllerTest {
         client.sent.clear()
 
         controller.sendHeartbeat()
-        controller.sendSensorTelemetry()
+        assertTrue(controller.sendSensorTelemetry())
         controller.sendUiAction(ServerDrivenAction(componentId = "start", action = "tap", value = "go"))
         controller.sendKeyText("x")
 

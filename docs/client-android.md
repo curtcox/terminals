@@ -174,9 +174,14 @@ failed `StreamReady`), WebSocket read errors, or gRPC stream termination
 performs bounded reconnect attempts using exponential backoff.
 Retry attempt, success, and exhaustion status are recorded in local diagnostics.
 
-While connected, the client also sends periodic battery sensor telemetry on the
-control stream (same fields and pacing as the Flutter reference client: about
-every 15 seconds when battery capability is present). While foregrounded, it
+While connected, the client sends an initial heartbeat and battery sensor sample
+right after the hello/capability snapshot succeeds when foregrounded (Flutter
+bootstrap parity), then periodic telemetry on the control stream (same fields and
+pacing as the Flutter reference client: about every 15 seconds when battery
+capability is present). Copyable diagnostics include `outbound_heartbeat_count`,
+`last_outbound_heartbeat_unix_ms`, `outbound_sensor_send_count`,
+`last_outbound_sensor_unix_ms`, and `stream_ready_send_count` (stream-ready
+acks after `StartStream`). While foregrounded, it
 also mirrors Flutter’s `terminal_client_shell` capability monitor timer (about
 every 2 seconds from production dependencies): each tick probes the capability
 session and sends a `capability_delta` with reason `runtime_monitor_poll` when

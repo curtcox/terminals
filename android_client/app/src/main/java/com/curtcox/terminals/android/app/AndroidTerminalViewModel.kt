@@ -83,6 +83,15 @@ class AndroidTerminalViewModel(
                     val connectedSession = session
                     if (connectedSession != null) {
                         runCatching { connectedSession.sendStreamReady(streamId) }
+                            .onSuccess {
+                                mutableState.update {
+                                    val next = it.copy(streamReadySendCount = it.streamReadySendCount + 1)
+                                    next.copy(
+                                        diagnosticsText =
+                                            formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next),
+                                    )
+                                }
+                            }
                             .onFailure { handleControlLoss(connectedSession, it) }
                     }
                     when (val lr = dependencies.mediaEngine.applyStartStream(response.startStream)) {
@@ -249,6 +258,16 @@ class AndroidTerminalViewModel(
                 session = nextSession
                 nextSession.connect(resolved)
                 dependencies.terminalSettings.setLastManualEndpoint(mutableState.value.endpointText)
+                if (appInForeground) {
+                    runCatching { sendHeartbeatTracked(nextSession) }.onFailure { error ->
+                        handleControlLoss(nextSession, error)
+                        return@launch
+                    }
+                    runCatching { sendSensorTelemetryTracked(nextSession) }.onFailure { error ->
+                        handleControlLoss(nextSession, error)
+                        return@launch
+                    }
+                }
                 startHeartbeat(nextSession)
                 startSensorTelemetry(nextSession)
                 startCapabilityMonitor(nextSession)
@@ -809,7 +828,7 @@ class AndroidTerminalViewModel(
             while (true) {
                 delay(intervalMs)
                 runCatching {
-                    connectedSession.sendHeartbeat()
+                    sendHeartbeatTracked(connectedSession)
                 }.onFailure { error ->
                     handleControlLoss(connectedSession, error)
                     return@launch
@@ -826,7 +845,7 @@ class AndroidTerminalViewModel(
             while (true) {
                 delay(intervalMs)
                 runCatching {
-                    connectedSession.sendSensorTelemetry()
+                    sendSensorTelemetryTracked(connectedSession)
                 }.onFailure { error ->
                     handleControlLoss(connectedSession, error)
                     return@launch
@@ -923,6 +942,19 @@ class AndroidTerminalViewModel(
                 val nextSession = dependencies.sessionFactory(responseSink)
                 val connected = runCatching {
                     nextSession.connect(endpoint)
+                    mutableState.update {
+                        it.copy(
+                            outboundHeartbeatCount = 0,
+                            lastOutboundHeartbeatUnixMs = 0L,
+                            outboundSensorSendCount = 0,
+                            lastOutboundSensorUnixMs = 0L,
+                            streamReadySendCount = 0,
+                        )
+                    }
+                    if (appInForeground) {
+                        sendHeartbeatTracked(nextSession)
+                        sendSensorTelemetryTracked(nextSession)
+                    }
                     session = nextSession
                     startHeartbeat(nextSession)
                     startSensorTelemetry(nextSession)
@@ -988,7 +1020,46 @@ class AndroidTerminalViewModel(
             lastControlErrorCode = null,
             lastControlResponseActivity = null,
             lastLiveMediaLine = null,
+            outboundHeartbeatCount = 0,
+            lastOutboundHeartbeatUnixMs = 0L,
+            outboundSensorSendCount = 0,
+            lastOutboundSensorUnixMs = 0L,
+            streamReadySendCount = 0,
         )
+
+    private suspend fun sendHeartbeatTracked(session: AndroidControlSession) {
+        session.sendHeartbeat()
+        recordOutboundHeartbeat()
+    }
+
+    private suspend fun sendSensorTelemetryTracked(session: AndroidControlSession) {
+        if (!session.sendSensorTelemetry()) return
+        recordOutboundSensor()
+    }
+
+    private fun recordOutboundHeartbeat() {
+        val now = dependencies.nowMillis()
+        mutableState.update {
+            val next =
+                it.copy(
+                    outboundHeartbeatCount = it.outboundHeartbeatCount + 1,
+                    lastOutboundHeartbeatUnixMs = now,
+                )
+            next.copy(diagnosticsText = formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next))
+        }
+    }
+
+    private fun recordOutboundSensor() {
+        val now = dependencies.nowMillis()
+        mutableState.update {
+            val next =
+                it.copy(
+                    outboundSensorSendCount = it.outboundSensorSendCount + 1,
+                    lastOutboundSensorUnixMs = now,
+                )
+            next.copy(diagnosticsText = formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next))
+        }
+    }
 
     private fun formatDiagnostics(
         endpoint: EndpointResolution?,
@@ -1050,6 +1121,13 @@ class AndroidTerminalViewModel(
             }
             handshakeSource?.lastServerHeartbeatUnixMs?.takeIf { it > 0 }?.let {
                 appendLine("last_server_heartbeat_unix_ms=$it")
+            }
+            handshakeSource?.let { src ->
+                appendLine("outbound_heartbeat_count=${src.outboundHeartbeatCount}")
+                appendLine("last_outbound_heartbeat_unix_ms=${src.lastOutboundHeartbeatUnixMs}")
+                appendLine("outbound_sensor_send_count=${src.outboundSensorSendCount}")
+                appendLine("last_outbound_sensor_unix_ms=${src.lastOutboundSensorUnixMs}")
+                appendLine("stream_ready_send_count=${src.streamReadySendCount}")
             }
             handshakeSource?.lastCommandResultRequestId?.takeIf { it.isNotBlank() }?.let {
                 appendLine("last_command_result_request_id=$it")

@@ -46,6 +46,12 @@ data class AndroidTerminalViewState(
     val lastOpaqueControlIoSummary: String? = null,
     /** Short label for the last inbound control message (aligned with Flutter `statusFromConnectResponse`). */
     val lastControlResponseActivity: String? = null,
+    /** Outbound control-stream telemetry (Flutter debug panel parity for smoke tests / copyable diagnostics). */
+    val outboundHeartbeatCount: Int = 0,
+    val lastOutboundHeartbeatUnixMs: Long = 0L,
+    val outboundSensorSendCount: Int = 0,
+    val lastOutboundSensorUnixMs: Long = 0L,
+    val streamReadySendCount: Int = 0,
     val localKeepAwakeEnabled: Boolean = false,
     val localFullscreenEnabled: Boolean = false,
     /** Local kiosk preference: transient vs sticky immersive behavior when fullscreen is applied. */

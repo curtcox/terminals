@@ -772,7 +772,7 @@ class AndroidTerminalAppSmokeTest {
             heartbeatError?.let { throw it }
         }
 
-        override suspend fun sendSensorTelemetry() = Unit
+        override suspend fun sendSensorTelemetry(): Boolean = false
 
         override suspend fun sendUiAction(action: ServerDrivenAction) {
             actions += action
