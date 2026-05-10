@@ -26,8 +26,8 @@ void main() {
           ConnectResponse()
             ..updateUi = (uiv1.UpdateUI()
               ..componentId = 'target'
-              ..node = (uiv1.Node()
-                ..text = (uiv1.TextWidget()..value = 'Patched'))),
+              ..node =
+                  (uiv1.Node()..text = (uiv1.TextWidget()..value = 'Patched'))),
         ),
         'UI patched',
       );
@@ -132,7 +132,9 @@ void main() {
         applyUpdateUi(
           currentRoot: root,
           update: uiv1.UpdateUI()..node = replacement,
-        )!.text.value,
+        )!
+            .text
+            .value,
         'Next',
       );
       expect(
@@ -141,7 +143,8 @@ void main() {
           update: uiv1.UpdateUI()
             ..componentId = 'root'
             ..node = replacement,
-        )!.id,
+        )!
+            .id,
         'next',
       );
     });
