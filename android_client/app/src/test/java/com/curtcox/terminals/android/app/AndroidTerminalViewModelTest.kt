@@ -37,6 +37,7 @@ import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.platform.FireOsDeviceInfo
 import com.curtcox.terminals.android.platform.FireOsDeviceInfoProvider
 import com.curtcox.terminals.android.ui.ServerDrivenAction
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -1201,6 +1202,48 @@ class AndroidTerminalViewModelTest {
         assertEquals(1, first.closeCount)
         assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
         assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_success_attempt=1"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun transportTerminationTriggersReconnectWithBackoff() = runTest(testDispatcher) {
+        val first = FakeSession()
+        val second = FakeSession()
+        val sessions = ArrayDeque(listOf(first, second))
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                reconnectPolicy = ReconnectPolicy(initialDelayMillis = 50, maxDelayMillis = 50),
+                maxReconnectAttempts = 2,
+                sessionFactory = { sink ->
+                    sessions.removeFirst().also { it.sink = sink }
+                },
+            ),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+
+        first.sink.onTransportTerminated(IOException("stream reset"))
+        runCurrent()
+
+        assertEquals(ConnectionState.Connecting, viewModel.state.value.connectionState)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_pending=true"))
+        assertEquals("stream reset", viewModel.state.value.lastError)
+        assertEquals(1, first.closeCount)
+
+        advanceTimeBy(50)
+        runCurrent()
+
+        assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
+        assertEquals(EndpointResolution("10.0.0.8", 8080), second.connectedEndpoint)
         assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_success_attempt=1"))
         viewModel.disconnect()
         advanceUntilIdle()

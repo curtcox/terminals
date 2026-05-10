@@ -159,8 +159,10 @@ services. Discovered servers are shown as selectable endpoint options when the
 network supports multicast; Fire OS or isolated Wi-Fi networks may still require
 manual endpoint entry.
 
-If the active control session is lost during heartbeat, the client closes the
-failed stream and performs bounded reconnect attempts using exponential backoff.
+If the active control session is lost during heartbeat, send failures (including
+failed `StreamReady`), WebSocket read errors, or gRPC stream termination
+(`onError` / server half-close), the client closes the failed transport and
+performs bounded reconnect attempts using exponential backoff.
 Retry attempt, success, and exhaustion status are recorded in local diagnostics.
 
 While connected, the client also sends periodic battery sensor telemetry on the

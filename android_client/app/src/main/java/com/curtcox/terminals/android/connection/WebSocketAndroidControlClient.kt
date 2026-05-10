@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import terminals.control.v1.Control
@@ -37,6 +38,9 @@ class WebSocketAndroidControlClient(
     private var readJob: Job? = null
     private var sequence: Long = 0
     private var sessionId: String = ""
+
+    @Volatile
+    private var closingSocket: Boolean = false
 
     override suspend fun connect(endpoint: EndpointResolution) = withContext(Dispatchers.IO) {
         close()
@@ -77,6 +81,7 @@ class WebSocketAndroidControlClient(
             throw IOException("websocket transport hello was not acknowledged")
         }
         sessionId = ack.transportHelloAck.sessionId
+        closingSocket = false
         readJob = scope.launch { readResponses() }
     }
 
@@ -94,6 +99,7 @@ class WebSocketAndroidControlClient(
     }
 
     override suspend fun close() = withContext(Dispatchers.IO) {
+        closingSocket = true
         readJob?.cancel()
         readJob = null
         closeQuietly(input)
@@ -104,16 +110,25 @@ class WebSocketAndroidControlClient(
         socket = null
         sessionId = ""
         sequence = 0
+        closingSocket = false
     }
 
     private suspend fun readResponses() {
-        while (true) {
-            val envelope = withContext(Dispatchers.IO) { readEnvelope() }
-            when {
-                envelope.hasServerMessage() -> responseSink?.onResponse(envelope.serverMessage)
-                envelope.hasTransportError() -> throw IOException(
-                    "transport error ${envelope.transportError.code}: ${envelope.transportError.message}",
-                )
+        try {
+            while (true) {
+                val envelope = withContext(Dispatchers.IO) { readEnvelope() }
+                when {
+                    envelope.hasServerMessage() -> responseSink?.onResponse(envelope.serverMessage)
+                    envelope.hasTransportError() -> throw IOException(
+                        "transport error ${envelope.transportError.code}: ${envelope.transportError.message}",
+                    )
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            if (!closingSocket) {
+                responseSink?.onTransportTerminated(error)
             }
         }
     }

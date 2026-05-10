@@ -18,6 +18,7 @@ import com.curtcox.terminals.android.media.AudioPlaybackResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import com.curtcox.terminals.android.util.Clock
+import java.io.EOFException
 import java.util.Locale
 import java.util.TimeZone
 import kotlinx.coroutines.CancellationException
@@ -116,6 +117,11 @@ class AndroidTerminalViewModel(
                     startSensorTelemetry(connectedSession)
                 }
             }
+        }
+
+        override suspend fun onTransportTerminated(error: Throwable?) {
+            val connectedSession = session ?: return
+            handleControlLoss(connectedSession, error ?: EOFException("control transport closed"))
         }
     }
     private var session: AndroidControlSession? = null

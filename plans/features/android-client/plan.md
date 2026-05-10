@@ -1239,6 +1239,11 @@ Remaining validation:
 - Matched Flutter shell streaming handshake: on inbound `ConnectResponse.start_stream` with non-blank `stream_id`, `AndroidTerminalViewModel` now calls `AndroidControlSession.sendStreamReady` (trimmed id) before merging dispatcher state; send failures route through `handleControlLoss` like heartbeat errors.
 - Added `ProtocolBuilders.streamReady`, `AndroidControlSessionController.sendStreamReady`, JVM coverage (`ProtocolBuildersTest`, `AndroidControlSessionControllerTest`, extended `opaqueStartStreamSummary…` / blank-id regression), and documented the behavior in `docs/client-android.md`.
 
+### 2026-05-09 (control transport stream termination → reconnect)
+
+- Extended `AndroidControlResponseSink` with `onTransportTerminated` (default no-op). `GrpcAndroidControlClient` forwards gRPC `StreamObserver.onError` / `onCompleted` once per stream (guarded against intentional `close()`); `WebSocketAndroidControlClient` notifies on read-loop failure without firing during intentional `close()` (`closingSocket`).
+- `AndroidTerminalViewModel` handles termination like other control loss via `handleControlLoss` (EOF when the server half-closes cleanly). JVM coverage: `transportTerminationTriggersReconnectWithBackoff`. Docs: reconnect paragraph in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests
