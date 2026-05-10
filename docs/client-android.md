@@ -236,7 +236,9 @@ visible); the control session stays open. On each foreground/background
 transition, the client sends a capability delta with reason `app_lifecycle_change`
 (same string as the Flutter reference client). On `Activity` configuration changes
 that affect display metrics, capability refresh uses `display_geometry_change`,
-also matching Flutter. Network-callback capability refreshes
+also matching Flutter. The same transitions refresh copyable network and
+permission education lines together (`last_network_refresh` and
+`last_permission_refresh`) so neither overwrites the other. Network-callback capability refreshes
 and automatic discovery restarts are suppressed while stopped so background
 network flapping does not spam the control stream or thrash NSD.
 

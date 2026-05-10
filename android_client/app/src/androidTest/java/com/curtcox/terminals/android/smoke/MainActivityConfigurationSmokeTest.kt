@@ -37,10 +37,15 @@ class MainActivityConfigurationSmokeTest {
         }
 
         rule.waitUntil(timeoutMillis = 10_000) {
-            rule.onAllNodesWithText("last_permission_refresh=configuration", substring = true)
+            val net = rule.onAllNodesWithText("last_network_refresh=configuration", substring = true)
                 .fetchSemanticsNodes()
                 .isNotEmpty()
+            val perm = rule.onAllNodesWithText("last_permission_refresh=configuration", substring = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+            net && perm
         }
+        rule.onNodeWithText("last_network_refresh=configuration", substring = true).assertExists()
         rule.onNodeWithText("last_permission_refresh=configuration", substring = true).assertExists()
     }
 }

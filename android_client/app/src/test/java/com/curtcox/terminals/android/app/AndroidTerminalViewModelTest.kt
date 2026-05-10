@@ -663,6 +663,27 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun refreshShellDiagnosticsAndCapabilitiesKeepsNetworkAndPermissionRefreshLines() {
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+            ),
+        )
+
+        viewModel.refreshShellDiagnosticsAndCapabilities(
+            networkRefreshReason = "configuration",
+            permissionRefreshReason = "configuration",
+            capabilityDeltaReason = "display_geometry_change",
+        )
+
+        val text = viewModel.state.value.diagnosticsText
+        assertTrue(text.contains("last_network_refresh=configuration"))
+        assertTrue(text.contains("last_permission_refresh=configuration"))
+    }
+
+    @Test
     fun refreshPermissionEducationIncludesMediaPermissionAndWebRtcDiagnostics() {
         var mediaPermissions = AndroidMediaPermissionState(
             microphoneGranted = false,

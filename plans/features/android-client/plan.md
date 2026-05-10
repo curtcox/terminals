@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-10 (`make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, boundary scripts; connected-device instrumentation not re-run in this session).
+Last local validation: 2026-05-10 (`make android-client-test`, `make android-client-compile-android-test`, boundary scripts; `connectedDebugAndroidTest` not re-run in this session after the combined refresh change).
 
 Passed:
 
@@ -1337,6 +1337,11 @@ Remaining validation:
 - Added `MainActivityConfigurationSmokeTest` for production `MainActivity` with manifest `configChanges`: toggling `requestedOrientation` runs `onConfigurationChanged` and terminal chrome shows `last_permission_refresh=configuration` (`refreshPermissionEducation` alongside network + capability refresh). `@After` resets orientation. Assertion uses `ComposeTestRule.waitUntil` so slower emulators stay stable. Filter: `./gradlew connectedDebugAndroidTest --tests '*MainActivityConfiguration*'`.
 - Documented example focused `--tests` filters in `docs/client-android.md` (launch, configuration, kiosk, media).
 - Re-ran `make android-client-test`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
+
+### 2026-05-10 (lifecycle diagnostics: combined network + permission refresh)
+
+- Fixed `MainActivity` `onResume` / `onConfigurationChanged` ordering: `refreshPermissionEducation` rebuilt diagnostics and dropped the prior `last_network_refresh` line from `refreshNetworkDiagnostics`. Added `AndroidTerminalViewModel.refreshShellDiagnosticsAndCapabilities` to refresh permission/media education and append both `last_network_refresh` and `last_permission_refresh` in one update, then call `refreshCapabilities` with the lifecycle reason (`activity-resume` vs `display_geometry_change`).
+- Extended `MainActivityConfigurationSmokeTest` and JVM coverage (`refreshShellDiagnosticsAndCapabilitiesKeepsNetworkAndPermissionRefreshLines`). Documented in `docs/client-android.md`.
 
 ## Test Plan
 

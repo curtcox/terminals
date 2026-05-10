@@ -592,6 +592,31 @@ class AndroidTerminalViewModel(
         }
     }
 
+    /**
+     * Refreshes permission/media education and records both network and permission diagnostic timestamps
+     * in one state update (so [refreshNetworkDiagnostics] does not get overwritten by
+     * [refreshPermissionEducation]), then requests a capability delta when connected.
+     */
+    fun refreshShellDiagnosticsAndCapabilities(
+        networkRefreshReason: String,
+        permissionRefreshReason: String,
+        capabilityDeltaReason: String,
+    ) {
+        mutableState.update {
+            val endpoint = parser.parse(it.endpointText)
+            val permissions = permissionEducation()
+            val mediaSupport = mediaSupport()
+            it.copy(
+                permissionEducation = permissions,
+                mediaSupport = mediaSupport,
+                diagnosticsText = "${formatDiagnostics(endpoint, it.connectionState, it)}\n" +
+                    "last_network_refresh=$networkRefreshReason\n" +
+                    "last_permission_refresh=$permissionRefreshReason",
+            )
+        }
+        refreshCapabilities(capabilityDeltaReason)
+    }
+
     fun refreshPermissionEducation(reason: String) {
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
