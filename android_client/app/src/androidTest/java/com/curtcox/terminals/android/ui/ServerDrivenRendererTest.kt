@@ -623,6 +623,27 @@ class ServerDrivenRendererTest {
     }
 
     @Test
+    fun verticalScrollDeprecatedStringDirectionRendersChildrenInColumn() {
+        val root = Ui.Node.newBuilder()
+            .setId("root")
+            .setScroll(Ui.ScrollWidget.newBuilder().setDirection("vertical").build())
+            .addChildren(node("top") {
+                text = Ui.TextWidget.newBuilder().setValue("Upper").build()
+            })
+            .addChildren(node("bottom") {
+                text = Ui.TextWidget.newBuilder().setValue("Lower").build()
+            })
+            .build()
+
+        compose.setContent { render(root) }
+
+        compose.onNodeWithText("Upper").assertIsDisplayed()
+        compose.onNodeWithText("Lower").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-top").assertIsDisplayed()
+        compose.onNodeWithTag("terminal-node-bottom").assertIsDisplayed()
+    }
+
+    @Test
     fun horizontalScrollDeprecatedStringDirectionRendersChildrenInRow() {
         val root = Ui.Node.newBuilder()
             .setId("scroll")

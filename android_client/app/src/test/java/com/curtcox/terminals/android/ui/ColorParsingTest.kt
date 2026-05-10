@@ -39,4 +39,10 @@ class ColorParsingTest {
         assertEquals(Color.Unspecified, parseColorOrUnspecified(null))
         assertEquals(Color.Unspecified, parseColorOrUnspecified("invalid"))
     }
+
+    @Test
+    fun parseColorOrUnspecifiedAcceptsValidHexLikeTextWidget() {
+        assertEquals(Color(0xFF112233), parseColorOrUnspecified("#112233"))
+        assertEquals(Color(0xFF112233), parseColorOrUnspecified("112233"))
+    }
 }

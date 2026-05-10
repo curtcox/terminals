@@ -1308,6 +1308,11 @@ Remaining validation:
 
 - Matched Flutter shell bug-report attachments: `AndroidBugReportBuilder` sets protobuf `screenshot_png` and `screenshot_byte_count` when non-empty bytes are supplied; `AndroidTerminalViewModel` captures via `AndroidClientDependencies.bugReportScreenshotCapture` (production `MainActivity` wires `WindowBugReportScreenshotCapture.capturePngOrNull` on the activity window). Failures or zero-size views omit the field. Added JVM coverage (`AndroidBugReportBuilderTest`, `AndroidTerminalViewModelTest`). Documented in `docs/client-android.md`. Re-run `make android-client-test`, `make android-client-lint`, and boundary scripts on a JDK 17 + Android SDK host.
 
+### 2026-05-10 (renderer scroll + TextWidget color parsing tests)
+
+- Added `ColorParsingTest.parseColorOrUnspecifiedAcceptsValidHexLikeTextWidget` so `parseColorOrUnspecified` coverage matches `TextWidget` color wiring (hash and bare RGB).
+- Added `ServerDrivenRendererTest.verticalScrollDeprecatedStringDirectionRendersChildrenInColumn` for legacy `ScrollWidget.direction == "vertical"` (Flutter parity with enum vertical / non-horizontal string). Re-run `make android-client-test` and `make android-client-compile-android-test` on a JDK 17 + Android SDK host.
+
 ### 2026-05-10 (Makefile Gradle stop + Apple Silicon gRPC codegen)
 
 - Fixed `Makefile` `android-client-test` and `android-client-connected-test`: the post-task `./gradlew --stop` line used a second `cd android_client` while the shell was already inside `android_client`, so `--stop` never ran and Make reported `cd: android_client: No such directory`.
