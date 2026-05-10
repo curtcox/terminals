@@ -282,7 +282,9 @@ void main() {
       expect(update.events.single.componentId, 'root');
       expect(update.transitionHint?.transition, 'fade');
       expect(
-          update.transitionHint?.duration, const Duration(milliseconds: 120));
+        update.transitionHint?.duration,
+        const Duration(milliseconds: 120),
+      );
       expect(update.transitionHint?.notification, 'Transition: fade (120ms)');
     });
 
