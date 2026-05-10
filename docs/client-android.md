@@ -134,6 +134,9 @@ you select the server.
 WebSocket connects send `TransportHello.resume_token` from the last successful
 transport hello acknowledgement (same resume semantics as the Flutter web shell),
 so brief reconnects can offer session resumption when the server supports it.
+The `grpc://` / `grpcs://` carrier opens the protobuf control stream directly and
+does not perform that envelope handshake, so the resume hint applies only to
+WebSocket (and other envelope transports), not to gRPC.
 
 The native Android client validates manual endpoints, manages the generic
 control-session lifecycle, sends protobuf-backed hello/capability/action

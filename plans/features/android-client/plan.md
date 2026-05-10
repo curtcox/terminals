@@ -1290,6 +1290,11 @@ Remaining validation:
 - Re-used `ProtocolBuilders.transportHello` for the opening envelope; added `TransportResumeTokenStoreTest`.
 - Documented resume behavior in `docs/client-android.md`.
 
+### 2026-05-09 (resume token docs + automated gate verification)
+
+- Clarified in `docs/client-android.md` that envelope resume hints apply to WebSocket (and similar transports), not the `grpc://` / `grpcs://` carrier.
+- Re-ran `make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
+
 ## Test Plan
 
 ### Unit tests
