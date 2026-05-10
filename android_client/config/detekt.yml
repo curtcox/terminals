@@ -1,6 +1,10 @@
 # Detekt: buildUponDefaultConfig merges this file with bundled defaults.
 # Compose rules require type resolution (enabled by the Android Detekt Gradle integration).
 
+coroutines:
+  InjectDispatcher:
+    active: false
+
 compose:
   ReusedModifierInstance:
     active: true
@@ -29,3 +33,23 @@ formatting:
     indentSize: 4
   MaximumLineLength:
     maxLineLength: 120
+
+complexity:
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 15
+  LongMethod:
+    active: true
+    threshold: 80
+
+performance:
+  ForEachOnRange:
+    active: true
+  SpreadOperator:
+    active: true
+
+potential-bugs:
+  UnreachableCatchBlock:
+    active: true
+  UnusedUnaryOperator:
+    active: true

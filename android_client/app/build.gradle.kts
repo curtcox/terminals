@@ -40,6 +40,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.protobuf")
     id("io.gitlab.arturbosch.detekt")
+    id("org.owasp.dependencycheck")
 }
 
 android {
@@ -106,6 +107,17 @@ android {
             "GradleDependency",
             "RtlHardcoded",
         )
+        // Promote high-signal issues to errors; matches already listed in lint-baseline.xml stay suppressed.
+        error += setOf(
+            "NewApi",
+            "InlinedApi",
+            "ObsoleteSdkInt",
+            "UnusedResources",
+            "UnusedIds",
+            "VectorPath",
+            "Autofill",
+            "UseKtx",
+        )
     }
 }
 
@@ -164,6 +176,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.lemonappdev:konsist:0.17.3")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
@@ -187,12 +200,42 @@ detekt {
     baseline = file("detekt-baseline.xml")
 }
 
+dependencyCheck {
+    outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
+    formats.set(listOf("HTML", "JSON"))
+    // Fail the build on high+ CVEs (7–10). Tune suppressions in config/dependency-check-suppressions.xml.
+    failBuildOnCVSS.set(7f)
+    suppressionFile.set(rootProject.file("config/dependency-check-suppressions.xml").absolutePath)
+    scanConfigurations.set(
+        listOf(
+            "releaseRuntimeClasspath",
+            "debugRuntimeClasspath",
+        ),
+    )
+
+    nvd {
+        apiKey.set(providers.environmentVariable("NVD_API_KEY").orElse(""))
+        // Reuse cached NVD data between runs (CI caches ~/.gradle/dependency-check-data).
+        validForHours.set(48)
+    }
+
+    analyzers {
+        assemblyEnabled.set(false)
+        nuspecEnabled.set(false)
+    }
+}
+
 tasks.named("detekt") {
     mustRunAfter(tasks.named("detektBaseline"))
 }
 
-tasks.named("check") {
-    dependsOn("detekt")
+afterEvaluate {
+    tasks.named("check").configure {
+        dependsOn("detektMain")
+    }
+    tasks.named("detektMain").configure {
+        mustRunAfter(tasks.named("detektBaselineMain"))
+    }
 }
 
 tasks.withType<KotlinCompile>().configureEach {

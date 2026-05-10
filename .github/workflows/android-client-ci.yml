@@ -56,9 +56,53 @@ jobs:
       - name: Android client boundary tests
         run: ./scripts/test-android-client-boundary.sh
 
-      - name: Unit tests, lint, detekt, debug assemble, compile instrumentation tests
+      - name: Unit tests, lint, detektMain, debug assemble, compile instrumentation tests
         working-directory: android_client
-        run: ./gradlew testDebugUnitTest lintDebug detekt assembleDebug compileDebugAndroidTestKotlin --no-daemon
+        run: ./gradlew testDebugUnitTest lintDebug detektMain assembleDebug compileDebugAndroidTestKotlin --no-daemon
+
+  # OWASP Dependency-Check can take a long time on a cold NVD cache without NVD_API_KEY; keep it parallel to the main checks.
+  android-client-dependency-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          log-accepted-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-android-gradle-${{ hashFiles('android_client/**/*.gradle.kts', 'android_client/config/**', 'android_client/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-android-gradle-
+
+      - name: Cache OWASP Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: ${{ runner.os }}-owasp-dc-${{ hashFiles('android_client/**/*.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-owasp-dc-
+
+      - name: OWASP Dependency-Check (runtime classpaths)
+        working-directory: android_client
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew :app:dependencyCheckAnalyze --no-daemon
 
   android-client-instrumentation:
     needs: android-client-checks
