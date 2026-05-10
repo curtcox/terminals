@@ -276,8 +276,7 @@ func mapKey(field protoreflect.FieldDescriptor, raw string) (protoreflect.MapKey
 	case protoreflect.BoolKind:
 		value, err := strconv.ParseBool(raw)
 		return protoreflect.ValueOfBool(value).MapKey(), err
-	case protoreflect.InvalidKind,
-		protoreflect.EnumKind,
+	case protoreflect.EnumKind,
 		protoreflect.FloatKind,
 		protoreflect.DoubleKind,
 		protoreflect.BytesKind,
