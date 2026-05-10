@@ -189,8 +189,10 @@ void main() {
         ..componentId = 'missing'
         ..node = (uiv1.Node()..text = (uiv1.TextWidget()..value = 'Next'));
 
-      expect(identical(applyUpdateUi(currentRoot: root, update: update), root),
-          isTrue);
+      expect(
+        identical(applyUpdateUi(currentRoot: root, update: update), root),
+        isTrue,
+      );
       expect(applyUpdateUi(currentRoot: null, update: update), isNull);
     });
   });
@@ -482,8 +484,10 @@ void main() {
             ..signalTypeEnum = WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER),
       );
 
-      expect(signalUpdate.webrtcSignalNotification,
-          'WebRTC signal: answer (video-1)');
+      expect(
+        signalUpdate.webrtcSignalNotification,
+        'WebRTC signal: answer (video-1)',
+      );
       expect(signalUpdate.lastNotification, 'WebRTC signal: answer (video-1)');
     });
 
@@ -498,8 +502,10 @@ void main() {
             ..kind = 'legacy-kind'
             ..streamKind = iov1.StreamKind.STREAM_KIND_SENSOR),
       );
-      expect(startUpdate.startStreamNotification,
-          'Start stream: sensor (stream-typed)');
+      expect(
+        startUpdate.startStreamNotification,
+        'Start stream: sensor (stream-typed)',
+      );
 
       final routeUpdate = synchronousMediaControlUpdateFromResponse(
         ConnectResponse()
@@ -565,8 +571,10 @@ void main() {
       );
       expect(playAudioSourceLabel(iov1.PlayAudio()..url = 'https://x'), 'url');
       expect(playAudioPcmByteCount(iov1.PlayAudio()..url = 'https://x'), 0);
-      expect(playAudioSourceLabel(iov1.PlayAudio()..ttsText = 'hello'),
-          'tts_text');
+      expect(
+        playAudioSourceLabel(iov1.PlayAudio()..ttsText = 'hello'),
+        'tts_text',
+      );
       expect(playAudioSourceLabel(iov1.PlayAudio()), 'not_set');
     });
 
