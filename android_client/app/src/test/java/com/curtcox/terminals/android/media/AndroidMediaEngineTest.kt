@@ -84,6 +84,54 @@ class AndroidMediaEngineTest {
     }
 
     @Test
+    fun liveMediaSessionDisabledSurfacesReasonOnStartStream() {
+        val session = AndroidLiveMediaSession.disabled("custom-webrtc-off")
+        val start = Io.StartStream.newBuilder().setStreamId("s1").build()
+
+        assertEquals(
+            LiveMediaSessionResult.Unsupported("custom-webrtc-off"),
+            session.applyStartStream(start),
+        )
+        assertEquals(LiveMediaSessionResult.Applied, session.applyStopStream("s1"))
+        assertEquals(
+            LiveMediaSessionResult.Applied,
+            session.applyRouteStream(Io.RouteStream.getDefaultInstance()),
+        )
+        assertEquals(
+            LiveMediaSessionResult.Applied,
+            session.applyWebRtcSignal(Control.WebRTCSignal.getDefaultInstance()),
+        )
+    }
+
+    @Test
+    fun liveMediaSessionFromDisabledAdapterMatchesDisabledStartStreamReason() {
+        val session = AndroidLiveMediaSession.fromAdapter(AndroidWebRtcAdapter.disabled("adapter-off"))
+        val start = Io.StartStream.newBuilder().setStreamId("x").build()
+
+        assertEquals(LiveMediaSessionResult.Unsupported("adapter-off"), session.applyStartStream(start))
+    }
+
+    @Test
+    fun liveMediaSessionWhenAdapterClaimsSupportedStillReportsSessionNotImplemented() {
+        val session = AndroidLiveMediaSession.fromAdapter(
+            AndroidWebRtcAdapter { AndroidWebRtcSupport(supported = true, reason = "") },
+        )
+        val start = Io.StartStream.newBuilder().setStreamId("live-1").build()
+
+        assertEquals(
+            LiveMediaSessionResult.Unsupported("live-media-session-not-implemented"),
+            session.applyStartStream(start),
+        )
+        assertEquals(LiveMediaSessionResult.Applied, session.applyStopStream("live-1"))
+        assertEquals(
+            LiveMediaSessionResult.Unsupported("live-media-session-not-implemented"),
+            session.applyWebRtcSignal(
+                Control.WebRTCSignal.newBuilder().setStreamId("live-1").build(),
+            ),
+        )
+    }
+
+    @Test
     fun liveMediaDelegatesStopRouteAndSignalToSession() {
         val live = RecordingLiveMediaSession()
         val engine = AndroidMediaEngine(liveMedia = live)

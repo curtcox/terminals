@@ -1253,6 +1253,11 @@ Remaining validation:
 - `AndroidClientDependencies.fromContext` uses one shared disabled `AndroidWebRtcAdapter` for both capability reporting and live-media gating; default JVM test dependencies pair `AndroidMediaEngine` live-media with the same `webRtcAdapter` instance as the ViewModel helper.
 - JVM coverage: `AndroidMediaEngineTest.liveMediaDelegatesStopRouteAndSignalToSession`, extended `opaqueStartStreamSummary…`, `startStreamWithWebRtcDisabledSurfacesAdapterReasonInLiveMediaDiagnostics`; documented in `docs/client-android.md`.
 
+### 2026-05-09 (live-media session JVM contract)
+
+- Added `AndroidMediaEngineTest` coverage for `AndroidLiveMediaSession.disabled(...)`, `fromAdapter(disabled)`, and `fromAdapter` when the adapter reports `supported=true` (still returns `live-media-session-not-implemented` for start/WebRTC signal until real WebRTC lands).
+- Re-ran `make android-client-test`; remaining plan gaps are physical-device checks listed under **Remaining validation**.
+
 ## Test Plan
 
 ### Unit tests
