@@ -153,9 +153,11 @@ android-client-test:
 		if [ -z "$(ANDROID_JAVA_HOME)" ] || [ ! -x "$(ANDROID_JAVA_HOME)/bin/java" ]; then \
 			echo "Skipping native Android tests: JDK not found (need a working Java 17+). Set JAVA_HOME, install openjdk@17, or rely on Android Studio's bundled JBR under Applications."; \
 		else \
+			python3 scripts/android-client-stop-stuck-workers.py --repo-root "$(CURDIR)" --android-root "$(CURDIR)/android_client" --java-home "$(ANDROID_JAVA_HOME)"; \
 			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew testDebugUnitTest; \
 			ec=$$?; \
 			JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew --stop || true; \
+			python3 "$(CURDIR)/scripts/android-client-stop-stuck-workers.py" --repo-root "$(CURDIR)" --android-root "$(CURDIR)/android_client" --java-home "$(ANDROID_JAVA_HOME)" || true; \
 			exit $$ec; \
 		fi; \
 	else \
@@ -193,9 +195,11 @@ android-client-connected-test:
 		elif ! adb devices | awk 'NR>1 && $$2=="device" {found=1} END {exit found ? 0 : 1}'; then \
 			echo "Skipping native Android connected tests: no connected Android device/emulator found."; \
 		else \
+			python3 scripts/android-client-stop-stuck-workers.py --repo-root "$(CURDIR)" --android-root "$(CURDIR)/android_client" --java-home "$(ANDROID_JAVA_HOME)"; \
 			cd android_client && JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew connectedDebugAndroidTest; \
 			ec=$$?; \
 			JAVA_HOME="$(ANDROID_JAVA_HOME)" ./gradlew --stop || true; \
+			python3 "$(CURDIR)/scripts/android-client-stop-stuck-workers.py" --repo-root "$(CURDIR)" --android-root "$(CURDIR)/android_client" --java-home "$(ANDROID_JAVA_HOME)" || true; \
 			exit $$ec; \
 		fi; \
 	else \
