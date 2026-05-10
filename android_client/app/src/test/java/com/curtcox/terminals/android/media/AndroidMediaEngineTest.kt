@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
+import terminals.control.v1.Control
 import terminals.io.v1.Io
 
 class AndroidMediaEngineTest {
@@ -80,5 +81,51 @@ class AndroidMediaEngineTest {
 
         assertFalse(support.supported)
         assertEquals("fire-os-webrtc-not-enabled", support.reason)
+    }
+
+    @Test
+    fun liveMediaDelegatesStopRouteAndSignalToSession() {
+        val live = RecordingLiveMediaSession()
+        val engine = AndroidMediaEngine(liveMedia = live)
+
+        val start = Io.StartStream.newBuilder().setStreamId("a1").build()
+        assertEquals(LiveMediaSessionResult.Applied, engine.applyStartStream(start))
+        engine.applyStopStream("a1")
+        val route = Io.RouteStream.newBuilder().setStreamId("a1").setSourceDeviceId("s").setTargetDeviceId("t").build()
+        engine.applyRouteStream(route)
+        val signal = Control.WebRTCSignal.newBuilder().setStreamId("a1").build()
+        engine.applyWebRtcSignal(signal)
+
+        assertEquals(listOf(start), live.starts)
+        assertEquals(listOf("a1"), live.stops)
+        assertEquals(listOf(route), live.routes)
+        assertEquals(listOf(signal), live.signals)
+    }
+
+    private class RecordingLiveMediaSession : AndroidLiveMediaSession {
+        val starts = mutableListOf<Io.StartStream>()
+        val stops = mutableListOf<String>()
+        val routes = mutableListOf<Io.RouteStream>()
+        val signals = mutableListOf<Control.WebRTCSignal>()
+
+        override fun applyStartStream(start: Io.StartStream): LiveMediaSessionResult {
+            starts += start
+            return LiveMediaSessionResult.Applied
+        }
+
+        override fun applyStopStream(streamId: String): LiveMediaSessionResult {
+            stops += streamId
+            return LiveMediaSessionResult.Applied
+        }
+
+        override fun applyRouteStream(route: Io.RouteStream): LiveMediaSessionResult {
+            routes += route
+            return LiveMediaSessionResult.Applied
+        }
+
+        override fun applyWebRtcSignal(signal: Control.WebRTCSignal): LiveMediaSessionResult {
+            signals += signal
+            return LiveMediaSessionResult.Applied
+        }
     }
 }

@@ -1246,6 +1246,13 @@ Remaining validation:
 - Hardened WebSocket intentional-close suppression so the read loop keeps treating socket errors as close-related until a later successful `connect()` re-enables termination callbacks, avoiding stale old-transport callbacks during reconnect/disconnect races.
 - Re-ran `make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, boundary scripts, and `git diff --check`.
 
+### 2026-05-09 (Flutter live-media control-response parity)
+
+- Added `AndroidLiveMediaSession` / `LiveMediaSessionResult` behind `AndroidWebRtcAdapter` (`WebRtcGatedLiveMediaSession`), delegated from `AndroidMediaEngine` for `StartStream`, `StopStream`, `RouteStream`, and `WebRTCSignal` responses.
+- `AndroidTerminalViewModel` calls the seam after `sendStreamReady` for non-blank stream ids; surfaces `last_live_media` / `lastLiveMediaLine` when start fails (`Unsupported`), clears the line in `withoutHandshake`.
+- `AndroidClientDependencies.fromContext` uses one shared disabled `AndroidWebRtcAdapter` for both capability reporting and live-media gating; default JVM test dependencies pair `AndroidMediaEngine` live-media with the same `webRtcAdapter` instance as the ViewModel helper.
+- JVM coverage: `AndroidMediaEngineTest.liveMediaDelegatesStopRouteAndSignalToSession`, extended `opaqueStartStreamSummary…`, `startStreamWithWebRtcDisabledSurfacesAdapterReasonInLiveMediaDiagnostics`; documented in `docs/client-android.md`.
+
 ## Test Plan
 
 ### Unit tests

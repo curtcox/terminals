@@ -17,6 +17,7 @@ import com.curtcox.terminals.android.diagnostics.ContextDiagnosticClipboard
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
 import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery
 import com.curtcox.terminals.android.discovery.NsdAndroidDiscovery
+import com.curtcox.terminals.android.media.AndroidLiveMediaSession
 import com.curtcox.terminals.android.media.AndroidMediaEngine
 import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
 import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
@@ -82,8 +83,9 @@ data class AndroidClientDependencies(
     },
 ) {
     companion object {
-        fun fromContext(context: Context): AndroidClientDependencies =
-            AndroidClientDependencies(
+        fun fromContext(context: Context): AndroidClientDependencies {
+            val webRtcAdapter = AndroidWebRtcAdapter.disabled()
+            return AndroidClientDependencies(
                 capabilityProbe = ContextAndroidCapabilityProbe(context),
                 keepAwakeController = if (context is Activity) {
                     WindowAndroidKeepAwakeController(context.window)
@@ -110,9 +112,10 @@ data class AndroidClientDependencies(
                 } ?: AndroidNsdDiscovery.unavailable(),
                 mediaEngine = AndroidMediaEngine(
                     audioPlayback = ContextAndroidAudioPlayback(context.applicationContext),
+                    liveMedia = AndroidLiveMediaSession.fromAdapter(webRtcAdapter),
                 ),
                 mediaPermissionProbe = ContextAndroidMediaPermissionProbe(context.applicationContext),
-                webRtcAdapter = AndroidWebRtcAdapter.disabled(),
+                webRtcAdapter = webRtcAdapter,
                 terminalSettings = SharedPreferencesAndroidTerminalSettings(context),
                 fireOsDeviceInfoProvider = FireOsDeviceInfoProvider {
                     FireOsDeviceInfo(
@@ -122,5 +125,6 @@ data class AndroidClientDependencies(
                     )
                 },
             )
+        }
     }
 }

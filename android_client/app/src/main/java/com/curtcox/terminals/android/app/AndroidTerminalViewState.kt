@@ -13,6 +13,8 @@ data class AndroidTerminalViewState(
     val lastNotificationBody: String? = null,
     val lastMediaRequestId: String? = null,
     val lastMediaStatus: String? = null,
+    /** Last live-stream / WebRTC seam diagnostic line from the shell (e.g. start_stream id + reason). */
+    val lastLiveMediaLine: String? = null,
     val lastDiagnosticsCopyStatus: String? = null,
     /** User-visible status for the last shell bug-report submit attempt (queued/sent/failed). */
     val lastBugReportSubmitStatus: String? = null,

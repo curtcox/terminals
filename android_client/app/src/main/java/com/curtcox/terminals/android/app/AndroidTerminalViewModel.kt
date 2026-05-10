@@ -15,6 +15,7 @@ import com.curtcox.terminals.android.diagnostics.AndroidBugReportBuilder
 import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
 import com.curtcox.terminals.android.discovery.DiscoveredServer
 import com.curtcox.terminals.android.media.AudioPlaybackResult
+import com.curtcox.terminals.android.media.LiveMediaSessionResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import com.curtcox.terminals.android.util.Clock
@@ -75,6 +76,7 @@ class AndroidTerminalViewModel(
             } else {
                 null
             }
+            var liveMediaLine: String? = null
             if (response.payloadCase == Control.ConnectResponse.PayloadCase.START_STREAM) {
                 val streamId = response.startStream.streamId.trim()
                 if (streamId.isNotEmpty()) {
@@ -83,6 +85,27 @@ class AndroidTerminalViewModel(
                         runCatching { connectedSession.sendStreamReady(streamId) }
                             .onFailure { handleControlLoss(connectedSession, it) }
                     }
+                    when (val lr = dependencies.mediaEngine.applyStartStream(response.startStream)) {
+                        is LiveMediaSessionResult.Unsupported ->
+                            liveMediaLine = "start_stream:$streamId:${lr.reason}"
+                        else -> {}
+                    }
+                }
+            }
+            if (response.payloadCase == Control.ConnectResponse.PayloadCase.STOP_STREAM) {
+                val streamId = response.stopStream.streamId.trim()
+                if (streamId.isNotEmpty()) {
+                    dependencies.mediaEngine.applyStopStream(streamId)
+                }
+            }
+            if (response.payloadCase == Control.ConnectResponse.PayloadCase.ROUTE_STREAM) {
+                dependencies.mediaEngine.applyRouteStream(response.routeStream)
+            }
+            if (response.payloadCase == Control.ConnectResponse.PayloadCase.WEBRTC_SIGNAL) {
+                when (val sr = dependencies.mediaEngine.applyWebRtcSignal(response.webrtcSignal)) {
+                    is LiveMediaSessionResult.Unsupported ->
+                        liveMediaLine = liveMediaLine ?: "webrtc_signal:${sr.reason}"
+                    else -> {}
                 }
             }
             mutableState.update {
@@ -98,6 +121,10 @@ class AndroidTerminalViewModel(
                 if (mediaStatus != null) {
                     diagnostics += "\nlast_media=${mediaStatus.first}:${mediaStatus.second}"
                 }
+                val resolvedLiveMediaLine = liveMediaLine ?: next.lastLiveMediaLine
+                resolvedLiveMediaLine?.takeIf { it.isNotBlank() }?.let { line ->
+                    diagnostics += "\nlast_live_media=$line"
+                }
                 next.copy(
                     diagnosticsText = if (rebaselineSent) {
                         "$diagnostics\nlast_capability_rebaseline=stale-generation"
@@ -106,6 +133,7 @@ class AndroidTerminalViewModel(
                     },
                     lastMediaRequestId = mediaStatus?.first ?: next.lastMediaRequestId,
                     lastMediaStatus = mediaStatus?.second ?: next.lastMediaStatus,
+                    lastLiveMediaLine = resolvedLiveMediaLine,
                 )
             }
             if (response.payloadCase == Control.ConnectResponse.PayloadCase.HELLO_ACK) {
@@ -888,6 +916,7 @@ class AndroidTerminalViewModel(
             lastBugReportAckDiagnostics = null,
             lastControlErrorCode = null,
             lastControlResponseActivity = null,
+            lastLiveMediaLine = null,
         )
 
     private fun formatDiagnostics(

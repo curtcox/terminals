@@ -170,7 +170,12 @@ control stream (same fields and pacing as the Flutter reference client: about
 every 15 seconds when battery capability is present). When the server sends
 `StartStream` with a non-empty `stream_id`, the client acknowledges with the same
 `StreamReady` control payload as the Flutter shell so generic streaming hooks can
-progress. As with Flutter, periodic
+progress. It then forwards `StartStream`, `StopStream`, `RouteStream`, and
+`WebRTCSignal` responses through the `AndroidMediaEngine` live-media seam
+(`AndroidLiveMediaSession`), matching Flutter’s media-engine hooks; while WebRTC
+remains disabled, `StartStream` surfaces a `last_live_media=` diagnostic with the
+adapter reason (or a not-implemented placeholder when the adapter reports
+supported). As with Flutter, periodic
 heartbeat and sensor telemetry pause while the activity is stopped (app not
 visible); the control session stays open. On each foreground/background
 transition, the client sends a capability delta with reason `app_lifecycle_change`

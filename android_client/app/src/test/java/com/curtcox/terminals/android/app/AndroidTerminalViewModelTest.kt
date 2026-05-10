@@ -16,6 +16,7 @@ import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
 import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery
 import com.curtcox.terminals.android.discovery.DiscoveredServer
 import com.curtcox.terminals.android.media.AndroidAudioPlayback
+import com.curtcox.terminals.android.media.AndroidLiveMediaSession
 import com.curtcox.terminals.android.media.AndroidMediaDisplay
 import com.curtcox.terminals.android.media.AndroidMediaEngine
 import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
@@ -1959,11 +1960,52 @@ class AndroidTerminalViewModelTest {
         assertEquals(listOf("s-out"), session.streamReadyIds)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_opaque_control_io="))
         assertTrue(viewModel.state.value.diagnosticsText.contains("stream_id=s-out"))
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains(
+                "last_live_media=start_stream:s-out:live-media-session-not-implemented",
+            ),
+        )
+        assertEquals(
+            "start_stream:s-out:live-media-session-not-implemented",
+            viewModel.state.value.lastLiveMediaLine,
+        )
         assertEquals("Stream started", viewModel.state.value.lastControlResponseActivity)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=Stream started"))
         viewModel.disconnect()
         advanceUntilIdle()
         assertNull(viewModel.state.value.lastOpaqueControlIoSummary)
+        assertNull(viewModel.state.value.lastLiveMediaLine)
+    }
+
+    @Test
+    fun startStreamWithWebRtcDisabledSurfacesAdapterReasonInLiveMediaDiagnostics() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            webRtcAdapter = AndroidWebRtcAdapter.disabled("custom-webrtc-off"),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setStartStream(
+                    Io.StartStream.newBuilder()
+                        .setStreamId("sx")
+                        .setStreamKind(Io.StreamKind.STREAM_KIND_VIDEO),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains(
+                "last_live_media=start_stream:sx:custom-webrtc-off",
+            ),
+        )
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -2438,10 +2480,12 @@ class AndroidTerminalViewModelTest {
         session: FakeSession,
         notificationDelivery: AndroidNotificationDelivery = AndroidNotificationDelivery.none(),
         speechDelivery: AndroidTerminalSpeech = AndroidTerminalSpeech.none(),
-        mediaEngine: AndroidMediaEngine = AndroidMediaEngine.unsupported(),
+        webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter { AndroidWebRtcSupport(supported = true) },
+        mediaEngine: AndroidMediaEngine = AndroidMediaEngine(
+            liveMedia = AndroidLiveMediaSession.fromAdapter(webRtcAdapter),
+        ),
         networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
         mediaPermissionProbe: AndroidMediaPermissionProbe = AndroidMediaPermissionProbe.unavailable(),
-        webRtcAdapter: AndroidWebRtcAdapter = AndroidWebRtcAdapter { AndroidWebRtcSupport(supported = true) },
         permissionRequester: AndroidPermissionRequester = AndroidPermissionRequester.none(),
         networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(),
         heartbeatIntervalMillis: Long = 0,
