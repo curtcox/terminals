@@ -2,8 +2,11 @@ package com.curtcox.terminals.android.diagnostics
 
 import com.curtcox.terminals.android.app.ConnectionState
 import com.curtcox.terminals.android.util.Clock
+import java.util.TimeZone
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import terminals.capabilities.v1.Capabilities
 import terminals.diagnostics.v1.Diagnostics
@@ -12,6 +15,18 @@ import terminals.ui.v1.Ui
 class AndroidBugReportBuilderTest {
     private val fixedClock = Clock { 1_778_353_200_000L }
     private val buildMeta = AndroidBuildMetadata("9.9.9-test", "abc123", "2026-05-09")
+    private var previousDefaultTimeZone: TimeZone? = null
+
+    @Before
+    fun pinDefaultTimeZone() {
+        previousDefaultTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"))
+    }
+
+    @After
+    fun restoreDefaultTimeZone() {
+        previousDefaultTimeZone?.let { TimeZone.setDefault(it) }
+    }
 
     @Test
     fun buildIncludesBugTagsHintsAndReportIdShape() {

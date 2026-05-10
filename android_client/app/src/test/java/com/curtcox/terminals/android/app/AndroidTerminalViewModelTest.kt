@@ -63,11 +63,13 @@ import terminals.ui.v1.Ui
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidTerminalViewModelTest {
-    private val dispatcher = StandardTestDispatcher()
+    /** Fresh queue per test so a leaked heartbeat/sensor loop cannot stall a later `advanceUntilIdle()`. */
+    private var testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(dispatcher)
+        testDispatcher = StandardTestDispatcher()
+        Dispatchers.setMain(testDispatcher)
     }
 
     @After
@@ -76,7 +78,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun connectCreatesSessionAndMarksStateConnected() = runTest(dispatcher) {
+    fun connectCreatesSessionAndMarksStateConnected() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(
             session,
@@ -101,7 +103,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun bugReportServerDrivenActionSendsBugReportNotUiAction() = runTest(dispatcher) {
+    fun bugReportServerDrivenActionSendsBugReportNotUiAction() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(
             session,
@@ -120,10 +122,12 @@ class AndroidTerminalViewModelTest {
         assertEquals(1, session.bugReports.size)
         assertEquals("other-device", session.bugReports.first().subjectDeviceId)
         assertTrue(session.bugReports.first().description.contains("on-device"))
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
-    fun chromeBugReportQueuedWhenOffline() = runTest(dispatcher) {
+    fun chromeBugReportQueuedWhenOffline() = runTest(testDispatcher) {
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
@@ -141,7 +145,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun chromeBugReportSendsWhenConnected() = runTest(dispatcher) {
+    fun chromeBugReportSendsWhenConnected() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(
             session,
@@ -162,7 +166,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun chromeBugReportQueuedThenFlushedOnConnect() = runTest(dispatcher) {
+    fun chromeBugReportQueuedThenFlushedOnConnect() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(
             session,
@@ -187,7 +191,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun chromeBugReportFlushMultipleQueuedAllSucceed() = runTest(dispatcher) {
+    fun chromeBugReportFlushMultipleQueuedAllSucceed() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(
             session,
@@ -212,7 +216,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun chromeBugReportFlushPartialFailureSummarizesCounts() = runTest(dispatcher) {
+    fun chromeBugReportFlushPartialFailureSummarizesCounts() = runTest(testDispatcher) {
         val session =
             FakeSession().apply {
                 bugReportFailurePattern = listOf(true, false)
@@ -241,7 +245,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun chromeBugReportFlushAllFailRecordsFailure() = runTest(dispatcher) {
+    fun chromeBugReportFlushAllFailRecordsFailure() = runTest(testDispatcher) {
         val session =
             FakeSession().apply {
                 bugReportFailurePattern = listOf(true, true)
@@ -311,7 +315,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkMonitorRefreshesDiagnosticsAndConnectedCapabilities() = runTest(dispatcher) {
+    fun networkMonitorRefreshesDiagnosticsAndConnectedCapabilities() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val monitor = FakeNetworkMonitor()
         var networkState = AndroidNetworkState(connected = true, metered = false)
@@ -360,7 +364,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkMonitorRestartsDiscoveryWhenScanning() = runTest(dispatcher) {
+    fun networkMonitorRestartsDiscoveryWhenScanning() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val monitor = FakeNetworkMonitor()
         val discovery = FakeDiscovery()
@@ -396,7 +400,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkMonitorDebouncesDiscoveryRestartWhenCallbacksBurst() = runTest(dispatcher) {
+    fun networkMonitorDebouncesDiscoveryRestartWhenCallbacksBurst() = runTest(testDispatcher) {
         val monitor = FakeNetworkMonitor()
         val discovery = FakeDiscovery()
         var now = 1_000L
@@ -434,7 +438,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkMonitorDebouncesCapabilityRefreshWhenCallbacksBurst() = runTest(dispatcher) {
+    fun networkMonitorDebouncesCapabilityRefreshWhenCallbacksBurst() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val monitor = FakeNetworkMonitor()
         var now = 5_000L
@@ -682,7 +686,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun requestMicrophonePermissionRefreshesPermissionEducationAndCapabilities() = runTest(dispatcher) {
+    fun requestMicrophonePermissionRefreshesPermissionEducationAndCapabilities() = runTest(testDispatcher) {
         val probe = FakeCapabilityProbe(
             permissions = PermissionCapabilityState(
                 microphoneGranted = false,
@@ -733,7 +737,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun requestMissingPermissionsRequestsPresentMissingMediaPermissions() = runTest(dispatcher) {
+    fun requestMissingPermissionsRequestsPresentMissingMediaPermissions() = runTest(testDispatcher) {
         val probe = FakeCapabilityProbe(
             permissions = PermissionCapabilityState(
                 microphoneGranted = false,
@@ -787,7 +791,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun requestMissingPermissionsRequestsNotificationPermissionWhenRuntimePromptIsSupported() = runTest(dispatcher) {
+    fun requestMissingPermissionsRequestsNotificationPermissionWhenRuntimePromptIsSupported() = runTest(testDispatcher) {
         assumeTrue(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
         val probe = FakeCapabilityProbe(
             permissions = PermissionCapabilityState(
@@ -840,7 +844,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun connectFailureReturnsToReadyStateWithDiagnostics() = runTest(dispatcher) {
+    fun connectFailureReturnsToReadyStateWithDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession(connectError = IllegalStateException("no route"))
         val viewModel = viewModel(session)
 
@@ -883,7 +887,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun reconnectClosesPreviousSessionBeforeOpeningNext() = runTest(dispatcher) {
+    fun reconnectClosesPreviousSessionBeforeOpeningNext() = runTest(testDispatcher) {
         val first = FakeSession()
         val second = FakeSession()
         val sessions = ArrayDeque(listOf(first, second))
@@ -912,7 +916,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun secondConnectCancelsInFlightConnectAttemptAndClosesProvisionalSession() = runTest(dispatcher) {
+    fun secondConnectCancelsInFlightConnectAttemptAndClosesProvisionalSession() = runTest(testDispatcher) {
         val firstConnectGate = CompletableDeferred<Unit>()
         val first = FakeSession(connectGate = firstConnectGate)
         val second = FakeSession()
@@ -946,7 +950,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun disconnectWithValidEndpointReturnsToReadyStateDiagnostics() = runTest(dispatcher) {
+    fun disconnectWithValidEndpointReturnsToReadyStateDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session, heartbeatIntervalMillis = 0)
 
@@ -962,7 +966,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun connectedSessionSendsPeriodicHeartbeats() = runTest(dispatcher) {
+    fun connectedSessionSendsPeriodicHeartbeats() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session, heartbeatIntervalMillis = 100)
 
@@ -978,7 +982,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun connectedSessionSendsPeriodicSensorTelemetry() = runTest(dispatcher) {
+    fun connectedSessionSendsPeriodicSensorTelemetry() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session, sensorTelemetryIntervalMillis = 100)
 
@@ -994,7 +998,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun backgroundPausesHeartbeatAndSensorTelemetryLoops() = runTest(dispatcher) {
+    fun backgroundPausesHeartbeatAndSensorTelemetryLoops() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(
             session,
@@ -1033,7 +1037,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun connectWhileBackgroundedDoesNotStartLoopsUntilForegrounded() = runTest(dispatcher) {
+    fun connectWhileBackgroundedDoesNotStartLoopsUntilForegrounded() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(
             session,
@@ -1063,12 +1067,12 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun appLifecycleChangeSendsCapabilityDeltaWhenConnected() = runTest(dispatcher) {
+    fun appLifecycleChangeSendsCapabilityDeltaWhenConnected() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val viewModel = viewModel(
             session,
-            heartbeatIntervalMillis = 100,
-            sensorTelemetryIntervalMillis = 100,
+            heartbeatIntervalMillis = 0,
+            sensorTelemetryIntervalMillis = 0,
         )
 
         viewModel.updateEndpoint("10.0.0.8:8080")
@@ -1090,7 +1094,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkMonitorSkipsCapabilityRefreshWhenBackgrounded() = runTest(dispatcher) {
+    fun networkMonitorSkipsCapabilityRefreshWhenBackgrounded() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val monitor = FakeNetworkMonitor()
         val viewModel = viewModel(
@@ -1111,10 +1115,17 @@ class AndroidTerminalViewModelTest {
 
         viewModel.setAppForegrounded(false)
         advanceUntilIdle()
+        assertEquals(
+            listOf("network-callback", "app_lifecycle_change"),
+            session.capabilityDeltaReasons,
+        )
         monitor.emitChange()
         advanceUntilIdle()
 
-        assertEquals(listOf("network-callback"), session.capabilityDeltaReasons)
+        assertEquals(
+            listOf("network-callback", "app_lifecycle_change"),
+            session.capabilityDeltaReasons,
+        )
         assertTrue(
             viewModel.state.value.diagnosticsText.contains("capability_refresh_suppressed=app-background"),
         )
@@ -1123,7 +1134,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkMonitorSkipsDiscoveryRestartWhenBackgrounded() = runTest(dispatcher) {
+    fun networkMonitorSkipsDiscoveryRestartWhenBackgrounded() = runTest(testDispatcher) {
         val monitor = FakeNetworkMonitor()
         val discovery = FakeDiscovery()
         val viewModel = AndroidTerminalViewModel(
@@ -1158,7 +1169,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun heartbeatFailureReconnectsWithBoundedBackoff() = runTest(dispatcher) {
+    fun heartbeatFailureReconnectsWithBoundedBackoff() = runTest(testDispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
         val second = FakeSession()
         val sessions = ArrayDeque(listOf(first, second))
@@ -1194,7 +1205,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun heartbeatFailureStopsAfterReconnectAttemptsAreExhausted() = runTest(dispatcher) {
+    fun heartbeatFailureStopsAfterReconnectAttemptsAreExhausted() = runTest(testDispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
         val second = FakeSession(connectError = IllegalStateException("still offline"))
         val sessions = ArrayDeque(listOf(first, second))
@@ -1225,7 +1236,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkRestoreRetriesConnectAfterReconnectIsExhausted() = runTest(dispatcher) {
+    fun networkRestoreRetriesConnectAfterReconnectIsExhausted() = runTest(testDispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
         val second = FakeSession(connectError = IllegalStateException("still offline"))
         val third = FakeSession()
@@ -1255,7 +1266,8 @@ class AndroidTerminalViewModelTest {
 
         viewModel.startNetworkMonitoring()
         monitor.emitChange()
-        advanceUntilIdle()
+        advanceTimeBy(400)
+        runCurrent()
 
         assertEquals(EndpointResolution("10.0.0.8", 8080), third.connectedEndpoint)
         assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
@@ -1265,7 +1277,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkRestoreDoesNotRetryAfterUserDisconnect() = runTest(dispatcher) {
+    fun networkRestoreDoesNotRetryAfterUserDisconnect() = runTest(testDispatcher) {
         val session = FakeSession()
         val sessions = ArrayDeque(listOf(session))
         val monitor = FakeNetworkMonitor()
@@ -1297,7 +1309,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun networkRestoreDebouncesReconnectAttempts() = runTest(dispatcher) {
+    fun networkRestoreDebouncesReconnectAttempts() = runTest(testDispatcher) {
         val first = FakeSession(heartbeatError = IllegalStateException("socket closed"))
         val second = FakeSession(connectError = IllegalStateException("still offline"))
         val third = FakeSession(connectError = IllegalStateException("still offline"))
@@ -1330,18 +1342,21 @@ class AndroidTerminalViewModelTest {
 
         viewModel.startNetworkMonitoring()
         monitor.emitChange()
-        advanceUntilIdle()
+        advanceTimeBy(400)
+        runCurrent()
         assertTrue(viewModel.state.value.diagnosticsText.contains("reconnect_cause=network-restore:network-callback"))
 
         now += 1_000
         monitor.emitChange()
-        advanceUntilIdle()
+        advanceTimeBy(400)
+        runCurrent()
         assertTrue(viewModel.state.value.diagnosticsText.contains("network_reconnect_restore_suppressed=network-callback"))
         assertEquals(true, sessions.size == 1)
 
         now += 5_000
         monitor.emitChange()
-        advanceUntilIdle()
+        advanceTimeBy(400)
+        runCurrent()
         assertEquals(EndpointResolution("10.0.0.8", 8080), fourth.connectedEndpoint)
         assertEquals(ConnectionState.Connected, viewModel.state.value.connectionState)
         viewModel.disconnect()
@@ -1349,7 +1364,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverSetUiResponseUpdatesRenderedRoot() = runTest(dispatcher) {
+    fun serverSetUiResponseUpdatesRenderedRoot() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1374,7 +1389,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverRegisterAckMessageIsSurfacedInDiagnostics() = runTest(dispatcher) {
+    fun serverRegisterAckMessageIsSurfacedInDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1401,7 +1416,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun registerAckMessageRemainsInDiagnosticsAfterDisconnect() = runTest(dispatcher) {
+    fun registerAckMessageRemainsInDiagnosticsAfterDisconnect() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1428,7 +1443,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverBugReportAckIsSurfacedInDiagnostics() = runTest(dispatcher) {
+    fun serverBugReportAckIsSurfacedInDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1459,7 +1474,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverBugReportAckRemainsInDiagnosticsAfterDisconnect() = runTest(dispatcher) {
+    fun serverBugReportAckRemainsInDiagnosticsAfterDisconnect() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1491,7 +1506,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun newConnectClearsBugReportAckFromPriorSession() = runTest(dispatcher) {
+    fun newConnectClearsBugReportAckFromPriorSession() = runTest(testDispatcher) {
         val first = FakeSession()
         val second = FakeSession()
         val sessions = ArrayDeque(listOf(first, second))
@@ -1535,7 +1550,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun newConnectClearsRegisterAckMessageFromPriorSession() = runTest(dispatcher) {
+    fun newConnectClearsRegisterAckMessageFromPriorSession() = runTest(testDispatcher) {
         val first = FakeSession()
         val second = FakeSession()
         val sessions = ArrayDeque(listOf(first, second))
@@ -1580,7 +1595,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun newConnectClearsControlActivityFromPriorSession() = runTest(dispatcher) {
+    fun newConnectClearsControlActivityFromPriorSession() = runTest(testDispatcher) {
         val first = FakeSession()
         val second = FakeSession()
         val sessions = ArrayDeque(listOf(first, second))
@@ -1626,7 +1641,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun controlActivityRemainsInDiagnosticsAfterDisconnect() = runTest(dispatcher) {
+    fun controlActivityRemainsInDiagnosticsAfterDisconnect() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1652,7 +1667,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverTransitionUiIsSurfacedInDiagnostics() = runTest(dispatcher) {
+    fun serverTransitionUiIsSurfacedInDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1679,7 +1694,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverTransitionUiRemainsInDiagnosticsAfterNetworkRefresh() = runTest(dispatcher) {
+    fun serverTransitionUiRemainsInDiagnosticsAfterNetworkRefresh() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1707,7 +1722,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverHeartbeatIsSurfacedInDiagnostics() = runTest(dispatcher) {
+    fun serverHeartbeatIsSurfacedInDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1734,7 +1749,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverCommandResultIsSurfacedInDiagnostics() = runTest(dispatcher) {
+    fun serverCommandResultIsSurfacedInDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1767,7 +1782,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverControlErrorIsSurfacedInDiagnostics() = runTest(dispatcher) {
+    fun serverControlErrorIsSurfacedInDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1803,7 +1818,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverControlErrorClearsAfterSuccessfulSetUi() = runTest(dispatcher) {
+    fun serverControlErrorClearsAfterSuccessfulSetUi() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1843,7 +1858,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun capabilityAckInvalidationsAndSnapshotAppliedAreSurfacedInDiagnostics() = runTest(dispatcher) {
+    fun capabilityAckInvalidationsAndSnapshotAppliedAreSurfacedInDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1878,7 +1893,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun opaqueStartStreamSummaryIsSurfacedInDiagnosticsAndClearsOnDisconnect() = runTest(dispatcher) {
+    fun opaqueStartStreamSummaryIsSurfacedInDiagnosticsAndClearsOnDisconnect() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -1906,7 +1921,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun serverNotificationIsDeliveredThroughPlatformAdapter() = runTest(dispatcher) {
+    fun serverNotificationIsDeliveredThroughPlatformAdapter() = runTest(testDispatcher) {
         val session = FakeSession()
         val delivered = mutableListOf<Pair<String, String>>()
         val viewModel = viewModel(
@@ -1939,7 +1954,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun playAudioResponseIsDelegatedThroughMediaEngine() = runTest(dispatcher) {
+    fun playAudioResponseIsDelegatedThroughMediaEngine() = runTest(testDispatcher) {
         val session = FakeSession()
         val played = mutableListOf<Io.PlayAudio>()
         val viewModel = viewModel(
@@ -1979,7 +1994,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun unsupportedShowMediaResponseIsRecordedInDiagnostics() = runTest(dispatcher) {
+    fun unsupportedShowMediaResponseIsRecordedInDiagnostics() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -2009,7 +2024,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun showMediaResponseCanBeDelegatedThroughMediaEngine() = runTest(dispatcher) {
+    fun showMediaResponseCanBeDelegatedThroughMediaEngine() = runTest(testDispatcher) {
         val session = FakeSession()
         val shown = mutableListOf<Io.ShowMedia>()
         val viewModel = viewModel(
@@ -2047,7 +2062,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun uiActionIsSentThroughConnectedSession() = runTest(dispatcher) {
+    fun uiActionIsSentThroughConnectedSession() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -2063,7 +2078,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun terminalKeyTextIsSentThroughConnectedSession() = runTest(dispatcher) {
+    fun terminalKeyTextIsSentThroughConnectedSession() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -2079,7 +2094,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun refreshCapabilitiesAsksConnectedSessionForDelta() = runTest(dispatcher) {
+    fun refreshCapabilitiesAsksConnectedSessionForDelta() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val viewModel = viewModel(session)
 
@@ -2096,7 +2111,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun staleGenerationProtocolErrorTriggersCapabilityRebaseline() = runTest(dispatcher) {
+    fun staleGenerationProtocolErrorTriggersCapabilityRebaseline() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 
@@ -2121,7 +2136,7 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
-    fun unrelatedProtocolErrorDoesNotRebaselineCapabilities() = runTest(dispatcher) {
+    fun unrelatedProtocolErrorDoesNotRebaselineCapabilities() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
 

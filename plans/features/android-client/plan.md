@@ -761,7 +761,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-09 (boundary scripts on agent host).
+Last local validation: 2026-05-09 (Android Studio JBR 21 + `ANDROID_SDK_ROOT`: `./gradlew testDebugUnitTest`; boundary scripts).
 
 Passed:
 
@@ -769,9 +769,10 @@ Passed:
 ./scripts/check-android-client-boundary.sh
 ./scripts/test-android-client-boundary.sh
 git diff --check
+cd android_client && ./gradlew testDebugUnitTest
 ```
 
-Gradle (`make android-client-test`, `lintDebug`, `assembleDebug`) should be re-run on a host with JDK 17 and `ANDROID_SDK_ROOT` configured; plain `./gradlew` without `JAVA_HOME` may fail on macOS stubs.
+Gradle (`make android-client-test`, `lintDebug`, `assembleDebug`) should be re-run on a host with JDK 17+ and `ANDROID_SDK_ROOT` configured; plain `./gradlew` without `JAVA_HOME` may fail on macOS stubs.
 
 Remaining validation:
 
@@ -1200,6 +1201,14 @@ Remaining validation:
 - Normalized discovery-only gRPC TXT values (`grpc=host:port`) to `grpc://…` in `AndroidTerminalViewModel` so selecting a discovered server no longer mis-routes through the WebSocket upgrade on the gRPC port.
 - Updated `docs/client-android.md` manual endpoint examples (explicit gRPC vs WebSocket URLs).
 - Fixed `AndroidControlSessionControllerTest.heartbeatAndUiActionUseProtocolBuilders` to `connect()` first so `sendSensorTelemetry` aligns with the “last registered capability snapshot” contract.
+
+### 2026-05-09 (ViewModel test scheduler + network-restore timing)
+
+- Recreated the test `StandardTestDispatcher` in `@Before` so heartbeat/sensor loops don’t leave infinite delayed work on a shared queue across tests.
+- Ended `bugReportServerDrivenActionSendsBugReportNotUiAction` with `disconnect()` + `advanceUntilIdle()` so connected periodic loops never leak into the next case.
+- Avoided `advanceUntilIdle()` while a positive-interval heartbeat could run forever (`appLifecycleChangeSendsCapabilityDeltaWhenConnected` uses zero heartbeat/sensor intervals).
+- For network-restore debouncing tests, replaced `advanceUntilIdle()` after reconnect with bounded `advanceTimeBy(400)` + `runCurrent()` so async reconnect settles without draining an infinite heartbeat loop; aligned `networkMonitorSkipsCapabilityRefreshWhenBackgrounded` with lifecycle capability deltas after backgrounding (`app_lifecycle_change`).
+- Pinned JVM default `TimeZone` in `AndroidBugReportBuilderTest` so `buildBugIdentifier` (uses `TimeZone.getDefault()`) matches expected bug-token hints on any host.
 
 ## Test Plan
 
