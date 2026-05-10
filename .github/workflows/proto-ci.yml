@@ -34,6 +34,9 @@ jobs:
         with:
           channel: stable
       - uses: bufbuild/buf-setup-action@v1
+      - name: Flutter pub get
+        working-directory: terminal_client
+        run: flutter pub get
       - name: Buf format check
         working-directory: api
         run: buf format -d --exit-code

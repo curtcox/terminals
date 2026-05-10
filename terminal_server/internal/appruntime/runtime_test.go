@@ -3058,7 +3058,7 @@ func TestRuntimeInterruptedMigrationReplaysAsStepFailedAndResumes(t *testing.T) 
 			"script":          "0002_2_to_3.tal",
 		},
 	}
-	var payload []byte
+	payload := make([]byte, 0, len(entries)*128)
 	for _, entry := range entries {
 		line, marshalErr := json.Marshal(entry)
 		if marshalErr != nil {

@@ -217,11 +217,12 @@ func valueAtPath(msg protoreflect.Message, path string) (resolvedValue, error) {
 		}
 		currentField = field
 		current = m.Get(field)
-		if field.IsMap() {
+		switch {
+		case field.IsMap():
 			present = current.Map().Len() > 0
-		} else if field.IsList() {
+		case field.IsList():
 			present = current.List().Len() > 0
-		} else {
+		default:
 			present = m.Has(field)
 		}
 		if selector := match[2]; selector != "" {
@@ -275,9 +276,16 @@ func mapKey(field protoreflect.FieldDescriptor, raw string) (protoreflect.MapKey
 	case protoreflect.BoolKind:
 		value, err := strconv.ParseBool(raw)
 		return protoreflect.ValueOfBool(value).MapKey(), err
-	default:
+	case protoreflect.InvalidKind,
+		protoreflect.EnumKind,
+		protoreflect.FloatKind,
+		protoreflect.DoubleKind,
+		protoreflect.BytesKind,
+		protoreflect.MessageKind,
+		protoreflect.GroupKind:
 		return protoreflect.MapKey{}, fmt.Errorf("unsupported key kind %s", field.Kind())
 	}
+	return protoreflect.MapKey{}, fmt.Errorf("unsupported key kind %s", field.Kind())
 }
 
 func scalarEquals(got resolvedValue, want interface{}) bool {
