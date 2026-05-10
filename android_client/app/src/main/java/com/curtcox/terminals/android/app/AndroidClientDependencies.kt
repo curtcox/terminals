@@ -71,6 +71,12 @@ data class AndroidClientDependencies(
     val discoveryRestartMinIntervalMillis: Long = 1_500,
     val networkCapabilityRefreshMinIntervalMillis: Long = 1_500,
     val networkReconnectRestoreMinIntervalMillis: Long = 5_000,
+    /**
+     * When false, [AndroidTerminalViewModel.requestNotificationPermission] is a no-op with education refresh only
+     * (Android 12 and below). Production uses API 33+; JVM unit tests override when exercising POST_NOTIFICATIONS.
+     */
+    val runtimeNotificationPermissionPromptSupported: Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
     val nowMillis: () -> Long = { System.currentTimeMillis() },
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->
         AndroidControlSessionController(

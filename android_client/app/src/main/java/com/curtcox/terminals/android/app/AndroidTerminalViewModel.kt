@@ -572,7 +572,7 @@ class AndroidTerminalViewModel(
     }
 
     fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        if (!dependencies.runtimeNotificationPermissionPromptSupported) {
             refreshPermissionEducation("notification-permission-not-required")
             return
         }

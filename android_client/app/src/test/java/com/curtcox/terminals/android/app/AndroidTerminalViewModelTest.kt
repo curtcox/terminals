@@ -50,7 +50,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.After
-import org.junit.Assume.assumeTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -796,7 +795,6 @@ class AndroidTerminalViewModelTest {
 
     @Test
     fun requestMissingPermissionsRequestsNotificationPermissionWhenRuntimePromptIsSupported() = runTest(testDispatcher) {
-        assumeTrue(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
         val probe = FakeCapabilityProbe(
             permissions = PermissionCapabilityState(
                 microphoneGranted = false,
@@ -819,6 +817,7 @@ class AndroidTerminalViewModelTest {
                 permissionRequester = permissionRequester,
                 heartbeatIntervalMillis = 0,
                 sensorTelemetryIntervalMillis = 0,
+                runtimeNotificationPermissionPromptSupported = true,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session

@@ -1258,6 +1258,12 @@ Remaining validation:
 - Added `AndroidMediaEngineTest` coverage for `AndroidLiveMediaSession.disabled(...)`, `fromAdapter(disabled)`, and `fromAdapter` when the adapter reports `supported=true` (still returns `live-media-session-not-implemented` for start/WebRTC signal until real WebRTC lands).
 - Re-ran `make android-client-test`; remaining plan gaps are physical-device checks listed under **Remaining validation**.
 
+### 2026-05-09 (notification permission JVM coverage)
+
+- Added `AndroidClientDependencies.runtimeNotificationPermissionPromptSupported` (defaults to API 33+) so `AndroidTerminalViewModel.requestNotificationPermission` does not rely on stubbed `Build.VERSION.SDK_INT` on JVM unit-test hosts.
+- `AndroidTerminalViewModelTest.requestMissingPermissionsRequestsNotificationPermissionWhenRuntimePromptIsSupported` now runs as **PASSED** instead of skipping via `assumeTrue`.
+- Re-ran `make android-client-test`.
+
 ## Test Plan
 
 ### Unit tests
