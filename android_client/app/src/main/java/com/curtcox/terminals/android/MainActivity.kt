@@ -11,12 +11,16 @@ import com.curtcox.terminals.android.app.AndroidClientDependencies
 import com.curtcox.terminals.android.app.AndroidTerminalApp
 import com.curtcox.terminals.android.app.AndroidTerminalViewModel
 import com.curtcox.terminals.android.platform.ActivityAndroidPermissionRequester
+import com.curtcox.terminals.android.platform.WindowBugReportScreenshotCapture
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AndroidTerminalViewModel by viewModels {
         AndroidTerminalViewModelFactory(
             AndroidClientDependencies.fromContext(this).copy(
                 permissionRequester = ActivityAndroidPermissionRequester(this),
+                bugReportScreenshotCapture = {
+                    WindowBugReportScreenshotCapture.capturePngOrNull(window)
+                },
             ),
         )
     }

@@ -468,6 +468,10 @@ class AndroidTerminalViewModel(
         extraHints: Map<String, String>,
     ): Diagnostics.BugReport {
         val s = mutableState.value
+        val screenshotPng =
+            runCatching { dependencies.bugReportScreenshotCapture() }.getOrNull()?.takeIf {
+                it.isNotEmpty()
+            }
         return AndroidBugReportBuilder.build(
             description = description,
             source = source,
@@ -485,6 +489,7 @@ class AndroidTerminalViewModel(
             osVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
             reconnectAttempt = s.reconnectAttempt,
             lastStatus = s.lastControlResponseActivity,
+            screenshotPng = screenshotPng,
         )
     }
 

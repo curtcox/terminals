@@ -86,6 +86,11 @@ data class AndroidClientDependencies(
     val runtimeNotificationPermissionPromptSupported: Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
     val nowMillis: () -> Long = { System.currentTimeMillis() },
+    /**
+     * Optional window screenshot for shell bug reports ([Diagnostics.BugReport.screenshot_png]).
+     * Production supplies a capture of the activity window; JVM tests default to no screenshot.
+     */
+    val bugReportScreenshotCapture: () -> ByteArray? = { null },
     /** WebSocket transport hello resume token; shared across sessions like Flutter [ControlClientTransportHint.resumeToken]. */
     val websocketResumeTokenStore: TransportResumeTokenStore = TransportResumeTokenStore(),
     val sessionFactory: (AndroidControlResponseSink) -> AndroidControlSession = { sink ->

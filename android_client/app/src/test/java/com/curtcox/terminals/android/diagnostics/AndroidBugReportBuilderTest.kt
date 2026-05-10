@@ -2,6 +2,7 @@ package com.curtcox.terminals.android.diagnostics
 
 import com.curtcox.terminals.android.app.ConnectionState
 import com.curtcox.terminals.android.util.Clock
+import com.google.protobuf.ByteString
 import java.util.TimeZone
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -173,5 +174,31 @@ class AndroidBugReportBuilderTest {
             )
 
         assertEquals("hello", report.clientContext.runtime.activeUiRoot.text.value)
+    }
+
+    @Test
+    fun buildEmbedsNonEmptyScreenshotAndByteCountHint() {
+        val pngBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+        val report =
+            AndroidBugReportBuilder.build(
+                description = "d",
+                source = Diagnostics.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
+                reporterDeviceId = "r",
+                subjectDeviceId = "s",
+                extraSourceHints = emptyMap(),
+                clock = fixedClock,
+                buildMetadata = buildMeta,
+                serverRoot = null,
+                connectionState = ConnectionState.Connected,
+                lastServerHeartbeatUnixMs = null,
+                registeredCapabilities = null,
+                localeTag = "en",
+                timezoneId = "UTC",
+                osVersion = "1",
+                screenshotPng = pngBytes,
+            )
+
+        assertEquals(pngBytes.size.toString(), report.sourceHintsMap["screenshot_byte_count"])
+        assertEquals(ByteString.copyFrom(pngBytes), report.screenshotPng)
     }
 }

@@ -38,6 +38,7 @@ import com.curtcox.terminals.android.platform.AndroidTerminalSettings
 import com.curtcox.terminals.android.platform.FireOsDeviceInfo
 import com.curtcox.terminals.android.platform.FireOsDeviceInfoProvider
 import com.curtcox.terminals.android.ui.ServerDrivenAction
+import com.google.protobuf.ByteString
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -166,6 +167,32 @@ class AndroidTerminalViewModelTest {
         assertEquals(1, session.bugReports.size)
         assertTrue(viewModel.state.value.lastBugReportSubmitStatus!!.contains("Sent"))
         assertEquals("android-native-terminal", session.bugReports.first().subjectDeviceId)
+    }
+
+    @Test
+    fun chromeBugReportIncludesScreenshotWhenCaptureReturnsBytes() = runTest(testDispatcher) {
+        val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x01)
+        val session = FakeSession()
+        val viewModel =
+            viewModel(
+                session,
+                networkStateProvider = AndroidNetworkStateProvider {
+                    AndroidNetworkState(connected = true, metered = false)
+                },
+                bugReportScreenshotCapture = { png },
+            )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.submitChromeBugReport()
+        advanceUntilIdle()
+
+        val sent = session.bugReports.single()
+        assertEquals(png.size.toString(), sent.sourceHintsMap["screenshot_byte_count"])
+        assertEquals(ByteString.copyFrom(png), sent.screenshotPng)
+        viewModel.disconnect()
+        advanceUntilIdle()
     }
 
     @Test
@@ -2623,6 +2650,7 @@ class AndroidTerminalViewModelTest {
         heartbeatIntervalMillis: Long = 0,
         sensorTelemetryIntervalMillis: Long = 0,
         capabilityMonitorIntervalMillis: Long = 0,
+        bugReportScreenshotCapture: () -> ByteArray? = { null },
     ): AndroidTerminalViewModel =
         AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -2638,6 +2666,7 @@ class AndroidTerminalViewModelTest {
                 heartbeatIntervalMillis = heartbeatIntervalMillis,
                 sensorTelemetryIntervalMillis = sensorTelemetryIntervalMillis,
                 capabilityMonitorIntervalMillis = capabilityMonitorIntervalMillis,
+                bugReportScreenshotCapture = bugReportScreenshotCapture,
                 sessionFactory = { sink ->
                     session.sink = sink
                     session

@@ -2,6 +2,7 @@ package com.curtcox.terminals.android.diagnostics
 
 import com.curtcox.terminals.android.app.ConnectionState
 import com.curtcox.terminals.android.util.Clock
+import com.google.protobuf.ByteString
 import terminals.capabilities.v1.Capabilities
 import terminals.diagnostics.v1.Diagnostics
 import terminals.ui.v1.Ui
@@ -28,6 +29,7 @@ object AndroidBugReportBuilder {
         osVersion: String,
         reconnectAttempt: Int = 0,
         lastStatus: String? = null,
+        screenshotPng: ByteArray? = null,
     ): Diagnostics.BugReport {
         val nowMillis = clock.nowMillis()
         val identifier = buildBugIdentifier(nowMillis)
@@ -66,19 +68,26 @@ object AndroidBugReportBuilder {
                 "bug_token_timestamp_unix_ms" to nowMillis.toString(),
             )
         hints.putAll(extraSourceHints)
+        if (screenshotPng != null && screenshotPng.isNotEmpty()) {
+            hints["screenshot_byte_count"] = screenshotPng.size.toString()
+        }
 
-        return Diagnostics.BugReport.newBuilder()
-            .setReportId(reportId)
-            .setReporterDeviceId(reporterDeviceId)
-            .setSubjectDeviceId(subjectDeviceId)
-            .setSource(source)
-            .setDescription(description)
-            .setTimestampUnixMs(nowMillis)
-            .addTags("bug_word:${identifier.word}")
-            .addTags("bug_code:${identifier.code}")
-            .putAllSourceHints(hints)
-            .setClientContext(clientContext)
-            .build()
+        val reportBuilder =
+            Diagnostics.BugReport.newBuilder()
+                .setReportId(reportId)
+                .setReporterDeviceId(reporterDeviceId)
+                .setSubjectDeviceId(subjectDeviceId)
+                .setSource(source)
+                .setDescription(description)
+                .setTimestampUnixMs(nowMillis)
+                .addTags("bug_word:${identifier.word}")
+                .addTags("bug_code:${identifier.code}")
+                .putAllSourceHints(hints)
+                .setClientContext(clientContext)
+        if (screenshotPng != null && screenshotPng.isNotEmpty()) {
+            reportBuilder.screenshotPng = ByteString.copyFrom(screenshotPng)
+        }
+        return reportBuilder.build()
     }
 
     private fun identity(

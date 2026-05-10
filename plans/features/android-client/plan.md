@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: curtcox
 validation: automated
-last-reviewed: 2026-05-09
+last-reviewed: 2026-05-10
 ---
 
 # Android Client
@@ -1299,6 +1299,14 @@ Remaining validation:
 
 - Added parallel job `android-client-instrumentation` to `.github/workflows/android-client-ci.yml` using `reactivecircus/android-emulator-runner@v2` (API 30, `google_apis`, x86_64) to run `./gradlew connectedDebugAndroidTest`, so instrumentation smoke runs on every qualifying push/PR without a physical tablet.
 - Documented PR emulator coverage in `docs/client-android.md` and clarified **Remaining validation** above (CI emulator vs local/Fire tablet smoke).
+
+### 2026-05-10 (Makefile: Gradle stop after Android tests)
+
+- Added `make android-client-gradle-stop` (`./gradlew --stop` with Makefile JDK resolution) and run the same stop step automatically after `make android-client-test` and `make android-client-connected-test`, preserving the test exit code so CI and `make all-test` still fail correctly. Prevents orphaned `Gradle Test Executor` JVMs when runs overlap or agents time out. Documented in `docs/client-android.md`.
+
+### 2026-05-10 (bug report screenshot parity)
+
+- Matched Flutter shell bug-report attachments: `AndroidBugReportBuilder` sets protobuf `screenshot_png` and `screenshot_byte_count` when non-empty bytes are supplied; `AndroidTerminalViewModel` captures via `AndroidClientDependencies.bugReportScreenshotCapture` (production `MainActivity` wires `WindowBugReportScreenshotCapture.capturePngOrNull` on the activity window). Failures or zero-size views omit the field. Added JVM coverage (`AndroidBugReportBuilderTest`, `AndroidTerminalViewModelTest`). Documented in `docs/client-android.md`. Re-run `make android-client-test`, `make android-client-lint`, and boundary scripts on a JDK 17 + Android SDK host.
 
 ### 2026-05-09 (Phase 7: immersive/sticky kiosk preference)
 

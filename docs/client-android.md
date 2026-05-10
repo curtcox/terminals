@@ -65,6 +65,11 @@ make android-client-compile-android-test
 make android-client-boundary
 ```
 
+`make android-client-test` and `make android-client-connected-test` run `./gradlew --stop`
+after Gradle finishes so JUnit worker processes and daemons do not keep burning CPU if a
+run was interrupted or overlapped with another. To stop daemons without running tests,
+use `make android-client-gradle-stop`. Direct `./gradlew` invocations do not add this step.
+
 Direct Gradle commands:
 
 ```bash
@@ -157,7 +162,10 @@ rather than emitting a `submit` UI action on Done.
 
 The shell **Report bug** control files an on-device bug report on the control
 stream as protobuf `Diagnostics.BugReport` (same token-word scheme as the
-Flutter client). Reports filed while disconnected are queued and sent after the
+Flutter client). When the activity window has non-zero size, the shell attaches
+a best-effort PNG of the decor view (`screenshot_png` plus `screenshot_byte_count`
+in source hints), matching the Flutter shell’s RepaintBoundary capture. Empty
+captures omit the field. Reports filed while disconnected are queued and sent after the
 next successful connect. Server-driven actions whose `action` starts with
 `bug_report` (optional `bug_report:<subject-device-id>`) file a report instead of
 emitting a `UIAction`. `BugReportAck` responses are merged into copyable
