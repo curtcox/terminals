@@ -29,8 +29,8 @@ Current implementation centers on:
   reliability wrappers.
 - `terminal_client/lib/media/` and `terminal_client/lib/io/` for media and
   sensor/input execution.
-- `android_client/` for the native Android/Kindle Fire client scaffold and
-  Android-specific platform seams.
+- `android_client/` for the native Android/Kindle Fire thin client and its
+  Android-specific platform seams (see `docs/client-android.md`).
 
 The architecture remains generic even where code is physically concentrated,
 and is covered by widget/integration-style tests in `terminal_client/test/`.

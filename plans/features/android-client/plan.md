@@ -761,7 +761,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-09 (Android Studio JBR 21 + `ANDROID_SDK_ROOT`: `./gradlew testDebugUnitTest`; boundary scripts).
+Last local validation: 2026-05-09 (`make android-client-test`, `make android-client-lint`, `make android-client-build`, `JAVA_HOME` from Makefile → Android Studio JBR; boundary scripts; `compileDebugAndroidTestKotlin`).
 
 Passed:
 
@@ -769,7 +769,10 @@ Passed:
 ./scripts/check-android-client-boundary.sh
 ./scripts/test-android-client-boundary.sh
 git diff --check
-cd android_client && ./gradlew testDebugUnitTest
+make android-client-test
+make android-client-lint
+make android-client-build
+cd android_client && JAVA_HOME="<Android Studio JBR>" ./gradlew compileDebugAndroidTestKotlin
 ```
 
 Gradle (`make android-client-test`, `lintDebug`, `assembleDebug`) should be re-run on a host with JDK 17+ and `ANDROID_SDK_ROOT` configured; plain `./gradlew` without `JAVA_HOME` may fail on macOS stubs.
@@ -778,8 +781,8 @@ Remaining validation:
 
 - Run `cd android_client && ./gradlew connectedDebugAndroidTest` on an emulator or Fire tablet.
 - Smoke-test manual connection to `make run-server` on a physical Fire OS 6+ tablet.
-- Confirm Android NSD discovery behavior on a multicast-capable Wi-Fi network and document Fire OS fallback behavior.
-- Complete the WebRTC dependency compatibility decision before advertising live media send/receive capabilities.
+- Confirm Android NSD discovery behavior on a multicast-capable Wi-Fi network (Fire OS fallback is documented under **Discovery (NSD / mDNS) quirks** in `docs/client-android.md`).
+- Live WebRTC send/receive remains **explicitly disabled** via `AndroidWebRtcAdapter.disabled(...)` until a follow-up selects Fire‑OS‑compatible dependencies; diagnostics surface the reason and capabilities must not falsely advertise transport (`docs/client-android.md`).
 
 ## Implementation Progress
 
@@ -1216,6 +1219,13 @@ Remaining validation:
 - Skipped delivery and speech when both title and body trim empty; tightened `last_notification` diagnostics to prefer trimmed title, else trimmed body.
 - Documented behavior in `docs/client-android.md`; extended `AndroidTerminalViewModelTest`.
 - Hardened `ContextAndroidTerminalSpeech` engine creation so `OnInit` applies `Locale.getDefault()` using an instance reachable from a one-element holder populated immediately after the `TextToSpeech` constructor returns (typical async `OnInit` always sees `holder[0]`; synchronous init callbacks may still skip locale and rely on the platform default).
+
+### 2026-05-09 (instrumentation compile + validation refresh)
+
+- Fixed `compileDebugAndroidTestKotlin`: removed duplicate `terminals.capabilities.v1.Capabilities` import in `AndroidTerminalAppSmokeTest`, and dropped the obsolete top-level `fetchSemanticsNode` import in `ServerDrivenRendererTest` (calls use `SemanticsNodeInteraction.fetchSemanticsNode()` without that import on Compose BOM `2025.10.00`).
+- Re-ran `make android-client-test`, `make android-client-lint`, `make android-client-build`, and `./gradlew compileDebugAndroidTestKotlin` with Makefile-resolved JDK.
+- Refreshed **Current Validation Evidence** and clarified remaining checks (NSD doc location, explicit WebRTC-disabled posture via `AndroidWebRtcAdapter`).
+- Updated `docs/client-architecture.md` to describe `android_client/` as the shipped native thin client (not only a scaffold).
 
 ## Test Plan
 

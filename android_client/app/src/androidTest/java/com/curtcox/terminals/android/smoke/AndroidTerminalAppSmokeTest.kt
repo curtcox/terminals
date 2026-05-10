@@ -43,7 +43,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
-import terminals.capabilities.v1.Capabilities
 import terminals.control.v1.Control
 import terminals.ui.v1.Ui
 
