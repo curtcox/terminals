@@ -1324,6 +1324,10 @@ Remaining validation:
 - Updated brittle reconnect diagnostics assertions to focus on stable behavior (`Connected` state and endpoint/session transitions) instead of exact transient diagnostics strings that can vary with scheduler timing.
 - Re-ran `./gradlew testDebugUnitTest --no-daemon` from `android_client/` on JDK 17+/Android Studio JBR; suite passed.
 
+### 2026-05-10 (MainActivity configuration / orientation smoke)
+
+- Added `MainActivityConfigurationSmokeTest` so production `MainActivity` exercises manifest `configChanges` orientation handling: toggling `requestedOrientation` triggers `onConfigurationChanged`, and terminal chrome shows `last_permission_refresh=configuration` (wires through to `refreshPermissionEducation` alongside network + capability refresh). Resets orientation after the test. Filter: `./gradlew connectedDebugAndroidTest --tests '*MainActivityConfiguration*'`. Re-ran `make android-client-compile-android-test`.
+
 ### 2026-05-09 (Phase 7: immersive/sticky kiosk preference)
 
 - Implemented optional **immersive sticky** as a persisted local terminal setting (`SharedPreferencesAndroidTerminalSettings` / `inMemory`), default **on** (matches prior legacy behavior).
