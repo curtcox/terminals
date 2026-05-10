@@ -110,7 +110,6 @@ class WebSocketAndroidControlClient(
         socket = null
         sessionId = ""
         sequence = 0
-        closingSocket = false
     }
 
     private suspend fun readResponses() {

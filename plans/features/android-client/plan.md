@@ -1243,6 +1243,8 @@ Remaining validation:
 
 - Extended `AndroidControlResponseSink` with `onTransportTerminated` (default no-op). `GrpcAndroidControlClient` forwards gRPC `StreamObserver.onError` / `onCompleted` once per stream (guarded against intentional `close()`); `WebSocketAndroidControlClient` notifies on read-loop failure without firing during intentional `close()` (`closingSocket`).
 - `AndroidTerminalViewModel` handles termination like other control loss via `handleControlLoss` (EOF when the server half-closes cleanly). JVM coverage: `transportTerminationTriggersReconnectWithBackoff`. Docs: reconnect paragraph in `docs/client-android.md`.
+- Hardened WebSocket intentional-close suppression so the read loop keeps treating socket errors as close-related until a later successful `connect()` re-enables termination callbacks, avoiding stale old-transport callbacks during reconnect/disconnect races.
+- Re-ran `make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, boundary scripts, and `git diff --check`.
 
 ## Test Plan
 
