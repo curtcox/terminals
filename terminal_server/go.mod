@@ -8,7 +8,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.1
 	github.com/hashicorp/mdns v1.0.6
 	github.com/klauspost/compress v1.18.6
-	github.com/pion/rtp v1.10.1
+	github.com/pion/rtp v1.10.2
 	github.com/pion/webrtc/v4 v4.2.11
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	golang.org/x/net v0.53.0
