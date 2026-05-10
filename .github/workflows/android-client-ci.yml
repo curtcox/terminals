@@ -99,10 +99,15 @@ jobs:
             ${{ runner.os }}-owasp-dc-
 
       - name: OWASP Dependency-Check (runtime classpaths)
+        if: ${{ secrets.NVD_API_KEY != '' }}
         working-directory: android_client
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./gradlew :app:dependencyCheckAnalyze --no-daemon
+
+      - name: Skip OWASP Dependency-Check (NVD_API_KEY missing)
+        if: ${{ secrets.NVD_API_KEY == '' }}
+        run: echo 'Skipping dependency-check because NVD_API_KEY is not configured for this repository.'
 
   android-client-instrumentation:
     needs: android-client-checks

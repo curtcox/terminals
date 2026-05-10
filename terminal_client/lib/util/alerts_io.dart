@@ -20,10 +20,10 @@ Future<void> showAlert({
   try {
     await _ensureInitialized();
     await _notifications.show(
-      _nextNotificationId++,
-      normalizedTitle.isEmpty ? 'Terminals' : normalizedTitle,
-      normalizedBody.isEmpty ? normalizedTitle : normalizedBody,
-      _notificationDetails(level),
+      id: _nextNotificationId++,
+      title: normalizedTitle.isEmpty ? 'Terminals' : normalizedTitle,
+      body: normalizedBody.isEmpty ? normalizedTitle : normalizedBody,
+      notificationDetails: _notificationDetails(level),
     );
   } catch (_) {
     // Notification delivery is best-effort on unsupported or uninitialized hosts.
@@ -48,7 +48,7 @@ Future<void> _ensureInitialized() async {
     linux: LinuxInitializationSettings(defaultActionName: 'Open notification'),
   );
 
-  await _notifications.initialize(settings);
+  await _notifications.initialize(initializationSettings: settings);
 
   await _notifications
       .resolvePlatformSpecificImplementation<
