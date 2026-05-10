@@ -33,6 +33,8 @@ android_client/.kotlin/
 android_client/local.properties
 android_client/build/
 android_client/app/build/
+# Ad-hoc Gradle unit-test tee captures from repo root (e.g. debugging hangs)
+/android_*_out.txt
 
 # Proto/codegen
 api/gen/
