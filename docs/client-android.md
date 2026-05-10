@@ -105,9 +105,11 @@ adb install -r android_client/app/build/outputs/apk/debug/app-debug.apk
 
 For kiosk-like smoke tests, also review Fire OS settings for screen timeout,
 battery optimization, Wi-Fi sleep, and app background restrictions.
-The terminal chrome includes local keep-awake, fullscreen, and bright-display
-toggles for kiosk-style use. They are stored on device and remain generic
-terminal behavior.
+The terminal chrome includes local keep-awake, fullscreen, immersive-sticky
+preference (controls how hidden system bars reappear while fullscreen is on),
+and bright-display toggles for kiosk-style use. They are stored on device and
+remain generic terminal behavior. Server-driven `FullscreenWidget` commands use
+the same immersive preference when enabling fullscreen.
 
 ## Run
 

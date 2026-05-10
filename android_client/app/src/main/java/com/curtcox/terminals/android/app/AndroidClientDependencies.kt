@@ -50,7 +50,7 @@ data class AndroidClientDependencies(
     val deviceId: String = "android-native-terminal",
     val capabilityProbe: AndroidCapabilityProbe = StaticAndroidCapabilityProbe(deviceId),
     val keepAwakeController: AndroidKeepAwakeController = AndroidKeepAwakeController {},
-    val fullscreenController: AndroidFullscreenController = AndroidFullscreenController {},
+    val fullscreenController: AndroidFullscreenController = AndroidFullscreenController { _, _ -> },
     val brightnessController: AndroidBrightnessController = AndroidBrightnessController {},
     val networkStateProvider: AndroidNetworkStateProvider = AndroidNetworkStateProvider.unknown(),
     val networkMonitor: AndroidNetworkMonitor = AndroidNetworkMonitor.none(),
@@ -116,7 +116,7 @@ data class AndroidClientDependencies(
                 fullscreenController = if (context is Activity) {
                     WindowAndroidFullscreenController(context.window)
                 } else {
-                    AndroidFullscreenController {}
+                    AndroidFullscreenController { _, _ -> }
                 },
                 brightnessController = if (context is Activity) {
                     WindowAndroidBrightnessController(context.window)

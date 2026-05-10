@@ -166,6 +166,18 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                     Text(if (state.localFullscreenEnabled) "Fullscreen on" else "Fullscreen off")
                 }
                 Button(
+                    onClick = { viewModel.setLocalImmersiveSticky(!state.localImmersiveStickyEnabled) },
+                    modifier = Modifier.testTag("terminal-local-immersive-sticky-button"),
+                ) {
+                    Text(
+                        if (state.localImmersiveStickyEnabled) {
+                            "Immersive sticky on"
+                        } else {
+                            "Immersive sticky off"
+                        },
+                    )
+                }
+                Button(
                     onClick = { viewModel.setLocalBrightDisplay(!state.localBrightDisplayEnabled) },
                     modifier = Modifier.testTag("terminal-local-bright-display-button"),
                 ) {

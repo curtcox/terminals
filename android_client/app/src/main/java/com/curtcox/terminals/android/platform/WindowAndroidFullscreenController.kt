@@ -10,11 +10,15 @@ import androidx.core.view.WindowInsetsControllerCompat
 class WindowAndroidFullscreenController(
     private val window: Window,
 ) : AndroidFullscreenController {
-    override fun setFullscreen(enabled: Boolean) {
+    override fun setFullscreen(enabled: Boolean, immersiveStickyWhenEnabled: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowCompat.setDecorFitsSystemWindows(window, !enabled)
             val insetsController = WindowInsetsControllerCompat(window, window.decorView)
-            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.systemBarsBehavior = if (immersiveStickyWhenEnabled) {
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+            }
             if (enabled) {
                 insetsController.hide(WindowInsetsCompat.Type.systemBars())
             } else {
@@ -23,18 +27,24 @@ class WindowAndroidFullscreenController(
         } else {
             @Suppress("DEPRECATION")
             run {
-                window.decorView.systemUiVisibility = legacySystemUiVisibility(enabled)
+                window.decorView.systemUiVisibility =
+                    legacySystemUiVisibility(enabled, immersiveStickyWhenEnabled)
             }
         }
     }
 }
 
 @Suppress("DEPRECATION")
-internal fun legacySystemUiVisibility(enabled: Boolean): Int =
+internal fun legacySystemUiVisibility(enabled: Boolean, immersiveStickyWhenEnabled: Boolean): Int =
     if (enabled) {
+        val immersiveFlag = if (immersiveStickyWhenEnabled) {
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        } else {
+            View.SYSTEM_UI_FLAG_IMMERSIVE
+        }
         View.SYSTEM_UI_FLAG_FULLSCREEN or
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+            immersiveFlag or
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
             View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE

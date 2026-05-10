@@ -666,10 +666,13 @@ class AndroidTerminalViewModel(
         }.onSuccess {
             dependencies.terminalSettings.setKeepAwakeEnabled(enabled)
             mutableState.update {
-                it.copy(
-                    localKeepAwakeEnabled = enabled,
-                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\n" +
-                        "local_keep_awake=$enabled",
+                val next = it.copy(localKeepAwakeEnabled = enabled)
+                next.copy(
+                    diagnosticsText = formatDiagnostics(
+                        parser.parse(next.endpointText),
+                        next.connectionState,
+                        next,
+                    ),
                 )
             }
         }.onFailure { error ->
@@ -683,8 +686,9 @@ class AndroidTerminalViewModel(
     }
 
     fun setFullscreen(enabled: Boolean) {
+        val sticky = immersiveStickyForFullscreen(enabled)
         runCatching {
-            dependencies.fullscreenController.setFullscreen(enabled)
+            dependencies.fullscreenController.setFullscreen(enabled, sticky)
         }.onFailure { error ->
             mutableState.update {
                 it.copy(lastError = error.message ?: error::class.java.simpleName)
@@ -693,15 +697,19 @@ class AndroidTerminalViewModel(
     }
 
     fun setLocalFullscreen(enabled: Boolean) {
+        val sticky = immersiveStickyForFullscreen(enabled)
         runCatching {
-            dependencies.fullscreenController.setFullscreen(enabled)
+            dependencies.fullscreenController.setFullscreen(enabled, sticky)
         }.onSuccess {
             dependencies.terminalSettings.setFullscreenEnabled(enabled)
             mutableState.update {
-                it.copy(
-                    localFullscreenEnabled = enabled,
-                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\n" +
-                        "local_fullscreen=$enabled",
+                val next = it.copy(localFullscreenEnabled = enabled)
+                next.copy(
+                    diagnosticsText = formatDiagnostics(
+                        parser.parse(next.endpointText),
+                        next.connectionState,
+                        next,
+                    ),
                 )
             }
         }.onFailure { error ->
@@ -711,6 +719,28 @@ class AndroidTerminalViewModel(
                     localFullscreenEnabled = dependencies.terminalSettings.fullscreenEnabled(),
                 )
             }
+        }
+    }
+
+    fun setLocalImmersiveSticky(enabled: Boolean) {
+        dependencies.terminalSettings.setImmersiveStickyEnabled(enabled)
+        mutableState.update {
+            val next = it.copy(localImmersiveStickyEnabled = enabled)
+            var updated = next.copy(
+                diagnosticsText = formatDiagnostics(
+                    parser.parse(next.endpointText),
+                    next.connectionState,
+                    next,
+                ),
+            )
+            if (next.localFullscreenEnabled) {
+                runCatching {
+                    dependencies.fullscreenController.setFullscreen(true, enabled)
+                }.onFailure { error ->
+                    updated = updated.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+            updated
         }
     }
 
@@ -730,10 +760,13 @@ class AndroidTerminalViewModel(
         }.onSuccess {
             dependencies.terminalSettings.setBrightDisplayEnabled(enabled)
             mutableState.update {
-                it.copy(
-                    localBrightDisplayEnabled = enabled,
-                    diagnosticsText = "${formatDiagnostics(parser.parse(it.endpointText), it.connectionState, it)}\n" +
-                        "local_bright_display=$enabled",
+                val next = it.copy(localBrightDisplayEnabled = enabled)
+                next.copy(
+                    diagnosticsText = formatDiagnostics(
+                        parser.parse(next.endpointText),
+                        next.connectionState,
+                        next,
+                    ),
                 )
             }
         }.onFailure { error ->
@@ -1046,19 +1079,36 @@ class AndroidTerminalViewModel(
                 appendLine()
                 append(bug)
             }
+            handshakeSource?.let { src ->
+                appendLine()
+                appendLine("local_keep_awake=${src.localKeepAwakeEnabled}")
+                appendLine("local_fullscreen=${src.localFullscreenEnabled}")
+                appendLine("local_immersive_sticky=${src.localImmersiveStickyEnabled}")
+                appendLine("local_bright_display=${src.localBrightDisplayEnabled}")
+            }
         }
     }
+
+    private fun immersiveStickyForFullscreen(enabled: Boolean): Boolean =
+        if (!enabled) {
+            false
+        } else {
+            runCatching { dependencies.terminalSettings.immersiveStickyEnabled() }.getOrDefault(true)
+        }
 
     private fun initialState(): AndroidTerminalViewState {
         val lastEndpoint = runCatching { dependencies.terminalSettings.lastManualEndpoint() }.getOrDefault("")
         val keepAwakeEnabled = runCatching { dependencies.terminalSettings.keepAwakeEnabled() }.getOrDefault(false)
         val fullscreenEnabled = runCatching { dependencies.terminalSettings.fullscreenEnabled() }.getOrDefault(false)
+        val immersiveStickyEnabled = runCatching { dependencies.terminalSettings.immersiveStickyEnabled() }.getOrDefault(true)
         val brightDisplayEnabled = runCatching { dependencies.terminalSettings.brightDisplayEnabled() }.getOrDefault(false)
         if (keepAwakeEnabled) {
             runCatching { dependencies.keepAwakeController.setKeepAwake(true) }
         }
         if (fullscreenEnabled) {
-            runCatching { dependencies.fullscreenController.setFullscreen(true) }
+            runCatching {
+                dependencies.fullscreenController.setFullscreen(true, immersiveStickyEnabled)
+            }
         }
         if (brightDisplayEnabled) {
             runCatching { dependencies.brightnessController.setBrightness(1.0) }
@@ -1069,17 +1119,19 @@ class AndroidTerminalViewModel(
             resolved != null -> ConnectionState.ReadyToConnect
             else -> ConnectionState.InvalidEndpoint
         }
-        return AndroidTerminalViewState(
+        val basis = AndroidTerminalViewState(
             endpointText = lastEndpoint,
             connectionState = state,
             lastError = if (state == ConnectionState.InvalidEndpoint) "Enter a host:port or http(s) URL." else null,
-            diagnosticsText = formatDiagnostics(resolved, state, null),
+            diagnosticsText = "",
             localKeepAwakeEnabled = keepAwakeEnabled,
             localFullscreenEnabled = fullscreenEnabled,
+            localImmersiveStickyEnabled = immersiveStickyEnabled,
             localBrightDisplayEnabled = brightDisplayEnabled,
             permissionEducation = permissionEducation(),
             mediaSupport = mediaSupport(),
         )
+        return basis.copy(diagnosticsText = formatDiagnostics(resolved, state, basis))
     }
 
     private fun permissionEducation(snapshot: AndroidCapabilitySnapshotInput? = null): PermissionEducationState {

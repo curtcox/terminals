@@ -2409,26 +2409,50 @@ class AndroidTerminalViewModelTest {
 
     @Test
     fun localFullscreenSettingIsRestoredAndApplied() {
-        val calls = mutableListOf<Boolean>()
+        val calls = mutableListOf<Pair<Boolean, Boolean>>()
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
                 terminalSettings = AndroidTerminalSettings.inMemory(initialFullscreenEnabled = true),
-                fullscreenController = AndroidFullscreenController { calls.add(it) },
+                fullscreenController = AndroidFullscreenController { enabled, sticky ->
+                    calls.add(enabled to sticky)
+                },
             ),
         )
 
         assertEquals(true, viewModel.state.value.localFullscreenEnabled)
-        assertEquals(listOf(true), calls)
+        assertEquals(listOf(true to true), calls)
+    }
+
+    @Test
+    fun localFullscreenRestoresWithImmersiveStickyDisabled() {
+        val calls = mutableListOf<Pair<Boolean, Boolean>>()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = AndroidTerminalSettings.inMemory(
+                    initialFullscreenEnabled = true,
+                    initialImmersiveStickyEnabled = false,
+                ),
+                fullscreenController = AndroidFullscreenController { enabled, sticky ->
+                    calls.add(enabled to sticky)
+                },
+            ),
+        )
+
+        assertEquals(listOf(true to false), calls)
+        assertEquals(false, viewModel.state.value.localImmersiveStickyEnabled)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("local_immersive_sticky=false"))
     }
 
     @Test
     fun localFullscreenTogglePersistsAndUpdatesDiagnostics() {
-        val calls = mutableListOf<Boolean>()
+        val calls = mutableListOf<Pair<Boolean, Boolean>>()
         val settings = AndroidTerminalSettings.inMemory()
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
                 terminalSettings = settings,
-                fullscreenController = AndroidFullscreenController { calls.add(it) },
+                fullscreenController = AndroidFullscreenController { enabled, sticky ->
+                    calls.add(enabled to sticky)
+                },
             ),
         )
 
@@ -2436,21 +2460,66 @@ class AndroidTerminalViewModelTest {
 
         assertEquals(true, settings.fullscreenEnabled())
         assertEquals(true, viewModel.state.value.localFullscreenEnabled)
-        assertEquals(listOf(true), calls)
+        assertEquals(listOf(true to true), calls)
         assertTrue(viewModel.state.value.diagnosticsText.contains("local_fullscreen=true"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("local_immersive_sticky=true"))
+    }
+
+    @Test
+    fun localImmersiveStickyToggleReappliesWhenFullscreenOn() {
+        val calls = mutableListOf<Pair<Boolean, Boolean>>()
+        val settings = AndroidTerminalSettings.inMemory()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = settings,
+                fullscreenController = AndroidFullscreenController { enabled, sticky ->
+                    calls.add(enabled to sticky)
+                },
+            ),
+        )
+
+        viewModel.setLocalFullscreen(true)
+        calls.clear()
+        viewModel.setLocalImmersiveSticky(false)
+
+        assertEquals(false, settings.immersiveStickyEnabled())
+        assertEquals(listOf(true to false), calls)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("local_immersive_sticky=false"))
     }
 
     @Test
     fun fullscreenDelegatesToPlatformAdapter() {
-        val calls = mutableListOf<Boolean>()
+        val calls = mutableListOf<Pair<Boolean, Boolean>>()
         val viewModel = AndroidTerminalViewModel(
-            AndroidClientDependencies(fullscreenController = AndroidFullscreenController { calls.add(it) }),
+            AndroidClientDependencies(
+                fullscreenController = AndroidFullscreenController { enabled, sticky ->
+                    calls.add(enabled to sticky)
+                },
+            ),
         )
 
         viewModel.setFullscreen(true)
         viewModel.setFullscreen(false)
 
-        assertEquals(listOf(true, false), calls)
+        assertEquals(listOf(true to true, false to false), calls)
+    }
+
+    @Test
+    fun serverFullscreenUsesImmersiveStickyTerminalSetting() {
+        val calls = mutableListOf<Pair<Boolean, Boolean>>()
+        val settings = AndroidTerminalSettings.inMemory(initialImmersiveStickyEnabled = false)
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                terminalSettings = settings,
+                fullscreenController = AndroidFullscreenController { enabled, sticky ->
+                    calls.add(enabled to sticky)
+                },
+            ),
+        )
+
+        viewModel.setFullscreen(true)
+
+        assertEquals(listOf(true to false), calls)
     }
 
     @Test

@@ -124,7 +124,7 @@ class AndroidTerminalAppSmokeTest {
     fun serverDrivenDeviceControlsReachPlatformAdapters() {
         val session = FakeSession()
         val keepAwakeValues = mutableListOf<Boolean>()
-        val fullscreenValues = mutableListOf<Boolean>()
+        val fullscreenValues = mutableListOf<Pair<Boolean, Boolean>>()
         val brightnessValues = mutableListOf<Double>()
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
@@ -133,7 +133,9 @@ class AndroidTerminalAppSmokeTest {
                 sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
                 keepAwakeController = AndroidKeepAwakeController { keepAwakeValues += it },
-                fullscreenController = AndroidFullscreenController { fullscreenValues += it },
+                fullscreenController = AndroidFullscreenController { enabled, sticky ->
+                    fullscreenValues += enabled to sticky
+                },
                 brightnessController = AndroidBrightnessController { brightnessValues += it },
                 sessionFactory = { sink ->
                     session.sink = sink
@@ -185,7 +187,7 @@ class AndroidTerminalAppSmokeTest {
         compose.onNodeWithText("0.42").assertIsDisplayed()
         compose.waitUntil {
             keepAwakeValues == listOf(true) &&
-                fullscreenValues == listOf(true) &&
+                fullscreenValues == listOf(true to true) &&
                 brightnessValues == listOf(0.42)
         }
     }
@@ -237,14 +239,16 @@ class AndroidTerminalAppSmokeTest {
 
     @Test
     fun localFullscreenCanBeToggledFromTerminalChrome() {
-        val fullscreenValues = mutableListOf<Boolean>()
+        val fullscreenValues = mutableListOf<Pair<Boolean, Boolean>>()
         val viewModel = AndroidTerminalViewModel(
             AndroidClientDependencies(
                 buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
                 heartbeatIntervalMillis = 0,
                 sensorTelemetryIntervalMillis = 0,
                 terminalSettings = AndroidTerminalSettings.inMemory(),
-                fullscreenController = AndroidFullscreenController { fullscreenValues += it },
+                fullscreenController = AndroidFullscreenController { enabled, sticky ->
+                    fullscreenValues += enabled to sticky
+                },
             ),
         )
 
@@ -255,7 +259,8 @@ class AndroidTerminalAppSmokeTest {
 
         compose.onNodeWithText("Fullscreen on").assertIsDisplayed()
         compose.onNodeWithText("local_fullscreen=true", substring = true).assertIsDisplayed()
-        assertEquals(listOf(true), fullscreenValues)
+        compose.onNodeWithText("local_immersive_sticky=true", substring = true).assertIsDisplayed()
+        assertEquals(listOf(true to true), fullscreenValues)
     }
 
     @Test

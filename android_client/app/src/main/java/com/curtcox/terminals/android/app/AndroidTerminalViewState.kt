@@ -48,6 +48,8 @@ data class AndroidTerminalViewState(
     val lastControlResponseActivity: String? = null,
     val localKeepAwakeEnabled: Boolean = false,
     val localFullscreenEnabled: Boolean = false,
+    /** Local kiosk preference: transient vs sticky immersive behavior when fullscreen is applied. */
+    val localImmersiveStickyEnabled: Boolean = true,
     val localBrightDisplayEnabled: Boolean = false,
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
     val mediaSupport: MediaSupportState = MediaSupportState(),

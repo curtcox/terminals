@@ -9,6 +9,12 @@ interface AndroidTerminalSettings {
     fun setKeepAwakeEnabled(enabled: Boolean)
     fun fullscreenEnabled(): Boolean
     fun setFullscreenEnabled(enabled: Boolean)
+    /**
+     * When local fullscreen is on (or server-driven fullscreen is applied), use immersive-sticky behavior
+     * (transient system bars) vs plain immersive (bars stay until dismissed).
+     */
+    fun immersiveStickyEnabled(): Boolean
+    fun setImmersiveStickyEnabled(enabled: Boolean)
     fun brightDisplayEnabled(): Boolean
     fun setBrightDisplayEnabled(enabled: Boolean)
 
@@ -17,12 +23,14 @@ interface AndroidTerminalSettings {
             initialEndpoint: String = "",
             initialKeepAwakeEnabled: Boolean = false,
             initialFullscreenEnabled: Boolean = false,
+            initialImmersiveStickyEnabled: Boolean = true,
             initialBrightDisplayEnabled: Boolean = false,
         ): AndroidTerminalSettings =
             object : AndroidTerminalSettings {
                 private var endpoint = initialEndpoint
                 private var keepAwake = initialKeepAwakeEnabled
                 private var fullscreen = initialFullscreenEnabled
+                private var immersiveSticky = initialImmersiveStickyEnabled
                 private var brightDisplay = initialBrightDisplayEnabled
 
                 override fun lastManualEndpoint(): String = endpoint
@@ -41,6 +49,12 @@ interface AndroidTerminalSettings {
 
                 override fun setFullscreenEnabled(enabled: Boolean) {
                     fullscreen = enabled
+                }
+
+                override fun immersiveStickyEnabled(): Boolean = immersiveSticky
+
+                override fun setImmersiveStickyEnabled(enabled: Boolean) {
+                    immersiveSticky = enabled
                 }
 
                 override fun brightDisplayEnabled(): Boolean = brightDisplay
@@ -81,6 +95,13 @@ class SharedPreferencesAndroidTerminalSettings(
         preferences.edit().putBoolean(KEY_FULLSCREEN_ENABLED, enabled).apply()
     }
 
+    override fun immersiveStickyEnabled(): Boolean =
+        preferences.getBoolean(KEY_IMMERSIVE_STICKY_ENABLED, true)
+
+    override fun setImmersiveStickyEnabled(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_IMMERSIVE_STICKY_ENABLED, enabled).apply()
+    }
+
     override fun brightDisplayEnabled(): Boolean =
         preferences.getBoolean(KEY_BRIGHT_DISPLAY_ENABLED, false)
 
@@ -92,6 +113,7 @@ class SharedPreferencesAndroidTerminalSettings(
         private const val KEY_LAST_MANUAL_ENDPOINT = "last_manual_endpoint"
         private const val KEY_KEEP_AWAKE_ENABLED = "keep_awake_enabled"
         private const val KEY_FULLSCREEN_ENABLED = "fullscreen_enabled"
+        private const val KEY_IMMERSIVE_STICKY_ENABLED = "immersive_sticky_enabled"
         private const val KEY_BRIGHT_DISPLAY_ENABLED = "bright_display_enabled"
     }
 }

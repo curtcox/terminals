@@ -38,6 +38,15 @@ class AndroidTerminalKioskSmokeTest {
     }
 
     @Test
+    fun localImmersiveStickyToggleUpdatesChromeLabel() {
+        rule.onNodeWithText("Immersive sticky on").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-local-immersive-sticky-button").performClick()
+        rule.onNodeWithText("Immersive sticky off").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-local-immersive-sticky-button").performClick()
+        rule.onNodeWithText("Immersive sticky on").assertIsDisplayed()
+    }
+
+    @Test
     fun localBrightDisplayToggleUpdatesChromeLabel() {
         rule.onNodeWithText("Bright display off").assertIsDisplayed()
         rule.onNodeWithTag("terminal-local-bright-display-button").performClick()

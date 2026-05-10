@@ -1295,6 +1295,14 @@ Remaining validation:
 - Clarified in `docs/client-android.md` that envelope resume hints apply to WebSocket (and similar transports), not the `grpc://` / `grpcs://` carrier.
 - Re-ran `make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
 
+### 2026-05-09 (Phase 7: immersive/sticky kiosk preference)
+
+- Implemented optional **immersive sticky** as a persisted local terminal setting (`SharedPreferencesAndroidTerminalSettings` / `inMemory`), default **on** (matches prior legacy behavior).
+- Extended `AndroidFullscreenController` / `WindowAndroidFullscreenController`: API 30+ uses `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE` vs `BEHAVIOR_DEFAULT`; pre-R uses `IMMERSIVE_STICKY` vs `IMMERSIVE`.
+- ViewModel applies the preference for local fullscreen, startup restore, server-driven `FullscreenWidget`, and re-applies when toggling sticky while fullscreen is already on; copyable diagnostics include `local_immersive_sticky` alongside other kiosk lines (fixed stale `it` usage when rebuilding diagnostics after local kiosk toggles).
+- Terminal chrome: `terminal-local-immersive-sticky-button`; `AndroidTerminalKioskSmokeTest.localImmersiveStickyToggleUpdatesChromeLabel`; JVM and Compose smoke updates.
+- Documented in `docs/client-android.md`. Re-verified `make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, and boundary scripts.
+
 ## Test Plan
 
 ### Unit tests
