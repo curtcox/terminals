@@ -48,7 +48,7 @@ Future<void> _ensureInitialized() async {
     linux: LinuxInitializationSettings(defaultActionName: 'Open notification'),
   );
 
-  await _notifications.initialize(settings);
+  await _notifications.initialize(settings: settings);
 
   await _notifications
       .resolvePlatformSpecificImplementation<
