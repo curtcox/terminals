@@ -283,8 +283,9 @@ func mapKey(field protoreflect.FieldDescriptor, raw string) (protoreflect.MapKey
 		protoreflect.MessageKind,
 		protoreflect.GroupKind:
 		return protoreflect.MapKey{}, fmt.Errorf("unsupported key kind %s", field.Kind())
+	default:
+		return protoreflect.MapKey{}, fmt.Errorf("unsupported key kind %s", field.Kind())
 	}
-	return protoreflect.MapKey{}, fmt.Errorf("unsupported key kind %s", field.Kind())
 }
 
 func scalarEquals(got resolvedValue, want interface{}) bool {
