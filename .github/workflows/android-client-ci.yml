@@ -56,6 +56,6 @@ jobs:
       - name: Android client boundary tests
         run: ./scripts/test-android-client-boundary.sh
 
-      - name: Unit tests, lint, debug assemble
+      - name: Unit tests, lint, debug assemble, compile instrumentation tests
         working-directory: android_client
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug compileDebugAndroidTestKotlin --no-daemon

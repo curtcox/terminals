@@ -1273,6 +1273,10 @@ Remaining validation:
 
 - Confirmed the native client matches the plan’s automated scope: `make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh` all pass on a JDK 17 + Android SDK host. Code-complete items under **Remaining validation** remain physical/network smoke (connected instrumentation, Fire tablet manual connect, real LAN NSD, WebRTC dependency follow-up).
 
+### 2026-05-09 (GitHub Actions instrumentation compile parity)
+
+- Extended `.github/workflows/android-client-ci.yml` so PR/push checks run `./gradlew compileDebugAndroidTestKotlin` alongside `testDebugUnitTest`, `lintDebug`, and `assembleDebug`, matching `make android-client-compile-android-test` / `make all-test` without requiring a connected device or emulator.
+
 ## Test Plan
 
 ### Unit tests
