@@ -1755,10 +1755,56 @@ class AndroidTerminalViewModelTest {
         viewModel.updateEndpoint("10.0.0.8:8080")
         viewModel.connect()
         advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setRegisterAck(
+                    Control.RegisterAck.newBuilder()
+                        .setServerId("srv-launch")
+                        .setMessage("registered"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
         viewModel.updateSelectedApplicationIntent("photo_frame")
         viewModel.submitApplicationLaunchCommand()
         advanceUntilIdle()
-        assertEquals(listOf("debug-launch-app-1" to "photo_frame"), session.applicationLaunchCommands)
+        assertEquals(listOf("photo_frame"), session.applicationLaunchCommands.map { it.second })
+        assertTrue(session.applicationLaunchCommands.single().first.startsWith("debug-launch-app-"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun applicationLaunchQueuesUntilRegisterAckThenSends() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.updateSelectedApplicationIntent("photo_frame")
+        viewModel.submitApplicationLaunchCommand()
+        advanceUntilIdle()
+        assertTrue(session.applicationLaunchCommands.isEmpty())
+        assertEquals("photo_frame", viewModel.state.value.applicationLaunchQueuedIntent)
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("application_launch_queued_until_register_ack=photo_frame"),
+        )
+
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setRegisterAck(
+                    Control.RegisterAck.newBuilder()
+                        .setServerId("srv-q")
+                        .setMessage("registered"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        assertEquals(null, viewModel.state.value.applicationLaunchQueuedIntent)
+        assertEquals(listOf("photo_frame"), session.applicationLaunchCommands.map { it.second })
+        assertTrue(session.applicationLaunchCommands.single().first.startsWith("debug-launch-app-"))
+        assertEquals(1, session.systemCommands.count { it.second == "scenario_registry" })
         viewModel.disconnect()
         advanceUntilIdle()
     }

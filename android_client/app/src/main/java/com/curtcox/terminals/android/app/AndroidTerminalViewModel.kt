@@ -160,12 +160,26 @@ class AndroidTerminalViewModel(
                     lastLiveMediaLine = resolvedLiveMediaLine,
                 )
             }
-            if (response.payloadCase == Control.ConnectResponse.PayloadCase.REGISTER_ACK &&
-                !registerAckScenarioQuerySent
-            ) {
-                registerAckScenarioQuerySent = true
-                viewModelScope.launch {
-                    sendScenarioRegistryQuery()
+            if (response.payloadCase == Control.ConnectResponse.PayloadCase.REGISTER_ACK) {
+                sawRegisterAck = true
+                if (!registerAckScenarioQuerySent) {
+                    registerAckScenarioQuerySent = true
+                    viewModelScope.launch {
+                        sendScenarioRegistryQuery()
+                    }
+                }
+                val flushIntent = mutableState.value.applicationLaunchQueuedIntent?.trim().orEmpty()
+                if (flushIntent.isNotEmpty()) {
+                    mutableState.update { st ->
+                        val cleared = st.copy(applicationLaunchQueuedIntent = null, lastError = null)
+                        cleared.copy(
+                            diagnosticsText =
+                                formatDiagnostics(parser.parse(cleared.endpointText), cleared.connectionState, cleared),
+                        )
+                    }
+                    viewModelScope.launch {
+                        sendApplicationLaunchNow(flushIntent)
+                    }
                 }
             }
             if (response.payloadCase == Control.ConnectResponse.PayloadCase.HELLO_ACK) {
@@ -208,6 +222,8 @@ class AndroidTerminalViewModel(
 
     /** First [Control.RegisterAck] per connection triggers automatic scenario registry query (Flutter shell). */
     private var registerAckScenarioQuerySent: Boolean = false
+    /** True after any inbound [Control.RegisterAck] for the active session (Flutter `_isConnectionRegistered` parity). */
+    private var sawRegisterAck: Boolean = false
     private val bugReportClock: Clock = Clock(dependencies.nowMillis)
     private val bugReportQueue: ArrayDeque<Diagnostics.BugReport> = ArrayDeque()
     private val mutableState = MutableStateFlow(
@@ -611,22 +627,35 @@ class AndroidTerminalViewModel(
             mutableState.update { it.copy(lastError = "Application intent required") }
             return
         }
+        if (!sawRegisterAck) {
+            mutableState.update { st ->
+                val next = st.copy(applicationLaunchQueuedIntent = intent, lastError = null)
+                next.copy(
+                    diagnosticsText = formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next),
+                )
+            }
+            return
+        }
         viewModelScope.launch {
-            val id = nextDebugRequestId("debug-launch-app")
-            runCatching {
-                session?.sendApplicationLaunchCommand(id, intent)
-                    ?: error("Control stream is not connected.")
-            }.onSuccess {
-                mutableState.update { st ->
-                    st.copy(
-                        lastError = null,
-                        diagnosticsText = "${st.diagnosticsText}\nlast_manual_command=application_launch:$id:$intent",
-                    )
-                }
-            }.onFailure { error ->
-                mutableState.update {
-                    it.copy(lastError = error.message ?: error::class.java.simpleName)
-                }
+            sendApplicationLaunchNow(intent)
+        }
+    }
+
+    private suspend fun sendApplicationLaunchNow(intent: String) {
+        val id = nextDebugRequestId("debug-launch-app")
+        runCatching {
+            session?.sendApplicationLaunchCommand(id, intent)
+                ?: error("Control stream is not connected.")
+        }.onSuccess {
+            mutableState.update { st ->
+                st.copy(
+                    lastError = null,
+                    diagnosticsText = "${st.diagnosticsText}\nlast_manual_command=application_launch:$id:$intent",
+                )
+            }
+        }.onFailure { error ->
+            mutableState.update {
+                it.copy(lastError = error.message ?: error::class.java.simpleName)
             }
         }
     }
@@ -1182,12 +1211,15 @@ class AndroidTerminalViewModel(
         stopCapabilityMonitor()
         if (session !== failedSession) return
         session = null
+        sawRegisterAck = false
+        registerAckScenarioQuerySent = false
         val endpoint = parser.parse(mutableState.value.endpointText)
         val message = error.message ?: error::class.java.simpleName
         mutableState.update {
             val next = it.copy(
                 connectionState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.Connecting,
                 lastError = message,
+                applicationLaunchQueuedIntent = null,
             )
             next.copy(
                 diagnosticsText = formatDiagnostics(endpoint, next.connectionState, next) +
@@ -1308,6 +1340,7 @@ class AndroidTerminalViewModel(
             streamReadySendCount = 0,
             availableApplicationIntents = listOf("terminal"),
             selectedApplicationIntent = "terminal",
+            applicationLaunchQueuedIntent = null,
         )
 
     private fun resetPerConnectionShellState() {
@@ -1317,6 +1350,7 @@ class AndroidTerminalViewModel(
         pendingPlaybackArtifactsRequestId = null
         pendingPlaybackMetadataRequestId = null
         registerAckScenarioQuerySent = false
+        sawRegisterAck = false
     }
 
     private fun snapshotDebugCommandPendingIds(): CommandDiagnosticsRequestIds =
@@ -1536,6 +1570,9 @@ class AndroidTerminalViewModel(
                 appendLine("local_immersive_sticky=${src.localImmersiveStickyEnabled}")
                 appendLine("local_bright_display=${src.localBrightDisplayEnabled}")
                 appendLine("privacy_mode=${src.privacyModeEnabled}")
+            }
+            handshakeSource?.applicationLaunchQueuedIntent?.takeIf { it.isNotBlank() }?.let { queued ->
+                appendLine("application_launch_queued_until_register_ack=$queued")
             }
         }
     }

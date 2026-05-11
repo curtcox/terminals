@@ -268,10 +268,24 @@ class AndroidTerminalAppSmokeTest {
         compose.onNodeWithTag("terminal-connect-button").performClick()
         compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
 
+        runBlocking {
+            session.sink.onResponse(
+                Control.ConnectResponse.newBuilder()
+                    .setRegisterAck(
+                        Control.RegisterAck.newBuilder()
+                            .setServerId("smoke-reg")
+                            .setMessage("registered"),
+                    )
+                    .build(),
+            )
+        }
+        compose.waitUntil { viewModel.state.value.registerAckServerId == "smoke-reg" }
+
         compose.onNodeWithTag("terminal-debug-launch-application-button").performClick()
         compose.waitUntil { session.applicationLaunchCommands.isNotEmpty() }
 
-        assertEquals(listOf("debug-launch-app-1" to "terminal"), session.applicationLaunchCommands)
+        assertEquals(listOf("terminal"), session.applicationLaunchCommands.map { it.second })
+        assertTrue(session.applicationLaunchCommands.single().first.startsWith("debug-launch-app-"))
     }
 
     @Test

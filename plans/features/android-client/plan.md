@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-11 (`make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, boundary scripts after connected debug-chrome Compose smoke; `connectedDebugAndroidTest` not re-run in this session).
+Last local validation: 2026-05-11 (`./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, `lintDebug`, boundary scripts after RegisterAck-gated **Open application** parity; `connectedDebugAndroidTest` not re-run in this session).
 
 Passed:
 
@@ -1380,6 +1380,13 @@ Remaining validation:
 
 - Extended `AndroidTerminalAppSmokeTest` so the fake session records `sendSystemCommand`, `sendPlaybackMetadataQuery`, and `sendApplicationLaunchCommand`; added Compose coverage for **Runtime status**, **Device status**, **List playback artifacts** + **Refresh applications**, **Playback metadata** (default target device id), and **Open application** after a successful connect. Closes the gap between JVM-only debug-query tests and UI wiring on the generic shell.
 - Re-verified `make android-client-test`, `make android-client-compile-android-test`, and boundary scripts on a JDK 17 + Android SDK host.
+
+### 2026-05-11 (Flutter shell: **Open application** waits for `RegisterAck`)
+
+- Matched Flutter `_launchSelectedApplication` / `_pendingLaunchApplicationIntent`: `AndroidTerminalViewModel` queues the selected intent in `AndroidTerminalViewState` (`applicationLaunchQueuedIntent`) until any inbound `RegisterAck`, then runs `sendApplicationLaunchNow` after the first-ack automatic `scenario_registry` dispatch; copyable diagnostics include `application_launch_queued_until_register_ack=` while waiting.
+- `handleControlLoss` clears `sawRegisterAck`, `registerAckScenarioQuerySent`, and the queued intent so reconnect sessions repeat the hello / RegisterAck handshake correctly.
+- JVM: `applicationLaunchQueuesUntilRegisterAckThenSends`; tightened `submitApplicationLaunchCommandSendsManualStart` (RegisterAck before launch). Compose: `AndroidTerminalAppSmokeTest.connectedOpenApplicationSendsManualLaunchCommand` delivers `RegisterAck` before **Open application**.
+- Documented in `docs/client-android.md`. Re-verified `./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, `lintDebug`, and Android boundary scripts with `JAVA_HOME` pointing at JDK 17.
 
 ## Test Plan
 

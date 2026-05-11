@@ -225,6 +225,13 @@ artifact field (`list_playback_artifacts`), or clears the matching pending id
 (`runtime_status`, `device_status`, `playback_metadata`), matching Flutter
 `commandDiagnosticsFromResponse`.
 
+**Open application** sends the manual start command for the dropdown-selected
+intent only after the control stream has received `RegisterAck` (Flutter
+`_isConnectionRegistered` / `_pendingLaunchApplicationIntent` parity). If the
+user taps **Open application** first, the intent is queued and flushed on the
+next `RegisterAck`; copyable diagnostics include
+`application_launch_queued_until_register_ack=<intent>` until then.
+
 Server `Notification` control responses post a status-bar notification when
 `POST_NOTIFICATIONS` is granted (Android 13+) and speak the message with
 on-device TTS, matching the Flutter client’s notification-plus-speech alert

@@ -75,6 +75,11 @@ data class AndroidTerminalViewState(
     val availableApplicationIntents: List<String> = listOf("terminal"),
     /** Selected intent for **Open application** (manual launch command). */
     val selectedApplicationIntent: String = "terminal",
+    /**
+     * When set, **Open application** was tapped before the first [terminals.control.v1.Control.RegisterAck];
+     * the launch is flushed automatically when RegisterAck arrives (Flutter `terminal_client_shell` parity).
+     */
+    val applicationLaunchQueuedIntent: String? = null,
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
     val mediaSupport: MediaSupportState = MediaSupportState(),
     val discoveryState: DiscoveryState = DiscoveryState(),
