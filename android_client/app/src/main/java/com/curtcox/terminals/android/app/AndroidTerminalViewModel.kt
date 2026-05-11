@@ -3,11 +3,9 @@
 package com.curtcox.terminals.android.app
 
 import android.Manifest
-import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
-import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.CommandDiagnosticsRequestIds
 import com.curtcox.terminals.android.connection.ControlResponseDispatcher
@@ -18,17 +16,10 @@ import com.curtcox.terminals.android.connection.commandResultDataMap
 import com.curtcox.terminals.android.connection.diagnosticsTitleForCommandResult
 import com.curtcox.terminals.android.connection.firstPlaybackArtifactId
 import com.curtcox.terminals.android.diagnostics.AndroidBugReportActions
-import com.curtcox.terminals.android.diagnostics.AndroidBugReportBuilder
 import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
 import com.curtcox.terminals.android.discovery.DiscoveredServer
-import com.curtcox.terminals.android.media.AudioPlaybackResult
-import com.curtcox.terminals.android.media.LiveMediaSessionResult
-import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import com.curtcox.terminals.android.util.Clock
-import java.io.EOFException
-import java.util.Locale
-import java.util.TimeZone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -41,195 +32,40 @@ import terminals.control.v1.Control
 import terminals.diagnostics.v1.Diagnostics
 
 class AndroidTerminalViewModel(
-    private val dependencies: AndroidClientDependencies = AndroidClientDependencies(),
+    internal val dependencies: AndroidClientDependencies = AndroidClientDependencies(),
 ) : ViewModel() {
-    private val parser = ManualEndpointParser()
-    private val chrome = AndroidClientChrome(dependencies.buildMetadata)
-    private val dispatcher = ControlResponseDispatcher()
-    private val responseSink = object : AndroidControlResponseSink {
-        override suspend fun onResponse(response: Control.ConnectResponse) {
-            val pendingSnapshot = snapshotDebugCommandPendingIds()
-            val rebaselineSent = if (response.requiresCapabilityRebaseline()) {
-                runCatching {
-                    session?.rebaselineCapabilitiesAfterStaleGeneration()
-                }.isSuccess
-            } else {
-                false
-            }
-            val notificationDelivered = if (response.payloadCase == Control.ConnectResponse.PayloadCase.NOTIFICATION) {
-                val title = response.notification.title.trim()
-                val body = response.notification.body.trim()
-                if (title.isEmpty() && body.isEmpty()) {
-                    false
-                } else {
-                    val notificationOk = runCatching {
-                        dependencies.notificationDelivery.deliver(title, body)
-                    }.isSuccess
-                    val spoken = if (body.isNotEmpty()) body else title
-                    runCatching { dependencies.speechDelivery.speak(spoken) }
-                    notificationOk
-                }
-            } else {
-                false
-            }
-            val audioResult = if (response.payloadCase == Control.ConnectResponse.PayloadCase.PLAY_AUDIO) {
-                runCatching { dependencies.mediaEngine.playAudio(response.playAudio) }
-                    .getOrElse { AudioPlaybackResult.Unsupported(it.message ?: it::class.java.simpleName) }
-            } else {
-                null
-            }
-            val mediaResult = if (response.payloadCase == Control.ConnectResponse.PayloadCase.SHOW_MEDIA) {
-                runCatching { dependencies.mediaEngine.showMedia(response.showMedia) }
-                    .getOrElse { MediaDisplayResult.Unsupported(it.message ?: it::class.java.simpleName) }
-            } else {
-                null
-            }
-            var liveMediaLine: String? = null
-            if (response.payloadCase == Control.ConnectResponse.PayloadCase.START_STREAM) {
-                val streamId = response.startStream.streamId.trim()
-                if (streamId.isNotEmpty()) {
-                    val connectedSession = session
-                    if (connectedSession != null) {
-                        runCatching { connectedSession.sendStreamReady(streamId) }
-                            .onSuccess {
-                                mutableState.update { state ->
-                                    val next = state.copy(streamReadySendCount = state.streamReadySendCount + 1)
-                                    next.copy(
-                                        diagnosticsText =
-                                            formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next),
-                                    )
-                                }
-                            }
-                            .onFailure { handleControlLoss(connectedSession, it) }
-                    }
-                    when (val lr = dependencies.mediaEngine.applyStartStream(response.startStream)) {
-                        is LiveMediaSessionResult.Unsupported ->
-                            liveMediaLine = "start_stream:$streamId:${lr.reason}"
-                        else -> {}
-                    }
-                }
-            }
-            if (response.payloadCase == Control.ConnectResponse.PayloadCase.STOP_STREAM) {
-                val streamId = response.stopStream.streamId.trim()
-                if (streamId.isNotEmpty()) {
-                    dependencies.mediaEngine.applyStopStream(streamId)
-                }
-            }
-            if (response.payloadCase == Control.ConnectResponse.PayloadCase.ROUTE_STREAM) {
-                dependencies.mediaEngine.applyRouteStream(response.routeStream)
-            }
-            if (response.payloadCase == Control.ConnectResponse.PayloadCase.WEBRTC_SIGNAL) {
-                when (val sr = dependencies.mediaEngine.applyWebRtcSignal(response.webrtcSignal)) {
-                    is LiveMediaSessionResult.Unsupported ->
-                        liveMediaLine = liveMediaLine ?: "webrtc_signal:${sr.reason}"
-                    else -> {}
-                }
-            }
-            mutableState.update {
-                val dispatched = dispatcher.dispatch(it, response)
-                val enriched =
-                    applyCommandResultDiagnostics(dispatched, response, pendingSnapshot).copy(
-                        inboundConnectResponseCount = it.inboundConnectResponseCount + 1,
-                    )
-                val endpoint = parser.parse(enriched.endpointText)
-                var diagnostics =
-                    formatDiagnostics(
-                        endpoint,
-                        enriched.connectionState,
-                        enriched,
-                    )
-                if (notificationDelivered) {
-                    val head = response.notification.title.trim()
-                        .ifEmpty { response.notification.body.trim() }
-                    diagnostics += "\nlast_notification=$head"
-                }
-                val mediaStatus = audioResult?.toStatus(response.playAudio.requestId)
-                    ?: mediaResult?.toStatus(response.showMedia.requestId)
-                if (mediaStatus != null) {
-                    diagnostics += "\nlast_media=${mediaStatus.first}:${mediaStatus.second}"
-                }
-                val resolvedLiveMediaLine = liveMediaLine ?: enriched.lastLiveMediaLine
-                resolvedLiveMediaLine?.takeIf(String::isNotBlank)?.let { line ->
-                    diagnostics += "\nlast_live_media=$line"
-                }
-                enriched.copy(
-                    diagnosticsText = if (rebaselineSent) {
-                        "$diagnostics\nlast_capability_rebaseline=stale-generation"
-                    } else {
-                        diagnostics
-                    },
-                    lastMediaRequestId = mediaStatus?.first ?: enriched.lastMediaRequestId,
-                    lastMediaStatus = mediaStatus?.second ?: enriched.lastMediaStatus,
-                    lastLiveMediaLine = resolvedLiveMediaLine,
-                )
-            }
-            if (response.payloadCase == Control.ConnectResponse.PayloadCase.REGISTER_ACK) {
-                sawRegisterAck = true
-                if (!registerAckScenarioQuerySent) {
-                    registerAckScenarioQuerySent = true
-                    viewModelScope.launch {
-                        sendScenarioRegistryQuery()
-                    }
-                }
-                val flushIntent = mutableState.value.applicationLaunchQueuedIntent?.trim().orEmpty()
-                if (flushIntent.isNotEmpty()) {
-                    mutableState.update { st ->
-                        val cleared = st.copy(applicationLaunchQueuedIntent = null, lastError = null)
-                        cleared.copy(
-                            diagnosticsText =
-                                formatDiagnostics(parser.parse(cleared.endpointText), cleared.connectionState, cleared),
-                        )
-                    }
-                    viewModelScope.launch {
-                        sendApplicationLaunchNow(flushIntent)
-                    }
-                }
-            }
-            if (response.payloadCase == Control.ConnectResponse.PayloadCase.HELLO_ACK) {
-                val ms = response.helloAck.heartbeatIntervalMs
-                effectiveHeartbeatMillis = if (ms > 0) ms else dependencies.heartbeatIntervalMillis
-                val connectedSession = session
-                if (connectedSession != null) {
-                    startHeartbeat(connectedSession)
-                    startSensorTelemetry(connectedSession)
-                    startCapabilityMonitor(connectedSession)
-                }
-            }
-        }
-
-        override suspend fun onTransportTerminated(error: Throwable?) {
-            val connectedSession = session ?: return
-            handleControlLoss(connectedSession, error ?: EOFException("control transport closed"))
-        }
-    }
-    private var session: AndroidControlSession? = null
-    private var connectJob: Job? = null
-    private var heartbeatJob: Job? = null
-    private var sensorTelemetryJob: Job? = null
-    private var capabilityMonitorJob: Job? = null
-    private var reconnectJob: Job? = null
+    internal val parser = ManualEndpointParser()
+    internal val chrome = AndroidClientChrome(dependencies.buildMetadata)
+    internal val dispatcher = ControlResponseDispatcher()
+    internal val responseSink = AndroidTerminalInboundSink(this)
+    internal var session: AndroidControlSession? = null
+    internal var connectJob: Job? = null
+    internal var heartbeatJob: Job? = null
+    internal var sensorTelemetryJob: Job? = null
+    internal var capabilityMonitorJob: Job? = null
+    internal var reconnectJob: Job? = null
     private var networkMonitoringActive: Boolean = false
     private var lastDiscoveryRestartAtMillis: Long = -1
     private var lastNetworkCapabilityRefreshAtMillis: Long = -1
     private var lastNetworkReconnectRestoreAtMillis: Long = -1
-    private var reconnectExhausted: Boolean = false
-    private var effectiveHeartbeatMillis: Long = dependencies.heartbeatIntervalMillis
+    internal var reconnectExhausted: Boolean = false
+    internal var effectiveHeartbeatMillis: Long = dependencies.heartbeatIntervalMillis
     /** When false, periodic heartbeat and sensor telemetry are paused (Flutter `AppLifecycle` parity). */
-    private var appInForeground: Boolean = true
-    private var debugCommandSeq: Int = 0
-    private var pendingRuntimeStatusRequestId: String? = null
-    private var pendingDeviceStatusRequestId: String? = null
-    private var pendingScenarioRegistryRequestId: String? = null
-    private var pendingPlaybackArtifactsRequestId: String? = null
-    private var pendingPlaybackMetadataRequestId: String? = null
+    internal var appInForeground: Boolean = true
+    internal var debugCommandSeq: Int = 0
+    internal var pendingRuntimeStatusRequestId: String? = null
+    internal var pendingDeviceStatusRequestId: String? = null
+    internal var pendingScenarioRegistryRequestId: String? = null
+    internal var pendingPlaybackArtifactsRequestId: String? = null
+    internal var pendingPlaybackMetadataRequestId: String? = null
 
     /** First [Control.RegisterAck] per connection triggers automatic scenario registry query (Flutter shell). */
-    private var registerAckScenarioQuerySent: Boolean = false
+    internal var registerAckScenarioQuerySent: Boolean = false
     /** True after any inbound [Control.RegisterAck] for the active session (Flutter `_isConnectionRegistered` parity). */
-    private var sawRegisterAck: Boolean = false
-    private val bugReportClock: Clock = Clock(dependencies.nowMillis)
-    private val bugReportQueue: ArrayDeque<Diagnostics.BugReport> = ArrayDeque()
-    private val mutableState = MutableStateFlow(
+    internal var sawRegisterAck: Boolean = false
+    internal val bugReportClock: Clock = Clock(dependencies.nowMillis)
+    internal val bugReportQueue: ArrayDeque<Diagnostics.BugReport> = ArrayDeque()
+    internal val mutableState = MutableStateFlow(
         initialState(),
     )
 
@@ -644,7 +480,7 @@ class AndroidTerminalViewModel(
         }
     }
 
-    private suspend fun sendApplicationLaunchNow(intent: String) {
+    internal suspend fun sendApplicationLaunchNow(intent: String) {
         val id = nextDebugRequestId("debug-launch-app")
         runCatching {
             session?.sendApplicationLaunchCommand(id, intent)
@@ -700,134 +536,6 @@ class AndroidTerminalViewModel(
         queueOrSendBugReport(report)
     }
 
-    private fun submitBugReportFromServerDrivenAction(action: ServerDrivenAction) {
-        val subject = resolveBugReportSubject(action)
-        val report =
-            buildShellBugReport(
-                description = "Filed from on-device bug report button",
-                source = Diagnostics.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
-                subjectDeviceId = subject,
-                extraHints =
-                    mapOf(
-                        "component_id" to action.componentId,
-                        "action" to action.action,
-                    ),
-            )
-        queueOrSendBugReport(report)
-    }
-
-    private fun resolveBugReportSubject(action: ServerDrivenAction): String {
-        if (action.action.startsWith(AndroidBugReportActions.PREFIX)) {
-            val explicit =
-                action.action
-                    .removePrefix(AndroidBugReportActions.PREFIX)
-                    .removePrefix(":")
-                    .trim()
-            if (explicit.isNotEmpty()) {
-                return explicit
-            }
-        }
-        val v = action.value.trim()
-        if (v.isNotEmpty()) {
-            return v
-        }
-        return dependencies.deviceId
-    }
-
-    private fun buildShellBugReport(
-        description: String,
-        source: Diagnostics.BugReportSource,
-        subjectDeviceId: String,
-        extraHints: Map<String, String>,
-    ): Diagnostics.BugReport {
-        val s = mutableState.value
-        val screenshotPng =
-            runCatching { dependencies.bugReportScreenshotCapture() }.getOrNull()?.takeIf {
-                it.isNotEmpty()
-            }
-        return AndroidBugReportBuilder.build(
-            description = description,
-            source = source,
-            reporterDeviceId = dependencies.deviceId,
-            subjectDeviceId = subjectDeviceId,
-            extraSourceHints = extraHints,
-            clock = bugReportClock,
-            buildMetadata = dependencies.buildMetadata,
-            serverRoot = s.serverRoot,
-            connectionState = s.connectionState,
-            lastServerHeartbeatUnixMs = s.lastServerHeartbeatUnixMs,
-            registeredCapabilities = session?.lastRegisteredCapabilities,
-            localeTag = Locale.getDefault().toLanguageTag(),
-            timezoneId = TimeZone.getDefault().id,
-            osVersion = "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-            reconnectAttempt = s.reconnectAttempt,
-            lastStatus = s.lastControlResponseActivity,
-            screenshotPng = screenshotPng,
-        )
-    }
-
-    private fun queueOrSendBugReport(report: Diagnostics.BugReport) {
-        viewModelScope.launch {
-            val currentSession = session
-            val connected = mutableState.value.connectionState == ConnectionState.Connected
-            if (currentSession != null && connected) {
-                runCatching { currentSession.sendBugReport(report) }
-                    .onSuccess {
-                        val word = report.sourceHintsMap["bug_token_word"].orEmpty()
-                        mutableState.update { st ->
-                            st.copy(
-                                lastBugReportSubmitStatus = "Sent bug report ${report.reportId} (word=$word).",
-                                lastError = null,
-                            )
-                        }
-                    }
-                    .onFailure { e ->
-                        mutableState.update {
-                            it.copy(
-                                lastBugReportSubmitStatus =
-                                    "Bug report send failed: ${e.message ?: e.javaClass.simpleName}",
-                            )
-                        }
-                    }
-            } else {
-                bugReportQueue.addLast(report)
-                val word = report.sourceHintsMap["bug_token_word"].orEmpty()
-                mutableState.update {
-                    it.copy(
-                        lastBugReportSubmitStatus = "Queued bug report (word=$word) until connected.",
-                    )
-                }
-            }
-        }
-    }
-
-    private suspend fun flushQueuedBugReports(target: AndroidControlSession) {
-        val pending = bugReportQueue.size
-        if (pending == 0) return
-        var sent = 0
-        var lastWord = ""
-        var lastFailure: String? = null
-        while (bugReportQueue.isNotEmpty()) {
-            val report = bugReportQueue.removeFirst()
-            runCatching { target.sendBugReport(report) }
-                .onSuccess {
-                    sent++
-                    lastWord = report.sourceHintsMap["bug_token_word"].orEmpty()
-                }
-                .onFailure { e ->
-                    lastFailure = e.message ?: e.javaClass.simpleName
-                }
-        }
-        val status =
-            when {
-                sent == pending && sent == 1 -> "Sent queued bug report (word=$lastWord)."
-                sent == pending && sent > 1 -> "Sent $sent queued bug reports (last word=$lastWord)."
-                sent > 0 ->
-                    "Sent $sent of $pending queued bug reports (last word=$lastWord). Remainder failed: $lastFailure"
-                else -> "Queued bug reports failed to send: $lastFailure"
-            }
-        mutableState.update { it.copy(lastBugReportSubmitStatus = status) }
-    }
 
     /**
      * Shell `terminal_input` parity with Flutter `_sendKeyText`: streams UTF-16 text chunks (including
@@ -975,134 +683,6 @@ class AndroidTerminalViewModel(
         }
     }
 
-    fun setKeepAwake(enabled: Boolean) {
-        runCatching {
-            dependencies.keepAwakeController.setKeepAwake(enabled)
-        }.onFailure { error ->
-            mutableState.update {
-                it.copy(lastError = error.message ?: error::class.java.simpleName)
-            }
-        }
-    }
-
-    fun setLocalKeepAwake(enabled: Boolean) {
-        runCatching {
-            dependencies.keepAwakeController.setKeepAwake(enabled)
-        }.onSuccess {
-            dependencies.terminalSettings.setKeepAwakeEnabled(enabled)
-            mutableState.update { st ->
-                val next = st.copy(localKeepAwakeEnabled = enabled)
-                next.copy(
-                    diagnosticsText = formatDiagnostics(
-                        parser.parse(next.endpointText),
-                        next.connectionState,
-                        next,
-                    ),
-                )
-            }
-        }.onFailure { error ->
-            mutableState.update {
-                it.copy(
-                    lastError = error.message ?: error::class.java.simpleName,
-                    localKeepAwakeEnabled = dependencies.terminalSettings.keepAwakeEnabled(),
-                )
-            }
-        }
-    }
-
-    fun setFullscreen(enabled: Boolean) {
-        val sticky = immersiveStickyForFullscreen(enabled)
-        runCatching {
-            dependencies.fullscreenController.setFullscreen(enabled, sticky)
-        }.onFailure { error ->
-            mutableState.update {
-                it.copy(lastError = error.message ?: error::class.java.simpleName)
-            }
-        }
-    }
-
-    fun setLocalFullscreen(enabled: Boolean) {
-        val sticky = immersiveStickyForFullscreen(enabled)
-        runCatching {
-            dependencies.fullscreenController.setFullscreen(enabled, sticky)
-        }.onSuccess {
-            dependencies.terminalSettings.setFullscreenEnabled(enabled)
-            mutableState.update { st ->
-                val next = st.copy(localFullscreenEnabled = enabled)
-                next.copy(
-                    diagnosticsText = formatDiagnostics(
-                        parser.parse(next.endpointText),
-                        next.connectionState,
-                        next,
-                    ),
-                )
-            }
-        }.onFailure { error ->
-            mutableState.update {
-                it.copy(
-                    lastError = error.message ?: error::class.java.simpleName,
-                    localFullscreenEnabled = dependencies.terminalSettings.fullscreenEnabled(),
-                )
-            }
-        }
-    }
-
-    fun setLocalImmersiveSticky(enabled: Boolean) {
-        dependencies.terminalSettings.setImmersiveStickyEnabled(enabled)
-        mutableState.update {
-            val next = it.copy(localImmersiveStickyEnabled = enabled)
-            var updated = next.copy(
-                diagnosticsText = formatDiagnostics(
-                    parser.parse(next.endpointText),
-                    next.connectionState,
-                    next,
-                ),
-            )
-            if (next.localFullscreenEnabled) {
-                runCatching {
-                    dependencies.fullscreenController.setFullscreen(true, enabled)
-                }.onFailure { error ->
-                    updated = updated.copy(lastError = error.message ?: error::class.java.simpleName)
-                }
-            }
-            updated
-        }
-    }
-
-    fun setBrightness(value: Double) {
-        runCatching {
-            dependencies.brightnessController.setBrightness(value)
-        }.onFailure { error ->
-            mutableState.update {
-                it.copy(lastError = error.message ?: error::class.java.simpleName)
-            }
-        }
-    }
-
-    fun setLocalBrightDisplay(enabled: Boolean) {
-        runCatching {
-            dependencies.brightnessController.setBrightness(if (enabled) 1.0 else 0.5)
-        }.onSuccess {
-            dependencies.terminalSettings.setBrightDisplayEnabled(enabled)
-            mutableState.update { st ->
-                val next = st.copy(localBrightDisplayEnabled = enabled)
-                next.copy(
-                    diagnosticsText = formatDiagnostics(
-                        parser.parse(next.endpointText),
-                        next.connectionState,
-                        next,
-                    ),
-                )
-            }
-        }.onFailure { error ->
-            mutableState.update {
-                it.copy(
-                    lastError = error.message ?: error::class.java.simpleName,
-                    localBrightDisplayEnabled = dependencies.terminalSettings.brightDisplayEnabled(),
-                )
-            }
-        }
-    }
 
     override fun onCleared() {
         stopNetworkMonitoring()
@@ -1111,200 +691,6 @@ class AndroidTerminalViewModel(
         super.onCleared()
     }
 
-    private fun discoveredEndpointText(server: DiscoveredServer): String {
-        val ws = server.webSocketEndpoint.trim()
-        if (ws.isNotEmpty()) return ws
-        val grpc = server.grpcEndpoint.trim()
-        if (grpc.isNotEmpty()) {
-            return if (grpc.contains("://")) grpc else "grpc://$grpc"
-        }
-        val http = server.httpEndpoint.trim()
-        if (http.isNotEmpty()) return http
-        return "${server.host}:${server.port}"
-    }
-
-    private fun startHeartbeat(connectedSession: AndroidControlSession) {
-        stopHeartbeat()
-        val intervalMs = when {
-            effectiveHeartbeatMillis > 0 -> effectiveHeartbeatMillis
-            else -> dependencies.heartbeatIntervalMillis
-        }
-        if (intervalMs <= 0 || !appInForeground) return
-        heartbeatJob = viewModelScope.launch {
-            while (true) {
-                delay(intervalMs)
-                runCatching {
-                    sendHeartbeatTracked(connectedSession)
-                }.onFailure { error ->
-                    handleControlLoss(connectedSession, error)
-                    return@launch
-                }
-            }
-        }
-    }
-
-    private fun startSensorTelemetry(connectedSession: AndroidControlSession) {
-        stopSensorTelemetry()
-        val intervalMs = dependencies.sensorTelemetryIntervalMillis
-        if (intervalMs <= 0 || !appInForeground) return
-        sensorTelemetryJob = viewModelScope.launch {
-            while (true) {
-                delay(intervalMs)
-                runCatching {
-                    sendSensorTelemetryTracked(connectedSession)
-                }.onFailure { error ->
-                    handleControlLoss(connectedSession, error)
-                    return@launch
-                }
-            }
-        }
-    }
-
-    private fun stopHeartbeat() {
-        heartbeatJob?.cancel()
-        heartbeatJob = null
-    }
-
-    private fun stopSensorTelemetry() {
-        sensorTelemetryJob?.cancel()
-        sensorTelemetryJob = null
-    }
-
-    private fun startCapabilityMonitor(connectedSession: AndroidControlSession) {
-        stopCapabilityMonitor()
-        val intervalMs = dependencies.capabilityMonitorIntervalMillis
-        if (intervalMs <= 0 || !appInForeground) return
-        capabilityMonitorJob = viewModelScope.launch {
-            while (true) {
-                delay(intervalMs)
-                runCatching {
-                    connectedSession.sendCapabilityDeltaIfChanged("runtime_monitor_poll")
-                }.onSuccess { sent ->
-                    if (sent) {
-                        mutableState.update {
-                            it.copy(diagnosticsText = "${it.diagnosticsText}\nlast_capability_delta=runtime_monitor_poll")
-                        }
-                    }
-                }.onFailure { error ->
-                    handleControlLoss(connectedSession, error)
-                    return@launch
-                }
-            }
-        }
-    }
-
-    private fun stopCapabilityMonitor() {
-        capabilityMonitorJob?.cancel()
-        capabilityMonitorJob = null
-    }
-
-    private fun stopConnect() {
-        connectJob?.cancel()
-        connectJob = null
-    }
-
-    private fun stopReconnect() {
-        reconnectJob?.cancel()
-        reconnectJob = null
-    }
-
-    private fun handleControlLoss(failedSession: AndroidControlSession, error: Throwable) {
-        stopHeartbeat()
-        stopSensorTelemetry()
-        stopCapabilityMonitor()
-        if (session !== failedSession) return
-        session = null
-        sawRegisterAck = false
-        registerAckScenarioQuerySent = false
-        val endpoint = parser.parse(mutableState.value.endpointText)
-        val message = error.message ?: error::class.java.simpleName
-        mutableState.update {
-            val next = it.copy(
-                connectionState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.Connecting,
-                lastError = message,
-                applicationLaunchQueuedIntent = null,
-            )
-            next.copy(
-                diagnosticsText = formatDiagnostics(endpoint, next.connectionState, next) +
-                    "\nreconnect_pending=${endpoint != null}",
-            )
-        }
-        viewModelScope.launch { failedSession.close() }
-        if (endpoint != null) {
-            startReconnect(endpoint, message)
-        }
-    }
-
-    private fun startReconnect(endpoint: EndpointResolution, errorContext: String, reconnectCause: String = errorContext) {
-        stopReconnect()
-        reconnectJob = viewModelScope.launch {
-            var lastError = errorContext
-            for (attempt in 1..dependencies.maxReconnectAttempts) {
-                delay(dependencies.reconnectPolicy.delayForAttempt(attempt))
-                mutableState.update {
-                    val basis = it.copy(
-                        connectionState = ConnectionState.Connecting,
-                        lastError = lastError,
-                        reconnectAttempt = attempt,
-                    )
-                    basis.copy(
-                        diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connecting, basis) +
-                            "\nreconnect_attempt=$attempt\nreconnect_cause=$reconnectCause",
-                    )
-                }
-                val nextSession = dependencies.sessionFactory(responseSink)
-                nextSession.setPrivacyMode(mutableState.value.privacyModeEnabled)
-                val connected = runCatching {
-                    nextSession.connect(endpoint)
-                    mutableState.update {
-                        it.copy(
-                            outboundHeartbeatCount = 0,
-                            lastOutboundHeartbeatUnixMs = 0L,
-                            outboundSensorSendCount = 0,
-                            lastOutboundSensorUnixMs = 0L,
-                            streamReadySendCount = 0,
-                            inboundConnectResponseCount = 0,
-                        )
-                    }
-                    if (appInForeground) {
-                        sendHeartbeatTracked(nextSession)
-                        sendSensorTelemetryTracked(nextSession)
-                    }
-                    session = nextSession
-                    startHeartbeat(nextSession)
-                    startSensorTelemetry(nextSession)
-                    startCapabilityMonitor(nextSession)
-                }.onFailure { error ->
-                    lastError = error.message ?: error::class.java.simpleName
-                    nextSession.close()
-                }.isSuccess
-                if (connected) {
-                    mutableState.update {
-                        it.copy(
-                            connectionState = ConnectionState.Connected,
-                            lastError = null,
-                            reconnectAttempt = 0,
-                            diagnosticsText = formatDiagnostics(endpoint, ConnectionState.Connected, it) +
-                                "\nreconnect_success_attempt=$attempt\nreconnect_cause=$reconnectCause",
-                        )
-                    }
-                    flushQueuedBugReports(nextSession)
-                    reconnectExhausted = false
-                    reconnectJob = null
-                    return@launch
-                }
-            }
-            mutableState.update {
-                val basis = it.copy(connectionState = ConnectionState.ReadyToConnect, lastError = lastError)
-                basis.copy(
-                    diagnosticsText = formatDiagnostics(endpoint, ConnectionState.ReadyToConnect, basis) +
-                        "\nreconnect_exhausted=${dependencies.maxReconnectAttempts}\nreconnect_cause=$reconnectCause",
-                )
-            }
-            reconnectExhausted = true
-            reconnectJob = null
-        }
-    }
 
 
     private fun resetPerConnectionShellState() {
@@ -1317,7 +703,7 @@ class AndroidTerminalViewModel(
         sawRegisterAck = false
     }
 
-    private fun snapshotDebugCommandPendingIds(): CommandDiagnosticsRequestIds =
+    internal fun snapshotDebugCommandPendingIds(): CommandDiagnosticsRequestIds =
         CommandDiagnosticsRequestIds(
             runtimeStatus = pendingRuntimeStatusRequestId.orEmpty(),
             deviceStatus = pendingDeviceStatusRequestId.orEmpty(),
@@ -1326,7 +712,7 @@ class AndroidTerminalViewModel(
             playbackMetadata = pendingPlaybackMetadataRequestId.orEmpty(),
         )
 
-    private fun applyCommandResultDiagnostics(
+    internal fun applyCommandResultDiagnostics(
         base: AndroidTerminalViewState,
         response: Control.ConnectResponse,
         pending: CommandDiagnosticsRequestIds,
@@ -1337,7 +723,7 @@ class AndroidTerminalViewModel(
             base
         }
 
-    private fun mergeShellCommandResultStateIfDataPresent(
+    internal fun mergeShellCommandResultStateIfDataPresent(
         base: AndroidTerminalViewState,
         result: Control.CommandResult,
         pending: CommandDiagnosticsRequestIds,
@@ -1354,7 +740,7 @@ class AndroidTerminalViewModel(
         }
     }
 
-    private fun mergeShellCommandResultStateForTitle(
+    internal fun mergeShellCommandResultStateForTitle(
         base: AndroidTerminalViewState,
         title: String,
         data: Map<String, String>,
@@ -1397,12 +783,12 @@ class AndroidTerminalViewModel(
         return out
     }
 
-    private suspend fun sendHeartbeatTracked(session: AndroidControlSession) {
+    internal suspend fun sendHeartbeatTracked(session: AndroidControlSession) {
         session.sendHeartbeat()
         recordOutboundHeartbeat()
     }
 
-    private suspend fun sendSensorTelemetryTracked(session: AndroidControlSession) {
+    internal suspend fun sendSensorTelemetryTracked(session: AndroidControlSession) {
         if (!session.sendSensorTelemetry()) return
         recordOutboundSensor()
     }
@@ -1431,7 +817,7 @@ class AndroidTerminalViewModel(
         }
     }
 
-    private fun formatDiagnostics(
+    internal fun formatDiagnostics(
         endpoint: EndpointResolution?,
         state: ConnectionState,
         handshakeSource: AndroidTerminalViewState? = null,
@@ -1451,7 +837,7 @@ class AndroidTerminalViewModel(
         )
     }
 
-    private fun immersiveStickyForFullscreen(enabled: Boolean): Boolean =
+    internal fun immersiveStickyForFullscreen(enabled: Boolean): Boolean =
         if (!enabled) {
             false
         } else {
