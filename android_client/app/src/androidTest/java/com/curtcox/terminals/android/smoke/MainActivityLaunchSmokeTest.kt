@@ -46,4 +46,11 @@ class MainActivityLaunchSmokeTest {
         rule.onNodeWithTag("terminal-bug-report-status").assertIsDisplayed()
         rule.onNodeWithTag("terminal-bug-report-status").assert(hasText("Queued", substring = true))
     }
+
+    @Test
+    fun copyDiagnosticsFromMainActivityShowsCopiedStatus() {
+        rule.onNodeWithTag("terminal-copy-diagnostics-button").performClick()
+        rule.onNodeWithTag("terminal-diagnostics-copy-status").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-diagnostics-copy-status").assert(hasText("copied", substring = true))
+    }
 }

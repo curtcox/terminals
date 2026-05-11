@@ -308,7 +308,11 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                     Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("terminal-bug-report-status"))
                 }
                 state.lastDiagnosticsCopyStatus?.let {
-                    Text("Diagnostics copy: $it", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "Diagnostics copy: $it",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag("terminal-diagnostics-copy-status"),
+                    )
                 }
                 SelectionContainer {
                     Text(state.diagnosticsText, fontFamily = FontFamily.Monospace)

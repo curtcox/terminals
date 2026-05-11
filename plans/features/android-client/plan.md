@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-11 (`./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, boundary scripts after playback-metadata explicit-target JVM + Compose instrumentation; `connectedDebugAndroidTest` not re-run in this session).
+Last local validation: 2026-05-11 (`./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, boundary scripts after MainActivity copy-diagnostics smoke + tag; `connectedDebugAndroidTest` not re-run in this session).
 
 Passed:
 
@@ -1399,6 +1399,11 @@ Remaining validation:
 - Added `AndroidTerminalViewModelTest.playbackMetadataUsesExplicitTargetDeviceWhenProvided` so JVM coverage matches Flutter shell behavior when **Target device (optional)** is non-empty (no default substitution to `deviceId`).
 - Added `AndroidTerminalAppSmokeTest.connectedDebugPlaybackMetadataSendsManualQueryWithExplicitTargetDevice` so Compose instrumentation exercises `terminal-playback-target-device-field` end-to-end with the fake session.
 - Re-run `make android-client-test`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh` on a JDK 17 + Android SDK host.
+
+### 2026-05-11 (MainActivity: copy diagnostics smoke)
+
+- Tagged diagnostics copy feedback with `terminal-diagnostics-copy-status` in `AndroidTerminalApp` for stable instrumentation.
+- Extended `MainActivityLaunchSmokeTest` with `copyDiagnosticsFromMainActivityShowsCopiedStatus` so the real launcher path (production `ContextDiagnosticClipboard`) asserts **Copy diagnostics** surfaces `copied`, advancing the plan **Device smoke tests** item on copyable diagnostics toward CI/emulator coverage.
 
 ## Test Plan
 
