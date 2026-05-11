@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: curtcox
 validation: automated
-last-reviewed: 2026-05-10
+last-reviewed: 2026-05-11
 ---
 
 # Android Client
@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-10 (`make android-client-test`, `make android-client-compile-android-test`, boundary scripts after Flutter playback-diagnostics parity; `connectedDebugAndroidTest` not re-run in this session).
+Last local validation: 2026-05-11 (`make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, boundary scripts after command-result diagnostics parity; `connectedDebugAndroidTest` not re-run in this session).
 
 Passed:
 
@@ -1368,6 +1368,13 @@ Remaining validation:
 - Added **List playback artifacts** (`COMMAND_KIND_SYSTEM` / `list_playback_artifacts`) and **Playback metadata** (`COMMAND_KIND_MANUAL` / `playback_metadata` with `artifact_id` + `target_device_id` typed args) to match Flutter `buildPlaybackArtifactsQueryRequest` / `buildPlaybackMetadataQueryRequest`.
 - `ProtocolBuilders.playbackMetadataCommand`, `AndroidControlSession.sendPlaybackMetadataQuery`, ViewModel fields for artifact/target text inputs, shell chrome (test tags `terminal-debug-playback-artifacts-button`, `terminal-playback-artifact-field`, `terminal-playback-target-device-field`, `terminal-debug-playback-metadata-button`).
 - JVM: `ProtocolBuildersTest`, `AndroidControlSessionControllerTest`, `AndroidTerminalViewModelTest`; instrumentation fakes implement the new session method. Documented in `docs/client-android.md`. Re-ran `make android-client-test`, `make android-client-compile-android-test`, and boundary scripts.
+
+### 2026-05-11 (Flutter `CommandResult` diagnostics parity)
+
+- Added `commandResultDataMap`, `diagnosticsTitleForCommandResult`, `applicationIntentsFromDiagnostics`, and `firstPlaybackArtifactId` in `CommandResultDiagnostics.kt` with `CommandDiagnosticsRequestIds` (mirrors Flutter `control_response_dispatcher.dart`).
+- `AndroidTerminalViewModel` applies `applyCommandResultDiagnostics` after `ControlResponseDispatcher` so inbound `CommandResult` payloads with data refresh shell state consistently with Flutter: scenario-registry intent list, playback artifact pre-fill, and clearing of pending debug request ids when titles match.
+- JVM: `CommandResultDiagnosticsTest`; extended `AndroidTerminalViewModelTest` / `ProtocolBuildersTest` as needed. Documented typed_data vs legacy `data` and classification behavior in `docs/client-android.md`.
+- Re-verified `make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
 
 ## Test Plan
 

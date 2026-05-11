@@ -212,7 +212,15 @@ metadata** sends `COMMAND_KIND_MANUAL` / `playback_metadata` with
 target field is empty, it defaults to this device id like Flutter. Successful
 system sends append `last_system_command=`; manual playback metadata appends
 `last_manual_command=playback_metadata:<requestId>`. Server replies surface
-through existing `CommandResult` diagnostics when present.
+through existing `CommandResult` diagnostics when present: non-empty `typed_data`
+entries are merged to a string map (same precedence as Flutter
+`commandResultDataMap`); otherwise the legacy `data` map is used. When that map
+is non-empty, the shell classifies the reply by matching `request_id` to the
+pending debug query ids or by known `notification` strings, then updates the
+**Open application** intent list (`scenario_registry`), pre-fills the playback
+artifact field (`list_playback_artifacts`), or clears the matching pending id
+(`runtime_status`, `device_status`, `playback_metadata`), matching Flutter
+`commandDiagnosticsFromResponse`.
 
 Server `Notification` control responses post a status-bar notification when
 `POST_NOTIFICATIONS` is granted (Android 13+) and speak the message with
