@@ -1405,6 +1405,13 @@ Remaining validation:
 - Tagged diagnostics copy feedback with `terminal-diagnostics-copy-status` in `AndroidTerminalApp` for stable instrumentation.
 - Extended `MainActivityLaunchSmokeTest` with `copyDiagnosticsFromMainActivityShowsCopiedStatus` so the real launcher path (production `ContextDiagnosticClipboard`) asserts **Copy diagnostics** surfaces `copied`, advancing the plan **Device smoke tests** item on copyable diagnostics toward CI/emulator coverage.
 
+### 2026-05-11 (terminal shell scroll + MainActivityLaunch on small screens)
+
+- Wrapped the native terminal shell `Column` in `verticalScroll` so lower chrome (privacy, copy diagnostics, report bug, etc.) is reachable on short viewports (small-phone emulators, dense DPI).
+- `MainActivityLaunchSmokeTest` uses `performScrollTo()` before asserting or clicking those tags so connected runs stay stable.
+- Corrected `docs/client-android.md` focused instrumentation examples: use `-Pandroid.testInstrumentationRunnerArguments.class=…` (or `package=…`) instead of unsupported `--tests` on `connectedDebugAndroidTest`.
+- Re-verified on `Small_Phone(AVD)` with JDK 17: `./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, and `connectedDebugAndroidTest` with `class=com.curtcox.terminals.android.smoke.MainActivityLaunchSmokeTest`.
+
 ## Test Plan
 
 ### Unit tests

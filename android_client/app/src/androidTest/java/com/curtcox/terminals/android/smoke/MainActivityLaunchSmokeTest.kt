@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import com.curtcox.terminals.android.MainActivity
@@ -34,23 +35,23 @@ class MainActivityLaunchSmokeTest {
         rule.onNodeWithTag("terminal-endpoint-field").assertIsDisplayed()
         rule.onNodeWithTag("terminal-connect-button").assertIsDisplayed()
         rule.onNodeWithTag("terminal-discovery-start-button").assertIsDisplayed()
-        rule.onNodeWithTag("terminal-live-media-status").assertIsDisplayed()
-        rule.onNodeWithTag("terminal-last-server-activity").assertIsDisplayed()
-        rule.onNodeWithTag("terminal-privacy-toggle-button").assertIsDisplayed()
-        rule.onNodeWithTag("terminal-report-bug-button").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-live-media-status").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("terminal-last-server-activity").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("terminal-privacy-toggle-button").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("terminal-report-bug-button").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun reportBugWhileOfflineShowsQueuedStatus() {
-        rule.onNodeWithTag("terminal-report-bug-button").performClick()
-        rule.onNodeWithTag("terminal-bug-report-status").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-report-bug-button").performScrollTo().performClick()
+        rule.onNodeWithTag("terminal-bug-report-status").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("terminal-bug-report-status").assert(hasText("Queued", substring = true))
     }
 
     @Test
     fun copyDiagnosticsFromMainActivityShowsCopiedStatus() {
-        rule.onNodeWithTag("terminal-copy-diagnostics-button").performClick()
-        rule.onNodeWithTag("terminal-diagnostics-copy-status").assertIsDisplayed()
+        rule.onNodeWithTag("terminal-copy-diagnostics-button").performScrollTo().performClick()
+        rule.onNodeWithTag("terminal-diagnostics-copy-status").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("terminal-diagnostics-copy-status").assert(hasText("copied", substring = true))
     }
 }

@@ -109,16 +109,25 @@ instrumentation compile checks.
 
 Focused instrumentation runs (examples):
 
+Gradle’s `connectedDebugAndroidTest` task does **not** accept `--tests` (that option applies to JVM test tasks). Filter with the instrumentation runner instead, for example:
+
 ```bash
 cd android_client
-./gradlew connectedDebugAndroidTest --tests '*MainActivityLaunch*'
-./gradlew connectedDebugAndroidTest --tests '*MainActivityConfiguration*'
-./gradlew connectedDebugAndroidTest --tests '*Kiosk*'
-./gradlew connectedDebugAndroidTest --tests '*Media*'
-./gradlew connectedDebugAndroidTest --tests '*connectedDebug*'
+./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.curtcox.terminals.android.smoke.MainActivityLaunchSmokeTest
+./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.curtcox.terminals.android.smoke.MainActivityConfigurationSmokeTest
+./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.curtcox.terminals.android.smoke.AndroidTerminalKioskSmokeTest
+./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.curtcox.terminals.android.smoke.AndroidTerminalMediaSmokeTest
+./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.curtcox.terminals.android.smoke.AndroidTerminalAppSmokeTest
 ```
 
-The `*connectedDebug*` filter runs `AndroidTerminalAppSmokeTest` cases that assert connected-shell debug actions (runtime/device status, playback artifacts/metadata, scenario registry, open application) reach the control session. Additional cases cover the first inbound `RegisterAck` automatic `scenario_registry` query (Flutter parity) and a matching `CommandResult` that updates the application-intent list; examples: `./gradlew connectedDebugAndroidTest --tests '*connectedRegisterAck*'`, `./gradlew connectedDebugAndroidTest --tests '*ScenarioRegistryCommandResult*'`.
+Use a JDK 17 `JAVA_HOME` and `ANDROID_SDK_ROOT` / `adb devices` as described above. To run every instrumentation class under `smoke/`, you can pass `package=com.curtcox.terminals.android.smoke` instead of `class=…`.
+
+`AndroidTerminalAppSmokeTest` holds the connected-shell debug actions (runtime/device status, playback artifacts/metadata, scenario registry, open application) plus `RegisterAck` / `CommandResult` cases (`connectedRegisterAck…`, `connectedScenarioRegistryCommandResult…`, and similar method names in that class).
 
 ## Fire Tablet Setup
 
