@@ -325,12 +325,57 @@ def render(results: "list[dict]") -> str:
     return "\n".join(out)
 
 
+BASELINE_PATH = REPO / "scripts" / "oversized-flag-baseline.txt"
+
+
+def load_baseline() -> "set[str]":
+    """Return the set of paths in the ratchet baseline file."""
+    if not BASELINE_PATH.exists():
+        return set()
+    return {
+        line.strip()
+        for line in BASELINE_PATH.read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    }
+
+
+def check_ratchet(results: "list[dict]") -> int:
+    """Exit non-zero if any FLAG-severity file is NOT in the baseline.
+
+    This is the CI ratchet: existing FLAG files are grandfathered in the
+    baseline; any new FLAG file breaks the build.  When a flagged file is
+    fixed, remove it from the baseline to lock in the improvement.
+
+    Returns the exit code (0 = clean, 1 = new FLAG files found).
+    """
+    baseline = load_baseline()
+    new_flags = [
+        r for r in results
+        if r["severity"] == "flag" and r["path"] not in baseline
+    ]
+    if not new_flags:
+        return 0
+    print("ERROR: new FLAG-severity oversized files (not in baseline):")
+    for r in new_flags:
+        size_s = fmt_size(r["unit"], r["size"])
+        print(f"  {r['path']} ({r['category']}, {size_s})")
+    print()
+    print(f"Add to {BASELINE_PATH.relative_to(REPO)} to acknowledge, or split the file.")
+    print("See scripts/find-oversized-files.py for thresholds.")
+    return 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--json", action="store_true",
                     help="emit JSON instead of markdown")
+    ap.add_argument("--check", action="store_true",
+                    help="exit 1 if any FLAG-severity file is not in the baseline "
+                         "(CI ratchet mode)")
     args = ap.parse_args()
     results = scan()
+    if args.check:
+        return check_ratchet(results)
     if args.json:
         print(json.dumps(results, indent=2))
     else:

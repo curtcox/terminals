@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Pick the next plan to work on, by the priority order in the agent prompt.
 
-Walks plans/ and parses YAML frontmatter, then groups candidates into the four
+Walks plans/ and parses YAML frontmatter, then groups candidates into five
 priority buckets used by the "pick the next work" prompt:
 
+  0. Quality debt      — open bug reports; FLAG-severity oversized source files
   1. Needs attention   — shipped-buggy, shipped-untested, open audits/incidents
   2. In flight         — status: building
   3. Promote to validated — shipped-untested with no automated validation wired
@@ -26,9 +27,88 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 PLANS = REPO / "plans"
+BUG_REPORTS_DIR = REPO / "terminal_server" / "logs" / "bug_reports"
 
 ATTENTION_STATUSES = {"shipped-buggy", "shipped-untested", "open"}
 NONTRIVIAL_LINE_THRESHOLD = 200  # plans larger than this need a plan-first pass
+
+
+def collect_open_bugs() -> "list[dict]":
+    """Return one synthetic entry per distinct bug description in the bug log.
+
+    Reads JSON reports under terminal_server/logs/bug_reports/.  Groups by
+    description (trimmed to 80 chars), counts occurrences, and returns them
+    sorted most-frequent first so the heaviest hitter is picked first.
+
+    Returns [] when the directory is absent (CI without a local log tree).
+    """
+    if not BUG_REPORTS_DIR.is_dir():
+        return []
+    from collections import Counter
+    counts: Counter[str] = Counter()
+    for day_dir in sorted(BUG_REPORTS_DIR.iterdir()):
+        if not day_dir.is_dir():
+            continue
+        for report_file in sorted(day_dir.glob("*.json")):
+            try:
+                import json as _json
+                d = _json.loads(report_file.read_bytes())
+            except Exception:
+                continue
+            desc = (d.get("summary") or {}).get("description") or ""
+            desc = " ".join(desc.split())[:80] or "(no description)"
+            counts[desc] += 1
+    bugs = []
+    for desc, cnt in counts.most_common():
+        label = f"{desc} (×{cnt})" if cnt > 1 else desc
+        bugs.append({
+            "path": "terminal_server/logs/bug_reports",
+            "title": f"Fix bug: {label}",
+            "kind": "quality-debt",
+            "status": "quality-debt",
+            "owner": "unowned",
+            "validation": "none",
+            "lines": 0,
+            "_debt_kind": "bug",
+            "_count": cnt,
+        })
+    return bugs
+
+
+def collect_flag_oversized() -> "list[dict]":
+    """Return synthetic entries for FLAG-severity tracked source/test files.
+
+    Avoids importing the full find-oversized-files scanner at module load time
+    by running it as a subprocess with --json.  Falls back to [] on error.
+    """
+    import subprocess
+    import json as _json
+    try:
+        result = subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "find-oversized-files.py"), "--json"],
+            capture_output=True, text=True, check=True, cwd=REPO,
+        )
+        items = _json.loads(result.stdout)
+    except Exception:
+        return []
+    entries = []
+    for item in items:
+        if item.get("severity") != "flag":
+            continue
+        if item.get("category") not in ("source", "test"):
+            continue
+        size_s = f"{item['size']} {item['unit']}"
+        entries.append({
+            "path": item["path"],
+            "title": f"Split {item['path'].rsplit('/', 1)[-1]} ({size_s}, FLAG)",
+            "kind": "quality-debt",
+            "status": "quality-debt",
+            "owner": "unowned",
+            "validation": "none",
+            "lines": 0,
+            "_debt_kind": "oversized",
+        })
+    return entries
 
 
 def parse_frontmatter(text: str) -> dict | None:
@@ -78,6 +158,12 @@ def collect():
 def bucket(plans):
     section = defaultdict(list)
 
+    # Priority 0: quality debt — bugs first, then FLAG oversized source files.
+    # Bugs outrank oversized files: a broken behavior is more urgent than a
+    # large-but-working file.
+    quality_debt = collect_open_bugs() + collect_flag_oversized()
+    section["quality_debt"] = quality_debt
+
     needs_attention = [p for p in plans if p["status"] in ATTENTION_STATUSES]
     # Order: open incidents/audits, shipped-buggy, then shipped-untested.
     attention_order = {"open": 0, "shipped-buggy": 1, "shipped-untested": 2}
@@ -106,8 +192,9 @@ def bucket(plans):
 
 
 def first_nonempty(section):
-    order = ["needs_attention", "in_flight", "promote_to_validated", "planned_small"]
+    order = ["quality_debt", "needs_attention", "in_flight", "promote_to_validated", "planned_small"]
     bucket_reason = {
+        "quality_debt": "Priority 0: Quality debt (open bugs / FLAG-severity oversized source) — fix before new features",
         "needs_attention": "Priority 1: Needs attention (shipped-buggy / shipped-untested / open)",
         "in_flight": "Priority 2: Already in flight (status: building) — finish it before starting new work",
         "promote_to_validated": "Priority 3: Promote shipped-untested → shipped-validated by wiring an automated usecase",
@@ -151,12 +238,13 @@ def render_markdown(section):
     out.append("")
 
     headings = {
+        "quality_debt": "Priority 0 — Quality debt (bugs / FLAG oversized)",
         "needs_attention": "Priority 1 — Needs attention",
         "in_flight": "Priority 2 — In flight (building)",
         "promote_to_validated": "Priority 3 — Ready to promote to shipped-validated",
         "planned_small": "Priority 4 — Planned (sorted small → large)",
     }
-    for name in ["needs_attention", "in_flight", "promote_to_validated", "planned_small"]:
+    for name in ["quality_debt", "needs_attention", "in_flight", "promote_to_validated", "planned_small"]:
         items = section[name]
         out.append(f"## {headings[name]} — {len(items)} candidate(s)")
         out.append("")
@@ -175,7 +263,7 @@ def render_markdown(section):
 
     out.append("---")
     out.append("")
-    out.append("Tie-breakers used: 'needs_attention' ordered open → shipped-buggy → shipped-untested; 'planned_small' ordered ascending by line count as a proxy for scope.")
+    out.append("Tie-breakers used: 'quality_debt' bugs ordered most-frequent first; 'needs_attention' ordered open → shipped-buggy → shipped-untested; 'planned_small' ordered ascending by line count as a proxy for scope.")
     out.append("")
     out.append("This script does not check inter-plan dependencies — confirm a planned pick's deps are shipped before starting.")
     return "\n".join(out)

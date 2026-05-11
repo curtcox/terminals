@@ -302,11 +302,14 @@ pick-next-work:
 next:
 	@python3 ./scripts/next.py
 
+quality-check:
+	@python3 ./scripts/find-oversized-files.py --check
+
 all-lint: server-lint client-lint client-boundary android-client-boundary android-client-lint web-client-lint proto-lint
 
 all-test: server-test client-test client-boundary-test android-client-boundary-test android-client-test android-client-compile-android-test web-client-test
 
-all-check: all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all android-client-build web-client-build development-docs-test usecases-index validation-matrix
+all-check: quality-check all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all android-client-build web-client-build development-docs-test usecases-index validation-matrix
 
 ci-local: all-check
 

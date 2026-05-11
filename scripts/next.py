@@ -35,6 +35,7 @@ PLANS = REPO / "plans"
 USECASES = REPO / "usecases.md"
 USECASES_DIR = REPO / "usecases"
 USECASE_VALIDATE_SH = REPO / "scripts" / "usecase-validate.sh"
+BUG_REPORTS_DIR = REPO / "terminal_server" / "logs" / "bug_reports"
 
 STALE_DAYS = 14
 
@@ -126,6 +127,39 @@ def stale_building(plans, today: _dt.date) -> "list[dict]":
     return out
 
 
+def collect_bug_summary() -> "list[dict]":
+    """Return distinct bug descriptions with counts from the bug report log.
+
+    Groups by normalized description (whitespace collapsed, 80-char cap).
+    Returns [] when the directory is absent (CI without a local log tree).
+    Each entry: {description, count, most_recent_date}.
+    """
+    if not BUG_REPORTS_DIR.is_dir():
+        return []
+    from collections import Counter
+    counts: Counter[str] = Counter()
+    most_recent: dict[str, str] = {}
+    for day_dir in sorted(BUG_REPORTS_DIR.iterdir()):
+        if not day_dir.is_dir():
+            continue
+        date_str = day_dir.name
+        for report_file in sorted(day_dir.glob("*.json")):
+            try:
+                import json as _json
+                d = _json.loads(report_file.read_bytes())
+            except Exception:
+                continue
+            raw = (d.get("summary") or {}).get("description") or ""
+            desc = " ".join(raw.split())[:80] or "(no description)"
+            counts[desc] += 1
+            if desc not in most_recent or date_str > most_recent[desc]:
+                most_recent[desc] = date_str
+    return [
+        {"description": desc, "count": cnt, "most_recent_date": most_recent.get(desc, "?")}
+        for desc, cnt in counts.most_common()
+    ]
+
+
 def open_audits_and_incidents(plans) -> "list[dict]":
     return sorted(
         [
@@ -201,6 +235,22 @@ def render(plans, section, signals, today: _dt.date) -> str:
         out.append("_(no tracked file exceeds its category threshold.)_")
     out.append("")
 
+    bugs = signals.get("bugs", [])
+    total_bug_count = sum(b["count"] for b in bugs)
+    out.append(f"## Bug reports — {len(bugs)} distinct description(s), "
+               f"{total_bug_count} total")
+    out.append("")
+    if bugs:
+        for b in bugs[:10]:
+            cnt_s = f"×{b['count']}" if b["count"] > 1 else "×1"
+            out.append(f"- {cnt_s} `{b['description']}` "
+                       f"(last seen {b['most_recent_date']})")
+        if len(bugs) > 10:
+            out.append(f"- _(+{len(bugs) - 10} more)_")
+    else:
+        out.append("_(no bug reports found in terminal_server/logs/bug_reports/.)_")
+    out.append("")
+
     return "\n".join(out)
 
 
@@ -219,6 +269,7 @@ def main() -> int:
         "open_items": open_audits_and_incidents(plans),
         "stale": stale_building(plans, today),
         "oversized": fof.scan(),
+        "bugs": collect_bug_summary(),
     }
 
     if args.json:

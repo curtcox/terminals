@@ -1,0 +1,12 @@
+# Ratchet baseline for FLAG-severity oversized files.
+#
+# Files listed here are grandfathered — they already exceeded the FLAG
+# threshold when the ratchet was introduced and are tracked as known debt.
+# CI passes as long as no file outside this list reaches FLAG severity.
+#
+# When you fix a file (split it, reduce its size below the flag threshold),
+# remove its entry here to lock in the improvement.
+#
+# Do NOT add new files here without a corresponding code-reduction plan.
+terminal_client/lib/app/terminal_client_shell.dart
+terminal_server/internal/appruntime/runtime_migration_script_fixture.go
