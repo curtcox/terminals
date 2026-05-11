@@ -1306,47 +1306,6 @@ class AndroidTerminalViewModel(
         }
     }
 
-    private fun Control.ConnectResponse.requiresCapabilityRebaseline(): Boolean {
-        if (!hasError()) return false
-        if (error.code != Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION) return false
-        return error.message.contains("stale", ignoreCase = true) &&
-            error.message.contains("generation", ignoreCase = true)
-    }
-
-    private fun withoutHandshake(state: AndroidTerminalViewState): AndroidTerminalViewState =
-        state.copy(
-            controlServerId = null,
-            controlSessionId = null,
-            serverHeartbeatIntervalMs = null,
-            serverBuildSha = null,
-            serverBuildDate = null,
-            registerAckMessage = null,
-            registerAckServerId = null,
-            registerAckAssetBaseUrl = null,
-            lastCapabilityAckGeneration = 0L,
-            lastCapabilityAckSnapshotApplied = false,
-            lastCapabilityInvalidationsSummary = null,
-            lastServerHeartbeatUnixMs = null,
-            lastCommandResultRequestId = null,
-            lastCommandResultNotification = null,
-            lastOpaqueControlIoSummary = null,
-            lastTransition = null,
-            lastTransitionDurationMs = null,
-            lastBugReportAckDiagnostics = null,
-            lastControlErrorCode = null,
-            lastControlResponseActivity = null,
-            lastLiveMediaLine = null,
-            reconnectAttempt = 0,
-            outboundHeartbeatCount = 0,
-            lastOutboundHeartbeatUnixMs = 0L,
-            outboundSensorSendCount = 0,
-            lastOutboundSensorUnixMs = 0L,
-            streamReadySendCount = 0,
-            inboundConnectResponseCount = 0,
-            availableApplicationIntents = listOf("terminal"),
-            selectedApplicationIntent = "terminal",
-            applicationLaunchQueuedIntent = null,
-        )
 
     private fun resetPerConnectionShellState() {
         pendingRuntimeStatusRequestId = null
@@ -1478,109 +1437,18 @@ class AndroidTerminalViewModel(
         handshakeSource: AndroidTerminalViewState? = null,
     ): String {
         val capabilitySnapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull()
-        val permissions = permissionEducation(capabilitySnapshot)
-        val mediaSupport = mediaSupport()
-        val controlStatus = session?.status
-        return buildString {
-            append(
-                chrome.formatDiagnostics(
-                    endpoint = endpoint,
-                    state = state,
-                    networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
-                    fireOsDeviceInfo = runCatching { dependencies.fireOsDeviceInfoProvider.current() }.getOrNull(),
-                    capabilitySnapshot = capabilitySnapshot,
-                ),
-            )
-            appendLine()
-            appendLine("control_connected=${controlStatus?.connected ?: false}")
-            appendLine("control_endpoint=${controlStatus?.endpoint?.displayName ?: "none"}")
-            appendLine("control_last_error=${controlStatus?.lastError ?: "none"}")
-            appendLine("control_last_capability_generation=${controlStatus?.lastCapabilityGeneration ?: 0}")
-            appendLine(permissions.toDiagnostics())
-            append(mediaSupport.toDiagnostics())
-            handshakeSource?.controlServerId?.takeIf { it.isNotBlank() }?.let {
-                appendLine()
-                appendLine("hello_server_id=$it")
-            }
-            handshakeSource?.controlSessionId?.takeIf { it.isNotBlank() }?.let {
-                appendLine("hello_session_id=$it")
-            }
-            handshakeSource?.serverHeartbeatIntervalMs?.takeIf { it > 0 }?.let {
-                appendLine("hello_heartbeat_interval_ms=$it")
-            }
-            handshakeSource?.serverBuildSha?.takeIf { it.isNotBlank() }?.let {
-                appendLine("server_build_sha=$it")
-            }
-            handshakeSource?.serverBuildDate?.takeIf { it.isNotBlank() }?.let {
-                appendLine("server_build_date=$it")
-            }
-            handshakeSource?.registerAckMessage?.takeIf { it.isNotBlank() }?.let {
-                appendLine("register_ack_message=$it")
-            }
-            handshakeSource?.registerAckServerId?.takeIf { it.isNotBlank() }?.let {
-                appendLine("register_ack_server_id=$it")
-            }
-            handshakeSource?.registerAckAssetBaseUrl?.takeIf { it.isNotBlank() }?.let {
-                appendLine("register_ack_asset_base_url=$it")
-            }
-            handshakeSource?.takeIf { it.lastCapabilityAckGeneration > 0L }?.let {
-                appendLine("last_capability_ack_generation=${it.lastCapabilityAckGeneration}")
-                appendLine("capability_ack_snapshot_applied=${it.lastCapabilityAckSnapshotApplied}")
-                it.lastCapabilityInvalidationsSummary?.takeIf { summary -> summary.isNotBlank() }?.let { summary ->
-                    appendLine("last_capability_invalidations=$summary")
-                }
-            }
-            handshakeSource?.lastServerHeartbeatUnixMs?.takeIf { it > 0 }?.let {
-                appendLine("last_server_heartbeat_unix_ms=$it")
-            }
-            handshakeSource?.let { src ->
-                appendLine("outbound_heartbeat_count=${src.outboundHeartbeatCount}")
-                appendLine("last_outbound_heartbeat_unix_ms=${src.lastOutboundHeartbeatUnixMs}")
-                appendLine("outbound_sensor_send_count=${src.outboundSensorSendCount}")
-                appendLine("last_outbound_sensor_unix_ms=${src.lastOutboundSensorUnixMs}")
-                appendLine("stream_ready_send_count=${src.streamReadySendCount}")
-                appendLine("inbound_connect_response_count=${src.inboundConnectResponseCount}")
-            }
-            handshakeSource?.lastCommandResultRequestId?.takeIf { it.isNotBlank() }?.let {
-                appendLine("last_command_result_request_id=$it")
-            }
-            handshakeSource?.lastCommandResultNotification?.takeIf { it.isNotBlank() }?.let {
-                appendLine("last_command_result_notification=$it")
-            }
-            handshakeSource?.lastOpaqueControlIoSummary?.takeIf { it.isNotBlank() }?.let {
-                appendLine("last_opaque_control_io=$it")
-            }
-            handshakeSource?.lastControlResponseActivity?.takeIf { it.isNotBlank() }?.let {
-                appendLine("last_control_activity=$it")
-            }
-            handshakeSource?.lastTransition?.takeIf { it.isNotBlank() }?.let {
-                appendLine("last_transition=$it")
-            }
-            handshakeSource?.lastTransitionDurationMs?.takeIf { it > 0 }?.let {
-                appendLine("last_transition_duration_ms=$it")
-            }
-            handshakeSource?.lastError?.takeIf { it.isNotBlank() }?.let { err ->
-                appendLine("last_error=$err")
-            }
-            handshakeSource?.lastControlErrorCode?.takeIf { it.isNotBlank() }?.let { code ->
-                appendLine("last_control_error_code=$code")
-            }
-            handshakeSource?.lastBugReportAckDiagnostics?.takeIf { it.isNotBlank() }?.let { bug ->
-                appendLine()
-                append(bug)
-            }
-            handshakeSource?.let { src ->
-                appendLine()
-                appendLine("local_keep_awake=${src.localKeepAwakeEnabled}")
-                appendLine("local_fullscreen=${src.localFullscreenEnabled}")
-                appendLine("local_immersive_sticky=${src.localImmersiveStickyEnabled}")
-                appendLine("local_bright_display=${src.localBrightDisplayEnabled}")
-                appendLine("privacy_mode=${src.privacyModeEnabled}")
-            }
-            handshakeSource?.applicationLaunchQueuedIntent?.takeIf { it.isNotBlank() }?.let { queued ->
-                appendLine("application_launch_queued_until_register_ack=$queued")
-            }
-        }
+        return formatTerminalDiagnostics(
+            chrome = chrome,
+            endpoint = endpoint,
+            state = state,
+            networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
+            fireOsDeviceInfo = runCatching { dependencies.fireOsDeviceInfoProvider.current() }.getOrNull(),
+            capabilitySnapshot = capabilitySnapshot,
+            controlStatus = session?.status,
+            permissions = permissionEducation(capabilitySnapshot),
+            mediaSupport = mediaSupport(),
+            handshakeSource = handshakeSource,
+        )
     }
 
     private fun immersiveStickyForFullscreen(enabled: Boolean): Boolean =
@@ -1639,14 +1507,6 @@ class AndroidTerminalViewModel(
             cameraAvailable = (capabilitySnapshot.hardware.frontCamera || capabilitySnapshot.hardware.backCamera) &&
                 capabilitySnapshot.permissions.cameraGranted,
         )
-    }
-
-    private fun PermissionEducationState.toDiagnostics(): String = buildString {
-        appendLine("permission_notifications=$notificationsGranted")
-        appendLine("permission_microphone_present=$microphonePresent")
-        appendLine("permission_microphone_available=$microphoneAvailable")
-        appendLine("permission_camera_present=$cameraPresent")
-        append("permission_camera_available=$cameraAvailable")
     }
 
     private fun mediaSupport(): MediaSupportState {
@@ -1764,15 +1624,4 @@ class AndroidTerminalViewModel(
         refreshCapabilities(reason)
     }
 
-    private fun AudioPlaybackResult.toStatus(requestId: String): Pair<String, String> =
-        when (this) {
-            is AudioPlaybackResult.Played -> (this.requestId.ifBlank { requestId }) to "played"
-            is AudioPlaybackResult.Unsupported -> requestId to "unsupported-audio:$reason"
-        }
-
-    private fun MediaDisplayResult.toStatus(requestId: String): Pair<String, String> =
-        when (this) {
-            is MediaDisplayResult.Shown -> (this.requestId.ifBlank { requestId }) to "shown"
-            is MediaDisplayResult.Unsupported -> requestId to "unsupported-media:$reason"
-        }
 }

@@ -1,0 +1,845 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:terminal_client/app/terminal_client_app.dart';
+import 'package:terminal_client/gen/terminals/control/v1/control.pb.dart';
+import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
+
+import 'widget_test_helpers.dart';
+
+void main() {
+  testWidgets('applies update_ui patch to active server-driven UI', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'greeting_text'
+                ..text = (uiv1.TextWidget()..value = 'Hello'),
+            ))),
+    );
+    await tester.pump();
+    expect(find.text('Hello'), findsOneWidget);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'greeting_text'
+          ..node = (uiv1.Node()
+            ..id = 'greeting_text'
+            ..text = (uiv1.TextWidget()..value = 'Updated hello'))),
+    );
+    await tester.pump();
+    expect(find.text('Hello'), findsNothing);
+    expect(find.text('Updated hello'), findsOneWidget);
+    expect(find.textContaining('Control Stream: UI patched'), findsOneWidget);
+  });
+
+  testWidgets('handles transition_ui responses', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'message'
+                ..text = (uiv1.TextWidget()..value = 'Before transition'),
+            ))),
+    );
+    await tester.pump();
+    expect(find.text('Before transition'), findsOneWidget);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'fade'
+          ..durationMs = 220),
+    );
+    await tester.pump();
+
+    expect(find.byType(FadeTransition), findsWidgets);
+    expect(
+        find.textContaining('Control Stream: UI transition'), findsOneWidget);
+    expect(find.textContaining('Transition: fade (220ms)'), findsOneWidget);
+  });
+
+  testWidgets('uses slide transition hint for UI updates', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'message'
+                ..text = (uiv1.TextWidget()..value = 'Before'),
+            ))),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'slide_left'
+          ..durationMs = 200),
+    );
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'message'
+          ..node = (uiv1.Node()
+            ..id = 'message'
+            ..text = (uiv1.TextWidget()..value = 'After'))),
+    );
+    await tester.pump();
+
+    expect(find.byType(SlideTransition), findsWidgets);
+    expect(find.text('After'), findsOneWidget);
+  });
+
+  testWidgets('maps PA transition hints to explicit animations',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'message'
+                ..text = (uiv1.TextWidget()..value = 'PA transition body'),
+            ))),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'pa_source_enter'
+          ..durationMs = 180),
+    );
+    await tester.pump();
+    expect(find.byType(ScaleTransition), findsWidgets);
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..transitionUi = (uiv1.TransitionUI()
+          ..transition = 'pa_receive_enter'
+          ..durationMs = 180),
+    );
+    await tester.pump();
+    expect(find.byType(SlideTransition), findsWidgets);
+  });
+
+  testWidgets('renders grid, padding, and progress primitives',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.addAll([
+              uiv1.Node()
+                ..padding = (uiv1.PaddingWidget()..all = 16)
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Padded child'),
+                ),
+              uiv1.Node()
+                ..center = (uiv1.CenterWidget())
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Centered child'),
+                ),
+              uiv1.Node()
+                ..grid = (uiv1.GridWidget()..columns = 2)
+                ..children.addAll([
+                  uiv1.Node()..text = (uiv1.TextWidget()..value = 'Cell A'),
+                  uiv1.Node()..text = (uiv1.TextWidget()..value = 'Cell B'),
+                ]),
+              uiv1.Node()..progress = (uiv1.ProgressWidget()..value = 0.4),
+            ]))),
+    );
+    await tester.pump();
+
+    expect(find.byType(Wrap), findsWidgets);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Padding && widget.padding == const EdgeInsets.all(16),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Cell A'), findsOneWidget);
+    expect(find.text('Cell B'), findsOneWidget);
+    expect(find.text('Centered child'), findsOneWidget);
+  });
+
+  testWidgets('renders expand primitive as Expanded widget',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..expand = (uiv1.ExpandWidget())
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Expanded child'),
+                ),
+            ))),
+    );
+    await tester.pump();
+
+    expect(find.byType(Expanded), findsOneWidget);
+    expect(find.text('Expanded child'), findsOneWidget);
+  });
+
+  testWidgets('renders image primitive as Image widget',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..image = (uiv1.ImageWidget()
+                  ..url = 'https://example.com/camera.jpg'),
+            ))),
+    );
+    await tester.pump();
+
+    expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('wires slider, toggle, and dropdown actions to UIAction',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.addAll([
+              uiv1.Node()
+                ..id = 'volume'
+                ..slider = (uiv1.SliderWidget()
+                  ..min = 0
+                  ..max = 1
+                  ..value = 0.25),
+              uiv1.Node()
+                ..id = 'mute'
+                ..toggle = (uiv1.ToggleWidget()..value = false),
+              uiv1.Node()
+                ..id = 'channel'
+                ..dropdown = (uiv1.DropdownWidget()
+                  ..options.addAll(['alpha', 'beta'])
+                  ..value = 'alpha'),
+            ]))),
+    );
+    await tester.pump();
+
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged?.call(0.75);
+    await tester.pump();
+
+    final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+    toggle.onChanged?.call(true);
+    await tester.pump();
+
+    final dropdown = tester
+        .widgetList<DropdownButton<String>>(find.byType(DropdownButton<String>))
+        .firstWhere((candidate) => candidate.value == 'alpha');
+    dropdown.onChanged?.call('beta');
+    await tester.pump();
+
+    final actions = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasUiAction())
+        .map((request) => request.input.uiAction)
+        .toList();
+
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == 'volume' &&
+            action.action == 'change' &&
+            action.value == '0.75',
+      ),
+      isTrue,
+    );
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == 'mute' &&
+            action.action == 'toggle' &&
+            action.value == 'true',
+      ),
+      isTrue,
+    );
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == 'channel' &&
+            action.action == 'select' &&
+            action.value == 'beta',
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('wires terminal text input changes/submission to key events',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'terminal_input'
+                ..textInput =
+                    (uiv1.TextInputWidget()..placeholder = 'Terminal prompt'),
+            ))),
+    );
+    await tester.pump();
+
+    final terminalField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == 'Terminal prompt',
+    );
+    expect(terminalField, findsOneWidget);
+
+    await tester.enterText(terminalField, 'ls');
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    final keyEvents = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasKey())
+        .map((request) => request.input.key.text)
+        .toList();
+    expect(keyEvents.any((text) => text == 'ls'), isTrue);
+    expect(keyEvents.any((text) => text == '\n'), isTrue);
+
+    final terminalSubmitActions = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasUiAction())
+        .map((request) => request.input.uiAction)
+        .where(
+          (action) =>
+              action.componentId == 'terminal_input' &&
+              action.action == 'submit',
+        )
+        .toList();
+    expect(terminalSubmitActions, isEmpty);
+  });
+
+  testWidgets('keeps terminal input focused across terminal output patches',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'terminal_root'
+            ..stack = (uiv1.StackWidget())
+            ..children.addAll([
+              uiv1.Node()
+                ..id = 'terminal_output'
+                ..text = (uiv1.TextWidget()..value = 'repl> '),
+              uiv1.Node()
+                ..id = 'terminal_input'
+                ..textInput =
+                    (uiv1.TextInputWidget()..placeholder = 'Terminal prompt'),
+            ]))),
+    );
+    await tester.pump();
+
+    final terminalField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == 'Terminal prompt',
+    );
+    expect(terminalField, findsOneWidget);
+
+    await tester.tap(terminalField);
+    await tester.pump();
+
+    EditableText editableText = tester.widget<EditableText>(
+      find.descendant(of: terminalField, matching: find.byType(EditableText)),
+    );
+    expect(editableText.focusNode.hasFocus, isTrue);
+
+    await tester.enterText(terminalField, 'h');
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'terminal_output'
+          ..node = (uiv1.Node()
+            ..id = 'terminal_output'
+            ..text = (uiv1.TextWidget()..value = 'repl> h'))),
+    );
+    await tester.pump();
+
+    editableText = tester.widget<EditableText>(
+      find.descendant(of: terminalField, matching: find.byType(EditableText)),
+    );
+    expect(editableText.focusNode.hasFocus, isTrue);
+
+    await tester.enterText(terminalField, 'he');
+    await tester.pump();
+
+    final keyEvents = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasKey())
+        .map((request) => request.input.key.text)
+        .toList();
+    expect(keyEvents.where((text) => text == 'h').length, 1);
+    expect(keyEvents.where((text) => text == 'e').length, 1);
+  });
+
+  testWidgets('renders overlay primitive with layered children',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'alert_overlay'
+                ..overlay = (uiv1.OverlayWidget())
+                ..children.addAll([
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Base content'),
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Overlay content'),
+                ]),
+            ))),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey<String>('ui-overlay-alert_overlay')),
+      findsOneWidget,
+    );
+    expect(find.text('Base content'), findsOneWidget);
+    expect(find.text('Overlay content'), findsOneWidget);
+  });
+
+  testWidgets('renders PA overlay when global overlay slot is patched',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'root'
+            ..stack = (uiv1.StackWidget())
+            ..children.addAll([
+              uiv1.Node()..text = (uiv1.TextWidget()..value = 'Base content'),
+              uiv1.Node()
+                ..id = 'global_overlay'
+                ..overlay = (uiv1.OverlayWidget()),
+            ]))),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..updateUi = (uiv1.UpdateUI()
+          ..componentId = 'global_overlay'
+          ..node = (uiv1.Node()
+            ..id = 'global_overlay'
+            ..overlay = (uiv1.OverlayWidget())
+            ..children.add(
+              uiv1.Node()
+                ..text = (uiv1.TextWidget()..value = 'PA from device-1'),
+            ))),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey<String>('ui-overlay-global_overlay')),
+      findsOneWidget,
+    );
+    expect(find.text('Base content'), findsOneWidget);
+    expect(find.text('PA from device-1'), findsOneWidget);
+  });
+
+  testWidgets('renders corner affordance and emits scoped corner.open UIAction',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+        clientFactory: harness.createClient,
+        mediaEngineFactory: harness.createMediaEngine,
+      ),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    // The scoped id matches the canonical form the server-side
+    // withCornerAffordance wrapper assigns. The test reads the value back
+    // from the emitted descriptor rather than hardcoding a bare logical id.
+    const scopedCornerId = 'act:device-1/__affordance.corner__';
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..id = 'terminal_root'
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = scopedCornerId
+                ..button = (uiv1.ButtonWidget()
+                  ..label = 'Menu'
+                  ..action = 'corner.open'),
+            ))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Menu'), findsOneWidget);
+
+    await tester.tap(find.text('Menu'));
+    await tester.pumpAndSettle();
+
+    final actions = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasUiAction())
+        .map((request) => request.input.uiAction)
+        .toList();
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == scopedCornerId &&
+            action.action == 'corner.open',
+      ),
+      isTrue,
+      reason:
+          'expected UIAction with scoped corner componentId and corner.open action',
+    );
+  });
+
+  testWidgets('wires gesture area tap to UIAction',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+    harness.lastClient.emitResponse(
+      ConnectResponse()..registerAck = (RegisterAck()),
+    );
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..stack = (uiv1.StackWidget())
+            ..children.add(
+              uiv1.Node()
+                ..id = 'gesture_tap_zone'
+                ..gestureArea = (uiv1.GestureAreaWidget()..action = 'announce')
+                ..children.add(
+                  uiv1.Node()..text = (uiv1.TextWidget()..value = 'Tap me'),
+                ),
+            ))),
+    );
+    await tester.pump();
+
+    final gesture = tester.widget<GestureDetector>(
+      find.byKey(const ValueKey<String>('ui-gesture-gesture_tap_zone')),
+    );
+    gesture.onTap?.call();
+    await tester.pump();
+
+    final actions = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasUiAction())
+        .map((request) => request.input.uiAction)
+        .toList();
+    expect(
+      actions.any(
+        (action) =>
+            action.componentId == 'gesture_tap_zone' &&
+            action.action == 'announce' &&
+            action.value.isEmpty,
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('renders media and system hint primitives with live widgets',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = FakeClientHarness();
+    await tester.pumpWidget(
+      TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine),
+    );
+    await tester.tap(find.text('Connect Stream'));
+    await tester.pump();
+
+    harness.lastClient.emitResponse(
+      ConnectResponse()
+        ..setUi = (uiv1.SetUI()
+          ..root = (uiv1.Node()
+            ..scroll = (uiv1.ScrollWidget())
+            ..children.addAll([
+              uiv1.Node()
+                ..id = 'camera_a'
+                ..videoSurface =
+                    (uiv1.VideoSurfaceWidget()..trackId = 'track-a'),
+              uiv1.Node()
+                ..id = 'mic_mix'
+                ..audioVisualizer =
+                    (uiv1.AudioVisualizerWidget()..streamId = 'stream-mix'),
+              uiv1.Node()
+                ..id = 'drawing'
+                ..canvas = (uiv1.CanvasWidget()
+                  ..drawOpsJson = '{"ops":[{"line":"x"}]}'),
+              uiv1.Node()
+                ..id = 'fs_hint'
+                ..fullscreen = (uiv1.FullscreenWidget()..enabled = true)
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Fullscreen body'),
+                ),
+              uiv1.Node()
+                ..id = 'awake_hint'
+                ..keepAwake = (uiv1.KeepAwakeWidget()..enabled = true)
+                ..children.add(
+                  uiv1.Node()..text = (uiv1.TextWidget()..value = 'Awake body'),
+                ),
+              uiv1.Node()
+                ..id = 'brightness_hint'
+                ..brightness = (uiv1.BrightnessWidget()..value = 0.8)
+                ..children.add(
+                  uiv1.Node()
+                    ..text = (uiv1.TextWidget()..value = 'Brightness body'),
+                ),
+            ]))),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey<String>('ui-video-surface-camera_a')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('ui-audio-visualizer-mic_mix')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('ui-canvas-drawing')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('ui-fullscreen-fs_hint')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('ui-keep-awake-awake_hint')),
+        findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('ui-brightness-brightness_hint')),
+      findsOneWidget,
+    );
+    expect(find.text('track-a'), findsOneWidget);
+    expect(find.text('Waiting for media'), findsNWidgets(2));
+    expect(find.text('Fullscreen body'), findsOneWidget);
+    expect(find.text('Awake body'), findsOneWidget);
+    expect(find.text('Brightness body'), findsOneWidget);
+  });
+}

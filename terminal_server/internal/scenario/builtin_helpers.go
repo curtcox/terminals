@@ -1,0 +1,344 @@
+package scenario
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/curtcox/terminals/terminal_server/internal/device"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
+)
+
+const (
+	micCaptureFallbackResource    = "mic.capture"
+	micAnalyzeFallbackResource    = "mic.analyze"
+	speakerMainFallbackResource   = "speaker.main"
+	screenOverlayFallbackResource = "screen.overlay"
+)
+
+func resolveAudioInputCaptureResource(env *Environment, deviceID string) string {
+	return resolveEndpointResource(
+		env,
+		deviceID,
+		"microphone",
+		func(endpointID string) string { return "audio_in." + endpointID + ".capture" },
+		micCaptureFallbackResource,
+	)
+}
+
+func resolveAudioInputAnalyzeResource(env *Environment, deviceID string) string {
+	return resolveEndpointResource(
+		env,
+		deviceID,
+		"microphone",
+		func(endpointID string) string { return "audio_in." + endpointID + ".analyze" },
+		micAnalyzeFallbackResource,
+	)
+}
+
+func resolveAudioOutResource(env *Environment, deviceID string) string {
+	return resolveEndpointResource(
+		env,
+		deviceID,
+		"speakers",
+		func(endpointID string) string { return "audio_out." + endpointID },
+		speakerMainFallbackResource,
+	)
+}
+
+func resolveDisplayOverlayResource(env *Environment, deviceID string) string {
+	return resolveEndpointResource(
+		env,
+		deviceID,
+		"display",
+		func(endpointID string) string { return "display." + endpointID + ".overlay" },
+		screenOverlayFallbackResource,
+	)
+}
+
+func resolveEndpointResource(
+	env *Environment,
+	deviceID string,
+	family string,
+	compose func(endpointID string) string,
+	fallback string,
+) string {
+	for _, endpointID := range endpointResourceIDsForDevice(env, deviceID, family) {
+		if endpointID == "" {
+			continue
+		}
+		return compose(endpointID)
+	}
+	return fallback
+}
+
+func endpointResourceIDsForDevice(env *Environment, deviceID string, family string) []string {
+	caps := capabilitiesForDevice(env, deviceID)
+	if len(caps) == 0 {
+		return nil
+	}
+	family = strings.TrimSpace(strings.ToLower(family))
+	if family == "" {
+		return nil
+	}
+
+	endpointPrefix := family + ".endpoint."
+	endpoints := map[string]string{}
+	for key, value := range caps {
+		key = strings.TrimSpace(strings.ToLower(key))
+		if !strings.HasPrefix(key, endpointPrefix) {
+			continue
+		}
+		remainder := strings.TrimPrefix(key, endpointPrefix)
+		parts := strings.Split(remainder, ".")
+		if len(parts) < 2 {
+			continue
+		}
+		indexToken := strings.TrimSpace(parts[0])
+		fieldToken := strings.TrimSpace(parts[1])
+		if indexToken == "" || fieldToken != "id" {
+			continue
+		}
+		index, err := strconv.Atoi(indexToken)
+		if err != nil || index < 0 {
+			continue
+		}
+		if endpointID := sanitizeResourceToken(value); endpointID != "" {
+			endpoints[indexToken] = endpointID
+		}
+	}
+
+	if len(endpoints) == 0 {
+		return nil
+	}
+	indexes := make([]int, 0, len(endpoints))
+	for raw := range endpoints {
+		idx, err := strconv.Atoi(raw)
+		if err != nil {
+			continue
+		}
+		indexes = append(indexes, idx)
+	}
+	sort.Ints(indexes)
+	resolved := make([]string, 0, len(indexes))
+	for _, index := range indexes {
+		endpointID := endpoints[strconv.Itoa(index)]
+		if endpointID == "" {
+			endpointID = fmt.Sprintf("endpoint-%d", index)
+		}
+		resolved = append(resolved, endpointID)
+	}
+	return resolved
+}
+
+func capabilitiesForDevice(env *Environment, deviceID string) map[string]string {
+	if env == nil || env.Devices == nil {
+		return nil
+	}
+	provider, ok := env.Devices.(interface {
+		Get(deviceID string) (device.Device, bool)
+	})
+	if !ok {
+		return nil
+	}
+	record, ok := provider.Get(strings.TrimSpace(deviceID))
+	if !ok {
+		return nil
+	}
+	if len(record.Capabilities) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(record.Capabilities))
+	for key, value := range record.Capabilities {
+		out[key] = value
+	}
+	return out
+}
+
+func sanitizeResourceToken(raw string) string {
+	raw = strings.TrimSpace(strings.ToLower(raw))
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(raw))
+	lastDash := false
+	for _, r := range raw {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	token := strings.Trim(b.String(), "-")
+	if token == "" {
+		return ""
+	}
+	return token
+}
+
+func intentMatches(intent string, accepted ...string) bool {
+	normalized := strings.TrimSpace(strings.ToLower(intent))
+	for _, candidate := range accepted {
+		if normalized == strings.TrimSpace(strings.ToLower(candidate)) {
+			return true
+		}
+	}
+	return false
+}
+
+func notifySource(ctx context.Context, env *Environment, sourceID, message string) error {
+	if env == nil || env.Broadcast == nil {
+		return nil
+	}
+	deviceIDs := []string{}
+	if strings.TrimSpace(sourceID) != "" {
+		deviceIDs = []string{strings.TrimSpace(sourceID)}
+	}
+	return env.Broadcast.Notify(ctx, deviceIDs, message)
+}
+
+type ioRoute struct {
+	sourceID   string
+	targetID   string
+	streamKind string
+}
+
+func connectBidirectionalSourceTargetsOwned(
+	_ context.Context,
+	env *Environment,
+	sourceID string,
+	targetIDs []string,
+	streamKind string,
+) ([]ioRoute, error) {
+	if env == nil || env.IO == nil || env.Devices == nil {
+		return nil, nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	if sourceID == "" {
+		return nil, nil
+	}
+	if targetIDs == nil {
+		targetIDs = nonSourceDeviceIDs(env, sourceID)
+	}
+	routes := make([]ioRoute, 0)
+	for _, peerID := range targetIDs {
+		if peerID == "" || peerID == sourceID {
+			continue
+		}
+		if err := env.IO.Connect(sourceID, peerID, streamKind); err != nil {
+			if !errors.Is(err, iorouter.ErrRouteExists) {
+				return nil, err
+			}
+		} else {
+			routes = append(routes, ioRoute{
+				sourceID:   sourceID,
+				targetID:   peerID,
+				streamKind: streamKind,
+			})
+		}
+		if err := env.IO.Connect(peerID, sourceID, streamKind); err != nil {
+			if !errors.Is(err, iorouter.ErrRouteExists) {
+				return nil, err
+			}
+		} else {
+			routes = append(routes, ioRoute{
+				sourceID:   peerID,
+				targetID:   sourceID,
+				streamKind: streamKind,
+			})
+		}
+	}
+	return routes, nil
+}
+
+func disconnectOwnedRoutes(env *Environment, routes []ioRoute) error {
+	if env == nil || env.IO == nil || len(routes) == 0 {
+		return nil
+	}
+	for _, route := range routes {
+		err := env.IO.Disconnect(route.sourceID, route.targetID, route.streamKind)
+		if err != nil && !errors.Is(err, iorouter.ErrRouteNotFound) {
+			return err
+		}
+	}
+	return nil
+}
+
+func reconnectOwnedRoutes(env *Environment, routes []ioRoute) error {
+	if env == nil || env.IO == nil || len(routes) == 0 {
+		return nil
+	}
+	for _, route := range routes {
+		err := env.IO.Connect(route.sourceID, route.targetID, route.streamKind)
+		if err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+			return err
+		}
+	}
+	return nil
+}
+
+func nonSourceDeviceIDs(env *Environment, sourceID string) []string {
+	if env == nil || env.Devices == nil {
+		return nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	peers := make([]string, 0)
+	for _, deviceID := range env.Devices.ListDeviceIDs() {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" || deviceID == sourceID {
+			continue
+		}
+		peers = append(peers, deviceID)
+	}
+	return peers
+}
+
+func peerTargetDeviceIDs(env *Environment, sourceID string, args map[string]string) []string {
+	if env == nil || env.Devices == nil {
+		return nil
+	}
+	sourceID = strings.TrimSpace(sourceID)
+	raw := ""
+	if args != nil {
+		raw = strings.TrimSpace(args["device_ids"])
+	}
+	if raw == "" {
+		return nonSourceDeviceIDs(env, sourceID)
+	}
+
+	validSet := map[string]struct{}{}
+	for _, deviceID := range env.Devices.ListDeviceIDs() {
+		trimmed := strings.TrimSpace(deviceID)
+		if trimmed == "" || trimmed == sourceID {
+			continue
+		}
+		validSet[trimmed] = struct{}{}
+	}
+
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		deviceID := strings.TrimSpace(part)
+		if deviceID == "" || deviceID == sourceID {
+			continue
+		}
+		if _, ok := validSet[deviceID]; !ok {
+			continue
+		}
+		if _, exists := seen[deviceID]; exists {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		out = append(out, deviceID)
+	}
+	return out
+}
