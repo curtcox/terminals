@@ -111,7 +111,7 @@ def collect_flag_oversized() -> "list[dict]":
     return entries
 
 
-def parse_frontmatter(text: str) -> dict | None:
+def parse_frontmatter(text: str) -> "dict | None":
     if not text.startswith("---\n"):
         return None
     end = text.find("\n---\n", 4)
