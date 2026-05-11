@@ -26,6 +26,7 @@ interface AndroidControlSession {
     suspend fun sendKeyText(text: String)
     suspend fun sendBugReport(report: Diagnostics.BugReport)
     suspend fun sendSystemCommand(requestId: String, intent: String)
+    suspend fun sendPlaybackMetadataQuery(requestId: String, artifactId: String, targetDeviceId: String)
     suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean
     suspend fun rebaselineCapabilitiesAfterStaleGeneration()
     suspend fun close()
@@ -107,6 +108,17 @@ class AndroidControlSessionController(
     override suspend fun sendSystemCommand(requestId: String, intent: String) {
         if (requestId.isEmpty() || intent.isEmpty()) return
         client.send(builders.systemCommand(requestId, intent))
+    }
+
+    override suspend fun sendPlaybackMetadataQuery(
+        requestId: String,
+        artifactId: String,
+        targetDeviceId: String,
+    ) {
+        if (requestId.isEmpty() || deviceId.isEmpty() || artifactId.isEmpty() || targetDeviceId.isEmpty()) {
+            return
+        }
+        client.send(builders.playbackMetadataCommand(requestId, deviceId, artifactId, targetDeviceId))
     }
 
     override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {

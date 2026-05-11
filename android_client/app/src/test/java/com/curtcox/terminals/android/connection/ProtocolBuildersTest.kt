@@ -191,4 +191,28 @@ class ProtocolBuildersTest {
         assertEquals("dev-2", device.command.requestId)
         assertEquals("device_status tablet-abc", device.command.intent)
     }
+
+    @Test
+    fun playbackMetadataCommandMatchesFlutterShellPlaybackDiagnosticsRequest() {
+        val req =
+            builders.playbackMetadataCommand(
+                requestId = "metadata-1",
+                deviceId = "terminal-a",
+                artifactId = "playback-1",
+                targetDeviceId = "terminal-b",
+            )
+        assertTrue(req.hasCommand())
+        assertEquals("metadata-1", req.command.requestId)
+        assertEquals("terminal-a", req.command.deviceId)
+        assertEquals(Control.CommandKind.COMMAND_KIND_MANUAL, req.command.kind)
+        assertEquals("playback_metadata", req.command.intent)
+        assertEquals("playback-1", req.command.argumentsMap["artifact_id"])
+        assertEquals("terminal-b", req.command.argumentsMap["target_device_id"])
+        val typed =
+            req.command.typedArgumentsList.associate { entry ->
+                entry.key to entry.value.stringValue
+            }
+        assertEquals("playback-1", typed["artifact_id"])
+        assertEquals("terminal-b", typed["target_device_id"])
+    }
 }

@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-10 (`make android-client-test`, `make android-client-compile-android-test`, boundary scripts; `connectedDebugAndroidTest` not re-run in this session after Konsist + instrumentation deprecation-suppress fix).
+Last local validation: 2026-05-10 (`make android-client-test`, `make android-client-compile-android-test`, boundary scripts after Flutter playback-diagnostics parity; `connectedDebugAndroidTest` not re-run in this session).
 
 Passed:
 
@@ -1362,6 +1362,12 @@ Remaining validation:
 ### 2026-05-10 (privacy toggle: stop capture only when enabling)
 
 - Matched Flutter `_handlePrivacyToggleAction`: `stopLocalCaptureStreamsForPrivacy` runs only when turning privacy **on** (not when turning it off). JVM: `AndroidTerminalViewModelTest.privacyToggleStopsLocalCaptureOnlyWhenEnablingPrivacy`. Doc tweak in `docs/client-android.md`.
+
+### 2026-05-10 (Flutter shell playback diagnostics parity)
+
+- Added **List playback artifacts** (`COMMAND_KIND_SYSTEM` / `list_playback_artifacts`) and **Playback metadata** (`COMMAND_KIND_MANUAL` / `playback_metadata` with `artifact_id` + `target_device_id` typed args) to match Flutter `buildPlaybackArtifactsQueryRequest` / `buildPlaybackMetadataQueryRequest`.
+- `ProtocolBuilders.playbackMetadataCommand`, `AndroidControlSession.sendPlaybackMetadataQuery`, ViewModel fields for artifact/target text inputs, shell chrome (test tags `terminal-debug-playback-artifacts-button`, `terminal-playback-artifact-field`, `terminal-playback-target-device-field`, `terminal-debug-playback-metadata-button`).
+- JVM: `ProtocolBuildersTest`, `AndroidControlSessionControllerTest`, `AndroidTerminalViewModelTest`; instrumentation fakes implement the new session method. Documented in `docs/client-android.md`. Re-ran `make android-client-test`, `make android-client-compile-android-test`, and boundary scripts.
 
 ## Test Plan
 

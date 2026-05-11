@@ -173,6 +173,24 @@ class AndroidControlSessionControllerTest {
     }
 
     @Test
+    fun sendPlaybackMetadataQueryUsesProtocolBuilder() = runTest {
+        val client = FakeControlClient()
+        val controller = controller(client = client)
+        controller.connect(EndpointResolution("10.0.0.8", 8080))
+        client.sent.clear()
+
+        controller.sendPlaybackMetadataQuery("meta-1", "artifact-z", "target-z")
+
+        val cmd = client.sent.single().command
+        assertEquals("meta-1", cmd.requestId)
+        assertEquals("device-1", cmd.deviceId)
+        assertEquals(Control.CommandKind.COMMAND_KIND_MANUAL, cmd.kind)
+        assertEquals("playback_metadata", cmd.intent)
+        assertEquals("artifact-z", cmd.argumentsMap["artifact_id"])
+        assertEquals("target-z", cmd.argumentsMap["target_device_id"])
+    }
+
+    @Test
     fun sendStreamReadyUsesProtocolBuilder() = runTest {
         val client = FakeControlClient()
         val controller = controller(client = client)

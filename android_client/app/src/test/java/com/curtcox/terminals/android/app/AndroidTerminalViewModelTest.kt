@@ -2523,6 +2523,50 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun debugPlaybackQueriesMatchFlutterShell() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.sendPlaybackArtifactsQuery()
+        viewModel.updatePlaybackArtifactId("artifact-a")
+        viewModel.sendPlaybackMetadataQuery()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("debug-playback-artifacts-1" to "list_playback_artifacts"),
+            session.systemCommands,
+        )
+        assertEquals(
+            listOf(Triple("debug-playback-metadata-2", "artifact-a", "android-native-terminal")),
+            session.playbackMetadataQueries,
+        )
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_system_command=list_playback_artifacts:debug-playback-artifacts-1"))
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_manual_command=playback_metadata:debug-playback-metadata-2"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun playbackMetadataWithoutArtifactIdSetsLastError() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.sendPlaybackMetadataQuery()
+        advanceUntilIdle()
+
+        assertEquals("Playback artifact ID required", viewModel.state.value.lastError)
+        assertTrue(session.playbackMetadataQueries.isEmpty())
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun refreshCapabilitiesAsksConnectedSessionForDelta() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val viewModel = viewModel(session)
@@ -2886,6 +2930,7 @@ class AndroidTerminalViewModelTest {
         val keyTexts = mutableListOf<String>()
         val streamReadyIds = mutableListOf<String>()
         val systemCommands = mutableListOf<Pair<String, String>>()
+        val playbackMetadataQueries = mutableListOf<Triple<String, String, String>>()
         val capabilityDeltaReasons = mutableListOf<String>()
         val privacyModeCalls = mutableListOf<Boolean>()
         var rebaselineCount = 0
@@ -2929,6 +2974,14 @@ class AndroidTerminalViewModelTest {
 
         override suspend fun sendSystemCommand(requestId: String, intent: String) {
             systemCommands += requestId to intent
+        }
+
+        override suspend fun sendPlaybackMetadataQuery(
+            requestId: String,
+            artifactId: String,
+            targetDeviceId: String,
+        ) {
+            playbackMetadataQueries += Triple(requestId, artifactId, targetDeviceId)
         }
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) {

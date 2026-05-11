@@ -202,12 +202,17 @@ send a `UIAction`). Toggles
 while connected request a capability delta with reason `privacy.toggle`.
 Copyable diagnostics include `privacy_mode=true|false`.
 
-While connected, the shell exposes **Runtime status** and **Device status**
-actions (Flutter shell parity). Each sends a protobuf `ConnectRequest` with
-`CommandRequest` kind `COMMAND_KIND_SYSTEM` and intent `runtime_status` or
-`device_status <deviceId>` (generic operator diagnostics, not scenario logic).
-Successful sends append a `last_system_command=` line to copyable diagnostics;
-server replies surface through existing `CommandResult` diagnostics when present.
+While connected, the shell exposes **Runtime status**, **Device status**,
+**List playback artifacts**, and **Playback metadata** actions (Flutter
+`terminal_client_shell` parity). The first two send `COMMAND_KIND_SYSTEM`
+intents `runtime_status` and `device_status <deviceId>`. **List playback
+artifacts** sends `COMMAND_KIND_SYSTEM` / `list_playback_artifacts`. **Playback
+metadata** sends `COMMAND_KIND_MANUAL` / `playback_metadata` with
+`artifact_id` and `target_device_id` (map + typed string arguments); when the
+target field is empty, it defaults to this device id like Flutter. Successful
+system sends append `last_system_command=`; manual playback metadata appends
+`last_manual_command=playback_metadata:<requestId>`. Server replies surface
+through existing `CommandResult` diagnostics when present.
 
 Server `Notification` control responses post a status-bar notification when
 `POST_NOTIFICATIONS` is granted (Android 13+) and speak the message with

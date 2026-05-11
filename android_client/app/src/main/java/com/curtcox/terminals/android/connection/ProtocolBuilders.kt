@@ -155,4 +155,36 @@ class ProtocolBuilders(
                     .setIntent(intent),
             )
             .build()
+
+    /**
+     * Matches Flutter `buildPlaybackMetadataQueryRequest`: manual command with map + typed string arguments.
+     */
+    fun playbackMetadataCommand(
+        requestId: String,
+        deviceId: String,
+        artifactId: String,
+        targetDeviceId: String,
+    ): Control.ConnectRequest {
+        val args =
+            mapOf(
+                "artifact_id" to artifactId,
+                "target_device_id" to targetDeviceId,
+            )
+        val cmd =
+            Control.CommandRequest.newBuilder()
+                .setRequestId(requestId)
+                .setDeviceId(deviceId)
+                .setKind(Control.CommandKind.COMMAND_KIND_MANUAL)
+                .setIntent("playback_metadata")
+                .putAllArguments(args)
+        for ((key, value) in args) {
+            cmd.addTypedArguments(
+                Control.CommandArgumentEntry.newBuilder()
+                    .setKey(key)
+                    .setValue(Control.CommandTypedValue.newBuilder().setStringValue(value).build())
+                    .build(),
+            )
+        }
+        return Control.ConnectRequest.newBuilder().setCommand(cmd).build()
+    }
 }

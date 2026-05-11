@@ -206,6 +206,41 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                         ) {
                             Text("Device status")
                         }
+                        TextButton(
+                            onClick = viewModel::sendPlaybackArtifactsQuery,
+                            modifier = Modifier.testTag("terminal-debug-playback-artifacts-button"),
+                        ) {
+                            Text("List playback artifacts")
+                        }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        OutlinedTextField(
+                            value = state.playbackArtifactIdText,
+                            onValueChange = viewModel::updatePlaybackArtifactId,
+                            label = { Text("Playback artifact ID") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("terminal-playback-artifact-field"),
+                        )
+                        OutlinedTextField(
+                            value = state.playbackTargetDeviceIdText,
+                            onValueChange = viewModel::updatePlaybackTargetDeviceId,
+                            label = { Text("Target device (optional)") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("terminal-playback-target-device-field"),
+                        )
+                    }
+                    TextButton(
+                        onClick = viewModel::sendPlaybackMetadataQuery,
+                        modifier = Modifier.testTag("terminal-debug-playback-metadata-button"),
+                    ) {
+                        Text("Playback metadata")
                     }
                 }
                 Button(

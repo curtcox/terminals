@@ -126,6 +126,12 @@ class AndroidTerminalMediaSmokeTest {
 
         override suspend fun sendSystemCommand(requestId: String, intent: String) = Unit
 
+        override suspend fun sendPlaybackMetadataQuery(
+            requestId: String,
+            artifactId: String,
+            targetDeviceId: String,
+        ) = Unit
+
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean = false
 
         override suspend fun rebaselineCapabilitiesAfterStaleGeneration() = Unit

@@ -65,6 +65,9 @@ data class AndroidTerminalViewState(
     val localBrightDisplayEnabled: Boolean = false,
     /** Withdraws microphone/camera from advertised capabilities until toggled off (Flutter `privacy.toggle` parity). */
     val privacyModeEnabled: Boolean = false,
+    /** Shell debug fields for **Playback metadata** (Flutter `terminal_client_shell` text inputs). */
+    val playbackArtifactIdText: String = "",
+    val playbackTargetDeviceIdText: String = "",
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
     val mediaSupport: MediaSupportState = MediaSupportState(),
     val discoveryState: DiscoveryState = DiscoveryState(),

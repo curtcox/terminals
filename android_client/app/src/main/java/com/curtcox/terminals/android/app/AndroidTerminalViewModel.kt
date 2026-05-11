@@ -467,6 +467,72 @@ class AndroidTerminalViewModel(
         }
     }
 
+    /** Flutter shell **List Playback Artifacts** — `COMMAND_KIND_SYSTEM` / `list_playback_artifacts`. */
+    fun sendPlaybackArtifactsQuery() {
+        if (mutableState.value.connectionState != ConnectionState.Connected) return
+        viewModelScope.launch {
+            val id = nextDebugRequestId("debug-playback-artifacts")
+            runCatching {
+                session?.sendSystemCommand(id, "list_playback_artifacts")
+                    ?: error("Control stream is not connected.")
+            }.onSuccess {
+                mutableState.update { st ->
+                    st.copy(diagnosticsText = "${st.diagnosticsText}\nlast_system_command=list_playback_artifacts:$id")
+                }
+            }.onFailure { error ->
+                mutableState.update {
+                    it.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+        }
+    }
+
+    fun updatePlaybackArtifactId(text: String) {
+        mutableState.update { it.copy(playbackArtifactIdText = text) }
+    }
+
+    fun updatePlaybackTargetDeviceId(text: String) {
+        mutableState.update { it.copy(playbackTargetDeviceIdText = text) }
+    }
+
+    /**
+     * Flutter shell **Playback Metadata** — `COMMAND_KIND_MANUAL` / `playback_metadata` with
+     * `artifact_id` and `target_device_id` arguments (defaults target to this device when blank).
+     */
+    fun sendPlaybackMetadataQuery() {
+        if (mutableState.value.connectionState != ConnectionState.Connected) return
+        val artifact = mutableState.value.playbackArtifactIdText.trim()
+        if (artifact.isEmpty()) {
+            mutableState.update {
+                it.copy(lastError = "Playback artifact ID required")
+            }
+            return
+        }
+        var target = mutableState.value.playbackTargetDeviceIdText.trim()
+        if (target.isEmpty()) {
+            target = dependencies.deviceId
+            mutableState.update { it.copy(playbackTargetDeviceIdText = target) }
+        }
+        viewModelScope.launch {
+            val id = nextDebugRequestId("debug-playback-metadata")
+            runCatching {
+                session?.sendPlaybackMetadataQuery(id, artifact, target)
+                    ?: error("Control stream is not connected.")
+            }.onSuccess {
+                mutableState.update { st ->
+                    st.copy(
+                        lastError = null,
+                        diagnosticsText = "${st.diagnosticsText}\nlast_manual_command=playback_metadata:$id",
+                    )
+                }
+            }.onFailure { error ->
+                mutableState.update {
+                    it.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+        }
+    }
+
     private fun nextDebugRequestId(prefix: String): String {
         debugCommandSeq += 1
         return "$prefix-$debugCommandSeq"
