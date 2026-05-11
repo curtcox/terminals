@@ -37,6 +37,8 @@ class MainActivityLaunchSmokeTest {
         rule.onNodeWithTag("terminal-discovery-start-button").assertIsDisplayed()
         rule.onNodeWithTag("terminal-live-media-status").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("terminal-last-server-activity").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("terminal-responses-count").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag("terminal-sensor-telemetry-line").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("terminal-privacy-toggle-button").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("terminal-report-bug-button").performScrollTo().assertIsDisplayed()
     }

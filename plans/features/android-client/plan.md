@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-11 (`make android-client-test`, boundary scripts after inbound `ConnectResponse` counter + diagnostics; `connectedDebugAndroidTest` not re-run in this session).
+Last local validation: 2026-05-11 (`make android-client-test`, `make android-client-compile-android-test` after visible Responses/sensor shell chrome; `connectedDebugAndroidTest` not re-run in this session).
 
 Passed:
 
@@ -1417,6 +1417,11 @@ Remaining validation:
 - Added `AndroidTerminalViewState.inboundConnectResponseCount`, incremented on each handled `ConnectResponse` in `AndroidTerminalViewModel` (parity with Flutter `terminal_client_shell` `Responses: $_responses`).
 - Copyable diagnostics include `inbound_connect_response_count=` alongside existing outbound heartbeat/sensor and `stream_ready_send_count` lines; counter resets with `withoutHandshake` and on reconnect session refresh.
 - JVM: extended `serverSetUiResponseUpdatesRenderedRoot`; added `inboundConnectResponseCountIncrementsPerControlMessage`. Re-verified `make android-client-test` and Android boundary scripts on JDK 17.
+
+### 2026-05-11 (Flutter shell: visible Responses + sensor telemetry chrome)
+
+- `AndroidTerminalApp` now shows the same on-screen counters as Flutter `terminal_client_shell` after **Last server activity**: `Responses:` (backed by `inboundConnectResponseCount`) and the sensor / stream-ready / capability-ack line (`terminal-responses-count`, `terminal-sensor-telemetry-line` test tags). Flutter’s separate **Media routes / Active streams / Signals** line remains unmirrored until native live-media bookkeeping exists.
+- `MainActivityLaunchSmokeTest` scrolls to and asserts the new tags; `AndroidTerminalAppSmokeTest.manualEndpointConnectsRendersServerUiAndDispatchesAction` asserts `Responses: 1` after a synthetic `SetUI` inbound message.
 
 ## Test Plan
 

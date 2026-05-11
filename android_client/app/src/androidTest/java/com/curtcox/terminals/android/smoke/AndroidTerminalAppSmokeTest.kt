@@ -1,8 +1,10 @@
 package com.curtcox.terminals.android.smoke
 
 import android.Manifest
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -113,6 +115,7 @@ class AndroidTerminalAppSmokeTest {
             )
         }
 
+        compose.onNodeWithTag("terminal-responses-count").assert(hasText("Responses: 1", substring = true))
         compose.onNodeWithText("Server action").assertIsDisplayed()
         compose.onNodeWithText("Server action").performClick()
         compose.waitUntil { session.actions.isNotEmpty() }

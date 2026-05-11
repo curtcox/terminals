@@ -163,6 +163,19 @@ fun AndroidTerminalApp(viewModel: AndroidTerminalViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.testTag("terminal-last-server-activity"),
                 )
+                Text(
+                    "Responses: ${state.inboundConnectResponseCount}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("terminal-responses-count"),
+                )
+                Text(
+                    "Sensor sends: ${state.outboundSensorSendCount}  " +
+                        "Last sensor unix_ms: ${state.lastOutboundSensorUnixMs}  " +
+                        "Stream-ready acks: ${state.streamReadySendCount}  " +
+                        "Capability ack gen: ${state.lastCapabilityAckGeneration}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("terminal-sensor-telemetry-line"),
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { viewModel.setLocalKeepAwake(!state.localKeepAwakeEnabled) },
