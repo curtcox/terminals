@@ -2,7 +2,7 @@
 """Single canonical answer to "what should I work on next?".
 
 Wraps `pick-next-work.py` (priority buckets across plans) and additionally
-surfaces three drift signals the pick-next-work ranker doesn't capture:
+surfaces four drift signals the pick-next-work ranker doesn't capture:
 
   a. Un-validated planned use-case IDs — IDs in `usecases.md` that no plan
      references via `validation: automated:<ID>` and that
@@ -10,6 +10,9 @@ surfaces three drift signals the pick-next-work ranker doesn't capture:
   b. Open audits and incidents — kind: audit/incident with status: open.
   c. Stale building plans — status: building plans whose progress log
      hasn't been touched in STALE_DAYS days.
+  d. Oversized tracked files — files exceeding their per-category size
+     threshold (see `scripts/find-oversized-files.py`). Indicates work
+     that needs splitting, refactoring, or git-lfs treatment.
 
 Replaces the hand-edited `next.md` pointer (see plans/audits/
 markdown-organization-audit.md F5+S2).
@@ -46,6 +49,13 @@ def _load(name: str, path: Path):
 
 pnw = _load("pick_next_work", REPO / "scripts" / "pick-next-work.py")
 gvm = _load("gen_validation_matrix", REPO / "scripts" / "generate-validation-matrix.py")
+fof = _load("find_oversized_files", REPO / "scripts" / "find-oversized-files.py")
+
+# Cap the number of oversized-file entries shown in the inline drift report.
+# Anything beyond this many is summarized as "(+N more)" with a hint to run
+# `find-oversized-files.py` directly for the full list. Keeps `next.py`
+# output scannable when the repo accumulates many large files.
+OVERSIZED_DISPLAY_LIMIT = 15
 
 
 def collect_usecase_ids() -> "list[str]":
@@ -170,6 +180,27 @@ def render(plans, section, signals, today: _dt.date) -> str:
         out.append("_(none stale.)_")
     out.append("")
 
+    oversized = signals["oversized"]
+    flag_count = sum(1 for r in oversized if r["severity"] == "flag")
+    out.append(f"## Oversized tracked files — {len(oversized)} "
+               f"({flag_count} at flag severity)")
+    out.append("")
+    if oversized:
+        shown = oversized[:OVERSIZED_DISPLAY_LIMIT]
+        for r in shown:
+            tag = "[FLAG]" if r["severity"] == "flag" else "[warn]"
+            size_s = fof.fmt_size(r["unit"], r["size"])
+            out.append(f"- {tag} `{r['path']}` "
+                       f"({r['category']}, {size_s}) — {r['suggestion']}")
+        if len(oversized) > OVERSIZED_DISPLAY_LIMIT:
+            remaining = len(oversized) - OVERSIZED_DISPLAY_LIMIT
+            out.append(f"- _(+{remaining} more — run "
+                       f"`python3 scripts/find-oversized-files.py` for the "
+                       f"full list.)_")
+    else:
+        out.append("_(no tracked file exceeds its category threshold.)_")
+    out.append("")
+
     return "\n".join(out)
 
 
@@ -187,6 +218,7 @@ def main() -> int:
         "unvalidated_ids": unvalidated_ids(),
         "open_items": open_audits_and_incidents(plans),
         "stale": stale_building(plans, today),
+        "oversized": fof.scan(),
     }
 
     if args.json:
