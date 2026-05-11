@@ -2691,6 +2691,28 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun playbackMetadataUsesExplicitTargetDeviceWhenProvided() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.updatePlaybackArtifactId("artifact-x")
+        viewModel.updatePlaybackTargetDeviceId("subject-tablet-1")
+        viewModel.sendPlaybackMetadataQuery()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(Triple("debug-playback-metadata-1", "artifact-x", "subject-tablet-1")),
+            session.playbackMetadataQueries,
+        )
+        assertTrue(viewModel.state.value.diagnosticsText.contains("last_manual_command=playback_metadata:debug-playback-metadata-1"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun refreshCapabilitiesAsksConnectedSessionForDelta() = runTest(testDispatcher) {
         val session = FakeSession(capabilityDeltaSent = true)
         val viewModel = viewModel(session)

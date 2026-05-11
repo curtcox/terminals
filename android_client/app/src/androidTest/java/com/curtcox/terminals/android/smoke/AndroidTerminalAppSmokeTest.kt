@@ -248,6 +248,39 @@ class AndroidTerminalAppSmokeTest {
     }
 
     @Test
+    fun connectedDebugPlaybackMetadataSendsManualQueryWithExplicitTargetDevice() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                deviceId = "android-native-terminal",
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        compose.onNodeWithTag("terminal-playback-artifact-field").performTextInput("artifact-99")
+        compose.onNodeWithTag("terminal-playback-target-device-field").performTextInput("subject-device-z")
+        compose.onNodeWithTag("terminal-debug-playback-metadata-button").performClick()
+        compose.waitUntil { session.playbackMetadataQueries.isNotEmpty() }
+
+        assertEquals(
+            listOf(Triple("debug-playback-metadata-1", "artifact-99", "subject-device-z")),
+            session.playbackMetadataQueries,
+        )
+    }
+
+    @Test
     fun connectedOpenApplicationSendsManualLaunchCommand() {
         val session = FakeSession()
         val viewModel = AndroidTerminalViewModel(
