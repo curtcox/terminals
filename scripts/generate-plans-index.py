@@ -48,7 +48,7 @@ STATUS_BADGE = {
 ATTENTION_STATUSES = {"shipped-buggy", "shipped-untested", "open"}
 
 
-def parse_frontmatter(text: str) -> dict | None:
+def parse_frontmatter(text: str) -> "dict | None":
     if not text.startswith("---\n"):
         return None
     end = text.find("\n---\n", 4)

@@ -32,7 +32,7 @@ class Proc:
     command: str
 
 
-def run(cmd: list[str], cwd: str | None = None) -> subprocess.CompletedProcess[str]:
+def run(cmd: "list[str]", cwd: "str | None" = None) -> "subprocess.CompletedProcess[str]":
     return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=False)
 
 

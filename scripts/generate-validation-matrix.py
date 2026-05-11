@@ -50,7 +50,7 @@ COVERAGE_DEPTH_LEGEND = [
 ]
 
 
-def parse_frontmatter(text: str) -> dict | None:
+def parse_frontmatter(text: str) -> "dict | None":
     if not text.startswith("---\n"):
         return None
     end = text.find("\n---\n", 4)
@@ -69,7 +69,7 @@ def parse_frontmatter(text: str) -> dict | None:
     return fm
 
 
-def extract_table_cells(line: str) -> list[str] | None:
+def extract_table_cells(line: str) -> "list[str] | None":
     s = line.strip()
     if not s.startswith("|") or not s.endswith("|"):
         return None
@@ -77,7 +77,7 @@ def extract_table_cells(line: str) -> list[str] | None:
     return cells
 
 
-def _scan_usecase_text(text: str, default_family: str | None,
+def _scan_usecase_text(text: str, default_family: "str | None",
                        out: "OrderedDict[str, dict]") -> None:
     family = default_family
     for raw in text.splitlines():
