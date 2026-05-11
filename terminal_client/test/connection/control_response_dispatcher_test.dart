@@ -54,8 +54,7 @@ void main() {
       );
       expect(
         statusFromConnectResponse(
-          ConnectResponse()
-            ..showMedia = (iov1.ShowMedia()..requestId = 'm1'),
+          ConnectResponse()..showMedia = (iov1.ShowMedia()..requestId = 'm1'),
         ),
         'Show media',
       );
@@ -150,36 +149,38 @@ void main() {
       );
     });
 
-    test('patches nested children by id or props id without mutating input',
-        () {
-      final root = uiv1.Node()
-        ..id = 'root'
-        ..stack = uiv1.StackWidget()
-        ..children.add(
-          uiv1.Node()
-            ..id = 'panel'
-            ..row = uiv1.RowWidget()
-            ..children.add(
-              uiv1.Node()
-                ..props['id'] = 'target'
-                ..text = (uiv1.TextWidget()..value = 'Old'),
-            ),
+    test(
+      'patches nested children by id or props id without mutating input',
+      () {
+        final root = uiv1.Node()
+          ..id = 'root'
+          ..stack = uiv1.StackWidget()
+          ..children.add(
+            uiv1.Node()
+              ..id = 'panel'
+              ..row = uiv1.RowWidget()
+              ..children.add(
+                uiv1.Node()
+                  ..props['id'] = 'target'
+                  ..text = (uiv1.TextWidget()..value = 'Old'),
+              ),
+          );
+        final replacement = uiv1.Node()
+          ..id = 'target'
+          ..text = (uiv1.TextWidget()..value = 'New');
+
+        final updated = applyUpdateUi(
+          currentRoot: root,
+          update: uiv1.UpdateUI()
+            ..componentId = 'target'
+            ..node = replacement,
         );
-      final replacement = uiv1.Node()
-        ..id = 'target'
-        ..text = (uiv1.TextWidget()..value = 'New');
 
-      final updated = applyUpdateUi(
-        currentRoot: root,
-        update: uiv1.UpdateUI()
-          ..componentId = 'target'
-          ..node = replacement,
-      );
-
-      expect(updated, isNot(same(root)));
-      expect(updated!.children.single.children.single.text.value, 'New');
-      expect(root.children.single.children.single.text.value, 'Old');
-    });
+        expect(updated, isNot(same(root)));
+        expect(updated!.children.single.children.single.text.value, 'New');
+        expect(root.children.single.children.single.text.value, 'Old');
+      },
+    );
 
     test('returns existing root if target is missing or root is absent', () {
       final root = uiv1.Node()
@@ -189,8 +190,10 @@ void main() {
         ..componentId = 'missing'
         ..node = (uiv1.Node()..text = (uiv1.TextWidget()..value = 'Next'));
 
-      expect(identical(applyUpdateUi(currentRoot: root, update: update), root),
-          isTrue);
+      expect(
+        identical(applyUpdateUi(currentRoot: root, update: update), root),
+        isTrue,
+      );
       expect(applyUpdateUi(currentRoot: null, update: update), isNull);
     });
   });
@@ -215,18 +218,11 @@ void main() {
       expect(update, isNotNull);
       expect(update!.activeRoot!.children.single.text.value, 'Old');
       expect(update.uiChanged, isTrue);
-      expect(
-        update.events.map((event) => event.kind),
-        <String>['set_ui'],
-      );
-      expect(
-        update.events.map((event) => event.kindEnum),
-        <diagv1.UiEventKind>[diagv1.UiEventKind.UI_EVENT_KIND_SET_UI],
-      );
-      expect(
-        update.events.map((event) => event.componentId),
-        <String>['root'],
-      );
+      expect(update.events.map((event) => event.kind), <String>['set_ui']);
+      expect(update.events.map((event) => event.kindEnum), <diagv1.UiEventKind>[
+        diagv1.UiEventKind.UI_EVENT_KIND_SET_UI,
+      ]);
+      expect(update.events.map((event) => event.componentId), <String>['root']);
     });
 
     test('derives patch UI updates without mutating the current root', () {
@@ -282,7 +278,9 @@ void main() {
       expect(update.events.single.componentId, 'root');
       expect(update.transitionHint?.transition, 'fade');
       expect(
-          update.transitionHint?.duration, const Duration(milliseconds: 120));
+        update.transitionHint?.duration,
+        const Duration(milliseconds: 120),
+      );
       expect(update.transitionHint?.notification, 'Transition: fade (120ms)');
     });
 
@@ -415,10 +413,7 @@ void main() {
       expect(update!.serverBuildSha, 'abc123');
       expect(update.serverBuildDate, '2026-05-03');
       expect(update.hasDiagnosticsData, isTrue);
-      expect(
-        update.metadata[registerMetadataServerBuildShaKey],
-        ' abc123 ',
-      );
+      expect(update.metadata[registerMetadataServerBuildShaKey], ' abc123 ');
     });
 
     test('returns unknown build values for empty register metadata', () {
@@ -438,52 +433,67 @@ void main() {
   });
 
   group('media and edge response helpers', () {
-    test('synchronousMediaControlUpdateFromResponse derives stream start data',
-        () {
-      final update = synchronousMediaControlUpdateFromResponse(
-        ConnectResponse()
-          ..startStream = (iov1.StartStream()
-            ..streamId = 'stream-1'
-            ..kind = 'audio'
-            ..streamKind = iov1.StreamKind.STREAM_KIND_AUDIO
-            ..sourceDeviceId = 'server'
-            ..targetDeviceId = 'client'),
-      );
+    test(
+      'synchronousMediaControlUpdateFromResponse derives stream start data',
+      () {
+        final update = synchronousMediaControlUpdateFromResponse(
+          ConnectResponse()
+            ..startStream = (iov1.StartStream()
+              ..streamId = 'stream-1'
+              ..kind = 'audio'
+              ..streamKind = iov1.StreamKind.STREAM_KIND_AUDIO
+              ..sourceDeviceId = 'server'
+              ..targetDeviceId = 'client'),
+        );
 
-      expect(update.startStreamID, 'stream-1');
-      expect(update.shouldAcknowledgeStartStream, isTrue);
-      expect(update.startStreamNotification, 'Start stream: audio (stream-1)');
-      expect(update.lastNotification, 'Start stream: audio (stream-1)');
-    });
+        expect(update.startStreamID, 'stream-1');
+        expect(update.shouldAcknowledgeStartStream, isTrue);
+        expect(
+          update.startStreamNotification,
+          'Start stream: audio (stream-1)',
+        );
+        expect(update.lastNotification, 'Start stream: audio (stream-1)');
+      },
+    );
 
-    test('synchronousMediaControlUpdateFromResponse derives route and signal',
-        () {
-      final routeUpdate = synchronousMediaControlUpdateFromResponse(
-        ConnectResponse()
-          ..routeStream = (iov1.RouteStream()
-            ..streamId = 'video-1'
-            ..sourceDeviceId = 'source'
-            ..targetDeviceId = 'target'
-            ..kind = 'video'
-            ..streamKind = iov1.StreamKind.STREAM_KIND_VIDEO),
-      );
+    test(
+      'synchronousMediaControlUpdateFromResponse derives route and signal',
+      () {
+        final routeUpdate = synchronousMediaControlUpdateFromResponse(
+          ConnectResponse()
+            ..routeStream = (iov1.RouteStream()
+              ..streamId = 'video-1'
+              ..sourceDeviceId = 'source'
+              ..targetDeviceId = 'target'
+              ..kind = 'video'
+              ..streamKind = iov1.StreamKind.STREAM_KIND_VIDEO),
+        );
 
-      expect(routeUpdate.routeStreamID, 'video-1');
-      expect(routeUpdate.routeNotification, 'Route: source -> target (video)');
-      expect(routeUpdate.lastNotification, 'Route: source -> target (video)');
+        expect(routeUpdate.routeStreamID, 'video-1');
+        expect(
+          routeUpdate.routeNotification,
+          'Route: source -> target (video)',
+        );
+        expect(routeUpdate.lastNotification, 'Route: source -> target (video)');
 
-      final signalUpdate = synchronousMediaControlUpdateFromResponse(
-        ConnectResponse()
-          ..webrtcSignal = (WebRTCSignal()
-            ..streamId = 'video-1'
-            ..signalType = 'answer'
-            ..signalTypeEnum = WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER),
-      );
+        final signalUpdate = synchronousMediaControlUpdateFromResponse(
+          ConnectResponse()
+            ..webrtcSignal = (WebRTCSignal()
+              ..streamId = 'video-1'
+              ..signalType = 'answer'
+              ..signalTypeEnum = WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_ANSWER),
+        );
 
-      expect(signalUpdate.webrtcSignalNotification,
-          'WebRTC signal: answer (video-1)');
-      expect(signalUpdate.lastNotification, 'WebRTC signal: answer (video-1)');
-    });
+        expect(
+          signalUpdate.webrtcSignalNotification,
+          'WebRTC signal: answer (video-1)',
+        );
+        expect(
+          signalUpdate.lastNotification,
+          'WebRTC signal: answer (video-1)',
+        );
+      },
+    );
 
     test('typed enum fields override legacy labels when both are present', () {
       // start_stream, route_stream, and webrtc_signal share a oneof on
@@ -496,8 +506,10 @@ void main() {
             ..kind = 'legacy-kind'
             ..streamKind = iov1.StreamKind.STREAM_KIND_SENSOR),
       );
-      expect(startUpdate.startStreamNotification,
-          'Start stream: sensor (stream-typed)');
+      expect(
+        startUpdate.startStreamNotification,
+        'Start stream: sensor (stream-typed)',
+      );
 
       final routeUpdate = synchronousMediaControlUpdateFromResponse(
         ConnectResponse()
@@ -524,17 +536,19 @@ void main() {
       );
     });
 
-    test('synchronousMediaControlUpdateFromResponse derives stop stream data',
-        () {
-      final update = synchronousMediaControlUpdateFromResponse(
-        ConnectResponse()
-          ..stopStream = (iov1.StopStream()..streamId = 'stream-2'),
-      );
+    test(
+      'synchronousMediaControlUpdateFromResponse derives stop stream data',
+      () {
+        final update = synchronousMediaControlUpdateFromResponse(
+          ConnectResponse()
+            ..stopStream = (iov1.StopStream()..streamId = 'stream-2'),
+        );
 
-      expect(update.stopStreamID, 'stream-2');
-      expect(update.stopStreamNotification, 'Stop stream: stream-2');
-      expect(update.lastNotification, 'Stop stream: stream-2');
-    });
+        expect(update.stopStreamID, 'stream-2');
+        expect(update.stopStreamNotification, 'Stop stream: stream-2');
+        expect(update.lastNotification, 'Stop stream: stream-2');
+      },
+    );
 
     test('bundleIDFromFlowPlan returns the first non-empty bundle id', () {
       expect(bundleIDFromFlowPlan(null), isNull);
@@ -563,8 +577,10 @@ void main() {
       );
       expect(playAudioSourceLabel(iov1.PlayAudio()..url = 'https://x'), 'url');
       expect(playAudioPcmByteCount(iov1.PlayAudio()..url = 'https://x'), 0);
-      expect(playAudioSourceLabel(iov1.PlayAudio()..ttsText = 'hello'),
-          'tts_text');
+      expect(
+        playAudioSourceLabel(iov1.PlayAudio()..ttsText = 'hello'),
+        'tts_text',
+      );
       expect(playAudioSourceLabel(iov1.PlayAudio()), 'not_set');
     });
 
@@ -587,24 +603,26 @@ void main() {
       );
     });
 
-    test('applicationIntentsFromDiagnostics keeps default first and sorts data',
-        () {
-      expect(
-        applicationIntentsFromDiagnostics(const <String, String>{
-          'weather': '',
-          ' terminal ': '',
-          'lights': '',
-          '': '',
-        }),
-        <String>['terminal', 'lights', 'weather'],
-      );
-      expect(
-        applicationIntentsFromDiagnostics(
-          const <String, String>{'z': '', 'a': ''},
-          defaultIntent: 'launcher',
-        ),
-        <String>['launcher', 'a', 'z'],
-      );
-    });
+    test(
+      'applicationIntentsFromDiagnostics keeps default first and sorts data',
+      () {
+        expect(
+          applicationIntentsFromDiagnostics(const <String, String>{
+            'weather': '',
+            ' terminal ': '',
+            'lights': '',
+            '': '',
+          }),
+          <String>['terminal', 'lights', 'weather'],
+        );
+        expect(
+          applicationIntentsFromDiagnostics(const <String, String>{
+            'z': '',
+            'a': '',
+          }, defaultIntent: 'launcher'),
+          <String>['launcher', 'a', 'z'],
+        );
+      },
+    );
   });
 }

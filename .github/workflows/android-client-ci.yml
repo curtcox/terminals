@@ -35,10 +35,10 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           log-accepted-android-sdk-licenses: true
-          packages: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -64,6 +64,8 @@ jobs:
   android-client-dependency-check:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    env:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
     steps:
       - uses: actions/checkout@v6
 
@@ -75,10 +77,10 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           log-accepted-android-sdk-licenses: true
-          packages: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -99,10 +101,13 @@ jobs:
             ${{ runner.os }}-owasp-dc-
 
       - name: OWASP Dependency-Check (runtime classpaths)
+        if: ${{ env.NVD_API_KEY != '' }}
         working-directory: android_client
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./gradlew :app:dependencyCheckAnalyze --no-daemon
+
+      - name: Skip OWASP Dependency-Check (NVD_API_KEY missing)
+        if: ${{ env.NVD_API_KEY == '' }}
+        run: echo 'Skipping dependency-check because NVD_API_KEY is not configured for this repository.'
 
   android-client-instrumentation:
     needs: android-client-checks
@@ -119,12 +124,10 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           log-accepted-android-sdk-licenses: true
-          packages: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
-            emulator
-            system-images;android-30;google_apis;x86_64
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "emulator" "system-images;android-29;default;x86_64"
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -136,11 +139,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-android-gradle-
 
-      - name: Instrumentation tests (API 30 emulator)
+      - name: Instrumentation tests (API 29 emulator)
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          target: google_apis
+          api-level: 29
+          target: default
           arch: x86_64
           profile: Nexus 6
           force-avd-creation: true

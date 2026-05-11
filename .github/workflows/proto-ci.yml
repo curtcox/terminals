@@ -34,6 +34,11 @@ jobs:
         with:
           channel: stable
       - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Flutter pub get
+        working-directory: terminal_client
+        run: flutter pub get
       - name: Buf format check
         working-directory: api
         run: buf format -d --exit-code
@@ -63,6 +68,8 @@ jobs:
         with:
           channel: stable
       - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Flutter pub get
         working-directory: terminal_client
         run: flutter pub get

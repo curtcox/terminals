@@ -1,3 +1,4 @@
+// Command proto-contract-generate converts contract fixture textprotos to deterministic wire bytes.
 package main
 
 import (
