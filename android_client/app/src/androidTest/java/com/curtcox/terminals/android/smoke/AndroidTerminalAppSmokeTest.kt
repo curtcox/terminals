@@ -121,6 +121,160 @@ class AndroidTerminalAppSmokeTest {
     }
 
     @Test
+    fun connectedDebugRuntimeStatusSendsSystemCommand() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        compose.onNodeWithTag("terminal-debug-runtime-status-button").performClick()
+        compose.waitUntil { session.systemCommands.isNotEmpty() }
+
+        assertEquals(listOf("debug-runtime-status-1" to "runtime_status"), session.systemCommands)
+        compose.onNodeWithText("last_system_command=runtime_status:debug-runtime-status-1", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun connectedDebugDeviceStatusSendsSystemCommandWithDeviceId() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                deviceId = "device-android-test",
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        compose.onNodeWithTag("terminal-debug-device-status-button").performClick()
+        compose.waitUntil { session.systemCommands.isNotEmpty() }
+
+        assertEquals(
+            listOf("debug-device-status-1" to "device_status device-android-test"),
+            session.systemCommands,
+        )
+    }
+
+    @Test
+    fun connectedDebugPlaybackArtifactsAndScenarioRegistrySendSystemCommands() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        compose.onNodeWithTag("terminal-debug-playback-artifacts-button").performClick()
+        compose.waitUntil { session.systemCommands.size >= 1 }
+        compose.onNodeWithTag("terminal-debug-scenario-registry-button").performClick()
+        compose.waitUntil { session.systemCommands.size >= 2 }
+
+        assertEquals(
+            listOf(
+                "debug-playback-artifacts-1" to "list_playback_artifacts",
+                "debug-scenario-registry-2" to "scenario_registry",
+            ),
+            session.systemCommands,
+        )
+    }
+
+    @Test
+    fun connectedDebugPlaybackMetadataSendsManualQueryWithDefaultTargetDevice() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                deviceId = "android-native-terminal",
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        compose.onNodeWithTag("terminal-playback-artifact-field").performTextInput("artifact-42")
+        compose.onNodeWithTag("terminal-debug-playback-metadata-button").performClick()
+        compose.waitUntil { session.playbackMetadataQueries.isNotEmpty() }
+
+        assertEquals(
+            listOf(Triple("debug-playback-metadata-1", "artifact-42", "android-native-terminal")),
+            session.playbackMetadataQueries,
+        )
+    }
+
+    @Test
+    fun connectedOpenApplicationSendsManualLaunchCommand() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        compose.onNodeWithTag("terminal-debug-launch-application-button").performClick()
+        compose.waitUntil { session.applicationLaunchCommands.isNotEmpty() }
+
+        assertEquals(listOf("debug-launch-app-1" to "terminal"), session.applicationLaunchCommands)
+    }
+
+    @Test
     fun serverDrivenDeviceControlsReachPlatformAdapters() {
         val session = FakeSession()
         val keepAwakeValues = mutableListOf<Boolean>()
@@ -762,6 +916,9 @@ class AndroidTerminalAppSmokeTest {
         override fun setPrivacyMode(enabled: Boolean) = Unit
         var closed: Boolean = false
         val actions = mutableListOf<ServerDrivenAction>()
+        val systemCommands = mutableListOf<Pair<String, String>>()
+        val playbackMetadataQueries = mutableListOf<Triple<String, String, String>>()
+        val applicationLaunchCommands = mutableListOf<Pair<String, String>>()
         val capabilityRefreshReasons = mutableListOf<String>()
 
         override suspend fun connect(endpoint: EndpointResolution) {
@@ -786,19 +943,25 @@ class AndroidTerminalAppSmokeTest {
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) = Unit
 
-        override suspend fun sendSystemCommand(requestId: String, intent: String) = Unit
+        override suspend fun sendSystemCommand(requestId: String, intent: String) {
+            systemCommands += requestId to intent
+        }
 
         override suspend fun sendPlaybackMetadataQuery(
             requestId: String,
             artifactId: String,
             targetDeviceId: String,
-        ) = Unit
+        ) {
+            playbackMetadataQueries += Triple(requestId, artifactId, targetDeviceId)
+        }
 
         override suspend fun sendApplicationLaunchCommand(
             requestId: String,
             intent: String,
             arguments: Map<String, String>,
-        ) = Unit
+        ) {
+            applicationLaunchCommands += requestId to intent
+        }
 
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
             capabilityRefreshReasons += reason

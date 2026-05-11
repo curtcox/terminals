@@ -115,7 +115,10 @@ cd android_client
 ./gradlew connectedDebugAndroidTest --tests '*MainActivityConfiguration*'
 ./gradlew connectedDebugAndroidTest --tests '*Kiosk*'
 ./gradlew connectedDebugAndroidTest --tests '*Media*'
+./gradlew connectedDebugAndroidTest --tests '*connectedDebug*'
 ```
+
+The `*connectedDebug*` filter runs `AndroidTerminalAppSmokeTest` cases that assert connected-shell debug actions (runtime/device status, playback artifacts/metadata, scenario registry, open application) reach the control session.
 
 ## Fire Tablet Setup
 

@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-11 (`make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, boundary scripts after command-result diagnostics parity; `connectedDebugAndroidTest` not re-run in this session).
+Last local validation: 2026-05-11 (`make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, boundary scripts after connected debug-chrome Compose smoke; `connectedDebugAndroidTest` not re-run in this session).
 
 Passed:
 
@@ -1375,6 +1375,11 @@ Remaining validation:
 - `AndroidTerminalViewModel` applies `applyCommandResultDiagnostics` after `ControlResponseDispatcher` so inbound `CommandResult` payloads with data refresh shell state consistently with Flutter: scenario-registry intent list, playback artifact pre-fill, and clearing of pending debug request ids when titles match.
 - JVM: `CommandResultDiagnosticsTest`; extended `AndroidTerminalViewModelTest` / `ProtocolBuildersTest` as needed. Documented typed_data vs legacy `data` and classification behavior in `docs/client-android.md`.
 - Re-verified `make android-client-test`, `make android-client-lint`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, and `./scripts/test-android-client-boundary.sh`.
+
+### 2026-05-11 (Compose smoke: connected debug chrome → session)
+
+- Extended `AndroidTerminalAppSmokeTest` so the fake session records `sendSystemCommand`, `sendPlaybackMetadataQuery`, and `sendApplicationLaunchCommand`; added Compose coverage for **Runtime status**, **Device status**, **List playback artifacts** + **Refresh applications**, **Playback metadata** (default target device id), and **Open application** after a successful connect. Closes the gap between JVM-only debug-query tests and UI wiring on the generic shell.
+- Re-verified `make android-client-test`, `make android-client-compile-android-test`, and boundary scripts on a JDK 17 + Android SDK host.
 
 ## Test Plan
 
