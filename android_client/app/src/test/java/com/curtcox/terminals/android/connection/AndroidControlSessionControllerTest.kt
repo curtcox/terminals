@@ -173,6 +173,24 @@ class AndroidControlSessionControllerTest {
     }
 
     @Test
+    fun sendApplicationLaunchCommandUsesProtocolBuilder() = runTest {
+        val client = FakeControlClient()
+        val controller = controller(client = client)
+        controller.connect(EndpointResolution("10.0.0.8", 8080))
+        client.sent.clear()
+
+        controller.sendApplicationLaunchCommand("launch-1", "photo_frame", mapOf("k" to "v"))
+
+        val cmd = client.sent.single().command
+        assertEquals("launch-1", cmd.requestId)
+        assertEquals("device-1", cmd.deviceId)
+        assertEquals(Control.CommandAction.COMMAND_ACTION_START, cmd.action)
+        assertEquals(Control.CommandKind.COMMAND_KIND_MANUAL, cmd.kind)
+        assertEquals("photo_frame", cmd.intent)
+        assertEquals("v", cmd.argumentsMap["k"])
+    }
+
+    @Test
     fun sendPlaybackMetadataQueryUsesProtocolBuilder() = runTest {
         val client = FakeControlClient()
         val controller = controller(client = client)

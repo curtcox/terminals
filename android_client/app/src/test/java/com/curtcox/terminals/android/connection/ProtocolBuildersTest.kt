@@ -215,4 +215,24 @@ class ProtocolBuildersTest {
         assertEquals("playback-1", typed["artifact_id"])
         assertEquals("terminal-b", typed["target_device_id"])
     }
+
+    @Test
+    fun applicationLaunchCommandMatchesFlutterShellManualStart() {
+        val req =
+            builders.applicationLaunchCommand(
+                requestId = "launch-1",
+                deviceId = "dev-a",
+                intent = "terminal",
+                arguments = mapOf("foo" to "bar"),
+            )
+        assertTrue(req.hasCommand())
+        assertEquals("launch-1", req.command.requestId)
+        assertEquals("dev-a", req.command.deviceId)
+        assertEquals(Control.CommandAction.COMMAND_ACTION_START, req.command.action)
+        assertEquals(Control.CommandKind.COMMAND_KIND_MANUAL, req.command.kind)
+        assertEquals("terminal", req.command.intent)
+        assertEquals("bar", req.command.argumentsMap["foo"])
+        val typed = req.command.typedArgumentsList.associate { it.key to it.value.stringValue }
+        assertEquals("bar", typed["foo"])
+    }
 }

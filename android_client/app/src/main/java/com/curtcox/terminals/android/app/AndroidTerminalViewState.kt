@@ -68,6 +68,13 @@ data class AndroidTerminalViewState(
     /** Shell debug fields for **Playback metadata** (Flutter `terminal_client_shell` text inputs). */
     val playbackArtifactIdText: String = "",
     val playbackTargetDeviceIdText: String = "",
+    /**
+     * Discoverable application intents from the last **scenario_registry** command result (Flutter shell
+     * dropdown parity); default lists only `terminal`.
+     */
+    val availableApplicationIntents: List<String> = listOf("terminal"),
+    /** Selected intent for **Open application** (manual launch command). */
+    val selectedApplicationIntent: String = "terminal",
     val permissionEducation: PermissionEducationState = PermissionEducationState(),
     val mediaSupport: MediaSupportState = MediaSupportState(),
     val discoveryState: DiscoveryState = DiscoveryState(),

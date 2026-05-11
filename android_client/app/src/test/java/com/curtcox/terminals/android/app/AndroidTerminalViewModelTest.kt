@@ -1686,6 +1686,84 @@ class AndroidTerminalViewModelTest {
     }
 
     @Test
+    fun registerAckTriggersScenarioRegistryQueryOnce() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.systemCommands.clear()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setRegisterAck(
+                    Control.RegisterAck.newBuilder()
+                        .setServerId("srv-reg")
+                        .setMessage("capabilities accepted"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        assertEquals(1, session.systemCommands.count { it.second == "scenario_registry" })
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setRegisterAck(
+                    Control.RegisterAck.newBuilder()
+                        .setServerId("srv-reg")
+                        .setMessage("again"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        assertEquals(1, session.systemCommands.count { it.second == "scenario_registry" })
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun scenarioRegistryCommandResultUpdatesApplicationIntents() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.sendScenarioRegistryQuery()
+        advanceUntilIdle()
+        val requestId = session.systemCommands.last { it.second == "scenario_registry" }.first
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setCommandResult(
+                    Control.CommandResult.newBuilder()
+                        .setRequestId(requestId)
+                        .putData("photo_frame", "")
+                        .putData("terminal", ""),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+        assertEquals(listOf("terminal", "photo_frame"), viewModel.state.value.availableApplicationIntents)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun submitApplicationLaunchCommandSendsManualStart() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        viewModel.updateSelectedApplicationIntent("photo_frame")
+        viewModel.submitApplicationLaunchCommand()
+        advanceUntilIdle()
+        assertEquals(listOf("debug-launch-app-1" to "photo_frame"), session.applicationLaunchCommands)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun registerAckMessageRemainsInDiagnosticsAfterDisconnect() = runTest(testDispatcher) {
         val session = FakeSession()
         val viewModel = viewModel(session)
@@ -2930,6 +3008,7 @@ class AndroidTerminalViewModelTest {
         val keyTexts = mutableListOf<String>()
         val streamReadyIds = mutableListOf<String>()
         val systemCommands = mutableListOf<Pair<String, String>>()
+        val applicationLaunchCommands = mutableListOf<Pair<String, String>>()
         val playbackMetadataQueries = mutableListOf<Triple<String, String, String>>()
         val capabilityDeltaReasons = mutableListOf<String>()
         val privacyModeCalls = mutableListOf<Boolean>()
@@ -2982,6 +3061,14 @@ class AndroidTerminalViewModelTest {
             targetDeviceId: String,
         ) {
             playbackMetadataQueries += Triple(requestId, artifactId, targetDeviceId)
+        }
+
+        override suspend fun sendApplicationLaunchCommand(
+            requestId: String,
+            intent: String,
+            arguments: Map<String, String>,
+        ) {
+            applicationLaunchCommands += requestId to intent
         }
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) {

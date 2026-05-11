@@ -794,6 +794,12 @@ class AndroidTerminalAppSmokeTest {
             targetDeviceId: String,
         ) = Unit
 
+        override suspend fun sendApplicationLaunchCommand(
+            requestId: String,
+            intent: String,
+            arguments: Map<String, String>,
+        ) = Unit
+
         override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
             capabilityRefreshReasons += reason
             return capabilityDeltaResult

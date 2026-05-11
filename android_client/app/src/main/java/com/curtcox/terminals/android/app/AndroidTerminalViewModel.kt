@@ -1,3 +1,5 @@
+@file:Suppress("ImportOrdering")
+
 package com.curtcox.terminals.android.app
 
 import android.Manifest
@@ -7,9 +9,14 @@ import androidx.lifecycle.viewModelScope
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
 import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
+import com.curtcox.terminals.android.connection.CommandDiagnosticsRequestIds
 import com.curtcox.terminals.android.connection.ControlResponseDispatcher
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.connection.ManualEndpointParser
+import com.curtcox.terminals.android.connection.applicationIntentsFromDiagnostics
+import com.curtcox.terminals.android.connection.commandResultDataMap
+import com.curtcox.terminals.android.connection.diagnosticsTitleForCommandResult
+import com.curtcox.terminals.android.connection.firstPlaybackArtifactId
 import com.curtcox.terminals.android.diagnostics.AndroidBugReportActions
 import com.curtcox.terminals.android.diagnostics.AndroidBugReportBuilder
 import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
@@ -24,12 +31,12 @@ import java.util.Locale
 import java.util.TimeZone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.launch
 import terminals.control.v1.Control
 import terminals.diagnostics.v1.Diagnostics
 
@@ -41,6 +48,7 @@ class AndroidTerminalViewModel(
     private val dispatcher = ControlResponseDispatcher()
     private val responseSink = object : AndroidControlResponseSink {
         override suspend fun onResponse(response: Control.ConnectResponse) {
+            val pendingSnapshot = snapshotDebugCommandPendingIds()
             val rebaselineSent = if (response.requiresCapabilityRebaseline()) {
                 runCatching {
                     session?.rebaselineCapabilitiesAfterStaleGeneration()
@@ -118,8 +126,15 @@ class AndroidTerminalViewModel(
                 }
             }
             mutableState.update {
-                val next = dispatcher.dispatch(it, response)
-                var diagnostics = formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next)
+                val dispatched = dispatcher.dispatch(it, response)
+                val enriched = applyCommandResultDiagnostics(dispatched, response, pendingSnapshot)
+                val endpoint = parser.parse(enriched.endpointText)
+                var diagnostics =
+                    formatDiagnostics(
+                        endpoint,
+                        enriched.connectionState,
+                        enriched,
+                    )
                 if (notificationDelivered) {
                     val head = response.notification.title.trim()
                         .ifEmpty { response.notification.body.trim() }
@@ -130,20 +145,28 @@ class AndroidTerminalViewModel(
                 if (mediaStatus != null) {
                     diagnostics += "\nlast_media=${mediaStatus.first}:${mediaStatus.second}"
                 }
-                val resolvedLiveMediaLine = liveMediaLine ?: next.lastLiveMediaLine
+                val resolvedLiveMediaLine = liveMediaLine ?: enriched.lastLiveMediaLine
                 resolvedLiveMediaLine?.takeIf(String::isNotBlank)?.let { line ->
                     diagnostics += "\nlast_live_media=$line"
                 }
-                next.copy(
+                enriched.copy(
                     diagnosticsText = if (rebaselineSent) {
                         "$diagnostics\nlast_capability_rebaseline=stale-generation"
                     } else {
                         diagnostics
                     },
-                    lastMediaRequestId = mediaStatus?.first ?: next.lastMediaRequestId,
-                    lastMediaStatus = mediaStatus?.second ?: next.lastMediaStatus,
+                    lastMediaRequestId = mediaStatus?.first ?: enriched.lastMediaRequestId,
+                    lastMediaStatus = mediaStatus?.second ?: enriched.lastMediaStatus,
                     lastLiveMediaLine = resolvedLiveMediaLine,
                 )
+            }
+            if (response.payloadCase == Control.ConnectResponse.PayloadCase.REGISTER_ACK &&
+                !registerAckScenarioQuerySent
+            ) {
+                registerAckScenarioQuerySent = true
+                viewModelScope.launch {
+                    sendScenarioRegistryQuery()
+                }
             }
             if (response.payloadCase == Control.ConnectResponse.PayloadCase.HELLO_ACK) {
                 val ms = response.helloAck.heartbeatIntervalMs
@@ -177,6 +200,14 @@ class AndroidTerminalViewModel(
     /** When false, periodic heartbeat and sensor telemetry are paused (Flutter `AppLifecycle` parity). */
     private var appInForeground: Boolean = true
     private var debugCommandSeq: Int = 0
+    private var pendingRuntimeStatusRequestId: String? = null
+    private var pendingDeviceStatusRequestId: String? = null
+    private var pendingScenarioRegistryRequestId: String? = null
+    private var pendingPlaybackArtifactsRequestId: String? = null
+    private var pendingPlaybackMetadataRequestId: String? = null
+
+    /** First [Control.RegisterAck] per connection triggers automatic scenario registry query (Flutter shell). */
+    private var registerAckScenarioQuerySent: Boolean = false
     private val bugReportClock: Clock = Clock(dependencies.nowMillis)
     private val bugReportQueue: ArrayDeque<Diagnostics.BugReport> = ArrayDeque()
     private val mutableState = MutableStateFlow(
@@ -237,6 +268,7 @@ class AndroidTerminalViewModel(
         }
         reconnectExhausted = false
         effectiveHeartbeatMillis = dependencies.heartbeatIntervalMillis
+        resetPerConnectionShellState()
 
         mutableState.update {
             withoutHandshake(it).copy(
@@ -247,7 +279,7 @@ class AndroidTerminalViewModel(
         }
         stopConnect()
         connectJob = viewModelScope.launch {
-            val thisJob = coroutineContext[Job]
+            val thisJob = currentCoroutineContext()[Job]
             var nextSession: AndroidControlSession? = null
             try {
                 stopReconnect()
@@ -379,6 +411,7 @@ class AndroidTerminalViewModel(
         stopReconnect()
         reconnectExhausted = false
         effectiveHeartbeatMillis = dependencies.heartbeatIntervalMillis
+        resetPerConnectionShellState()
         mutableState.update {
             val endpoint = parser.parse(it.endpointText)
             val nextState = if (endpoint == null) ConnectionState.Disconnected else ConnectionState.ReadyToConnect
@@ -431,6 +464,7 @@ class AndroidTerminalViewModel(
         if (mutableState.value.connectionState != ConnectionState.Connected) return
         viewModelScope.launch {
             val id = nextDebugRequestId("debug-runtime-status")
+            pendingRuntimeStatusRequestId = id
             runCatching {
                 session?.sendSystemCommand(id, "runtime_status")
                     ?: error("Control stream is not connected.")
@@ -451,6 +485,7 @@ class AndroidTerminalViewModel(
         if (mutableState.value.connectionState != ConnectionState.Connected) return
         viewModelScope.launch {
             val id = nextDebugRequestId("debug-device-status")
+            pendingDeviceStatusRequestId = id
             val intent = "device_status ${dependencies.deviceId}"
             runCatching {
                 session?.sendSystemCommand(id, intent)
@@ -472,6 +507,7 @@ class AndroidTerminalViewModel(
         if (mutableState.value.connectionState != ConnectionState.Connected) return
         viewModelScope.launch {
             val id = nextDebugRequestId("debug-playback-artifacts")
+            pendingPlaybackArtifactsRequestId = id
             runCatching {
                 session?.sendSystemCommand(id, "list_playback_artifacts")
                     ?: error("Control stream is not connected.")
@@ -515,6 +551,7 @@ class AndroidTerminalViewModel(
         }
         viewModelScope.launch {
             val id = nextDebugRequestId("debug-playback-metadata")
+            pendingPlaybackMetadataRequestId = id
             runCatching {
                 session?.sendPlaybackMetadataQuery(id, artifact, target)
                     ?: error("Control stream is not connected.")
@@ -536,6 +573,62 @@ class AndroidTerminalViewModel(
     private fun nextDebugRequestId(prefix: String): String {
         debugCommandSeq += 1
         return "$prefix-$debugCommandSeq"
+    }
+
+    fun updateSelectedApplicationIntent(intent: String) {
+        mutableState.update { it.copy(selectedApplicationIntent = intent) }
+    }
+
+    /** Flutter shell **Refresh Applications** — `COMMAND_KIND_SYSTEM` / `scenario_registry`. */
+    fun sendScenarioRegistryQuery() {
+        if (mutableState.value.connectionState != ConnectionState.Connected) return
+        viewModelScope.launch {
+            val id = nextDebugRequestId("debug-scenario-registry")
+            pendingScenarioRegistryRequestId = id
+            runCatching {
+                session?.sendSystemCommand(id, "scenario_registry")
+                    ?: error("Control stream is not connected.")
+            }.onSuccess {
+                mutableState.update { st ->
+                    st.copy(
+                        lastError = null,
+                        diagnosticsText = "${st.diagnosticsText}\nlast_system_command=scenario_registry:$id",
+                    )
+                }
+            }.onFailure { error ->
+                mutableState.update {
+                    it.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+        }
+    }
+
+    /** Flutter shell **Open Application** — manual `COMMAND_ACTION_START` with the selected intent. */
+    fun submitApplicationLaunchCommand() {
+        if (mutableState.value.connectionState != ConnectionState.Connected) return
+        val intent = mutableState.value.selectedApplicationIntent.trim()
+        if (intent.isEmpty()) {
+            mutableState.update { it.copy(lastError = "Application intent required") }
+            return
+        }
+        viewModelScope.launch {
+            val id = nextDebugRequestId("debug-launch-app")
+            runCatching {
+                session?.sendApplicationLaunchCommand(id, intent)
+                    ?: error("Control stream is not connected.")
+            }.onSuccess {
+                mutableState.update { st ->
+                    st.copy(
+                        lastError = null,
+                        diagnosticsText = "${st.diagnosticsText}\nlast_manual_command=application_launch:$id:$intent",
+                    )
+                }
+            }.onFailure { error ->
+                mutableState.update {
+                    it.copy(lastError = error.message ?: error::class.java.simpleName)
+                }
+            }
+        }
     }
 
     /**
@@ -1213,7 +1306,98 @@ class AndroidTerminalViewModel(
             outboundSensorSendCount = 0,
             lastOutboundSensorUnixMs = 0L,
             streamReadySendCount = 0,
+            availableApplicationIntents = listOf("terminal"),
+            selectedApplicationIntent = "terminal",
         )
+
+    private fun resetPerConnectionShellState() {
+        pendingRuntimeStatusRequestId = null
+        pendingDeviceStatusRequestId = null
+        pendingScenarioRegistryRequestId = null
+        pendingPlaybackArtifactsRequestId = null
+        pendingPlaybackMetadataRequestId = null
+        registerAckScenarioQuerySent = false
+    }
+
+    private fun snapshotDebugCommandPendingIds(): CommandDiagnosticsRequestIds =
+        CommandDiagnosticsRequestIds(
+            runtimeStatus = pendingRuntimeStatusRequestId.orEmpty(),
+            deviceStatus = pendingDeviceStatusRequestId.orEmpty(),
+            scenarioRegistry = pendingScenarioRegistryRequestId.orEmpty(),
+            playbackArtifacts = pendingPlaybackArtifactsRequestId.orEmpty(),
+            playbackMetadata = pendingPlaybackMetadataRequestId.orEmpty(),
+        )
+
+    private fun applyCommandResultDiagnostics(
+        base: AndroidTerminalViewState,
+        response: Control.ConnectResponse,
+        pending: CommandDiagnosticsRequestIds,
+    ): AndroidTerminalViewState =
+        if (response.payloadCase == Control.ConnectResponse.PayloadCase.COMMAND_RESULT) {
+            mergeShellCommandResultStateIfDataPresent(base, response.commandResult, pending)
+        } else {
+            base
+        }
+
+    private fun mergeShellCommandResultStateIfDataPresent(
+        base: AndroidTerminalViewState,
+        result: Control.CommandResult,
+        pending: CommandDiagnosticsRequestIds,
+    ): AndroidTerminalViewState {
+        val data = commandResultDataMap(result)
+        return if (data.isEmpty()) {
+            base
+        } else {
+            mergeShellCommandResultStateForTitle(
+                base,
+                diagnosticsTitleForCommandResult(result, pending),
+                data,
+            )
+        }
+    }
+
+    private fun mergeShellCommandResultStateForTitle(
+        base: AndroidTerminalViewState,
+        title: String,
+        data: Map<String, String>,
+    ): AndroidTerminalViewState {
+        var out = base
+        when (title) {
+            "scenario_registry" -> {
+                val intents = applicationIntentsFromDiagnostics(data)
+                val selected =
+                    if (base.selectedApplicationIntent.trim() in intents) {
+                        base.selectedApplicationIntent.trim()
+                    } else {
+                        intents.first()
+                    }
+                out =
+                    out.copy(
+                        availableApplicationIntents = intents.toList(),
+                        selectedApplicationIntent = selected,
+                    )
+                pendingScenarioRegistryRequestId = null
+            }
+            "list_playback_artifacts" -> {
+                val first = firstPlaybackArtifactId(data)
+                if (first.isNotEmpty()) {
+                    out = out.copy(playbackArtifactIdText = first)
+                }
+                pendingPlaybackArtifactsRequestId = null
+            }
+            "runtime_status" -> {
+                pendingRuntimeStatusRequestId = null
+            }
+            "device_status" -> {
+                pendingDeviceStatusRequestId = null
+            }
+            "playback_metadata" -> {
+                pendingPlaybackMetadataRequestId = null
+            }
+            else -> {}
+        }
+        return out
+    }
 
     private suspend fun sendHeartbeatTracked(session: AndroidControlSession) {
         session.sendHeartbeat()

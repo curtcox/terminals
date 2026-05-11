@@ -187,4 +187,33 @@ class ProtocolBuilders(
         }
         return Control.ConnectRequest.newBuilder().setCommand(cmd).build()
     }
+
+    /**
+     * Matches Flutter `buildApplicationLaunchCommandRequest`: manual start command with optional
+     * string arguments (mirrors map + typed string entries).
+     */
+    fun applicationLaunchCommand(
+        requestId: String,
+        deviceId: String,
+        intent: String,
+        arguments: Map<String, String> = emptyMap(),
+    ): Control.ConnectRequest {
+        val cmd =
+            Control.CommandRequest.newBuilder()
+                .setRequestId(requestId)
+                .setDeviceId(deviceId)
+                .setAction(Control.CommandAction.COMMAND_ACTION_START)
+                .setKind(Control.CommandKind.COMMAND_KIND_MANUAL)
+                .setIntent(intent)
+                .putAllArguments(arguments)
+        for ((key, value) in arguments) {
+            cmd.addTypedArguments(
+                Control.CommandArgumentEntry.newBuilder()
+                    .setKey(key)
+                    .setValue(Control.CommandTypedValue.newBuilder().setStringValue(value).build())
+                    .build(),
+            )
+        }
+        return Control.ConnectRequest.newBuilder().setCommand(cmd).build()
+    }
 }

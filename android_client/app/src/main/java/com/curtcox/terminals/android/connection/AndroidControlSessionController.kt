@@ -27,6 +27,11 @@ interface AndroidControlSession {
     suspend fun sendBugReport(report: Diagnostics.BugReport)
     suspend fun sendSystemCommand(requestId: String, intent: String)
     suspend fun sendPlaybackMetadataQuery(requestId: String, artifactId: String, targetDeviceId: String)
+    suspend fun sendApplicationLaunchCommand(
+        requestId: String,
+        intent: String,
+        arguments: Map<String, String> = emptyMap(),
+    )
     suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean
     suspend fun rebaselineCapabilitiesAfterStaleGeneration()
     suspend fun close()
@@ -115,10 +120,18 @@ class AndroidControlSessionController(
         artifactId: String,
         targetDeviceId: String,
     ) {
-        if (requestId.isEmpty() || deviceId.isEmpty() || artifactId.isEmpty() || targetDeviceId.isEmpty()) {
-            return
-        }
+        if (listOf(requestId, deviceId, artifactId, targetDeviceId).any { it.isEmpty() }) return
         client.send(builders.playbackMetadataCommand(requestId, deviceId, artifactId, targetDeviceId))
+    }
+
+    override suspend fun sendApplicationLaunchCommand(
+        requestId: String,
+        intent: String,
+        arguments: Map<String, String>,
+    ) {
+        val trimmedIntent = intent.trim()
+        if (listOf(requestId, deviceId, trimmedIntent).any { it.isEmpty() }) return
+        client.send(builders.applicationLaunchCommand(requestId, deviceId, trimmedIntent, arguments))
     }
 
     override suspend fun sendCapabilityDeltaIfChanged(reason: String): Boolean {
