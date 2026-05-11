@@ -1,0 +1,81 @@
+---
+title: "Fire Tablet Validation — Progress Log"
+plan: "plans/features/android-client-fire-tablet-validation/plan.md"
+last-updated: 2026-05-11
+---
+
+# Progress Log
+
+## 2026-05-11 — Phase C Step 1: WebRTC Dependency Survey
+
+**Status:** Survey complete. Dependency selected. Code wiring not yet started.
+
+### Candidates evaluated
+
+#### 1. `io.github.webrtc-sdk:android` — **SELECTED**
+
+| Attribute | Value |
+|-----------|-------|
+| Latest version | `144.7559.05` |
+| Released | 2026-04-30 |
+| License | BSD-3-Clause (GitHub shows MIT — both are permissive) |
+| Hosted | Maven Central |
+| Google Play Services | None declared |
+| Transitive deps | None (self-contained native AAR) |
+| Variants | `android`, `android-prefixed`, `android-prefixed-stripped` |
+
+Rationale:
+- Pre-compiled native WebRTC AAR — no Google Play Services transitive pull. The boundary
+  script at `scripts/check-android-client-boundary.sh` checks `app/build.gradle.kts` for
+  `play-services|firebase|com.google.android.gms` patterns; this dependency will not trigger it.
+- Active maintenance cadence: v144.7559.05 released 2026-04-30.
+- The same library underpins LiveKit Android SDK (`android-prefixed` variant), confirming it
+  is production-tested at scale on standard Android API levels.
+- `minSdk = 25` (Fire OS 6+) is comfortably within WebRTC-for-Android's supported range
+  (native WebRTC targets API 21+).
+- Use the `android-prefixed-stripped` variant if APK size is a concern after initial
+  integration; start with `android` to keep the org.webrtc package namespace familiar.
+
+Gradle coordinate to add to `android_client/app/build.gradle.kts`:
+
+```kotlin
+implementation("io.github.webrtc-sdk:android:144.7559.05")
+```
+
+Add a `local.properties` override property (e.g. `webrtc.sdk.version`) to allow pinning or
+disabling without code changes, matching the existing `grpc.java.plugin` pattern.
+
+#### 2. `org.webrtc:google-webrtc` — **REJECTED**
+
+Last published: 2021. Google has not released an updated AAR since the project moved to
+Chromium's internal build system. The artifact is archived and unmaintained. Do not use.
+
+#### 3. `io.livekit:livekit-android` v2.25.2 — **NOT SELECTED (overkill)**
+
+License: Apache 2.0. No Google Play Services dependency. However, LiveKit is a high-level
+SDK that bundles signaling, room management, participant tracking, and DataChannel helpers
+on top of WebRTC. Adopting it would couple the Android terminal to LiveKit's server-side
+signaling model, violating the thin-client rule ("behavior on the server, not the client").
+The project's existing `AndroidWebRtcAdapter` / `AndroidLiveMediaSession` seams are designed
+for a raw WebRTC stack, not a managed-room abstraction.
+
+LiveKit internally uses `io.github.webrtc-sdk:android-prefixed` — using the raw SDK directly
+gets the same native layer without the coupling.
+
+#### 4. Jitsi-style SDKs (org.jitsi / lib-jitsi-meet) — **NOT EVALUATED**
+
+`lib-jitsi-meet` targets web (JavaScript). The `org.jitsi:jitsi-meet-sdk` Android artifact
+bundles React Native and is not suitable for a native Kotlin client. Skipped.
+
+### Next step
+
+Phase C Step 2: add `io.github.webrtc-sdk:android:144.7559.05` to `app/build.gradle.kts`
+with a `local.properties` version override, implement `WebRtcSdkAndroidAdapter`, and extend
+`WebRtcGatedLiveMediaSession` with real StartStream / WebRTCSignal handling. Confirm boundary
+scripts still pass.
+
+---
+
+## Phases A, B, D
+
+Not started. Require physical Fire OS 6+ hardware.
