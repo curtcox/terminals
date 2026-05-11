@@ -1,7 +1,7 @@
 ---
 title: "Android Client"
 kind: plan
-status: building
+status: shipped-validated
 owner: curtcox
 validation: automated
 last-reviewed: 2026-05-11
@@ -10,6 +10,10 @@ last-reviewed: 2026-05-11
 # Android Client
 
 Target repository path: `plans/features/android-client/plan.md`
+
+> **Status:** All ten implementation phases are code-complete and pass automated gates on a JDK 17 + Android SDK host (`make android-client-test`, `make android-client-lint`, `make android-client-build`, `make android-client-compile-android-test`, `./scripts/check-android-client-boundary.sh`, `./scripts/test-android-client-boundary.sh`) plus the CI emulator `connectedDebugAndroidTest` job in `.github/workflows/android-client-ci.yml`.
+>
+> Remaining work that cannot be closed from CI alone — physical Kindle Fire tablet smoke, real LAN NSD validation, and Fire-OS-compatible WebRTC dependency selection — has moved to [`plans/features/android-client-fire-tablet-validation/plan.md`](../android-client-fire-tablet-validation/plan.md).
 
 Extends `masterplan.md`, `docs/client-architecture.md`, `docs/client-web.md`, `docs/client-macos.md`, and the existing Flutter client under `terminal_client/`. Preserves the repository rule from `AGENTS.md`, `CLAUDE.md`, and `masterplan.md`:
 
@@ -780,12 +784,12 @@ make android-client-compile-android-test
 
 Gradle (`make android-client-test`, `lintDebug`, `assembleDebug`) should be re-run on a host with JDK 17+ and `ANDROID_SDK_ROOT` configured; plain `./gradlew` without `JAVA_HOME` may fail on macOS stubs.
 
-Remaining validation:
+Remaining validation has moved to [`plans/features/android-client-fire-tablet-validation/plan.md`](../android-client-fire-tablet-validation/plan.md):
 
-- GitHub Actions runs `connectedDebugAndroidTest` on an API 30 emulator for qualifying PRs (see `.github/workflows/android-client-ci.yml`). Locally, still run `cd android_client && ./gradlew connectedDebugAndroidTest` on a Fire tablet or different emulator/API when changing instrumentation-sensitive behavior.
-- Smoke-test manual connection to `make run-server` on a physical Fire OS 6+ tablet.
-- Confirm Android NSD discovery behavior on a multicast-capable Wi-Fi network (Fire OS fallback is documented under **Discovery (NSD / mDNS) quirks** in `docs/client-android.md`).
-- Live WebRTC send/receive remains **explicitly disabled** via `AndroidWebRtcAdapter.disabled(...)` until a follow-up selects Fire‑OS‑compatible dependencies; diagnostics surface the reason and capabilities must not falsely advertise transport (`docs/client-android.md`).
+- Physical Kindle Fire tablet smoke (manual connect, rotate, kiosk, copy diagnostics).
+- Real LAN NSD/mDNS discovery on a multicast-capable Wi-Fi network.
+- Local `connectedDebugAndroidTest` on a Fire tablet (CI already runs the API 30 emulator path).
+- Fire-OS-compatible WebRTC dependency selection to retire the `AndroidWebRtcAdapter.disabled(...)` posture.
 
 ## Implementation Progress
 
