@@ -118,7 +118,7 @@ cd android_client
 ./gradlew connectedDebugAndroidTest --tests '*connectedDebug*'
 ```
 
-The `*connectedDebug*` filter runs `AndroidTerminalAppSmokeTest` cases that assert connected-shell debug actions (runtime/device status, playback artifacts/metadata, scenario registry, open application) reach the control session.
+The `*connectedDebug*` filter runs `AndroidTerminalAppSmokeTest` cases that assert connected-shell debug actions (runtime/device status, playback artifacts/metadata, scenario registry, open application) reach the control session. Additional cases cover the first inbound `RegisterAck` automatic `scenario_registry` query (Flutter parity) and a matching `CommandResult` that updates the application-intent list; examples: `./gradlew connectedDebugAndroidTest --tests '*connectedRegisterAck*'`, `./gradlew connectedDebugAndroidTest --tests '*ScenarioRegistryCommandResult*'`.
 
 ## Fire Tablet Setup
 

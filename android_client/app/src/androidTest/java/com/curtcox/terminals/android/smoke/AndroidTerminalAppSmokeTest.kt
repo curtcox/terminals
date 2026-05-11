@@ -289,6 +289,100 @@ class AndroidTerminalAppSmokeTest {
     }
 
     @Test
+    fun connectedRegisterAckTriggersAutomaticScenarioRegistryQuery() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        runBlocking {
+            session.sink.onResponse(
+                Control.ConnectResponse.newBuilder()
+                    .setRegisterAck(
+                        Control.RegisterAck.newBuilder()
+                            .setServerId("auto-reg")
+                            .setMessage("registered"),
+                    )
+                    .build(),
+            )
+        }
+        compose.waitUntil { session.systemCommands.any { it.second == "scenario_registry" } }
+
+        assertEquals(1, session.systemCommands.count { it.second == "scenario_registry" })
+        val registryId = session.systemCommands.first { it.second == "scenario_registry" }.first
+        assertTrue(registryId.startsWith("debug-scenario-registry-"))
+        compose.onNodeWithText("last_system_command=scenario_registry:$registryId", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun connectedScenarioRegistryCommandResultUpdatesAvailableIntents() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        runBlocking {
+            session.sink.onResponse(
+                Control.ConnectResponse.newBuilder()
+                    .setRegisterAck(
+                        Control.RegisterAck.newBuilder()
+                            .setServerId("reg-for-registry")
+                            .setMessage("registered"),
+                    )
+                    .build(),
+            )
+        }
+        compose.waitUntil { session.systemCommands.any { it.second == "scenario_registry" } }
+        val registryId = session.systemCommands.first { it.second == "scenario_registry" }.first
+
+        runBlocking {
+            session.sink.onResponse(
+                Control.ConnectResponse.newBuilder()
+                    .setCommandResult(
+                        Control.CommandResult.newBuilder()
+                            .setRequestId(registryId)
+                            .setNotification("System query: scenario_registry")
+                            .putData("intercom", "priority=50")
+                            .putData("red_alert", "priority=100"),
+                    )
+                    .build(),
+            )
+        }
+        compose.waitUntil {
+            viewModel.state.value.availableApplicationIntents == listOf("terminal", "intercom", "red_alert")
+        }
+    }
+
+    @Test
     fun serverDrivenDeviceControlsReachPlatformAdapters() {
         val session = FakeSession()
         val keepAwakeValues = mutableListOf<Boolean>()

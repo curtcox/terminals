@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-11 (`./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, `lintDebug`, boundary scripts after RegisterAck-gated **Open application** parity; `connectedDebugAndroidTest` not re-run in this session).
+Last local validation: 2026-05-11 (`./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, boundary scripts after RegisterAck automatic `scenario_registry` + CommandResult intent-list instrumentation; `connectedDebugAndroidTest` not re-run in this session).
 
 Passed:
 
@@ -1387,6 +1387,12 @@ Remaining validation:
 - `handleControlLoss` clears `sawRegisterAck`, `registerAckScenarioQuerySent`, and the queued intent so reconnect sessions repeat the hello / RegisterAck handshake correctly.
 - JVM: `applicationLaunchQueuesUntilRegisterAckThenSends`; tightened `submitApplicationLaunchCommandSendsManualStart` (RegisterAck before launch). Compose: `AndroidTerminalAppSmokeTest.connectedOpenApplicationSendsManualLaunchCommand` delivers `RegisterAck` before **Open application**.
 - Documented in `docs/client-android.md`. Re-verified `./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, `lintDebug`, and Android boundary scripts with `JAVA_HOME` pointing at JDK 17.
+
+### 2026-05-11 (instrumentation: RegisterAck → scenario registry + CommandResult intents)
+
+- Added `AndroidTerminalAppSmokeTest.connectedRegisterAckTriggersAutomaticScenarioRegistryQuery` so the Compose shell asserts the first inbound `RegisterAck` dispatches exactly one automatic `scenario_registry` system command (Flutter first-ack parity) and surfaces `last_system_command=` in chrome.
+- Added `AndroidTerminalAppSmokeTest.connectedScenarioRegistryCommandResultUpdatesAvailableIntents` so a matching `CommandResult` after that query updates `availableApplicationIntents` end-to-end (mirrors JVM `scenarioRegistryCommandResultUpdatesApplicationIntents` through the UI stack).
+- Re-verified `make android-client-test`, `./gradlew compileDebugAndroidTestKotlin`, and Android boundary scripts.
 
 ## Test Plan
 
