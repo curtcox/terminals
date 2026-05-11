@@ -69,6 +69,18 @@ make run-local-smoke-test
 
 Add behavior on the server, not the client. The client remains a generic terminal.
 
+## Engineering Priorities
+
+Quality before quantity. Before adding a new feature:
+
+1. Prefer clearer specs, better design, and better code over more features.
+2. Fix existing bugs in the area you are touching first.
+3. Add missing tests and enable missing static-analysis or lint checks first.
+4. Encode the new invariant in CI so it cannot regress silently.
+5. Favor simplicity over backward compatibility — change shapes and update all callers rather than carrying shims.
+
+See [`docs/code-quality-and-ci.md`](docs/code-quality-and-ci.md) for the durable version.
+
 ## Agent Delegation (Claude Code / Codex)
 
 The server exposes the REPL command registry to Claude Code and Codex over MCP so an LLM agent can drive the system with exactly the access a REPL user has — no more, no less. See [`plans/agent-delegation.md`](plans/features/agent-delegation.md) for the design, and the setup guides to enable it:

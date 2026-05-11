@@ -26,12 +26,22 @@ Subproject guidance:
 
 ## Repository Rules Carried by Agent Guidance
 
-All top-level and subproject guidance should remain aligned with these architecture constraints:
+All top-level and subproject guidance should remain aligned with these engineering priorities (in priority order — quality work always precedes feature work):
+
+1. Prioritize clearer specs, better design, and better code over more features.
+2. Fix existing bugs in the touched area before adding new behavior.
+3. Add missing tests and enable missing static-analysis or lint checks before extending a unit.
+4. Encode invariants in CI rather than written rules.
+5. Favor simplicity over backward compatibility — change shapes and update callers rather than adding shims.
+
+…and with these architecture constraints:
 
 1. Keep the Flutter client generic. Scenario behavior belongs on the Go server.
 2. Keep client/server contracts in protobuf under `api/terminals/`.
 3. Keep AI providers behind interfaces in server code.
 4. Build UI using shared server-driven primitives.
+
+The durable, longer-form version of the engineering priorities lives in [`docs/code-quality-and-ci.md`](code-quality-and-ci.md).
 
 ## Validation and Maintenance
 

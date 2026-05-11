@@ -8,6 +8,18 @@ This document is the durable build, lint, and validation contract for Terminals.
 - Make quality gates discoverable through top-level make targets.
 - Ensure server, client, and protobuf changes are validated together.
 
+## Engineering Priorities
+
+Quality work comes before feature work. In order:
+
+1. **Specs, design, and code quality beat new features.** A clearer spec, a simpler design, or better-named code is always a valid change to ship on its own.
+2. **Fix bugs before adding features.** When touching an area with a known bug or broken path, the bug fix lands first (and ideally as its own commit).
+3. **Fix missing tests and static-analysis gaps before adding features.** If the code you are extending lacks tests, or a lint/static-analysis check that would have caught the bug at hand is disabled or missing, add the test or enable the check first.
+4. **Encode invariants in CI.** Prefer an automated check (test, lint rule, generated-code drift check, `make` target wired into a workflow under `.github/workflows/`) over a written rule. If you fixed a class of bug, add the check that prevents the regression.
+5. **Simplicity over backward compatibility.** Change protobuf, Go, and Dart APIs when the new design is clearer, and update all callers. Do not add compatibility shims, deprecated aliases, or `// kept for compatibility` comments unless an external constraint requires it.
+
+These priorities apply across `terminal_server/`, `terminal_client/`, `android_client/`, `web_client/`, `api/`, and `scripts/`.
+
 ## Top-Level Commands
 
 Use these from repository root.
