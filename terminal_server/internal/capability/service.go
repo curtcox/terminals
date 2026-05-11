@@ -2,7 +2,6 @@
 package capability
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
