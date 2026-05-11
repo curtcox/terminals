@@ -375,7 +375,7 @@ class ServerDrivenRendererTest {
 
         compose.setContent { render(root, actions::add, keys::add) }
         compose.onNodeWithTag("terminal-node-terminal_input").performTextInput("a")
-        compose.onNodeWithTag("terminal-node-terminal_input").performTextInput("ab")
+        compose.onNodeWithTag("terminal-node-terminal_input").performTextInput("b")
         compose.onNodeWithTag("terminal-node-terminal_input").performImeAction()
 
         assertEquals(listOf("a", "b", "\n"), keys)

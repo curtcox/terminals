@@ -1,11 +1,13 @@
 package com.curtcox.terminals.android.smoke
 
+import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.rule.GrantPermissionRule
 import com.curtcox.terminals.android.MainActivity
 import org.junit.Rule
 import org.junit.Test
@@ -16,7 +18,13 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidTerminalKioskSmokeTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val grantPermissions: GrantPermissionRule = GrantPermissionRule.grant(
+        Manifest.permission.RECORD_AUDIO,
+        Manifest.permission.CAMERA,
+    )
+
+    @get:Rule(order = 1)
     val rule = createAndroidComposeRule<MainActivity>()
 
     @Test
