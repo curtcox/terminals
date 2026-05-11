@@ -1654,6 +1654,32 @@ class AndroidTerminalViewModelTest {
         assertEquals(root, viewModel.state.value.serverRoot)
         assertEquals("UI updated", viewModel.state.value.lastControlResponseActivity)
         assertTrue(viewModel.state.value.diagnosticsText.contains("last_control_activity=UI updated"))
+        assertEquals(1, viewModel.state.value.inboundConnectResponseCount)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("inbound_connect_response_count=1"))
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun inboundConnectResponseCountIncrementsPerControlMessage() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(session)
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setHeartbeat(Control.Heartbeat.newBuilder().build())
+                .build(),
+        )
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setHeartbeat(Control.Heartbeat.newBuilder().build())
+                .build(),
+        )
+        assertEquals(2, viewModel.state.value.inboundConnectResponseCount)
+        assertTrue(viewModel.state.value.diagnosticsText.contains("inbound_connect_response_count=2"))
         viewModel.disconnect()
         advanceUntilIdle()
     }

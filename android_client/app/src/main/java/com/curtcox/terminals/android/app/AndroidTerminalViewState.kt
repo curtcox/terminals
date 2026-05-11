@@ -58,6 +58,8 @@ data class AndroidTerminalViewState(
     val outboundSensorSendCount: Int = 0,
     val lastOutboundSensorUnixMs: Long = 0L,
     val streamReadySendCount: Int = 0,
+    /** Inbound control messages handled this session (Flutter shell `Responses` counter parity). */
+    val inboundConnectResponseCount: Int = 0,
     val localKeepAwakeEnabled: Boolean = false,
     val localFullscreenEnabled: Boolean = false,
     /** Local kiosk preference: transient vs sticky immersive behavior when fullscreen is applied. */

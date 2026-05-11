@@ -764,7 +764,7 @@ make android-client-lint
 
 ## Current Validation Evidence
 
-Last local validation: 2026-05-11 (`./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, boundary scripts after MainActivity copy-diagnostics smoke + tag; `connectedDebugAndroidTest` not re-run in this session).
+Last local validation: 2026-05-11 (`make android-client-test`, boundary scripts after inbound `ConnectResponse` counter + diagnostics; `connectedDebugAndroidTest` not re-run in this session).
 
 Passed:
 
@@ -1411,6 +1411,12 @@ Remaining validation:
 - `MainActivityLaunchSmokeTest` uses `performScrollTo()` before asserting or clicking those tags so connected runs stay stable.
 - Corrected `docs/client-android.md` focused instrumentation examples: use `-Pandroid.testInstrumentationRunnerArguments.class=…` (or `package=…`) instead of unsupported `--tests` on `connectedDebugAndroidTest`.
 - Re-verified on `Small_Phone(AVD)` with JDK 17: `./gradlew testDebugUnitTest`, `compileDebugAndroidTestKotlin`, and `connectedDebugAndroidTest` with `class=com.curtcox.terminals.android.smoke.MainActivityLaunchSmokeTest`.
+
+### 2026-05-11 (Flutter shell: inbound control response counter)
+
+- Added `AndroidTerminalViewState.inboundConnectResponseCount`, incremented on each handled `ConnectResponse` in `AndroidTerminalViewModel` (parity with Flutter `terminal_client_shell` `Responses: $_responses`).
+- Copyable diagnostics include `inbound_connect_response_count=` alongside existing outbound heartbeat/sensor and `stream_ready_send_count` lines; counter resets with `withoutHandshake` and on reconnect session refresh.
+- JVM: extended `serverSetUiResponseUpdatesRenderedRoot`; added `inboundConnectResponseCountIncrementsPerControlMessage`. Re-verified `make android-client-test` and Android boundary scripts on JDK 17.
 
 ## Test Plan
 

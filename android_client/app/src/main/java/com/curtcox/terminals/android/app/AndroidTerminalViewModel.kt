@@ -127,7 +127,10 @@ class AndroidTerminalViewModel(
             }
             mutableState.update {
                 val dispatched = dispatcher.dispatch(it, response)
-                val enriched = applyCommandResultDiagnostics(dispatched, response, pendingSnapshot)
+                val enriched =
+                    applyCommandResultDiagnostics(dispatched, response, pendingSnapshot).copy(
+                        inboundConnectResponseCount = it.inboundConnectResponseCount + 1,
+                    )
                 val endpoint = parser.parse(enriched.endpointText)
                 var diagnostics =
                     formatDiagnostics(
@@ -1260,6 +1263,7 @@ class AndroidTerminalViewModel(
                             outboundSensorSendCount = 0,
                             lastOutboundSensorUnixMs = 0L,
                             streamReadySendCount = 0,
+                            inboundConnectResponseCount = 0,
                         )
                     }
                     if (appInForeground) {
@@ -1338,6 +1342,7 @@ class AndroidTerminalViewModel(
             outboundSensorSendCount = 0,
             lastOutboundSensorUnixMs = 0L,
             streamReadySendCount = 0,
+            inboundConnectResponseCount = 0,
             availableApplicationIntents = listOf("terminal"),
             selectedApplicationIntent = "terminal",
             applicationLaunchQueuedIntent = null,
@@ -1534,6 +1539,7 @@ class AndroidTerminalViewModel(
                 appendLine("outbound_sensor_send_count=${src.outboundSensorSendCount}")
                 appendLine("last_outbound_sensor_unix_ms=${src.lastOutboundSensorUnixMs}")
                 appendLine("stream_ready_send_count=${src.streamReadySendCount}")
+                appendLine("inbound_connect_response_count=${src.inboundConnectResponseCount}")
             }
             handshakeSource?.lastCommandResultRequestId?.takeIf { it.isNotBlank() }?.let {
                 appendLine("last_command_result_request_id=$it")
