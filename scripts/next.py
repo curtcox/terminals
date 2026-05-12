@@ -36,6 +36,7 @@ USECASES = REPO / "usecases.md"
 USECASES_DIR = REPO / "usecases"
 USECASE_VALIDATE_SH = REPO / "scripts" / "usecase-validate.sh"
 BUG_REPORTS_DIR = REPO / "terminal_server" / "logs" / "bug_reports"
+RESOLVED_BUGS_DIR = REPO / "terminal_server" / "bug_reports" / "resolved"
 
 STALE_DAYS = 14
 
@@ -128,15 +129,24 @@ def stale_building(plans, today: _dt.date) -> "list[dict]":
 
 
 def _resolved_bug_descriptions() -> "set[str]":
-    """Return descriptions from resolved.txt that should be excluded from reports."""
-    resolved_file = BUG_REPORTS_DIR / "resolved.txt"
-    if not resolved_file.is_file():
+    """Return descriptions of resolved bugs that should be excluded from reports.
+
+    Reads `terminal_server/bug_reports/resolved/*.json`. Each file is one
+    resolved-bug record written by `scripts/bug-resolve.py`. The `description`
+    field is normalized the same way callers normalize the live report
+    descriptions (whitespace collapsed, 80-char cap).
+    """
+    if not RESOLVED_BUGS_DIR.is_dir():
         return set()
-    resolved = set()
-    for line in resolved_file.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            resolved.add(" ".join(line.split())[:80])
+    resolved: "set[str]" = set()
+    for record_file in RESOLVED_BUGS_DIR.glob("*.json"):
+        try:
+            data = json.loads(record_file.read_bytes())
+        except Exception:
+            continue
+        desc = data.get("description")
+        if isinstance(desc, str) and desc:
+            resolved.add(" ".join(desc.split())[:80])
     return resolved
 
 
@@ -146,7 +156,8 @@ def collect_bug_summary() -> "list[dict]":
     Groups by normalized description (whitespace collapsed, 80-char cap).
     Returns [] when the directory is absent (CI without a local log tree).
     Each entry: {description, count, most_recent_date}.
-    Descriptions listed in resolved.txt are excluded (bug is fixed).
+    Descriptions with a matching record under
+    `terminal_server/bug_reports/resolved/` are excluded (bug is fixed).
     """
     if not BUG_REPORTS_DIR.is_dir():
         return []

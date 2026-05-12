@@ -89,6 +89,21 @@ Follow the project's core rules from [CLAUDE.md](../../../CLAUDE.md):
 
 After the change, run the relevant gate(s): `make client-test` / `make server-test` / `make all-check`. If there's a matching use-case ID for the broken feature, also run `make usecase-validate USECASE=<ID>` (see the `usecase-validate` skill).
 
+### 7. Record the resolution
+
+After the fix is committed and the regression test passes, record the bug as resolved so `scripts/next.py` and `scripts/pick-next-work.py` stop surfacing it:
+
+```
+scripts/bug-resolve.py \
+    --report-id <report_id> \
+    --token-word <word> \
+    --fix-commit <git-sha> \
+    --regression-test "<test name, e.g. terminal_client/test/foo_test.dart::scanLan_noOpOnWeb>" \
+    --root-cause "<one-line root cause>"
+```
+
+Repeat `--fix-commit` / `--regression-test` for multiple commits or tests. The script writes `terminal_server/bug_reports/resolved/<report_id>.json` and validates every `--fix-commit` SHA exists in git history. Commit the new file along with the fix.
+
 ## Worked example — word "photo" (2026-04-18)
 
 1. `grep '"bug_token_word":"photo"' terminal_server/logs/terminals.jsonl` → `report_id=bug-20260418t222807.151-44d18db8`, `report_path=logs/bug_reports/2026-04-18/bug-20260418t222807.151-44d18db8.json`.

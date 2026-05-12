@@ -28,7 +28,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	android-client-build android-client-test android-client-lint android-client-deps android-client-dependency-check android-client-compile-android-test android-client-connected-test android-client-gradle-stop android-client-boundary android-client-boundary-test \
 	web-client-build web-client-test web-client-lint web-client-boundary web-client-proto-check web-client-smoke-test run-web-client \
 	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-generate proto-contract-test proto-contract-verify \
-	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next \
+	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index pick-next-work next bug-resolved-check bug-resolve-test \
 	all-lint all-test all-check ci-local stop-server stop-server-test run-server run-client-web run-web-client \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
 	ui-inspect-test
@@ -305,11 +305,17 @@ next:
 quality-check:
 	@python3 ./scripts/find-oversized-files.py --check
 
+bug-resolved-check:
+	@python3 ./scripts/check-resolved-bugs.py
+
+bug-resolve-test:
+	@python3 ./scripts/test_bug_resolve.py
+
 all-lint: server-lint client-lint client-boundary android-client-boundary android-client-lint web-client-lint proto-lint
 
 all-test: server-test client-test client-boundary-test android-client-boundary-test android-client-test android-client-compile-android-test web-client-test
 
-all-check: quality-check all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all android-client-build web-client-build development-docs-test usecases-index validation-matrix
+all-check: quality-check bug-resolved-check bug-resolve-test all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all android-client-build web-client-build development-docs-test usecases-index validation-matrix
 
 ci-local: all-check
 

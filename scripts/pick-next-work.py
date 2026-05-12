@@ -28,21 +28,31 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 PLANS = REPO / "plans"
 BUG_REPORTS_DIR = REPO / "terminal_server" / "logs" / "bug_reports"
+RESOLVED_BUGS_DIR = REPO / "terminal_server" / "bug_reports" / "resolved"
 
 ATTENTION_STATUSES = {"shipped-buggy", "shipped-untested", "open"}
 NONTRIVIAL_LINE_THRESHOLD = 200  # plans larger than this need a plan-first pass
 
 
 def _resolved_bug_descriptions() -> "set[str]":
-    """Return descriptions from resolved.txt that should be excluded from the work queue."""
-    resolved_file = BUG_REPORTS_DIR / "resolved.txt"
-    if not resolved_file.is_file():
+    """Return descriptions of resolved bugs that should be excluded from the work queue.
+
+    Reads `terminal_server/bug_reports/resolved/*.json`. Each file is one
+    resolved-bug record written by `scripts/bug-resolve.py`. The `description`
+    field is normalized the same way live report descriptions are normalized
+    below (whitespace collapsed, 80-char cap).
+    """
+    if not RESOLVED_BUGS_DIR.is_dir():
         return set()
-    resolved = set()
-    for line in resolved_file.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            resolved.add(" ".join(line.split())[:80])
+    resolved: "set[str]" = set()
+    for record_file in RESOLVED_BUGS_DIR.glob("*.json"):
+        try:
+            data = json.loads(record_file.read_bytes())
+        except Exception:
+            continue
+        desc = data.get("description")
+        if isinstance(desc, str) and desc:
+            resolved.add(" ".join(desc.split())[:80])
     return resolved
 
 
@@ -53,7 +63,8 @@ def collect_open_bugs() -> "list[dict]":
     description (trimmed to 80 chars), counts occurrences, and returns them
     sorted most-frequent first so the heaviest hitter is picked first.
 
-    Descriptions listed in resolved.txt are excluded (bug is fixed).
+    Descriptions with a matching record under
+    `terminal_server/bug_reports/resolved/` are excluded (bug is fixed).
 
     Returns [] when the directory is absent (CI without a local log tree).
     """
