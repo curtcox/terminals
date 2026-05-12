@@ -11,7 +11,7 @@ last-reviewed: 2026-05-12
 
 Target repository path: `plans/features/android-client-fire-tablet-validation/plan.md`
 
-Continuation of [`plans/features/android-client/plan.md`](../android-client/plan.md), which is code-complete (`shipped-validated`). All ten implementation phases of the native Android client are merged and pass automated repository gates plus the CI emulator instrumentation job. The remaining work is the validation and dependency selection that requires real Fire OS hardware, a multicast-capable LAN, and a Fire-OS-compatible WebRTC stack — none of which can be closed by the existing automated gates.
+Continuation of [`plans/features/android-client/plan.md`](../android-client/plan.md), which is code-complete (`shipped-validated`). All ten implementation phases of the native Android client are merged and pass automated repository gates plus the CI emulator instrumentation job. The remaining work is **physical** validation on Fire OS (smoke tests, real LAN discovery, and on-device live WebRTC audio) — none of which can be closed by the existing automated gates.
 
 Preserves the repository rules from `AGENTS.md`, `CLAUDE.md`, `masterplan.md`, and the parent plan:
 
@@ -22,7 +22,7 @@ Preserves the repository rules from `AGENTS.md`, `CLAUDE.md`, `masterplan.md`, a
 The native Android client under `android_client/` ships behind two open gates:
 
 1. **No physical Fire tablet has been used to confirm protocol parity end-to-end.** CI runs `connectedDebugAndroidTest` on a `reactivecircus/android-emulator-runner@v2` API 30 `google_apis` x86_64 emulator. That covers instrumentation regressions but does not exercise Fire OS 6+ devices, Amazon-tablet network stacks, Fire OS power/wake behavior, or Fire-tablet-specific permission UX.
-2. **Live WebRTC media is explicitly disabled.** `AndroidWebRtcAdapter.disabled(...)` is wired through `AndroidClientDependencies.fromContext` so capability reporting and `AndroidLiveMediaSession` never falsely advertise transport. The native client currently surfaces `last_live_media=Unsupported` for any server-issued `StartStream` that requests live media. A Fire-OS-compatible WebRTC implementation has not been selected.
+2. **Live WebRTC on real Fire hardware is unvalidated.** `io.github.webrtc-sdk:android` is wired through `WebRtcSdkAndroidAdapter` + `WebRtcSdkLiveMediaSession` with a `disabled(...)` fallback when the engine does not load. Emulator and JVM tests cover the enabled paths, but no Fire tablet has yet confirmed an audible server-issued `StartStream` or capture lifecycle end-to-end.
 
 These items appear under **Remaining validation** in the parent plan but never block CI, so they tend to be deferred. Splitting them into a dedicated plan makes them trackable independent of further protocol/parity work landing against the now-complete parent plan.
 
@@ -47,11 +47,11 @@ These items appear under **Remaining validation** in the parent plan but never b
 ## Current State
 
 - `android_client/` builds a debug APK that installs via `adb install` on Fire tablets per `docs/client-android.md`.
-- `AndroidClientDependencies.fromContext` wires `AndroidWebRtcAdapter.disabled("dependency-not-selected")` (or equivalent reason) into both capability reporting and `WebRtcGatedLiveMediaSession`.
-- `AndroidLiveMediaSession.fromAdapter(disabled)` returns `live-media-session-not-implemented` for `StartStream` / `WebRTCSignal`, and the ViewModel surfaces `last_live_media=Unsupported` in copyable diagnostics.
+- `AndroidClientDependencies.fromContext` wires `WebRtcSdkAndroidAdapter` + `WebRtcSdkLiveMediaSession` when the WebRTC AAR loads; on init failure or absent dependency it falls back to `AndroidWebRtcAdapter.disabled(...)` and the gated not-implemented session (same diagnostic shape as before).
+- JVM and instrumentation tests cover enabled-adapter paths; smoke records non-`Unsupported` `last_live_media` lines when the fake supported adapter is used. Real-device audio playback for server-issued `StartStream` is still unconfirmed pending Phase A hardware.
 - CI emulator runs cover orientation, lifecycle, permission, kiosk, discovery-fallback, media-command, bug-report, copy-diagnostics, and reconnect smoke paths.
-- `docs/client-android.md` documents Fire developer-mode, ADB install, manual endpoint format (`ws://`, `wss://`, `grpc://`, `grpcs://`), NSD/mDNS quirks, kiosk toggles, and the disabled-WebRTC posture.
-- No physical Fire tablet smoke results have been recorded in this repository.
+- `docs/client-android.md` documents Fire developer-mode, ADB install, manual endpoint format (`ws://`, `wss://`, `grpc://`, `grpcs://`), NSD/mDNS quirks, kiosk toggles, WebRTC SDK version override (`webrtc.sdk.version`), and runtime fallback to the disabled adapter.
+- No physical Fire tablet smoke results have been recorded in this repository (`progress.md` logs code milestones; device evidence sections remain to be filled after Phases A–B).
 
 ## Phases
 
@@ -104,7 +104,7 @@ Acceptance criteria:
 
 ### Phase C: WebRTC Dependency Selection & Enablement
 
-Status: not started
+Status: code complete in repo (2026-05-12); on-device live-audio acceptance from Phase C acceptance criteria awaits Phase A Fire hardware run.
 
 Tasks:
 
@@ -132,11 +132,11 @@ Acceptance criteria:
 
 ### Phase D: Evidence & Plan Closure
 
-Status: not started
+Status: in progress — `progress.md` exists and records Phase C implementation; paste device diagnostics and LAN notes when Phases A–B complete.
 
 Tasks:
 
-1. Create `plans/features/android-client-fire-tablet-validation/progress.md` (mirror the pattern from `plans/features/io-abstraction/progress.md`). Record:
+1. ~~Create~~ Maintain `plans/features/android-client-fire-tablet-validation/progress.md` (mirror the pattern from `plans/features/io-abstraction/progress.md`). Record:
    - Tablet hardware (manufacturer, model, Fire OS version, API level).
    - LAN details (router/AP, multicast behavior).
    - Pasted **Copy diagnostics** output from a successful connected session.

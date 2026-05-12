@@ -12,8 +12,7 @@ Updated `docs/client-android.md` to remove stale "WebRTC media transport remains
 explicitly disabled" language. Now describes the enabled posture: `WebRtcSdkAndroidAdapter`
 initializes `PeerConnectionFactory` at startup and falls back to `disabled(...)` automatically
 on init failure. Added `webrtc.sdk.version` local.properties override docs and explained the
-runtime fallback diagnostic (`last_live_media=start_stream:<id>:<reason>`). Phase C is now
-complete — all automated gates pass and docs reflect the shipped state.
+runtime fallback diagnostic (`last_live_media=start_stream:<id>:<reason>`). Phase C is **code and docs complete** (automated gates pass); the plan marks on-device live-audio acceptance as pending Phase A hardware.
 
 ---
 
@@ -117,6 +116,6 @@ scripts still pass.
 
 ---
 
-## Phases A, B, D
+## Phases A, B, D (device + evidence)
 
-Not started. Require physical Fire OS 6+ hardware.
+Not started for **device evidence** (hardware smoke, LAN notes, pasted diagnostics). `progress.md` already records Phase C implementation; fill evidence sections after Phases A–B on a Fire OS 6+ tablet.
