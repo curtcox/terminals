@@ -398,6 +398,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
       return;
     }
     _syncMonitoringLoops();
+    if (_appIsForeground && _shouldStayConnected && !_hasActiveControlSession && !_isConnecting) {
+      _reconnectAttempt = 0;
+      _scheduleReconnect();
+    }
     _sendLifecycleCapabilityUpdate(reason: 'app_lifecycle_change');
   }
 

@@ -539,6 +539,12 @@ extension _ConnectionExtension on _TerminalClientShellState {
       if (!_shouldStayConnected || !mounted) {
         return;
       }
+      if (!_appIsForeground) {
+        // Don't attempt to reconnect while backgrounded — the server will time
+        // out again immediately since heartbeats are suppressed in background.
+        // didChangeAppLifecycleState will trigger reconnect on resume.
+        return;
+      }
       unawaited(_startStream(userInitiated: false));
     });
   }
