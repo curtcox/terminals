@@ -46,6 +46,60 @@ void main() {
     expect(afterPause, beforePause);
   });
 
+  testWidgets(
+    'does not reconnect-loop when stream drops while app is backgrounded',
+    (WidgetTester tester) async {
+      final harness = FakeClientHarness();
+      await tester.pumpWidget(
+        TerminalClientApp(
+          clientFactory: harness.createClient,
+          mediaEngineFactory: harness.createMediaEngine,
+          reconnectDelayBase: const Duration(milliseconds: 20),
+          reconnectDelayMaxSeconds: 1,
+        ),
+      );
+
+      await tester.tap(find.text('Connect Stream'));
+      await tester.pump();
+      harness.lastClient.emitResponse(
+        ConnectResponse()..registerAck = (RegisterAck()),
+      );
+      await tester.pump();
+      expect(harness.createdClients.length, 1);
+
+      // Background the app — heartbeats are suppressed in background.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+
+      // Server drops the connection (as it would after a heartbeat timeout).
+      await harness.lastClient.closeStream();
+      await tester.pump();
+
+      // Wait well past the reconnect delay — no reconnect should occur while backgrounded.
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(harness.createdClients.length, 1,
+          reason: 'should not reconnect while backgrounded');
+
+      // Return to foreground via the valid state sequence.
+      tester.binding
+          .handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding
+          .handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding
+          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      for (var i = 0; i < 20; i++) {
+        if (harness.createdClients.length >= 2) break;
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(harness.createdClients.length, 2,
+          reason: 'should reconnect on foreground resume');
+    },
+  );
+
   testWidgets('reconnect creates a new control client after stream failure', (
     WidgetTester tester,
   ) async {

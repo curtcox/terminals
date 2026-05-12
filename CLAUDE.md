@@ -24,6 +24,14 @@ These rules always win over shipping more features. Apply them in order before s
 4. **Use CI to enforce quality.** When you fix a class of bug or add a new invariant, add a CI check (test, lint rule, generated-code drift check, `make` target wired into a workflow) so it cannot regress silently. Prefer automation over written rules.
 5. **Simplicity over backward compatibility.** This project favors clean, simple code over preserving old shapes. Delete dead code, rename for clarity, change protobuf and APIs when the new design is better, and update all callers. Do not add compatibility shims, deprecated aliases, or `// kept for compatibility` comments unless an external constraint requires it.
 
+## Bug Handling
+
+When working a bug report:
+
+1. Write an automated test that attempts to reproduce the bug.
+2. If the test fails (bug reproduced), fix the bug and confirm the test passes.
+3. If the test passes (bug not reproduced), the bug is already fixed — close it.
+
 ## Core Rules
 
 1. Never add scenario-specific behavior to the client.
