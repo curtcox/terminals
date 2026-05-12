@@ -38,6 +38,7 @@ import 'package:terminal_client/gen/terminals/io/v1/io.pb.dart' as iov1;
 import 'package:terminal_client/gen/terminals/ui/v1/ui.pb.dart' as uiv1;
 import 'package:terminal_client/media/playback.dart';
 import 'package:terminal_client/media/webrtc_engine.dart';
+import 'package:terminal_client/ui/idle_main_layer_placeholder.dart';
 import 'package:terminal_client/ui/server_driven_action.dart';
 import 'package:terminal_client/ui/server_driven_node_key.dart';
 import 'package:terminal_client/ui/server_driven_renderer.dart';
@@ -127,6 +128,7 @@ class TerminalClientShell extends StatefulWidget {
     required this.screenMetricsChangeListenable,
     required this.displayGeometryDebounceInterval,
     required this.mediaPermissionProbe,
+    this.displaySurfaceMode = false,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -146,6 +148,10 @@ class TerminalClientShell extends StatefulWidget {
   final Listenable? screenMetricsChangeListenable;
   final Duration displayGeometryDebounceInterval;
   final MediaPermissionProbe mediaPermissionProbe;
+  /// When true, after registration and before the first server `SetUI`, show
+  /// [idleMainLayerPlaceholderRoot] fullscreen (terminal-ui plan, Phase H).
+  /// Defaults from [TerminalClientApp] via `TERMINALS_DISPLAY_SURFACE`.
+  final bool displaySurfaceMode;
 
   @override
   State<TerminalClientShell> createState() => _TerminalClientShellState();
@@ -247,6 +253,19 @@ class _TerminalClientShellState extends State<TerminalClientShell>
       <diagv1.ControlErrorEntry>[];
   final Map<String, double> _lastSensorSnapshot = <String, double>{};
   final CapabilitySession _capabilitySession = CapabilitySession();
+
+  /// Effective UI root: server `SetUI` tree, or the idle placeholder while
+  /// [TerminalClientShell.displaySurfaceMode] is enabled and awaiting first UI.
+  uiv1.Node? get _resolvedUiRoot {
+    final serverRoot = _activeRoot;
+    if (serverRoot != null) {
+      return serverRoot;
+    }
+    if (widget.displaySurfaceMode && _isConnectionRegistered) {
+      return idleMainLayerPlaceholderRoot();
+    }
+    return null;
+  }
   int _lastHeartbeatUnixMs = 0;
   int _pendingHeartbeatUnixMs = 0;
   double _lastRttMs = 0;
@@ -493,8 +512,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     if (directionality != null) {
       _lastKnownTextDirection = directionality;
     }
-    final hideClientChrome = shouldHideClientChromeForRoot(_activeRoot);
+    final resolvedRoot = _resolvedUiRoot;
+    final hideClientChrome = shouldHideClientChromeForRoot(resolvedRoot);
     if (hideClientChrome) {
+      final root = resolvedRoot!;
       return RepaintBoundary(
         key: _bugReportScreenshotKey,
         child: Scaffold(
@@ -506,7 +527,7 @@ class _TerminalClientShellState extends State<TerminalClientShell>
             child: Stack(
               children: [
                 SizedBox.expand(
-                  child: _buildServerDrivenRenderer(_activeRoot!),
+                  child: _buildServerDrivenRenderer(root),
                 ),
                 if (_shouldShowFullscreenStatusOverlay())
                   Positioned(

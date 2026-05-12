@@ -74,3 +74,21 @@ parent: plans/features/terminal-ui/plan.md
   `TestGeneratedSessionMidFlightOverlayIdempotent` both pass; the
   `t.Skip` markers were removed.
 - `make all-check` is green.
+
+## 2026-05-12
+
+- **Phase H (idle placeholder):** Added `ui.IdleMainLayerPlaceholder()` plus
+  `TestIdleMainLayerPlaceholderGoldenWire` (semantic match vs
+  `testdata/idle_main_layer_placeholder_root.pb`) and Dart
+  `idleMainLayerPlaceholderRoot()` with parity checks. `TerminalClientShell`
+  gains `displaySurfaceMode` (wired from `TerminalClientApp` /
+  `TERMINALS_DISPLAY_SURFACE`); when enabled and registered before the first
+  `SetUI`, the client shows the canonical placeholder fullscreen instead of
+  dev chrome.
+- **Tests:** `widget_test_terminal_ui_phase_h.dart` covers cold-start
+  placeholder, first `SetUI` replacement, and “no idle cache” across a fresh
+  shell dispose/recreate. `idle_main_layer_placeholder_test.dart` fingerprints
+  the unmarshaled golden.
+- **`make client-build-ios`:** Treat Xcode’s “iOS X.Y Platform Not Installed”
+  the same as a missing simulator SDK so `make all-check` skips iOS locally
+  when the platform bundle is absent.

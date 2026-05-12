@@ -12,6 +12,11 @@ const bool _autoConnectOnStartupDefault = bool.fromEnvironment(
   defaultValue: kIsWeb,
 );
 
+const bool _displaySurfaceModeDefault = bool.fromEnvironment(
+  'TERMINALS_DISPLAY_SURFACE',
+  defaultValue: false,
+);
+
 class TerminalClientApp extends StatelessWidget {
   const TerminalClientApp({
     super.key,
@@ -32,6 +37,7 @@ class TerminalClientApp extends StatelessWidget {
     this.screenMetricsChangeListenable,
     this.displayGeometryDebounceInterval = kDisplayGeometryDebounceInterval,
     this.mediaPermissionProbe = defaultMediaPermissionProbe,
+    this.displaySurfaceMode = _displaySurfaceModeDefault,
   });
 
   final TerminalControlClientFactory clientFactory;
@@ -51,6 +57,9 @@ class TerminalClientApp extends StatelessWidget {
   final Listenable? screenMetricsChangeListenable;
   final Duration displayGeometryDebounceInterval;
   final MediaPermissionProbe mediaPermissionProbe;
+  /// Immersive display-surface mode: after register, show the idle placeholder
+  /// until the first server `SetUI` (see `TERMINALS_DISPLAY_SURFACE`).
+  final bool displaySurfaceMode;
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +83,7 @@ class TerminalClientApp extends StatelessWidget {
         screenMetricsChangeListenable: screenMetricsChangeListenable,
         displayGeometryDebounceInterval: displayGeometryDebounceInterval,
         mediaPermissionProbe: mediaPermissionProbe,
+        displaySurfaceMode: displaySurfaceMode,
       ),
     );
   }
