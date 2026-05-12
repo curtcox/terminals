@@ -19,10 +19,11 @@ Terminals is a thin-client system:
 These rules always win over shipping more features. Apply them in order before starting any new work.
 
 1. **Quality before quantity.** Prioritize clearer specs, better design, and better code over adding features. If a change can be smaller, simpler, or better-named, do that first.
-2. **Fix bugs before features.** If you discover an existing bug or known-broken code path in the area you are about to touch, fix it before adding anything new. Do not pile features on top of broken foundations.
-3. **Fix missing tests and static analysis before features.** If a unit you are about to extend lacks tests, or a lint/static-analysis check is disabled or missing where it would catch the kind of bug you just saw, add the test or enable the check first.
-4. **Use CI to enforce quality.** When you fix a class of bug or add a new invariant, add a CI check (test, lint rule, generated-code drift check, `make` target wired into a workflow) so it cannot regress silently. Prefer automation over written rules.
-5. **Simplicity over backward compatibility.** This project favors clean, simple code over preserving old shapes. Delete dead code, rename for clarity, change protobuf and APIs when the new design is better, and update all callers. Do not add compatibility shims, deprecated aliases, or `// kept for compatibility` comments unless an external constraint requires it.
+2. **Fix failing CI gates before features.** Before picking up any feature work, run `make ci-status` to probe the current gate state, then `make next` to get the priority recommendation. Any failing gate (detekt, lint, etc.) appears as Priority 0 quality debt and must be cleared before new feature work begins.
+3. **Fix bugs before features.** If you discover an existing bug or known-broken code path in the area you are about to touch, fix it before adding anything new. Do not pile features on top of broken foundations.
+4. **Fix missing tests and static analysis before features.** If a unit you are about to extend lacks tests, or a lint/static-analysis check is disabled or missing where it would catch the kind of bug you just saw, add the test or enable the check first.
+5. **Use CI to enforce quality.** When you fix a class of bug or add a new invariant, add a CI check (test, lint rule, generated-code drift check, `make` target wired into a workflow) so it cannot regress silently. Prefer automation over written rules.
+6. **Simplicity over backward compatibility.** This project favors clean, simple code over preserving old shapes. Delete dead code, rename for clarity, change protobuf and APIs when the new design is better, and update all callers. Do not add compatibility shims, deprecated aliases, or `// kept for compatibility` comments unless an external constraint requires it.
 
 ## Bug Handling
 
@@ -42,6 +43,7 @@ When working a bug report:
 ## Build and Check Commands
 
 ```bash
+make ci-status          # probe CI gates and write scripts/ci-status.json (run before make next)
 make server-build
 make server-test
 make server-lint

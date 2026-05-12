@@ -296,6 +296,9 @@ validation-matrix:
 usecases-index:
 	python3 ./scripts/generate-usecases-index.py
 
+ci-status:
+	@scripts/check-ci-gates.sh; true
+
 pick-next-work:
 	@python3 ./scripts/pick-next-work.py
 

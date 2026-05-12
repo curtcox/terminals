@@ -4,7 +4,8 @@
 Walks plans/ and parses YAML frontmatter, then groups candidates into five
 priority buckets used by the "pick the next work" prompt:
 
-  0. Quality debt      — open bug reports; FLAG-severity oversized source files
+  0. Quality debt      — open bug reports; FLAG-severity oversized source files;
+                         failing CI gates recorded in scripts/ci-status.json
   1. Needs attention   — shipped-buggy, shipped-untested, open audits/incidents
   2. In flight         — status: building
   3. Promote to validated — shipped-untested with no automated validation wired
@@ -14,6 +15,10 @@ priority buckets used by the "pick the next work" prompt:
 Outputs a markdown report. The first non-empty bucket's first entry is the
 recommended pick. Larger plans are flagged as non-trivial so the agent knows
 to STOP and report a plan before implementing.
+
+CI gate status is read from scripts/ci-status.json, written by
+`scripts/check-ci-gates.sh` (run via `make ci-status`).  If the file is
+absent, CI gates are not surfaced — run `make ci-status` to populate it.
 
 Usage:
   python3 scripts/pick-next-work.py            # human/agent-readable report
@@ -32,6 +37,7 @@ RESOLVED_BUGS_DIR = REPO / "terminal_server" / "bug_reports" / "resolved"
 
 ATTENTION_STATUSES = {"shipped-buggy", "shipped-untested", "open"}
 NONTRIVIAL_LINE_THRESHOLD = 200  # plans larger than this need a plan-first pass
+CI_STATUS_FILE = REPO / "scripts" / "ci-status.json"
 
 
 def _resolved_bug_descriptions() -> "set[str]":
@@ -102,6 +108,44 @@ def collect_open_bugs() -> "list[dict]":
             "_count": cnt,
         })
     return bugs
+
+
+def collect_ci_failures() -> "list[dict]":
+    """Return synthetic quality-debt entries for failing CI gates.
+
+    Reads ``scripts/ci-status.json``, written by ``scripts/check-ci-gates.sh``
+    (run via ``make ci-status``).  Each gate whose ``status`` is ``"fail"``
+    becomes a Priority 0 quality-debt item so it blocks feature work.
+
+    Returns [] when the file is absent (gates not yet probed) or unreadable.
+    """
+    if not CI_STATUS_FILE.exists():
+        return []
+    try:
+        data = json.loads(CI_STATUS_FILE.read_bytes())
+    except Exception:
+        return []
+    entries = []
+    for gate in data.get("gates", []):
+        if gate.get("status") != "fail":
+            continue
+        name = gate.get("name", "unknown-gate")
+        count = gate.get("violation_count", 0)
+        count_s = f" ({count} violation(s))" if count else ""
+        generated = data.get("generated", "unknown date")
+        entries.append({
+            "path": f"scripts/ci-status.json (gate: {name})",
+            "title": f"Fix CI gate failure: {name}{count_s} — as of {generated}",
+            "kind": "quality-debt",
+            "status": "quality-debt",
+            "owner": "unowned",
+            "validation": "none",
+            "lines": 0,
+            "_debt_kind": "ci-failure",
+            "_gate": name,
+            "_violation_count": count,
+        })
+    return entries
 
 
 def collect_flag_oversized() -> "list[dict]":
@@ -187,10 +231,9 @@ def collect():
 def bucket(plans):
     section = defaultdict(list)
 
-    # Priority 0: quality debt — bugs first, then FLAG oversized source files.
-    # Bugs outrank oversized files: a broken behavior is more urgent than a
-    # large-but-working file.
-    quality_debt = collect_open_bugs() + collect_flag_oversized()
+    # Priority 0: quality debt — CI failures first (broken gate blocks all
+    # other work), then bug reports (broken behavior), then FLAG oversized files.
+    quality_debt = collect_ci_failures() + collect_open_bugs() + collect_flag_oversized()
     section["quality_debt"] = quality_debt
 
     needs_attention = [p for p in plans if p["status"] in ATTENTION_STATUSES]
@@ -223,7 +266,7 @@ def bucket(plans):
 def first_nonempty(section):
     order = ["quality_debt", "needs_attention", "in_flight", "promote_to_validated", "planned_small"]
     bucket_reason = {
-        "quality_debt": "Priority 0: Quality debt (open bugs / FLAG-severity oversized source) — fix before new features",
+        "quality_debt": "Priority 0: Quality debt (failing CI gates / open bugs / FLAG-severity oversized source) — fix before new features",
         "needs_attention": "Priority 1: Needs attention (shipped-buggy / shipped-untested / open)",
         "in_flight": "Priority 2: Already in flight (status: building) — finish it before starting new work",
         "promote_to_validated": "Priority 3: Promote shipped-untested → shipped-validated by wiring an automated usecase",
@@ -267,7 +310,7 @@ def render_markdown(section):
     out.append("")
 
     headings = {
-        "quality_debt": "Priority 0 — Quality debt (bugs / FLAG oversized)",
+        "quality_debt": "Priority 0 — Quality debt (CI failures / bugs / FLAG oversized)",
         "needs_attention": "Priority 1 — Needs attention",
         "in_flight": "Priority 2 — In flight (building)",
         "promote_to_validated": "Priority 3 — Ready to promote to shipped-validated",
