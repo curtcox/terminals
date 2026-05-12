@@ -315,15 +315,15 @@ class AndroidControlSessionControllerTest {
         fun baseInputWithMicAndCamera(): AndroidCapabilitySnapshotInput =
             baseInput().copy(
                 hardware =
-                    AndroidHardwareCapabilities(
-                        microphone = true,
-                        frontCamera = true,
-                    ),
+                AndroidHardwareCapabilities(
+                    microphone = true,
+                    frontCamera = true,
+                ),
                 permissions =
-                    PermissionCapabilityState(
-                        microphoneGranted = true,
-                        cameraGranted = true,
-                    ),
+                PermissionCapabilityState(
+                    microphoneGranted = true,
+                    cameraGranted = true,
+                ),
             )
     }
 }

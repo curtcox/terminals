@@ -5,23 +5,22 @@ import com.curtcox.terminals.android.media.AudioPlaybackResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import terminals.control.v1.Control
 
-internal fun Control.ConnectResponse.requiresCapabilityRebaseline(): Boolean {
-    if (!hasError()) return false
-    if (error.code != Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION) return false
-    return error.message.contains("stale", ignoreCase = true) &&
+internal fun Control.ConnectResponse.requiresCapabilityRebaseline(): Boolean =
+    hasError() &&
+        error.code == Control.ControlErrorCode.CONTROL_ERROR_CODE_PROTOCOL_VIOLATION &&
+        error.message.contains("stale", ignoreCase = true) &&
         error.message.contains("generation", ignoreCase = true)
-}
 
 internal fun discoveredEndpointText(server: DiscoveredServer): String {
     val ws = server.webSocketEndpoint.trim()
     if (ws.isNotEmpty()) return ws
     val grpc = server.grpcEndpoint.trim()
-    if (grpc.isNotEmpty()) {
-        return if (grpc.contains("://")) grpc else "grpc://$grpc"
-    }
     val http = server.httpEndpoint.trim()
-    if (http.isNotEmpty()) return http
-    return "${server.host}:${server.port}"
+    return when {
+        grpc.isNotEmpty() -> if (grpc.contains("://")) grpc else "grpc://$grpc"
+        http.isNotEmpty() -> http
+        else -> "${server.host}:${server.port}"
+    }
 }
 
 internal fun withoutHandshake(state: AndroidTerminalViewState): AndroidTerminalViewState =

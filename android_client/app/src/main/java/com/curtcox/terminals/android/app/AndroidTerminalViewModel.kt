@@ -23,7 +23,7 @@ import com.curtcox.terminals.android.util.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -61,7 +61,8 @@ class AndroidTerminalViewModel(
 
     /** First [Control.RegisterAck] per connection triggers automatic scenario registry query (Flutter shell). */
     internal var registerAckScenarioQuerySent: Boolean = false
-    /** True after any inbound [Control.RegisterAck] for the active session (Flutter `_isConnectionRegistered` parity). */
+
+    /** True after any inbound [Control.RegisterAck] for the active session (`_isConnectionRegistered` parity). */
     internal var sawRegisterAck: Boolean = false
     internal val bugReportClock: Clock = Clock(dependencies.nowMillis)
     internal val bugReportQueue: ArrayDeque<Diagnostics.BugReport> = ArrayDeque()
@@ -464,19 +465,15 @@ class AndroidTerminalViewModel(
         val intent = mutableState.value.selectedApplicationIntent.trim()
         if (intent.isEmpty()) {
             mutableState.update { it.copy(lastError = "Application intent required") }
-            return
-        }
-        if (!sawRegisterAck) {
+        } else if (!sawRegisterAck) {
             mutableState.update { st ->
                 val next = st.copy(applicationLaunchQueuedIntent = intent, lastError = null)
                 next.copy(
                     diagnosticsText = formatDiagnostics(parser.parse(next.endpointText), next.connectionState, next),
                 )
             }
-            return
-        }
-        viewModelScope.launch {
-            sendApplicationLaunchNow(intent)
+        } else {
+            viewModelScope.launch { sendApplicationLaunchNow(intent) }
         }
     }
 
@@ -535,7 +532,6 @@ class AndroidTerminalViewModel(
             )
         queueOrSendBugReport(report)
     }
-
 
     /**
      * Shell `terminal_input` parity with Flutter `_sendKeyText`: streams UTF-16 text chunks (including
@@ -683,15 +679,12 @@ class AndroidTerminalViewModel(
         }
     }
 
-
     override fun onCleared() {
         stopNetworkMonitoring()
         dependencies.discovery.stop()
         disconnect()
         super.onCleared()
     }
-
-
 
     private fun resetPerConnectionShellState() {
         pendingRuntimeStatusRequestId = null
@@ -824,16 +817,18 @@ class AndroidTerminalViewModel(
     ): String {
         val capabilitySnapshot = runCatching { dependencies.capabilityProbe.current() }.getOrNull()
         return formatTerminalDiagnostics(
-            chrome = chrome,
-            endpoint = endpoint,
-            state = state,
-            networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
-            fireOsDeviceInfo = runCatching { dependencies.fireOsDeviceInfoProvider.current() }.getOrNull(),
-            capabilitySnapshot = capabilitySnapshot,
-            controlStatus = session?.status,
-            permissions = permissionEducation(capabilitySnapshot),
-            mediaSupport = mediaSupport(),
-            handshakeSource = handshakeSource,
+            TerminalDiagnosticsRequest(
+                chrome = chrome,
+                endpoint = endpoint,
+                state = state,
+                networkState = runCatching { dependencies.networkStateProvider.current() }.getOrNull(),
+                fireOsDeviceInfo = runCatching { dependencies.fireOsDeviceInfoProvider.current() }.getOrNull(),
+                capabilitySnapshot = capabilitySnapshot,
+                controlStatus = session?.status,
+                permissions = permissionEducation(capabilitySnapshot),
+                mediaSupport = mediaSupport(),
+                handshakeSource = handshakeSource,
+            )
         )
     }
 
@@ -1009,5 +1004,4 @@ class AndroidTerminalViewModel(
         if (mutableState.value.connectionState != ConnectionState.Connected) return
         refreshCapabilities(reason)
     }
-
 }

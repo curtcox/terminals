@@ -1,6 +1,12 @@
 package com.curtcox.terminals.android.app
 
+import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
+import com.curtcox.terminals.android.connection.ControlSessionStatus
+import com.curtcox.terminals.android.connection.EndpointResolution
+import com.curtcox.terminals.android.diagnostics.AndroidClientChrome
 import com.curtcox.terminals.android.discovery.DiscoveredServer
+import com.curtcox.terminals.android.platform.AndroidNetworkState
+import com.curtcox.terminals.android.platform.FireOsDeviceInfo
 import terminals.ui.v1.Ui
 
 data class AndroidTerminalViewState(
@@ -129,6 +135,19 @@ data class MediaSupportState(
         append("media_webrtc_reason=$webRtcReason")
     }
 }
+
+internal data class TerminalDiagnosticsRequest(
+    val chrome: AndroidClientChrome,
+    val endpoint: EndpointResolution?,
+    val state: ConnectionState,
+    val networkState: AndroidNetworkState?,
+    val fireOsDeviceInfo: FireOsDeviceInfo?,
+    val capabilitySnapshot: AndroidCapabilitySnapshotInput?,
+    val controlStatus: ControlSessionStatus?,
+    val permissions: PermissionEducationState,
+    val mediaSupport: MediaSupportState,
+    val handshakeSource: AndroidTerminalViewState? = null,
+)
 
 data class DiscoveryState(
     val scanning: Boolean = false,

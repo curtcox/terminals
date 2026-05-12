@@ -21,11 +21,11 @@ fun AndroidTerminalViewModel.setLocalKeepAwake(enabled: Boolean) {
             val next = st.copy(localKeepAwakeEnabled = enabled)
             next.copy(
                 diagnosticsText =
-                    formatDiagnostics(
-                        parser.parse(next.endpointText),
-                        next.connectionState,
-                        next,
-                    ),
+                formatDiagnostics(
+                    parser.parse(next.endpointText),
+                    next.connectionState,
+                    next,
+                ),
             )
         }
     }.onFailure { error ->
@@ -59,11 +59,11 @@ fun AndroidTerminalViewModel.setLocalFullscreen(enabled: Boolean) {
             val next = st.copy(localFullscreenEnabled = enabled)
             next.copy(
                 diagnosticsText =
-                    formatDiagnostics(
-                        parser.parse(next.endpointText),
-                        next.connectionState,
-                        next,
-                    ),
+                formatDiagnostics(
+                    parser.parse(next.endpointText),
+                    next.connectionState,
+                    next,
+                ),
             )
         }
     }.onFailure { error ->
@@ -83,11 +83,11 @@ fun AndroidTerminalViewModel.setLocalImmersiveSticky(enabled: Boolean) {
         var updated =
             next.copy(
                 diagnosticsText =
-                    formatDiagnostics(
-                        parser.parse(next.endpointText),
-                        next.connectionState,
-                        next,
-                    ),
+                formatDiagnostics(
+                    parser.parse(next.endpointText),
+                    next.connectionState,
+                    next,
+                ),
             )
         if (next.localFullscreenEnabled) {
             runCatching {
@@ -110,20 +110,25 @@ fun AndroidTerminalViewModel.setBrightness(value: Double) {
     }
 }
 
+private const val BRIGHT_DISPLAY_BRIGHTNESS = 1.0
+private const val DIM_DISPLAY_BRIGHTNESS = 0.5
+
 fun AndroidTerminalViewModel.setLocalBrightDisplay(enabled: Boolean) {
     runCatching {
-        dependencies.brightnessController.setBrightness(if (enabled) 1.0 else 0.5)
+        dependencies.brightnessController.setBrightness(
+            if (enabled) BRIGHT_DISPLAY_BRIGHTNESS else DIM_DISPLAY_BRIGHTNESS,
+        )
     }.onSuccess {
         dependencies.terminalSettings.setBrightDisplayEnabled(enabled)
         mutableState.update { st ->
             val next = st.copy(localBrightDisplayEnabled = enabled)
             next.copy(
                 diagnosticsText =
-                    formatDiagnostics(
-                        parser.parse(next.endpointText),
-                        next.connectionState,
-                        next,
-                    ),
+                formatDiagnostics(
+                    parser.parse(next.endpointText),
+                    next.connectionState,
+                    next,
+                ),
             )
         }
     }.onFailure { error ->

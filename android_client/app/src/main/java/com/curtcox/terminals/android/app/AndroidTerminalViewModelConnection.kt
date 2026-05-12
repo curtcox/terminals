@@ -70,7 +70,10 @@ internal fun AndroidTerminalViewModel.startCapabilityMonitor(connectedSession: A
                 }.onSuccess { sent ->
                     if (sent) {
                         mutableState.update {
-                            it.copy(diagnosticsText = "${it.diagnosticsText}\nlast_capability_delta=runtime_monitor_poll")
+                            it.copy(
+                                diagnosticsText =
+                                "${it.diagnosticsText}\nlast_capability_delta=runtime_monitor_poll",
+                            )
                         }
                     }
                 }.onFailure { error ->
@@ -115,8 +118,8 @@ internal fun AndroidTerminalViewModel.handleControlLoss(failedSession: AndroidCo
             )
         next.copy(
             diagnosticsText =
-                formatDiagnostics(endpoint, next.connectionState, next) +
-                    "\nreconnect_pending=${endpoint != null}",
+            formatDiagnostics(endpoint, next.connectionState, next) +
+                "\nreconnect_pending=${endpoint != null}",
         )
     }
     viewModelScope.launch { failedSession.close() }
@@ -145,8 +148,8 @@ internal fun AndroidTerminalViewModel.startReconnect(
                         )
                     basis.copy(
                         diagnosticsText =
-                            formatDiagnostics(endpoint, ConnectionState.Connecting, basis) +
-                                "\nreconnect_attempt=$attempt\nreconnect_cause=$reconnectCause",
+                        formatDiagnostics(endpoint, ConnectionState.Connecting, basis) +
+                            "\nreconnect_attempt=$attempt\nreconnect_cause=$reconnectCause",
                     )
                 }
                 val nextSession = dependencies.sessionFactory(responseSink)
@@ -183,8 +186,8 @@ internal fun AndroidTerminalViewModel.startReconnect(
                             lastError = null,
                             reconnectAttempt = 0,
                             diagnosticsText =
-                                formatDiagnostics(endpoint, ConnectionState.Connected, it) +
-                                    "\nreconnect_success_attempt=$attempt\nreconnect_cause=$reconnectCause",
+                            formatDiagnostics(endpoint, ConnectionState.Connected, it) +
+                                "\nreconnect_success_attempt=$attempt\nreconnect_cause=$reconnectCause",
                         )
                     }
                     flushQueuedBugReports(nextSession)
@@ -197,8 +200,8 @@ internal fun AndroidTerminalViewModel.startReconnect(
                 val basis = it.copy(connectionState = ConnectionState.ReadyToConnect, lastError = lastError)
                 basis.copy(
                     diagnosticsText =
-                        formatDiagnostics(endpoint, ConnectionState.ReadyToConnect, basis) +
-                            "\nreconnect_exhausted=${dependencies.maxReconnectAttempts}\nreconnect_cause=$reconnectCause",
+                    formatDiagnostics(endpoint, ConnectionState.ReadyToConnect, basis) +
+                        "\nreconnect_exhausted=${dependencies.maxReconnectAttempts}\nreconnect_cause=$reconnectCause",
                 )
             }
             reconnectExhausted = true

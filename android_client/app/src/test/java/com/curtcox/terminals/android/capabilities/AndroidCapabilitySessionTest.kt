@@ -110,10 +110,10 @@ class AndroidCapabilitySessionTest {
                     baseInput().copy(
                         hardware = baseHardware.copy(microphone = true, frontCamera = true),
                         permissions =
-                            PermissionCapabilityState(
-                                microphoneGranted = true,
-                                cameraGranted = true,
-                            ),
+                        PermissionCapabilityState(
+                            microphoneGranted = true,
+                            cameraGranted = true,
+                        ),
                     ),
                 ),
             )
@@ -131,10 +131,10 @@ class AndroidCapabilitySessionTest {
                 baseInput().copy(
                     hardware = baseHardware.copy(microphone = true, frontCamera = true),
                     permissions =
-                        PermissionCapabilityState(
-                            microphoneGranted = true,
-                            cameraGranted = true,
-                        ),
+                    PermissionCapabilityState(
+                        microphoneGranted = true,
+                        cameraGranted = true,
+                    ),
                 ),
             )
         val session = AndroidCapabilitySession("device-1", probe)

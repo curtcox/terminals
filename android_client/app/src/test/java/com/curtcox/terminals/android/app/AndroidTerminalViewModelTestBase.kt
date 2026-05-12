@@ -1,15 +1,14 @@
 package com.curtcox.terminals.android.app
 
-import android.Manifest
-import com.curtcox.terminals.android.connection.AndroidControlResponseSink
-import com.curtcox.terminals.android.connection.AndroidControlSession
-import com.curtcox.terminals.android.connection.ControlSessionStatus
-import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.capabilities.AndroidCapabilityProbe
 import com.curtcox.terminals.android.capabilities.AndroidCapabilitySnapshotInput
 import com.curtcox.terminals.android.capabilities.AndroidHardwareCapabilities
 import com.curtcox.terminals.android.capabilities.AndroidScreenMetrics
 import com.curtcox.terminals.android.capabilities.PermissionCapabilityState
+import com.curtcox.terminals.android.connection.AndroidControlResponseSink
+import com.curtcox.terminals.android.connection.AndroidControlSession
+import com.curtcox.terminals.android.connection.ControlSessionStatus
+import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery
 import com.curtcox.terminals.android.discovery.DiscoveredServer
@@ -24,7 +23,6 @@ import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
 import com.curtcox.terminals.android.platform.AndroidPermissionRequester
 import com.curtcox.terminals.android.platform.AndroidTerminalSpeech
 import com.curtcox.terminals.android.ui.ServerDrivenAction
-import com.google.protobuf.ByteString
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -139,6 +137,7 @@ abstract class AndroidTerminalViewModelTestBase {
         var connectedEndpoint: EndpointResolution? = null
         val actions = mutableListOf<ServerDrivenAction>()
         val bugReports = mutableListOf<Diagnostics.BugReport>()
+
         /** Per-call: `true` means [sendBugReport] throws for that attempt (flush continues). */
         var bugReportFailurePattern: List<Boolean> = emptyList()
         private var bugReportAttemptIndex = 0
@@ -215,7 +214,7 @@ abstract class AndroidTerminalViewModelTestBase {
                 val fail = bugReportFailurePattern.getOrElse(bugReportAttemptIndex) { false }
                 bugReportAttemptIndex++
                 if (fail) {
-                    throw IllegalStateException("simulated-bug-report-send-failure")
+                    error("simulated-bug-report-send-failure")
                 }
             }
             bugReports += report

@@ -63,8 +63,12 @@ class AndroidTerminalViewModelActionsTest : AndroidTerminalViewModelTestBase() {
             ),
             session.systemCommands,
         )
-        assertTrue(viewModel.state.value.diagnosticsText.contains("last_system_command=runtime_status:debug-runtime-status-1"))
-        assertTrue(viewModel.state.value.diagnosticsText.contains("last_system_command=device_status:debug-device-status-2"))
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_system_command=runtime_status:debug-runtime-status-1"),
+        )
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_system_command=device_status:debug-device-status-2"),
+        )
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -90,8 +94,12 @@ class AndroidTerminalViewModelActionsTest : AndroidTerminalViewModelTestBase() {
             listOf(Triple("debug-playback-metadata-2", "artifact-a", "android-native-terminal")),
             session.playbackMetadataQueries,
         )
-        assertTrue(viewModel.state.value.diagnosticsText.contains("last_system_command=list_playback_artifacts:debug-playback-artifacts-1"))
-        assertTrue(viewModel.state.value.diagnosticsText.contains("last_manual_command=playback_metadata:debug-playback-metadata-2"))
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_system_command=list_playback_artifacts:debug-playback-artifacts-1"),
+        )
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_manual_command=playback_metadata:debug-playback-metadata-2"),
+        )
         viewModel.disconnect()
         advanceUntilIdle()
     }
@@ -130,7 +138,9 @@ class AndroidTerminalViewModelActionsTest : AndroidTerminalViewModelTestBase() {
             listOf(Triple("debug-playback-metadata-1", "artifact-x", "subject-tablet-1")),
             session.playbackMetadataQueries,
         )
-        assertTrue(viewModel.state.value.diagnosticsText.contains("last_manual_command=playback_metadata:debug-playback-metadata-1"))
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_manual_command=playback_metadata:debug-playback-metadata-1"),
+        )
         viewModel.disconnect()
         advanceUntilIdle()
     }

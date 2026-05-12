@@ -2,9 +2,9 @@ package com.curtcox.terminals.android.app
 
 import android.os.Build
 import androidx.lifecycle.viewModelScope
+import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.diagnostics.AndroidBugReportActions
 import com.curtcox.terminals.android.diagnostics.AndroidBugReportBuilder
-import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -20,30 +20,24 @@ internal fun AndroidTerminalViewModel.submitBugReportFromServerDrivenAction(acti
             source = Diagnostics.BugReportSource.BUG_REPORT_SOURCE_SCREEN_BUTTON,
             subjectDeviceId = subject,
             extraHints =
-                mapOf(
-                    "component_id" to action.componentId,
-                    "action" to action.action,
-                ),
+            mapOf(
+                "component_id" to action.componentId,
+                "action" to action.action,
+            ),
         )
     queueOrSendBugReport(report)
 }
 
 internal fun AndroidTerminalViewModel.resolveBugReportSubject(action: ServerDrivenAction): String {
-    if (action.action.startsWith(AndroidBugReportActions.PREFIX)) {
-        val explicit =
-            action.action
-                .removePrefix(AndroidBugReportActions.PREFIX)
-                .removePrefix(":")
-                .trim()
-        if (explicit.isNotEmpty()) {
-            return explicit
-        }
-    }
-    val v = action.value.trim()
-    if (v.isNotEmpty()) {
-        return v
-    }
-    return dependencies.deviceId
+    val fromAction = action.action
+        .takeIf { it.startsWith(AndroidBugReportActions.PREFIX) }
+        ?.removePrefix(AndroidBugReportActions.PREFIX)
+        ?.removePrefix(":")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+    return fromAction
+        ?: action.value.trim().takeIf { it.isNotEmpty() }
+        ?: dependencies.deviceId
 }
 
 internal fun AndroidTerminalViewModel.buildShellBugReport(
@@ -97,7 +91,7 @@ internal fun AndroidTerminalViewModel.queueOrSendBugReport(report: Diagnostics.B
                     mutableState.update {
                         it.copy(
                             lastBugReportSubmitStatus =
-                                "Bug report send failed: ${e.message ?: e.javaClass.simpleName}",
+                            "Bug report send failed: ${e.message ?: e.javaClass.simpleName}",
                         )
                     }
                 }
