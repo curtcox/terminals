@@ -398,7 +398,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
       return;
     }
     _syncMonitoringLoops();
-    if (_appIsForeground && _shouldStayConnected && !_hasActiveControlSession && !_isConnecting) {
+    if (_appIsForeground &&
+        _shouldStayConnected &&
+        !_hasActiveControlSession &&
+        !_isConnecting) {
       _reconnectAttempt = 0;
       _scheduleReconnect();
     }
@@ -495,6 +498,7 @@ class _TerminalClientShellState extends State<TerminalClientShell>
       return RepaintBoundary(
         key: _bugReportScreenshotKey,
         child: Scaffold(
+          resizeToAvoidBottomInset: false,
           floatingActionButton:
               BugReportButton(onPressed: _showBugReportDialog),
           bottomNavigationBar: _buildMetadataFooter(),

@@ -83,12 +83,9 @@ void main() {
           reason: 'should not reconnect while backgrounded');
 
       // Return to foreground via the valid state sequence.
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
 
       for (var i = 0; i < 20; i++) {

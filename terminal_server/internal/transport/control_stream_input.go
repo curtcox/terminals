@@ -22,6 +22,10 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 
 	action := strings.ToLower(strings.TrimSpace(in.Action))
 	componentID := strings.TrimSpace(in.ComponentID)
+	_, _, logicalComponentID, _ := parseScopedComponentID(componentID)
+	if logicalComponentID == "" {
+		logicalComponentID = componentID
+	}
 	if requiresScopedUIActionComponent(action) && h.uiOwners.HasKnownActivation(deviceID) {
 		if _, reason, ok := h.uiOwners.Resolve(deviceID, componentID); !ok {
 			if h.metrics != nil {
@@ -47,7 +51,7 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 
 	switch action {
 	case "change":
-		if componentID == "terminal_input" {
+		if logicalComponentID == "terminal_input" {
 			if sessionID, ok := h.replSessionIDForDevice(deviceID); ok {
 				_ = h.replSessions.SetDraft(sessionID, deviceID, in.Value)
 			}
@@ -75,7 +79,7 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 		return h.commandResponses(ctx, cmd, commandResult), nil
 	}
 
-	if action != "" && (componentID != "terminal_input" || action != "submit") {
+	if action != "" && (logicalComponentID != "terminal_input" || action != "submit") {
 		if out, routed, err := h.routeScenarioUIAction(ctx, deviceID, action); routed {
 			return out, err
 		}
@@ -88,7 +92,7 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 
 	text := in.Value
 	fromKey := false
-	if text == "" && componentID == "terminal_input" {
+	if text == "" && logicalComponentID == "terminal_input" {
 		draft, err := h.replSessions.Draft(sessionID, deviceID)
 		if err == nil {
 			text = draft
@@ -121,7 +125,7 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	}); err != nil {
 		return nil, err
 	}
-	if componentID == "terminal_input" {
+	if logicalComponentID == "terminal_input" {
 		_ = h.replSessions.ClearDraft(sessionID, deviceID)
 	}
 

@@ -608,6 +608,81 @@ func TestHandleMessageInputTerminalChangeUsesDraftOnSubmit(t *testing.T) {
 	}
 }
 
+// TestHandleMessageInputTerminalScopedComponentID verifies that scoped component IDs
+// (act:<deviceID>/terminal_input) are handled identically to the unscoped form.
+// The Flutter client receives scoped IDs from the server and sends them back in actions.
+func TestHandleMessageInputTerminalScopedComponentID(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{
+			DeviceID:   "device-1",
+			DeviceName: "Kitchen Chromebook",
+		},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-scoped-id-start",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	// Scoped component ID — the form the Flutter client sends after receiving SetUI.
+	scopedComponentID := "act:device-1/terminal_input"
+
+	// change with scoped ID must set draft and return no messages (not fall through to renderTerminalUIAction).
+	changeOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: scopedComponentID,
+			Action:      "change",
+			Value:       "echo scoped-draft",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(change/scoped) error = %v", err)
+	}
+	if len(changeOut) != 0 {
+		t.Fatalf("change with scoped ID should return 0 messages, got %d: %+v", len(changeOut), changeOut)
+	}
+
+	// submit with scoped ID must use the draft set above.
+	submitOut, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID:    "device-1",
+			ComponentID: scopedComponentID,
+			Action:      "submit",
+			Value:       "",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(submit/scoped) error = %v", err)
+	}
+	if len(submitOut) != 1 {
+		t.Fatalf("len(submitOut) = %d, want 1", len(submitOut))
+	}
+	if submitOut[0].UpdateUI == nil {
+		t.Fatalf("expected UpdateUI response for scoped terminal submit")
+	}
+	if !strings.Contains(submitOut[0].UpdateUI.Node.Props["value"], "scoped-draft") {
+		t.Fatalf("terminal output did not include scoped draft: %+v", submitOut[0].UpdateUI.Node.Props)
+	}
+}
+
 func TestHandleMessageInputTerminalInteractiveActions(t *testing.T) {
 	devices := device.NewManager()
 	control := NewControlService("srv-1", devices)

@@ -78,10 +78,18 @@ extension _UiExtension on _TerminalClientShellState {
     await _sendUiAction(action);
   }
 
+  String _logicalComponentId(String componentId) {
+    if (componentId.startsWith('act:')) {
+      final slash = componentId.indexOf('/');
+      if (slash >= 0) return componentId.substring(slash + 1);
+    }
+    return componentId;
+  }
+
   ServerDrivenTextInputBinding? _textInputBindingForComponent(
     String componentId,
   ) {
-    if (componentId != 'terminal_input') {
+    if (_logicalComponentId(componentId) != 'terminal_input') {
       return null;
     }
     if (_terminalInputController.text != _terminalInputShadow) {
