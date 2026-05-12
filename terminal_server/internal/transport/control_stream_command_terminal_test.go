@@ -753,3 +753,68 @@ func TestHandleMessageInputTerminalInteractiveActions(t *testing.T) {
 		t.Fatalf("missing select action in output: %+v", secondOut[0].UpdateUI.Node.Props)
 	}
 }
+
+// TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance pins use case UI1
+// (idle main-layer server-driven descriptor includes the typed corner affordance)
+// from plans/features/terminal-ui/plan.md Phase I.
+func TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	broadcaster := ui.NewMemoryBroadcaster()
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: broadcaster,
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1", DeviceName: "Kitchen Chromebook"},
+	})
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-ui1-photo-frame",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "photo frame",
+		},
+	})
+	if err != nil {
+		t.Fatalf("photo frame start error = %v", err)
+	}
+	var root *ui.Descriptor
+	for i := range out {
+		if out[i].SetUI == nil {
+			continue
+		}
+		if findNodePropValue(out[i].SetUI, "photo_frame_image", "url") == "" {
+			continue
+		}
+		msg := handler.decorateBugReportAffordance("device-1", out[i])
+		prepared, prepErr := handler.prepareOutboundUI("device-1", msg)
+		if prepErr != nil {
+			t.Fatalf("prepareOutboundUI: %v", prepErr)
+		}
+		root = prepared.SetUI
+		break
+	}
+	if root == nil {
+		t.Fatalf("expected photo frame SetUI in responses: %+v", out)
+	}
+	cornerID := "act:device-1/__affordance.corner__"
+	node := findNodeByID(root, cornerID)
+	if node == nil {
+		t.Fatalf("SetUI tree missing corner affordance node %q", cornerID)
+	}
+	if strings.TrimSpace(node.Type) != "button" {
+		t.Fatalf("corner node type = %q, want button", node.Type)
+	}
+	if node.Props["action"] != "corner.open" {
+		t.Fatalf("corner action = %q, want corner.open", node.Props["action"])
+	}
+}

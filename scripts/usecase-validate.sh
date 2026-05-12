@@ -48,6 +48,16 @@ metadata() {
     PL8) echo "PL8|Contract|interactive session join/leave and control lifecycle capability tests" ;;
     PL20) echo "PL20|Contract|capability artifact template save/apply and artifact history tests" ;;
     T1) echo "T1|Smoke|due-timer loop; transport run_due_timers; kitchen timer package smoke test; future TAL simulation coverage" ;;
+    UI1) echo "UI1|Transport|idle photo-frame SetUI includes scoped corner affordance (terminal-ui plan)" ;;
+    UI2) echo "UI2|Transport|corner.open toggles menu overlay claim without disturbing main" ;;
+    UI3) echo "UI3|Transport|menu overlay default MIXED policy: main pointer blocked, audio live" ;;
+    UI4) echo "UI4|Transport+Client|privacy toggle: proto withdrawal, server routes, post-cutover frame drop" ;;
+    UI5) echo "UI5|Client|privacy mode: no VoiceAudio after withdrawal; no client-chrome privacy indicators" ;;
+    UI6) echo "UI6|Transport|wake-word path activates scenario (single client)" ;;
+    UI7) echo "UI7|Transport|wake-word dedupe across two clients dispatches at most one intent" ;;
+    UI8) echo "UI8|Transport+Client|capability delta on rotation/resize; overlay survives orientation delta" ;;
+    UI9) echo "UI9|Transport|reconnect restores main + overlay UI state (RECON-1)" ;;
+    UI10) echo "UI10|Scenario|registry corner affordance reachability invariant for every main-layer scenario" ;;
     *)
       echo "unsupported use case id: ${id}" >&2
       exit 2
@@ -55,7 +65,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA6 B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1)
+all_ids=(AA6 B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
 
 run_go_test() {
   local pkg="$1"
@@ -68,6 +78,13 @@ run_app_test() {
   local name="$1"
   echo "==> go run ./cmd/term app test ${name}"
   (cd "${ROOT_DIR}/terminal_server" && go run ./cmd/term app test "${name}")
+}
+
+run_flutter_test() {
+  local rel_path="$1"
+  local plain_name="$2"
+  echo "==> flutter test ${rel_path} --plain-name ${plain_name}"
+  (cd "${ROOT_DIR}/terminal_client" && flutter test "${rel_path}" --plain-name "${plain_name}")
 }
 
 run_usecase() {
@@ -150,6 +167,43 @@ run_usecase() {
       run_go_test ./cmd/server 'TestRunDueTimerLoopProcessesTimers$'
       run_go_test ./internal/transport 'TestHandleMessageSystemRunDueTimers$'
       run_app_test kitchen_timer
+      ;;
+    UI1)
+      run_go_test ./internal/transport 'TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance$'
+      ;;
+    UI2)
+      run_go_test ./internal/transport 'TestHandleMessageInputCornerOpenTogglesMenuOverlayAndClaim$'
+      ;;
+    UI3)
+      run_go_test ./internal/transport 'TestHandleMessageInputMenuOverlayDefaultMixedPolicyBlocksMainPointerButKeepsAudioLive$'
+      ;;
+    UI4)
+      run_go_test ./internal/transport 'TestHandleMessageVoiceAudioDropsPostPrivacyCutoverFrames$'
+      run_go_test ./internal/transport 'TestGeneratedSessionPrivacyToggleCapabilityLossStopsAudioAndVideoRoutes$'
+      run_go_test ./internal/transport 'TestGeneratedSessionPrivacyToggleExitReaddsCapabilitiesAndResumesClaims$'
+      run_go_test ./internal/transport 'TestProtoRoundTripCapabilityDeltaPrivacyWithdrawalOmitsMicAndCameraFields$'
+      run_flutter_test test/widget_test_media.dart 'privacy.toggle stops local capture before sending capability delta'
+      ;;
+    UI5)
+      run_flutter_test test/widget_test_reconnect.dart 'wake-word utterance does not send VoiceAudio after privacy.toggle withdraws microphone capability'
+      run_flutter_test test/widget_test_reconnect.dart 'privacy.toggle does not render persistent client-chrome privacy/capture indicator'
+      ;;
+    UI6)
+      run_go_test ./internal/transport 'TestControlStreamVoiceAudioWakeWordDetectedActivatesScenario$'
+      ;;
+    UI7)
+      run_go_test ./internal/transport 'TestControlStreamVoiceAudioWakeWordDedupeAcrossClientsDispatchesAtMostOneIntent$'
+      ;;
+    UI8)
+      run_flutter_test test/widget_test_connection.dart 'deterministic metrics seam emits CapabilityDelta on rotation with fresh generation'
+      run_flutter_test test/widget_test_connection.dart 'deterministic metrics seam emits CapabilityDelta on resize'
+      run_go_test ./internal/transport 'TestCapabilityDeltaWhileMenuOverlayOpenPreservesMainAndOverlayActivations$'
+      ;;
+    UI9)
+      run_go_test ./internal/transport 'TestGeneratedSessionUI_RECON_1$'
+      ;;
+    UI10)
+      run_go_test ./internal/transport 'TestWithCornerAffordance_RegistryReachabilityInvariant$'
       ;;
     *)
       echo "unsupported use case id: ${id}"

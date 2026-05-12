@@ -1,9 +1,9 @@
 ---
 title: "Terminal UI"
 kind: plan
-status: building
+status: complete
 owner: github-copilot
-validation: none
+validation: automated:UI1,UI2,UI3,UI4,UI5,UI6,UI7,UI8,UI9,UI10
 last-reviewed: 2026-05-02
 ---
 
@@ -847,33 +847,33 @@ phase's PR (`make client-test` + `make server-test`):
 
 ## Phase I — End-to-end use cases
 
-Register in [usecases.md](../../usecases.md) and wire into
+Register in [usecases/terminal-ui.md](../../usecases/terminal-ui.md) and wire into
 `make usecase-validate` per the `usecase-implement` skill.
 Tests added in this phase are wired into `make all-check` via
-`make usecase-validate`. Candidate IDs (exact IDs at registration
-time):
+`make usecase-validate`. Candidate IDs (as registered in the repo; see
+`usecases/terminal-ui.md` and `scripts/usecase-validate.sh`):
 
-- **UI-IDLE-1**: terminal with no user-launched app shows a
+- **UI1** (idle + corner): terminal with no user-launched app shows a
   server-driven main-layer descriptor; the corner affordance is
   present.
-- **UI-CORNER-1**: activating the corner affordance opens the menu
+- **UI2** (`UI-CORNER-1`): activating the corner affordance opens the menu
   overlay without disturbing main-layer state.
-- **UI-CORNER-2**: menu-overlay default routing (audio stays live,
+- **UI3** (`UI-CORNER-2`): menu-overlay default routing (audio stays live,
   pointer routes to overlay) is observed in a real round-trip.
-- **UI-PRIV-1**: toggling privacy mode stops mic/camera frame
+- **UI4** (`UI-PRIV-1`): toggling privacy mode stops mic/camera frame
   delivery atomically across the capability cutover (no post-cutover
   frames reach the server), and restores both on exit.
-- **UI-PRIV-2**: wake-word detection is suspended in privacy mode;
+- **UI5** (`UI-PRIV-2`): wake-word detection is suspended in privacy mode;
   keypress/touch still route.
-- **UI-WAKE-1**: a wake word heard by a single terminal triggers the
+- **UI6** (`UI-WAKE-1`): a wake word heard by a single terminal triggers the
   server-configured intent and the server-chosen feedback.
-- **UI-WAKE-2**: a wake word heard simultaneously by two terminals
+- **UI7** (`UI-WAKE-2`): a wake word heard simultaneously by two terminals
   dispatches at most one intent.
-- **UI-ROT-1**: rotating the tablet client emits a capability delta
+- **UI8** (`UI-ROT-1`): rotating the tablet client emits a capability delta
   and, for a scenario with layout variants, triggers a descriptor
-  swap.
-- **UI-RECON-1**: reconnect-mid-menu restores both layers.
-- **UI-INVARIANT-1**: the reachability invariant check (Phase A)
+  swap (client rotation + server overlay preservation tests).
+- **UI9** (`UI-RECON-1`): reconnect-mid-menu restores both layers.
+- **UI10** (`UI-INVARIANT-1`): the reachability invariant check (Phase A)
   runs against every registered scenario as part of the gate.
 
 Each use case is implemented per `usecase-implement` and must pass

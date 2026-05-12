@@ -19,6 +19,7 @@ Use cases derived from the [Master Plan](../masterplan.md). One file per family;
 | `PL` | [PLATO-Inspired Extension Use Cases](plato.md) | `PL1`, `PL2`, `PL3`, `PL4`, `PL5`, `PL6`, `PL7`, `PL8`, `PL9`, `PL10`, `PL11`, `PL12`, `PL13`, `PL14`, `PL15`, `PL16`, `PL17`, `PL18`, `PL19`, `PL20`, `PL21`, `PL22`, `PL23`, `PL24`, `PL25`, `PL26`, `PL27` |
 | `S` | [Security and Surveillance Use Cases](security.md) | `S1`, `S2`, `S3` |
 | `T` | [Timers, Reminders, and Scheduling Use Cases](timers.md) | `T1`, `T2`, `T3`, `T4` |
+| `UI` | [Terminal UI Use Cases](terminal-ui.md) | `UI1`, `UI2`, `UI3`, `UI4`, `UI5`, `UI6`, `UI7`, `UI8`, `UI9`, `UI10` |
 | `V` | [Voice Assistant Use Cases](voice.md) | `V1`, `V2`, `V3` |
 
-Total: 14 families, 108 IDs.
+Total: 15 families, 118 IDs.
