@@ -274,10 +274,13 @@ the snapshot changed (permission drift, battery, etc.), without waiting for an
 `StreamReady` control payload as the Flutter shell so generic streaming hooks can
 progress. It then forwards `StartStream`, `StopStream`, `RouteStream`, and
 `WebRTCSignal` responses through the `AndroidMediaEngine` live-media seam
-(`AndroidLiveMediaSession`), matching Flutter’s media-engine hooks; while WebRTC
-remains disabled, `StartStream` surfaces a `last_live_media=` diagnostic with the
-adapter reason (or a not-implemented placeholder when the adapter reports
-supported). As with Flutter, periodic
+(`AndroidLiveMediaSession`), matching Flutter’s media-engine hooks. When
+`WebRtcSdkAndroidAdapter` initializes successfully (the default), `StartStream`
+creates a `PeerConnection` and `last_live_media=start_stream:<id>:applied` appears
+in diagnostics; if initialization fails (e.g. native library load error on an
+unsupported device), the adapter falls back to `disabled` automatically and
+`StartStream` surfaces `last_live_media=start_stream:<id>:<reason>` with the
+failure reason. As with Flutter, periodic
 heartbeat and sensor telemetry pause while the activity is stopped (app not
 visible); the control session stays open. On each foreground/background
 transition, the client sends a capability delta with reason `app_lifecycle_change`
@@ -290,10 +293,21 @@ and automatic discovery restarts are suppressed while stopped so background
 network flapping does not spam the control stream or thrash NSD.
 
 The APK declares microphone and camera permissions so capability reporting and
-future media capture can reflect runtime permission state. WebRTC media
-transport remains explicitly disabled until the dependency compatibility pass is
-complete; the client reports that status in local diagnostics and does not
-advertise unsupported media send/receive behavior.
+live media capture can reflect runtime permission state. Live media transport
+uses `io.github.webrtc-sdk:android` (default version `144.7559.05`). The
+dependency version can be overridden per-machine in `android_client/local.properties`:
+
+```properties
+webrtc.sdk.version=<version>
+```
+
+Leave the property absent or empty to use the default. The disabled adapter
+path is always retained: `WebRtcSdkAndroidAdapter.fromContext` wraps
+`PeerConnectionFactory` initialization in a `runCatching` block and falls back
+to `AndroidWebRtcAdapter.disabled("webrtc-init-failed:<ExceptionType>")` if
+native library loading fails at runtime (e.g. on emulators or device SKUs whose
+ABI is not covered by the SDK). Copyable diagnostics will show
+`last_live_media=start_stream:<id>:<reason>` with that fallback reason.
 
 Discovery, media transport, kiosk, and connected-device behavior continue to
 mature under `plans/features/android-client/plan.md`.

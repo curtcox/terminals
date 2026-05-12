@@ -6,6 +6,17 @@ last-updated: 2026-05-12
 
 # Progress Log
 
+## 2026-05-12 — Phase C: Update docs to reflect enabled WebRTC posture
+
+Updated `docs/client-android.md` to remove stale "WebRTC media transport remains
+explicitly disabled" language. Now describes the enabled posture: `WebRtcSdkAndroidAdapter`
+initializes `PeerConnectionFactory` at startup and falls back to `disabled(...)` automatically
+on init failure. Added `webrtc.sdk.version` local.properties override docs and explained the
+runtime fallback diagnostic (`last_live_media=start_stream:<id>:<reason>`). Phase C is now
+complete — all automated gates pass and docs reflect the shipped state.
+
+---
+
 ## 2026-05-12 — Phase C: Fix compileDebugAndroidTestKotlin
 
 `AndroidTerminalMediaSmokeTest.FakeSession` was missing `sendWebRtcSignal` (added to
