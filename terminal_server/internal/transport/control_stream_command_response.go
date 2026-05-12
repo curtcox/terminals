@@ -643,4 +643,3 @@ func (h *StreamHandler) commandTargetDeviceIDs(cmd *CommandRequest) []string {
 	}
 	return nil
 }
-

@@ -434,4 +434,3 @@ read_adapter = "../outside_read_adapter.tal"
 		t.Fatalf("LoadPackage() error = %q, want read_adapter root escape detail", err.Error())
 	}
 }
-

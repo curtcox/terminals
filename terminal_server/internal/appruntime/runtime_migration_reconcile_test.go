@@ -496,4 +496,3 @@ drain_policy = "none"
 		t.Fatalf("RetryMigration() steps_completed = %d, want 2", status.StepsCompleted)
 	}
 }
-

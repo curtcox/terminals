@@ -1,5 +1,6 @@
-// manifest.toml migration plan loading and migration path helpers.
 package appruntime
+
+// manifest.toml migration plan loading and migration path helpers.
 
 import (
 	"encoding/json"

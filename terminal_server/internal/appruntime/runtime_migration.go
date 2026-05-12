@@ -66,11 +66,16 @@ type migrationPlanStep struct {
 	RequiresDrain bool
 }
 
+// SetMigrationDryRunGateEnabled toggles the dry-run gate that requires a successful
+// rehearsal before a migration run may proceed.
 func (r *Runtime) SetMigrationDryRunGateEnabled(enabled bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.migrationDryRunGateEnabled = enabled
 }
+
+// GetMigrationStatus returns the current migration status for the named package,
+// or ErrPackageNotFound if the package is unknown.
 func (r *Runtime) GetMigrationStatus(name string) (MigrationStatus, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -615,6 +620,8 @@ func migrationStepEmitsCheckpoint(root string, step migrationPlanStep, checkpoin
 	return stats.StoreOps >= checkpointEvery, nil
 }
 
+// AbortMigration aborts an in-progress migration and rewinds to the requested target.
+// target must be MigrationAbortToCheckpoint or MigrationAbortToBaseline; empty defaults to checkpoint.
 func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

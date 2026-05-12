@@ -406,4 +406,3 @@ func defaultPhotoFrameSlides() []string {
 		"https://picsum.photos/id/1043/1920/1080",
 	}
 }
-

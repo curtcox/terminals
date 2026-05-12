@@ -200,6 +200,7 @@ func (s *Service) UISnapshot(deviceID string) (UISnapshot, bool) {
 	snapshot.Subscriptions = append([]string(nil), subs...)
 	return snapshot, true
 }
+
 func normalizeDeviceIDs(deviceIDs []string) []string {
 	if len(deviceIDs) == 0 {
 		return nil

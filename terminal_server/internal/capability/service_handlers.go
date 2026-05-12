@@ -63,6 +63,7 @@ func (s *Service) HandlerOff(handlerID string) bool {
 	s.appendRecentLocked("handler", handlerID+" off")
 	return true
 }
+
 func normalizeHandlerSelector(selector string) string {
 	return strings.ToLower(strings.TrimSpace(selector))
 }

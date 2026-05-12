@@ -24,7 +24,6 @@ type Options struct {
 	DocsMode     DocsRenderMode
 }
 
-
 // Run executes the Terminals control-plane REPL over stdin/stdout.
 func Run(ctx context.Context, in io.Reader, out io.Writer, opts Options) error {
 	if in == nil {
@@ -325,4 +324,3 @@ func (s *state) queryLogs(ctx context.Context, appName, query string) error {
 	_, err = fmt.Fprintln(s.out, body)
 	return err
 }
-

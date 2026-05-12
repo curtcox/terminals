@@ -178,6 +178,7 @@ func (s *Service) ListUnreadMessages(identityID, room string) []Message {
 	}
 	return out
 }
+
 func normalizeTargetRef(targetRef string) string {
 	targetRef = strings.TrimSpace(targetRef)
 	if targetRef == "" {

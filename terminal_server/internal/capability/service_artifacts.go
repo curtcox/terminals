@@ -163,6 +163,7 @@ func (s *Service) ArtifactHistory(artifactID string) ([]ArtifactVersion, bool) {
 	}
 	return append([]ArtifactVersion(nil), versions...), true
 }
+
 func (s *Service) appendArtifactVersionLocked(item Artifact, action string) {
 	s.versions[item.ID] = append(s.versions[item.ID], ArtifactVersion{
 		ArtifactID: item.ID,

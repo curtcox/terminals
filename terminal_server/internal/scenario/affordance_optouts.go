@@ -1,3 +1,5 @@
+// Package scenario contains the server-side scenario engine, including affordance
+// rules, recipes, and built-in scenarios that compose Terminals interactions.
 package scenario
 
 import (

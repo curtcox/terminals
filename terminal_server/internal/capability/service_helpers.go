@@ -8,6 +8,7 @@ func (s *Service) nextIDLocked(prefix string) string {
 	s.seq++
 	return prefix + "-" + strconv64(s.seq)
 }
+
 func defaultIfBlank(value, fallback string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -15,6 +16,7 @@ func defaultIfBlank(value, fallback string) string {
 	}
 	return value
 }
+
 func sliceContainsFold(values []string, needle string) bool {
 	for _, value := range values {
 		if strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(needle)) {

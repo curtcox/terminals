@@ -364,4 +364,3 @@ func scopedActivationFromComponentIDs(componentIDs []string, fallback string) st
 func (h *StreamHandler) swapMainUIActivation(deviceID, activationID string) string {
 	return h.uiSession.SwapMainUIActivation(deviceID, activationID)
 }
-

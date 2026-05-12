@@ -1,5 +1,6 @@
-// Journal replay and NDJSON field helpers for runtime migrations.
 package appruntime
+
+// Journal replay and NDJSON field helpers for runtime migrations.
 
 import (
 	"bufio"

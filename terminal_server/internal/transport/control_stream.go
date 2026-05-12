@@ -618,6 +618,7 @@ func (h *StreamHandler) broadcastNotificationsSince(
 	return out
 }
 
+// NoteProtocolError increments the transport protocol-error counter exposed via metrics.
 func (h *StreamHandler) NoteProtocolError() {
 	if h.metrics != nil {
 		h.metrics.protocolErrors.Add(1)

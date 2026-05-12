@@ -203,4 +203,3 @@ func (h *StreamHandler) SetMenuAppPolicy(policy MenuAppPolicy) {
 	}
 	h.menuAppPolicy = policy
 }
-

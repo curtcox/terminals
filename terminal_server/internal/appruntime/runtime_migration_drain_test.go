@@ -304,4 +304,3 @@ drain_policy = "drain"
 		t.Fatalf("RetryMigration() after restart = verdict %q steps %d, want ok steps 1", status.Verdict, status.StepsCompleted)
 	}
 }
-

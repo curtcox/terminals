@@ -223,6 +223,7 @@ func (s *Service) SimRecord(deviceID string, duration time.Duration) (SimRecordR
 	s.appendRecentLocked("sim", "record "+deviceID)
 	return result, true
 }
+
 func normalizeSimCaps(caps []string) []string {
 	out := make([]string, 0, len(caps))
 	seen := map[string]struct{}{}

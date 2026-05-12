@@ -151,4 +151,3 @@ func (s *Service) StoreBind(namespace, key, binding string) (StoreRecord, bool) 
 func storeRecordExpired(record StoreRecord, now time.Time) bool {
 	return record.ExpiresAt != nil && !record.ExpiresAt.After(now)
 }
-

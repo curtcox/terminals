@@ -114,6 +114,7 @@ func (s *Service) SearchRecent(scope string, limit int) []RecentItem {
 	}
 	return buffer
 }
+
 func normalizedTokens(value string) []string {
 	fields := strings.Fields(strings.ToLower(strings.TrimSpace(value)))
 	out := make([]string, 0, len(fields))
@@ -131,6 +132,7 @@ func normalizedTokens(value string) []string {
 	}
 	return out
 }
+
 func (s *Service) searchCorpusLocked() []searchableItem {
 	out := make([]searchableItem, 0, len(s.messages)+len(s.boardItems)+len(s.artifacts)+len(s.memories))
 	for _, item := range s.messages {

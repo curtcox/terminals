@@ -58,6 +58,7 @@ func (s *Service) CohortDelete(name string) bool {
 	s.appendRecentLocked("cohort", name+" deleted")
 	return true
 }
+
 func normalizeSelectors(selectors []string) []string {
 	if len(selectors) == 0 {
 		return nil

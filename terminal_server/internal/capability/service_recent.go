@@ -10,6 +10,7 @@ func (s *Service) ListRecent() []RecentItem {
 	defer s.mu.RUnlock()
 	return append([]RecentItem(nil), s.recent...)
 }
+
 func (s *Service) appendRecentLocked(kind, text string) {
 	item := RecentItem{
 		ID:        s.nextIDLocked("recent"),

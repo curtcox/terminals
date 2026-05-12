@@ -81,4 +81,3 @@ func filterBusEvents(events []BusEvent, kind, name string, limit int) []BusEvent
 	}
 	return filtered
 }
-

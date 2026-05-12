@@ -439,4 +439,3 @@ func TestRuntimeRollbackKeepDataRejectsMalformedDowngradeStep(t *testing.T) {
 		t.Fatalf("RollbackPackage(keep_data) error = %v, want ErrRollbackKeepDataRequiresDowngrade", err)
 	}
 }
-

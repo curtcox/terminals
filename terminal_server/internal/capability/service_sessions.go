@@ -328,6 +328,7 @@ func (s *Service) RevokeControl(sessionID, participant, revokedBy string) (Inter
 	}
 	return InteractiveSession{}, false
 }
+
 func cloneSessions(input []InteractiveSession) []InteractiveSession {
 	out := make([]InteractiveSession, 0, len(input))
 	for _, item := range input {

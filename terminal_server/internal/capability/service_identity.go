@@ -199,6 +199,7 @@ func (s *Service) GetAcknowledgements(subjectRef string) []Acknowledgement {
 	})
 	return out
 }
+
 func ackKey(identityID, subjectRef string) string {
 	return strings.ToLower(strings.TrimSpace(identityID)) + "|" + strings.ToLower(strings.TrimSpace(subjectRef))
 }

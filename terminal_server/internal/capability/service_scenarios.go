@@ -75,6 +75,7 @@ func (s *Service) ScenarioUndefine(name string) bool {
 	s.appendRecentLocked("scenario", name+" undefine")
 	return true
 }
+
 func normalizeScenarioTokens(values []string) []string {
 	out := make([]string, 0, len(values))
 	for _, value := range values {
@@ -102,6 +103,7 @@ func normalizeScenarioPriority(value string) string {
 		return "normal"
 	}
 }
+
 func cloneScenarioDefinition(def InlineScenarioDefinition) InlineScenarioDefinition {
 	clone := def
 	clone.MatchIntents = append([]string(nil), def.MatchIntents...)

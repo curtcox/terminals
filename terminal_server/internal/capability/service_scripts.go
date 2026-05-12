@@ -511,4 +511,3 @@ func parseScriptCommands(script string) ([]string, int) {
 	}
 	return commands, skippedCount
 }
-

@@ -1,5 +1,6 @@
-// TAL migration script validation, fixture types, verification, and execution.
 package appruntime
+
+// TAL migration script validation, fixture types, verification, and execution.
 
 import (
 	"encoding/json"

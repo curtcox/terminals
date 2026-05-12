@@ -71,7 +71,6 @@ var (
 	ErrMigrationResourceLimit = errors.New("migration resource limit exceeded")
 )
 
-
 var allowedPermissions = map[string]struct{}{
 	"placement.read": {},
 	"claims.request": {},
@@ -236,7 +235,6 @@ type Runtime struct {
 	skipDryRunGate             bool
 }
 
-
 // NewRuntime returns an empty application runtime.
 func NewRuntime() *Runtime {
 	return NewRuntimeWithKernelAPI(DefaultKernelAPIVersion)
@@ -255,7 +253,6 @@ func NewRuntimeWithKernelAPI(kernelAPIVersion string) *Runtime {
 		migrations:       make(map[string]migrationState),
 	}
 }
-
 
 // GetPackage returns the latest loaded package for one app name.
 func (r *Runtime) GetPackage(name string) (Package, bool) {

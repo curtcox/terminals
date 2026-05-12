@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/storage"
