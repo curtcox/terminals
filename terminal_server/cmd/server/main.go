@@ -357,7 +357,6 @@ func main() {
 	go runLivenessLoop(
 		ctx,
 		controlService,
-		bugReports,
 		time.Duration(cfg.HeartbeatTimeoutSeconds)*time.Second,
 		time.Duration(cfg.LivenessReconcileIntervalSecs)*time.Second,
 	)
@@ -1001,7 +1000,6 @@ func runDueTimerLoop(ctx context.Context, runtime *scenario.Runtime, interval ti
 func runLivenessLoop(
 	ctx context.Context,
 	control *transport.ControlService,
-	bugs *bugreport.Service,
 	timeout, interval time.Duration,
 ) {
 	logger := eventlog.Component("housekeeping")
@@ -1019,18 +1017,6 @@ func runLivenessLoop(
 			updatedIDs := control.ReconcileLivenessDeviceIDs(timeout)
 			if len(updatedIDs) > 0 {
 				logger.Info("liveness reconcile updated", "event", "housekeeping.liveness.reconciled", "updated", len(updatedIDs))
-				for _, deviceID := range updatedIDs {
-					if bugs == nil {
-						continue
-					}
-					if _, err := bugs.FileAutodetect(ctx, deviceID, "heartbeat timeout or reconnect loop", nil); err != nil {
-						logger.Error("autodetect bug filing failed",
-							"event", "bug.report.autodetect.failed",
-							"device_id", deviceID,
-							"error", err,
-						)
-					}
-				}
 			} else {
 				logger.Debug("liveness reconcile idle", "event", "housekeeping.liveness.reconciled", "updated", 0)
 			}
