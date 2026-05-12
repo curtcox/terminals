@@ -33,6 +33,19 @@ ATTENTION_STATUSES = {"shipped-buggy", "shipped-untested", "open"}
 NONTRIVIAL_LINE_THRESHOLD = 200  # plans larger than this need a plan-first pass
 
 
+def _resolved_bug_descriptions() -> "set[str]":
+    """Return descriptions from resolved.txt that should be excluded from the work queue."""
+    resolved_file = BUG_REPORTS_DIR / "resolved.txt"
+    if not resolved_file.is_file():
+        return set()
+    resolved = set()
+    for line in resolved_file.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            resolved.add(" ".join(line.split())[:80])
+    return resolved
+
+
 def collect_open_bugs() -> "list[dict]":
     """Return one synthetic entry per distinct bug description in the bug log.
 
@@ -40,11 +53,14 @@ def collect_open_bugs() -> "list[dict]":
     description (trimmed to 80 chars), counts occurrences, and returns them
     sorted most-frequent first so the heaviest hitter is picked first.
 
+    Descriptions listed in resolved.txt are excluded (bug is fixed).
+
     Returns [] when the directory is absent (CI without a local log tree).
     """
     if not BUG_REPORTS_DIR.is_dir():
         return []
     from collections import Counter
+    resolved = _resolved_bug_descriptions()
     counts: Counter[str] = Counter()
     for day_dir in sorted(BUG_REPORTS_DIR.iterdir()):
         if not day_dir.is_dir():
@@ -57,6 +73,8 @@ def collect_open_bugs() -> "list[dict]":
                 continue
             desc = (d.get("summary") or {}).get("description") or ""
             desc = " ".join(desc.split())[:80] or "(no description)"
+            if desc in resolved:
+                continue
             counts[desc] += 1
     bugs = []
     for desc, cnt in counts.most_common():

@@ -127,16 +127,31 @@ def stale_building(plans, today: _dt.date) -> "list[dict]":
     return out
 
 
+def _resolved_bug_descriptions() -> "set[str]":
+    """Return descriptions from resolved.txt that should be excluded from reports."""
+    resolved_file = BUG_REPORTS_DIR / "resolved.txt"
+    if not resolved_file.is_file():
+        return set()
+    resolved = set()
+    for line in resolved_file.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            resolved.add(" ".join(line.split())[:80])
+    return resolved
+
+
 def collect_bug_summary() -> "list[dict]":
     """Return distinct bug descriptions with counts from the bug report log.
 
     Groups by normalized description (whitespace collapsed, 80-char cap).
     Returns [] when the directory is absent (CI without a local log tree).
     Each entry: {description, count, most_recent_date}.
+    Descriptions listed in resolved.txt are excluded (bug is fixed).
     """
     if not BUG_REPORTS_DIR.is_dir():
         return []
     from collections import Counter
+    resolved = _resolved_bug_descriptions()
     counts: Counter[str] = Counter()
     most_recent: dict[str, str] = {}
     for day_dir in sorted(BUG_REPORTS_DIR.iterdir()):
@@ -151,6 +166,8 @@ def collect_bug_summary() -> "list[dict]":
                 continue
             raw = (d.get("summary") or {}).get("description") or ""
             desc = " ".join(raw.split())[:80] or "(no description)"
+            if desc in resolved:
+                continue
             counts[desc] += 1
             if desc not in most_recent or date_str > most_recent[desc]:
                 most_recent[desc] = date_str
