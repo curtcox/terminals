@@ -17,9 +17,11 @@ type bugReportIntakeStub struct {
 	ack        *diagnosticsv1.BugReportAck
 	err        error
 	lastReport *diagnosticsv1.BugReport
+	callCount  int
 }
 
 func (s *bugReportIntakeStub) File(_ context.Context, report *diagnosticsv1.BugReport) (*diagnosticsv1.BugReportAck, error) {
+	s.callCount++
 	if report != nil {
 		s.lastReport = proto.Clone(report).(*diagnosticsv1.BugReport)
 	}

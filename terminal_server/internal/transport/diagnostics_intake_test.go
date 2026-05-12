@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
 )
@@ -66,6 +67,105 @@ func TestDiagnosticsIntakeContextCancellationPropagates(t *testing.T) {
 	_, err := d.HandleBugReport(ctx, &diagnosticsv1.BugReport{ReportId: "x"})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+}
+
+func TestDiagnosticsIntakeDedupWithinCooldown(t *testing.T) {
+	stub := &bugReportIntakeStub{
+		ack: &diagnosticsv1.BugReportAck{
+			ReportId: "original",
+			Status:   diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED,
+		},
+	}
+	now := time.Now()
+	d := NewDiagnosticsIntake(stub)
+	d.now = func() time.Time { return now }
+
+	report := &diagnosticsv1.BugReport{
+		ReportId:         "r1",
+		ReporterDeviceId: "device-1",
+	}
+	msg1, err := d.HandleBugReport(context.Background(), report)
+	if err != nil {
+		t.Fatalf("first report: unexpected err: %v", err)
+	}
+	if msg1.BugReportAck.GetReportId() != "original" {
+		t.Fatalf("first ack report_id = %q, want original", msg1.BugReportAck.GetReportId())
+	}
+	if stub.callCount != 1 {
+		t.Fatalf("intake call count = %d, want 1 after first report", stub.callCount)
+	}
+
+	// Second press 2 seconds later — within cooldown — must NOT call intake again.
+	d.now = func() time.Time { return now.Add(2 * time.Second) }
+	stub.ack = &diagnosticsv1.BugReportAck{ReportId: "should-not-appear"}
+	msg2, err := d.HandleBugReport(context.Background(), &diagnosticsv1.BugReport{
+		ReportId:         "r2",
+		ReporterDeviceId: "device-1",
+	})
+	if err != nil {
+		t.Fatalf("second report: unexpected err: %v", err)
+	}
+	if msg2.BugReportAck.GetReportId() != "original" {
+		t.Fatalf("second ack report_id = %q, want original (deduped)", msg2.BugReportAck.GetReportId())
+	}
+	if stub.callCount != 1 {
+		t.Fatalf("intake call count = %d, want 1 (second should be deduped)", stub.callCount)
+	}
+}
+
+func TestDiagnosticsIntakeAllowsReportAfterCooldown(t *testing.T) {
+	stub := &bugReportIntakeStub{
+		ack: &diagnosticsv1.BugReportAck{ReportId: "first"},
+	}
+	now := time.Now()
+	d := NewDiagnosticsIntake(stub)
+	d.now = func() time.Time { return now }
+
+	_, _ = d.HandleBugReport(context.Background(), &diagnosticsv1.BugReport{
+		ReportId: "r1", ReporterDeviceId: "device-1",
+	})
+
+	// After cooldown elapses a new report should be filed.
+	d.now = func() time.Time { return now.Add(bugReportCooldown + time.Second) }
+	stub.ack = &diagnosticsv1.BugReportAck{ReportId: "second"}
+	msg, err := d.HandleBugReport(context.Background(), &diagnosticsv1.BugReport{
+		ReportId: "r2", ReporterDeviceId: "device-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if msg.BugReportAck.GetReportId() != "second" {
+		t.Fatalf("ack = %q, want second", msg.BugReportAck.GetReportId())
+	}
+	if stub.callCount != 2 {
+		t.Fatalf("intake call count = %d, want 2", stub.callCount)
+	}
+}
+
+func TestDiagnosticsIntakeDifferentDevicesNotDeduped(t *testing.T) {
+	calls := 0
+	stub := &bugReportIntakeStub{}
+	stub.ack = &diagnosticsv1.BugReportAck{ReportId: "r"}
+	now := time.Now()
+	d := NewDiagnosticsIntake(stub)
+	d.now = func() time.Time { return now }
+	_ = calls
+
+	for _, id := range []string{"device-a", "device-b"} {
+		stub.ack = &diagnosticsv1.BugReportAck{ReportId: id + "-ack"}
+		msg, err := d.HandleBugReport(context.Background(), &diagnosticsv1.BugReport{
+			ReportId: id, ReporterDeviceId: id,
+		})
+		if err != nil {
+			t.Fatalf("device %s: unexpected err: %v", id, err)
+		}
+		if msg.BugReportAck.GetReportId() != id+"-ack" {
+			t.Fatalf("device %s: ack = %q, want %s-ack", id, msg.BugReportAck.GetReportId(), id)
+		}
+	}
+	if stub.callCount != 2 {
+		t.Fatalf("intake call count = %d, want 2 (one per device)", stub.callCount)
 	}
 }
 
