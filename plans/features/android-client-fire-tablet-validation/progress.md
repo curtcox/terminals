@@ -6,6 +6,13 @@ last-updated: 2026-05-12
 
 # Progress Log
 
+## 2026-05-12 — Phase C: Fix compileDebugAndroidTestKotlin
+
+`AndroidTerminalMediaSmokeTest.FakeSession` was missing `sendWebRtcSignal` (added to
+`AndroidControlSession` interface as part of Phase C Step 2). Added the no-op override.
+All four automated gates now pass: `android-client-test`, `android-client-lint`,
+`android-client-build`, `compileDebugAndroidTestKotlin`, plus both boundary scripts.
+
 ## 2026-05-12 — Phase C Step 2: WebRTC Library Wiring
 
 **Status:** Complete. All JVM unit tests pass. Detekt clean on new code.

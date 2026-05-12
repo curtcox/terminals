@@ -120,6 +120,8 @@ class AndroidTerminalMediaSmokeTest {
 
         override suspend fun sendStreamReady(streamId: String) = Unit
 
+        override suspend fun sendWebRtcSignal(signal: Control.WebRTCSignal) = Unit
+
         override suspend fun sendKeyText(text: String) = Unit
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) = Unit
