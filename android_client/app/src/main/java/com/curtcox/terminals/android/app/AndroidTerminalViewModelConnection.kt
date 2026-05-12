@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.connection.EndpointResolution
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 internal fun AndroidTerminalViewModel.startHeartbeat(connectedSession: AndroidControlSession) {

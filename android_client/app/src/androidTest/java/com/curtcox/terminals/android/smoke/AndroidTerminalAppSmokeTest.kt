@@ -23,6 +23,7 @@ import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import terminals.capabilities.v1.Capabilities
 import terminals.diagnostics.v1.Diagnostics
+import terminals.io.v1.Io
 import com.curtcox.terminals.android.connection.ControlSessionStatus
 import com.curtcox.terminals.android.connection.EndpointResolution
 import com.curtcox.terminals.android.connection.ReconnectPolicy
@@ -30,9 +31,13 @@ import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.diagnostics.DiagnosticClipboard
 import com.curtcox.terminals.android.discovery.AndroidNsdDiscovery
 import com.curtcox.terminals.android.discovery.DiscoveredServer
+import com.curtcox.terminals.android.media.AndroidLiveMediaSession
+import com.curtcox.terminals.android.media.AndroidMediaEngine
 import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
 import com.curtcox.terminals.android.media.AndroidMediaPermissionState
 import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
+import com.curtcox.terminals.android.media.AndroidWebRtcSupport
+import com.curtcox.terminals.android.media.LiveMediaSessionResult
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
@@ -1083,6 +1088,8 @@ class AndroidTerminalAppSmokeTest {
 
         override suspend fun sendStreamReady(streamId: String) = Unit
 
+        override suspend fun sendWebRtcSignal(signal: Control.WebRTCSignal) = Unit
+
         override suspend fun sendKeyText(text: String) = Unit
 
         override suspend fun sendBugReport(report: Diagnostics.BugReport) = Unit
@@ -1140,6 +1147,73 @@ class AndroidTerminalAppSmokeTest {
         fun publish(server: DiscoveredServer) {
             onServer?.invoke(server)
         }
+    }
+
+    @Test
+    fun startStreamAndWebRtcSignalWithSupportedAdapterRecordAppliedLiveMediaLines() {
+        val session = FakeSession()
+        val viewModel = AndroidTerminalViewModel(
+            AndroidClientDependencies(
+                buildMetadata = AndroidBuildMetadata("0.1.0-test", "sha", "date"),
+                heartbeatIntervalMillis = 0,
+                sensorTelemetryIntervalMillis = 0,
+                terminalSettings = AndroidTerminalSettings.inMemory(),
+                webRtcAdapter = AndroidWebRtcAdapter { AndroidWebRtcSupport(supported = true, reason = "test-supported") },
+                mediaEngine = AndroidMediaEngine(
+                    liveMedia = object : AndroidLiveMediaSession {
+                        override fun applyStartStream(start: Io.StartStream) = LiveMediaSessionResult.Applied
+                        override fun applyStopStream(streamId: String) = LiveMediaSessionResult.Applied
+                        override fun applyRouteStream(route: Io.RouteStream) = LiveMediaSessionResult.Applied
+                        override fun applyWebRtcSignal(signal: Control.WebRTCSignal) = LiveMediaSessionResult.Applied
+                        override fun stopLocalCaptureStreamsForPrivacy() = Unit
+                    },
+                ),
+                sessionFactory = { sink ->
+                    session.sink = sink
+                    session
+                },
+            ),
+        )
+
+        compose.setContent { AndroidTerminalApp(viewModel) }
+        compose.onNodeWithTag("terminal-endpoint-field").performTextInput("10.0.2.2:8080")
+        compose.onNodeWithTag("terminal-connect-button").performClick()
+        compose.waitUntil { viewModel.state.value.connectionState == ConnectionState.Connected }
+
+        runBlocking {
+            session.sink.onResponse(
+                Control.ConnectResponse.newBuilder()
+                    .setStartStream(
+                        Io.StartStream.newBuilder()
+                            .setStreamId("live-test")
+                            .setStreamKind(Io.StreamKind.STREAM_KIND_AUDIO),
+                    )
+                    .build(),
+            )
+        }
+        compose.waitUntil {
+            viewModel.state.value.diagnosticsText.contains("last_live_media=start_stream:live-test:applied")
+        }
+
+        runBlocking {
+            session.sink.onResponse(
+                Control.ConnectResponse.newBuilder()
+                    .setWebrtcSignal(
+                        Control.WebRTCSignal.newBuilder()
+                            .setStreamId("live-test")
+                            .setSignalTypeEnum(Control.WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_OFFER)
+                            .setPayload("v=0\r\n"),
+                    )
+                    .build(),
+            )
+        }
+        compose.waitUntil {
+            viewModel.state.value.diagnosticsText.contains("last_live_media=webrtc_signal:live-test:applied")
+        }
+
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_live_media=webrtc_signal:live-test:applied"),
+        )
     }
 
     private class FakePermissionRequester : AndroidPermissionRequester {

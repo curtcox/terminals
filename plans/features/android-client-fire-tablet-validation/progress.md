@@ -1,10 +1,33 @@
 ---
 title: "Fire Tablet Validation — Progress Log"
 plan: "plans/features/android-client-fire-tablet-validation/plan.md"
-last-updated: 2026-05-11
+last-updated: 2026-05-12
 ---
 
 # Progress Log
+
+## 2026-05-12 — Phase C Step 2: WebRTC Library Wiring
+
+**Status:** Complete. All JVM unit tests pass. Detekt clean on new code.
+
+### Changes shipped
+
+- `app/build.gradle.kts`: added `io.github.webrtc-sdk:android:144.7559.05` with `local.properties` version override (`webrtc.sdk.version`)
+- `WebRtcSdkAndroidAdapter` (new): implements `AndroidWebRtcAdapter`, initialises `PeerConnectionFactory`, reports `supported=true`
+- `WebRtcSdkLiveMediaSession` (new): implements `AndroidLiveMediaSession`, manages one `PeerConnection` per stream ID, handles SDP OFFER/ANSWER and ICE candidates
+- `AndroidControlSession` + `AndroidControlSessionController`: added `sendWebRtcSignal` to forward client-generated signals (ICE candidates, SDP answer) to the server
+- `ProtocolBuilders`: added `webRtcSignal` request builder
+- `AndroidClientDependencies.fromContext`: wires `WebRtcSdkAndroidAdapter` and `WebRtcSdkLiveMediaSession` with a capture-variable pattern for the signal sender
+- `AndroidTerminalInboundSink`: `start_stream` and `webrtc_signal` now record `applied` in `last_live_media` diagnostics
+- Fixed pre-existing missing `kotlinx.coroutines.flow.update` imports in 4 extension files
+- New JVM tests: `AndroidMediaEngineTest` (6 tests), `AndroidTerminalViewModelServerResponseTest` (4 tests)
+- New smoke test: `AndroidTerminalAppSmokeTest.startStreamAndWebRtcSignalWithSupportedAdapterRecordAppliedLiveMediaLines`
+
+### Remaining for full Phase C completion
+
+On-device validation (phases A, B, D) requires physical Fire OS 6+ hardware.
+
+---
 
 ## 2026-05-11 — Phase C Step 1: WebRTC Dependency Survey
 

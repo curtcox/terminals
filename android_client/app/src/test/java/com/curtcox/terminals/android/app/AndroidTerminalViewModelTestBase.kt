@@ -34,6 +34,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import terminals.capabilities.v1.Capabilities
+import terminals.control.v1.Control
 import terminals.diagnostics.v1.Diagnostics
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -178,6 +179,8 @@ abstract class AndroidTerminalViewModelTestBase {
         override suspend fun sendUiAction(action: ServerDrivenAction) {
             actions += action
         }
+
+        override suspend fun sendWebRtcSignal(signal: Control.WebRTCSignal) = Unit
 
         override suspend fun sendStreamReady(streamId: String) {
             streamReadyIds += streamId

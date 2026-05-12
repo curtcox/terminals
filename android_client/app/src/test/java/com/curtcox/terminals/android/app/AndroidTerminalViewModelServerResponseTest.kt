@@ -2,10 +2,12 @@ package com.curtcox.terminals.android.app
 
 import com.curtcox.terminals.android.diagnostics.AndroidBuildMetadata
 import com.curtcox.terminals.android.media.AndroidAudioPlayback
+import com.curtcox.terminals.android.media.AndroidLiveMediaSession
 import com.curtcox.terminals.android.media.AndroidMediaDisplay
 import com.curtcox.terminals.android.media.AndroidMediaEngine
 import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
 import com.curtcox.terminals.android.media.AudioPlaybackResult
+import com.curtcox.terminals.android.media.LiveMediaSessionResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
 import com.curtcox.terminals.android.platform.AndroidNotificationDelivery
 import com.curtcox.terminals.android.platform.AndroidTerminalSpeech
@@ -1006,4 +1008,133 @@ class AndroidTerminalViewModelServerResponseTest : AndroidTerminalViewModelTestB
         viewModel.disconnect()
         advanceUntilIdle()
     }
+
+    @Test
+    fun startStreamWithSupportedSessionRecordsAppliedInLiveMediaDiagnostics() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            mediaEngine = AndroidMediaEngine(liveMedia = alwaysAppliedSession()),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setStartStream(
+                    Io.StartStream.newBuilder()
+                        .setStreamId("s-applied")
+                        .setStreamKind(Io.StreamKind.STREAM_KIND_AUDIO),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains(
+                "last_live_media=start_stream:s-applied:applied",
+            ),
+        )
+        assertEquals("start_stream:s-applied:applied", viewModel.state.value.lastLiveMediaLine)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun webRtcSignalWithSupportedSessionRecordsAppliedInLiveMediaDiagnostics() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            mediaEngine = AndroidMediaEngine(liveMedia = alwaysAppliedSession()),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setWebrtcSignal(
+                    Control.WebRTCSignal.newBuilder()
+                        .setStreamId("sig-1")
+                        .setSignalTypeEnum(Control.WebRTCSignalType.WEB_RTC_SIGNAL_TYPE_OFFER)
+                        .setPayload("sdp-offer"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_live_media=webrtc_signal:sig-1:applied"),
+        )
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun stopStreamWithSupportedSessionAppliesCleanly() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            mediaEngine = AndroidMediaEngine(liveMedia = alwaysAppliedSession()),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setStartStream(Io.StartStream.newBuilder().setStreamId("s2").build())
+                .build(),
+        )
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setStopStream(Io.StopStream.newBuilder().setStreamId("s2").build())
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            viewModel.state.value.diagnosticsText.contains("last_live_media=start_stream:s2:applied"),
+        )
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun routeStreamWithSupportedSessionAppliesCleanly() = runTest(testDispatcher) {
+        val session = FakeSession()
+        val viewModel = viewModel(
+            session,
+            mediaEngine = AndroidMediaEngine(liveMedia = alwaysAppliedSession()),
+        )
+
+        viewModel.updateEndpoint("10.0.0.8:8080")
+        viewModel.connect()
+        advanceUntilIdle()
+        session.sink.onResponse(
+            Control.ConnectResponse.newBuilder()
+                .setRouteStream(
+                    Io.RouteStream.newBuilder()
+                        .setStreamId("s3")
+                        .setSourceDeviceId("src")
+                        .setTargetDeviceId("tgt"),
+                )
+                .build(),
+        )
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.inboundConnectResponseCount >= 1)
+        viewModel.disconnect()
+        advanceUntilIdle()
+    }
+
+    private fun alwaysAppliedSession(): AndroidLiveMediaSession =
+        object : AndroidLiveMediaSession {
+            override fun applyStartStream(start: Io.StartStream) = LiveMediaSessionResult.Applied
+            override fun applyStopStream(streamId: String) = LiveMediaSessionResult.Applied
+            override fun applyRouteStream(route: Io.RouteStream) = LiveMediaSessionResult.Applied
+            override fun applyWebRtcSignal(signal: Control.WebRTCSignal) = LiveMediaSessionResult.Applied
+            override fun stopLocalCaptureStreamsForPrivacy() = Unit
+        }
 }

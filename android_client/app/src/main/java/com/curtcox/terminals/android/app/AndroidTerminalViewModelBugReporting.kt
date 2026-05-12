@@ -6,6 +6,7 @@ import com.curtcox.terminals.android.diagnostics.AndroidBugReportActions
 import com.curtcox.terminals.android.diagnostics.AndroidBugReportBuilder
 import com.curtcox.terminals.android.connection.AndroidControlSession
 import com.curtcox.terminals.android.ui.ServerDrivenAction
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import terminals.diagnostics.v1.Diagnostics
 import java.util.Locale

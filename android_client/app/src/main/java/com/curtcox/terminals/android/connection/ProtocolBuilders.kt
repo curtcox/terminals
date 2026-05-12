@@ -88,6 +88,12 @@ class ProtocolBuilders(
             )
             .build()
 
+    /** Sends a WebRTC signaling message (ICE candidate, SDP answer) back to the server. */
+    fun webRtcSignal(signal: Control.WebRTCSignal): Control.ConnectRequest =
+        Control.ConnectRequest.newBuilder()
+            .setWebrtcSignal(signal)
+            .build()
+
     /**
      * Matches Flutter `buildSensorTelemetryRequest`: only battery fields from the last registered
      * capabilities snapshot; returns null when there is nothing to send.

@@ -24,6 +24,7 @@ import com.curtcox.terminals.android.media.AndroidMediaPermissionProbe
 import com.curtcox.terminals.android.media.AndroidWebRtcAdapter
 import com.curtcox.terminals.android.media.ContextAndroidMediaPermissionProbe
 import com.curtcox.terminals.android.media.ContextAndroidAudioPlayback
+import com.curtcox.terminals.android.media.WebRtcSdkAndroidAdapter
 import com.curtcox.terminals.android.platform.AndroidBrightnessController
 import com.curtcox.terminals.android.platform.AndroidFullscreenController
 import com.curtcox.terminals.android.platform.AndroidKeepAwakeController
@@ -109,10 +110,29 @@ data class AndroidClientDependencies(
 ) {
     companion object {
         fun fromContext(context: Context): AndroidClientDependencies {
-            val webRtcAdapter = AndroidWebRtcAdapter.disabled()
+            val webRtcAdapter = WebRtcSdkAndroidAdapter.fromContext(context)
+            val deviceId = "android-native-terminal"
+            val buildMetadata = AndroidBuildMetadata.fromBuildConfig()
+            val capabilityProbe = ContextAndroidCapabilityProbe(context)
+            val websocketStore = TransportResumeTokenStore()
+            var controlSession: AndroidControlSession? = null
+
+            val liveMedia: AndroidLiveMediaSession = if (webRtcAdapter is WebRtcSdkAndroidAdapter) {
+                webRtcAdapter.createSession(
+                    signalSender = { signal ->
+                        runCatching { controlSession?.sendWebRtcSignal(signal) }
+                    },
+                )
+            } else {
+                AndroidLiveMediaSession.fromAdapter(webRtcAdapter)
+            }
+
             return AndroidClientDependencies(
+                deviceId = deviceId,
+                buildMetadata = buildMetadata,
                 capabilityMonitorIntervalMillis = 2_000,
-                capabilityProbe = ContextAndroidCapabilityProbe(context),
+                capabilityProbe = capabilityProbe,
+                websocketResumeTokenStore = websocketStore,
                 keepAwakeController = if (context is Activity) {
                     WindowAndroidKeepAwakeController(context.window)
                 } else {
@@ -138,7 +158,7 @@ data class AndroidClientDependencies(
                 } ?: AndroidNsdDiscovery.unavailable(),
                 mediaEngine = AndroidMediaEngine(
                     audioPlayback = ContextAndroidAudioPlayback(context.applicationContext),
-                    liveMedia = AndroidLiveMediaSession.fromAdapter(webRtcAdapter),
+                    liveMedia = liveMedia,
                 ),
                 mediaPermissionProbe = ContextAndroidMediaPermissionProbe(context.applicationContext),
                 webRtcAdapter = webRtcAdapter,
@@ -149,6 +169,19 @@ data class AndroidClientDependencies(
                         model = Build.MODEL,
                         sdkInt = Build.VERSION.SDK_INT,
                     )
+                },
+                sessionFactory = { sink ->
+                    AndroidControlSessionController(
+                        deviceId = deviceId,
+                        clientVersion = buildMetadata.versionName,
+                        client = CarrierSelectingAndroidControlClient(
+                            deviceId = deviceId,
+                            websocketResumeTokenStore = websocketStore,
+                            responseSink = sink,
+                        ),
+                        capabilities = AndroidCapabilitySession(deviceId, capabilityProbe),
+                        clock = Clock { System.currentTimeMillis() },
+                    ).also { controlSession = it }
                 },
             )
         }

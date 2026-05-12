@@ -4,6 +4,7 @@ import com.curtcox.terminals.android.capabilities.AndroidCapabilitySession
 import com.curtcox.terminals.android.ui.ServerDrivenAction
 import com.curtcox.terminals.android.util.Clock
 import terminals.capabilities.v1.Capabilities
+import terminals.control.v1.Control
 import terminals.diagnostics.v1.Diagnostics
 
 data class ControlSessionStatus(
@@ -23,6 +24,7 @@ interface AndroidControlSession {
     suspend fun sendSensorTelemetry(): Boolean
     suspend fun sendUiAction(action: ServerDrivenAction)
     suspend fun sendStreamReady(streamId: String)
+    suspend fun sendWebRtcSignal(signal: Control.WebRTCSignal)
     suspend fun sendKeyText(text: String)
     suspend fun sendBugReport(report: Diagnostics.BugReport)
     suspend fun sendSystemCommand(requestId: String, intent: String)
@@ -99,6 +101,11 @@ class AndroidControlSessionController(
         val trimmed = streamId.trim()
         if (trimmed.isEmpty()) return
         client.send(builders.streamReady(trimmed))
+    }
+
+    override suspend fun sendWebRtcSignal(signal: Control.WebRTCSignal) {
+        if (signal.streamId.trim().isEmpty()) return
+        client.send(builders.webRtcSignal(signal))
     }
 
     override suspend fun sendKeyText(text: String) {

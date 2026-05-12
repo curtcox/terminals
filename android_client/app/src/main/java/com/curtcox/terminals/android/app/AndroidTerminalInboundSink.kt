@@ -5,6 +5,7 @@ import com.curtcox.terminals.android.connection.AndroidControlResponseSink
 import com.curtcox.terminals.android.media.AudioPlaybackResult
 import com.curtcox.terminals.android.media.LiveMediaSessionResult
 import com.curtcox.terminals.android.media.MediaDisplayResult
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import terminals.control.v1.Control
 import java.io.EOFException
@@ -88,7 +89,8 @@ internal class AndroidTerminalInboundSink(
                 when (val lr = viewModel.dependencies.mediaEngine.applyStartStream(response.startStream)) {
                     is LiveMediaSessionResult.Unsupported ->
                         liveMediaLine = "start_stream:$streamId:${lr.reason}"
-                    else -> {}
+                    is LiveMediaSessionResult.Applied ->
+                        liveMediaLine = "start_stream:$streamId:applied"
                 }
             }
         }
@@ -102,10 +104,12 @@ internal class AndroidTerminalInboundSink(
             viewModel.dependencies.mediaEngine.applyRouteStream(response.routeStream)
         }
         if (response.payloadCase == Control.ConnectResponse.PayloadCase.WEBRTC_SIGNAL) {
+            val signalStreamId = response.webrtcSignal.streamId.trim()
             when (val sr = viewModel.dependencies.mediaEngine.applyWebRtcSignal(response.webrtcSignal)) {
                 is LiveMediaSessionResult.Unsupported ->
                     liveMediaLine = liveMediaLine ?: "webrtc_signal:${sr.reason}"
-                else -> {}
+                is LiveMediaSessionResult.Applied ->
+                    liveMediaLine = liveMediaLine ?: "webrtc_signal:$signalStreamId:applied"
             }
         }
         viewModel.mutableState.update {

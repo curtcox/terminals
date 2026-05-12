@@ -132,6 +132,66 @@ class AndroidMediaEngineTest {
     }
 
     @Test
+    fun supportedLiveMediaSessionAppliesStartStream() {
+        val session = alwaysAppliedSession()
+        val start = Io.StartStream.newBuilder().setStreamId("s1").build()
+        assertEquals(LiveMediaSessionResult.Applied, session.applyStartStream(start))
+    }
+
+    @Test
+    fun supportedLiveMediaSessionAppliesWebRtcSignal() {
+        val session = alwaysAppliedSession()
+        assertEquals(
+            LiveMediaSessionResult.Applied,
+            session.applyWebRtcSignal(Control.WebRTCSignal.newBuilder().setStreamId("s1").build()),
+        )
+    }
+
+    @Test
+    fun supportedLiveMediaSessionAppliesStopStream() {
+        val session = alwaysAppliedSession()
+        assertEquals(LiveMediaSessionResult.Applied, session.applyStopStream("s1"))
+    }
+
+    @Test
+    fun supportedLiveMediaSessionAppliesRouteStream() {
+        val session = alwaysAppliedSession()
+        val route = Io.RouteStream.newBuilder()
+            .setStreamId("s1")
+            .setSourceDeviceId("src")
+            .setTargetDeviceId("tgt")
+            .build()
+        assertEquals(LiveMediaSessionResult.Applied, session.applyRouteStream(route))
+    }
+
+    @Test
+    fun mediaEngineWithSupportedSessionPropagatesAppliedStartStream() {
+        val engine = AndroidMediaEngine(liveMedia = alwaysAppliedSession())
+        assertEquals(
+            LiveMediaSessionResult.Applied,
+            engine.applyStartStream(Io.StartStream.newBuilder().setStreamId("s1").build()),
+        )
+    }
+
+    @Test
+    fun mediaEngineWithSupportedSessionPropagatesAppliedWebRtcSignal() {
+        val engine = AndroidMediaEngine(liveMedia = alwaysAppliedSession())
+        assertEquals(
+            LiveMediaSessionResult.Applied,
+            engine.applyWebRtcSignal(Control.WebRTCSignal.newBuilder().setStreamId("s1").build()),
+        )
+    }
+
+    private fun alwaysAppliedSession(): AndroidLiveMediaSession =
+        object : AndroidLiveMediaSession {
+            override fun applyStartStream(start: Io.StartStream) = LiveMediaSessionResult.Applied
+            override fun applyStopStream(streamId: String) = LiveMediaSessionResult.Applied
+            override fun applyRouteStream(route: Io.RouteStream) = LiveMediaSessionResult.Applied
+            override fun applyWebRtcSignal(signal: Control.WebRTCSignal) = LiveMediaSessionResult.Applied
+            override fun stopLocalCaptureStreamsForPrivacy() = Unit
+        }
+
+    @Test
     fun liveMediaDelegatesStopRouteAndSignalToSession() {
         val live = RecordingLiveMediaSession()
         val engine = AndroidMediaEngine(liveMedia = live)

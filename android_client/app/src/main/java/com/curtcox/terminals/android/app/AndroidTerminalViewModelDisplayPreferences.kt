@@ -1,5 +1,7 @@
 package com.curtcox.terminals.android.app
 
+import kotlinx.coroutines.flow.update
+
 fun AndroidTerminalViewModel.setKeepAwake(enabled: Boolean) {
     runCatching {
         dependencies.keepAwakeController.setKeepAwake(enabled)

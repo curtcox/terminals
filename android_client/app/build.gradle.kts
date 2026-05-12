@@ -18,6 +18,10 @@ val localProperties = Properties().apply {
     }
 }
 
+val webRtcSdkVersion: String =
+    localProperties.getProperty("webrtc.sdk.version")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: "144.7559.05"
+
 fun resolveGrpcJavaProtocPluginPath(): String? {
     localProperties.getProperty("grpc.java.plugin")?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
     System.getenv("GRPC_JAVA_PLUGIN")?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -170,6 +174,7 @@ dependencies {
     implementation("io.grpc:grpc-protobuf-lite")
     implementation("io.grpc:grpc-stub")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("io.github.webrtc-sdk:android:$webRtcSdkVersion")
     compileOnly("javax.annotation:javax.annotation-api:1.3.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
