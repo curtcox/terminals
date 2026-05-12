@@ -1,0 +1,15 @@
+{
+  "report_id": "clientbug-1776793145224-flutter-1776793127789-flutter-1776793127789-123854-year",
+  "bug_token_word": "year",
+  "description": "Still no",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "906c09cd",
+    "ac86e232"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test.dart::connect bootstrap retries register when transport attaches request stream late"
+  ],
+  "root_cause": "Same RegisterAck/idle stream issue as energy/power. Still unresolved in client SHA 906c09cd at time of filing; ac86e232 (register retry) fully addressed it.",
+  "notes": ""
+}

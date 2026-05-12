@@ -1,0 +1,16 @@
+{
+  "report_id": "clientbug-1776791748722-flutter-1776791617335-flutter-1776791617335-121425-power",
+  "bug_token_word": "power",
+  "description": "The server build info is still unavailable and the text showing the message is s",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "906c09cd",
+    "ac86e232",
+    "3ee3f69b"
+  ],
+  "regression_tests": [
+    "terminal_server/internal/transport/control_stream_test.go::TestHandleMessageCapabilitySnapshotReturnsRegisterAckOnRebaseline"
+  ],
+  "root_cause": "Server build info unavailable and text not selectable \u2014 same root cause as energy report (RegisterAck not always sent; no SelectableText). See energy resolution.",
+  "notes": ""
+}

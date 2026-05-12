@@ -1,0 +1,15 @@
+{
+  "report_id": "bug-20260417t170843.506-4bc17b13",
+  "bug_token_word": "control",
+  "description": "?",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "ac86e232",
+    "4cc2f036"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test.dart::connect bootstrap sends register request so metadata and app list hydrate without reconnect"
+  ],
+  "root_cause": "User filed bug report from idle connect screen before connecting to server. No code bug \u2014 blank active_ui_root is expected before RegisterAck. Connection flow improved by register retry (ac86e232) and auto-connect (4cc2f036).",
+  "notes": "All three '?' reports (control/number/pixel) share this description. One resolution file suppresses all three."
+}

@@ -1,0 +1,15 @@
+{
+  "report_id": "clientbug-1776789808971-flutter-1776789687905-flutter-1776789687905-114210-energy",
+  "bug_token_word": "energy",
+  "description": "Client/Server Build - info should be selectable and isn't - server build info is",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "906c09cd",
+    "3ee3f69b"
+  ],
+  "regression_tests": [
+    "terminal_server/internal/transport/control_stream_test.go::TestHandleMessageCapabilitySnapshotReturnsRegisterAckOnRebaseline"
+  ],
+  "root_cause": "Server didn't always send RegisterAck on capability snapshots, leaving client stuck in Idle. Build info text was also non-selectable. Both fixed: 906c09cd always sends RegisterAck; 3ee3f69b uses SelectableText in extracted client_chrome.dart.",
+  "notes": ""
+}

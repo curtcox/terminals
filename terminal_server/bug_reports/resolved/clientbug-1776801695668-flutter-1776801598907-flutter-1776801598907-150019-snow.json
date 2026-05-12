@@ -1,0 +1,16 @@
+{
+  "report_id": "clientbug-1776801695668-flutter-1776801598907-flutter-1776801598907-150019-snow",
+  "bug_token_word": "snow",
+  "description": "Still not o'working",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "906c09cd",
+    "ac86e232",
+    "4cc2f036"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test.dart::connect bootstrap retries register when transport attaches request stream late"
+  ],
+  "root_cause": "Same RegisterAck/idle stream issue. Final entry in the April-21 session. See memory resolution.",
+  "notes": ""
+}

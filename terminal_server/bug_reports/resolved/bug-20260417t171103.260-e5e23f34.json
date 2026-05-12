@@ -1,0 +1,16 @@
+{
+  "report_id": "bug-20260417t171103.260-e5e23f34",
+  "bug_token_word": "heartbeat",
+  "description": "heartbeat timeout or reconnect loop",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "65108f95",
+    "3248296a",
+    "32eec640"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test_reconnect.dart::does not reconnect-loop when stream drops while app is backgrounded"
+  ],
+  "root_cause": "Reconnect loop while app is backgrounded caused heartbeat timeouts. Fixed by skipping reconnect in background and triggering immediate reconnect on foreground return.",
+  "notes": "All 127 auto-detected reports share this description. One resolution file suppresses all of them. The noisy auto-detect was also removed from the liveness loop (32eec640)."
+}

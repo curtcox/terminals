@@ -1,0 +1,16 @@
+{
+  "report_id": "clientbug-1776800307198-flutter-1776800273739-flutter-1776800273739-143805-memory",
+  "bug_token_word": "memory",
+  "description": "Are you sure it is fixed?",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "906c09cd",
+    "ac86e232",
+    "4cc2f036"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test.dart::connect bootstrap retries register when transport attaches request stream late"
+  ],
+  "root_cause": "RegisterAck still not arriving reliably. 4cc2f036 (auto-connect + extended retry timeout) was the final fix for this session.",
+  "notes": ""
+}

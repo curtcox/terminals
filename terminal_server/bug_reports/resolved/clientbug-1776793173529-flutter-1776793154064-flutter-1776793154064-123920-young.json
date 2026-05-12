@@ -1,0 +1,15 @@
+{
+  "report_id": "clientbug-1776793173529-flutter-1776793154064-flutter-1776793154064-123920-young",
+  "bug_token_word": "young",
+  "description": "How long?",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "906c09cd",
+    "ac86e232"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test.dart::connect bootstrap retries register when transport attaches request stream late"
+  ],
+  "root_cause": "Same RegisterAck/idle stream issue. See year resolution.",
+  "notes": ""
+}
