@@ -1,7 +1,7 @@
 {
   "report_id": "clientbug-1776614763979-flutter-1776614704915-flutter-1776614704915-110557-source",
   "bug_token_word": "source",
-  "description": "DDC is about to load 1/2 scripts with pool size = 1000",
+  "description": "DDC is about to load 1/2 scripts with pool size = 1000 ddc_module_loader.js:1015",
   "resolved_at": "2026-05-12",
   "fix_commits": [],
   "regression_tests": [],
