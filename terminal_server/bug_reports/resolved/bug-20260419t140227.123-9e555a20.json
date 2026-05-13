@@ -1,0 +1,15 @@
+{
+  "report_id": "bug-20260419t140227.123-9e555a20",
+  "bug_token_word": "design",
+  "description": "Filed from terminal client bug-report dialog",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "08d10ede3db4a242622f9118298e1af89724138f"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test_ui.dart::wires terminal text input changes/submission to key events",
+    "terminal_server/internal/transport/control_stream_command_terminal_test.go::TestHandleMessageInputTerminalKeyTextNoDoubleOutput"
+  ],
+  "root_cause": "Same double-output server bug as garden/breeze: terminal_output showed 'heellpp' (each character doubled) confirming the bug. User typed help and filed the report. Description is the server default because no custom text was entered. Fixed by 08d10ede (server readTerminalOutput AppendOutput-twice fix + client shadow-reset fix).",
+  "notes": "Platform macOS:web. Filed 2026-04-19 during same testing session as other double-output reports."
+}

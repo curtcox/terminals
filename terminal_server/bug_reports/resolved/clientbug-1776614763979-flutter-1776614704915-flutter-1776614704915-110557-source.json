@@ -1,0 +1,10 @@
+{
+  "report_id": "clientbug-1776614763979-flutter-1776614704915-flutter-1776614704915-110557-source",
+  "bug_token_word": "source",
+  "description": "DDC is about to load 1/2 scripts with pool size = 1000",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [],
+  "regression_tests": [],
+  "root_cause": "Not a real bug. The description is standard Flutter web DDC (Dart Dev Compiler) startup output — normal logs from running in debug/DDC mode. The terminal_output showed a working REPL session with no double-echo or errors. User mistakenly included DDC console output as the bug description.",
+  "notes": "Platform macOS:web. The REPL was functioning correctly at time of report."
+}

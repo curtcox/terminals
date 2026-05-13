@@ -1,0 +1,10 @@
+{
+  "report_id": "bug-20260417t012935.667-39f994b6",
+  "bug_token_word": "stream",
+  "description": "Codex verification submit for stream token",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [],
+  "regression_tests": [],
+  "root_cause": "Not a real bug. Synthetic verification report filed by Codex (source=BUG_REPORT_SOURCE_ADMIN, reporter=codex-local, tags=[verification]) to exercise the bug submission pipeline. Timestamp_unix_ms=1760000000000 is a synthetic value; the actual creation time was 2026-04-17.",
+  "notes": "No fix needed. Filed programmatically to test that the pipeline accepts and stores admin-sourced reports."
+}

@@ -1,0 +1,14 @@
+{
+  "report_id": "clientbug-1776911507547-flutter-1776910950818-flutter-1776910950818-213049-shadow",
+  "bug_token_word": "shadow",
+  "description": "Update this screen to be a full screen app as descibed in plans/terminal-ui.md",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "790a2cbf783038e2bb13f1db7287ad5990308a43"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test_terminal_ui_phase_h.dart"
+  ],
+  "root_cause": "Feature request: client was showing its own connect/diagnostics screen instead of a server-driven full-screen UI. Phase H of the terminal-ui plan implemented displaySurfaceMode (TERMINALS_DISPLAY_SURFACE env var) which hides the connection chrome and shows the server-provided idle placeholder until the first SetUI arrives, then transitions to the server-driven descriptor.",
+  "notes": "Platform macOS:web. Client had received terminal_root SetUI updates at time of filing but was still showing the connection screen because displaySurfaceMode=false (default). The display-surface mode is intended for dedicated kiosk/display devices."
+}
