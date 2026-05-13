@@ -1,0 +1,12 @@
+{
+  "report_id": "bug-20260418t222807.151-44d18db8",
+  "bug_token_word": "photo",
+  "description": "The Scan LAN button reports an error.",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "02e9f09841dc6b069fea3a9f5aedbd1932be871a"
+  ],
+  "regression_tests": [],
+  "root_cause": "Same root cause as corner (6235e5ce): _scanForServers() used InternetAddress.anyIPv4 (dart:io) on Flutter Web. client_context.connection.last_status confirmed 'Discovery error: Unsupported operation: InternetAddress.anyIPv4'. Fix added kIsWeb early-return and hid the Scan LAN button on web.",
+  "notes": "This was the worked example in the bugword skill. Platform macOS:web."
+}

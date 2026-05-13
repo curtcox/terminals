@@ -1,0 +1,12 @@
+{
+  "report_id": "bug-20260418t215113.600-6235e5ce",
+  "bug_token_word": "corner",
+  "description": "Scan LAN prodcues error",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "02e9f09841dc6b069fea3a9f5aedbd1932be871a"
+  ],
+  "regression_tests": [],
+  "root_cause": "On Flutter Web, _scanForServers() called InternetAddress.anyIPv4 from dart:io, which is not available in the browser runtime. Fix added a kIsWeb guard that returns early with a status message instead of attempting LAN discovery. The Scan LAN button is also hidden on web.",
+  "notes": "Platform macOS:web. No dedicated regression test added; the fix is guarded by the compile-time kIsWeb constant which is enforced by the Flutter web build toolchain."
+}

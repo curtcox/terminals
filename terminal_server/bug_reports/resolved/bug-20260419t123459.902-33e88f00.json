@@ -1,0 +1,15 @@
+{
+  "report_id": "bug-20260419t123459.902-33e88f00",
+  "bug_token_word": "breeze",
+  "description": "Typing in the REPL only accepts one character. After that, any additional characters typed are ignored.",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "08d10ede3db4a242622f9118298e1af89724138f"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test_ui.dart::wires terminal text input changes/submission to key events",
+    "terminal_server/internal/transport/control_stream_command_terminal_test.go::TestHandleMessageInputTerminalKeyTextNoDoubleOutput"
+  ],
+  "root_cause": "Same session as book bugs (8bc7605b, 023840af). Two compounding issues: (1) client onSubmitted cleared TextEditingController before resetting _terminalInputShadow, causing _handleTerminalInputChanged to detect a deletion and send a spurious backspace to the PTY on Flutter Web — corrupting the line buffer after every submit; (2) server readTerminalOutput called AppendOutput after ReadAvailable had already appended, doubling PTY output in live.output.",
+  "notes": "Filed ~90 seconds after the two book reports from the same device (flutter-1776601915162), describing the same broken state."
+}

@@ -1,0 +1,15 @@
+{
+  "report_id": "bug-20260419t153155.199-18142327",
+  "bug_token_word": "garden",
+  "description": "Typed characters are doble echoed. Also, the striped line represents a problem detailed in the console log.",
+  "resolved_at": "2026-05-12",
+  "fix_commits": [
+    "08d10ede3db4a242622f9118298e1af89724138f"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test_ui.dart::wires terminal text input changes/submission to key events",
+    "terminal_server/internal/transport/control_stream_command_terminal_test.go::TestHandleMessageInputTerminalKeyTextNoDoubleOutput"
+  ],
+  "root_cause": "Server readTerminalOutput called AppendOutput after ReadAvailable had already appended, doubling PTY echo bytes in live.output — causing heellpp output for help input. Secondary symptom (striped overflow line) was a RenderFlex overflow at 286px screen height (browser with keyboard raised) that was incidental to the double-output state.",
+  "notes": "Platform macOS:web; screen height only 286px at time of filing (likely browser keyboard open). DDC loader messages in description are normal Flutter web output, not errors."
+}
