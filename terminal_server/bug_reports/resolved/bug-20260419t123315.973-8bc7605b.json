@@ -1,0 +1,14 @@
+{
+  "report_id": "bug-20260419t123315.973-8bc7605b",
+  "bug_token_word": "book",
+  "description": "Filed from on-device bug report button",
+  "resolved_at": "2026-05-13",
+  "fix_commits": [
+    "08d10ede3db4a242622f9118298e1af89724138f"
+  ],
+  "regression_tests": [
+    "terminal_client/test/widget_test_ui.dart::wires terminal text input changes/submission to key events"
+  ],
+  "root_cause": "onSubmitted cleared controller before resetting shadow, causing spurious backspace on Flutter Web; also: server readTerminalOutput called AppendOutput twice (already fixed earlier)",
+  "notes": ""
+}
