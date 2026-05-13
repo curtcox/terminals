@@ -18,6 +18,7 @@ func TestWithCornerAffordanceAddsDefaultScopedButton(t *testing.T) {
 	corner := findNodeByID(&got, "act:device-1/__affordance.corner__")
 	if corner == nil {
 		t.Fatalf("expected scoped corner affordance node")
+		return
 	}
 	if corner.Type != "button" {
 		t.Fatalf("corner type = %q, want button", corner.Type)

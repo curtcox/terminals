@@ -61,6 +61,7 @@ func TestNoopLLMReturnsSentinelResponse(t *testing.T) {
 	}
 	if resp == nil {
 		t.Fatalf("Query() resp = nil, want non-nil")
+		return
 	}
 	if resp.Text != noopSentinel {
 		t.Fatalf("resp.Text = %q, want %q", resp.Text, noopSentinel)

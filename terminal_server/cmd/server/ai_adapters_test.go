@@ -62,6 +62,7 @@ func TestScenarioVisionAnalyzerAnalyzeMapsResponse(t *testing.T) {
 	}
 	if got == nil {
 		t.Fatalf("Analyze() response = nil, want non-nil")
+		return
 	}
 	if got.Caption != "kitchen" {
 		t.Fatalf("Caption = %q, want kitchen", got.Caption)

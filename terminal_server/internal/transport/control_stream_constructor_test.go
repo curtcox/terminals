@@ -28,6 +28,7 @@ func TestStreamHandlerConstructorsInitializeFields(t *testing.T) {
 			h := tc.build()
 			if h == nil {
 				t.Fatal("constructor returned nil")
+				return
 			}
 			if h.metrics == nil {
 				t.Error("metrics not initialized")

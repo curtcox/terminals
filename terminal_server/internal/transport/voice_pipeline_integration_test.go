@@ -287,6 +287,7 @@ func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 	}
 	if updateUI == nil {
 		t.Fatalf("expected UpdateUI overlay rich response, got %+v", out)
+		return
 	}
 	if updateUI.ComponentID != ui.GlobalOverlayComponentID {
 		t.Fatalf("UpdateUI component = %q, want %q", updateUI.ComponentID, ui.GlobalOverlayComponentID)
@@ -299,6 +300,7 @@ func TestControlStreamVoiceAudioPipeline(t *testing.T) {
 	}
 	if play == nil {
 		t.Fatalf("expected PlayAudio reply, got %+v", out)
+		return
 	}
 	if play.DeviceID != "device-1" {
 		t.Fatalf("PlayAudio.DeviceID = %q, want device-1", play.DeviceID)
@@ -508,6 +510,7 @@ func TestControlStreamVoiceAudioWithoutTTSEmitsRichResponseUI(t *testing.T) {
 	}
 	if updateUI == nil {
 		t.Fatalf("expected UpdateUI rich response when TTS unavailable, got %+v", out)
+		return
 	}
 	if updateUI.ComponentID != ui.GlobalOverlayComponentID {
 		t.Fatalf("UpdateUI component = %q, want %q", updateUI.ComponentID, ui.GlobalOverlayComponentID)

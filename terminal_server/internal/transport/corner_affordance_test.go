@@ -81,6 +81,7 @@ func TestWithCornerAffordanceConfig_PerCornerPlacement(t *testing.T) {
 			node := findNodeByID(&got, "act:device-1/__affordance.corner__")
 			if node == nil {
 				t.Fatalf("missing scoped corner node for corner=%s", corner)
+				return
 			}
 			if node.Props["corner"] != corner {
 				t.Fatalf("emitted corner = %q, want %q", node.Props["corner"], corner)
@@ -108,6 +109,7 @@ func TestWithCornerAffordanceConfig_HitTargetMeetsMinimumAtDensity(t *testing.T)
 			node := findNodeByID(&got, "act:device-1/__affordance.corner__")
 			if node == nil {
 				t.Fatalf("missing scoped corner node")
+				return
 			}
 			gotDp, err := strconv.Atoi(node.Props["min_hit_dp"])
 			if err != nil {
@@ -257,6 +259,7 @@ func TestWithCornerAffordance_RegistryReachabilityInvariant(t *testing.T) {
 				node := findNodeByID(&wrapped, wantID)
 				if node == nil {
 					t.Fatalf("scenario %q fixture %d: missing scoped corner node", info.Name, i)
+					return
 				}
 				if strings.TrimSpace(node.Type) != "button" {
 					t.Fatalf("scenario %q fixture %d: corner type = %q, want button",

@@ -862,6 +862,7 @@ func TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance(t *testing.T) {
 	node := findNodeByID(root, cornerID)
 	if node == nil {
 		t.Fatalf("SetUI tree missing corner affordance node %q", cornerID)
+		return
 	}
 	if strings.TrimSpace(node.Type) != "button" {
 		t.Fatalf("corner node type = %q, want button", node.Type)
