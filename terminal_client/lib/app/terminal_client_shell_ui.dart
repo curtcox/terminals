@@ -106,8 +106,8 @@ extension _UiExtension on _TerminalClientShellState {
       onChanged: _handleTerminalInputChanged,
       onSubmitted: (value) async {
         await _sendKeyText('\n');
-        _terminalInputController.clear();
         _terminalInputShadow = '';
+        _terminalInputController.clear();
       },
     );
   }

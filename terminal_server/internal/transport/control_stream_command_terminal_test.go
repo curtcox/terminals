@@ -754,6 +754,58 @@ func TestHandleMessageInputTerminalInteractiveActions(t *testing.T) {
 	}
 }
 
+// TestHandleMessageInputTerminalKeyTextNoDoubleOutput verifies that key text
+// input does not double-accumulate PTY output (regression for book/8bc7605b
+// bug: old readTerminalOutput called AppendOutput after ReadAvailable had
+// already appended, duplicating the banner + echo in live.output).
+func TestHandleMessageInputTerminalKeyTextNoDoubleOutput(t *testing.T) {
+	devices := device.NewManager()
+	control := NewControlService("srv-1", devices)
+	engine := scenario.NewEngine()
+	scenario.RegisterBuiltins(engine)
+	runtime := scenario.NewRuntime(engine, &scenario.Environment{
+		Devices:   devices,
+		IO:        io.NewRouter(),
+		Telephony: telephony.NoopBridge{},
+		Storage:   storage.NewMemoryStore(),
+		Scheduler: storage.NewMemoryScheduler(),
+		Broadcast: ui.NewMemoryBroadcaster(),
+	})
+	handler := NewStreamHandlerWithRuntime(control, runtime)
+	handler.terminalReadDeadline = 40 * time.Millisecond
+	handler.terminalReadInterval = 5 * time.Millisecond
+
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Register: &RegisterRequest{DeviceID: "device-1"},
+	})
+	_, _ = handler.HandleMessage(context.Background(), ClientMessage{
+		Command: &CommandRequest{
+			RequestID: "cmd-no-double-output",
+			DeviceID:  "device-1",
+			Kind:      "manual",
+			Intent:    "terminal",
+		},
+	})
+
+	out, err := handler.HandleMessage(context.Background(), ClientMessage{
+		Input: &InputRequest{
+			DeviceID: "device-1",
+			KeyText:  "echo unique-marker\n",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleMessage(key text) error = %v", err)
+	}
+	if len(out) != 1 || out[0].UpdateUI == nil {
+		t.Fatalf("expected single UpdateUI, got %v", out)
+	}
+	value := out[0].UpdateUI.Node.Props["value"]
+	count := strings.Count(value, "unique-marker")
+	if count != 1 {
+		t.Fatalf("terminal output contains %q %d time(s), want exactly 1 (double-output regression)", "unique-marker", count)
+	}
+}
+
 // TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance pins use case UI1
 // (idle main-layer server-driven descriptor includes the typed corner affordance)
 // from plans/features/terminal-ui/plan.md Phase I.

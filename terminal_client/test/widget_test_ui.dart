@@ -483,6 +483,24 @@ void main() {
         )
         .toList();
     expect(terminalSubmitActions, isEmpty);
+
+    final backspaceEvents = keyEvents.where((text) => text == '\b').toList();
+    expect(
+      backspaceEvents,
+      isEmpty,
+      reason:
+          'submit must not send a spurious backspace (shadow reset race bug)',
+    );
+
+    // Type again after submit: should work correctly (shadow is reset to '').
+    await tester.enterText(terminalField, 'pwd');
+    await tester.pump();
+    final keyEvents2 = harness.lastClient.requests
+        .where((request) => request.hasInput() && request.input.hasKey())
+        .map((request) => request.input.key.text)
+        .toList();
+    expect(keyEvents2.any((text) => text == 'pwd'), isTrue,
+        reason: 'typing after submit should send the new text as key events');
   });
 
   testWidgets('keeps terminal input focused across terminal output patches',
