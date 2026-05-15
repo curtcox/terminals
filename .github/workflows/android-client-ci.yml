@@ -32,7 +32,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           log-accepted-android-sdk-licenses: true
       - name: Install Android SDK packages
@@ -74,7 +74,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           log-accepted-android-sdk-licenses: true
       - name: Install Android SDK packages
@@ -121,7 +121,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           log-accepted-android-sdk-licenses: true
       - name: Install Android SDK packages
