@@ -55,9 +55,7 @@ part 'terminal_client_shell_bug_report.dart';
 part 'terminal_client_shell_media.dart';
 part 'terminal_client_shell_ui.dart';
 
-const bool _e2eEmitEvents = bool.fromEnvironment(
-  'TERMINALS_E2E_EMIT_EVENTS',
-);
+const bool _e2eEmitEvents = bool.fromEnvironment('TERMINALS_E2E_EMIT_EVENTS');
 const bool _e2eAutoScanConnect = bool.fromEnvironment(
   'TERMINALS_E2E_AUTO_SCAN_CONNECT',
 );
@@ -81,8 +79,9 @@ const int _defaultControlWSPort = int.fromEnvironment(
   'TERMINALS_CONTROL_WS_PORT',
   defaultValue: 50054,
 );
-const int _defaultControlPort =
-    kIsWeb ? _defaultControlWSPort : _defaultGrpcPort;
+const int _defaultControlPort = kIsWeb
+    ? _defaultControlWSPort
+    : _defaultGrpcPort;
 const String _buildSha = String.fromEnvironment(
   'TERMINALS_BUILD_SHA',
   defaultValue: 'unknown',
@@ -148,6 +147,7 @@ class TerminalClientShell extends StatefulWidget {
   final Listenable? screenMetricsChangeListenable;
   final Duration displayGeometryDebounceInterval;
   final MediaPermissionProbe mediaPermissionProbe;
+
   /// When true, after registration and before the first server `SetUI`, show
   /// [idleMainLayerPlaceholderRoot] fullscreen (terminal-ui plan, Phase H).
   /// Defaults from [TerminalClientApp] via `TERMINALS_DISPLAY_SURFACE`.
@@ -266,6 +266,7 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     }
     return null;
   }
+
   int _lastHeartbeatUnixMs = 0;
   int _pendingHeartbeatUnixMs = 0;
   double _lastRttMs = 0;
@@ -339,13 +340,12 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     );
     _registerAckRetryController = RetryController(
       policy: _registerAckRetryPolicy,
-      nowUtc: () => DateTime.fromMillisecondsSinceEpoch(
-        _nowUnixMs(),
-        isUtc: true,
-      ),
+      nowUtc: () =>
+          DateTime.fromMillisecondsSinceEpoch(_nowUnixMs(), isUtc: true),
     );
-    widget.screenMetricsChangeListenable
-        ?.addListener(_handleInjectedScreenMetricsChanged);
+    widget.screenMetricsChangeListenable?.addListener(
+      _handleInjectedScreenMetricsChanged,
+    );
     _recordClientLog('info', 'client started');
     if (_e2eEmitEvents) {
       debugPrint('E2E_EVENT: client_started');
@@ -368,10 +368,12 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.screenMetricsChangeListenable !=
         widget.screenMetricsChangeListenable) {
-      oldWidget.screenMetricsChangeListenable
-          ?.removeListener(_handleInjectedScreenMetricsChanged);
-      widget.screenMetricsChangeListenable
-          ?.addListener(_handleInjectedScreenMetricsChanged);
+      oldWidget.screenMetricsChangeListenable?.removeListener(
+        _handleInjectedScreenMetricsChanged,
+      );
+      widget.screenMetricsChangeListenable?.addListener(
+        _handleInjectedScreenMetricsChanged,
+      );
     }
   }
 
@@ -478,8 +480,9 @@ class _TerminalClientShellState extends State<TerminalClientShell>
     _playbackArtifactIdController.dispose();
     _playbackTargetDeviceIdController.dispose();
     _restoreFlutterErrorHook();
-    widget.screenMetricsChangeListenable
-        ?.removeListener(_handleInjectedScreenMetricsChanged);
+    widget.screenMetricsChangeListenable?.removeListener(
+      _handleInjectedScreenMetricsChanged,
+    );
     super.dispose();
   }
 
@@ -520,15 +523,14 @@ class _TerminalClientShellState extends State<TerminalClientShell>
         key: _bugReportScreenshotKey,
         child: Scaffold(
           resizeToAvoidBottomInset: false,
-          floatingActionButton:
-              BugReportButton(onPressed: _showBugReportDialog),
+          floatingActionButton: BugReportButton(
+            onPressed: _showBugReportDialog,
+          ),
           bottomNavigationBar: _buildMetadataFooter(),
           body: SafeArea(
             child: Stack(
               children: [
-                SizedBox.expand(
-                  child: _buildServerDrivenRenderer(root),
-                ),
+                SizedBox.expand(child: _buildServerDrivenRenderer(root)),
                 if (_shouldShowFullscreenStatusOverlay())
                   Positioned(
                     top: 12,
@@ -584,8 +586,9 @@ class _TerminalClientShellState extends State<TerminalClientShell>
                     DropdownButtonFormField<String>(
                       key: ValueKey<String?>(_selectedDiscoveredServer),
                       initialValue: _selectedDiscoveredServer,
-                      decoration:
-                          const InputDecoration(labelText: 'Discovered Server'),
+                      decoration: const InputDecoration(
+                        labelText: 'Discovered Server',
+                      ),
                       items: _discoveredServers
                           .map(
                             (server) => DropdownMenuItem<String>(
@@ -760,8 +763,10 @@ class _TerminalClientShellState extends State<TerminalClientShell>
                   _buildDiagnosticsPanel(),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    initialValue: _availableApplicationIntents
-                            .contains(_selectedApplicationIntent)
+                    initialValue:
+                        _availableApplicationIntents.contains(
+                          _selectedApplicationIntent,
+                        )
                         ? _selectedApplicationIntent
                         : _availableApplicationIntents.first,
                     decoration: const InputDecoration(
