@@ -74,8 +74,7 @@ func TestValidateServiceInfo(t *testing.T) {
 func TestMDNSAdvertiserIncludesTransportMetadata(t *testing.T) {
 	t.Parallel()
 
-	advertiser := NewMDNSAdvertiser()
-	zone, err := advertiser.newZone(ServiceInfo{
+	txt := buildMDNSTXTRecords(ServiceInfo{
 		ServiceType: "_terminals._tcp.local.",
 		Name:        "HomeServer",
 		Port:        50051,
@@ -87,12 +86,7 @@ func TestMDNSAdvertiserIncludesTransportMetadata(t *testing.T) {
 		MCP:         "http://127.0.0.1:50053/mcp",
 		Priority:    []string{"grpc", "websocket", "tcp", "http", "mcp"},
 	})
-	if err != nil {
-		t.Fatalf("newZone() error = %v", err)
-	}
-	if zone == nil {
-		t.Fatalf("newZone() = nil")
-	}
+	zone := &mdns.MDNSService{TXT: txt}
 
 	assertTXTContains(t, zone, "version=2")
 	assertTXTContains(t, zone, "name=HomeServer")
