@@ -8,6 +8,7 @@ linters:
     - bodyclose
     - errcheck
     - exhaustive
+    - gocognit
     - gocritic
     - govet
     - ineffassign
@@ -16,6 +17,10 @@ linters:
     - revive
     - staticcheck
     - unused
+  settings:
+    gocognit:
+      # TODO(complexity): current ceiling is 722 (repl_eval_control_plane_ops.go); aspirational target is 15.
+      min-complexity: 730
 
 formatters:
   enable:

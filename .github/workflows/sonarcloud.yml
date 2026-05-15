@@ -1,0 +1,36 @@
+# MANUAL PREREQUISITE (cannot be automated):
+# 1. Create a project at https://sonarcloud.io for this repo.
+# 2. Add SONAR_TOKEN as a repository secret in GitHub:
+#    Settings → Secrets → Actions → New repository secret
+#    Name: SONAR_TOKEN  Value: <token from SonarCloud>
+# 3. Set sonar.organization in sonar-project.properties to your SonarCloud org slug.
+
+name: SonarCloud
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history required for blame/new-code detection
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: terminal_server/go.mod
+
+      - name: Run Go tests with coverage
+        working-directory: terminal_server
+        run: go test ./... -coverprofile=coverage.out
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
