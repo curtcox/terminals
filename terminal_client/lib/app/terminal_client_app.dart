@@ -57,6 +57,7 @@ class TerminalClientApp extends StatelessWidget {
   final Listenable? screenMetricsChangeListenable;
   final Duration displayGeometryDebounceInterval;
   final MediaPermissionProbe mediaPermissionProbe;
+
   /// Immersive display-surface mode: after register, show the idle placeholder
   /// until the first server `SetUI` (see `TERMINALS_DISPLAY_SURFACE`).
   final bool displaySurfaceMode;
