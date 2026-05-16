@@ -89,6 +89,8 @@ func ParseVoiceTrigger(sourceID, spoken string, now time.Time) Trigger {
 			trigger.Arguments["device_id"] = deviceID
 			trigger.Arguments["method"] = method
 		}
+	case normalized == "camera monitor" || normalized == "monitor camera" || normalized == "watch camera":
+		trigger.Intent = "camera monitor"
 	case normalized == "schedule monitor":
 		trigger.Intent = "schedule monitor"
 	case normalized == "cancel timer" || normalized == "cancel the timer" || normalized == "stop timer" || normalized == "stop the timer":

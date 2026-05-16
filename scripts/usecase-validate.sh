@@ -38,6 +38,7 @@ metadata() {
     M2) echo "M2|Scenario|audio monitor runtime test for dryer beep detection" ;;
     M3) echo "M3|Transport|generated+wire red alert integration tests" ;;
     M4) echo "M4|Transport|generated+wire voice stop/stand-down tests" ;;
+    M5) echo "M5|Simulation|camera activity watch: time-window policy gates alerts; harness-backed sensor routing and suppression evidence" ;;
     P2) echo "P2|Scenario|REPL session mobility and coexistence lifecycle test" ;;
     P3) echo "P3|Scenario|REPL ai ask/gen commands plus mutating approval-gate metadata test" ;;
     P4) echo "P4|Scenario|sticky REPL AI provider/model survives detach and reattach" ;;
@@ -48,7 +49,7 @@ metadata() {
     PL1) echo "PL1|Contract|capability message room/thread/unread acknowledgement lifecycle test" ;;
     PL8) echo "PL8|Contract|interactive session join/leave and control lifecycle capability tests" ;;
     PL20) echo "PL20|Contract|capability artifact template save/apply and artifact history tests" ;;
-    T1) echo "T1|Smoke|due-timer loop; transport run_due_timers; kitchen timer package smoke test; future TAL simulation coverage" ;;
+    T1) echo "T1|Simulation|due-timer loop; transport run_due_timers; kitchen timer package smoke test; voice-path fake-clock harness (timer fires via synthetic time advance)" ;;
     T2) echo "T2|Simulation|timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time" ;;
     UI1) echo "UI1|Transport|idle photo-frame SetUI includes scoped corner affordance (terminal-ui plan)" ;;
     UI2) echo "UI2|Transport|corner.open toggles menu overlay claim without disturbing main" ;;
@@ -67,7 +68,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 M1 M2 M3 M4 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
+all_ids=(AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
 
 run_go_test() {
   local pkg="$1"
@@ -139,6 +140,9 @@ run_usecase() {
     M4)
       run_go_test ./internal/transport 'Test(Generated|Wire)Session(VoiceStandDownStopsRedAlert|VoiceStopRedAlertStopsRedAlert)$'
       ;;
+    M5)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseM5WithEvidence$'
+      ;;
     P2)
       run_go_test ./internal/replsession 'TestUseCaseP2SessionMobilityAndCoexistence$'
       ;;
@@ -173,6 +177,7 @@ run_usecase() {
       run_go_test ./cmd/server 'TestRunDueTimerLoopProcessesTimers$'
       run_go_test ./internal/transport 'TestHandleMessageSystemRunDueTimers$'
       run_app_test kitchen_timer
+      run_go_test ./internal/usecasevalidation 'TestUseCaseT1WithEvidence$'
       ;;
     T2)
       run_go_test ./internal/usecasevalidation 'TestUseCaseT2WithEvidence$'

@@ -106,6 +106,93 @@ func parseFloatOrDefault(raw string, fallback float64) float64 {
 	return parsed
 }
 
+// CameraMonitorScenario watches for camera activity markers and alerts when
+// activity is detected during an optional monitored time window.
+type CameraMonitorScenario struct {
+	trigger Trigger
+
+	mu              sync.Mutex
+	lastAlertUnixMS int64
+}
+
+// Name returns the stable scenario identifier.
+func (s *CameraMonitorScenario) Name() string { return "camera_monitor" }
+
+// Match records trigger metadata when camera monitoring is requested.
+func (s *CameraMonitorScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "camera monitor", "camera_monitor", "monitor camera", "watch camera") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start arms the camera monitor and confirms activation to the source device.
+func (s *CameraMonitorScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil {
+		return nil
+	}
+	s.mu.Lock()
+	s.lastAlertUnixMS = 0
+	s.mu.Unlock()
+	return notifySource(ctx, env, s.trigger.SourceID, "Camera monitor active")
+}
+
+// Stop ends camera monitor mode.
+func (s *CameraMonitorScenario) Stop() error { return nil }
+
+// HandleSensor fires a "Camera activity detected" alert when a sensor reading
+// carries a non-zero camera_activity value and the reading timestamp falls
+// within the configured window (window_start_ms to window_end_ms, if set).
+// A configurable cooldown_ms (default 60 s) suppresses duplicate alerts.
+func (s *CameraMonitorScenario) HandleSensor(ctx context.Context, env *Environment, reading SensorReading) error {
+	if env == nil || env.Broadcast == nil {
+		return nil
+	}
+	if strings.TrimSpace(reading.DeviceID) == "" {
+		return nil
+	}
+
+	activity, ok := reading.Values["camera_activity"]
+	if !ok || activity <= 0 {
+		return nil
+	}
+
+	eventUnixMS := reading.UnixMS
+	if eventUnixMS <= 0 {
+		eventUnixMS = time.Now().UnixMilli()
+	}
+
+	// Enforce optional time window.
+	if raw := strings.TrimSpace(s.trigger.Arguments["window_start_ms"]); raw != "" {
+		startMS, err := strconv.ParseInt(raw, 10, 64)
+		if err == nil && eventUnixMS < startMS {
+			return nil
+		}
+	}
+	if raw := strings.TrimSpace(s.trigger.Arguments["window_end_ms"]); raw != "" {
+		endMS, err := strconv.ParseInt(raw, 10, 64)
+		if err == nil && eventUnixMS > endMS {
+			return nil
+		}
+	}
+
+	cooldownMS := int64(parseFloatOrDefault(s.trigger.Arguments["cooldown_ms"], 60_000))
+	if cooldownMS < 0 {
+		cooldownMS = 0
+	}
+
+	s.mu.Lock()
+	if s.lastAlertUnixMS > 0 && eventUnixMS-s.lastAlertUnixMS < cooldownMS {
+		s.mu.Unlock()
+		return nil
+	}
+	s.lastAlertUnixMS = eventUnixMS
+	s.mu.Unlock()
+
+	return notifySource(ctx, env, reading.DeviceID, fmt.Sprintf("Camera activity detected: activity=%.2f", activity))
+}
+
 func sensorMotionMagnitude(values map[string]float64) (float64, bool) {
 	if len(values) == 0 {
 		return 0, false

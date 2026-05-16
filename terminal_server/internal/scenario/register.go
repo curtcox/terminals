@@ -68,6 +68,10 @@ func RegisterBuiltins(engine *Engine) {
 		Priority: PriorityNormal,
 	})
 	engine.Register(Registration{
+		Factory:  func() Scenario { return &CameraMonitorScenario{} },
+		Priority: PriorityNormal,
+	})
+	engine.Register(Registration{
 		Factory:  func() Scenario { return &RecentIMUAnomalyScenario{} },
 		Priority: PriorityNormal,
 	})
