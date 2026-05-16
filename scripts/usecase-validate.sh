@@ -28,6 +28,9 @@ metadata() {
     AA3) echo "AA3|Simulation|AI agent resolves ambiguous voice command via fake LLM; LLM-decoded announce intent routes announcement_audio to a second terminal" ;;
     AA4) echo "AA4|Simulation|scheduling agent creates and cancels a timer via manual API; cancelled timer produces no 'Timer done!' broadcast" ;;
     AA6) echo "AA6|Simulation|admin scripts run over seeded sim/store/ui/bus fixture plus mutating Layer 2 message, board, artifact, canvas, and session paths" ;;
+    V1) echo "V1|Simulation|voice assistant wake-and-answer: 'assistant <question>' triggers VoiceAssistantScenario; FakeLLM queried; response broadcast back to source device" ;;
+    V2) echo "V2|Simulation|voice recipe request: 'assistant how do I make <dish>' triggers VoiceAssistantScenario; FakeLLM returns recipe; broadcast back to kitchen terminal" ;;
+    V3) echo "V3|Simulation|voice general-knowledge query: 'assistant <question>' triggers VoiceAssistantScenario; FakeLLM returns answer; broadcast back to requesting device" ;;
     B1) echo "B1|Scenario|transport input bug-report action coverage for modality parity" ;;
     B2) echo "B2|Scenario|diagnostics bug-report service cross-device subject/offline coverage" ;;
     B3) echo "B3|Scenario|diagnostics service autodetect merge test" ;;
@@ -75,7 +78,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA1 AA2 AA3 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
+all_ids=(AA1 AA2 AA3 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10 V1 V2 V3)
 
 run_go_test() {
   local pkg="$1"
@@ -247,6 +250,15 @@ run_usecase() {
       ;;
     UI10)
       run_go_test ./internal/transport 'TestWithCornerAffordance_RegistryReachabilityInvariant$'
+      ;;
+    V1)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseV1WithEvidence$'
+      ;;
+    V2)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseV2WithEvidence$'
+      ;;
+    V3)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseV3WithEvidence$'
       ;;
     *)
       echo "unsupported use case id: ${id}"

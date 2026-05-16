@@ -3,7 +3,7 @@ title: "Use Case Validation Automation"
 kind: plan
 status: shipped
 owner: curtcox
-validation: automated:C1,C2,M5,T1,T2,T3,T4,AA1,AA2,AA3,AA4,UI9,D2
+validation: automated:C1,C2,M5,T1,T2,T3,T4,AA1,AA2,AA3,AA4,UI9,D2,V1,V2,V3
 last-reviewed: 2026-05-16
 progress:
   - 2026-05-16: Phase 1 complete (C1 harness skeleton, evidence bundle, USECASE_ARTIFACTS flag)
@@ -14,6 +14,7 @@ progress:
   - 2026-05-16: D2 added (photo frame yields to higher-priority scenario and resumes; scenario preemption tests in internal/scenario)
   - 2026-05-16: AA2 added (monitoring agent arms audio monitoring via manual API; FakeSoundClassifier injects dryer_beep event; broadcast notification targeted at agent device ID)
   - 2026-05-16: AA3 added (AI agent LLM voice resolution; FakeLLM injected via SetLLM; ambiguous voice command decoded to announce intent; announcement_audio route confirmed on receiver)
+  - 2026-05-16: V1/V2/V3 added (voice assistant wake-and-answer; VoiceAssistantScenario triggered by 'assistant <query>'; FakeLLM records queries and returns plain-text response; broadcast events verified for weather, recipe, and general-knowledge queries)
 ---
 
 # Use Case Validation Automation
