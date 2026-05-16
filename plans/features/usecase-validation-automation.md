@@ -33,7 +33,7 @@ physical dependencies with controlled simulation.
 ## Goals
 
 - Validate use-case implementation through scenario-level tests that exercise a
-  real running server instance whenever practical.
+  real server instance (in-process) whenever practical.
 - Simulate users, terminals, clocks, sensors, media events, and external agents
   without requiring physical hardware or real elapsed days.
 - Capture enough evidence on every run to prove success and to diagnose failure
@@ -55,12 +55,17 @@ physical dependencies with controlled simulation.
 - Do not hide nondeterminism behind arbitrary sleeps or retry loops.
 - Do not make simulated validation the only release gate for behavior that also
   needs occasional physical-device or manual validation.
+- Do not start an out-of-process server subprocess; in-process server
+  construction reusing production handlers is the correct execution model.
+- Do not add YAML scenario loading before Phase 4; all scenarios in Phases 1–3
+  are Go-authored.
 
 ## Design Principles
 
-1. **Real server first** — start the actual server binary or the same in-process
-   server construction used by production, then inject deterministic seams for
-   time, terminals, IO, and external services.
+1. **Real server first** — use the same in-process server construction used by
+   production, then inject deterministic seams for time, terminals, IO, and
+   external services. Timing correctness and logic correctness are the goals;
+   subprocess execution is not required.
 2. **Generic terminals only** — simulated terminals should speak the same wire
    protocol and expose the same capabilities as real clients. Test-only helpers
    may drive a terminal, but they must not receive privileged server APIs unless
@@ -82,26 +87,26 @@ physical dependencies with controlled simulation.
 
 ### 1. Scenario Validation Harness
 
-Add a reusable harness under `terminal_server/internal/usecasevalidation` or an
-adjacent package name chosen during implementation.
+Add a reusable harness package at
+`terminal_server/internal/usecasevalidation/`.
 
 The harness should provide:
 
-- `Harness.StartServer(config)` that starts a real server with test-owned temp
-  storage, logs, app registry, package registry, and network/listener strategy.
-- `Harness.ConnectTerminal(profile)` that creates simulated terminals over the
-  real transport path when possible.
+- `Harness.StartServer(config)` that starts a real in-process server with
+  test-owned temp storage, logs, app registry, package registry, and injected
+  clock.
+- `Harness.ConnectTerminal(profile)` that creates simulated terminals using an
+  in-process adapter that reuses the same production handlers and command
+  registries as the networked server. Falls back to a loopback listener only
+  when an end-to-end transport path is required by the scenario.
 - `Harness.Actor(name, profile)` that can drive a terminal or API client using
   high-level steps.
 - `Harness.Clock()` that exposes deterministic `Now`, `Advance`, `RunUntilIdle`,
-  and `AdvanceTo` operations.
+  and `AdvanceTo` operations on a new fake clock implementation (no existing
+  clock abstraction covers the server subsystems; this is greenfield).
 - `Harness.Expect()` helpers for server state, terminal state, UI state, media
   routes, scheduled jobs, notifications, logs, and durable stores.
 - `Harness.Evidence()` that returns the structured evidence bundle for the run.
-
-The preferred execution mode should be a real server instance and real protocol
-messages. In-process adapters are acceptable only when they reuse the same
-production handlers and command registries as the networked server.
 
 ### 2. Simulated Terminals
 
@@ -146,10 +151,19 @@ Actor scripts should be deterministic but realistic. For example, an actor may
 wait until a terminal displays an alert and then dismiss it after simulated
 seconds, or may miss the first reminder and trigger an escalation path.
 
+Simple actors that only produce tap and voice events (no time dependency) may be
+introduced in Phase 3 alongside the clock work, so the two efforts can proceed
+in parallel. Time-dependent actors (missed reminders, escalation paths, external
+scheduling agents) are Phase 4.
+
 ### 4. Simulated Clock and Scheduled Work
 
-Introduce or standardize a clock interface for every server subsystem used by
-use cases:
+Introduce a new fake clock interface for every server subsystem used by use
+cases. This is a greenfield implementation; no existing clock abstraction covers
+these subsystems. Before designing the interface, inventory every `time.Now()`
+and `time.Sleep()` call in server code to scope the retrofit.
+
+Subsystems that must be clock-injectable:
 
 - timers and reminders;
 - recurring school-day or business-hour schedules;
@@ -166,8 +180,11 @@ work until the server reaches quiescence.
 
 ### 5. Event and Evidence Capture
 
-Every validation run should write a scenario evidence bundle. Keep it small for
-passing CI runs and detailed for failures.
+Every validation run should write a scenario evidence bundle under
+`artifacts/usecase-validation/<run-id>/`. The `artifacts/` directory is
+`.gitignore`d and created on demand; CI artifact upload is configured separately
+via the GitHub Actions `upload-artifact` step. Passing CI runs upload only the
+`manifest.json` summary; failed runs upload the full bundle automatically.
 
 Recommended bundle layout:
 
@@ -209,11 +226,19 @@ failure should answer:
 
 ### 6. Scenario Specification Format
 
-Support a declarative scenario format for larger use cases, with Go helpers for
-lower-level coverage. YAML is a good default because use cases are already
-Markdown-based and the repo has generated indexes.
+All scenarios in Phases 1–3 are Go-authored for speed, type safety, and
+interface stability. YAML loading is explicitly out of scope until Phase 4,
+after the core actor, terminal, clock, and evidence interfaces have settled.
 
-Example shape:
+Scenario testdata files live at
+`terminal_server/internal/usecasevalidation/testdata/` alongside the Go test
+code so that refactors stay in-tree.
+
+When YAML loading is added in Phase 4, each step's `says` field maps to a
+`VoiceAudio` proto event with the transcript set to the given text; the mapping
+must be documented in the YAML schema before parsing is implemented.
+
+Example shape (reference only; not parsed until Phase 4):
 
 ```yaml
 id: T3-school-morning-escalation
@@ -252,10 +277,6 @@ steps:
       spoken: "the bus comes in 10 minutes"
 ```
 
-The implementation should begin with Go-authored scenarios for speed and type
-safety, then add YAML loading once the core actor, terminal, clock, and evidence
-interfaces settle.
-
 ## Validation Depth Levels
 
 Extend the validation matrix vocabulary with stricter criteria for harness-based
@@ -279,40 +300,58 @@ observable user outcome, not merely an internal function call.
 
 - Inventory every current `make usecase-validate` mapping and classify which
   tests already have reusable fixture pieces.
-- Add a minimal harness package that can start the server with temp storage,
-  structured logging, and deterministic configuration.
+- Create `terminal_server/internal/usecasevalidation/harness.go` with
+  `Harness.StartServer`, `Harness.Evidence`, and supporting types.
+- Add `TestUseCaseC1WithEvidence` as the first harness-backed test: wrap the
+  existing C1 transport coverage to emit an evidence bundle, without changing
+  the underlying production behavior.
 - Capture server events and assertion results into a first-version evidence
   bundle.
-- Add a `make usecase-validate-artifacts USECASE=<ID>` or environment flag such
-  as `USECASE_ARTIFACTS=1` to preserve bundles on demand.
+- Add the `USECASE_ARTIFACTS=1` environment flag to preserve bundles on demand.
+- Add `artifacts/` to `.gitignore`.
 
 Acceptance criteria:
 
 - Existing automated IDs still pass through `make usecase-validate USECASE=all`.
-- At least one existing scenario test emits a useful evidence bundle without
-  changing production behavior.
+- `TestUseCaseC1WithEvidence` emits a valid evidence bundle with `manifest.json`
+  and `assertions.jsonl`.
+- `scripts/usecase-validate.sh` is updated to register the new harness-backed
+  C1 variant and any other IDs added in this phase.
 
 ### Phase 2 — Simulated Terminal Transport
 
-- Build simulated terminals that connect through the real server transport path
-  where possible.
+- Build simulated terminals that connect through the in-process server transport
+  path, reusing production handlers and command registries.
 - Model registration, capabilities, heartbeat, input events, reconnect, and
   received UI/control messages.
-- Convert one existing transport-heavy use case, such as `C1`, `M3`, or `UI9`,
-  into a harness-backed scenario while retaining the narrower transport tests.
+- Implement two harness-backed scenarios as the first full Phase 2 deliverables:
+  - **UI9 — Reconnect while overlay is open**: use simulated terminal reconnect
+    to validate restored main and overlay layers with evidence beyond the
+    existing internal assertions in `TestGeneratedSessionUI_RECON_1`.
+  - **C2 — Whole-house announcement**: simulate one speaking terminal and three
+    receiving terminals; verify broadcast routing, terminal observations, event
+    log entries, and no duplicate delivery.
+- Retain the narrower transport tests that already exist for both IDs.
 
 Acceptance criteria:
 
 - A two-terminal scenario can prove both the server-side route and each
   terminal's observed result.
 - Failure output includes both wire-level events and terminal-level observations.
+- `scripts/usecase-validate.sh` is updated to register UI9 (harness) and C2.
 
-### Phase 3 — Simulated Clock
+### Phase 3 — Simulated Clock and Time-Independent Actors
 
-- Standardize a clock abstraction for timers, reminders, dedupe, heartbeat,
-  rotation, expiry, and escalation code paths.
+- Begin with an inventory: grep server code for `time.Now()` and `time.Sleep()`
+  to identify every subsystem that needs a clock seam, and estimate retrofit
+  scope before writing the interface.
+- Introduce the fake clock interface and inject it into timer, reminder, dedupe,
+  heartbeat, rotation, expiry, and escalation code paths.
 - Replace test sleeps with `Advance`, `AdvanceTo`, and `RunUntilIdle` in
   scenario tests.
+- Add simple time-independent actors (tap and voice events, no escalation or
+  scheduling logic) in parallel with clock work, so actor and clock
+  infrastructure can be tested together.
 - Upgrade `T1` from smoke coverage toward simulation coverage.
 - Add first automated coverage for `T2` using a spoken/visual reminder scenario.
 
@@ -320,13 +359,18 @@ Acceptance criteria:
 
 - A scenario that represents hours or days of elapsed time completes in seconds.
 - Scheduler traces show why a timer, reminder, escalation, or expiry fired.
+- `scripts/usecase-validate.sh` is updated to register T1 (upgraded) and T2.
 
-### Phase 4 — Actor Scripts and Multi-Use-Case Scenarios
+### Phase 4 — Actor Scripts, YAML Loading, and Multi-Use-Case Scenarios
 
-- Add actor helpers for voice, taps, menu choices, missed notifications,
-  dismissal, and external-agent API calls.
-- Add scenario specs for cross-use-case flows, especially:
-  - `C2` whole-house announcement;
+- Add time-dependent actor helpers for missed notifications, dismissal,
+  escalation paths, and external-agent API calls.
+- Add YAML scenario loading. Before implementing the parser, document the full
+  YAML schema including how `says` maps to `VoiceAudio` proto events.
+- Migrate scenarios for `T3/T4` and `AA1/AA4` to YAML once the schema is
+  stable; keep Go-authored tests for lower-level coverage.
+- Add scenario specs for cross-use-case flows:
+  - `C2` (already harness-backed from Phase 2; extend to YAML if useful);
   - `M5` camera activity monitoring;
   - `T3` and `T4` school-morning monitoring and escalation;
   - `AA1` through `AA5` automation, monitoring, LLM, scheduling, and vision
@@ -340,13 +384,18 @@ Acceptance criteria:
   devices.
 - External agent use cases use the public server API or MCP/REPL surfaces rather
   than privileged test-only hooks.
+- At least one YAML scenario passes `make usecase-validate`.
+- `scripts/usecase-validate.sh` is updated to register M5, T3, T4, and AA-family
+  IDs added in this phase.
 
 ### Phase 5 — Evidence Review and CI Integration
 
 - Teach `scripts/usecase-validate.sh --info` and
   `docs/usecase-validation-matrix.md` to include evidence bundle availability.
-- Publish failed scenario bundles as CI artifacts.
-- Add a local replay command, for example:
+- Configure CI to upload failed scenario bundles as artifacts automatically, and
+  upload `manifest.json` summaries for passing runs. Full bundles for passing
+  runs are not uploaded to avoid bloating artifact storage.
+- Add a local replay command:
 
 ```bash
 go test ./internal/usecasevalidation -run TestReplay -args \
@@ -355,46 +404,53 @@ go test ./internal/usecasevalidation -run TestReplay -args \
 
 - Add concise `summary.md` output that can be pasted into bug reports or plan
   review comments.
+- `scripts/usecase-validate.sh` is updated to register any IDs added or promoted
+  to harness coverage in this phase.
 
 Acceptance criteria:
 
 - A failed CI scenario gives enough evidence to reproduce and debug locally.
 - Validation matrix entries distinguish narrow automated checks from
   harness-backed simulation/full coverage.
+- CI uploads failed bundles and passing manifests without manual intervention.
 
 ## Initial Candidate Scenarios
 
 Start with use cases that exercise multiple harness features and expose obvious
 user-visible outcomes:
 
-1. **C2 — Whole-house announcement**
+1. **C1 — Intercom (Phase 1 harness target)**
+   - Wrap existing transport coverage to emit an evidence bundle.
+   - First proof that the harness skeleton works end-to-end.
+
+2. **UI9 — Reconnect while overlay is open (Phase 2 target)**
+   - Use simulated terminal reconnect to validate restored main and overlay
+     layers with evidence beyond internal assertions.
+
+3. **C2 — Whole-house announcement (Phase 2 target)**
    - Simulate one speaking terminal and three receiving terminals.
    - Verify broadcast routing, terminal observations, event log entries, and no
      duplicate delivery.
 
-2. **T2 — Reminder at a specific time**
+4. **T2 — Reminder at a specific time (Phase 3 target)**
    - Simulate voice creation, clock advance to due time, spoken and visual
      reminder, and dismissal.
    - Verify scheduler trace and terminal UI/audio evidence.
 
-3. **T3/T4 — Morning routine escalation**
+5. **T3/T4 — Morning routine escalation (Phase 4 target)**
    - Simulate a recurring school-day schedule, no observed child activity,
      parent notification, and child-room speaker warning after synthetic time
      advances.
    - Verify escalation timing and suppression on non-school days.
 
-4. **M5 — Camera activity watch**
+6. **M5 — Camera activity watch (Phase 4 target)**
    - Simulate camera activity markers during monitored and unmonitored windows.
    - Verify alert generation only when policy says it should fire.
 
-5. **AA1/AA4 — External automation and scheduling agent**
+7. **AA1/AA4 — External automation and scheduling agent (Phase 4 target)**
    - Simulate API calls from an automation agent that creates, modifies, and
      cancels scheduled events.
    - Verify public API behavior, durable state, and terminal-visible outcomes.
-
-6. **UI9 — Reconnect while overlay is open**
-   - Use simulated terminal reconnect to validate restored main and overlay
-     layers with evidence beyond internal assertions.
 
 ## Evidence Quality Requirements
 
@@ -409,8 +465,8 @@ Each scenario assertion should have a stable assertion ID and should emit:
   duplicate route, stale clock, dropped capability, unhandled reconnect, or
   missing UI layer.
 
-Passing runs may keep only summary evidence by default. Failed runs must preserve
-full evidence automatically.
+Passing runs preserve only the `manifest.json` summary by default. Failed runs
+must preserve the full evidence bundle automatically.
 
 ## Acceptance Criteria
 
@@ -428,12 +484,27 @@ full evidence automatically.
 - `docs/usecase-validation-matrix.md` can identify which IDs are backed by this
   harness and link each ID to its primary evidence.
 
+## Decisions Made
+
+- **Harness package**: `terminal_server/internal/usecasevalidation/` — internal
+  to the server module, separate from `internal/scenario` to keep validation
+  infrastructure distinct from production scenario code.
+- **Execution model**: in-process server construction, not a subprocess. Timing
+  and logic correctness are the goals; network round-trips add noise without
+  value for these tests.
+- **Fake clock**: greenfield. No existing clock abstraction covers the relevant
+  server subsystems. Inventory `time.Now()` / `time.Sleep()` calls before
+  designing the interface.
+- **YAML scenario loading**: explicitly deferred to Phase 4. All Phase 1–3
+  scenarios are Go-authored.
+- **Scenario testdata location**: `terminal_server/internal/usecasevalidation/testdata/`.
+- **CI artifact policy**: upload failed bundles in full; upload `manifest.json`
+  summaries only for passing runs.
+- **First Phase 2 scenarios**: both UI9 and C2, chosen because UI9 has a clear
+  existing transport boundary and C2 demonstrates multi-terminal broadcast.
+
 ## Open Questions
 
-- Should scenario specs live beside use case files (`usecases/scenarios/`) or in
-  server testdata (`terminal_server/internal/usecasevalidation/testdata/`)?
-- Should CI upload passing evidence bundles for all scenarios, or only failed
-  bundles plus sampled passing summaries?
 - Should simulated media events remain symbolic for all CI scenarios, or should
   a small golden audio/video fixture set be added for classifier-level tests?
 - Should replay be implemented as a Go test mode first, or as a `term` CLI
