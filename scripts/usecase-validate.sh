@@ -23,6 +23,8 @@ fi
 metadata() {
   local id="$1"
   case "${id}" in
+    AA1) echo "AA1|Simulation|external automation agent triggers announcement scenario via manual API; display terminal receives announcement_audio route" ;;
+    AA4) echo "AA4|Simulation|scheduling agent creates and cancels a timer via manual API; cancelled timer produces no 'Timer done!' broadcast" ;;
     AA6) echo "AA6|Simulation|admin scripts run over seeded sim/store/ui/bus fixture plus mutating Layer 2 message, board, artifact, canvas, and session paths" ;;
     B1) echo "B1|Scenario|transport input bug-report action coverage for modality parity" ;;
     B2) echo "B2|Scenario|diagnostics bug-report service cross-device subject/offline coverage" ;;
@@ -51,6 +53,8 @@ metadata() {
     PL20) echo "PL20|Contract|capability artifact template save/apply and artifact history tests" ;;
     T1) echo "T1|Simulation|due-timer loop; transport run_due_timers; kitchen timer package smoke test; voice-path fake-clock harness (timer fires via synthetic time advance)" ;;
     T2) echo "T2|Simulation|timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time" ;;
+    T3) echo "T3|Simulation|school-morning monitor: no camera activity by alert time notifies parent; activity before alert cancels notification" ;;
+    T4) echo "T4|Simulation|school-morning warning: bus-warning broadcast fires to child-room at configured warning time via synthetic clock advance" ;;
     UI1) echo "UI1|Transport|idle photo-frame SetUI includes scoped corner affordance (terminal-ui plan)" ;;
     UI2) echo "UI2|Transport|corner.open toggles menu overlay claim without disturbing main" ;;
     UI3) echo "UI3|Transport|menu overlay default MIXED policy: main pointer blocked, audio live" ;;
@@ -68,7 +72,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
+all_ids=(AA1 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
 
 run_go_test() {
   local pkg="$1"
@@ -93,6 +97,12 @@ run_flutter_test() {
 run_usecase() {
   local id="$1"
   case "${id}" in
+    AA1)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAA1WithEvidence$'
+      ;;
+    AA4)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAA4WithEvidence$'
+      ;;
     AA6)
       run_go_test ./internal/admin 'TestScriptsRunCrossUsecaseSimulationFixture$'
       ;;
@@ -181,6 +191,12 @@ run_usecase() {
       ;;
     T2)
       run_go_test ./internal/usecasevalidation 'TestUseCaseT2WithEvidence$'
+      ;;
+    T3)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseT3(T4WithEvidence|ActivityCancelsAlert)$'
+      ;;
+    T4)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseT3T4WithEvidence$'
       ;;
     UI1)
       run_go_test ./internal/transport 'TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance$'

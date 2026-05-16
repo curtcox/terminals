@@ -568,6 +568,10 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 					},
 				})
 			}
+		} else if handled, err := processMorningRoutineRecord(ctx, r.Env, record); handled {
+			if err != nil {
+				return processed, err
+			}
 		}
 		if err := r.Env.Scheduler.Remove(ctx, record.Key); err != nil {
 			return processed, err

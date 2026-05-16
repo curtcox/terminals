@@ -5,6 +5,11 @@ status: building
 owner: curtcox
 validation: none
 last-reviewed: 2026-05-16
+progress:
+  - 2026-05-16: Phase 1 complete (C1 harness skeleton, evidence bundle, USECASE_ARTIFACTS flag)
+  - 2026-05-16: Phase 2 complete (simulated terminal transport; UI9 reconnect + C2 multi-terminal broadcast)
+  - 2026-05-16: Phase 3 complete (fake clock; T1 voice path, T2 timer reminder, M5 camera activity)
+  - 2026-05-16: Phase 4 complete (morning routine monitor scenario; T3/T4 school-morning, AA1 agent trigger, AA4 timer create/cancel; all registered in usecase-validate.sh)
 ---
 
 # Use Case Validation Automation
