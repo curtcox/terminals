@@ -40,8 +40,9 @@ type Harness struct {
 	Broadcast *ui.MemoryBroadcaster
 	Handler   *transport.StreamHandler
 
-	sound scenario.SoundClassifier
-	llm   scenario.LLM
+	sound  scenario.SoundClassifier
+	llm    scenario.LLM
+	vision scenario.VisionAnalyzer
 
 	mu         sync.Mutex
 	assertions []AssertionRecord
@@ -117,8 +118,9 @@ func (h *Harness) StartServer() {
 		Scheduler: storage.NewMemoryScheduler(),
 		Telephony: telephony.NoopBridge{},
 		Broadcast: h.Broadcast,
-		Sound:     h.sound,
-		LLM:       h.llm,
+		Sound:  h.sound,
+		LLM:    h.llm,
+		Vision: h.vision,
 	})
 	h.Handler = transport.NewStreamHandlerWithRuntime(h.Control, h.Runtime)
 }
@@ -133,6 +135,12 @@ func (h *Harness) SetSound(sc scenario.SoundClassifier) {
 // Must be called before StartServer.
 func (h *Harness) SetLLM(llm scenario.LLM) {
 	h.llm = llm
+}
+
+// SetVision configures a VisionAnalyzer to inject into the scenario runtime.
+// Must be called before StartServer.
+func (h *Harness) SetVision(v scenario.VisionAnalyzer) {
+	h.vision = v
 }
 
 // Clock returns the harness's deterministic fake clock. Scenario tests should

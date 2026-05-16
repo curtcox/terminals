@@ -193,6 +193,92 @@ func (s *CameraMonitorScenario) HandleSensor(ctx context.Context, env *Environme
 	return notifySource(ctx, env, reading.DeviceID, fmt.Sprintf("Camera activity detected: activity=%.2f", activity))
 }
 
+// VisionAnalysisScenario watches for camera activity and runs the vision
+// analyzer on each detected frame, broadcasting the caption and labels.
+type VisionAnalysisScenario struct {
+	trigger Trigger
+
+	mu              sync.Mutex
+	lastAlertUnixMS int64
+}
+
+// Name returns the stable scenario identifier.
+func (s *VisionAnalysisScenario) Name() string { return "vision_analysis" }
+
+// Match records trigger metadata when vision analysis is requested.
+func (s *VisionAnalysisScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "vision analysis", "vision_analysis", "analyze camera", "detect packages", "watch door") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start arms vision analysis and confirms activation to the source device.
+func (s *VisionAnalysisScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil {
+		return nil
+	}
+	s.mu.Lock()
+	s.lastAlertUnixMS = 0
+	s.mu.Unlock()
+	return notifySource(ctx, env, s.trigger.SourceID, "Vision analysis active")
+}
+
+// Stop ends vision analysis mode.
+func (s *VisionAnalysisScenario) Stop() error { return nil }
+
+// HandleSensor fires when camera activity is detected: calls the vision
+// analyzer and broadcasts a camera view alert with the caption and labels.
+// A configurable cooldown_ms (default 60 s) suppresses duplicate alerts.
+func (s *VisionAnalysisScenario) HandleSensor(ctx context.Context, env *Environment, reading SensorReading) error {
+	if env == nil || env.Broadcast == nil || env.Vision == nil {
+		return nil
+	}
+	if strings.TrimSpace(reading.DeviceID) == "" {
+		return nil
+	}
+
+	activity, ok := reading.Values["camera_activity"]
+	if !ok || activity <= 0 {
+		return nil
+	}
+
+	eventUnixMS := reading.UnixMS
+	if eventUnixMS <= 0 {
+		eventUnixMS = time.Now().UnixMilli()
+	}
+
+	cooldownMS := int64(parseFloatOrDefault(s.trigger.Arguments["cooldown_ms"], 60_000))
+	if cooldownMS < 0 {
+		cooldownMS = 0
+	}
+
+	s.mu.Lock()
+	if s.lastAlertUnixMS > 0 && eventUnixMS-s.lastAlertUnixMS < cooldownMS {
+		s.mu.Unlock()
+		return nil
+	}
+	s.lastAlertUnixMS = eventUnixMS
+	s.mu.Unlock()
+
+	prompt := strings.TrimSpace(s.trigger.Arguments["prompt"])
+	if prompt == "" {
+		prompt = "Identify objects in view, especially packages or people"
+	}
+
+	analysis, err := env.Vision.Analyze(ctx, nil, prompt)
+	if err != nil || analysis == nil {
+		return nil
+	}
+
+	msg := "Camera view: " + analysis.Caption
+	if len(analysis.Labels) > 0 {
+		msg += " [" + strings.Join(analysis.Labels, ", ") + "]"
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, msg)
+}
+
 func sensorMotionMagnitude(values map[string]float64) (float64, bool) {
 	if len(values) == 0 {
 		return 0, false
