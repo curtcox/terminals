@@ -49,6 +49,7 @@ metadata() {
     PL8) echo "PL8|Contract|interactive session join/leave and control lifecycle capability tests" ;;
     PL20) echo "PL20|Contract|capability artifact template save/apply and artifact history tests" ;;
     T1) echo "T1|Smoke|due-timer loop; transport run_due_timers; kitchen timer package smoke test; future TAL simulation coverage" ;;
+    T2) echo "T2|Simulation|timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time" ;;
     UI1) echo "UI1|Transport|idle photo-frame SetUI includes scoped corner affordance (terminal-ui plan)" ;;
     UI2) echo "UI2|Transport|corner.open toggles menu overlay claim without disturbing main" ;;
     UI3) echo "UI3|Transport|menu overlay default MIXED policy: main pointer blocked, audio live" ;;
@@ -66,7 +67,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 M1 M2 M3 M4 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
+all_ids=(AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 M1 M2 M3 M4 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
 
 run_go_test() {
   local pkg="$1"
@@ -172,6 +173,9 @@ run_usecase() {
       run_go_test ./cmd/server 'TestRunDueTimerLoopProcessesTimers$'
       run_go_test ./internal/transport 'TestHandleMessageSystemRunDueTimers$'
       run_app_test kitchen_timer
+      ;;
+    T2)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseT2WithEvidence$'
       ;;
     UI1)
       run_go_test ./internal/transport 'TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance$'

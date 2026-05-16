@@ -31,6 +31,7 @@ type Harness struct {
 	t     testing.TB
 	runID string
 	start time.Time
+	clock *FakeClock
 
 	Devices   *device.Manager
 	Control   *transport.ControlService
@@ -42,14 +43,57 @@ type Harness struct {
 	assertions []AssertionRecord
 }
 
-// New creates a Harness bound to the given test.
+// New creates a Harness bound to the given test. The harness clock starts at
+// the real current time; call h.Clock().SetNow to override it before StartServer.
 func New(t testing.TB) *Harness {
 	t.Helper()
+	now := time.Now().UTC()
 	return &Harness{
 		t:     t,
-		runID: fmt.Sprintf("%d", time.Now().UnixNano()),
-		start: time.Now().UTC(),
+		runID: fmt.Sprintf("%d", now.UnixNano()),
+		start: now,
+		clock: &FakeClock{now: now},
 	}
+}
+
+// FakeClock is a deterministic clock for scenario tests. All harness helpers
+// that need a "now" read from this clock. Advance synthetic time with Advance
+// or AdvanceTo; never sleep in tests — drive the clock instead.
+type FakeClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+// Now returns the current synthetic time.
+func (c *FakeClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+// SetNow sets the fake clock to an absolute time.
+func (c *FakeClock) SetNow(t time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = t.UTC()
+}
+
+// Advance moves synthetic time forward by d.
+func (c *FakeClock) Advance(d time.Duration) time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+	return c.now
+}
+
+// AdvanceTo moves synthetic time to t (no-op if t is before current time).
+func (c *FakeClock) AdvanceTo(t time.Time) time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if t.UTC().After(c.now) {
+		c.now = t.UTC()
+	}
+	return c.now
 }
 
 // StartServer initializes a real in-process server with isolated, test-owned
@@ -71,6 +115,20 @@ func (h *Harness) StartServer() {
 		Broadcast: h.Broadcast,
 	})
 	h.Handler = transport.NewStreamHandlerWithRuntime(h.Control, h.Runtime)
+}
+
+// Clock returns the harness's deterministic fake clock. Scenario tests should
+// use h.Clock().Advance or h.Clock().AdvanceTo to move synthetic time forward,
+// then call h.ProcessDueTimers to fire any scheduled work that became due.
+func (h *Harness) Clock() *FakeClock {
+	return h.clock
+}
+
+// ProcessDueTimers drives the scenario runtime's timer loop at the current
+// synthetic clock time. Returns the number of timers processed.
+func (h *Harness) ProcessDueTimers(ctx context.Context) (int, error) {
+	h.t.Helper()
+	return h.Runtime.ProcessDueTimers(ctx, h.clock.Now())
 }
 
 // ConnectTerminal starts a simulated terminal session in a background goroutine.
@@ -343,6 +401,7 @@ func NewMemStream(ctx context.Context, msgs []transport.ProtoClientEnvelope) *Me
 	return &MemStream{ctx: ctx, recvQueue: msgs}
 }
 
+// RecvProto delivers the next queued message or EOF when the queue is exhausted.
 func (s *MemStream) RecvProto() (transport.ProtoClientEnvelope, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -354,6 +413,7 @@ func (s *MemStream) RecvProto() (transport.ProtoClientEnvelope, error) {
 	return msg, nil
 }
 
+// SendProto appends a server-to-client message to Sent.
 func (s *MemStream) SendProto(env transport.ProtoServerEnvelope) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -361,6 +421,7 @@ func (s *MemStream) SendProto(env transport.ProtoServerEnvelope) error {
 	return nil
 }
 
+// Context returns the stream's context.
 func (s *MemStream) Context() context.Context { return s.ctx }
 
 func artifactsRoot() string {
@@ -377,7 +438,7 @@ func artifactsRoot() string {
 		}
 		dir = parent
 	}
-	return filepath.Join("artifacts")
+	return "artifacts"
 }
 
 func gitCommit() string {
@@ -398,10 +459,14 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-	return enc.Encode(v)
+	encErr := enc.Encode(v)
+	closeErr := f.Close()
+	if encErr != nil {
+		return encErr
+	}
+	return closeErr
 }
 
 func writeJSONL(path string, records []any) error {
@@ -409,15 +474,19 @@ func writeJSONL(path string, records []any) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	w := bufio.NewWriter(f)
 	enc := json.NewEncoder(w)
 	for _, r := range records {
 		if err := enc.Encode(r); err != nil {
+			_ = f.Close()
 			return err
 		}
 	}
-	return w.Flush()
+	if err := w.Flush(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 func assertionsToAny(assertions []AssertionRecord) []any {
