@@ -30,6 +30,7 @@ metadata() {
     B4) echo "B4|Scenario|admin bug intake/list/detail and filter tests" ;;
     B5) echo "B5|Scenario|admin bug intake JSON SIP source + transcript hints test" ;;
     C1) echo "C1|Transport|internal/transport generated+wire integration tests; internal/usecasevalidation harness-backed evidence test" ;;
+    C2) echo "C2|Simulation|whole-house announcement: 1 speaker + 3 receivers; harness-backed broadcast routing and no-duplicate-delivery evidence" ;;
     C3) echo "C3|Transport|PA relay, voice start, voice stop alias tests" ;;
     C5) echo "C5|Transport|TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow" ;;
     D1) echo "D1|Scenario|photo-frame config + heartbeat rotation tests" ;;
@@ -56,7 +57,7 @@ metadata() {
     UI6) echo "UI6|Transport|wake-word path activates scenario (single client)" ;;
     UI7) echo "UI7|Transport|wake-word dedupe across two clients dispatches at most one intent" ;;
     UI8) echo "UI8|Transport+Client|capability delta on rotation/resize; overlay survives orientation delta" ;;
-    UI9) echo "UI9|Transport|reconnect restores main + overlay UI state (RECON-1)" ;;
+    UI9) echo "UI9|Simulation|reconnect restores main + overlay UI state; harness-backed evidence (RECON-1)" ;;
     UI10) echo "UI10|Scenario|registry corner affordance reachability invariant for every main-layer scenario" ;;
     *)
       echo "unsupported use case id: ${id}" >&2
@@ -65,7 +66,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA6 B1 B2 B3 B4 B5 C1 C3 C5 D1 M1 M2 M3 M4 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
+all_ids=(AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 M1 M2 M3 M4 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
 
 run_go_test() {
   local pkg="$1"
@@ -111,6 +112,9 @@ run_usecase() {
     C1)
       run_go_test ./internal/transport 'Test(Generated|Wire)SessionIntercom(EmitsRouteStream|StopEmitsStopStream|FanOutRelaysMediaToPeerSession)$'
       run_go_test ./internal/usecasevalidation 'TestUseCaseC1WithEvidence$'
+      ;;
+    C2)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseC2WithEvidence$'
       ;;
     C3)
       run_go_test ./internal/transport 'Test(Generated|Wire)Session(PASystemRelaysReceiverOverlayAndTransitions|VoicePAModeStartsPASystem|PASystemVoiceStopAliasesRelayCleanup)$'
@@ -202,6 +206,7 @@ run_usecase() {
       ;;
     UI9)
       run_go_test ./internal/transport 'TestGeneratedSessionUI_RECON_1$'
+      run_go_test ./internal/usecasevalidation 'TestUseCaseUI9WithEvidence$'
       ;;
     UI10)
       run_go_test ./internal/transport 'TestWithCornerAffordance_RegistryReachabilityInvariant$'
