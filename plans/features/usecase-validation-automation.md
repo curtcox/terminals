@@ -1,7 +1,7 @@
 ---
 title: "Use Case Validation Automation"
 kind: plan
-status: planned
+status: building
 owner: curtcox
 validation: none
 last-reviewed: 2026-05-16

@@ -29,7 +29,7 @@ metadata() {
     B3) echo "B3|Scenario|diagnostics service autodetect merge test" ;;
     B4) echo "B4|Scenario|admin bug intake/list/detail and filter tests" ;;
     B5) echo "B5|Scenario|admin bug intake JSON SIP source + transcript hints test" ;;
-    C1) echo "C1|Transport|internal/transport generated+wire integration tests" ;;
+    C1) echo "C1|Transport|internal/transport generated+wire integration tests; internal/usecasevalidation harness-backed evidence test" ;;
     C3) echo "C3|Transport|PA relay, voice start, voice stop alias tests" ;;
     C5) echo "C5|Transport|TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow" ;;
     D1) echo "D1|Scenario|photo-frame config + heartbeat rotation tests" ;;
@@ -110,6 +110,7 @@ run_usecase() {
       ;;
     C1)
       run_go_test ./internal/transport 'Test(Generated|Wire)SessionIntercom(EmitsRouteStream|StopEmitsStopStream|FanOutRelaysMediaToPeerSession)$'
+      run_go_test ./internal/usecasevalidation 'TestUseCaseC1WithEvidence$'
       ;;
     C3)
       run_go_test ./internal/transport 'Test(Generated|Wire)Session(PASystemRelaysReceiverOverlayAndTransitions|VoicePAModeStartsPASystem|PASystemVoiceStopAliasesRelayCleanup)$'
