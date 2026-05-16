@@ -24,6 +24,7 @@ metadata() {
   local id="$1"
   case "${id}" in
     AA1) echo "AA1|Simulation|external automation agent triggers announcement scenario via manual API; display terminal receives announcement_audio route" ;;
+    AA2) echo "AA2|Simulation|monitoring agent arms audio monitoring via manual API; fake classifier emits dryer_beep; broadcast targeted at agent device ID" ;;
     AA4) echo "AA4|Simulation|scheduling agent creates and cancels a timer via manual API; cancelled timer produces no 'Timer done!' broadcast" ;;
     AA6) echo "AA6|Simulation|admin scripts run over seeded sim/store/ui/bus fixture plus mutating Layer 2 message, board, artifact, canvas, and session paths" ;;
     B1) echo "B1|Scenario|transport input bug-report action coverage for modality parity" ;;
@@ -73,7 +74,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA1 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
+all_ids=(AA1 AA2 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
 
 run_go_test() {
   local pkg="$1"
@@ -100,6 +101,9 @@ run_usecase() {
   case "${id}" in
     AA1)
       run_go_test ./internal/usecasevalidation 'TestUseCaseAA1WithEvidence$'
+      ;;
+    AA2)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAA2WithEvidence$'
       ;;
     AA4)
       run_go_test ./internal/usecasevalidation 'TestUseCaseAA4WithEvidence$'

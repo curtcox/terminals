@@ -40,6 +40,8 @@ type Harness struct {
 	Broadcast *ui.MemoryBroadcaster
 	Handler   *transport.StreamHandler
 
+	sound scenario.SoundClassifier
+
 	mu         sync.Mutex
 	assertions []AssertionRecord
 }
@@ -114,8 +116,15 @@ func (h *Harness) StartServer() {
 		Scheduler: storage.NewMemoryScheduler(),
 		Telephony: telephony.NoopBridge{},
 		Broadcast: h.Broadcast,
+		Sound:     h.sound,
 	})
 	h.Handler = transport.NewStreamHandlerWithRuntime(h.Control, h.Runtime)
+}
+
+// SetSound configures a SoundClassifier to inject into the scenario runtime.
+// Must be called before StartServer.
+func (h *Harness) SetSound(sc scenario.SoundClassifier) {
+	h.sound = sc
 }
 
 // Clock returns the harness's deterministic fake clock. Scenario tests should
