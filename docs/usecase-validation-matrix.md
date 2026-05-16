@@ -35,6 +35,7 @@ Coverage depth labels:
 | C3 | activate PA mode so my microphone streams to all speakers simultaneously | `make usecase-validate USECASE=C3` | PA relay, voice start, voice stop alias tests | Transport |
 | C5 | start a video call between two devices in the house | `make usecase-validate USECASE=C5` | TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow | Transport |
 | D1 | set an idle tablet to photo frame mode that rotates pictures | `make usecase-validate USECASE=D1` | photo-frame config + heartbeat rotation tests | Scenario |
+| D2 | have the photo frame automatically yield to higher-priority scenarios and resume afterward | `make usecase-validate USECASE=D2` | photo frame yields to higher-priority scenario (alert/call) and resumes afterward | Scenario |
 | M1 | say "tell me when the dishwasher stops" and have the system listen for silence | `make usecase-validate USECASE=M1` | silence classifier integration test | Scenario |
 | M2 | say "tell me when the dryer beeps" and have the system listen for a specific sound | `make usecase-validate USECASE=M2` | audio monitor runtime test for dryer beep detection | Scenario |
 | M3 | say "red alert" and have every screen turn red with an alarm sound | `make usecase-validate USECASE=M3` | generated+wire red alert integration tests | Transport |
@@ -72,6 +73,6 @@ Coverage depth labels:
 
 The following planned IDs are not declared automated by any plan and are not wired into `scripts/usecase-validate.sh`:
 
-`AB1`, `AB2`, `AB3`, `AB4`, `AB5`, `AB6`, `AB7`, `AH1`, `AH2`, `AH3`, `AH4`, `AH5`, `AH6`, `AH7`, `AH8`, `AH9`, `AH10`, `AH11`, `AH12`, `AH13`, `AH14`, `AH15`, `AH16`, `AH17`, `AO1`, `AO2`, `AO3`, `AO4`, `AO5`, `AO6`, `AO7`, `C4`, `C6`, `D2`, `D3`, `I1`, `I2`, `I3`, `I4`, `I5`, `I6`, `I7`, `I8`, `I9`, `I10`, `I11`, `PL2`, `PL3`, `PL4`, `PL5`, `PL6`, `PL7`, `PL9`, `PL10`, `PL11`, `PL12`, `PL13`, `PL14`, `PL15`, `PL16`, `PL17`, `PL18`, `PL19`, `PL21`, `PL22`, `PL23`, `PL24`, `PL25`, `PL26`, `PL27`, `AA2`, `AA3`, `AA5`, `V1`, `V2`, `V3`.
+`AB1`, `AB2`, `AB3`, `AB4`, `AB5`, `AB6`, `AB7`, `AH1`, `AH2`, `AH3`, `AH4`, `AH5`, `AH6`, `AH7`, `AH8`, `AH9`, `AH10`, `AH11`, `AH12`, `AH13`, `AH14`, `AH15`, `AH16`, `AH17`, `AO1`, `AO2`, `AO3`, `AO4`, `AO5`, `AO6`, `AO7`, `C4`, `C6`, `D3`, `I1`, `I2`, `I3`, `I4`, `I5`, `I6`, `I7`, `I8`, `I9`, `I10`, `I11`, `PL2`, `PL3`, `PL4`, `PL5`, `PL6`, `PL7`, `PL9`, `PL10`, `PL11`, `PL12`, `PL13`, `PL14`, `PL15`, `PL16`, `PL17`, `PL18`, `PL19`, `PL21`, `PL22`, `PL23`, `PL24`, `PL25`, `PL26`, `PL27`, `AA2`, `AA3`, `AA5`, `V1`, `V2`, `V3`.
 
 Use `make all-check` as the baseline repository gate while dedicated use-case mappings are added.

@@ -36,6 +36,7 @@ metadata() {
     C3) echo "C3|Transport|PA relay, voice start, voice stop alias tests" ;;
     C5) echo "C5|Transport|TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow" ;;
     D1) echo "D1|Scenario|photo-frame config + heartbeat rotation tests" ;;
+    D2) echo "D2|Scenario|photo frame yields to higher-priority scenario (alert/call) and resumes afterward" ;;
     M1) echo "M1|Scenario|silence classifier integration test" ;;
     M2) echo "M2|Scenario|audio monitor runtime test for dryer beep detection" ;;
     M3) echo "M3|Transport|generated+wire red alert integration tests" ;;
@@ -72,7 +73,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA1 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
+all_ids=(AA1 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10)
 
 run_go_test() {
   local pkg="$1"
@@ -137,6 +138,9 @@ run_usecase() {
     D1)
       run_go_test ./cmd/server 'TestConfigurePhotoFrameUsesDirectorySlidesAndInterval$'
       run_go_test ./internal/transport 'TestHandleMessageHeartbeatRotatesPhotoFrameAfterInterval$'
+      ;;
+    D2)
+      run_go_test ./internal/scenario 'TestRuntimePhotoFrameYields(ToHigherPriorityScenarioAndResumes|ToCallAndResumes)$'
       ;;
     M1)
       run_go_test ./cmd/server 'TestSilenceClassifierThroughAudioHubNotifiesAudioMonitor$'

@@ -162,6 +162,119 @@ func TestRuntimePAClaimsEndpointScopedResourcesWhenAvailable(t *testing.T) {
 	}
 }
 
+// TestRuntimePhotoFrameYieldsToHigherPriorityScenarioAndResumes validates D2:
+// a photo frame in ambient mode is preempted when a higher-priority scenario
+// activates (e.g. an alert or intercom call) and automatically resumes when
+// the higher-priority scenario ends — so the user never misses an alert.
+func TestRuntimePhotoFrameYieldsToHigherPriorityScenarioAndResumes(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Living Room"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: PhotoFrameScenario{}, Priority: PriorityLow})
+	engine.Register(Registration{Scenario: AlertScenario{}, Priority: PriorityCritical})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+	ctx := context.Background()
+
+	if _, err := runtime.HandleTrigger(ctx, Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "photo frame",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(photo frame) error = %v", err)
+	}
+	if name, ok := engine.Active("d1"); !ok || name != "photo_frame" {
+		t.Fatalf("active after photo_frame trigger = %q %v, want photo_frame true", name, ok)
+	}
+
+	// Higher-priority alert preempts the photo frame.
+	if _, err := runtime.HandleTrigger(ctx, Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "red_alert",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(red_alert) error = %v", err)
+	}
+	if name, _ := engine.Active("d1"); name == "photo_frame" {
+		t.Fatalf("photo_frame still active after red_alert preemption — it should have yielded")
+	}
+
+	// Alert ends — photo frame resumes as the active ambient scenario.
+	if _, err := runtime.StopTrigger(ctx, Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "red_alert",
+	}); err != nil {
+		t.Fatalf("StopTrigger(red_alert) error = %v", err)
+	}
+	if name, ok := engine.Active("d1"); !ok || name != "photo_frame" {
+		t.Fatalf("active after red_alert ends = %q %v, want photo_frame true (photo frame should resume)", name, ok)
+	}
+}
+
+// TestRuntimePhotoFrameYieldsToCallAndResumes validates D2 for a communication
+// use case: an incoming intercom call preempts the photo frame, and the ambient
+// display resumes once the call ends.
+func TestRuntimePhotoFrameYieldsToCallAndResumes(t *testing.T) {
+	devices := device.NewManager()
+	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Living Room"})
+	_, _ = devices.Register(device.Manifest{DeviceID: "d2", DeviceName: "Kitchen"})
+	broadcaster := ui.NewMemoryBroadcaster()
+	router := iorouter.NewRouter()
+
+	engine := NewEngine()
+	engine.Register(Registration{Scenario: PhotoFrameScenario{}, Priority: PriorityLow})
+	engine.Register(Registration{Scenario: &IntercomScenario{}, Priority: PriorityHigh})
+	runtime := NewRuntime(engine, &Environment{
+		Devices:   devices,
+		IO:        router,
+		Broadcast: broadcaster,
+	})
+	ctx := context.Background()
+
+	if _, err := runtime.HandleTrigger(ctx, Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "photo frame",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(photo frame) error = %v", err)
+	}
+	if name, ok := engine.Active("d1"); !ok || name != "photo_frame" {
+		t.Fatalf("active after photo_frame trigger = %q %v, want photo_frame true", name, ok)
+	}
+
+	// Intercom (higher priority) preempts photo frame.
+	if _, err := runtime.HandleTrigger(ctx, Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "intercom",
+	}); err != nil {
+		t.Fatalf("HandleTrigger(intercom) error = %v", err)
+	}
+	if name, _ := engine.Active("d1"); name == "photo_frame" {
+		t.Fatalf("photo_frame still active after intercom starts — it should have yielded to the call")
+	}
+
+	// Call ends — photo frame resumes.
+	if _, err := runtime.StopTrigger(ctx, Trigger{
+		Kind:     TriggerManual,
+		SourceID: "d1",
+		Intent:   "intercom",
+	}); err != nil {
+		t.Fatalf("StopTrigger(intercom) error = %v", err)
+	}
+	if name, ok := engine.Active("d1"); !ok || name != "photo_frame" {
+		t.Fatalf("active after intercom ends = %q %v, want photo_frame true (photo frame should resume)", name, ok)
+	}
+}
+
 func TestRuntimeNestedPreemptionSoak(t *testing.T) {
 	devices := device.NewManager()
 	_, _ = devices.Register(device.Manifest{DeviceID: "d1", DeviceName: "Kitchen"})

@@ -79,9 +79,8 @@ const int _defaultControlWSPort = int.fromEnvironment(
   'TERMINALS_CONTROL_WS_PORT',
   defaultValue: 50054,
 );
-const int _defaultControlPort = kIsWeb
-    ? _defaultControlWSPort
-    : _defaultGrpcPort;
+const int _defaultControlPort =
+    kIsWeb ? _defaultControlWSPort : _defaultGrpcPort;
 const String _buildSha = String.fromEnvironment(
   'TERMINALS_BUILD_SHA',
   defaultValue: 'unknown',
@@ -763,10 +762,9 @@ class _TerminalClientShellState extends State<TerminalClientShell>
                   _buildDiagnosticsPanel(),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    initialValue:
-                        _availableApplicationIntents.contains(
-                          _selectedApplicationIntent,
-                        )
+                    initialValue: _availableApplicationIntents.contains(
+                      _selectedApplicationIntent,
+                    )
                         ? _selectedApplicationIntent
                         : _availableApplicationIntents.first,
                     decoration: const InputDecoration(
