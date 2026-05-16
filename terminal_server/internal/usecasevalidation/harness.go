@@ -41,6 +41,7 @@ type Harness struct {
 	Handler   *transport.StreamHandler
 
 	sound scenario.SoundClassifier
+	llm   scenario.LLM
 
 	mu         sync.Mutex
 	assertions []AssertionRecord
@@ -117,6 +118,7 @@ func (h *Harness) StartServer() {
 		Telephony: telephony.NoopBridge{},
 		Broadcast: h.Broadcast,
 		Sound:     h.sound,
+		LLM:       h.llm,
 	})
 	h.Handler = transport.NewStreamHandlerWithRuntime(h.Control, h.Runtime)
 }
@@ -125,6 +127,12 @@ func (h *Harness) StartServer() {
 // Must be called before StartServer.
 func (h *Harness) SetSound(sc scenario.SoundClassifier) {
 	h.sound = sc
+}
+
+// SetLLM configures an LLM to inject into the scenario runtime.
+// Must be called before StartServer.
+func (h *Harness) SetLLM(llm scenario.LLM) {
+	h.llm = llm
 }
 
 // Clock returns the harness's deterministic fake clock. Scenario tests should
