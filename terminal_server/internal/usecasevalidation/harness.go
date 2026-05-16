@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -351,12 +352,59 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 		if err := writeJSONL(filepath.Join(dir, "assertions.jsonl"), assertionsToAny(assertions)); err != nil {
 			h.t.Logf("usecasevalidation: could not write assertions.jsonl: %v", err)
 		}
+		if err := writeSummaryMD(filepath.Join(dir, "summary.md"), bundle); err != nil {
+			h.t.Logf("usecasevalidation: could not write summary.md: %v", err)
+		}
 		h.t.Logf("usecasevalidation: full evidence bundle at %s", dir)
 	} else {
 		h.t.Logf("usecasevalidation: manifest at %s/manifest.json (set USECASE_ARTIFACTS=1 for full bundle)", dir)
 	}
 
 	return bundle
+}
+
+func writeSummaryMD(path string, b *EvidenceBundle) error {
+	m := b.Manifest
+	result := "PASS"
+	if !m.Pass {
+		result = "FAIL"
+	}
+
+	passed := 0
+	failed := 0
+	for _, a := range b.Assertions {
+		if a.Pass {
+			passed++
+		} else {
+			failed++
+		}
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "# Use Case %s — Validation Summary\n\n", m.UseCaseID)
+	fmt.Fprintf(&sb, "**Run ID:** %s  \n", m.RunID)
+	fmt.Fprintf(&sb, "**Scenario:** %s  \n", m.ScenarioName)
+	fmt.Fprintf(&sb, "**Result:** %s  \n", result)
+	fmt.Fprintf(&sb, "**Start:** %s  \n", m.TimestampStart.Format(time.RFC3339))
+	fmt.Fprintf(&sb, "**End:** %s  \n", m.TimestampEnd.Format(time.RFC3339))
+	if m.GitCommit != "" {
+		fmt.Fprintf(&sb, "**Git commit:** %s  \n", m.GitCommit)
+	}
+	fmt.Fprintf(&sb, "\n## Assertions (%d passed, %d failed)\n\n", passed, failed)
+	fmt.Fprintf(&sb, "| ID | Description | Result | Detail |\n")
+	fmt.Fprintf(&sb, "|---|---|---|---|\n")
+	for _, a := range b.Assertions {
+		mark := "✓ PASS"
+		if !a.Pass {
+			mark = "✗ FAIL"
+		}
+		fmt.Fprintf(&sb, "| %s | %s | %s | %s |\n", a.ID, a.Description, mark, a.Detail)
+	}
+	if len(m.FailingAssertions) > 0 {
+		fmt.Fprintf(&sb, "\n**Failing assertions:** %s\n", strings.Join(m.FailingAssertions, ", "))
+	}
+	fmt.Fprintf(&sb, "\n## Replay\n\n```bash\ngo test ./internal/usecasevalidation -run TestReplay -args -bundle %s\n```\n", filepath.Dir(path))
+	return os.WriteFile(path, []byte(sb.String()), 0o644)
 }
 
 // AssertionRecord captures the result of a single named assertion.

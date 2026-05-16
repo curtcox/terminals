@@ -35,6 +35,8 @@ ID_RE = re.compile(r"^[A-Z]+\d+$")
 HEADING_RE = re.compile(r"^(#{2,4})\s+(.*)$")
 AUTOMATED_RE = re.compile(r"^automated:([A-Za-z0-9]+(?:,[A-Za-z0-9]+)*)$")
 ALL_IDS_RE = re.compile(r"^all_ids=\(([^)]*)\)\s*$")
+# Matches: `    AA1) echo "AA1|Simulation|description..." ;;`
+METADATA_RE = re.compile(r"""^\s+\w+\)\s+echo\s+"([A-Z]+\d+)\|([^|"]+)\|([^"]+)"\s+;;\s*$""")
 
 COVERAGE_DEPTH_LEGEND = [
     ("Smoke", "proves a narrow server loop or command path."),
@@ -136,6 +138,33 @@ def parse_usecase_validate_sh() -> list[str]:
     return []
 
 
+def parse_sh_metadata() -> dict[str, tuple[str, str]]:
+    """Parse the metadata() function body in usecase-validate.sh.
+
+    Returns {id: (depth, evidence)} for every line matching the pattern:
+        ID) echo "ID|Depth|Evidence text" ;;
+    This is the authoritative source for coverage depth and primary evidence.
+    """
+    if not USECASE_VALIDATE_SH.exists():
+        return {}
+    out: dict[str, tuple[str, str]] = {}
+    in_metadata = False
+    for raw in USECASE_VALIDATE_SH.read_text().splitlines():
+        stripped = raw.strip()
+        if stripped.startswith("metadata()"):
+            in_metadata = True
+            continue
+        if in_metadata and stripped == "}":
+            break
+        if not in_metadata:
+            continue
+        m = METADATA_RE.match(raw)
+        if m:
+            uid, depth, evidence = m.group(1), m.group(2).strip(), m.group(3).strip()
+            out[uid] = (depth, evidence)
+    return out
+
+
 def collect_plan_validations() -> tuple[dict[str, list[dict]], list[str]]:
     """Walk plans/, return {id: [{path,title,status}, ...]} and errors."""
     by_id: dict[str, list[dict]] = {}
@@ -199,6 +228,7 @@ def render(
     plan_by_id: dict[str, list[dict]],
     sh_ids: set[str],
     existing: dict[str, tuple[str, str]],
+    sh_metadata: dict[str, tuple[str, str]] | None = None,
 ) -> tuple[str, list[str]]:
     """Return (rendered text, list of TODO IDs)."""
     automated_set = set(plan_by_id.keys()) | sh_ids
@@ -237,7 +267,12 @@ def render(
     lines.append("|---|---|---|---|---|")
     for uid in automated_ids:
         scenario = usecases[uid]["scenario"]
-        evidence, depth = existing.get(uid, ("TODO", "TODO"))
+        # sh_metadata (from usecase-validate.sh metadata()) is the primary source;
+        # fall back to the existing hand-maintained matrix for IDs not yet in metadata().
+        if sh_metadata and uid in sh_metadata:
+            depth, evidence = sh_metadata[uid]
+        else:
+            evidence, depth = existing.get(uid, ("TODO", "TODO"))
         if evidence == "TODO" or depth == "TODO":
             todos.append(uid)
         cmd = f"`make usecase-validate USECASE={uid}`"
@@ -319,7 +354,8 @@ def main() -> int:
         )
 
     existing = parse_existing_evidence()
-    rendered, todos = render(usecases, plan_by_id, sh_ids, existing)
+    sh_metadata = parse_sh_metadata()
+    rendered, todos = render(usecases, plan_by_id, sh_ids, existing, sh_metadata)
 
     # Warn about new IDs that need TODO replacement.
     if todos:

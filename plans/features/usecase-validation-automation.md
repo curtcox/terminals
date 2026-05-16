@@ -1,15 +1,16 @@
 ---
 title: "Use Case Validation Automation"
 kind: plan
-status: building
+status: shipped
 owner: curtcox
-validation: none
+validation: automated:C1,C2,M5,T1,T2,T3,T4,AA1,AA4,UI9
 last-reviewed: 2026-05-16
 progress:
   - 2026-05-16: Phase 1 complete (C1 harness skeleton, evidence bundle, USECASE_ARTIFACTS flag)
   - 2026-05-16: Phase 2 complete (simulated terminal transport; UI9 reconnect + C2 multi-terminal broadcast)
   - 2026-05-16: Phase 3 complete (fake clock; T1 voice path, T2 timer reminder, M5 camera activity)
   - 2026-05-16: Phase 4 complete (morning routine monitor scenario; T3/T4 school-morning, AA1 agent trigger, AA4 timer create/cancel; all registered in usecase-validate.sh)
+  - 2026-05-16: Phase 5 complete (summary.md in evidence bundle; TestReplay command; CI artifact upload; validation matrix auto-populated from usecase-validate.sh metadata; plan validation frontmatter updated)
 ---
 
 # Use Case Validation Automation
