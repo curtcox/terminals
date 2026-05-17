@@ -43,7 +43,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: make usecases-site-check
       - name: Test
-        run: go test ./...
+        run: USECASE_ARTIFACTS=1 go test ./...
       - name: Test (race)
         run: go test -race ./...
       - name: Test (coverage)
@@ -66,6 +66,17 @@ jobs:
         with:
           name: usecase-results-${{ github.run_id }}
           path: artifacts/usecases/
+          if-no-files-found: ignore
+      - name: Generate enriched use-case site
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: python3 ./scripts/build-usecase-site.py --include-results --include-bugs
+      - name: Upload enriched use-case site
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: usecases-site-${{ github.run_id }}
+          path: docs/usecases-site/
           if-no-files-found: ignore
       - name: Govulncheck
         run: |

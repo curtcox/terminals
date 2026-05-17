@@ -17,3 +17,25 @@ document.querySelectorAll("table").forEach((table) => {
     });
   });
 });
+
+(function () {
+  const links = document.querySelectorAll(".frame-link");
+  if (!links.length) return;
+  const dialog = document.createElement("dialog");
+  dialog.id = "frame-lightbox";
+  dialog.innerHTML =
+    '<figure><button class="lightbox-close" aria-label="Close">×</button>' +
+    '<img id="lightbox-img" src="" alt=""><figcaption id="lightbox-caption"></figcaption></figure>';
+  document.body.appendChild(dialog);
+  dialog.querySelector(".lightbox-close").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
+  links.forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById("lightbox-img").src = link.href;
+      document.getElementById("lightbox-img").alt = link.querySelector("span").textContent;
+      document.getElementById("lightbox-caption").textContent = link.querySelector("span").textContent;
+      dialog.showModal();
+    });
+  });
+}());

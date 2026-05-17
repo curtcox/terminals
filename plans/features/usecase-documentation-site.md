@@ -231,6 +231,17 @@ Each milestone is independently shippable and leaves the site usable.
   broadcast assertions also capture the relevant terminal's UI state. Result:
   all 53 validated use cases now produce frames and interaction traces when run
   with USECASE_ARTIFACTS=1 (or via `make usecase-validate`).
+- 2026-05-17: Per-use-case page polish and CI enriched-site upload. Evidence
+  section now renders the `make usecase-validate` command in a `<code>` element.
+  "How to use it" placeholder now distinguishes automated (shows the command)
+  from untested (says no scenario exists). Added a CSS+JS lightbox: clicking a
+  frame thumbnail opens a `<dialog>` overlay with the full image rather than
+  navigating away, completing the M3 "frame strip + lightbox" spec. Added
+  `code` styling to the CSS. CI "Test" step now sets `USECASE_ARTIFACTS=1` so
+  frames, videos, and result.json are produced on every successful test run.
+  Added CI steps to regenerate the enriched site from those artifacts and upload
+  it as a `usecases-site-<run>` workflow artifact, giving PR reviewers a
+  pass/fail site with media without touching the catalog-only drift check.
 
 ## Open Questions
 

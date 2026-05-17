@@ -492,7 +492,7 @@ def render_usecase(usecase: UseCase) -> str:
         f'<li><a href="../../{html.escape(usecase.source)}">{html.escape(usecase.source)}</a></li>',
     ]
     if usecase.automated:
-        evidence_items.append(f"<li>make usecase-validate USECASE={usecase.id}</li>")
+        evidence_items.append(f"<li><code>make usecase-validate USECASE={usecase.id}</code></li>")
     else:
         evidence_items.append("<li>No automated validation command wired yet.</li>")
     if result:
@@ -503,8 +503,10 @@ def render_usecase(usecase: UseCase) -> str:
     if result and result.interaction_trace:
         interaction_items = "\n        ".join(f"<li>{html.escape(item)}</li>" for item in result.interaction_trace)
         interaction_html = f"<ol>\n        {interaction_items}\n      </ol>"
+    elif usecase.automated:
+        interaction_html = f'<p class="placeholder">Run <code>make usecase-validate USECASE={usecase.id}</code> to generate interaction traces for this use case.</p>'
     else:
-        interaction_html = '<p class="placeholder">Interaction traces are not captured yet. This section will be generated from validation scenarios.</p>'
+        interaction_html = '<p class="placeholder">No automated scenario exists yet. Interaction trace not available.</p>'
     visual_html = render_visual_media(result)
     audio_html = render_audio_media(result)
 
@@ -738,6 +740,60 @@ th button {
   margin: 0 0 18px;
 }
 
+code {
+  background: #eef1ee;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  padding: 2px 5px;
+}
+
+dialog#frame-lightbox {
+  background: rgba(0, 0, 0, 0.92);
+  border: 0;
+  max-height: 95vh;
+  max-width: 95vw;
+  padding: 0;
+}
+
+dialog#frame-lightbox figure {
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+dialog#frame-lightbox img {
+  display: block;
+  max-height: 88vh;
+  max-width: 92vw;
+  object-fit: contain;
+}
+
+dialog#frame-lightbox figcaption {
+  color: #bcc5c7;
+  font-size: 0.88rem;
+  padding: 8px 40px 10px 14px;
+  text-align: center;
+}
+
+.lightbox-close {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 8px 12px;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
 @media (max-width: 680px) {
   main { padding: 20px 12px 40px; }
   h1 { font-size: 1.7rem; }
@@ -766,6 +822,28 @@ def javascript() -> str:
     });
   });
 });
+
+(function () {
+  const links = document.querySelectorAll(".frame-link");
+  if (!links.length) return;
+  const dialog = document.createElement("dialog");
+  dialog.id = "frame-lightbox";
+  dialog.innerHTML =
+    '<figure><button class="lightbox-close" aria-label="Close">×</button>' +
+    '<img id="lightbox-img" src="" alt=""><figcaption id="lightbox-caption"></figcaption></figure>';
+  document.body.appendChild(dialog);
+  dialog.querySelector(".lightbox-close").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); });
+  links.forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById("lightbox-img").src = link.href;
+      document.getElementById("lightbox-img").alt = link.querySelector("span").textContent;
+      document.getElementById("lightbox-caption").textContent = link.querySelector("span").textContent;
+      dialog.showModal();
+    });
+  });
+}());
 """
 
 
