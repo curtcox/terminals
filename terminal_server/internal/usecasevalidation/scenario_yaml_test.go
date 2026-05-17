@@ -65,9 +65,9 @@ func runYAMLScenario(t *testing.T, name string) *usecasevalidation.EvidenceBundl
 	if len(spec.Usecases) == 0 {
 		t.Fatal("scenario missing usecases")
 	}
-	label := spec.Usecases[0]
-	if len(spec.Usecases) > 1 {
-		label = spec.Usecases[0] + "/" + spec.Usecases[1]
+	var bundle *usecasevalidation.EvidenceBundle
+	for _, id := range spec.Usecases {
+		bundle = h.Evidence(id)
 	}
-	return h.Evidence(label)
+	return bundle
 }
