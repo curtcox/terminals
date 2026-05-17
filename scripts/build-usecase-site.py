@@ -52,6 +52,13 @@ class UseCase:
 
 
 @dataclass(frozen=True)
+class MediaAsset:
+    label: str
+    path: str
+    kind: str
+
+
+@dataclass(frozen=True)
 class Result:
     usecase_id: str
     run_id: str
@@ -60,6 +67,9 @@ class Result:
     pass_: bool
     failing_assertions: tuple[str, ...]
     interaction_trace: tuple[str, ...]
+    frames: tuple[MediaAsset, ...]
+    videos: tuple[MediaAsset, ...]
+    audio: tuple[MediaAsset, ...]
     source: str
 
     @property
@@ -147,6 +157,9 @@ def result_from_manifest(path: Path) -> Result | None:
         pass_=bool(raw.get("pass", False)),
         failing_assertions=tuple(str(item) for item in raw.get("failing_assertions", [])),
         interaction_trace=tuple(interaction_summaries(raw.get("interaction_trace", []))),
+        frames=tuple(media_assets(raw, "frames", "screenshot", path)),
+        videos=tuple(media_assets(raw, "videos", "video", path)),
+        audio=tuple(media_assets(raw, "audio", "audio", path)),
         source=path.relative_to(REPO).as_posix(),
     )
 
@@ -162,6 +175,53 @@ def interaction_summaries(raw: object) -> list[str]:
         if summary:
             summaries.append(summary)
     return summaries
+
+
+def media_assets(raw: dict[str, object], key: str, kind: str, manifest_path: Path) -> list[MediaAsset]:
+    assets: list[MediaAsset] = []
+    candidates: list[object] = []
+    direct = raw.get(key)
+    if isinstance(direct, list):
+        candidates.extend(direct)
+    media = raw.get("media")
+    if isinstance(media, dict):
+        nested = media.get(key)
+        if isinstance(nested, list):
+            candidates.extend(nested)
+    for index, item in enumerate(candidates, start=1):
+        asset = media_asset(item, kind, index, manifest_path)
+        if asset is not None:
+            assets.append(asset)
+    return assets
+
+
+def media_asset(item: object, kind: str, index: int, manifest_path: Path) -> MediaAsset | None:
+    label = f"{kind.title()} {index}"
+    path = ""
+    if isinstance(item, str):
+        path = item
+    elif isinstance(item, dict):
+        for key in ("path", "href", "uri", "source"):
+            value = str(item.get(key, "")).strip()
+            if value:
+                path = value
+                break
+        label = str(item.get("label") or item.get("step_id") or item.get("id") or label)
+    if not path:
+        return None
+    return MediaAsset(label=label, path=site_relative_asset_path(path, manifest_path), kind=kind)
+
+
+def site_relative_asset_path(path: str, manifest_path: Path) -> str:
+    if re.match(r"^[a-z][a-z0-9+.-]*:", path, re.IGNORECASE) or path.startswith("/"):
+        return path
+    manifest_dir = manifest_path.parent
+    candidate = (manifest_dir / path).resolve()
+    try:
+        repo_relative = candidate.relative_to(REPO.resolve())
+    except ValueError:
+        repo_relative = Path(path)
+    return "../../" + repo_relative.as_posix()
 
 
 def latest_results(include_results: bool = False, include_validation_runs: bool = False) -> dict[str, Result]:
@@ -445,6 +505,8 @@ def render_usecase(usecase: UseCase) -> str:
         interaction_html = f"<ol>\n        {interaction_items}\n      </ol>"
     else:
         interaction_html = '<p class="placeholder">Interaction traces are not captured yet. This section will be generated from validation scenarios.</p>'
+    visual_html = render_visual_media(result)
+    audio_html = render_audio_media(result)
 
     body = f"""    <p class="back"><a href="index.html">Back to all use cases</a></p>
     <header class="case-header {header_class}">
@@ -462,11 +524,11 @@ def render_usecase(usecase: UseCase) -> str:
     </section>
     <section>
       <h2>What you see</h2>
-      <p class="placeholder">Rendered server-primitive screenshots are not captured yet.</p>
+      {visual_html}
     </section>
     <section>
       <h2>What you hear</h2>
-      <p class="placeholder">Audio artifacts are not captured yet.</p>
+      {audio_html}
     </section>
     <section>
       <h2>Defects</h2>
@@ -479,6 +541,36 @@ def render_usecase(usecase: UseCase) -> str:
       </ul>
     </section>"""
     return page(f"{usecase.id} {usecase.title}", body)
+
+
+def render_visual_media(result: Result | None) -> str:
+    if not result or (not result.frames and not result.videos):
+        return '<p class="placeholder">Rendered server-primitive screenshots are not captured yet.</p>'
+    parts = [
+        '<p class="media-note">Rendered from server primitives; client pixel parity is covered by the manual UI audit.</p>',
+    ]
+    for video in result.videos:
+        parts.append(
+            f'<figure class="media-block"><video controls muted loop playsinline src="{html.escape(video.path)}"></video>'
+            f"<figcaption>{html.escape(video.label)}</figcaption></figure>"
+        )
+    if result.frames:
+        frame_items = "\n        ".join(
+            f'<a class="frame-link" href="{html.escape(frame.path)}"><img src="{html.escape(frame.path)}" alt="{html.escape(frame.label)}"><span>{html.escape(frame.label)}</span></a>'
+            for frame in result.frames
+        )
+        parts.append(f'<div class="frame-strip">\n        {frame_items}\n      </div>')
+    return "\n      ".join(parts)
+
+
+def render_audio_media(result: Result | None) -> str:
+    if not result or not result.audio:
+        return '<p class="placeholder">Audio artifacts are not captured yet.</p>'
+    items = "\n        ".join(
+        f'<figure class="media-block audio-block"><figcaption>{html.escape(asset.label)}</figcaption><audio controls src="{html.escape(asset.path)}"></audio></figure>'
+        for asset in result.audio
+    )
+    return items
 
 
 def stylesheet() -> str:
@@ -583,6 +675,63 @@ th button {
 
 .placeholder {
   color: #586467;
+}
+
+.media-note {
+  color: #586467;
+  margin-top: 0;
+}
+
+.media-block {
+  margin: 0 0 16px;
+}
+
+.media-block video {
+  width: 100%;
+  max-height: 560px;
+  background: #111;
+}
+
+.media-block audio {
+  width: 100%;
+}
+
+.media-block figcaption {
+  color: #465154;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+.audio-block figcaption {
+  margin: 0 0 6px;
+}
+
+.frame-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.frame-link {
+  background: #fff;
+  border: 1px solid #d9dedc;
+  color: #1d2528;
+  display: block;
+  text-decoration: none;
+}
+
+.frame-link img {
+  aspect-ratio: 16 / 9;
+  background: #111;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.frame-link span {
+  display: block;
+  font-size: 0.85rem;
+  padding: 6px 8px;
 }
 
 .back {

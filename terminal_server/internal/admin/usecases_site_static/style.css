@@ -101,6 +101,63 @@ th button {
   color: #586467;
 }
 
+.media-note {
+  color: #586467;
+  margin-top: 0;
+}
+
+.media-block {
+  margin: 0 0 16px;
+}
+
+.media-block video {
+  width: 100%;
+  max-height: 560px;
+  background: #111;
+}
+
+.media-block audio {
+  width: 100%;
+}
+
+.media-block figcaption {
+  color: #465154;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+.audio-block figcaption {
+  margin: 0 0 6px;
+}
+
+.frame-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.frame-link {
+  background: #fff;
+  border: 1px solid #d9dedc;
+  color: #1d2528;
+  display: block;
+  text-decoration: none;
+}
+
+.frame-link img {
+  aspect-ratio: 16 / 9;
+  background: #111;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.frame-link span {
+  display: block;
+  font-size: 0.85rem;
+  padding: 6px 8px;
+}
+
 .back {
   margin: 0 0 18px;
 }

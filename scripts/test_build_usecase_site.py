@@ -114,6 +114,33 @@ family: "C"
         self.assertIn("Tap &quot;End call&quot;.", c1_page)
         self.assertNotIn("Interaction traces are not captured yet", c1_page)
 
+    def test_result_feed_renders_media_assets(self) -> None:
+        path = self.write_result("C1", "2026-05-17T12:00:00Z", True)
+        data = json.loads(path.read_text())
+        data["media"] = {
+            "frames": [
+                {"step_id": "connected", "path": "frames/connected.png"},
+            ],
+            "videos": [
+                {"label": "Intercom flow", "path": "video/intercom.mp4"},
+            ],
+            "audio": [
+                {"label": "Caller audio", "path": "audio/caller.wav"},
+            ],
+        }
+        path.write_text(json.dumps(data))
+
+        self.module.RESULTS = self.module.latest_results(include_results=True)
+        usecases = self.module.parse_usecases()
+        c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
+
+        self.assertIn("Rendered from server primitives", c1_page)
+        self.assertIn('<video controls muted loop playsinline src="../../artifacts/usecases/C1/video/intercom.mp4">', c1_page)
+        self.assertIn('<img src="../../artifacts/usecases/C1/frames/connected.png"', c1_page)
+        self.assertIn('<audio controls src="../../artifacts/usecases/C1/audio/caller.wav">', c1_page)
+        self.assertNotIn("Rendered server-primitive screenshots are not captured yet", c1_page)
+        self.assertNotIn("Audio artifacts are not captured yet", c1_page)
+
     def test_result_feed_marks_failed_usecase_as_defect(self) -> None:
         self.write_result("C1", "2026-05-17T12:00:00Z", False, "C1-route-stream")
 

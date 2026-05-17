@@ -192,6 +192,12 @@ Each milestone is independently shippable and leaves the site usable.
   cases to `DEFECT` with report links on the per-use-case page. Default
   generation remains catalog-only for deterministic clean-checkout drift
   checks.
+- 2026-05-17: M3/M4 media rendering is prepared on the documentation side.
+  Result manifests can now include `media.frames`, `media.videos`, and
+  `media.audio` entries, and the per-use-case pages render frame strips,
+  video players, and audio players when those artifacts exist. Catalog-only
+  generation still emits placeholders, so the default drift check remains
+  deterministic until capture mode produces real media.
 
 ## Open Questions
 
