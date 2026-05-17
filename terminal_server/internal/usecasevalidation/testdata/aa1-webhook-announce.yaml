@@ -1,0 +1,26 @@
+id: aa1-webhook-announce
+usecases:
+  - AA1
+terminals:
+  agent:
+    device_id: webhook-agent
+    name: Webhook Automation Agent
+  display:
+    device_id: living-room
+    name: Living Room
+steps:
+  - connect: {}
+  - command:
+      terminal: agent
+      intent: announce
+  - expect:
+      id: AA1-scenario-triggered
+      description: external agent triggered announcement scenario via manual API
+      terminal: agent
+      scenario_start: announcement
+  - expect:
+      id: AA1-route-delivered
+      description: display terminal received announcement_audio route from agent trigger
+      terminal: display
+      route_kind: announcement_audio
+  - disconnect: {}

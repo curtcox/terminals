@@ -62,6 +62,36 @@ the spoken phrase (same path as harness Go tests; no raw `VoiceAudio` STT in CI)
     text: "announce: dinner is ready"
 ```
 
+### `sensor`
+
+Inject a sensor reading from a terminal at the current synthetic clock time.
+
+```yaml
+- sensor:
+    terminal: child_room
+    values:
+      camera_activity: 1.0
+```
+
+### `mark_broadcast`
+
+Record the current broadcast event count. Use with `expect.broadcast_since_mark`
+to assert only on events emitted after this step.
+
+```yaml
+- mark_broadcast: {}
+```
+
+### `yield`
+
+Wait briefly so async session handlers can settle (default `50ms`). Use after
+sensor injection or cancel commands before asserting on broadcasts.
+
+```yaml
+- yield:
+    duration: 50ms
+```
+
 ### `clock_advance`
 
 Advance synthetic time by a Go duration string (`5m`, `1h30m`, etc.).
@@ -108,6 +138,9 @@ Record harness assertions. All checks are optional; at least one should be set.
     timers_processed: 1
 ```
 
+`broadcast_not_contains` fails if any matching event is present (optionally only
+events after the last `mark_broadcast` when `broadcast_since_mark: true`).
+
 ### `disconnect`
 
 Disconnect terminal(s). Omit `terminal` to disconnect all connected terminals.
@@ -117,6 +150,10 @@ Disconnect terminal(s). Omit `terminal` to disconnect all connected terminals.
     terminal: kitchen
 ```
 
-## Example (T2 timer reminder)
+## Examples
 
-See `t2-timer-reminder.yaml`.
+- `t2-timer-reminder.yaml` — timer reminder (T2)
+- `t3-t4-school-morning.yaml` — school-morning monitor and bus warning (T3, T4)
+- `t3-activity-cancels-alert.yaml` — camera activity suppresses parent alert (T3)
+- `aa1-webhook-announce.yaml` — external agent triggers announcement (AA1)
+- `aa4-timer-cancel.yaml` — scheduling agent creates and cancels a timer (AA4)

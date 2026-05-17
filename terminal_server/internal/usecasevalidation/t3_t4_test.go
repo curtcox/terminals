@@ -218,7 +218,7 @@ func TestUseCaseT3ActivityCancelsAlert(t *testing.T) {
 
 	// Child gets up at 7:15 — camera activity detected before alert time.
 	activityTimeMS := windowStart.Add(15 * time.Minute).UnixMilli()
-	childRoom.Send(sensorData("child-room2", activityTimeMS, map[string]float64{
+	childRoom.Send(usecasevalidation.SensorDataRequest("child-room2", activityTimeMS, map[string]float64{
 		"camera_activity": 1.0,
 	}))
 

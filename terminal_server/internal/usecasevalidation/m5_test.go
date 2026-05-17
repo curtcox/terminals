@@ -8,7 +8,6 @@ import (
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
-	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
 	"github.com/curtcox/terminals/terminal_server/internal/usecasevalidation"
 )
@@ -81,7 +80,7 @@ func TestUseCaseM5WithEvidence(t *testing.T) {
 	// --- Activity inside window: synthetic time T+15min (7:15 AM) ---
 	// Camera activity at 7:15 AM is inside the 7–8 AM window and should fire.
 	insideWindowMS := windowStart.Add(15 * time.Minute).UnixMilli()
-	childRoom.Send(sensorData("child-room", insideWindowMS, map[string]float64{
+	childRoom.Send(usecasevalidation.SensorDataRequest("child-room", insideWindowMS, map[string]float64{
 		"camera_activity": 1.0,
 	}))
 
@@ -98,7 +97,7 @@ func TestUseCaseM5WithEvidence(t *testing.T) {
 	// Camera activity at 8:30 AM is outside the window and must be suppressed.
 	outsideWindowMS := windowStart.Add(90 * time.Minute).UnixMilli()
 	beforeCount := len(h.Broadcast.Events())
-	childRoom.Send(sensorData("child-room", outsideWindowMS, map[string]float64{
+	childRoom.Send(usecasevalidation.SensorDataRequest("child-room", outsideWindowMS, map[string]float64{
 		"camera_activity": 1.0,
 	}))
 
@@ -111,7 +110,7 @@ func TestUseCaseM5WithEvidence(t *testing.T) {
 
 	// --- Zero activity: should never trigger ---
 	beforeCount2 := len(h.Broadcast.Events())
-	childRoom.Send(sensorData("child-room", insideWindowMS, map[string]float64{
+	childRoom.Send(usecasevalidation.SensorDataRequest("child-room", insideWindowMS, map[string]float64{
 		"camera_activity": 0.0,
 	}))
 
@@ -127,15 +126,3 @@ func TestUseCaseM5WithEvidence(t *testing.T) {
 	h.Evidence("M5")
 }
 
-// sensorData builds a ConnectRequest carrying SensorData for harness use.
-func sensorData(deviceID string, unixMS int64, values map[string]float64) *controlv1.ConnectRequest {
-	return &controlv1.ConnectRequest{
-		Payload: &controlv1.ConnectRequest_Sensor{
-			Sensor: &iov1.SensorData{
-				DeviceId: deviceID,
-				UnixMs:   unixMS,
-				Values:   values,
-			},
-		},
-	}
-}

@@ -39,14 +39,17 @@ type ScenarioClock struct {
 
 // ScenarioStep is one ordered step in a YAML scenario.
 type ScenarioStep struct {
-	Connect          map[string]any    `yaml:"connect,omitempty"`
-	Command          *CommandStep      `yaml:"command,omitempty"`
-	Says             *SaysStep         `yaml:"says,omitempty"`
-	ClockAdvance     *DurationStep     `yaml:"clock_advance,omitempty"`
-	ClockAdvanceTo   *TimeStep         `yaml:"clock_advance_to,omitempty"`
+	Connect          map[string]any     `yaml:"connect,omitempty"`
+	Command          *CommandStep       `yaml:"command,omitempty"`
+	Says             *SaysStep          `yaml:"says,omitempty"`
+	Sensor           *SensorStep        `yaml:"sensor,omitempty"`
+	ClockAdvance     *DurationStep      `yaml:"clock_advance,omitempty"`
+	ClockAdvanceTo   *TimeStep          `yaml:"clock_advance_to,omitempty"`
 	ProcessDueTimers *ProcessTimersStep `yaml:"process_due_timers,omitempty"`
-	Expect           *ExpectStep       `yaml:"expect,omitempty"`
-	Disconnect       *DisconnectStep   `yaml:"disconnect,omitempty"`
+	MarkBroadcast    map[string]any     `yaml:"mark_broadcast,omitempty"`
+	Yield            *YieldStep           `yaml:"yield,omitempty"`
+	Expect           *ExpectStep          `yaml:"expect,omitempty"`
+	Disconnect       *DisconnectStep    `yaml:"disconnect,omitempty"`
 }
 
 // CommandStep sends COMMAND_KIND_MANUAL with an intent and optional arguments.
@@ -60,6 +63,12 @@ type CommandStep struct {
 type SaysStep struct {
 	Terminal string `yaml:"terminal"`
 	Text     string `yaml:"text"`
+}
+
+// SensorStep injects a sensor reading from a terminal at the current synthetic time.
+type SensorStep struct {
+	Terminal string             `yaml:"terminal"`
+	Values   map[string]float64 `yaml:"values"`
 }
 
 // DurationStep advances the fake clock by a Go duration string.
@@ -80,18 +89,26 @@ type ProcessTimersStep struct {
 
 // ExpectStep records one or more harness assertions.
 type ExpectStep struct {
-	ID                string `yaml:"id"`
-	Description       string `yaml:"description,omitempty"`
-	Terminal          string `yaml:"terminal,omitempty"`
-	ScenarioStart     string `yaml:"scenario_start,omitempty"`
-	RouteKind         string `yaml:"route_kind,omitempty"`
-	BroadcastContains string `yaml:"broadcast_contains,omitempty"`
-	TimersProcessed   *int   `yaml:"timers_processed,omitempty"`
+	ID                   string `yaml:"id"`
+	Description          string `yaml:"description,omitempty"`
+	Terminal             string `yaml:"terminal,omitempty"`
+	ScenarioStart        string `yaml:"scenario_start,omitempty"`
+	RouteKind            string `yaml:"route_kind,omitempty"`
+	BroadcastContains    string `yaml:"broadcast_contains,omitempty"`
+	BroadcastNotContains string `yaml:"broadcast_not_contains,omitempty"`
+	BroadcastSinceMark   bool   `yaml:"broadcast_since_mark,omitempty"`
+	TimersProcessed      *int   `yaml:"timers_processed,omitempty"`
 }
 
 // DisconnectStep closes one or all terminal sessions.
 type DisconnectStep struct {
 	Terminal string `yaml:"terminal,omitempty"`
+}
+
+// YieldStep waits briefly so async session handlers can settle. Prefer short
+// durations; scenario timing should still be driven by the fake clock.
+type YieldStep struct {
+	Duration string `yaml:"duration,omitempty"`
 }
 
 // LoadScenarioFile reads and parses a YAML scenario from path.
@@ -139,6 +156,7 @@ func (h *Harness) runScenario(t *testing.T, spec *ScenarioFile) {
 
 	terminals := make(map[string]*SimTerminal)
 	profiles := make(map[string]TerminalProfile, len(spec.Terminals))
+	broadcastMark := 0
 
 	for alias, prof := range spec.Terminals {
 		deviceID := prof.DeviceID
@@ -212,6 +230,15 @@ func (h *Harness) runScenario(t *testing.T, spec *ScenarioFile) {
 					},
 				},
 			})
+		case step.Sensor != nil:
+			term := terminals[step.Sensor.Terminal]
+			if term == nil {
+				t.Fatalf("scenario %s step %d: unknown terminal %q", spec.ID, i, step.Sensor.Terminal)
+			}
+			if len(step.Sensor.Values) == 0 {
+				t.Fatalf("scenario %s step %d: sensor.values required", spec.ID, i)
+			}
+			term.Send(SensorDataRequest(term.DeviceID, h.Clock().Now().UnixMilli(), step.Sensor.Values))
 		case step.ClockAdvance != nil:
 			d, err := time.ParseDuration(step.ClockAdvance.Duration)
 			if err != nil {
@@ -238,8 +265,20 @@ func (h *Harness) runScenario(t *testing.T, spec *ScenarioFile) {
 			} else if err != nil {
 				t.Fatalf("scenario %s step %d: ProcessDueTimers: %v", spec.ID, i, err)
 			}
+		case step.MarkBroadcast != nil:
+			broadcastMark = len(h.Broadcast.Events())
+		case step.Yield != nil:
+			d := 50 * time.Millisecond
+			if step.Yield.Duration != "" {
+				parsed, err := time.ParseDuration(step.Yield.Duration)
+				if err != nil {
+					t.Fatalf("scenario %s step %d: yield.duration: %v", spec.ID, i, err)
+				}
+				d = parsed
+			}
+			time.Sleep(d)
 		case step.Expect != nil:
-			h.runExpectStep(t, spec.ID, i, step.Expect, terminals)
+			h.runExpectStep(t, spec.ID, i, step.Expect, terminals, broadcastMark)
 		case step.Disconnect != nil:
 			if step.Disconnect.Terminal == "" {
 				for _, term := range terminals {
@@ -273,7 +312,7 @@ func (h *Harness) connectProfile(prof TerminalProfile) *SimTerminal {
 	})
 }
 
-func (h *Harness) runExpectStep(t *testing.T, scenarioID string, stepIdx int, exp *ExpectStep, terminals map[string]*SimTerminal) {
+func (h *Harness) runExpectStep(t *testing.T, scenarioID string, stepIdx int, exp *ExpectStep, terminals map[string]*SimTerminal, broadcastMark int) {
 	t.Helper()
 	id := exp.ID
 	if id == "" {
@@ -323,9 +362,14 @@ func (h *Harness) runExpectStep(t *testing.T, scenarioID string, stepIdx int, ex
 		}
 	}
 
+	events := h.Broadcast.Events()
+	if exp.BroadcastSinceMark {
+		events = events[broadcastMark:]
+	}
+
 	if exp.BroadcastContains != "" {
 		found := false
-		for _, ev := range h.Broadcast.Events() {
+		for _, ev := range events {
 			if ev.Message == exp.BroadcastContains {
 				found = true
 				break
@@ -336,7 +380,20 @@ func (h *Harness) runExpectStep(t *testing.T, scenarioID string, stepIdx int, ex
 			if detail != "" {
 				detail += "; "
 			}
-			detail += fmt.Sprintf("broadcast missing %q (%d events)", exp.BroadcastContains, len(h.Broadcast.Events()))
+			detail += fmt.Sprintf("broadcast missing %q (%d events)", exp.BroadcastContains, len(events))
+		}
+	}
+
+	if exp.BroadcastNotContains != "" {
+		for _, ev := range events {
+			if ev.Message == exp.BroadcastNotContains {
+				pass = false
+				if detail != "" {
+					detail += "; "
+				}
+				detail += fmt.Sprintf("broadcast unexpectedly contains %q", exp.BroadcastNotContains)
+				break
+			}
 		}
 	}
 

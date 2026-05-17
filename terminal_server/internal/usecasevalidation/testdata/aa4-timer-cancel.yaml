@@ -1,0 +1,46 @@
+id: aa4-timer-cancel
+usecases:
+  - AA4
+clock:
+  start: "2026-05-16T10:00:00Z"
+terminals:
+  agent:
+    device_id: automation-agent
+    name: Automation Agent
+steps:
+  - connect: {}
+  - command:
+      terminal: agent
+      intent: set timer
+      arguments:
+        duration_seconds: "600"
+        label: meeting-reminder
+  - expect:
+      id: AA4-timer-created
+      description: scheduling agent created a timer via manual API
+      terminal: agent
+      scenario_start: timer_reminder
+  - process_due_timers:
+      expect_processed: 0
+      assert_id: AA4-no-premature-fire
+  - mark_broadcast: {}
+  - command:
+      terminal: agent
+      intent: cancel timer
+  - yield:
+      duration: 50ms
+  - expect:
+      id: AA4-timer-cancelled
+      description: scheduling agent cancelled the timer via manual API
+      broadcast_contains: "Timer cancelled"
+  - clock_advance_to:
+      time: "2026-05-16T10:11:00Z"
+  - process_due_timers:
+      expect_processed: 0
+      assert_id: AA4-no-fire-after-cancel
+  - expect:
+      id: AA4-done-suppressed
+      description: cancelled timer does not produce Timer done broadcast
+      broadcast_not_contains: "Timer done!"
+      broadcast_since_mark: true
+  - disconnect: {}

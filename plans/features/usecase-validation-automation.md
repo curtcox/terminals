@@ -19,6 +19,7 @@ progress:
   - 2026-05-16: D3/I3 added (standby/clock mode activated by voice command; capability manifest reported on connection; transport-layer tests registered in validate script); I6 registered (preemption scenario; plan frontmatter updated to include D3, I3, I6); AA5 wired into usecase-validate.sh (was missing from all_ids and run_usecase despite test existing)
   - 2026-05-16: I4 added (device registry capability query; Generated+Wire transport tests register two devices with different caps, verify placement engine returns only matching devices for camera/screen/microphone/speaker queries; wired into validate script and matrix)
   - 2026-05-16: YAML scenario loading (Phase 4): scenario-schema.md, LoadScenarioFile/RunScenarioFile, t2-timer-reminder.yaml; TestYAMLScenarioT2TimerReminder wired into T2 validation
+  - 2026-05-16: Phase 4 YAML migration complete for T3/T4, AA1, AA4: sensor/mark_broadcast/yield/broadcast_not_contains steps; testdata YAML scenarios wired into usecase-validate.sh alongside Go-authored tests
 ---
 
 # Use Case Validation Automation

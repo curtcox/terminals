@@ -1,0 +1,49 @@
+id: t3-t4-school-morning
+usecases:
+  - T3
+  - T4
+clock:
+  start: "2026-09-01T07:00:00Z"
+terminals:
+  parent:
+    device_id: parent
+    name: Parent Bedroom
+  child_room:
+    device_id: child-room
+    name: Child Room
+steps:
+  - connect: {}
+  - command:
+      terminal: parent
+      intent: morning routine monitor
+      arguments:
+        alert_time_ms: "1788247800000"
+        warning_time_ms: "1788249000000"
+        alert_device_id: parent
+        warning_device_id: child-room
+        alert_message: "Morning routine: no activity detected"
+        warning_message: "The bus comes in 10 minutes"
+  - expect:
+      id: T3-monitor-armed
+      description: morning_routine_monitor scenario started after arm command
+      terminal: parent
+      scenario_start: morning_routine_monitor
+  - clock_advance_to:
+      time: "2026-09-01T07:30:01Z"
+  - process_due_timers:
+      expect_processed: 1
+      assert_id: T3-alert-fired
+  - expect:
+      id: T3-parent-notified
+      description: parent notified that child has not been seen
+      broadcast_contains: "Morning routine: no activity detected"
+  - clock_advance_to:
+      time: "2026-09-01T07:50:01Z"
+  - process_due_timers:
+      expect_processed: 1
+      assert_id: T4-warning-fired
+  - expect:
+      id: T4-child-warned
+      description: child-room notified bus warning
+      broadcast_contains: "The bus comes in 10 minutes"
+  - disconnect: {}

@@ -23,10 +23,10 @@ fi
 metadata() {
   local id="$1"
   case "${id}" in
-    AA1) echo "AA1|Simulation|external automation agent triggers announcement scenario via manual API; display terminal receives announcement_audio route" ;;
+    AA1) echo "AA1|Simulation|external automation agent triggers announcement scenario via manual API; display terminal receives announcement_audio route; YAML scenario in internal/usecasevalidation/testdata/aa1-webhook-announce.yaml" ;;
     AA2) echo "AA2|Simulation|monitoring agent arms audio monitoring via manual API; fake classifier emits dryer_beep; broadcast targeted at agent device ID" ;;
     AA3) echo "AA3|Simulation|AI agent resolves ambiguous voice command via fake LLM; LLM-decoded announce intent routes announcement_audio to a second terminal" ;;
-    AA4) echo "AA4|Simulation|scheduling agent creates and cancels a timer via manual API; cancelled timer produces no 'Timer done!' broadcast" ;;
+    AA4) echo "AA4|Simulation|scheduling agent creates and cancels a timer via manual API; cancelled timer produces no 'Timer done!' broadcast; YAML scenario in internal/usecasevalidation/testdata/aa4-timer-cancel.yaml" ;;
     AA5) echo "AA5|Simulation|vision analysis agent: FakeVisionAnalyzer returns caption and labels; camera_activity sensor triggers analysis; broadcast verified with caption, labels, and agent device target" ;;
     AA6) echo "AA6|Simulation|admin scripts run over seeded sim/store/ui/bus fixture plus mutating Layer 2 message, board, artifact, canvas, and session paths" ;;
     V1) echo "V1|Simulation|voice assistant wake-and-answer: 'assistant <question>' triggers VoiceAssistantScenario; FakeLLM queried; response broadcast back to source device" ;;
@@ -64,8 +64,8 @@ metadata() {
     PL20) echo "PL20|Contract|capability artifact template save/apply and artifact history tests" ;;
     T1) echo "T1|Simulation|due-timer loop; transport run_due_timers; kitchen timer package smoke test; voice-path fake-clock harness (timer fires via synthetic time advance)" ;;
     T2) echo "T2|Simulation|timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time; YAML scenario in internal/usecasevalidation/testdata/t2-timer-reminder.yaml" ;;
-    T3) echo "T3|Simulation|school-morning monitor: no camera activity by alert time notifies parent; activity before alert cancels notification" ;;
-    T4) echo "T4|Simulation|school-morning warning: bus-warning broadcast fires to child-room at configured warning time via synthetic clock advance" ;;
+    T3) echo "T3|Simulation|school-morning monitor: no camera activity by alert time notifies parent; activity before alert cancels notification; YAML scenarios in internal/usecasevalidation/testdata/t3-t4-school-morning.yaml and t3-activity-cancels-alert.yaml" ;;
+    T4) echo "T4|Simulation|school-morning warning: bus-warning broadcast fires to child-room at configured warning time via synthetic clock advance; YAML scenario in internal/usecasevalidation/testdata/t3-t4-school-morning.yaml" ;;
     UI1) echo "UI1|Transport|idle photo-frame SetUI includes scoped corner affordance (terminal-ui plan)" ;;
     UI2) echo "UI2|Transport|corner.open toggles menu overlay claim without disturbing main" ;;
     UI3) echo "UI3|Transport|menu overlay default MIXED policy: main pointer blocked, audio live" ;;
@@ -110,6 +110,7 @@ run_usecase() {
   case "${id}" in
     AA1)
       run_go_test ./internal/usecasevalidation 'TestUseCaseAA1WithEvidence$'
+      run_go_test ./internal/usecasevalidation 'TestYAMLScenarioAA1WebhookAnnounce$'
       ;;
     AA2)
       run_go_test ./internal/usecasevalidation 'TestUseCaseAA2WithEvidence$'
@@ -119,6 +120,7 @@ run_usecase() {
       ;;
     AA4)
       run_go_test ./internal/usecasevalidation 'TestUseCaseAA4WithEvidence$'
+      run_go_test ./internal/usecasevalidation 'TestYAMLScenarioAA4TimerCancel$'
       ;;
     AA5)
       run_go_test ./internal/usecasevalidation 'TestUseCaseAA5WithEvidence$'
@@ -230,9 +232,11 @@ run_usecase() {
       ;;
     T3)
       run_go_test ./internal/usecasevalidation 'TestUseCaseT3(T4WithEvidence|ActivityCancelsAlert)$'
+      run_go_test ./internal/usecasevalidation 'TestYAMLScenarioT3(ActivityCancelsAlert|T4SchoolMorning)$'
       ;;
     T4)
       run_go_test ./internal/usecasevalidation 'TestUseCaseT3T4WithEvidence$'
+      run_go_test ./internal/usecasevalidation 'TestYAMLScenarioT3T4SchoolMorning$'
       ;;
     UI1)
       run_go_test ./internal/transport 'TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance$'

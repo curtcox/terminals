@@ -1,0 +1,44 @@
+id: t3-activity-cancels-alert
+usecases:
+  - T3
+clock:
+  start: "2026-09-01T07:00:00Z"
+terminals:
+  parent:
+    device_id: parent2
+    name: Parent Bedroom
+  child_room:
+    device_id: child-room2
+    name: Child Room
+steps:
+  - connect: {}
+  - command:
+      terminal: parent
+      intent: morning routine monitor
+      arguments:
+        alert_time_ms: "1788247800000"
+        alert_device_id: parent2
+        alert_message: "Morning routine: no activity detected"
+  - expect:
+      id: T3-cancel-armed
+      description: morning_routine_monitor started
+      terminal: parent
+      scenario_start: morning_routine_monitor
+  - clock_advance:
+      duration: 15m
+  - sensor:
+      terminal: child_room
+      values:
+        camera_activity: 1.0
+  - yield:
+      duration: 50ms
+  - clock_advance_to:
+      time: "2026-09-01T07:30:01Z"
+  - process_due_timers:
+      expect_processed: 0
+      assert_id: T3-no-alert-when-active
+  - expect:
+      id: T3-alert-suppressed
+      description: no parent alert when child was seen active
+      broadcast_not_contains: "Morning routine: no activity detected"
+  - disconnect: {}
