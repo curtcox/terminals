@@ -4,7 +4,9 @@ package usecasevalidation
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -22,6 +24,7 @@ import (
 	"time"
 
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	iov1 "github.com/curtcox/terminals/terminal_server/gen/go/io/v1"
 	uiv1 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
@@ -50,11 +53,13 @@ type Harness struct {
 	sound  scenario.SoundClassifier
 	llm    scenario.LLM
 	vision scenario.VisionAnalyzer
+	tts    *FakeTTS
 
 	mu           sync.Mutex
 	assertions   []AssertionRecord
 	interactions []InteractionRecord
 	frames       []FrameRecord
+	audioClips   []AudioRecord
 }
 
 // New creates a Harness bound to the given test. The harness clock starts at
@@ -120,6 +125,7 @@ func (h *Harness) StartServer() {
 	h.Broadcast = ui.NewMemoryBroadcaster()
 	engine := scenario.NewEngine()
 	scenario.RegisterBuiltins(engine)
+	h.tts = &FakeTTS{}
 	h.Runtime = scenario.NewRuntime(engine, &scenario.Environment{
 		Devices:   h.Devices,
 		IO:        iorouter.NewRouter(),
@@ -130,6 +136,7 @@ func (h *Harness) StartServer() {
 		Sound:     h.sound,
 		LLM:       h.llm,
 		Vision:    h.vision,
+		TTS:       h.tts,
 	})
 	h.Handler = transport.NewStreamHandlerWithRuntime(h.Control, h.Runtime)
 }
@@ -365,12 +372,63 @@ func (h *Harness) CaptureFrame(stepID, terminal string, messages []transport.Pro
 	h.mu.Unlock()
 }
 
+// CaptureAudio extracts any PlayAudio messages from messages and records them
+// as audio artifacts for the doc site.
+func (h *Harness) CaptureAudio(stepID, _ string, messages []transport.ProtoServerEnvelope) {
+	var index int
+	for _, env := range messages {
+		resp, ok := env.(*controlv1.ConnectResponse)
+		if !ok {
+			continue
+		}
+		pa := resp.GetPlayAudio()
+		if pa == nil {
+			continue
+		}
+		pcm, ok := pa.Source.(*iov1.PlayAudio_PcmData)
+		if !ok || len(pcm.PcmData) == 0 {
+			continue
+		}
+		label := fmt.Sprintf("%s-audio-%d", stepID, index)
+		index++
+		h.mu.Lock()
+		h.audioClips = append(h.audioClips, AudioRecord{
+			Label:     label,
+			Path:      filepath.ToSlash(filepath.Join("audio", safeArtifactName(label)+".wav")),
+			PCM:       append([]byte(nil), pcm.PcmData...),
+			Timestamp: time.Now().UTC(),
+		})
+		h.mu.Unlock()
+	}
+}
+
 // Evidence writes the evidence bundle for this run and returns a summary.
 // The bundle is always written under artifacts/usecase-validation/<run-id>/.
 // The full bundle (including assertions.jsonl) is written when any assertion
 // failed or USECASE_ARTIFACTS=1 is set. Otherwise only manifest.json is written.
 func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 	h.t.Helper()
+	// Collect TTS captures from the FakeTTS before taking the mutex snapshot so
+	// that audio recorded during the run is included even if CaptureAudio was
+	// not called explicitly.
+	if h.tts != nil {
+		for i, cap := range h.tts.Captures() {
+			label := fmt.Sprintf("tts-%d", i)
+			h.mu.Lock()
+			h.audioClips = append(h.audioClips, AudioRecord{
+				Label:     fmt.Sprintf("%s: %s", label, cap.Text),
+				Path:      filepath.ToSlash(filepath.Join("audio", safeArtifactName(label)+".wav")),
+				PCM:       cap.PCM,
+				Timestamp: cap.Timestamp,
+			})
+			h.mu.Unlock()
+		}
+		// Reset so repeated Evidence() calls don't double-count.
+		h.tts.mu.Lock()
+		h.tts.captures = nil
+		h.tts.mu.Unlock()
+	}
+
 	h.mu.Lock()
 	assertions := make([]AssertionRecord, len(h.assertions))
 	copy(assertions, h.assertions)
@@ -378,6 +436,8 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 	copy(interactions, h.interactions)
 	frames := make([]FrameRecord, len(h.frames))
 	copy(frames, h.frames)
+	audioClips := make([]AudioRecord, len(h.audioClips))
+	copy(audioClips, h.audioClips)
 	h.mu.Unlock()
 
 	end := time.Now().UTC()
@@ -390,8 +450,15 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 		}
 	}
 
+	// Strip PCM bytes from audio records before serialising into the manifest.
+	audioMeta := make([]AudioRecord, len(audioClips))
+	for i, a := range audioClips {
+		audioMeta[i] = AudioRecord{Label: a.Label, Path: a.Path, Timestamp: a.Timestamp}
+	}
+
 	media := MediaManifest{
 		Frames: frames,
+		Audio:  audioMeta,
 	}
 	bundle := &EvidenceBundle{
 		Manifest: Manifest{
@@ -409,6 +476,7 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 		Assertions:   assertions,
 		Interactions: interactions,
 		Frames:       frames,
+		Audio:        audioClips,
 	}
 
 	writeArtifacts := os.Getenv("USECASE_ARTIFACTS") == "1" || !pass
@@ -421,14 +489,21 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 	resultDir := filepath.Join(artifactsRoot(), "usecases", usecaseID)
 	if err := os.MkdirAll(resultDir, 0o755); err != nil {
 		h.t.Logf("usecasevalidation: could not create result dir %s: %v", resultDir, err)
-	} else if len(frames) > 0 {
-		if err := writeFramePNGs(resultDir, frames); err != nil {
-			h.t.Logf("usecasevalidation: could not write frame artifacts: %v", err)
-		} else if video, err := writeFrameVideo(resultDir, frames); err != nil {
-			h.t.Logf("usecasevalidation: could not write video artifact: %v", err)
-		} else if video != nil {
-			bundle.Manifest.Media.Videos = append(bundle.Manifest.Media.Videos, *video)
-			bundle.Videos = append(bundle.Videos, *video)
+	} else {
+		if len(frames) > 0 {
+			if err := writeFramePNGs(resultDir, frames); err != nil {
+				h.t.Logf("usecasevalidation: could not write frame artifacts: %v", err)
+			} else if video, err := writeFrameVideo(resultDir, frames); err != nil {
+				h.t.Logf("usecasevalidation: could not write video artifact: %v", err)
+			} else if video != nil {
+				bundle.Manifest.Media.Videos = append(bundle.Manifest.Media.Videos, *video)
+				bundle.Videos = append(bundle.Videos, *video)
+			}
+		}
+		if len(audioClips) > 0 {
+			if err := writeAudioWAVs(resultDir, audioClips); err != nil {
+				h.t.Logf("usecasevalidation: could not write audio artifacts: %v", err)
+			}
 		}
 	}
 	if len(frames) > 0 {
@@ -436,6 +511,11 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 			h.t.Logf("usecasevalidation: could not write evidence frame artifacts: %v", err)
 		} else if _, err := writeFrameVideo(dir, frames); err != nil {
 			h.t.Logf("usecasevalidation: could not write evidence video artifact: %v", err)
+		}
+	}
+	if len(audioClips) > 0 {
+		if err := writeAudioWAVs(dir, audioClips); err != nil {
+			h.t.Logf("usecasevalidation: could not write evidence audio artifacts: %v", err)
 		}
 	}
 	if err := writeJSON(filepath.Join(dir, "manifest.json"), bundle.Manifest); err != nil {
@@ -600,6 +680,57 @@ func writeFrameVideo(baseDir string, frames []FrameRecord) (*VideoRecord, error)
 		return nil, fmt.Errorf("ffmpeg: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 	return &video, nil
+}
+
+// writeAudioWAVs encodes each AudioRecord's raw PCM16 data as a WAV file.
+// Records without PCM bytes are skipped (metadata-only records from deserialized manifests).
+func writeAudioWAVs(baseDir string, clips []AudioRecord) error {
+	for _, clip := range clips {
+		if len(clip.PCM) == 0 {
+			continue
+		}
+		path := filepath.Join(baseDir, filepath.FromSlash(clip.Path))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		wavData := encodeWAV(clip.PCM, 24000, 1)
+		if err := os.WriteFile(path, wavData, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// encodeWAV wraps raw PCM16-LE samples in a RIFF/WAV container.
+func encodeWAV(pcm []byte, sampleRate, channels int) []byte {
+	const bitsPerSample = 16
+	byteRate := sampleRate * channels * bitsPerSample / 8
+	blockAlign := channels * bitsPerSample / 8
+	dataSize := len(pcm)
+	totalSize := 36 + dataSize
+
+	var buf bytes.Buffer
+	buf.Grow(8 + totalSize)
+	mustWrite := func(v any) {
+		if err := binary.Write(&buf, binary.LittleEndian, v); err != nil {
+			panic(fmt.Sprintf("encodeWAV: binary.Write: %v", err))
+		}
+	}
+	buf.WriteString("RIFF")
+	mustWrite(uint32(totalSize))
+	buf.WriteString("WAVE")
+	buf.WriteString("fmt ")
+	mustWrite(uint32(16)) // chunk size
+	mustWrite(uint16(1))  // PCM
+	mustWrite(uint16(channels))
+	mustWrite(uint32(sampleRate))
+	mustWrite(uint32(byteRate))
+	mustWrite(uint16(blockAlign))
+	mustWrite(uint16(bitsPerSample))
+	buf.WriteString("data")
+	mustWrite(uint32(dataSize))
+	buf.Write(pcm)
+	return buf.Bytes()
 }
 
 func renderFrameImage(frame FrameRecord) image.Image {
@@ -858,10 +989,20 @@ type FrameRecord struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// AudioRecord describes a captured audio artifact from a PlayAudio server message.
+type AudioRecord struct {
+	Label     string    `json:"label"`
+	Path      string    `json:"path"`
+	Timestamp time.Time `json:"timestamp"`
+	// PCM holds the raw pcm16 bytes — populated only in memory, not serialised.
+	PCM []byte `json:"-"`
+}
+
 // MediaManifest groups doc-site media artifacts emitted by validation.
 type MediaManifest struct {
 	Frames []FrameRecord `json:"frames,omitempty"`
 	Videos []VideoRecord `json:"videos,omitempty"`
+	Audio  []AudioRecord `json:"audio,omitempty"`
 }
 
 // VideoRecord describes a generated validation video artifact.
@@ -891,6 +1032,7 @@ type EvidenceBundle struct {
 	Interactions []InteractionRecord
 	Frames       []FrameRecord
 	Videos       []VideoRecord
+	Audio        []AudioRecord
 }
 
 // MemStream is an in-process implementation of transport.ProtoStream.

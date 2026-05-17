@@ -118,7 +118,9 @@ func TestUseCaseV1WithEvidence(t *testing.T) {
 		sawResponse,
 		fmt.Sprintf("broadcast events: %d", len(events)))
 
-	h.CaptureFrame("V1-assistant-response", deviceID, term.Received())
+	msgs := term.Received()
+	h.CaptureFrame("V1-assistant-response", deviceID, msgs)
+	h.CaptureAudio("V1-assistant-response", deviceID, msgs)
 
 	if err := term.Disconnect(); err != nil {
 		t.Logf("%s disconnect: %v", deviceID, err)
@@ -177,7 +179,9 @@ func TestUseCaseV2WithEvidence(t *testing.T) {
 		sawRecipe,
 		fmt.Sprintf("broadcast events: %d", len(events)))
 
-	h.CaptureFrame("V2-recipe-response", deviceID, term.Received())
+	msgs := term.Received()
+	h.CaptureFrame("V2-recipe-response", deviceID, msgs)
+	h.CaptureAudio("V2-recipe-response", deviceID, msgs)
 
 	if err := term.Disconnect(); err != nil {
 		t.Logf("%s disconnect: %v", deviceID, err)
@@ -234,7 +238,9 @@ func TestUseCaseV3WithEvidence(t *testing.T) {
 		sawAnswer,
 		fmt.Sprintf("broadcast events: %d", len(events)))
 
-	h.CaptureFrame("V3-answer-response", deviceID, term.Received())
+	msgs := term.Received()
+	h.CaptureFrame("V3-answer-response", deviceID, msgs)
+	h.CaptureAudio("V3-answer-response", deviceID, msgs)
 
 	if err := term.Disconnect(); err != nil {
 		t.Logf("%s disconnect: %v", deviceID, err)

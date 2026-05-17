@@ -242,6 +242,19 @@ Each milestone is independently shippable and leaves the site usable.
   Added CI steps to regenerate the enriched site from those artifacts and upload
   it as a `usecases-site-<run>` workflow artifact, giving PR reviewers a
   pass/fail site with media without touching the catalog-only drift check.
+- 2026-05-17: M4 audio capture completed. Added `FakeTTS` to the validation
+  harness as a recording TTS double: each `Synthesize` call records the text and
+  0.1 s of silent PCM16 audio. `StartServer()` now wires `FakeTTS` automatically
+  so audio capture requires no test-side setup. At `Evidence()` time the harness
+  collects all FakeTTS captures, encodes them as WAV files (RIFF/PCM16 24 kHz
+  mono), and publishes them through `media.audio` in `result.json`. Timer tests
+  (T1, T2, T3/T4) now produce audio artifacts because `ProcessDueTimers` calls
+  `TTS.Synthesize`. Added `CaptureAudio` method on `Harness` for extracting
+  `PlayAudio` proto messages from a terminal's received stream (covers the raw
+  audio voice pipeline path). YAML scenarios call `CaptureAudio` alongside
+  `CaptureFrame` in every `expect` step. V1/V2/V3 tests call `CaptureAudio`
+  after each capture-frame call. The site generator's `render_audio_media`
+  renders `<audio controls>` players for all captured clips.
 
 ## Open Questions
 
