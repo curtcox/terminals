@@ -300,6 +300,13 @@ Each milestone is independently shippable and leaves the site usable.
   `make usecases-site-with-results` target passes `--include-validation-runs`,
   and CI uses that target for the uploaded review artifact so detailed per-run
   media and evidence can win when they are newer than the aggregate result.
+- 2026-05-17: Per-page Evidence sections now include the primary validation
+  evidence text from `scripts/usecase-validate.sh` metadata, reusing the same
+  source that feeds `docs/usecase-validation-matrix.md`. This makes automated
+  pages show the concrete test/scenario basis for the use case even in the
+  deterministic catalog-only site. Focused generator tests cover the rendered
+  evidence, and the committed static site plus embedded admin copy were
+  regenerated.
 
 ## Open Questions
 

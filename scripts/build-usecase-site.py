@@ -36,6 +36,7 @@ MAX_FRAME_STRIP_ITEMS = 24
 ID_RE = re.compile(r"^[A-Z]+\d+$")
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 ALL_IDS_RE = re.compile(r"^all_ids=\(([^)]*)\)\s*$")
+METADATA_RE = re.compile(r"^\s*([A-Z]+\d+)\)\s+echo\s+\"([A-Z]+\d+)\|([^|]*)\|([^\"]*)\"\s+;;")
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,8 @@ class UseCase:
     action: str
     outcome: str
     automated: bool
+    validation_depth: str
+    validation_evidence: str
 
     @property
     def title(self) -> str:
@@ -129,6 +132,21 @@ def automated_ids() -> set[str]:
         if match:
             return {tok for tok in match.group(1).split() if ID_RE.match(tok)}
     return set()
+
+
+def validation_metadata() -> dict[str, tuple[str, str]]:
+    if not VALIDATOR.exists():
+        return {}
+    metadata: dict[str, tuple[str, str]] = {}
+    for raw in VALIDATOR.read_text().splitlines():
+        match = METADATA_RE.match(raw)
+        if not match:
+            continue
+        case_id, echoed_id, depth, evidence = match.groups()
+        if case_id != echoed_id:
+            continue
+        metadata[case_id] = (depth.strip(), evidence.strip())
+    return metadata
 
 
 def parse_timestamp(value: str) -> datetime:
@@ -326,6 +344,7 @@ def open_bug_reports(include_bugs: bool = False) -> dict[str, tuple[BugReport, .
 
 def parse_usecases() -> list[UseCase]:
     automated = automated_ids()
+    metadata = validation_metadata()
     usecases: list[UseCase] = []
     for path in sorted(USECASES_DIR.glob("*.md")):
         if path.name == "INDEX.md":
@@ -338,6 +357,7 @@ def parse_usecases() -> list[UseCase]:
             cells = table_cells(raw)
             if not cells or len(cells) < 4 or not ID_RE.match(cells[0]):
                 continue
+            depth, evidence = metadata.get(cells[0], ("", ""))
             usecases.append(
                 UseCase(
                     id=cells[0],
@@ -348,6 +368,8 @@ def parse_usecases() -> list[UseCase]:
                     action=cells[2],
                     outcome=cells[3],
                     automated=cells[0] in automated,
+                    validation_depth=depth,
+                    validation_evidence=evidence,
                 )
             )
     return usecases
@@ -501,6 +523,11 @@ def render_usecase(usecase: UseCase) -> str:
     ]
     if usecase.automated:
         evidence_items.append(f"<li><code>make usecase-validate USECASE={usecase.id}</code></li>")
+        if usecase.validation_evidence:
+            depth = f"{usecase.validation_depth}: " if usecase.validation_depth else ""
+            evidence_items.append(
+                f"<li>Primary validation evidence: {html.escape(depth + usecase.validation_evidence)}</li>"
+            )
     else:
         evidence_items.append("<li>No automated validation command wired yet.</li>")
     if UI_INSPECT_SKILL.exists():

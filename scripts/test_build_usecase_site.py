@@ -46,7 +46,17 @@ class BuildUsecaseSiteTest(unittest.TestCase):
         self.module.BUG_REPORTS_BY_USECASE = {}
         self.module.USECASES_DIR.mkdir(parents=True)
         self.module.VALIDATOR.parent.mkdir(parents=True)
-        self.module.VALIDATOR.write_text("all_ids=(C1 T1)\n")
+        self.module.VALIDATOR.write_text(
+            """metadata() {
+  local id="$1"
+  case "${id}" in
+    C1) echo "C1|Transport|generated intercom route test; harness evidence" ;;
+    T1) echo "T1|Simulation|timer harness evidence" ;;
+  esac
+}
+all_ids=(C1 T1)
+"""
+        )
         self.module.UI_AUDIT.parent.mkdir(parents=True)
         self.module.UI_AUDIT.write_text("#!/usr/bin/env bash\n")
         self.module.UI_INSPECT_SKILL.parent.mkdir(parents=True)
@@ -204,6 +214,10 @@ family: "C"
         usecases = self.module.parse_usecases()
         c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
 
+        self.assertIn(
+            "Primary validation evidence: Transport: generated intercom route test; harness evidence",
+            c1_page,
+        )
         self.assertIn(
             '<a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a>',
             c1_page,
