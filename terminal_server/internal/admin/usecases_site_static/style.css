@@ -45,6 +45,29 @@ a { color: #0b5cad; }
   font-size: 1.25rem;
 }
 
+.index-filter {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(220px, 1fr) minmax(150px, 220px);
+}
+
+.index-filter label {
+  color: #334044;
+  font-weight: 700;
+}
+
+.index-filter input,
+.index-filter select {
+  background: #fff;
+  border: 1px solid #b8c2bf;
+  border-radius: 4px;
+  color: #1d2528;
+  font: inherit;
+  min-height: 38px;
+  padding: 7px 9px;
+}
+
 .case-header {
   padding: 22px;
   color: #111;
@@ -274,5 +297,6 @@ dialog::backdrop {
 @media (max-width: 680px) {
   main { padding: 20px 12px 40px; }
   h1 { font-size: 1.7rem; }
+  .index-filter { grid-template-columns: 1fr; }
   th, td { padding: 8px 6px; }
 }

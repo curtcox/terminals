@@ -482,13 +482,27 @@ def render_index(usecases: list[UseCase]) -> str:
         status_summary,
         "      </ul>",
         "    </section>",
+        "    <section class=\"index-filter\" aria-label=\"Filter use cases\">",
+        "      <label for=\"usecase-filter\">Filter</label>",
+        "      <input id=\"usecase-filter\" type=\"search\" placeholder=\"Search ID, status, or use case\">",
+        "      <select id=\"status-filter\" aria-label=\"Filter by status\">",
+        "        <option value=\"\">All statuses</option>",
+        "        <option value=\"defect\">DEFECT</option>",
+        "        <option value=\"untested\">UNTESTED</option>",
+        "        <option value=\"stale\">STALE</option>",
+        "        <option value=\"passing\">PASSING</option>",
+        "      </select>",
+        "    </section>",
     ]
     for family, items in grouped.items():
         rows.append(f"    <section class=\"family\"><h2>{html.escape(family)}</h2>")
         rows.append("      <table><thead><tr><th><button type=\"button\">ID</button></th><th><button type=\"button\">Status</button></th><th><button type=\"button\">Use case</button></th><th><button type=\"button\">Last validated</button></th></tr></thead><tbody>")
         for usecase in items:
             rows.append(
-                "        <tr>"
+                "        <tr"
+                f" data-status=\"{status_class(usecase)}\""
+                f" data-filter=\"{html.escape((usecase.id + ' ' + status_label(usecase) + ' ' + usecase.title + ' ' + usecase.family_title).lower())}\""
+                ">"
                 f"<td><a href=\"{usecase.id}.html\">{usecase.id}</a></td>"
                 f"<td><span class=\"badge {status_class(usecase)}\">{status_label(usecase)}</span></td>"
                 f"<td>{html.escape(usecase.title)}</td>"
@@ -706,6 +720,29 @@ a { color: #0b5cad; }
 
 .status-overview strong {
   font-size: 1.25rem;
+}
+
+.index-filter {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(220px, 1fr) minmax(150px, 220px);
+}
+
+.index-filter label {
+  color: #334044;
+  font-weight: 700;
+}
+
+.index-filter input,
+.index-filter select {
+  background: #fff;
+  border: 1px solid #b8c2bf;
+  border-radius: 4px;
+  color: #1d2528;
+  font: inherit;
+  min-height: 38px;
+  padding: 7px 9px;
 }
 
 .case-header {
@@ -937,6 +974,7 @@ dialog::backdrop {
 @media (max-width: 680px) {
   main { padding: 20px 12px 40px; }
   h1 { font-size: 1.7rem; }
+  .index-filter { grid-template-columns: 1fr; }
   th, td { padding: 8px 6px; }
 }
 """
@@ -962,6 +1000,26 @@ def javascript() -> str:
     });
   });
 });
+
+const textFilter = document.getElementById("usecase-filter");
+const statusFilter = document.getElementById("status-filter");
+if (textFilter && statusFilter) {
+  const rows = Array.from(document.querySelectorAll("tbody tr"));
+  const applyFilters = () => {
+    const query = textFilter.value.trim().toLowerCase();
+    const status = statusFilter.value;
+    rows.forEach((row) => {
+      const matchesText = !query || row.dataset.filter.includes(query);
+      const matchesStatus = !status || row.dataset.status === status;
+      row.hidden = !(matchesText && matchesStatus);
+    });
+    document.querySelectorAll(".family").forEach((section) => {
+      section.hidden = !section.querySelector("tbody tr:not([hidden])");
+    });
+  };
+  textFilter.addEventListener("input", applyFilters);
+  statusFilter.addEventListener("change", applyFilters);
+}
 
 document.querySelectorAll(".frame-scrubber").forEach((scrubber) => {
   const frames = JSON.parse(scrubber.dataset.frames || "[]");

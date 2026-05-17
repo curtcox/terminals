@@ -236,6 +236,22 @@ family: "C"
         self.assertIn('<li><span class="badge untested">UNTESTED</span><strong>1</strong></li>', index)
         self.assertIn('<li><span class="badge passing">PASSING</span><strong>0</strong></li>', index)
 
+    def test_index_renders_filter_controls_and_row_metadata(self) -> None:
+        self.write_result("C1", "2026-05-17T12:00:00Z", True)
+
+        self.module.RESULTS = self.module.latest_results(include_results=True)
+        usecases = self.module.parse_usecases()
+        index = self.module.render_index(usecases)
+        script = self.module.javascript()
+
+        self.assertIn('<section class="index-filter" aria-label="Filter use cases">', index)
+        self.assertIn('<input id="usecase-filter" type="search" placeholder="Search ID, status, or use case">', index)
+        self.assertIn('<select id="status-filter" aria-label="Filter by status">', index)
+        self.assertIn('<tr data-status="passing" data-filter="c1 passing call the kitchen communication">', index)
+        self.assertIn('<tr data-status="untested" data-filter="c2 untested announce dinner communication">', index)
+        self.assertIn('row.hidden = !(matchesText && matchesStatus);', script)
+        self.assertIn('section.hidden = !section.querySelector("tbody tr:not([hidden])");', script)
+
     def test_latest_result_prefers_newest_manifest(self) -> None:
         self.write_result("C1", "2026-05-17T11:00:00Z", False, "old-failure")
         newer = self.module.USECASE_VALIDATION / "newer" / "manifest.json"

@@ -307,6 +307,12 @@ Each milestone is independently shippable and leaves the site usable.
   deterministic catalog-only site. Focused generator tests cover the rendered
   evidence, and the committed static site plus embedded admin copy were
   regenerated.
+- 2026-05-17: Added index filtering to the generated static site. The index now
+  includes a text search box and status dropdown, generated rows carry status
+  and search metadata, and the static `site.js` hides non-matching rows and
+  empty family sections without adding dependencies. Focused generator tests
+  cover the controls, row metadata, and filter script; the committed static
+  site plus embedded admin copy were regenerated.
 
 ## Open Questions
 

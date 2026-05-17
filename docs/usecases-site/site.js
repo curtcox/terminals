@@ -18,6 +18,26 @@ document.querySelectorAll("table").forEach((table) => {
   });
 });
 
+const textFilter = document.getElementById("usecase-filter");
+const statusFilter = document.getElementById("status-filter");
+if (textFilter && statusFilter) {
+  const rows = Array.from(document.querySelectorAll("tbody tr"));
+  const applyFilters = () => {
+    const query = textFilter.value.trim().toLowerCase();
+    const status = statusFilter.value;
+    rows.forEach((row) => {
+      const matchesText = !query || row.dataset.filter.includes(query);
+      const matchesStatus = !status || row.dataset.status === status;
+      row.hidden = !(matchesText && matchesStatus);
+    });
+    document.querySelectorAll(".family").forEach((section) => {
+      section.hidden = !section.querySelector("tbody tr:not([hidden])");
+    });
+  };
+  textFilter.addEventListener("input", applyFilters);
+  statusFilter.addEventListener("change", applyFilters);
+}
+
 document.querySelectorAll(".frame-scrubber").forEach((scrubber) => {
   const frames = JSON.parse(scrubber.dataset.frames || "[]");
   const image = scrubber.querySelector(".frame-preview-image");
