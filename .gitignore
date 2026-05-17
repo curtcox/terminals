@@ -8,6 +8,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Agent-local worktrees
+.claude/worktrees/
+
 # Go
 terminal_server/bin/
 terminal_server/server

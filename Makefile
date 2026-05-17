@@ -28,7 +28,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	android-client-build android-client-test android-client-lint android-client-deps android-client-dependency-check android-client-compile-android-test android-client-connected-test android-client-gradle-stop android-client-boundary android-client-boundary-test \
 	web-client-build web-client-test web-client-lint web-client-boundary web-client-proto-check web-client-smoke-test run-web-client \
 	proto-lint proto-breaking proto-generate proto-flex-check proto-contract-generate proto-contract-test proto-contract-verify \
-	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index usecase-wiring-audit pick-next-work next bug-resolved-check bug-resolve-test \
+	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index usecases-site usecases-site-check usecase-wiring-audit pick-next-work next bug-resolved-check bug-resolve-test \
 	all-lint all-test all-check ci-local stop-server stop-server-test run-server run-client-web run-web-client \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
 	ui-inspect-test
@@ -296,6 +296,12 @@ validation-matrix:
 usecases-index:
 	python3 ./scripts/generate-usecases-index.py
 
+usecases-site:
+	python3 ./scripts/build-usecase-site.py
+
+usecases-site-check:
+	python3 ./scripts/build-usecase-site.py --check
+
 usecase-wiring-audit:
 	bash terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh
 
@@ -321,7 +327,7 @@ all-lint: server-lint client-lint client-boundary android-client-boundary androi
 
 all-test: server-test client-test client-boundary-test android-client-boundary-test android-client-test android-client-compile-android-test web-client-test
 
-all-check: quality-check bug-resolved-check bug-resolve-test all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all android-client-build web-client-build development-docs-test usecases-index usecase-wiring-audit validation-matrix
+all-check: quality-check bug-resolved-check bug-resolve-test all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all android-client-build web-client-build development-docs-test usecases-index usecases-site-check usecase-wiring-audit validation-matrix
 
 ci-local: all-check
 

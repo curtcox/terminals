@@ -20,6 +20,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 | [Client — Windows](client-windows.md) | Flutter Windows desktop client |
 | [Event Taxonomy](event-taxonomy.md) | Server event names emitted to JSONL logs |
 | [Use Case Validation Matrix](usecase-validation-matrix.md) | Mapping from use-case IDs to automated validation commands |
+| [Use Case Documentation Site](usecases-site/index.html) | Browseable generated pages for every use-case ID |
 | [Use Case Flows](use-case-flows.md) | Durable baseline scenario flow reference |
 | [Sensing and Edge Observation Use Case Flows](sensing-use-case-flows.md) | Durable sensing-heavy edge-observation flow reference |
 | [Observation Plane and Flow Model](observation-plane.md) | Durable FlowPlan, observation, and artifact control-plane contract |

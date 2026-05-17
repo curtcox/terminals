@@ -4,11 +4,19 @@ on:
   push:
     paths:
       - "terminal_server/**"
+      - "docs/usecases-site/**"
+      - "scripts/build-usecase-site.py"
+      - "usecases/**"
+      - "Makefile"
       - "api/**"
       - ".github/workflows/server-ci.yml"
   pull_request:
     paths:
       - "terminal_server/**"
+      - "docs/usecases-site/**"
+      - "scripts/build-usecase-site.py"
+      - "usecases/**"
+      - "Makefile"
       - "api/**"
       - ".github/workflows/server-ci.yml"
 
@@ -31,6 +39,9 @@ jobs:
         run: go build ./...
       - name: Assert network probe coverage support
         run: bash ../scripts/assert-server-test-network-probe.sh
+      - name: Check generated usecase site
+        working-directory: ${{ github.workspace }}
+        run: make usecases-site-check
       - name: Test
         run: go test ./...
       - name: Test (race)
@@ -53,4 +64,3 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
-
