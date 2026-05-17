@@ -471,7 +471,7 @@ def render_usecase(usecase: UseCase) -> str:
     elif result:
         header_text = f"Validated on {last_validated(usecase)} - all assertions passed."
     elif usecase.automated:
-        header_text = "Automated validation is wired for this use case. Result capture will land in the next milestone."
+        header_text = f"Automated validation is wired. Run 'make usecase-validate USECASE={usecase.id}' to generate results."
     else:
         header_text = "UNTESTED - no automated scenario exists for this use case."
 
