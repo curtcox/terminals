@@ -294,6 +294,12 @@ Each milestone is independently shippable and leaves the site usable.
   plus the `make usecase-wiring-audit` command that guards UI use-case wiring.
   Focused generator tests cover both links, and the committed static site plus
   embedded admin copy were regenerated.
+- 2026-05-17: Enriched site generation now includes ephemeral
+  `artifacts/usecase-validation/*/manifest.json` run bundles in addition to
+  aggregate `artifacts/usecases/<ID>/result.json` files. The
+  `make usecases-site-with-results` target passes `--include-validation-runs`,
+  and CI uses that target for the uploaded review artifact so detailed per-run
+  media and evidence can win when they are newer than the aggregate result.
 
 ## Open Questions
 

@@ -70,7 +70,7 @@ jobs:
       - name: Generate enriched use-case site
         if: always()
         working-directory: ${{ github.workspace }}
-        run: python3 ./scripts/build-usecase-site.py --include-results --include-bugs
+        run: make usecases-site-with-results
       - name: Upload enriched use-case site
         if: always()
         uses: actions/upload-artifact@v7
