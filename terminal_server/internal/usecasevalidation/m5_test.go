@@ -50,6 +50,8 @@ func TestUseCaseM5WithEvidence(t *testing.T) {
 		t.Fatal("child-room terminal: timed out waiting for session establishment")
 	}
 
+	h.RecordInteraction("command", "Arm camera monitor on child-room device with window 7:00–8:00 AM.", "child-room")
+
 	// Arm the camera monitor from the child-room device, restricted to the morning window.
 	// The scenario's SourceID will be "child-room" so it processes readings from this device.
 	childRoom.Send(&controlv1.ConnectRequest{
@@ -79,6 +81,7 @@ func TestUseCaseM5WithEvidence(t *testing.T) {
 
 	// --- Activity inside window: synthetic time T+15min (7:15 AM) ---
 	// Camera activity at 7:15 AM is inside the 7–8 AM window and should fire.
+	h.RecordInteraction("sensor", "Camera activity detected at 7:15 AM (inside monitored window — triggers alert).", "child-room")
 	insideWindowMS := windowStart.Add(15 * time.Minute).UnixMilli()
 	childRoom.Send(usecasevalidation.SensorDataRequest("child-room", insideWindowMS, map[string]float64{
 		"camera_activity": 1.0,

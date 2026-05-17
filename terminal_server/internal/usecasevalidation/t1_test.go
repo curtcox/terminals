@@ -48,6 +48,8 @@ func TestUseCaseT1WithEvidence(t *testing.T) {
 		t.Fatal("kitchen terminal: timed out waiting for session establishment")
 	}
 
+	h.RecordInteraction("voice", "Say \"set a timer for 10 minutes\" on the Kitchen device.", "kitchen")
+
 	// Send voice command through the voice parser — same path as a real terminal.
 	kitchen.Send(&controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Command{

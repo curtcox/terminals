@@ -136,6 +136,11 @@ func TestUseCaseUI9WithEvidence(t *testing.T) {
 		}
 	}
 
+	h.RecordInteraction("command", "Connect Kitchen device (first session) and start intercom + open overlay.", "device-1")
+	h.RecordInteraction("command", "Disconnect and reconnect the Kitchen device (simulate drop/rejoin).", "device-1")
+
+	h.CaptureFrame("UI9-reconnect-replay", "device-1", stream2.Sent)
+
 	h.Assert("UI9-replay-set-ui", "SetUI replayed on reconnect",
 		sawReplaySetUI, fmt.Sprintf("sent=%d messages", len(stream2.Sent)))
 	h.Assert("UI9-replay-overlay", "overlay UpdateUI replayed on reconnect",

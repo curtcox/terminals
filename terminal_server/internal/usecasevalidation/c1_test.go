@@ -61,6 +61,9 @@ func TestUseCaseC1WithEvidence(t *testing.T) {
 	h.Assert("C1-no-session-error", "RunProtoSession returns nil", err == nil,
 		fmt.Sprintf("err=%v", err))
 
+	h.RecordInteraction("command", "Press intercom button or say \"intercom to kitchen\" from the Kitchen device.", "device-1")
+	h.RecordInteraction("command", "End the intercom call (stop command).", "device-1")
+
 	var sawRoute, sawStop bool
 	for _, sent := range stream.Sent {
 		resp, ok := sent.(*controlv1.ConnectResponse)

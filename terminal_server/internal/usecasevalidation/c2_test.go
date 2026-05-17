@@ -46,6 +46,8 @@ func TestUseCaseC2WithEvidence(t *testing.T) {
 		}
 	}
 
+	h.RecordInteraction("command", "Say \"announce: dinner is ready\" or press the announce button.", "speaker")
+
 	// Trigger announcement from speaker.
 	speaker.Send(&controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Command{

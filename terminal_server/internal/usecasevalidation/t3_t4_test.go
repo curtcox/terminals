@@ -64,6 +64,8 @@ func TestUseCaseT3T4WithEvidence(t *testing.T) {
 		t.Fatal("child-room terminal: timed out waiting for session establishment")
 	}
 
+	h.RecordInteraction("command", "Parent arms school morning monitor: alert at 7:30 AM if child not seen, warn child at 7:50 AM (bus in 10 min).", "parent")
+
 	// Parent arms morning routine monitor (T3): alert at 7:30, warn child at 7:50.
 	parent.Send(&controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Command{

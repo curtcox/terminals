@@ -43,6 +43,8 @@ func TestUseCaseT2WithEvidence(t *testing.T) {
 		t.Fatal("kitchen terminal: timed out waiting for session establishment")
 	}
 
+	h.RecordInteraction("command", "Set a 5-minute \"pasta\" timer on the Kitchen device.", "kitchen")
+
 	// Schedule a 5-minute timer with an explicit fire_unix_ms so the scenario
 	// uses our synthetic time rather than time.Now().
 	const timerDuration = 5 * time.Minute
