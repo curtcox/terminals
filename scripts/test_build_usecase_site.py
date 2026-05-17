@@ -264,8 +264,23 @@ family: "C"
         self.assertIn('<section class="index-filter" aria-label="Filter use cases">', index)
         self.assertIn('<input id="usecase-filter" type="search" placeholder="Search ID, status, or use case">', index)
         self.assertIn('<select id="status-filter" aria-label="Filter by status">', index)
-        self.assertIn('<tr data-status="passing" data-filter="c1 passing call the kitchen communication">', index)
-        self.assertIn('<tr data-status="untested" data-filter="c2 untested announce dinner communication">', index)
+        self.assertIn(
+            '<th aria-sort="none"><button type="button" data-sort-key="status">Status</button></th>',
+            index,
+        )
+        self.assertIn(
+            '<tr data-status="passing" data-filter="c1 passing call the kitchen communication" data-sort-id="C1" data-sort-status="3" data-sort-title="call the kitchen"',
+            index,
+        )
+        self.assertIn(
+            '<tr data-status="untested" data-filter="c2 untested announce dinner communication" data-sort-id="C2" data-sort-status="1" data-sort-title="announce dinner"',
+            index,
+        )
+        self.assertIn('data-sort-validated="2026-05-17T12:00:00+00:00"', index)
+        self.assertIn('other.closest("th").setAttribute("aria-sort", "none");', script)
+        self.assertIn('button.closest("th").setAttribute("aria-sort", direction === 1 ? "ascending" : "descending");', script)
+        self.assertIn('const sortKey = button.dataset.sortKey;', script)
+        self.assertIn('a.dataset[`sort${sortKey[0].toUpperCase()}${sortKey.slice(1)}`] || "";', script)
         self.assertIn('row.hidden = !(matchesText && matchesStatus);', script)
         self.assertIn('section.hidden = !section.querySelector("tbody tr:not([hidden])");', script)
 
@@ -274,11 +289,11 @@ family: "C"
         index = self.module.render_index(usecases)
         c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
 
-        self.assertIn('<tr data-status="not-validated" data-filter="c1 not validated call the kitchen communication">', index)
+        self.assertIn('<tr data-status="not-validated" data-filter="c1 not validated call the kitchen communication" data-sort-id="C1" data-sort-status="2"', index)
         self.assertIn('<span class="badge not-validated">NOT VALIDATED</span>', index)
         self.assertIn('<option value="not-validated">NOT VALIDATED</option>', index)
         self.assertIn("NOT VALIDATED - automated validation is wired, but no captured passing result exists yet.", c1_page)
-        self.assertNotIn('<tr data-status="passing" data-filter="c1 passing call the kitchen communication">', index)
+        self.assertNotIn('<tr data-status="passing" data-filter="c1 passing call the kitchen communication" data-sort-id="C1"', index)
 
     def test_latest_result_prefers_newest_manifest(self) -> None:
         self.write_result("C1", "2026-05-17T11:00:00Z", False, "old-failure")

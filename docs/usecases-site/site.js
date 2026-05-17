@@ -1,16 +1,19 @@
 document.querySelectorAll("table").forEach((table) => {
   const tbody = table.querySelector("tbody");
-  table.querySelectorAll("th button").forEach((button, column) => {
+  table.querySelectorAll("th button").forEach((button) => {
     button.addEventListener("click", () => {
       const rows = Array.from(tbody.querySelectorAll("tr"));
       const direction = button.dataset.direction === "asc" ? -1 : 1;
       table.querySelectorAll("th button").forEach((other) => {
         other.dataset.direction = "";
+        other.closest("th").setAttribute("aria-sort", "none");
       });
       button.dataset.direction = direction === 1 ? "asc" : "desc";
+      button.closest("th").setAttribute("aria-sort", direction === 1 ? "ascending" : "descending");
+      const sortKey = button.dataset.sortKey;
       rows.sort((a, b) => {
-        const left = a.children[column].innerText.trim();
-        const right = b.children[column].innerText.trim();
+        const left = a.dataset[`sort${sortKey[0].toUpperCase()}${sortKey.slice(1)}`] || "";
+        const right = b.dataset[`sort${sortKey[0].toUpperCase()}${sortKey.slice(1)}`] || "";
         return left.localeCompare(right, undefined, { numeric: true }) * direction;
       });
       rows.forEach((row) => tbody.appendChild(row));

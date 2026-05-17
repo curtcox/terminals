@@ -335,6 +335,11 @@ Each milestone is independently shippable and leaves the site usable.
   `PASSING` is reserved for use cases with a captured result manifest whose
   latest assertions passed, preventing catalog-only `index.html` output from
   claiming evidence that does not exist.
+- 2026-05-17: Index sorting now uses explicit generated sort keys instead of
+  visible cell text. Status sorting follows the planned health priority
+  (`DEFECT`, `UNTESTED`, `NOT VALIDATED`/`STALE`, `PASSING`), IDs sort
+  naturally, last-validated dates sort by timestamps, and sort buttons expose
+  `aria-sort` state for assistive technology.
 
 ## Open Questions
 

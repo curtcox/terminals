@@ -454,6 +454,16 @@ def last_validated(usecase: UseCase) -> str:
     return parsed.strftime("%Y-%m-%d %H:%M UTC")
 
 
+def last_validated_sort_key(usecase: UseCase) -> str:
+    result = RESULTS.get(usecase.id)
+    if not result:
+        return ""
+    parsed = parse_timestamp(result.timestamp_end)
+    if parsed == datetime.min.replace(tzinfo=timezone.utc):
+        return result.timestamp_end
+    return parsed.isoformat()
+
+
 def is_stale(result: Result) -> bool:
     if not result.pass_:
         return False
@@ -538,12 +548,23 @@ def render_index(usecases: list[UseCase]) -> str:
     ]
     for family, items in grouped.items():
         rows.append(f"    <section class=\"family\"><h2>{html.escape(family)}</h2>")
-        rows.append("      <table><thead><tr><th><button type=\"button\">ID</button></th><th><button type=\"button\">Status</button></th><th><button type=\"button\">Use case</button></th><th><button type=\"button\">Last validated</button></th></tr></thead><tbody>")
+        rows.append(
+            "      <table><thead><tr>"
+            "<th aria-sort=\"none\"><button type=\"button\" data-sort-key=\"id\">ID</button></th>"
+            "<th aria-sort=\"none\"><button type=\"button\" data-sort-key=\"status\">Status</button></th>"
+            "<th aria-sort=\"none\"><button type=\"button\" data-sort-key=\"title\">Use case</button></th>"
+            "<th aria-sort=\"none\"><button type=\"button\" data-sort-key=\"validated\">Last validated</button></th>"
+            "</tr></thead><tbody>"
+        )
         for usecase in items:
             rows.append(
                 "        <tr"
                 f" data-status=\"{status_class(usecase)}\""
                 f" data-filter=\"{html.escape((usecase.id + ' ' + status_label(usecase) + ' ' + usecase.title + ' ' + usecase.family_title).lower())}\""
+                f" data-sort-id=\"{html.escape(usecase.id)}\""
+                f" data-sort-status=\"{status_rank(usecase)}\""
+                f" data-sort-title=\"{html.escape(usecase.title.lower())}\""
+                f" data-sort-validated=\"{html.escape(last_validated_sort_key(usecase))}\""
                 ">"
                 f"<td><a href=\"{usecase.id}.html\">{usecase.id}</a></td>"
                 f"<td><span class=\"badge {status_class(usecase)}\">{status_label(usecase)}</span></td>"
@@ -1097,17 +1118,20 @@ dialog::backdrop {
 def javascript() -> str:
     return """document.querySelectorAll("table").forEach((table) => {
   const tbody = table.querySelector("tbody");
-  table.querySelectorAll("th button").forEach((button, column) => {
+  table.querySelectorAll("th button").forEach((button) => {
     button.addEventListener("click", () => {
       const rows = Array.from(tbody.querySelectorAll("tr"));
       const direction = button.dataset.direction === "asc" ? -1 : 1;
       table.querySelectorAll("th button").forEach((other) => {
         other.dataset.direction = "";
+        other.closest("th").setAttribute("aria-sort", "none");
       });
       button.dataset.direction = direction === 1 ? "asc" : "desc";
+      button.closest("th").setAttribute("aria-sort", direction === 1 ? "ascending" : "descending");
+      const sortKey = button.dataset.sortKey;
       rows.sort((a, b) => {
-        const left = a.children[column].innerText.trim();
-        const right = b.children[column].innerText.trim();
+        const left = a.dataset[`sort${sortKey[0].toUpperCase()}${sortKey.slice(1)}`] || "";
+        const right = b.dataset[`sort${sortKey[0].toUpperCase()}${sortKey.slice(1)}`] || "";
         return left.localeCompare(right, undefined, { numeric: true }) * direction;
       });
       rows.forEach((row) => tbody.appendChild(row));
