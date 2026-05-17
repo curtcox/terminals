@@ -36,7 +36,10 @@ class BuildUsecaseSiteTest(unittest.TestCase):
         self.module.EMBED_OUT = self.root / "terminal_server" / "internal" / "admin" / "usecases_site_static"
         self.module.USECASE_RESULTS = self.root / "artifacts" / "usecases"
         self.module.USECASE_VALIDATION = self.root / "artifacts" / "usecase-validation"
+        self.module.BUG_REPORTS = self.root / "terminal_server" / "logs" / "bug_reports"
+        self.module.RESOLVED_BUGS = self.root / "terminal_server" / "bug_reports" / "resolved"
         self.module.RESULTS = {}
+        self.module.BUG_REPORTS_BY_USECASE = {}
         self.module.USECASES_DIR.mkdir(parents=True)
         self.module.VALIDATOR.parent.mkdir(parents=True)
         self.module.VALIDATOR.write_text("all_ids=(C1 T1)\n")
@@ -69,6 +72,28 @@ family: "C"
         if failure:
             data["failing_assertions"] = [failure]
         path.write_text(json.dumps(data))
+        return path
+
+    def write_bug(
+        self,
+        report_id: str,
+        description: str,
+        tags: list[str],
+        date: str = "2026-05-17",
+    ) -> Path:
+        path = self.module.BUG_REPORTS / date / f"{report_id}.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "report_id": report_id,
+                        "description": description,
+                        "tags": tags,
+                    }
+                }
+            )
+        )
         return path
 
     def test_result_feed_renders_interaction_trace(self) -> None:
@@ -133,6 +158,32 @@ family: "C"
 
         self.assertIn('<span class="badge stale">STALE</span>', index)
         self.assertIn("result is older than 30 days", c1_page)
+
+    def test_open_bug_tag_marks_usecase_as_defect(self) -> None:
+        self.write_result("C1", "2026-05-17T12:00:00Z", True)
+        self.write_bug("bug-c1", "Intercom route fails", ["usecase:C1", "bug_word:route"])
+
+        self.module.RESULTS = self.module.latest_results(include_results=True)
+        self.module.BUG_REPORTS_BY_USECASE = self.module.open_bug_reports(include_bugs=True)
+        usecases = self.module.parse_usecases()
+        index = self.module.render_index(usecases)
+        c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
+
+        self.assertIn('<span class="badge defect">DEFECT</span>', index)
+        self.assertIn("1 open defect tagged for this use case.", c1_page)
+        self.assertIn("bug-c1: Intercom route fails", c1_page)
+        self.assertIn("terminal_server/logs/bug_reports/2026-05-17/bug-c1.json", c1_page)
+
+    def test_resolved_bug_description_is_excluded_from_defect_feed(self) -> None:
+        self.write_bug("bug-c1", "  Intercom   route fails  ", ["usecase:C1"])
+        self.module.RESOLVED_BUGS.mkdir(parents=True)
+        (self.module.RESOLVED_BUGS / "bug-c1.json").write_text(
+            json.dumps({"report_id": "bug-c1", "description": "Intercom route fails"})
+        )
+
+        self.module.BUG_REPORTS_BY_USECASE = self.module.open_bug_reports(include_bugs=True)
+
+        self.assertNotIn("C1", self.module.BUG_REPORTS_BY_USECASE)
 
 
 if __name__ == "__main__":

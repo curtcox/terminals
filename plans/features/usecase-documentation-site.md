@@ -185,6 +185,13 @@ Each milestone is independently shippable and leaves the site usable.
   traces when it writes its aggregate result; the site renders trace summaries
   in the per-use-case "How to use it" section when generated with
   `--include-results`.
+- 2026-05-17: M6 defect-feed plumbing started. The site generator can now
+  merge open bug reports tagged with use-case IDs (`usecase:C1`, `USE_CASE=C1`,
+  or bare `C1`) when invoked with `--include-bugs`, excludes reports whose
+  normalized descriptions have resolved-bug records, and promotes affected use
+  cases to `DEFECT` with report links on the per-use-case page. Default
+  generation remains catalog-only for deterministic clean-checkout drift
+  checks.
 
 ## Open Questions
 

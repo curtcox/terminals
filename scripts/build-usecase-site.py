@@ -26,6 +26,8 @@ OUT = REPO / "docs" / "usecases-site"
 EMBED_OUT = REPO / "terminal_server" / "internal" / "admin" / "usecases_site_static"
 USECASE_RESULTS = REPO / "artifacts" / "usecases"
 USECASE_VALIDATION = REPO / "artifacts" / "usecase-validation"
+BUG_REPORTS = REPO / "terminal_server" / "logs" / "bug_reports"
+RESOLVED_BUGS = REPO / "terminal_server" / "bug_reports" / "resolved"
 STALE_RESULT_DAYS = 30
 
 ID_RE = re.compile(r"^[A-Z]+\d+$")
@@ -65,6 +67,20 @@ class Result:
         if self.failing_assertions:
             return self.failing_assertions[0]
         return "validation failed"
+
+
+@dataclass(frozen=True)
+class BugReport:
+    report_id: str
+    description: str
+    tags: tuple[str, ...]
+    source: str
+
+    @property
+    def label(self) -> str:
+        if self.description:
+            return f"{self.report_id}: {self.description}"
+        return self.report_id
 
 
 def parse_frontmatter(text: str) -> dict[str, str]:
@@ -168,6 +184,83 @@ def latest_results(include_results: bool = False, include_validation_runs: bool 
     return results
 
 
+def normalize_description(raw: object) -> str:
+    return " ".join(str(raw or "").split())[:80] or "(no description)"
+
+
+def resolved_descriptions() -> set[str]:
+    resolved: set[str] = set()
+    if not RESOLVED_BUGS.exists():
+        return resolved
+    for path in RESOLVED_BUGS.glob("*.json"):
+        try:
+            raw = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        resolved.add(normalize_description(raw.get("description")))
+    return resolved
+
+
+def tagged_usecase_ids(tags: object) -> set[str]:
+    if not isinstance(tags, list):
+        return set()
+    ids: set[str] = set()
+    for raw in tags:
+        tag = str(raw).strip()
+        normalized = tag.upper()
+        if ID_RE.match(normalized):
+            ids.add(normalized)
+            continue
+        for prefix in ("USECASE:", "USECASE=", "USE_CASE:", "USE_CASE=", "USE-CASE:", "USE-CASE="):
+            if normalized.startswith(prefix):
+                candidate = normalized[len(prefix) :]
+                if ID_RE.match(candidate):
+                    ids.add(candidate)
+    return ids
+
+
+def bug_report_from_path(path: Path, resolved: set[str]) -> tuple[set[str], BugReport] | None:
+    try:
+        raw = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    summary = raw.get("summary")
+    if not isinstance(summary, dict):
+        return None
+    description = normalize_description(summary.get("description"))
+    if description in resolved:
+        return None
+    tags = tuple(str(item) for item in summary.get("tags", []) if str(item).strip())
+    ids = tagged_usecase_ids(list(tags))
+    if not ids:
+        return None
+    report_id = str(summary.get("report_id") or path.stem)
+    return (
+        ids,
+        BugReport(
+            report_id=report_id,
+            description="" if description == "(no description)" else description,
+            tags=tags,
+            source=path.relative_to(REPO).as_posix(),
+        ),
+    )
+
+
+def open_bug_reports(include_bugs: bool = False) -> dict[str, tuple[BugReport, ...]]:
+    if not include_bugs or not BUG_REPORTS.exists():
+        return {}
+    resolved = resolved_descriptions()
+    by_usecase: dict[str, list[BugReport]] = {}
+    for path in sorted(BUG_REPORTS.glob("*/*.json")):
+        parsed = bug_report_from_path(path, resolved)
+        if parsed is None:
+            continue
+        ids, report = parsed
+        for usecase_id in ids:
+            by_usecase.setdefault(usecase_id, []).append(report)
+    return {usecase_id: tuple(reports) for usecase_id, reports in by_usecase.items()}
+
+
 def parse_usecases() -> list[UseCase]:
     automated = automated_ids()
     usecases: list[UseCase] = []
@@ -199,7 +292,7 @@ def parse_usecases() -> list[UseCase]:
 
 def status_rank(usecase: UseCase) -> int:
     result = RESULTS.get(usecase.id)
-    if result and not result.pass_:
+    if has_defect(usecase):
         return 0
     if not usecase.automated:
         return 1
@@ -210,7 +303,7 @@ def status_rank(usecase: UseCase) -> int:
 
 def status_label(usecase: UseCase) -> str:
     result = RESULTS.get(usecase.id)
-    if result and not result.pass_:
+    if has_defect(usecase):
         return "DEFECT"
     if result and is_stale(result):
         return "STALE"
@@ -219,7 +312,7 @@ def status_label(usecase: UseCase) -> str:
 
 def status_class(usecase: UseCase) -> str:
     result = RESULTS.get(usecase.id)
-    if result and not result.pass_:
+    if has_defect(usecase):
         return "defect"
     if result and is_stale(result):
         return "stale"
@@ -243,6 +336,11 @@ def is_stale(result: Result) -> bool:
     if parsed == datetime.min.replace(tzinfo=timezone.utc):
         return False
     return (datetime.now(timezone.utc) - parsed).days > STALE_RESULT_DAYS
+
+
+def has_defect(usecase: UseCase) -> bool:
+    result = RESULTS.get(usecase.id)
+    return bool(result and not result.pass_) or bool(BUG_REPORTS_BY_USECASE.get(usecase.id))
 
 
 def id_sort_key(usecase: UseCase) -> tuple[str, int, str]:
@@ -302,8 +400,12 @@ def render_index(usecases: list[UseCase]) -> str:
 def render_usecase(usecase: UseCase) -> str:
     header_class = status_class(usecase)
     result = RESULTS.get(usecase.id)
+    bugs = BUG_REPORTS_BY_USECASE.get(usecase.id, ())
     if result and not result.pass_:
         header_text = f"Failed on {last_validated(usecase)}: {result.first_failure}."
+    elif bugs:
+        noun = "defect" if len(bugs) == 1 else "defects"
+        header_text = f"{len(bugs)} open {noun} tagged for this use case."
     elif result and is_stale(result):
         header_text = f"Last validated on {last_validated(usecase)} - result is older than {STALE_RESULT_DAYS} days."
     elif result:
@@ -313,10 +415,19 @@ def render_usecase(usecase: UseCase) -> str:
     else:
         header_text = "UNTESTED - no automated scenario exists for this use case."
 
-    defect_text = "No defects detected in the latest captured result." if result and result.pass_ else "No result.json defect feed is available yet."
+    defect_html = (
+        "<p>No defects detected in the latest captured result.</p>"
+        if result and result.pass_
+        else "<p>No result.json defect feed is available yet.</p>"
+    )
     if result and not result.pass_:
         failures = ", ".join(html.escape(item) for item in result.failing_assertions) or "validation failed"
-        defect_text = f"Latest validation failed: {failures}."
+        defect_html = f"<p>Latest validation failed: {failures}.</p>"
+    if bugs:
+        bug_items = "\n        ".join(
+            f'<li><a href="../../{html.escape(bug.source)}">{html.escape(bug.label)}</a></li>' for bug in bugs
+        )
+        defect_html = f"<ul>\n        {bug_items}\n      </ul>"
     evidence_items = [
         f'<li><a href="../../{html.escape(usecase.source)}">{html.escape(usecase.source)}</a></li>',
     ]
@@ -359,7 +470,7 @@ def render_usecase(usecase: UseCase) -> str:
     </section>
     <section>
       <h2>Defects</h2>
-      <p>{defect_text}</p>
+      {defect_html}
     </section>
     <section>
       <h2>Evidence</h2>
@@ -566,10 +677,17 @@ def main() -> int:
         action="store_true",
         help="also read ephemeral artifacts/usecase-validation/*/manifest.json files",
     )
+    parser.add_argument(
+        "--include-bugs",
+        action="store_true",
+        help="read terminal_server/logs/bug_reports entries tagged with use-case IDs into the generated status pages",
+    )
     args = parser.parse_args()
 
     global RESULTS
+    global BUG_REPORTS_BY_USECASE
     RESULTS = latest_results(args.include_results, args.include_validation_runs)
+    BUG_REPORTS_BY_USECASE = open_bug_reports(args.include_bugs)
     usecases = parse_usecases()
     if not usecases:
         print("ERROR: no use cases found under usecases/.", file=sys.stderr)
@@ -584,6 +702,7 @@ def main() -> int:
 
 
 RESULTS: dict[str, Result] = {}
+BUG_REPORTS_BY_USECASE: dict[str, tuple[BugReport, ...]] = {}
 
 if __name__ == "__main__":
     sys.exit(main())
