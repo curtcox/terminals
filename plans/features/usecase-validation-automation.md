@@ -18,6 +18,7 @@ progress:
   - 2026-05-16: AA5 added (vision analysis agent; VisionAnalysisScenario triggered by 'vision analysis' intent; FakeVisionAnalyzer returns caption and labels; camera_activity sensor reading triggers analysis; broadcast verified to include caption, labels, and agent device target)
   - 2026-05-16: D3/I3 added (standby/clock mode activated by voice command; capability manifest reported on connection; transport-layer tests registered in validate script); I6 registered (preemption scenario; plan frontmatter updated to include D3, I3, I6); AA5 wired into usecase-validate.sh (was missing from all_ids and run_usecase despite test existing)
   - 2026-05-16: I4 added (device registry capability query; Generated+Wire transport tests register two devices with different caps, verify placement engine returns only matching devices for camera/screen/microphone/speaker queries; wired into validate script and matrix)
+  - 2026-05-16: YAML scenario loading (Phase 4): scenario-schema.md, LoadScenarioFile/RunScenarioFile, t2-timer-reminder.yaml; TestYAMLScenarioT2TimerReminder wired into T2 validation
 ---
 
 # Use Case Validation Automation

@@ -1,0 +1,35 @@
+id: t2-timer-reminder
+usecases:
+  - T2
+clock:
+  start: "2026-05-16T09:00:00Z"
+terminals:
+  kitchen:
+    device_id: kitchen
+    name: Kitchen
+steps:
+  - connect: {}
+  - command:
+      terminal: kitchen
+      intent: set timer
+      arguments:
+        duration_seconds: "300"
+        label: pasta
+  - expect:
+      id: T2-timer-set
+      description: timer_reminder scenario started after set timer command
+      terminal: kitchen
+      scenario_start: timer_reminder
+  - process_due_timers:
+      expect_processed: 0
+      assert_id: T2-no-premature-fire
+  - clock_advance:
+      duration: 5m1s
+  - process_due_timers:
+      expect_processed: 1
+      assert_id: T2-timer-fired
+  - expect:
+      id: T2-done-notification
+      description: broadcast emits Timer done after timer fires
+      broadcast_contains: "Timer done!"
+  - disconnect: {}

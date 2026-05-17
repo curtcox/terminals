@@ -63,7 +63,7 @@ metadata() {
     PL8) echo "PL8|Contract|interactive session join/leave and control lifecycle capability tests" ;;
     PL20) echo "PL20|Contract|capability artifact template save/apply and artifact history tests" ;;
     T1) echo "T1|Simulation|due-timer loop; transport run_due_timers; kitchen timer package smoke test; voice-path fake-clock harness (timer fires via synthetic time advance)" ;;
-    T2) echo "T2|Simulation|timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time" ;;
+    T2) echo "T2|Simulation|timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time; YAML scenario in internal/usecasevalidation/testdata/t2-timer-reminder.yaml" ;;
     T3) echo "T3|Simulation|school-morning monitor: no camera activity by alert time notifies parent; activity before alert cancels notification" ;;
     T4) echo "T4|Simulation|school-morning warning: bus-warning broadcast fires to child-room at configured warning time via synthetic clock advance" ;;
     UI1) echo "UI1|Transport|idle photo-frame SetUI includes scoped corner affordance (terminal-ui plan)" ;;
@@ -226,6 +226,7 @@ run_usecase() {
       ;;
     T2)
       run_go_test ./internal/usecasevalidation 'TestUseCaseT2WithEvidence$'
+      run_go_test ./internal/usecasevalidation 'TestYAMLScenarioT2TimerReminder$'
       ;;
     T3)
       run_go_test ./internal/usecasevalidation 'TestUseCaseT3(T4WithEvidence|ActivityCancelsAlert)$'
