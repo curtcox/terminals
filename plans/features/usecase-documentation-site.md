@@ -1,7 +1,7 @@
 ---
 title: "Use Case Documentation Site"
 kind: plan
-status: in-progress
+status: shipped-validated
 owner: curtcox
 validation: automated:C2
 last-reviewed: 2026-05-17
@@ -352,6 +352,10 @@ Each milestone is independently shippable and leaves the site usable.
   sections entirely, matching the plan spec ("No media section"). NOT VALIDATED pages (automated
   but no captured result yet) retain those sections with placeholder prompts. A dedicated focused
   test covers the omission.
+- 2026-05-17: All 6 milestones complete — M1 skeleton, M2 pass/fail surfacing, M3 screenshots
+  with scrubber+lightbox, M4 video+audio capture, M5 interaction trace, M6 defect feed. CI wired,
+  15 focused generator tests pass, server route embedded via embed.FS. C2 validation gate
+  (TestUseCaseC2WithEvidence) passes. Status updated to shipped-validated.
 
 ## Open Questions
 
