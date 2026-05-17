@@ -137,6 +137,7 @@ func (h *Harness) StartServer() {
 		LLM:       h.llm,
 		Vision:    h.vision,
 		TTS:       h.tts,
+		UI:        ui.NewMemoryHost(),
 	})
 	h.Handler = transport.NewStreamHandlerWithRuntime(h.Control, h.Runtime)
 }
@@ -370,6 +371,84 @@ func (h *Harness) CaptureFrame(stepID, terminal string, messages []transport.Pro
 		Timestamp: time.Now().UTC(),
 	})
 	h.mu.Unlock()
+}
+
+// CaptureHostFrame records a frame from the current server-side UI state for
+// a device by replaying MemoryHost events. Use this to capture UI state
+// produced by server operations that bypass the terminal stream (e.g.
+// ProcessDueTimers patches the banner via env.UI.Patch without sending a
+// proto message to the terminal).
+func (h *Harness) CaptureHostFrame(stepID, deviceID string) {
+	if h.Runtime == nil || h.Runtime.Env == nil || h.Runtime.Env.UI == nil {
+		return
+	}
+	type eventer interface {
+		Events() []ui.HostEvent
+	}
+	host, ok := h.Runtime.Env.UI.(eventer)
+	if !ok {
+		return
+	}
+	current, ok := replayHostEvents(host.Events(), deviceID)
+	if !ok {
+		return
+	}
+	summary := "UI state: " + summarizeDescriptor(current)
+	h.mu.Lock()
+	h.frames = append(h.frames, FrameRecord{
+		StepID:    stepID,
+		Terminal:  deviceID,
+		Label:     stepID,
+		Summary:   summary,
+		Path:      filepath.ToSlash(filepath.Join("frames", safeArtifactName(stepID)+".png")),
+		Timestamp: time.Now().UTC(),
+	})
+	h.mu.Unlock()
+}
+
+// replayHostEvents replays UI host events for a device to produce its current
+// UI state including all applied patches.
+func replayHostEvents(events []ui.HostEvent, deviceID string) (ui.Descriptor, bool) {
+	var root ui.Descriptor
+	found := false
+	for _, ev := range events {
+		if ev.DeviceID != deviceID {
+			continue
+		}
+		switch ev.Kind {
+		case "set":
+			root = ev.Node
+			found = true
+		case "patch":
+			if found {
+				root = applyDescriptorPatch(root, ev.ComponentID, ev.Node)
+			}
+		case "clear":
+			root = ui.Descriptor{}
+			found = false
+		}
+	}
+	return root, found
+}
+
+// applyDescriptorPatch replaces the node whose Props["id"] matches componentID.
+// The transport layer may scope plain IDs to "act:<deviceID>/<componentID>" when
+// sending to terminals, which mutates the shared Props map stored in MemoryHost
+// events. Both plain ("banner") and scoped ("act:kitchen/banner") forms are matched.
+func applyDescriptorPatch(root ui.Descriptor, componentID string, node ui.Descriptor) ui.Descriptor {
+	id := root.Props["id"]
+	if id == componentID || strings.HasSuffix(id, "/"+componentID) {
+		return node
+	}
+	if len(root.Children) == 0 {
+		return root
+	}
+	patched := make([]ui.Descriptor, len(root.Children))
+	for i, child := range root.Children {
+		patched[i] = applyDescriptorPatch(child, componentID, node)
+	}
+	root.Children = patched
+	return root
 }
 
 // CaptureAudio extracts any PlayAudio messages from messages and records them
@@ -872,6 +951,47 @@ func nodeWidgetName(node *uiv1.Node) string {
 	default:
 		return "node"
 	}
+}
+
+// summarizeDescriptor produces a human-readable summary of a ui.Descriptor
+// tree for use in host-side frame captures. Mirrors summarizeNode but works
+// with the server-side Descriptor type rather than the proto Node type.
+func summarizeDescriptor(d ui.Descriptor) string {
+	parts := []string{d.Type}
+	if d.ID != "" {
+		parts = append(parts, "#"+d.ID)
+	}
+	props := d.Props
+	if len(props) > 0 {
+		keys := make([]string, 0, len(props))
+		for key := range props {
+			if key == "id" || key == "draw_ops_json" {
+				continue
+			}
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if v := props[key]; v != "" {
+				parts = append(parts, key+"="+quoteSummary(v))
+			}
+		}
+	}
+	if len(d.Children) > 0 {
+		limit := 4
+		if len(d.Children) < limit {
+			limit = len(d.Children)
+		}
+		childParts := make([]string, 0, limit)
+		for _, child := range d.Children[:limit] {
+			childParts = append(childParts, summarizeDescriptor(child))
+		}
+		if len(d.Children) > 4 {
+			childParts = append(childParts, fmt.Sprintf("%d more", len(d.Children)-4))
+		}
+		parts = append(parts, "children=["+strings.Join(childParts, "; ")+"]")
+	}
+	return strings.Join(parts, " ")
 }
 
 func quoteSummary(value string) string {

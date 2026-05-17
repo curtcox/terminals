@@ -105,6 +105,8 @@ func TestUseCaseT2WithEvidence(t *testing.T) {
 		sawDone,
 		fmt.Sprintf("broadcast events: %d", len(events)))
 
+	h.CaptureHostFrame("T2-timer-done", "kitchen")
+
 	// Disconnect cleanly.
 	if err := kitchen.Disconnect(); err != nil {
 		t.Logf("kitchen disconnect: %v", err)

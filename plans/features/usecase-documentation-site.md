@@ -256,6 +256,19 @@ Each milestone is independently shippable and leaves the site usable.
   after each capture-frame call. The site generator's `render_audio_media`
   renders `<audio controls>` players for all captured clips.
 
+- 2026-05-17: Frame rendering quality improved in two ways. First, `StartServer()`
+  now wires `UI: ui.NewMemoryHost()` in the scenario environment so timer scenarios
+  (and any other scenario calling `OperationUISet`) actually execute their SetUI
+  operations during validation rather than silently skipping them. Timer countdown
+  and timer-done UI states now appear in captured frames instead of the initial
+  connection screen. Second, added `CaptureHostFrame` method on `Harness` to
+  capture UI state directly from the MemoryHost by replaying set/patch/clear
+  events. This is used by T1 and T2 to capture the "Timer done!" banner state
+  that `ProcessDueTimers` sets via `env.UI.Patch` — a code path that bypasses
+  the terminal stream. `replayHostEvents` and `applyDescriptorPatch` handle the
+  transport layer's `act:<device>/<id>` scoping side-effect (the scoping mutates
+  shared Props maps) by matching both plain and scoped component IDs.
+
 ## Open Questions
 
 - **Audio capture format and licensing.** TTS output from external
