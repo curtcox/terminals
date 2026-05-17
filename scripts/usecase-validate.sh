@@ -327,6 +327,13 @@ if status != 0:
     result["failing_assertions"] = [failure or f"use-case validation exited with status {status}"]
 
 out = root / "artifacts" / "usecases" / usecase_id / "result.json"
+if out.exists():
+    try:
+        previous = json.loads(out.read_text())
+    except json.JSONDecodeError:
+        previous = {}
+    if previous.get("usecase_id") == usecase_id and previous.get("interaction_trace"):
+        result["interaction_trace"] = previous["interaction_trace"]
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(result, indent=2) + "\n")
 PY

@@ -71,6 +71,24 @@ family: "C"
         path.write_text(json.dumps(data))
         return path
 
+    def test_result_feed_renders_interaction_trace(self) -> None:
+        path = self.write_result("C1", "2026-05-17T12:00:00Z", True)
+        data = json.loads(path.read_text())
+        data["interaction_trace"] = [
+            {"kind": "voice", "summary": 'Say "call the kitchen".', "terminal": "hall"},
+            {"kind": "command", "summary": 'Tap "End call".', "terminal": "hall"},
+        ]
+        path.write_text(json.dumps(data))
+
+        self.module.RESULTS = self.module.latest_results(include_results=True)
+        usecases = self.module.parse_usecases()
+        c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
+
+        self.assertIn("<ol>", c1_page)
+        self.assertIn("Say &quot;call the kitchen&quot;.", c1_page)
+        self.assertIn("Tap &quot;End call&quot;.", c1_page)
+        self.assertNotIn("Interaction traces are not captured yet", c1_page)
+
     def test_result_feed_marks_failed_usecase_as_defect(self) -> None:
         self.write_result("C1", "2026-05-17T12:00:00Z", False, "C1-route-stream")
 

@@ -44,8 +44,9 @@ type Harness struct {
 	llm    scenario.LLM
 	vision scenario.VisionAnalyzer
 
-	mu         sync.Mutex
-	assertions []AssertionRecord
+	mu           sync.Mutex
+	assertions   []AssertionRecord
+	interactions []InteractionRecord
 }
 
 // New creates a Harness bound to the given test. The harness clock starts at
@@ -327,6 +328,20 @@ func (h *Harness) Assert(id, description string, pass bool, detail string) {
 	}
 }
 
+// RecordInteraction appends one user-facing action to the evidence timeline.
+// Validation docs use this as the "How to use it" source, so keep summaries
+// phrased from the actor's point of view rather than as low-level protocol.
+func (h *Harness) RecordInteraction(kind, summary, terminal string) {
+	h.mu.Lock()
+	h.interactions = append(h.interactions, InteractionRecord{
+		Kind:      kind,
+		Summary:   summary,
+		Terminal:  terminal,
+		Timestamp: time.Now().UTC(),
+	})
+	h.mu.Unlock()
+}
+
 // Evidence writes the evidence bundle for this run and returns a summary.
 // The bundle is always written under artifacts/usecase-validation/<run-id>/.
 // The full bundle (including assertions.jsonl) is written when any assertion
@@ -336,6 +351,8 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 	h.mu.Lock()
 	assertions := make([]AssertionRecord, len(h.assertions))
 	copy(assertions, h.assertions)
+	interactions := make([]InteractionRecord, len(h.interactions))
+	copy(interactions, h.interactions)
 	h.mu.Unlock()
 
 	end := time.Now().UTC()
@@ -358,8 +375,10 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 			TimestampEnd:      end,
 			Pass:              pass,
 			FailingAssertions: failingIDs,
+			InteractionTrace:  interactions,
 		},
-		Assertions: assertions,
+		Assertions:   assertions,
+		Interactions: interactions,
 	}
 
 	writeArtifacts := os.Getenv("USECASE_ARTIFACTS") == "1" || !pass
@@ -382,6 +401,9 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 	if writeArtifacts {
 		if err := writeJSONL(filepath.Join(dir, "assertions.jsonl"), assertionsToAny(assertions)); err != nil {
 			h.t.Logf("usecasevalidation: could not write assertions.jsonl: %v", err)
+		}
+		if err := writeJSONL(filepath.Join(dir, "interaction_trace.jsonl"), interactionsToAny(interactions)); err != nil {
+			h.t.Logf("usecasevalidation: could not write interaction_trace.jsonl: %v", err)
 		}
 		if err := writeSummaryMD(filepath.Join(dir, "summary.md"), bundle); err != nil {
 			h.t.Logf("usecasevalidation: could not write summary.md: %v", err)
@@ -434,6 +456,12 @@ func writeSummaryMD(path string, b *EvidenceBundle) error {
 	if len(m.FailingAssertions) > 0 {
 		fmt.Fprintf(&sb, "\n**Failing assertions:** %s\n", strings.Join(m.FailingAssertions, ", "))
 	}
+	if len(b.Interactions) > 0 {
+		fmt.Fprintf(&sb, "\n## Interaction trace\n\n")
+		for i, interaction := range b.Interactions {
+			fmt.Fprintf(&sb, "%d. %s\n", i+1, interaction.Summary)
+		}
+	}
 	fmt.Fprintf(&sb, "\n## Replay\n\n```bash\ngo test ./internal/usecasevalidation -run TestReplay -args -bundle %s\n```\n", filepath.Dir(path))
 	return os.WriteFile(path, []byte(sb.String()), 0o644)
 }
@@ -447,22 +475,32 @@ type AssertionRecord struct {
 	Timestamp   time.Time `json:"timestamp"`
 }
 
+// InteractionRecord captures a user-facing action injected by a scenario.
+type InteractionRecord struct {
+	Kind      string    `json:"kind"`
+	Summary   string    `json:"summary"`
+	Terminal  string    `json:"terminal,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
 // Manifest is the top-level summary written to manifest.json.
 type Manifest struct {
-	RunID             string    `json:"run_id"`
-	UseCaseID         string    `json:"usecase_id"`
-	ScenarioName      string    `json:"scenario_name"`
-	GitCommit         string    `json:"git_commit,omitempty"`
-	TimestampStart    time.Time `json:"timestamp_start"`
-	TimestampEnd      time.Time `json:"timestamp_end"`
-	Pass              bool      `json:"pass"`
-	FailingAssertions []string  `json:"failing_assertions,omitempty"`
+	RunID             string              `json:"run_id"`
+	UseCaseID         string              `json:"usecase_id"`
+	ScenarioName      string              `json:"scenario_name"`
+	GitCommit         string              `json:"git_commit,omitempty"`
+	TimestampStart    time.Time           `json:"timestamp_start"`
+	TimestampEnd      time.Time           `json:"timestamp_end"`
+	Pass              bool                `json:"pass"`
+	FailingAssertions []string            `json:"failing_assertions,omitempty"`
+	InteractionTrace  []InteractionRecord `json:"interaction_trace,omitempty"`
 }
 
 // EvidenceBundle holds the full set of captured evidence for a scenario run.
 type EvidenceBundle struct {
-	Manifest   Manifest
-	Assertions []AssertionRecord
+	Manifest     Manifest
+	Assertions   []AssertionRecord
+	Interactions []InteractionRecord
 }
 
 // MemStream is an in-process implementation of transport.ProtoStream.
@@ -572,6 +610,14 @@ func assertionsToAny(assertions []AssertionRecord) []any {
 	out := make([]any, len(assertions))
 	for i, a := range assertions {
 		out[i] = a
+	}
+	return out
+}
+
+func interactionsToAny(interactions []InteractionRecord) []any {
+	out := make([]any, len(interactions))
+	for i, interaction := range interactions {
+		out[i] = interaction
 	}
 	return out
 }

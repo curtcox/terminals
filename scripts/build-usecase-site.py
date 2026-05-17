@@ -57,6 +57,7 @@ class Result:
     timestamp_end: str
     pass_: bool
     failing_assertions: tuple[str, ...]
+    interaction_trace: tuple[str, ...]
     source: str
 
     @property
@@ -129,8 +130,22 @@ def result_from_manifest(path: Path) -> Result | None:
         timestamp_end=str(raw.get("timestamp_end", "")),
         pass_=bool(raw.get("pass", False)),
         failing_assertions=tuple(str(item) for item in raw.get("failing_assertions", [])),
+        interaction_trace=tuple(interaction_summaries(raw.get("interaction_trace", []))),
         source=path.relative_to(REPO).as_posix(),
     )
+
+
+def interaction_summaries(raw: object) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    summaries: list[str] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        summary = str(item.get("summary", "")).strip()
+        if summary:
+            summaries.append(summary)
+    return summaries
 
 
 def latest_results(include_results: bool = False, include_validation_runs: bool = False) -> dict[str, Result]:
@@ -314,6 +329,11 @@ def render_usecase(usecase: UseCase) -> str:
         if result.scenario_name:
             evidence_items.append(f"<li>Scenario: {html.escape(result.scenario_name)}</li>")
     evidence_html = "\n        ".join(evidence_items)
+    if result and result.interaction_trace:
+        interaction_items = "\n        ".join(f"<li>{html.escape(item)}</li>" for item in result.interaction_trace)
+        interaction_html = f"<ol>\n        {interaction_items}\n      </ol>"
+    else:
+        interaction_html = '<p class="placeholder">Interaction traces are not captured yet. This section will be generated from validation scenarios.</p>'
 
     body = f"""    <p class="back"><a href="index.html">Back to all use cases</a></p>
     <header class="case-header {header_class}">
@@ -327,7 +347,7 @@ def render_usecase(usecase: UseCase) -> str:
     </section>
     <section>
       <h2>How to use it</h2>
-      <p class="placeholder">Interaction traces are not captured yet. This section will be generated from validation scenarios.</p>
+      {interaction_html}
     </section>
     <section>
       <h2>What you see</h2>

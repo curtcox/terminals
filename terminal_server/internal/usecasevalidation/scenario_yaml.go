@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,8 +49,8 @@ type ScenarioStep struct {
 	ClockAdvanceTo   *TimeStep          `yaml:"clock_advance_to,omitempty"`
 	ProcessDueTimers *ProcessTimersStep `yaml:"process_due_timers,omitempty"`
 	MarkBroadcast    map[string]any     `yaml:"mark_broadcast,omitempty"`
-	Yield            *YieldStep           `yaml:"yield,omitempty"`
-	Expect           *ExpectStep          `yaml:"expect,omitempty"`
+	Yield            *YieldStep         `yaml:"yield,omitempty"`
+	Expect           *ExpectStep        `yaml:"expect,omitempty"`
 	Disconnect       *DisconnectStep    `yaml:"disconnect,omitempty"`
 }
 
@@ -215,6 +217,7 @@ func (h *Harness) runScenario(t *testing.T, spec *ScenarioFile) {
 					},
 				},
 			})
+			h.RecordInteraction("command", describeCommandInteraction(step.Command, args), step.Command.Terminal)
 		case step.Says != nil:
 			term := terminals[step.Says.Terminal]
 			if term == nil {
@@ -230,6 +233,7 @@ func (h *Harness) runScenario(t *testing.T, spec *ScenarioFile) {
 					},
 				},
 			})
+			h.RecordInteraction("voice", fmt.Sprintf("Say %q.", step.Says.Text), step.Says.Terminal)
 		case step.Sensor != nil:
 			term := terminals[step.Sensor.Terminal]
 			if term == nil {
@@ -239,6 +243,7 @@ func (h *Harness) runScenario(t *testing.T, spec *ScenarioFile) {
 				t.Fatalf("scenario %s step %d: sensor.values required", spec.ID, i)
 			}
 			term.Send(SensorDataRequest(term.DeviceID, h.Clock().Now().UnixMilli(), step.Sensor.Values))
+			h.RecordInteraction("sensor", describeSensorInteraction(step.Sensor), step.Sensor.Terminal)
 		case step.ClockAdvance != nil:
 			d, err := time.ParseDuration(step.ClockAdvance.Duration)
 			if err != nil {
@@ -426,4 +431,43 @@ func copyStringMap(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func describeCommandInteraction(step *CommandStep, args map[string]string) string {
+	if step == nil {
+		return ""
+	}
+	parts := []string{fmt.Sprintf("Run %q", step.Intent)}
+	keys := make([]string, 0, len(args))
+	for key := range args {
+		if key == "fire_unix_ms" {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	if len(keys) > 0 {
+		values := make([]string, 0, len(keys))
+		for _, key := range keys {
+			values = append(values, fmt.Sprintf("%s=%q", key, args[key]))
+		}
+		parts = append(parts, "with "+strings.Join(values, ", "))
+	}
+	return strings.Join(parts, " ") + "."
+}
+
+func describeSensorInteraction(step *SensorStep) string {
+	if step == nil {
+		return ""
+	}
+	keys := make([]string, 0, len(step.Values))
+	for key := range step.Values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	values := make([]string, 0, len(keys))
+	for _, key := range keys {
+		values = append(values, fmt.Sprintf("%s=%g", key, step.Values[key]))
+	}
+	return "Trigger sensor input: " + strings.Join(values, ", ") + "."
 }

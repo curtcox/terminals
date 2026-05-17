@@ -27,7 +27,13 @@ func TestLoadScenarioFileT2(t *testing.T) {
 // TestYAMLScenarioT2TimerReminder runs the T2 timer-reminder story from YAML.
 // Phase 4 acceptance: at least one YAML scenario passes make usecase-validate.
 func TestYAMLScenarioT2TimerReminder(t *testing.T) {
-	runYAMLScenario(t, "t2-timer-reminder.yaml")
+	bundle := runYAMLScenario(t, "t2-timer-reminder.yaml")
+	if len(bundle.Manifest.InteractionTrace) == 0 {
+		t.Fatal("interaction trace is empty")
+	}
+	if got, want := bundle.Manifest.InteractionTrace[0].Summary, "Run \"set timer\" with duration_seconds=\"300\", label=\"pasta\"."; got != want {
+		t.Fatalf("first interaction = %q, want %q", got, want)
+	}
 }
 
 func TestYAMLScenarioT3T4SchoolMorning(t *testing.T) {
@@ -46,7 +52,7 @@ func TestYAMLScenarioAA4TimerCancel(t *testing.T) {
 	runYAMLScenario(t, "aa4-timer-cancel.yaml")
 }
 
-func runYAMLScenario(t *testing.T, name string) {
+func runYAMLScenario(t *testing.T, name string) *usecasevalidation.EvidenceBundle {
 	t.Helper()
 	h := usecasevalidation.New(t)
 	spec := h.RunScenarioFile(t, usecasevalidation.ScenarioFilePath(name))
@@ -57,5 +63,5 @@ func runYAMLScenario(t *testing.T, name string) {
 	if len(spec.Usecases) > 1 {
 		label = spec.Usecases[0] + "/" + spec.Usecases[1]
 	}
-	h.Evidence(label)
+	return h.Evidence(label)
 }

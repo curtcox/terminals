@@ -179,6 +179,12 @@ Each milestone is independently shippable and leaves the site usable.
   manifests as `STALE`, matching the planned badge priority, and
   `make usecases-site-check` runs focused generator tests before the static
   artifact drift check.
+- 2026-05-17: M5 interaction-trace plumbing started. YAML scenario command,
+  voice, and sensor steps now append `interaction_trace` records to harness
+  manifests and `result.json`; `scripts/usecase-validate.sh` preserves those
+  traces when it writes its aggregate result; the site renders trace summaries
+  in the per-use-case "How to use it" section when generated with
+  `--include-results`.
 
 ## Open Questions
 
