@@ -38,6 +38,9 @@ class BuildUsecaseSiteTest(unittest.TestCase):
         self.module.USECASE_VALIDATION = self.root / "artifacts" / "usecase-validation"
         self.module.BUG_REPORTS = self.root / "terminal_server" / "logs" / "bug_reports"
         self.module.RESOLVED_BUGS = self.root / "terminal_server" / "bug_reports" / "resolved"
+        self.module.UI_AUDIT = (
+            self.root / "terminal_server" / "internal" / "scenario" / "audit" / "verify_terminal_ui_usecases.sh"
+        )
         self.module.RESULTS = {}
         self.module.BUG_REPORTS_BY_USECASE = {}
         self.module.USECASES_DIR.mkdir(parents=True)
@@ -135,6 +138,10 @@ family: "C"
         c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
 
         self.assertIn("Rendered from server primitives", c1_page)
+        self.assertIn(
+            '<a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>',
+            c1_page,
+        )
         self.assertIn('<video controls muted loop playsinline src="../../artifacts/usecases/C1/video/intercom.mp4">', c1_page)
         self.assertIn('<img src="../../artifacts/usecases/C1/frames/connected.png"', c1_page)
         self.assertIn('<audio controls src="../../artifacts/usecases/C1/audio/caller.wav">', c1_page)
@@ -142,7 +149,14 @@ family: "C"
         self.assertNotIn("Audio artifacts are not captured yet", c1_page)
 
     def test_result_feed_marks_failed_usecase_as_defect(self) -> None:
-        self.write_result("C1", "2026-05-17T12:00:00Z", False, "C1-route-stream")
+        path = self.write_result("C1", "2026-05-17T12:00:00Z", False, "C1-route-stream")
+        data = json.loads(path.read_text())
+        data["media"] = {
+            "frames": [
+                {"step_id": "C1-route-stream", "path": "frames/route-stream.png"},
+            ],
+        }
+        path.write_text(json.dumps(data))
 
         self.module.RESULTS = self.module.latest_results(include_results=True)
         usecases = self.module.parse_usecases()
@@ -151,7 +165,9 @@ family: "C"
 
         self.assertIn('<span class="badge defect">DEFECT</span>', index)
         self.assertIn("Failed on 2026-05-17 12:00 UTC: C1-route-stream.", c1_page)
-        self.assertIn("Latest validation failed: C1-route-stream.", c1_page)
+        self.assertIn("Latest validation failed:", c1_page)
+        self.assertIn("<li>C1-route-stream", c1_page)
+        self.assertIn('<a href="../../artifacts/usecases/C1/frames/route-stream.png">failure frame</a>', c1_page)
         self.assertIn("Latest result manifest", c1_page)
 
     def test_latest_result_prefers_newest_manifest(self) -> None:

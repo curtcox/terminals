@@ -242,6 +242,37 @@ Each milestone is independently shippable and leaves the site usable.
   Added CI steps to regenerate the enriched site from those artifacts and upload
   it as a `usecases-site-<run>` workflow artifact, giving PR reviewers a
   pass/fail site with media without touching the catalog-only drift check.
+- 2026-05-17: M4 audio capture completed. Added `FakeTTS` to the validation
+  harness as a recording TTS double: each `Synthesize` call records the text and
+  0.1 s of silent PCM16 audio. `StartServer()` now wires `FakeTTS` automatically
+  so audio capture requires no test-side setup. At `Evidence()` time the harness
+  collects all FakeTTS captures, encodes them as WAV files (RIFF/PCM16 24 kHz
+  mono), and publishes them through `media.audio` in `result.json`. Timer tests
+  (T1, T2, T3/T4) now produce audio artifacts because `ProcessDueTimers` calls
+  `TTS.Synthesize`. Added `CaptureAudio` method on `Harness` for extracting
+  `PlayAudio` proto messages from a terminal's received stream (covers the raw
+  audio voice pipeline path). YAML scenarios call `CaptureAudio` alongside
+  `CaptureFrame` in every `expect` step. V1/V2/V3 tests call `CaptureAudio`
+  after each capture-frame call. The site generator's `render_audio_media`
+  renders `<audio controls>` players for all captured clips.
+
+- 2026-05-17: Frame rendering quality improved in two ways. First, `StartServer()`
+  now wires `UI: ui.NewMemoryHost()` in the scenario environment so timer scenarios
+  (and any other scenario calling `OperationUISet`) actually execute their SetUI
+  operations during validation rather than silently skipping them. Timer countdown
+  and timer-done UI states now appear in captured frames instead of the initial
+  connection screen. Second, added `CaptureHostFrame` method on `Harness` to
+  capture UI state directly from the MemoryHost by replaying set/patch/clear
+  events. This is used by T1 and T2 to capture the "Timer done!" banner state
+  that `ProcessDueTimers` sets via `env.UI.Patch` — a code path that bypasses
+  the terminal stream. `replayHostEvents` and `applyDescriptorPatch` handle the
+  transport layer's `act:<device>/<id>` scoping side-effect (the scoping mutates
+  shared Props maps) by matching both plain and scoped component IDs.
+- 2026-05-17: Defect evidence rendering now links failed assertions to their
+  captured frame when the assertion ID matches a frame step ID. The per-use-case
+  Defects section renders validation failures and open bug-report links as
+  separate evidence lists, preserving passing-result messaging while making
+  failure pages more directly actionable.
 
 ## Open Questions
 
