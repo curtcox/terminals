@@ -1,9 +1,9 @@
 ---
 title: "Adjacent Business Use Case Validation (AB1–AB7)"
 kind: plan
-status: planned
+status: shipped
 owner: curtcox
-validation: none
+validation: automated:AB1,AB2,AB3,AB4,AB5,AB6,AB7
 last-reviewed: 2026-05-17
 ---
 
