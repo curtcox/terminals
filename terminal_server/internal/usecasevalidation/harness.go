@@ -118,9 +118,9 @@ func (h *Harness) StartServer() {
 		Scheduler: storage.NewMemoryScheduler(),
 		Telephony: telephony.NoopBridge{},
 		Broadcast: h.Broadcast,
-		Sound:  h.sound,
-		LLM:    h.llm,
-		Vision: h.vision,
+		Sound:     h.sound,
+		LLM:       h.llm,
+		Vision:    h.vision,
 	})
 	h.Handler = transport.NewStreamHandlerWithRuntime(h.Control, h.Runtime)
 }

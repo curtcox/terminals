@@ -108,6 +108,10 @@ func RegisterBuiltins(engine *Engine) {
 		Priority: PriorityLow,
 	})
 	engine.Register(Registration{
+		Factory:  func() Scenario { return &StandbyScenario{} },
+		Priority: PriorityLow,
+	})
+	engine.Register(Registration{
 		Factory:  func() Scenario { return &MultiWindowScenario{} },
 		Priority: PriorityNormal,
 	})

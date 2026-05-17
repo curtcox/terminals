@@ -52,6 +52,38 @@ func (PhotoFrameScenario) Start(ctx context.Context, env *Environment) error {
 // Stop ends the scenario and currently has no side effects.
 func (PhotoFrameScenario) Stop() error { return nil }
 
+// StandbyScenario shows a clock or minimal ambient display on idle devices.
+type StandbyScenario struct {
+	trigger Trigger
+}
+
+// Name returns the stable scenario identifier.
+func (StandbyScenario) Name() string { return "standby" }
+
+// Match checks whether the trigger intent activates standby/clock mode.
+func (s *StandbyScenario) Match(trigger Trigger) bool {
+	if !intentMatches(trigger.Intent, "standby", "standby mode", "clock", "clock screen") {
+		return false
+	}
+	s.trigger = trigger
+	return true
+}
+
+// Start broadcasts standby activation to the requesting device.
+func (s *StandbyScenario) Start(ctx context.Context, env *Environment) error {
+	if env == nil || env.Broadcast == nil {
+		return nil
+	}
+	deviceIDs := []string{}
+	if s.trigger.SourceID != "" {
+		deviceIDs = []string{s.trigger.SourceID}
+	}
+	return env.Broadcast.Notify(ctx, deviceIDs, "Standby active")
+}
+
+// Stop ends standby mode and currently has no side effects.
+func (StandbyScenario) Stop() error { return nil }
+
 // TerminalScenario activates interactive terminal mode on the requesting device.
 type TerminalScenario struct {
 	trigger Trigger

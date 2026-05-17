@@ -40,6 +40,9 @@ metadata() {
     C2) echo "C2|Simulation|whole-house announcement: 1 speaker + 3 receivers; harness-backed broadcast routing and no-duplicate-delivery evidence" ;;
     C3) echo "C3|Transport|PA relay, voice start, voice stop alias tests" ;;
     C5) echo "C5|Transport|TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow" ;;
+    I3) echo "I3|Transport|capability manifest on connection: server records full hardware capability set declared by connecting device" ;;
+    I6) echo "I6|Scenario|preemption: engine suspends lower-priority scenario routes when higher-priority scenario starts and resumes them on stop" ;;
+    D3) echo "D3|Transport|standby/clock mode activated by voice or manual command; server notifies requesting device" ;;
     D1) echo "D1|Scenario|photo-frame config + heartbeat rotation tests" ;;
     D2) echo "D2|Scenario|photo frame yields to higher-priority scenario (alert/call) and resumes afterward" ;;
     M1) echo "M1|Scenario|silence classifier integration test" ;;
@@ -78,7 +81,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA1 AA2 AA3 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10 V1 V2 V3)
+all_ids=(AA1 AA2 AA3 AA4 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 I3 I6 D3 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10 V1 V2 V3)
 
 run_go_test() {
   local pkg="$1"
@@ -145,6 +148,15 @@ run_usecase() {
       ;;
     C5)
       run_go_test ./internal/transport 'TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow$'
+      ;;
+    I3)
+      run_go_test ./internal/transport 'Test(Generated|Wire)SessionCapabilityManifestReportedOnConnection$'
+      ;;
+    I6)
+      run_go_test ./internal/scenario 'TestRuntime(Intercom|PA)PreemptedByRedAlertSuspendsAndResumesRoutes$'
+      ;;
+    D3)
+      run_go_test ./internal/transport 'Test(Generated|Wire)SessionStandbyModeActivatedByVoiceCommand$'
       ;;
     D1)
       run_go_test ./cmd/server 'TestConfigurePhotoFrameUsesDirectorySlidesAndInterval$'

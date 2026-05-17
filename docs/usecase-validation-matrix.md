@@ -69,11 +69,14 @@ Coverage depth labels:
 | T2 | say "remind me to check the oven at 3 PM" | `make usecase-validate USECASE=T2` | timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time | Simulation |
 | T3 | configure the system to monitor my child's morning routine via camera at 7 AM on school days | `make usecase-validate USECASE=T3` | school-morning monitor: no camera activity by alert time notifies parent; activity before alert cancels notification | Simulation |
 | T4 | have the system warn my child via speaker ("the bus comes in 10 minutes") | `make usecase-validate USECASE=T4` | school-morning warning: bus-warning broadcast fires to child-room at configured warning time via synthetic clock advance | Simulation |
+| I3 | report my full capability manifest (screen, mic, camera, sensors, etc.) on connection | `make usecase-validate USECASE=I3` | capability manifest on connection: server records full hardware capability set declared by connecting device | Transport |
+| I6 | preempt lower-priority scenarios and suspend them for later resumption | `make usecase-validate USECASE=I6` | preemption: engine suspends lower-priority scenario routes when higher-priority scenario starts and resumes them on stop | Scenario |
+| D3 | see a clock or standby screen on idle devices | `make usecase-validate USECASE=D3` | standby/clock mode activated by voice or manual command; server notifies requesting device | Transport |
 
 ## Planned / Not Yet Automated
 
 The following planned IDs are not declared automated by any plan and are not wired into `scripts/usecase-validate.sh`:
 
-`AB1`, `AB2`, `AB3`, `AB4`, `AB5`, `AB6`, `AB7`, `AH1`, `AH2`, `AH3`, `AH4`, `AH5`, `AH6`, `AH7`, `AH8`, `AH9`, `AH10`, `AH11`, `AH12`, `AH13`, `AH14`, `AH15`, `AH16`, `AH17`, `AO1`, `AO2`, `AO3`, `AO4`, `AO5`, `AO6`, `AO7`, `C4`, `C6`, `D3`, `I1`, `I2`, `I3`, `I4`, `I5`, `I6`, `I7`, `I8`, `I9`, `I10`, `I11`, `PL2`, `PL3`, `PL4`, `PL5`, `PL6`, `PL7`, `PL9`, `PL10`, `PL11`, `PL12`, `PL13`, `PL14`, `PL15`, `PL16`, `PL17`, `PL18`, `PL19`, `PL21`, `PL22`, `PL23`, `PL24`, `PL25`, `PL26`, `PL27`, `AA3`, `AA5`, `V1`, `V2`, `V3`.
+`AB1`, `AB2`, `AB3`, `AB4`, `AB5`, `AB6`, `AB7`, `AH1`, `AH2`, `AH3`, `AH4`, `AH5`, `AH6`, `AH7`, `AH8`, `AH9`, `AH10`, `AH11`, `AH12`, `AH13`, `AH14`, `AH15`, `AH16`, `AH17`, `AO1`, `AO2`, `AO3`, `AO4`, `AO5`, `AO6`, `AO7`, `C4`, `C6`, `I1`, `I2`, `I4`, `I5`, `I7`, `I8`, `I9`, `I10`, `I11`, `PL2`, `PL3`, `PL4`, `PL5`, `PL6`, `PL7`, `PL9`, `PL10`, `PL11`, `PL12`, `PL13`, `PL14`, `PL15`, `PL16`, `PL17`, `PL18`, `PL19`, `PL21`, `PL22`, `PL23`, `PL24`, `PL25`, `PL26`, `PL27`, `AA3`, `AA5`, `V1`, `V2`, `V3`.
 
 Use `make all-check` as the baseline repository gate while dedicated use-case mappings are added.
