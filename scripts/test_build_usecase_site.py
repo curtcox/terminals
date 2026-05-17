@@ -41,11 +41,16 @@ class BuildUsecaseSiteTest(unittest.TestCase):
         self.module.UI_AUDIT = (
             self.root / "terminal_server" / "internal" / "scenario" / "audit" / "verify_terminal_ui_usecases.sh"
         )
+        self.module.UI_INSPECT_SKILL = self.root / ".claude" / "skills" / "ui-inspect" / "SKILL.md"
         self.module.RESULTS = {}
         self.module.BUG_REPORTS_BY_USECASE = {}
         self.module.USECASES_DIR.mkdir(parents=True)
         self.module.VALIDATOR.parent.mkdir(parents=True)
         self.module.VALIDATOR.write_text("all_ids=(C1 T1)\n")
+        self.module.UI_AUDIT.parent.mkdir(parents=True)
+        self.module.UI_AUDIT.write_text("#!/usr/bin/env bash\n")
+        self.module.UI_INSPECT_SKILL.parent.mkdir(parents=True)
+        self.module.UI_INSPECT_SKILL.write_text("# ui-inspect\n")
         (self.module.USECASES_DIR / "communication.md").write_text(
             """---
 title: "Communication"
@@ -194,6 +199,16 @@ family: "C"
         self.assertIn("<li>C1-route-stream", c1_page)
         self.assertIn('<a href="../../artifacts/usecases/C1/frames/route-stream.png">failure frame</a>', c1_page)
         self.assertIn("Latest result manifest", c1_page)
+
+    def test_usecase_page_links_client_ui_inspection_evidence(self) -> None:
+        usecases = self.module.parse_usecases()
+        c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
+
+        self.assertIn(
+            '<a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a>',
+            c1_page,
+        )
+        self.assertIn("<code>make usecase-wiring-audit</code>", c1_page)
 
     def test_index_renders_status_overview_counts(self) -> None:
         self.write_result("C1", "2026-05-17T12:00:00Z", False, "C1-route-stream")

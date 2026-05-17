@@ -29,6 +29,7 @@ USECASE_VALIDATION = REPO / "artifacts" / "usecase-validation"
 BUG_REPORTS = REPO / "terminal_server" / "logs" / "bug_reports"
 RESOLVED_BUGS = REPO / "terminal_server" / "bug_reports" / "resolved"
 UI_AUDIT = REPO / "terminal_server" / "internal" / "scenario" / "audit" / "verify_terminal_ui_usecases.sh"
+UI_INSPECT_SKILL = REPO / ".claude" / "skills" / "ui-inspect" / "SKILL.md"
 STALE_RESULT_DAYS = 30
 MAX_FRAME_STRIP_ITEMS = 24
 
@@ -502,6 +503,12 @@ def render_usecase(usecase: UseCase) -> str:
         evidence_items.append(f"<li><code>make usecase-validate USECASE={usecase.id}</code></li>")
     else:
         evidence_items.append("<li>No automated validation command wired yet.</li>")
+    if UI_INSPECT_SKILL.exists():
+        evidence_items.append(
+            f'<li><a href="../../{html.escape(UI_INSPECT_SKILL.relative_to(REPO).as_posix())}">Client UI inspection workflow</a></li>'
+        )
+    if UI_AUDIT.exists():
+        evidence_items.append(f"<li><code>make usecase-wiring-audit</code></li>")
     if result:
         evidence_items.append(f'<li><a href="../../{html.escape(result.source)}">Latest result manifest</a></li>')
         if result.scenario_name:

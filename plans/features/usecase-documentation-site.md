@@ -288,6 +288,12 @@ Each milestone is independently shippable and leaves the site usable.
   the catalog's health is visible without scanning every row. The overview is
   covered by the focused generator tests and included in both committed static
   outputs.
+- 2026-05-17: Cross-client evidence is now linked from every generated use-case
+  page. The Evidence section includes the repo-local `ui-inspect` workflow so
+  server-rendered frames can be paired with real Flutter web/macOS inspection,
+  plus the `make usecase-wiring-audit` command that guards UI use-case wiring.
+  Focused generator tests cover both links, and the committed static site plus
+  embedded admin copy were regenerated.
 
 ## Open Questions
 
