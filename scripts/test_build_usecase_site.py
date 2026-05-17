@@ -250,6 +250,7 @@ family: "C"
         self.assertIn('<section class="status-overview" aria-label="Use case status summary">', index)
         self.assertIn('<li><span class="badge defect">DEFECT</span><strong>1</strong></li>', index)
         self.assertIn('<li><span class="badge untested">UNTESTED</span><strong>1</strong></li>', index)
+        self.assertIn('<li><span class="badge not-validated">NOT VALIDATED</span><strong>0</strong></li>', index)
         self.assertIn('<li><span class="badge passing">PASSING</span><strong>0</strong></li>', index)
 
     def test_index_renders_filter_controls_and_row_metadata(self) -> None:
@@ -267,6 +268,17 @@ family: "C"
         self.assertIn('<tr data-status="untested" data-filter="c2 untested announce dinner communication">', index)
         self.assertIn('row.hidden = !(matchesText && matchesStatus);', script)
         self.assertIn('section.hidden = !section.querySelector("tbody tr:not([hidden])");', script)
+
+    def test_automated_usecase_without_result_is_not_validated(self) -> None:
+        usecases = self.module.parse_usecases()
+        index = self.module.render_index(usecases)
+        c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
+
+        self.assertIn('<tr data-status="not-validated" data-filter="c1 not validated call the kitchen communication">', index)
+        self.assertIn('<span class="badge not-validated">NOT VALIDATED</span>', index)
+        self.assertIn('<option value="not-validated">NOT VALIDATED</option>', index)
+        self.assertIn("NOT VALIDATED - automated validation is wired, but no captured passing result exists yet.", c1_page)
+        self.assertNotIn('<tr data-status="passing" data-filter="c1 passing call the kitchen communication">', index)
 
     def test_latest_result_prefers_newest_manifest(self) -> None:
         self.write_result("C1", "2026-05-17T11:00:00Z", False, "old-failure")

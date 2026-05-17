@@ -95,8 +95,10 @@ checked.
 - Status badges, in priority order:
   - 🔴 **DEFECT** — most recent run failed or flagged a bug
   - ⚠️ **UNTESTED** — no automated scenario
+  - 🔵 **NOT VALIDATED** — automated validation is wired, but no result has
+    been captured for the current generated site
   - 🟡 **STALE** — last successful run older than N days
-  - 🟢 **PASSING**
+  - 🟢 **PASSING** — a captured result exists and its assertions passed
 - Index is sortable; defects and untested float to the top by default so
   a cursory glance surfaces problems.
 
@@ -107,6 +109,8 @@ Header strip, full-width, color-coded:
 - 🟢 "Validated on <date> — all assertions passed."
 - 🔴 "Failed on <date>: <first failing assertion>. <N> defects open."
 - ⚠️ "UNTESTED — no automated scenario exists for this use case."
+- 🔵 "NOT VALIDATED — automated validation is wired, but no captured passing
+  result exists yet."
 
 Body sections:
 
@@ -326,6 +330,11 @@ Each milestone is independently shippable and leaves the site usable.
   `PlayAudio` captures are labeled as protobuf-emitted PCM evidence. The site
   generator renders those notes beside audio players when present, with focused
   generator coverage.
+- 2026-05-17: Status semantics tightened. The generator now distinguishes
+  automated-but-not-captured use cases as `NOT VALIDATED` instead of `PASSING`.
+  `PASSING` is reserved for use cases with a captured result manifest whose
+  latest assertions passed, preventing catalog-only `index.html` output from
+  claiming evidence that does not exist.
 
 ## Open Questions
 

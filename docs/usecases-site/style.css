@@ -75,6 +75,7 @@ a { color: #0b5cad; }
 
 .case-header.passing { background: #dff1df; border-left: 8px solid #247a35; }
 .case-header.untested { background: #fff2cc; border-left: 8px solid #a06c00; }
+.case-header.not-validated { background: #e4edf7; border-left: 8px solid #326da8; }
 .case-header.stale { background: #fff6d8; border-left: 8px solid #b08a00; }
 .case-header.defect { background: #ffe1df; border-left: 8px solid #b42318; }
 
@@ -141,6 +142,7 @@ th button {
 
 .badge.passing { background: #247a35; color: #fff; }
 .badge.untested { background: #a06c00; color: #fff; }
+.badge.not-validated { background: #326da8; color: #fff; }
 .badge.stale { background: #b08a00; color: #111; }
 .badge.defect { background: #b42318; color: #fff; }
 

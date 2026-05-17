@@ -411,7 +411,9 @@ def status_rank(usecase: UseCase) -> int:
         return 0
     if not usecase.automated:
         return 1
-    if result and is_stale(result):
+    if not result:
+        return 2
+    if is_stale(result):
         return 2
     return 3
 
@@ -420,18 +422,26 @@ def status_label(usecase: UseCase) -> str:
     result = RESULTS.get(usecase.id)
     if has_defect(usecase):
         return "DEFECT"
+    if not usecase.automated:
+        return "UNTESTED"
+    if not result:
+        return "NOT VALIDATED"
     if result and is_stale(result):
         return "STALE"
-    return "PASSING" if usecase.automated else "UNTESTED"
+    return "PASSING"
 
 
 def status_class(usecase: UseCase) -> str:
     result = RESULTS.get(usecase.id)
     if has_defect(usecase):
         return "defect"
+    if not usecase.automated:
+        return "untested"
+    if not result:
+        return "not-validated"
     if result and is_stale(result):
         return "stale"
-    return "passing" if usecase.automated else "untested"
+    return "passing"
 
 
 def last_validated(usecase: UseCase) -> str:
@@ -493,12 +503,13 @@ def render_index(usecases: list[UseCase]) -> str:
         (
             ("defect", sum(1 for usecase in usecases if status_class(usecase) == "defect")),
             ("untested", sum(1 for usecase in usecases if status_class(usecase) == "untested")),
+            ("not-validated", sum(1 for usecase in usecases if status_class(usecase) == "not-validated")),
             ("stale", sum(1 for usecase in usecases if status_class(usecase) == "stale")),
             ("passing", sum(1 for usecase in usecases if status_class(usecase) == "passing")),
         )
     )
     status_summary = "\n".join(
-        f'        <li><span class="badge {name}">{name.upper()}</span><strong>{count}</strong></li>'
+        f'        <li><span class="badge {name}">{status_display_name(name)}</span><strong>{count}</strong></li>'
         for name, count in status_counts.items()
     )
     rows: list[str] = [
@@ -519,6 +530,7 @@ def render_index(usecases: list[UseCase]) -> str:
         "        <option value=\"\">All statuses</option>",
         "        <option value=\"defect\">DEFECT</option>",
         "        <option value=\"untested\">UNTESTED</option>",
+        "        <option value=\"not-validated\">NOT VALIDATED</option>",
         "        <option value=\"stale\">STALE</option>",
         "        <option value=\"passing\">PASSING</option>",
         "      </select>",
@@ -543,6 +555,10 @@ def render_index(usecases: list[UseCase]) -> str:
     return page("Index", "\n".join(rows))
 
 
+def status_display_name(status: str) -> str:
+    return status.replace("-", " ").upper()
+
+
 def render_usecase(usecase: UseCase) -> str:
     header_class = status_class(usecase)
     result = RESULTS.get(usecase.id)
@@ -557,7 +573,7 @@ def render_usecase(usecase: UseCase) -> str:
     elif result:
         header_text = f"Validated on {last_validated(usecase)} - all assertions passed."
     elif usecase.automated:
-        header_text = f"Automated validation is wired. Run 'make usecase-validate USECASE={usecase.id}' to generate results."
+        header_text = f"NOT VALIDATED - automated validation is wired, but no captured passing result exists yet. Run 'make usecase-validate USECASE={usecase.id}' to generate results."
     else:
         header_text = "UNTESTED - no automated scenario exists for this use case."
 
@@ -815,6 +831,7 @@ a { color: #0b5cad; }
 
 .case-header.passing { background: #dff1df; border-left: 8px solid #247a35; }
 .case-header.untested { background: #fff2cc; border-left: 8px solid #a06c00; }
+.case-header.not-validated { background: #e4edf7; border-left: 8px solid #326da8; }
 .case-header.stale { background: #fff6d8; border-left: 8px solid #b08a00; }
 .case-header.defect { background: #ffe1df; border-left: 8px solid #b42318; }
 
@@ -881,6 +898,7 @@ th button {
 
 .badge.passing { background: #247a35; color: #fff; }
 .badge.untested { background: #a06c00; color: #fff; }
+.badge.not-validated { background: #326da8; color: #fff; }
 .badge.stale { background: #b08a00; color: #111; }
 .badge.defect { background: #b42318; color: #fff; }
 
