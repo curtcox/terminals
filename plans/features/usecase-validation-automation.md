@@ -3,7 +3,7 @@ title: "Use Case Validation Automation"
 kind: plan
 status: shipped
 owner: curtcox
-validation: automated:C1,C2,M5,T1,T2,T3,T4,AA1,AA2,AA3,AA4,AA5,UI9,D2,V1,V2,V3
+validation: automated:C1,C2,M5,T1,T2,T3,T4,AA1,AA2,AA3,AA4,AA5,UI9,D2,D3,I3,I6,V1,V2,V3
 last-reviewed: 2026-05-16
 progress:
   - 2026-05-16: Phase 1 complete (C1 harness skeleton, evidence bundle, USECASE_ARTIFACTS flag)
@@ -16,6 +16,7 @@ progress:
   - 2026-05-16: AA3 added (AI agent LLM voice resolution; FakeLLM injected via SetLLM; ambiguous voice command decoded to announce intent; announcement_audio route confirmed on receiver)
   - 2026-05-16: V1/V2/V3 added (voice assistant wake-and-answer; VoiceAssistantScenario triggered by 'assistant <query>'; FakeLLM records queries and returns plain-text response; broadcast events verified for weather, recipe, and general-knowledge queries)
   - 2026-05-16: AA5 added (vision analysis agent; VisionAnalysisScenario triggered by 'vision analysis' intent; FakeVisionAnalyzer returns caption and labels; camera_activity sensor reading triggers analysis; broadcast verified to include caption, labels, and agent device target)
+  - 2026-05-16: D3/I3 added (standby/clock mode activated by voice command; capability manifest reported on connection; transport-layer tests registered in validate script); I6 registered (preemption scenario; plan frontmatter updated to include D3, I3, I6); AA5 wired into usecase-validate.sh (was missing from all_ids and run_usecase despite test existing)
 ---
 
 # Use Case Validation Automation

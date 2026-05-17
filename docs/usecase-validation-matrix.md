@@ -36,6 +36,9 @@ Coverage depth labels:
 | C5 | start a video call between two devices in the house | `make usecase-validate USECASE=C5` | TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow | Transport |
 | D1 | set an idle tablet to photo frame mode that rotates pictures | `make usecase-validate USECASE=D1` | photo-frame config + heartbeat rotation tests | Scenario |
 | D2 | have the photo frame automatically yield to higher-priority scenarios and resume afterward | `make usecase-validate USECASE=D2` | photo frame yields to higher-priority scenario (alert/call) and resumes afterward | Scenario |
+| D3 | see a clock or standby screen on idle devices | `make usecase-validate USECASE=D3` | standby/clock mode activated by voice or manual command; server notifies requesting device | Transport |
+| I3 | report my full capability manifest (screen, mic, camera, sensors, etc.) on connection | `make usecase-validate USECASE=I3` | capability manifest on connection: server records full hardware capability set declared by connecting device | Transport |
+| I6 | preempt lower-priority scenarios and suspend them for later resumption | `make usecase-validate USECASE=I6` | preemption: engine suspends lower-priority scenario routes when higher-priority scenario starts and resumes them on stop | Scenario |
 | M1 | say "tell me when the dishwasher stops" and have the system listen for silence | `make usecase-validate USECASE=M1` | silence classifier integration test | Scenario |
 | M2 | say "tell me when the dryer beeps" and have the system listen for a specific sound | `make usecase-validate USECASE=M2` | audio monitor runtime test for dryer beep detection | Scenario |
 | M3 | say "red alert" and have every screen turn red with an alarm sound | `make usecase-validate USECASE=M3` | generated+wire red alert integration tests | Transport |
@@ -53,7 +56,9 @@ Coverage depth labels:
 | S3 | have camera feeds mixed into a single audio track by default | `make usecase-validate USECASE=S3` | generated+wire multi-window audio mix tests | Transport |
 | AA1 | trigger scenarios via the server API based on external events (calendar, webhook, sensor) | `make usecase-validate USECASE=AA1` | external automation agent triggers announcement scenario via manual API; display terminal receives announcement_audio route | Simulation |
 | AA2 | subscribe to sound classification events and route notifications to other systems (Slack, email) | `make usecase-validate USECASE=AA2` | monitoring agent arms audio monitoring via manual API; fake classifier emits dryer_beep; broadcast targeted at agent device ID | Simulation |
+| AA3 | use the LLM backend to interpret ambiguous voice commands and map them to scenarios | `make usecase-validate USECASE=AA3` | AI agent resolves ambiguous voice command via fake LLM; LLM-decoded announce intent routes announcement_audio to a second terminal | Simulation |
 | AA4 | create, modify, and cancel timers and reminders via the server API | `make usecase-validate USECASE=AA4` | scheduling agent creates and cancels a timer via manual API; cancelled timer produces no 'Timer done!' broadcast | Simulation |
+| AA5 | process camera frames and generate alerts or annotations on the viewing device | `make usecase-validate USECASE=AA5` | vision analysis agent: FakeVisionAnalyzer returns caption and labels; camera_activity sensor triggers analysis; broadcast verified with caption, labels, and agent device target | Simulation |
 | AA6 | run integration tests that simulate multiple devices connecting and exchanging IO | `make usecase-validate USECASE=AA6` | admin scripts run over seeded sim/store/ui/bus fixture plus mutating Layer 2 message, board, artifact, canvas, and session paths | Simulation |
 | UI1 | see an idle tablet show server-driven ambient UI with a reachable corner menu affordance | `make usecase-validate USECASE=UI1` | idle photo-frame SetUI includes scoped corner affordance (terminal-ui plan) | Transport |
 | UI2 | tap the corner affordance and open the menu overlay | `make usecase-validate USECASE=UI2` | corner.open toggles menu overlay claim without disturbing main | Transport |
@@ -69,14 +74,14 @@ Coverage depth labels:
 | T2 | say "remind me to check the oven at 3 PM" | `make usecase-validate USECASE=T2` | timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time | Simulation |
 | T3 | configure the system to monitor my child's morning routine via camera at 7 AM on school days | `make usecase-validate USECASE=T3` | school-morning monitor: no camera activity by alert time notifies parent; activity before alert cancels notification | Simulation |
 | T4 | have the system warn my child via speaker ("the bus comes in 10 minutes") | `make usecase-validate USECASE=T4` | school-morning warning: bus-warning broadcast fires to child-room at configured warning time via synthetic clock advance | Simulation |
-| I3 | report my full capability manifest (screen, mic, camera, sensors, etc.) on connection | `make usecase-validate USECASE=I3` | capability manifest on connection: server records full hardware capability set declared by connecting device | Transport |
-| I6 | preempt lower-priority scenarios and suspend them for later resumption | `make usecase-validate USECASE=I6` | preemption: engine suspends lower-priority scenario routes when higher-priority scenario starts and resumes them on stop | Scenario |
-| D3 | see a clock or standby screen on idle devices | `make usecase-validate USECASE=D3` | standby/clock mode activated by voice or manual command; server notifies requesting device | Transport |
+| V1 | say a wake word and ask a question on any device | `make usecase-validate USECASE=V1` | voice assistant wake-and-answer: 'assistant <question>' triggers VoiceAssistantScenario; FakeLLM queried; response broadcast back to source device | Simulation |
+| V2 | ask for a recipe by voice and see it displayed on the nearest screen | `make usecase-validate USECASE=V2` | voice recipe request: 'assistant how do I make <dish>' triggers VoiceAssistantScenario; FakeLLM returns recipe; broadcast back to kitchen terminal | Simulation |
+| V3 | ask the system about the weather, news, or general knowledge | `make usecase-validate USECASE=V3` | voice general-knowledge query: 'assistant <question>' triggers VoiceAssistantScenario; FakeLLM returns answer; broadcast back to requesting device | Simulation |
 
 ## Planned / Not Yet Automated
 
 The following planned IDs are not declared automated by any plan and are not wired into `scripts/usecase-validate.sh`:
 
-`AB1`, `AB2`, `AB3`, `AB4`, `AB5`, `AB6`, `AB7`, `AH1`, `AH2`, `AH3`, `AH4`, `AH5`, `AH6`, `AH7`, `AH8`, `AH9`, `AH10`, `AH11`, `AH12`, `AH13`, `AH14`, `AH15`, `AH16`, `AH17`, `AO1`, `AO2`, `AO3`, `AO4`, `AO5`, `AO6`, `AO7`, `C4`, `C6`, `I1`, `I2`, `I4`, `I5`, `I7`, `I8`, `I9`, `I10`, `I11`, `PL2`, `PL3`, `PL4`, `PL5`, `PL6`, `PL7`, `PL9`, `PL10`, `PL11`, `PL12`, `PL13`, `PL14`, `PL15`, `PL16`, `PL17`, `PL18`, `PL19`, `PL21`, `PL22`, `PL23`, `PL24`, `PL25`, `PL26`, `PL27`, `AA3`, `AA5`, `V1`, `V2`, `V3`.
+`AB1`, `AB2`, `AB3`, `AB4`, `AB5`, `AB6`, `AB7`, `AH1`, `AH2`, `AH3`, `AH4`, `AH5`, `AH6`, `AH7`, `AH8`, `AH9`, `AH10`, `AH11`, `AH12`, `AH13`, `AH14`, `AH15`, `AH16`, `AH17`, `AO1`, `AO2`, `AO3`, `AO4`, `AO5`, `AO6`, `AO7`, `C4`, `C6`, `I1`, `I2`, `I4`, `I5`, `I7`, `I8`, `I9`, `I10`, `I11`, `PL2`, `PL3`, `PL4`, `PL5`, `PL6`, `PL7`, `PL9`, `PL10`, `PL11`, `PL12`, `PL13`, `PL14`, `PL15`, `PL16`, `PL17`, `PL18`, `PL19`, `PL21`, `PL22`, `PL23`, `PL24`, `PL25`, `PL26`, `PL27`.
 
 Use `make all-check` as the baseline repository gate while dedicated use-case mappings are added.
