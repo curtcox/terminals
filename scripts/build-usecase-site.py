@@ -742,8 +742,24 @@ def render_usecase(usecase: UseCase) -> str:
         interaction_html = f'<p class="placeholder">Run <code>make usecase-validate USECASE={usecase.id}</code> to generate interaction traces for this use case.</p>'
     else:
         interaction_html = '<p class="placeholder">No automated scenario exists yet. Interaction trace not available.</p>'
-    visual_html = render_visual_media(result)
-    audio_html = render_audio_media(result)
+
+    if usecase.automated:
+        visual_html = render_visual_media(result)
+        audio_html = render_audio_media(result)
+        media_sections = f"""    <section>
+      <h2>What you see</h2>
+      {visual_html}
+    </section>
+    <section>
+      <h2>What you hear</h2>
+      {audio_html}
+    </section>
+    <section>
+      <h2>Defects</h2>
+      {defect_html}
+    </section>"""
+    else:
+        media_sections = ""
 
     body = f"""    <p class="back"><a href="index.html">Back to all use cases</a></p>
     <header class="case-header {header_class}">
@@ -759,18 +775,7 @@ def render_usecase(usecase: UseCase) -> str:
       <h2>How to use it</h2>
       {interaction_html}
     </section>
-    <section>
-      <h2>What you see</h2>
-      {visual_html}
-    </section>
-    <section>
-      <h2>What you hear</h2>
-      {audio_html}
-    </section>
-    <section>
-      <h2>Defects</h2>
-      {defect_html}
-    </section>
+    {media_sections}
     <section>
       <h2>Evidence</h2>
       <ul>

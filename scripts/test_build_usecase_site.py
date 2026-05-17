@@ -386,6 +386,18 @@ all_ids=(C1)
         self.assertIn("bug-c1: Intercom route fails", c1_page)
         self.assertIn("terminal_server/logs/bug_reports/2026-05-17/bug-c1.json", c1_page)
 
+    def test_untested_page_omits_media_and_defects_sections(self) -> None:
+        usecases = self.module.parse_usecases()
+        c2_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C2"))
+
+        self.assertIn("UNTESTED", c2_page)
+        self.assertNotIn("<h2>What you see</h2>", c2_page)
+        self.assertNotIn("<h2>What you hear</h2>", c2_page)
+        self.assertNotIn("<h2>Defects</h2>", c2_page)
+        self.assertIn("<h2>What it does</h2>", c2_page)
+        self.assertIn("<h2>How to use it</h2>", c2_page)
+        self.assertIn("<h2>Evidence</h2>", c2_page)
+
     def test_resolved_bug_description_is_excluded_from_defect_feed(self) -> None:
         self.write_bug("bug-c1", "  Intercom   route fails  ", ["usecase:C1"])
         self.module.RESOLVED_BUGS.mkdir(parents=True)

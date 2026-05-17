@@ -348,6 +348,11 @@ Each milestone is independently shippable and leaves the site usable.
   matching the planned evidence list. Status sort keys now rank `NOT VALIDATED`
   ahead of `STALE` so the index default order matches the badge priority.
 
+- 2026-05-17: Untested use-case pages now omit the "What you see", "What you hear", and "Defects"
+  sections entirely, matching the plan spec ("No media section"). NOT VALIDATED pages (automated
+  but no captured result yet) retain those sections with placeholder prompts. A dedicated focused
+  test covers the omission.
+
 ## Open Questions
 
 - **Audio capture format and licensing.** Validation-generated fake TTS audio is
