@@ -372,6 +372,12 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 	if err := writeJSON(filepath.Join(dir, "manifest.json"), bundle.Manifest); err != nil {
 		h.t.Logf("usecasevalidation: could not write manifest.json: %v", err)
 	}
+	resultDir := filepath.Join(artifactsRoot(), "usecases", usecaseID)
+	if err := os.MkdirAll(resultDir, 0o755); err != nil {
+		h.t.Logf("usecasevalidation: could not create result dir %s: %v", resultDir, err)
+	} else if err := writeJSON(filepath.Join(resultDir, "result.json"), bundle.Manifest); err != nil {
+		h.t.Logf("usecasevalidation: could not write result.json: %v", err)
+	}
 
 	if writeArtifacts {
 		if err := writeJSONL(filepath.Join(dir, "assertions.jsonl"), assertionsToAny(assertions)); err != nil {

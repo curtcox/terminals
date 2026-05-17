@@ -29,6 +29,7 @@ a { color: #0b5cad; }
 
 .case-header.passing { background: #dff1df; border-left: 8px solid #247a35; }
 .case-header.untested { background: #fff2cc; border-left: 8px solid #a06c00; }
+.case-header.defect { background: #ffe1df; border-left: 8px solid #b42318; }
 
 .eyebrow {
   margin: 0 0 6px;
@@ -92,6 +93,7 @@ th button {
 
 .badge.passing { background: #247a35; color: #fff; }
 .badge.untested { background: #a06c00; color: #fff; }
+.badge.defect { background: #b42318; color: #fff; }
 
 .placeholder {
   color: #586467;

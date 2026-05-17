@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import re
 import shutil
 import sys
 from collections import OrderedDict
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -22,6 +24,8 @@ USECASES_DIR = REPO / "usecases"
 VALIDATOR = REPO / "scripts" / "usecase-validate.sh"
 OUT = REPO / "docs" / "usecases-site"
 EMBED_OUT = REPO / "terminal_server" / "internal" / "admin" / "usecases_site_static"
+USECASE_RESULTS = REPO / "artifacts" / "usecases"
+USECASE_VALIDATION = REPO / "artifacts" / "usecase-validation"
 
 ID_RE = re.compile(r"^[A-Z]+\d+$")
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
@@ -42,6 +46,23 @@ class UseCase:
     @property
     def title(self) -> str:
         return self.action[:1].upper() + self.action[1:]
+
+
+@dataclass(frozen=True)
+class Result:
+    usecase_id: str
+    run_id: str
+    scenario_name: str
+    timestamp_end: str
+    pass_: bool
+    failing_assertions: tuple[str, ...]
+    source: str
+
+    @property
+    def first_failure(self) -> str:
+        if self.failing_assertions:
+            return self.failing_assertions[0]
+        return "validation failed"
 
 
 def parse_frontmatter(text: str) -> dict[str, str]:
@@ -79,6 +100,58 @@ def automated_ids() -> set[str]:
     return set()
 
 
+def parse_timestamp(value: str) -> datetime:
+    if not value:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def result_from_manifest(path: Path) -> Result | None:
+    try:
+        raw = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    usecase_id = str(raw.get("usecase_id", "")).strip()
+    if not ID_RE.match(usecase_id):
+        return None
+    return Result(
+        usecase_id=usecase_id,
+        run_id=str(raw.get("run_id", "")),
+        scenario_name=str(raw.get("scenario_name", "")),
+        timestamp_end=str(raw.get("timestamp_end", "")),
+        pass_=bool(raw.get("pass", False)),
+        failing_assertions=tuple(str(item) for item in raw.get("failing_assertions", [])),
+        source=path.relative_to(REPO).as_posix(),
+    )
+
+
+def latest_results(include_results: bool = False, include_validation_runs: bool = False) -> dict[str, Result]:
+    results: dict[str, Result] = {}
+    sources = []
+    if include_results:
+        sources.append((USECASE_RESULTS, "*/result.json"))
+    if include_validation_runs:
+        sources.append((USECASE_VALIDATION, "*/manifest.json"))
+    for base, pattern in sources:
+        if not base.exists():
+            continue
+        for path in base.glob(pattern):
+            result = result_from_manifest(path)
+            if result is None:
+                continue
+            previous = results.get(result.usecase_id)
+            if previous is None or parse_timestamp(result.timestamp_end) > parse_timestamp(previous.timestamp_end):
+                results[result.usecase_id] = result
+    return results
+
+
 def parse_usecases() -> list[UseCase]:
     automated = automated_ids()
     usecases: list[UseCase] = []
@@ -109,15 +182,34 @@ def parse_usecases() -> list[UseCase]:
 
 
 def status_rank(usecase: UseCase) -> int:
+    result = RESULTS.get(usecase.id)
+    if result and not result.pass_:
+        return 0
     return 3 if usecase.automated else 1
 
 
 def status_label(usecase: UseCase) -> str:
+    result = RESULTS.get(usecase.id)
+    if result and not result.pass_:
+        return "DEFECT"
     return "PASSING" if usecase.automated else "UNTESTED"
 
 
 def status_class(usecase: UseCase) -> str:
+    result = RESULTS.get(usecase.id)
+    if result and not result.pass_:
+        return "defect"
     return "passing" if usecase.automated else "untested"
+
+
+def last_validated(usecase: UseCase) -> str:
+    result = RESULTS.get(usecase.id)
+    if not result:
+        return "not captured yet"
+    parsed = parse_timestamp(result.timestamp_end)
+    if parsed == datetime.min.replace(tzinfo=timezone.utc):
+        return html.escape(result.timestamp_end)
+    return parsed.strftime("%Y-%m-%d %H:%M UTC")
 
 
 def id_sort_key(usecase: UseCase) -> tuple[str, int, str]:
@@ -167,7 +259,7 @@ def render_index(usecases: list[UseCase]) -> str:
                 f"<td><a href=\"{usecase.id}.html\">{usecase.id}</a></td>"
                 f"<td><span class=\"badge {status_class(usecase)}\">{status_label(usecase)}</span></td>"
                 f"<td>{html.escape(usecase.title)}</td>"
-                "<td>not captured yet</td>"
+                f"<td>{last_validated(usecase)}</td>"
                 "</tr>"
             )
         rows.append("      </tbody></table></section>")
@@ -176,10 +268,32 @@ def render_index(usecases: list[UseCase]) -> str:
 
 def render_usecase(usecase: UseCase) -> str:
     header_class = status_class(usecase)
-    if usecase.automated:
+    result = RESULTS.get(usecase.id)
+    if result and not result.pass_:
+        header_text = f"Failed on {last_validated(usecase)}: {result.first_failure}."
+    elif result:
+        header_text = f"Validated on {last_validated(usecase)} - all assertions passed."
+    elif usecase.automated:
         header_text = "Automated validation is wired for this use case. Result capture will land in the next milestone."
     else:
         header_text = "UNTESTED - no automated scenario exists for this use case."
+
+    defect_text = "No defects detected in the latest captured result." if result and result.pass_ else "No result.json defect feed is available yet."
+    if result and not result.pass_:
+        failures = ", ".join(html.escape(item) for item in result.failing_assertions) or "validation failed"
+        defect_text = f"Latest validation failed: {failures}."
+    evidence_items = [
+        f'<li><a href="../../{html.escape(usecase.source)}">{html.escape(usecase.source)}</a></li>',
+    ]
+    if usecase.automated:
+        evidence_items.append(f"<li>make usecase-validate USECASE={usecase.id}</li>")
+    else:
+        evidence_items.append("<li>No automated validation command wired yet.</li>")
+    if result:
+        evidence_items.append(f'<li><a href="../../{html.escape(result.source)}">Latest result manifest</a></li>')
+        if result.scenario_name:
+            evidence_items.append(f"<li>Scenario: {html.escape(result.scenario_name)}</li>")
+    evidence_html = "\n        ".join(evidence_items)
 
     body = f"""    <p class="back"><a href="index.html">Back to all use cases</a></p>
     <header class="case-header {header_class}">
@@ -205,13 +319,12 @@ def render_usecase(usecase: UseCase) -> str:
     </section>
     <section>
       <h2>Defects</h2>
-      <p>No result.json defect feed is available yet.</p>
+      <p>{defect_text}</p>
     </section>
     <section>
       <h2>Evidence</h2>
       <ul>
-        <li><a href="../../{html.escape(usecase.source)}">{html.escape(usecase.source)}</a></li>
-        <li>{'make usecase-validate USECASE=' + usecase.id if usecase.automated else 'No automated validation command wired yet.'}</li>
+        {evidence_html}
       </ul>
     </section>"""
     return page(f"{usecase.id} {usecase.title}", body)
@@ -249,6 +362,7 @@ a { color: #0b5cad; }
 
 .case-header.passing { background: #dff1df; border-left: 8px solid #247a35; }
 .case-header.untested { background: #fff2cc; border-left: 8px solid #a06c00; }
+.case-header.defect { background: #ffe1df; border-left: 8px solid #b42318; }
 
 .eyebrow {
   margin: 0 0 6px;
@@ -312,6 +426,7 @@ th button {
 
 .badge.passing { background: #247a35; color: #fff; }
 .badge.untested { background: #a06c00; color: #fff; }
+.badge.defect { background: #b42318; color: #fff; }
 
 .placeholder {
   color: #586467;
@@ -399,8 +514,20 @@ def check_files(files: dict[Path, str]) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true", help="fail if generated output differs from disk")
+    parser.add_argument(
+        "--include-results",
+        action="store_true",
+        help="read artifacts/usecases/<ID>/result.json files into the generated status pages",
+    )
+    parser.add_argument(
+        "--include-validation-runs",
+        action="store_true",
+        help="also read ephemeral artifacts/usecase-validation/*/manifest.json files",
+    )
     args = parser.parse_args()
 
+    global RESULTS
+    RESULTS = latest_results(args.include_results, args.include_validation_runs)
     usecases = parse_usecases()
     if not usecases:
         print("ERROR: no use cases found under usecases/.", file=sys.stderr)
@@ -413,6 +540,8 @@ def main() -> int:
     print(f"wrote {OUT.relative_to(REPO)} ({len(usecases)} use cases, {untested} untested)")
     return 0
 
+
+RESULTS: dict[str, Result] = {}
 
 if __name__ == "__main__":
     sys.exit(main())
