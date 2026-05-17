@@ -170,6 +170,11 @@ Each milestone is independently shippable and leaves the site usable.
   invoked with `--include-results`. Default generation remains catalog-only
   so clean-checkout drift checks are deterministic until CI has an explicit
   artifact-producing site-render step.
+- 2026-05-17: `scripts/usecase-validate.sh` now writes an aggregate
+  `artifacts/usecases/<ID>/result.json` for every automated use case it runs,
+  including non-harness-backed package, Flutter, and app validations. This
+  gives M2 a uniform pass/fail feed across the public `make usecase-validate`
+  entry point while preserving detailed harness bundles where they exist.
 
 ## Open Questions
 
