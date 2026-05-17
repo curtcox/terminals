@@ -34,6 +34,12 @@ func TestYAMLScenarioT2TimerReminder(t *testing.T) {
 	if got, want := bundle.Manifest.InteractionTrace[0].Summary, "Run \"set timer\" with duration_seconds=\"300\", label=\"pasta\"."; got != want {
 		t.Fatalf("first interaction = %q, want %q", got, want)
 	}
+	if len(bundle.Manifest.Media.Frames) == 0 {
+		t.Fatal("visual frame manifest is empty")
+	}
+	if got := bundle.Manifest.Media.Frames[0].Path; got == "" {
+		t.Fatal("first visual frame path is empty")
+	}
 }
 
 func TestYAMLScenarioT3T4SchoolMorning(t *testing.T) {

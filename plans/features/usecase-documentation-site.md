@@ -198,6 +198,13 @@ Each milestone is independently shippable and leaves the site usable.
   video players, and audio players when those artifacts exist. Catalog-only
   generation still emits placeholders, so the default drift check remains
   deterministic until capture mode produces real media.
+- 2026-05-17: M3 capture plumbing started. YAML scenario `expect` steps now
+  snapshot the latest server-driven UI message for the asserted terminal into
+  deterministic PNG frame artifacts and publish them through
+  `media.frames` in `artifacts/usecases/<ID>/result.json`. The public
+  `scripts/usecase-validate.sh` aggregate writer preserves harness media
+  manifests so `make usecase-validate && python3 scripts/build-usecase-site.py
+  --include-results` can render frame strips.
 
 ## Open Questions
 

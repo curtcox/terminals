@@ -7,15 +7,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	goio "io"
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
+	uiv1 "github.com/curtcox/terminals/terminal_server/gen/go/ui/v1"
 	"github.com/curtcox/terminals/terminal_server/internal/device"
 	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
@@ -47,6 +53,7 @@ type Harness struct {
 	mu           sync.Mutex
 	assertions   []AssertionRecord
 	interactions []InteractionRecord
+	frames       []FrameRecord
 }
 
 // New creates a Harness bound to the given test. The harness clock starts at
@@ -342,6 +349,21 @@ func (h *Harness) RecordInteraction(kind, summary, terminal string) {
 	h.mu.Unlock()
 }
 
+// CaptureFrame records a deterministic server-side visual snapshot for docs.
+func (h *Harness) CaptureFrame(stepID, terminal string, messages []transport.ProtoServerEnvelope) {
+	summary := summarizeLatestUI(messages)
+	h.mu.Lock()
+	h.frames = append(h.frames, FrameRecord{
+		StepID:    stepID,
+		Terminal:  terminal,
+		Label:     stepID,
+		Summary:   summary,
+		Path:      filepath.ToSlash(filepath.Join("frames", safeArtifactName(stepID)+".png")),
+		Timestamp: time.Now().UTC(),
+	})
+	h.mu.Unlock()
+}
+
 // Evidence writes the evidence bundle for this run and returns a summary.
 // The bundle is always written under artifacts/usecase-validation/<run-id>/.
 // The full bundle (including assertions.jsonl) is written when any assertion
@@ -353,6 +375,8 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 	copy(assertions, h.assertions)
 	interactions := make([]InteractionRecord, len(h.interactions))
 	copy(interactions, h.interactions)
+	frames := make([]FrameRecord, len(h.frames))
+	copy(frames, h.frames)
 	h.mu.Unlock()
 
 	end := time.Now().UTC()
@@ -376,9 +400,13 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 			Pass:              pass,
 			FailingAssertions: failingIDs,
 			InteractionTrace:  interactions,
+			Media: MediaManifest{
+				Frames: frames,
+			},
 		},
 		Assertions:   assertions,
 		Interactions: interactions,
+		Frames:       frames,
 	}
 
 	writeArtifacts := os.Getenv("USECASE_ARTIFACTS") == "1" || !pass
@@ -397,6 +425,11 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 	} else if err := writeJSON(filepath.Join(resultDir, "result.json"), bundle.Manifest); err != nil {
 		h.t.Logf("usecasevalidation: could not write result.json: %v", err)
 	}
+	if len(frames) > 0 {
+		if err := writeFramePNGs(resultDir, frames); err != nil {
+			h.t.Logf("usecasevalidation: could not write frame artifacts: %v", err)
+		}
+	}
 
 	if writeArtifacts {
 		if err := writeJSONL(filepath.Join(dir, "assertions.jsonl"), assertionsToAny(assertions)); err != nil {
@@ -404,6 +437,11 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 		}
 		if err := writeJSONL(filepath.Join(dir, "interaction_trace.jsonl"), interactionsToAny(interactions)); err != nil {
 			h.t.Logf("usecasevalidation: could not write interaction_trace.jsonl: %v", err)
+		}
+		if len(frames) > 0 {
+			if err := writeFramePNGs(dir, frames); err != nil {
+				h.t.Logf("usecasevalidation: could not write evidence frame artifacts: %v", err)
+			}
 		}
 		if err := writeSummaryMD(filepath.Join(dir, "summary.md"), bundle); err != nil {
 			h.t.Logf("usecasevalidation: could not write summary.md: %v", err)
@@ -462,8 +500,265 @@ func writeSummaryMD(path string, b *EvidenceBundle) error {
 			fmt.Fprintf(&sb, "%d. %s\n", i+1, interaction.Summary)
 		}
 	}
+	if len(b.Frames) > 0 {
+		fmt.Fprintf(&sb, "\n## Visual frames\n\n")
+		for _, frame := range b.Frames {
+			fmt.Fprintf(&sb, "- [%s](%s): %s\n", frame.Label, frame.Path, frame.Summary)
+		}
+	}
 	fmt.Fprintf(&sb, "\n## Replay\n\n```bash\ngo test ./internal/usecasevalidation -run TestReplay -args -bundle %s\n```\n", filepath.Dir(path))
 	return os.WriteFile(path, []byte(sb.String()), 0o644)
+}
+
+func writeFramePNGs(baseDir string, frames []FrameRecord) error {
+	for _, frame := range frames {
+		path := filepath.Join(baseDir, filepath.FromSlash(frame.Path))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		file, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		err = png.Encode(file, renderFrameImage(frame))
+		closeErr := file.Close()
+		if err != nil {
+			return err
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+	return nil
+}
+
+func renderFrameImage(frame FrameRecord) image.Image {
+	const width = 960
+	const height = 540
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	fillRect(img, img.Bounds(), color.RGBA{R: 16, G: 20, B: 24, A: 255})
+	fillRect(img, image.Rect(0, 0, width, 72), color.RGBA{R: 37, G: 90, B: 99, A: 255})
+	drawText(img, 32, 28, "Terminals validation frame", color.RGBA{R: 238, G: 246, B: 247, A: 255})
+	drawText(img, 32, 94, "Step: "+frame.StepID, color.RGBA{R: 226, G: 232, B: 234, A: 255})
+	if frame.Terminal != "" {
+		drawText(img, 32, 122, "Terminal: "+frame.Terminal, color.RGBA{R: 190, G: 203, B: 207, A: 255})
+	}
+	y := 166
+	for _, line := range wrapText(frame.Summary, 82) {
+		drawText(img, 32, y, line, color.RGBA{R: 238, G: 238, B: 232, A: 255})
+		y += 28
+		if y > height-36 {
+			break
+		}
+	}
+	return img
+}
+
+func summarizeLatestUI(messages []transport.ProtoServerEnvelope) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		resp, ok := messages[i].(*controlv1.ConnectResponse)
+		if !ok {
+			continue
+		}
+		if setUI := resp.GetSetUi(); setUI != nil {
+			return "Set UI: " + summarizeNode(setUI.GetRoot())
+		}
+		if updateUI := resp.GetUpdateUi(); updateUI != nil {
+			return "Update UI " + updateUI.GetComponentId() + ": " + summarizeNode(updateUI.GetNode())
+		}
+		if notification := resp.GetNotification(); notification != nil {
+			return "Notification: " + notification.GetTitle() + " - " + notification.GetBody()
+		}
+	}
+	return "No server-driven UI message was observed before this assertion."
+}
+
+func summarizeNode(node *uiv1.Node) string {
+	if node == nil {
+		return "(empty)"
+	}
+	parts := []string{nodeWidgetName(node)}
+	if node.GetId() != "" {
+		parts = append(parts, "#"+node.GetId())
+	}
+	if text := node.GetText(); text != nil && text.GetValue() != "" {
+		parts = append(parts, quoteSummary(text.GetValue()))
+	}
+	if button := node.GetButton(); button != nil && button.GetLabel() != "" {
+		parts = append(parts, "button "+quoteSummary(button.GetLabel()))
+	}
+	props := node.GetProps()
+	if len(props) > 0 {
+		keys := make([]string, 0, len(props))
+		for key := range props {
+			if key == "id" || key == "draw_ops_json" {
+				continue
+			}
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if props[key] != "" {
+				parts = append(parts, key+"="+quoteSummary(props[key]))
+			}
+		}
+	}
+	children := node.GetChildren()
+	if len(children) > 0 {
+		childSummaries := make([]string, 0, minInt(len(children), 4))
+		for _, child := range children {
+			if len(childSummaries) == 4 {
+				break
+			}
+			childSummaries = append(childSummaries, summarizeNode(child))
+		}
+		if len(children) > 4 {
+			childSummaries = append(childSummaries, fmt.Sprintf("%d more", len(children)-4))
+		}
+		parts = append(parts, "children=["+strings.Join(childSummaries, "; ")+"]")
+	}
+	return strings.Join(parts, " ")
+}
+
+func nodeWidgetName(node *uiv1.Node) string {
+	switch {
+	case node.GetStack() != nil:
+		return "stack"
+	case node.GetRow() != nil:
+		return "row"
+	case node.GetGrid() != nil:
+		return "grid"
+	case node.GetScroll() != nil:
+		return "scroll"
+	case node.GetPadding() != nil:
+		return "padding"
+	case node.GetCenter() != nil:
+		return "center"
+	case node.GetExpand() != nil:
+		return "expand"
+	case node.GetText() != nil:
+		return "text"
+	case node.GetImage() != nil:
+		return "image"
+	case node.GetVideoSurface() != nil:
+		return "video_surface"
+	case node.GetAudioVisualizer() != nil:
+		return "audio_visualizer"
+	case node.GetCanvas() != nil:
+		return "canvas"
+	case node.GetTextInput() != nil:
+		return "text_input"
+	case node.GetButton() != nil:
+		return "button"
+	case node.GetSlider() != nil:
+		return "slider"
+	case node.GetToggle() != nil:
+		return "toggle"
+	case node.GetDropdown() != nil:
+		return "dropdown"
+	case node.GetGestureArea() != nil:
+		return "gesture_area"
+	case node.GetOverlay() != nil:
+		return "overlay"
+	case node.GetProgress() != nil:
+		return "progress"
+	case node.GetFullscreen() != nil:
+		return "fullscreen"
+	case node.GetKeepAwake() != nil:
+		return "keep_awake"
+	case node.GetBrightness() != nil:
+		return "brightness"
+	default:
+		return "node"
+	}
+}
+
+func quoteSummary(value string) string {
+	if len(value) > 80 {
+		value = value[:77] + "..."
+	}
+	return fmt.Sprintf("%q", value)
+}
+
+func safeArtifactName(value string) string {
+	var b strings.Builder
+	lastDash := false
+	for _, r := range strings.ToLower(value) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if b.Len() > 0 && !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "frame"
+	}
+	return out
+}
+
+func fillRect(img *image.RGBA, rect image.Rectangle, c color.RGBA) {
+	for y := rect.Min.Y; y < rect.Max.Y; y++ {
+		for x := rect.Min.X; x < rect.Max.X; x++ {
+			img.SetRGBA(x, y, c)
+		}
+	}
+}
+
+func drawText(img *image.RGBA, x, y int, text string, c color.RGBA) {
+	for i, r := range text {
+		if r < 32 || r > 126 {
+			r = '?'
+		}
+		drawGlyph(img, x+i*8, y, byte(r), c)
+	}
+}
+
+func drawGlyph(img *image.RGBA, x, y int, ch byte, c color.RGBA) {
+	for row := 0; row < 7; row++ {
+		for col := 0; col < 5; col++ {
+			if ((int(ch) >> uint((row+col)%7)) & 1) == 0 {
+				continue
+			}
+			fillRect(img, image.Rect(x+col, y+row*2, x+col+1, y+row*2+2), c)
+		}
+	}
+}
+
+func wrapText(text string, width int) []string {
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return []string{"(no UI summary)"}
+	}
+	var lines []string
+	line := ""
+	for _, word := range words {
+		if len(line)+len(word)+1 > width && line != "" {
+			lines = append(lines, line)
+			line = word
+			continue
+		}
+		if line == "" {
+			line = word
+		} else {
+			line += " " + word
+		}
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // AssertionRecord captures the result of a single named assertion.
@@ -483,6 +778,21 @@ type InteractionRecord struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// FrameRecord describes a deterministic visual artifact captured from server primitives.
+type FrameRecord struct {
+	StepID    string    `json:"step_id"`
+	Terminal  string    `json:"terminal,omitempty"`
+	Label     string    `json:"label"`
+	Path      string    `json:"path"`
+	Summary   string    `json:"summary,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// MediaManifest groups doc-site media artifacts emitted by validation.
+type MediaManifest struct {
+	Frames []FrameRecord `json:"frames,omitempty"`
+}
+
 // Manifest is the top-level summary written to manifest.json.
 type Manifest struct {
 	RunID             string              `json:"run_id"`
@@ -494,6 +804,7 @@ type Manifest struct {
 	Pass              bool                `json:"pass"`
 	FailingAssertions []string            `json:"failing_assertions,omitempty"`
 	InteractionTrace  []InteractionRecord `json:"interaction_trace,omitempty"`
+	Media             MediaManifest       `json:"media,omitempty"`
 }
 
 // EvidenceBundle holds the full set of captured evidence for a scenario run.
@@ -501,6 +812,7 @@ type EvidenceBundle struct {
 	Manifest     Manifest
 	Assertions   []AssertionRecord
 	Interactions []InteractionRecord
+	Frames       []FrameRecord
 }
 
 // MemStream is an in-process implementation of transport.ProtoStream.

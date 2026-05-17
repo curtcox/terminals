@@ -415,6 +415,11 @@ func (h *Harness) runExpectStep(t *testing.T, scenarioID string, stepIdx int, ex
 	}
 
 	h.Assert(id, desc, pass, detail)
+	if exp.Terminal != "" {
+		if term := terminals[exp.Terminal]; term != nil {
+			h.CaptureFrame(id, exp.Terminal, term.Received())
+		}
+	}
 }
 
 // ScenarioFilePath resolves a path under testdata/ next to this package.
