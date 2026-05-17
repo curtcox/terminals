@@ -283,6 +283,11 @@ Each milestone is independently shippable and leaves the site usable.
   frames and renders a summary note for the remaining frames, keeping long
   scenarios browseable while preserving full evidence through the scrubber and
   raw manifest.
+- 2026-05-17: Added an index-level status overview. The generated index now
+  shows DEFECT, UNTESTED, STALE, and PASSING counts above the family tables, so
+  the catalog's health is visible without scanning every row. The overview is
+  covered by the focused generator tests and included in both committed static
+  outputs.
 
 ## Open Questions
 

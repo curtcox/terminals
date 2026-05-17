@@ -22,6 +22,29 @@ a { color: #0b5cad; }
   padding-bottom: 18px;
 }
 
+.status-overview ul {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.status-overview li {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d9dedc;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.status-overview strong {
+  font-size: 1.25rem;
+}
+
 .case-header {
   padding: 22px;
   color: #111;

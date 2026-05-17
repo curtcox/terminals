@@ -195,6 +195,18 @@ family: "C"
         self.assertIn('<a href="../../artifacts/usecases/C1/frames/route-stream.png">failure frame</a>', c1_page)
         self.assertIn("Latest result manifest", c1_page)
 
+    def test_index_renders_status_overview_counts(self) -> None:
+        self.write_result("C1", "2026-05-17T12:00:00Z", False, "C1-route-stream")
+
+        self.module.RESULTS = self.module.latest_results(include_results=True)
+        usecases = self.module.parse_usecases()
+        index = self.module.render_index(usecases)
+
+        self.assertIn('<section class="status-overview" aria-label="Use case status summary">', index)
+        self.assertIn('<li><span class="badge defect">DEFECT</span><strong>1</strong></li>', index)
+        self.assertIn('<li><span class="badge untested">UNTESTED</span><strong>1</strong></li>', index)
+        self.assertIn('<li><span class="badge passing">PASSING</span><strong>0</strong></li>', index)
+
     def test_latest_result_prefers_newest_manifest(self) -> None:
         self.write_result("C1", "2026-05-17T11:00:00Z", False, "old-failure")
         newer = self.module.USECASE_VALIDATION / "newer" / "manifest.json"

@@ -436,12 +436,29 @@ def render_index(usecases: list[UseCase]) -> str:
     for usecase in sorted(usecases, key=lambda u: (status_rank(u), u.family, id_sort_key(u))):
         grouped.setdefault(usecase.family_title, []).append(usecase)
 
+    status_counts = OrderedDict(
+        (
+            ("defect", sum(1 for usecase in usecases if status_class(usecase) == "defect")),
+            ("untested", sum(1 for usecase in usecases if status_class(usecase) == "untested")),
+            ("stale", sum(1 for usecase in usecases if status_class(usecase) == "stale")),
+            ("passing", sum(1 for usecase in usecases if status_class(usecase) == "passing")),
+        )
+    )
+    status_summary = "\n".join(
+        f'        <li><span class="badge {name}">{name.upper()}</span><strong>{count}</strong></li>'
+        for name, count in status_counts.items()
+    )
     rows: list[str] = [
         "    <header class=\"site-header\">",
         "      <p class=\"eyebrow\">Generated from usecases/*.md</p>",
         "      <h1>Terminals Use Cases</h1>",
         "      <p class=\"lede\">One browseable index of what the system is meant to do and which behaviors are already covered by automated validation.</p>",
         "    </header>",
+        "    <section class=\"status-overview\" aria-label=\"Use case status summary\">",
+        "      <ul>",
+        status_summary,
+        "      </ul>",
+        "    </section>",
     ]
     for family, items in grouped.items():
         rows.append(f"    <section class=\"family\"><h2>{html.escape(family)}</h2>")
@@ -632,6 +649,29 @@ a { color: #0b5cad; }
 .site-header {
   border-bottom: 3px solid #2d5a63;
   padding-bottom: 18px;
+}
+
+.status-overview ul {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.status-overview li {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d9dedc;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.status-overview strong {
+  font-size: 1.25rem;
 }
 
 .case-header {
