@@ -23,6 +23,13 @@ fi
 metadata() {
   local id="$1"
   case "${id}" in
+    AB1) echo "AB1|Simulation|kitchen/front-of-house intercom: audio route opened from front_of_house to kitchen_terminal; stop closes route; harness-backed evidence" ;;
+    AB2) echo "AB2|Simulation|PA broadcast to sales floor: pa_system scenario started on manager_terminal; broadcast delivers 'PA from manager_terminal' to all sales floor devices" ;;
+    AB3) echo "AB3|Simulation|guest welcome display: photo_frame scenario started on lobby_display device; broadcast confirms display mode active" ;;
+    AB4) echo "AB4|Simulation|multi-window camera grid: multi_window scenario started on supervisor_terminal; video routes established from all four dock cameras" ;;
+    AB5) echo "AB5|Simulation|after-hours alarm monitoring: audio_monitor armed for glass_break; FakeSoundClassifier emits glass_break; alert broadcast to security_terminal" ;;
+    AB6) echo "AB6|Simulation|voice timer for food service: voice 'set a timer for 12 minutes table 5' sets timer with label; fake-clock advance fires 'Timer done!' broadcast" ;;
+    AB7) echo "AB7|Simulation|voice announcement to waiting area: announcement scenario started; waiting_area_terminal receives announcement_audio RouteStream; no duplicate routes" ;;
     AA1) echo "AA1|Simulation|external automation agent triggers announcement scenario via manual API; display terminal receives announcement_audio route; YAML scenario in internal/usecasevalidation/testdata/aa1-webhook-announce.yaml" ;;
     AA2) echo "AA2|Simulation|monitoring agent arms audio monitoring via manual API; fake classifier emits dryer_beep; broadcast targeted at agent device ID" ;;
     AA3) echo "AA3|Simulation|AI agent resolves ambiguous voice command via fake LLM; LLM-decoded announce intent routes announcement_audio to a second terminal" ;;
@@ -83,7 +90,7 @@ metadata() {
   esac
 }
 
-all_ids=(AA1 AA2 AA3 AA4 AA5 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 I3 I4 I6 D3 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10 V1 V2 V3)
+all_ids=(AB1 AB2 AB3 AB4 AB5 AB6 AB7 AA1 AA2 AA3 AA4 AA5 AA6 B1 B2 B3 B4 B5 C1 C2 C3 C5 I3 I4 I6 D3 D1 D2 M1 M2 M3 M4 M5 P2 P3 P4 S1 S2 S3 P1 PL1 PL8 PL20 T1 T2 T3 T4 UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10 V1 V2 V3)
 
 run_go_test() {
   local pkg="$1"
@@ -108,6 +115,27 @@ run_flutter_test() {
 run_usecase() {
   local id="$1"
   case "${id}" in
+    AB1)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAB1WithEvidence$'
+      ;;
+    AB2)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAB2WithEvidence$'
+      ;;
+    AB3)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAB3WithEvidence$'
+      ;;
+    AB4)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAB4WithEvidence$'
+      ;;
+    AB5)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAB5WithEvidence$'
+      ;;
+    AB6)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAB6WithEvidence$'
+      ;;
+    AB7)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseAB7WithEvidence$'
+      ;;
     AA1)
       run_go_test ./internal/usecasevalidation 'TestUseCaseAA1WithEvidence$'
       run_go_test ./internal/usecasevalidation 'TestYAMLScenarioAA1WebhookAnnounce$'
