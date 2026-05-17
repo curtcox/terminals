@@ -95,6 +95,7 @@ func NewHandler(
 	}
 
 	mux := http.NewServeMux()
+	mux.Handle("/artifacts/", newArtifactHandler())
 	mux.Handle("/docs/usecases/", newUsecaseSiteHandler())
 	mux.HandleFunc("/docs/usecases", redirectUsecaseSiteIndex)
 	mux.HandleFunc("/admin", h.handleDashboard)

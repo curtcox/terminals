@@ -78,6 +78,7 @@ func TestUseCaseM5WithEvidence(t *testing.T) {
 	h.Assert("M5-monitor-armed", "camera_monitor scenario started after arm command",
 		sawMonitorActive,
 		fmt.Sprintf("child-room received %d messages", len(childRoom.Received())))
+	h.CaptureFrame("M5-monitor-armed", "child-room", childRoom.Received())
 
 	// --- Activity inside window: synthetic time T+15min (7:15 AM) ---
 	// Camera activity at 7:15 AM is inside the 7–8 AM window and should fire.
@@ -128,4 +129,3 @@ func TestUseCaseM5WithEvidence(t *testing.T) {
 
 	h.Evidence("M5")
 }
-

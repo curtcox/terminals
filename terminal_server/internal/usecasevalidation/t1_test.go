@@ -70,6 +70,7 @@ func TestUseCaseT1WithEvidence(t *testing.T) {
 	h.Assert("T1-timer-set-voice", "timer_reminder scenario started via voice command",
 		sawScenarioStart,
 		fmt.Sprintf("kitchen received %d messages", len(kitchen.Received())))
+	h.CaptureFrame("T1-timer-started", "kitchen", kitchen.Received())
 
 	// At synthetic time T+0 no timer should fire yet.
 	processed0, err := h.ProcessDueTimers(context.Background())
