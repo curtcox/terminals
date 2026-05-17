@@ -300,6 +300,7 @@ usecases-site:
 	python3 ./scripts/build-usecase-site.py
 
 usecases-site-check:
+	python3 ./scripts/test_build_usecase_site.py
 	python3 ./scripts/build-usecase-site.py --check
 
 usecase-wiring-audit:

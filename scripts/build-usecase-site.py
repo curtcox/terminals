@@ -26,6 +26,7 @@ OUT = REPO / "docs" / "usecases-site"
 EMBED_OUT = REPO / "terminal_server" / "internal" / "admin" / "usecases_site_static"
 USECASE_RESULTS = REPO / "artifacts" / "usecases"
 USECASE_VALIDATION = REPO / "artifacts" / "usecase-validation"
+STALE_RESULT_DAYS = 30
 
 ID_RE = re.compile(r"^[A-Z]+\d+$")
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
@@ -185,13 +186,19 @@ def status_rank(usecase: UseCase) -> int:
     result = RESULTS.get(usecase.id)
     if result and not result.pass_:
         return 0
-    return 3 if usecase.automated else 1
+    if not usecase.automated:
+        return 1
+    if result and is_stale(result):
+        return 2
+    return 3
 
 
 def status_label(usecase: UseCase) -> str:
     result = RESULTS.get(usecase.id)
     if result and not result.pass_:
         return "DEFECT"
+    if result and is_stale(result):
+        return "STALE"
     return "PASSING" if usecase.automated else "UNTESTED"
 
 
@@ -199,6 +206,8 @@ def status_class(usecase: UseCase) -> str:
     result = RESULTS.get(usecase.id)
     if result and not result.pass_:
         return "defect"
+    if result and is_stale(result):
+        return "stale"
     return "passing" if usecase.automated else "untested"
 
 
@@ -210,6 +219,15 @@ def last_validated(usecase: UseCase) -> str:
     if parsed == datetime.min.replace(tzinfo=timezone.utc):
         return html.escape(result.timestamp_end)
     return parsed.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def is_stale(result: Result) -> bool:
+    if not result.pass_:
+        return False
+    parsed = parse_timestamp(result.timestamp_end)
+    if parsed == datetime.min.replace(tzinfo=timezone.utc):
+        return False
+    return (datetime.now(timezone.utc) - parsed).days > STALE_RESULT_DAYS
 
 
 def id_sort_key(usecase: UseCase) -> tuple[str, int, str]:
@@ -271,6 +289,8 @@ def render_usecase(usecase: UseCase) -> str:
     result = RESULTS.get(usecase.id)
     if result and not result.pass_:
         header_text = f"Failed on {last_validated(usecase)}: {result.first_failure}."
+    elif result and is_stale(result):
+        header_text = f"Last validated on {last_validated(usecase)} - result is older than {STALE_RESULT_DAYS} days."
     elif result:
         header_text = f"Validated on {last_validated(usecase)} - all assertions passed."
     elif usecase.automated:
@@ -362,6 +382,7 @@ a { color: #0b5cad; }
 
 .case-header.passing { background: #dff1df; border-left: 8px solid #247a35; }
 .case-header.untested { background: #fff2cc; border-left: 8px solid #a06c00; }
+.case-header.stale { background: #fff6d8; border-left: 8px solid #b08a00; }
 .case-header.defect { background: #ffe1df; border-left: 8px solid #b42318; }
 
 .eyebrow {
@@ -426,6 +447,7 @@ th button {
 
 .badge.passing { background: #247a35; color: #fff; }
 .badge.untested { background: #a06c00; color: #fff; }
+.badge.stale { background: #b08a00; color: #111; }
 .badge.defect { background: #b42318; color: #fff; }
 
 .placeholder {

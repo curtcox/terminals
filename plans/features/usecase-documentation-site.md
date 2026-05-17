@@ -175,6 +175,10 @@ Each milestone is independently shippable and leaves the site usable.
   including non-harness-backed package, Flutter, and app validations. This
   gives M2 a uniform pass/fail feed across the public `make usecase-validate`
   entry point while preserving detailed harness bundles where they exist.
+- 2026-05-17: The site generator now classifies old successful result
+  manifests as `STALE`, matching the planned badge priority, and
+  `make usecases-site-check` runs focused generator tests before the static
+  artifact drift check.
 
 ## Open Questions
 
