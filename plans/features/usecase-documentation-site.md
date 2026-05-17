@@ -205,6 +205,12 @@ Each milestone is independently shippable and leaves the site usable.
   `scripts/usecase-validate.sh` aggregate writer preserves harness media
   manifests so `make usecase-validate && python3 scripts/build-usecase-site.py
   --include-results` can render frame strips.
+- 2026-05-17: M4 video stitching started. When `ffmpeg` is available and a
+  validation run captured frames, the harness now writes a deterministic
+  `video/validation.mp4` walkthrough next to the frame PNGs and publishes it
+  through `media.videos` in both the per-use-case result manifest and the
+  run bundle manifest. Runs without `ffmpeg` still pass and keep the frame
+  evidence.
 
 ## Open Questions
 

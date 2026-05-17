@@ -12,6 +12,7 @@ import (
 	"image/png"
 	goio "io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime/debug"
 	"sort"
@@ -389,6 +390,9 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 		}
 	}
 
+	media := MediaManifest{
+		Frames: frames,
+	}
 	bundle := &EvidenceBundle{
 		Manifest: Manifest{
 			RunID:             h.runID,
@@ -400,9 +404,7 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 			Pass:              pass,
 			FailingAssertions: failingIDs,
 			InteractionTrace:  interactions,
-			Media: MediaManifest{
-				Frames: frames,
-			},
+			Media:             media,
 		},
 		Assertions:   assertions,
 		Interactions: interactions,
@@ -416,19 +418,33 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 		return bundle
 	}
 
+	resultDir := filepath.Join(artifactsRoot(), "usecases", usecaseID)
+	if err := os.MkdirAll(resultDir, 0o755); err != nil {
+		h.t.Logf("usecasevalidation: could not create result dir %s: %v", resultDir, err)
+	} else if len(frames) > 0 {
+		if err := writeFramePNGs(resultDir, frames); err != nil {
+			h.t.Logf("usecasevalidation: could not write frame artifacts: %v", err)
+		} else if video, err := writeFrameVideo(resultDir, frames); err != nil {
+			h.t.Logf("usecasevalidation: could not write video artifact: %v", err)
+		} else if video != nil {
+			bundle.Manifest.Media.Videos = append(bundle.Manifest.Media.Videos, *video)
+			bundle.Videos = append(bundle.Videos, *video)
+		}
+	}
+	if len(frames) > 0 {
+		if err := writeFramePNGs(dir, frames); err != nil {
+			h.t.Logf("usecasevalidation: could not write evidence frame artifacts: %v", err)
+		} else if _, err := writeFrameVideo(dir, frames); err != nil {
+			h.t.Logf("usecasevalidation: could not write evidence video artifact: %v", err)
+		}
+	}
 	if err := writeJSON(filepath.Join(dir, "manifest.json"), bundle.Manifest); err != nil {
 		h.t.Logf("usecasevalidation: could not write manifest.json: %v", err)
 	}
-	resultDir := filepath.Join(artifactsRoot(), "usecases", usecaseID)
 	if err := os.MkdirAll(resultDir, 0o755); err != nil {
 		h.t.Logf("usecasevalidation: could not create result dir %s: %v", resultDir, err)
 	} else if err := writeJSON(filepath.Join(resultDir, "result.json"), bundle.Manifest); err != nil {
 		h.t.Logf("usecasevalidation: could not write result.json: %v", err)
-	}
-	if len(frames) > 0 {
-		if err := writeFramePNGs(resultDir, frames); err != nil {
-			h.t.Logf("usecasevalidation: could not write frame artifacts: %v", err)
-		}
 	}
 
 	if writeArtifacts {
@@ -437,11 +453,6 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 		}
 		if err := writeJSONL(filepath.Join(dir, "interaction_trace.jsonl"), interactionsToAny(interactions)); err != nil {
 			h.t.Logf("usecasevalidation: could not write interaction_trace.jsonl: %v", err)
-		}
-		if len(frames) > 0 {
-			if err := writeFramePNGs(dir, frames); err != nil {
-				h.t.Logf("usecasevalidation: could not write evidence frame artifacts: %v", err)
-			}
 		}
 		if err := writeSummaryMD(filepath.Join(dir, "summary.md"), bundle); err != nil {
 			h.t.Logf("usecasevalidation: could not write summary.md: %v", err)
@@ -506,6 +517,12 @@ func writeSummaryMD(path string, b *EvidenceBundle) error {
 			fmt.Fprintf(&sb, "- [%s](%s): %s\n", frame.Label, frame.Path, frame.Summary)
 		}
 	}
+	if len(b.Videos) > 0 {
+		fmt.Fprintf(&sb, "\n## Video\n\n")
+		for _, video := range b.Videos {
+			fmt.Fprintf(&sb, "- [%s](%s)\n", video.Label, video.Path)
+		}
+	}
 	fmt.Fprintf(&sb, "\n## Replay\n\n```bash\ngo test ./internal/usecasevalidation -run TestReplay -args -bundle %s\n```\n", filepath.Dir(path))
 	return os.WriteFile(path, []byte(sb.String()), 0o644)
 }
@@ -530,6 +547,59 @@ func writeFramePNGs(baseDir string, frames []FrameRecord) error {
 		}
 	}
 	return nil
+}
+
+func writeFrameVideo(baseDir string, frames []FrameRecord) (*VideoRecord, error) {
+	if len(frames) == 0 {
+		return nil, nil
+	}
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return nil, nil
+	}
+	video := VideoRecord{
+		Label: "Validation walkthrough",
+		Path:  filepath.ToSlash(filepath.Join("video", "validation.mp4")),
+	}
+	videoPath := filepath.Join(baseDir, filepath.FromSlash(video.Path))
+	if err := os.MkdirAll(filepath.Dir(videoPath), 0o755); err != nil {
+		return nil, err
+	}
+	listPath := filepath.Join(filepath.Dir(videoPath), "frames.txt")
+	var sb strings.Builder
+	for _, frame := range frames {
+		framePath, err := filepath.Abs(filepath.Join(baseDir, filepath.FromSlash(frame.Path)))
+		if err != nil {
+			return nil, err
+		}
+		escaped := strings.ReplaceAll(framePath, "'", "'\\''")
+		fmt.Fprintf(&sb, "file '%s'\n", escaped)
+		fmt.Fprintf(&sb, "duration %.2f\n", 1.25)
+	}
+	lastFramePath, err := filepath.Abs(filepath.Join(baseDir, filepath.FromSlash(frames[len(frames)-1].Path)))
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprintf(&sb, "file '%s'\n", strings.ReplaceAll(lastFramePath, "'", "'\\''"))
+	if err := os.WriteFile(listPath, []byte(sb.String()), 0o644); err != nil {
+		return nil, err
+	}
+	cmd := exec.Command(
+		ffmpeg,
+		"-hide_banner",
+		"-loglevel", "error",
+		"-y",
+		"-f", "concat",
+		"-safe", "0",
+		"-i", listPath,
+		"-pix_fmt", "yuv420p",
+		"-movflags", "+faststart",
+		videoPath,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("ffmpeg: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return &video, nil
 }
 
 func renderFrameImage(frame FrameRecord) image.Image {
@@ -791,6 +861,13 @@ type FrameRecord struct {
 // MediaManifest groups doc-site media artifacts emitted by validation.
 type MediaManifest struct {
 	Frames []FrameRecord `json:"frames,omitempty"`
+	Videos []VideoRecord `json:"videos,omitempty"`
+}
+
+// VideoRecord describes a generated validation video artifact.
+type VideoRecord struct {
+	Label string `json:"label"`
+	Path  string `json:"path"`
 }
 
 // Manifest is the top-level summary written to manifest.json.
@@ -813,6 +890,7 @@ type EvidenceBundle struct {
 	Assertions   []AssertionRecord
 	Interactions []InteractionRecord
 	Frames       []FrameRecord
+	Videos       []VideoRecord
 }
 
 // MemStream is an in-process implementation of transport.ProtoStream.
