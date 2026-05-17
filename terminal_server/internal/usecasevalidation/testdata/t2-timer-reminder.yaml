@@ -31,5 +31,6 @@ steps:
   - expect:
       id: T2-done-notification
       description: broadcast emits Timer done after timer fires
+      terminal: kitchen
       broadcast_contains: "Timer done!"
   - disconnect: {}

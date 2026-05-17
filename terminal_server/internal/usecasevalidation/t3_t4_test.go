@@ -96,6 +96,8 @@ func TestUseCaseT3T4WithEvidence(t *testing.T) {
 		sawMonitorActive,
 		fmt.Sprintf("parent received %d messages", len(parent.Received())))
 
+	h.CaptureFrame("T3-monitor-armed", "parent", parent.Received())
+
 	// No camera activity sent — child is not yet up.
 
 	// Advance clock to alert time and fire due jobs.
@@ -140,6 +142,9 @@ func TestUseCaseT3T4WithEvidence(t *testing.T) {
 	h.Assert("T4-child-warned", "child-room notified 'The bus comes in 10 minutes'",
 		sawChildWarning,
 		fmt.Sprintf("broadcast events after warning time: %d", len(events2)))
+
+	h.CaptureFrame("T3-parent-alert", "parent", parent.Received())
+	h.CaptureFrame("T4-child-warned", "child-room", childRoom.Received())
 
 	if err := parent.Disconnect(); err != nil {
 		t.Logf("parent disconnect: %v", err)
@@ -218,6 +223,10 @@ func TestUseCaseT3ActivityCancelsAlert(t *testing.T) {
 		sawMonitorActive,
 		fmt.Sprintf("parent received %d messages", len(parent.Received())))
 
+	h.CaptureFrame("T3-monitor-armed", "parent2", parent.Received())
+
+	h.RecordInteraction("sensor", "Camera activity detected in child's room at 7:15 AM (child is up).", "child-room2")
+
 	// Child gets up at 7:15 — camera activity detected before alert time.
 	activityTimeMS := windowStart.Add(15 * time.Minute).UnixMilli()
 	childRoom.Send(usecasevalidation.SensorDataRequest("child-room2", activityTimeMS, map[string]float64{
@@ -247,6 +256,8 @@ func TestUseCaseT3ActivityCancelsAlert(t *testing.T) {
 	h.Assert("T3-alert-suppressed", "no 'no activity' alert when child was seen active",
 		!sawSpuriousAlert,
 		fmt.Sprintf("new broadcast events after alert time: %d", len(events)-beforeCount))
+
+	h.CaptureFrame("T3-alert-suppressed", "parent2", parent.Received())
 
 	_ = parent.Disconnect()
 	_ = childRoom.Disconnect()

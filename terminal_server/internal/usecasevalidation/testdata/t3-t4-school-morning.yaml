@@ -36,6 +36,7 @@ steps:
   - expect:
       id: T3-parent-notified
       description: parent notified that child has not been seen
+      terminal: parent
       broadcast_contains: "Morning routine: no activity detected"
   - clock_advance_to:
       time: "2026-09-01T07:50:01Z"
@@ -45,5 +46,6 @@ steps:
   - expect:
       id: T4-child-warned
       description: child-room notified bus warning
+      terminal: child_room
       broadcast_contains: "The bus comes in 10 minutes"
   - disconnect: {}

@@ -221,6 +221,16 @@ Each milestone is independently shippable and leaves the site usable.
   only the first, so secondary use cases (T4) get frames and interaction
   traces in their own result.json. Server CI now also uploads
   `artifacts/usecases/` as a `usecase-results-<run>` workflow artifact.
+- 2026-05-17: Extended CaptureFrame and RecordInteraction coverage to all
+  direct harness tests. Added CaptureFrame to c1, c2, t2, t3, t4, aa2, aa3,
+  aa4, aa5, v1, v2, v3 direct harness tests so every harness-validated use
+  case produces PNG frames and MP4 video walkthroughs. Added RecordInteraction
+  calls to aa2, aa3, aa5, v1, v2, v3 tests that were missing them. Added
+  `terminal` fields to broadcast_contains expect steps in t2-timer-reminder.yaml,
+  aa4-timer-cancel.yaml, and t3-t4-school-morning.yaml so YAML-scenario
+  broadcast assertions also capture the relevant terminal's UI state. Result:
+  all 53 validated use cases now produce frames and interaction traces when run
+  with USECASE_ARTIFACTS=1 (or via `make usecase-validate`).
 
 ## Open Questions
 

@@ -72,6 +72,8 @@ func TestUseCaseAA4WithEvidence(t *testing.T) {
 		sawTimerSet,
 		fmt.Sprintf("agent received %d messages", len(agent.Received())))
 
+	h.CaptureFrame("AA4-timer-created", "automation-agent", agent.Received())
+
 	// --- Step 2: verify timer is pending (would fire if clock advanced). ---
 	processedBefore, err := h.ProcessDueTimers(context.Background())
 	h.Assert("AA4-no-premature-fire", "timer does not fire before due time",
@@ -211,6 +213,8 @@ func TestUseCaseAA1WithEvidence(t *testing.T) {
 	h.Assert("AA1-route-delivered", "display terminal received announcement_audio route from agent trigger",
 		sawRoute,
 		fmt.Sprintf("display received %d messages", len(display.Received())))
+
+	h.CaptureFrame("AA1-route-delivered", "living-room", display.Received())
 
 	_ = agent.Disconnect()
 	_ = display.Disconnect()

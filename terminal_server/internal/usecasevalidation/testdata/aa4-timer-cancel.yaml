@@ -32,6 +32,7 @@ steps:
   - expect:
       id: AA4-timer-cancelled
       description: scheduling agent cancelled the timer via manual API
+      terminal: agent
       broadcast_contains: "Timer cancelled"
   - clock_advance_to:
       time: "2026-05-16T10:11:00Z"

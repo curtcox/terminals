@@ -127,6 +127,8 @@ func TestUseCaseC2WithEvidence(t *testing.T) {
 		)
 	}
 
+	h.CaptureFrame("C2-announcement-routes-sent", "hall", hall.Received())
+
 	// Disconnect all terminals cleanly.
 	for _, term := range []*usecasevalidation.SimTerminal{speaker, hall, living, bedroom} {
 		if err := term.Disconnect(); err != nil {

@@ -50,6 +50,8 @@ func TestUseCaseAA5WithEvidence(t *testing.T) {
 		t.Fatal("vision-agent terminal: timed out waiting for session establishment")
 	}
 
+	h.RecordInteraction("command", "Run \"vision analysis\" with prompt=\"Identify packages, people, or vehicles at the front door\" on the vision-agent device.", "vision-agent")
+
 	// --- Step 1: agent arms vision analysis for the front door camera. ---
 	agent.Send(&controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Command{
@@ -74,6 +76,8 @@ func TestUseCaseAA5WithEvidence(t *testing.T) {
 	h.Assert("AA5-vision-armed", "vision agent armed vision analysis via manual API",
 		sawVisionArmed,
 		fmt.Sprintf("agent received %d messages", len(agent.Received())))
+
+	h.CaptureFrame("AA5-vision-armed", "vision-agent", agent.Received())
 
 	// --- Step 2: camera activity is detected. ---
 	// Inject a camera_activity sensor reading from the agent device to trigger
@@ -130,6 +134,8 @@ func TestUseCaseAA5WithEvidence(t *testing.T) {
 	h.Assert("AA5-labels-included", "broadcast message includes camera labels",
 		strings.Contains(analysisMsg, "package") && strings.Contains(analysisMsg, "door"),
 		fmt.Sprintf("message: %q", analysisMsg))
+
+	h.CaptureFrame("AA5-analysis-result", "vision-agent", agent.Received())
 
 	// --- Step 5: zero activity is suppressed. ---
 	beforeCount := len(h.Broadcast.Events())

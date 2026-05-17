@@ -75,6 +75,8 @@ func TestUseCaseT2WithEvidence(t *testing.T) {
 		sawSetNotification,
 		fmt.Sprintf("kitchen received %d messages", len(kitchen.Received())))
 
+	h.CaptureFrame("T2-timer-set", "kitchen", kitchen.Received())
+
 	// At synthetic time T+0: no timer should fire yet.
 	processed0, err := h.ProcessDueTimers(context.Background())
 	h.Assert("T2-no-premature-fire", "no timers fire before the due time",

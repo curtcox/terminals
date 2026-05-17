@@ -53,6 +53,8 @@ func TestUseCaseAA2WithEvidence(t *testing.T) {
 		t.Fatal("monitoring-agent terminal: timed out waiting for session establishment")
 	}
 
+	h.RecordInteraction("command", "Run \"audio monitor\" with target=\"dryer\" on the monitoring-agent device.", "monitoring-agent")
+
 	// --- Step 1: agent arms audio monitoring for the dryer target. ---
 	// In production this would be triggered by configuration or an external event.
 	agent.Send(&controlv1.ConnectRequest{
@@ -77,6 +79,8 @@ func TestUseCaseAA2WithEvidence(t *testing.T) {
 	h.Assert("AA2-monitor-armed", "monitoring agent armed audio monitoring via manual API",
 		sawMonitorArmed,
 		fmt.Sprintf("agent received %d messages", len(agent.Received())))
+
+	h.CaptureFrame("AA2-monitor-armed", "monitoring-agent", agent.Received())
 
 	// --- Step 2: wait for the dryer_beep classification event to be broadcast. ---
 	// The fake sound classifier emits the event immediately after arming; the

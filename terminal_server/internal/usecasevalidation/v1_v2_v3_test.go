@@ -41,6 +41,8 @@ func voiceAssistantHarness(t *testing.T, deviceID, voiceText, llmResponse string
 		t.Fatalf("%s: timed out waiting for session establishment", deviceID)
 	}
 
+	h.RecordInteraction("voice", fmt.Sprintf("Say %q on the %s device.", voiceText, deviceID), deviceID)
+
 	term.Send(&controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Command{
 			Command: &controlv1.CommandRequest{
@@ -116,6 +118,8 @@ func TestUseCaseV1WithEvidence(t *testing.T) {
 		sawResponse,
 		fmt.Sprintf("broadcast events: %d", len(events)))
 
+	h.CaptureFrame("V1-assistant-response", deviceID, term.Received())
+
 	if err := term.Disconnect(); err != nil {
 		t.Logf("%s disconnect: %v", deviceID, err)
 	}
@@ -173,6 +177,8 @@ func TestUseCaseV2WithEvidence(t *testing.T) {
 		sawRecipe,
 		fmt.Sprintf("broadcast events: %d", len(events)))
 
+	h.CaptureFrame("V2-recipe-response", deviceID, term.Received())
+
 	if err := term.Disconnect(); err != nil {
 		t.Logf("%s disconnect: %v", deviceID, err)
 	}
@@ -227,6 +233,8 @@ func TestUseCaseV3WithEvidence(t *testing.T) {
 		"general-knowledge answer is broadcast back to the requesting device",
 		sawAnswer,
 		fmt.Sprintf("broadcast events: %d", len(events)))
+
+	h.CaptureFrame("V3-answer-response", deviceID, term.Received())
 
 	if err := term.Disconnect(); err != nil {
 		t.Logf("%s disconnect: %v", deviceID, err)

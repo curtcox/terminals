@@ -61,6 +61,8 @@ func TestUseCaseAA3WithEvidence(t *testing.T) {
 		t.Fatal("living terminal: timed out waiting for session establishment")
 	}
 
+	h.RecordInteraction("voice", "Say \"please broadcast a message that dinner is ready\" on the Kitchen device.", "kitchen")
+
 	// --- Step 1: send ambiguous voice command. ---
 	// "please broadcast a message that dinner is ready" does not match any
 	// fixed keyword in ParseVoiceTrigger, so shouldResolveWithLLM returns true.
@@ -98,6 +100,9 @@ func TestUseCaseAA3WithEvidence(t *testing.T) {
 		"announcement audio route delivered to non-speaking terminal after LLM resolution",
 		sawRoute,
 		fmt.Sprintf("living received %d messages", len(living.Received())))
+
+	h.CaptureFrame("AA3-llm-resolved", "kitchen", kitchen.Received())
+	h.CaptureFrame("AA3-route-delivered", "living", living.Received())
 
 	for _, term := range []*usecasevalidation.SimTerminal{kitchen, living} {
 		if err := term.Disconnect(); err != nil {

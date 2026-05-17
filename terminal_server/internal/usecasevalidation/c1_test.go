@@ -87,5 +87,7 @@ func TestUseCaseC1WithEvidence(t *testing.T) {
 	h.Assert("C1-stop-stream", "intercom stop emits stop stream for audio route",
 		sawStop, fmt.Sprintf("sent=%d messages", len(stream.Sent)))
 
+	h.CaptureFrame("C1-intercom-routed", "device-1", stream.Sent)
+
 	h.Evidence("C1")
 }
