@@ -268,6 +268,11 @@ Each milestone is independently shippable and leaves the site usable.
   the terminal stream. `replayHostEvents` and `applyDescriptorPatch` handle the
   transport layer's `act:<device>/<id>` scoping side-effect (the scoping mutates
   shared Props maps) by matching both plain and scoped component IDs.
+- 2026-05-17: Defect evidence rendering now links failed assertions to their
+  captured frame when the assertion ID matches a frame step ID. The per-use-case
+  Defects section renders validation failures and open bug-report links as
+  separate evidence lists, preserving passing-result messaging while making
+  failure pages more directly actionable.
 
 ## Open Questions
 

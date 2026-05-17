@@ -475,19 +475,7 @@ def render_usecase(usecase: UseCase) -> str:
     else:
         header_text = "UNTESTED - no automated scenario exists for this use case."
 
-    defect_html = (
-        "<p>No defects detected in the latest captured result.</p>"
-        if result and result.pass_
-        else "<p>No result.json defect feed is available yet.</p>"
-    )
-    if result and not result.pass_:
-        failures = ", ".join(html.escape(item) for item in result.failing_assertions) or "validation failed"
-        defect_html = f"<p>Latest validation failed: {failures}.</p>"
-    if bugs:
-        bug_items = "\n        ".join(
-            f'<li><a href="../../{html.escape(bug.source)}">{html.escape(bug.label)}</a></li>' for bug in bugs
-        )
-        defect_html = f"<ul>\n        {bug_items}\n      </ul>"
+    defect_html = render_defects(result, bugs)
     evidence_items = [
         f'<li><a href="../../{html.escape(usecase.source)}">{html.escape(usecase.source)}</a></li>',
     ]
@@ -573,6 +561,34 @@ def render_audio_media(result: Result | None) -> str:
         for asset in result.audio
     )
     return items
+
+
+def render_defects(result: Result | None, bugs: tuple[BugReport, ...]) -> str:
+    parts: list[str] = []
+    if result and not result.pass_:
+        failures = result.failing_assertions or ("validation failed",)
+        frame_by_label = {frame.label: frame for frame in result.frames}
+        items: list[str] = []
+        for failure in failures:
+            frame = frame_by_label.get(failure)
+            frame_link = ""
+            if frame is not None:
+                frame_link = f' <a href="{html.escape(frame.path)}">failure frame</a>'
+            items.append(f"<li>{html.escape(failure)}{frame_link}</li>")
+        parts.append("<p>Latest validation failed:</p>")
+        parts.append("<ul>\n        " + "\n        ".join(items) + "\n      </ul>")
+    elif result and result.pass_:
+        parts.append("<p>No defects detected in the latest captured result.</p>")
+    else:
+        parts.append("<p>No result.json defect feed is available yet.</p>")
+
+    if bugs:
+        bug_items = "\n        ".join(
+            f'<li><a href="../../{html.escape(bug.source)}">{html.escape(bug.label)}</a></li>' for bug in bugs
+        )
+        parts.append("<p>Open bug reports:</p>")
+        parts.append(f"<ul>\n        {bug_items}\n      </ul>")
+    return "\n      ".join(parts)
 
 
 def stylesheet() -> str:
