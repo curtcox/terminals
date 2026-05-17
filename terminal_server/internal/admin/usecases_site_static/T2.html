@@ -41,6 +41,9 @@
         <li><a href="../../usecases/timers.md">usecases/timers.md</a></li>
         <li><code>make usecase-validate USECASE=T2</code></li>
         <li>Primary validation evidence: Simulation: timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms &#x27;Timer done!&#x27; without real elapsed time; YAML scenario in internal/usecasevalidation/testdata/t2-timer-reminder.yaml</li>
+        <li><a href="../../terminal_server/internal/usecasevalidation/testdata/t2-timer-reminder.yaml">YAML scenario: t2-timer-reminder.yaml</a></li>
+        <li><a href="../../terminal_server/internal/usecasevalidation/t2_test.go">Go test: TestUseCaseT2WithEvidence (t2_test.go)</a></li>
+        <li><a href="../../terminal_server/internal/usecasevalidation/scenario_yaml_test.go">Go test: TestYAMLScenarioT2TimerReminder (scenario_yaml_test.go)</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
       </ul>

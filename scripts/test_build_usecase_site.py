@@ -226,6 +226,50 @@ family: "C"
         self.assertIn('<a href="../../artifacts/usecases/C1/frames/route-stream.png">failure frame</a>', c1_page)
         self.assertIn("Latest result manifest", c1_page)
 
+    def test_validation_evidence_links_include_scenario_yaml_and_go_test(self) -> None:
+        pkg = self.root / "terminal_server" / "internal" / "usecasevalidation"
+        pkg.mkdir(parents=True)
+        (pkg / "c1_test.go").write_text("func TestUseCaseC1WithEvidence(t *testing.T) {}\n")
+        yaml = pkg / "testdata" / "c1-route.yaml"
+        yaml.parent.mkdir(parents=True)
+        yaml.write_text("id: c1\n")
+        self.module.VALIDATOR.write_text(
+            """metadata() {
+  local id="$1"
+  case "${id}" in
+    C1) echo "C1|Transport|YAML scenario in internal/usecasevalidation/testdata/c1-route.yaml" ;;
+  esac
+}
+run_usecase() {
+  local id="$1"
+  case "${id}" in
+    C1)
+      run_go_test ./internal/usecasevalidation 'TestUseCaseC1WithEvidence$'
+      ;;
+  esac
+}
+all_ids=(C1)
+"""
+        )
+        links = self.module.validation_evidence_links("C1")
+        paths = {link.path for link in links}
+        self.assertIn("terminal_server/internal/usecasevalidation/testdata/c1-route.yaml", paths)
+        self.assertIn("terminal_server/internal/usecasevalidation/c1_test.go", paths)
+
+        usecases = self.module.parse_usecases()
+        c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
+        self.assertIn("YAML scenario: c1-route.yaml", c1_page)
+        self.assertIn("Go test: TestUseCaseC1WithEvidence (c1_test.go)", c1_page)
+
+    def test_stale_usecase_sorts_after_not_validated(self) -> None:
+        self.write_result("C1", "2024-01-01T00:00:00Z", True)
+        self.module.RESULTS = self.module.latest_results(include_results=True)
+        usecases = self.module.parse_usecases()
+        c1 = next(usecase for usecase in usecases if usecase.id == "C1")
+        self.assertEqual(self.module.status_rank(c1), 3)
+        index = self.module.render_index(usecases)
+        self.assertIn('data-status="stale" data-filter="c1 stale call the kitchen communication" data-sort-id="C1" data-sort-status="3"', index)
+
     def test_usecase_page_links_client_ui_inspection_evidence(self) -> None:
         usecases = self.module.parse_usecases()
         c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
@@ -269,7 +313,7 @@ family: "C"
             index,
         )
         self.assertIn(
-            '<tr data-status="passing" data-filter="c1 passing call the kitchen communication" data-sort-id="C1" data-sort-status="3" data-sort-title="call the kitchen"',
+            '<tr data-status="passing" data-filter="c1 passing call the kitchen communication" data-sort-id="C1" data-sort-status="4" data-sort-title="call the kitchen"',
             index,
         )
         self.assertIn(

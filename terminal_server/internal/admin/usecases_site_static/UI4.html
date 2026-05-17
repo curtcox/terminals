@@ -41,6 +41,10 @@
         <li><a href="../../usecases/terminal-ui.md">usecases/terminal-ui.md</a></li>
         <li><code>make usecase-validate USECASE=UI4</code></li>
         <li>Primary validation evidence: Transport+Client: privacy toggle: proto withdrawal, server routes, post-cutover frame drop</li>
+        <li><a href="../../terminal_server/internal/transport/control_stream_sensor_voice_test.go">Go test: TestHandleMessageVoiceAudioDropsPostPrivacyCutoverFrames (control_stream_sensor_voice_test.go)</a></li>
+        <li><a href="../../terminal_server/internal/transport/generated_proto_integration_intercom_test.go">Go test: TestGeneratedSessionPrivacyToggleCapabilityLossStopsAudioAndVideoRoutes (generated_proto_integration_intercom_test.go)</a></li>
+        <li><a href="../../terminal_server/internal/transport/generated_proto_adapter_test.go">Go test: TestProtoRoundTripCapabilityDeltaPrivacyWithdrawalOmitsMicAndCameraFields (generated_proto_adapter_test.go)</a></li>
+        <li><a href="../../terminal_client/test/widget_test_media.dart">Flutter test: privacy.toggle stops local capture before sending capability delta</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
       </ul>

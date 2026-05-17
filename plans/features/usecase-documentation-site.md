@@ -343,6 +343,10 @@ Each milestone is independently shippable and leaves the site usable.
   (`DEFECT`, `UNTESTED`, `NOT VALIDATED`/`STALE`, `PASSING`), IDs sort
   naturally, last-validated dates sort by timestamps, and sort buttons expose
   `aria-sort` state for assistive technology.
+- 2026-05-17: Per-page Evidence sections now link directly to the YAML scenario
+  files and Go/Flutter test sources referenced by `scripts/usecase-validate.sh`,
+  matching the planned evidence list. Status sort keys now rank `NOT VALIDATED`
+  ahead of `STALE` so the index default order matches the badge priority.
 
 ## Open Questions
 

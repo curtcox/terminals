@@ -37,6 +37,16 @@ ID_RE = re.compile(r"^[A-Z]+\d+$")
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 ALL_IDS_RE = re.compile(r"^all_ids=\(([^)]*)\)\s*$")
 METADATA_RE = re.compile(r"^\s*([A-Z]+\d+)\)\s+echo\s+\"([A-Z]+\d+)\|([^|]*)\|([^\"]*)\"\s+;;")
+VALIDATOR_YAML_RE = re.compile(
+    r"(?:terminal_server/)?(internal/usecasevalidation/testdata/[A-Za-z0-9_.-]+\.yaml)"
+)
+RUN_GO_TEST_RE = re.compile(r"run_go_test\s+(\./\S+)\s+'([^']+)'")
+RUN_FLUTTER_TEST_RE = re.compile(r"run_flutter_test\s+(\S+)\s+'([^']+)'")
+RUN_APP_TEST_RE = re.compile(r"run_app_test\s+'([^']+)'")
+CASE_BLOCK_RE = re.compile(
+    r"^\s+([A-Z]+\d+)\)\s*\n((?:[ \t]+.*\n)*?[ \t]+;;\s*\n)",
+    re.MULTILINE,
+)
 
 
 @dataclass(frozen=True)
@@ -109,6 +119,12 @@ class BugReport:
         return self.report_id
 
 
+@dataclass(frozen=True)
+class ValidationLink:
+    label: str
+    path: str
+
+
 def parse_frontmatter(text: str) -> dict[str, str]:
     match = FRONTMATTER_RE.match(text)
     if not match:
@@ -157,6 +173,99 @@ def validation_metadata() -> dict[str, tuple[str, str]]:
             continue
         metadata[case_id] = (depth.strip(), evidence.strip())
     return metadata
+
+
+def validator_text() -> str:
+    if not VALIDATOR.exists():
+        return ""
+    return VALIDATOR.read_text()
+
+
+def run_usecase_block(usecase_id: str) -> str:
+    match = CASE_BLOCK_RE.search(validator_text())
+    while match:
+        if match.group(1) == usecase_id:
+            return match.group(2)
+        match = CASE_BLOCK_RE.search(validator_text(), match.end())
+    return ""
+
+
+def terminal_server_package_dir(package: str) -> Path:
+    return REPO / "terminal_server" / package.removeprefix("./")
+
+
+def primary_go_test_name(run_pattern: str) -> str | None:
+    candidate = run_pattern.rstrip("$")
+    direct = re.search(r"Test(?:UseCase[A-Z0-9]+WithEvidence|YAMLScenario[A-Za-z0-9]+)", candidate)
+    if direct:
+        return direct.group(0)
+    if candidate.startswith("Test") and "|" not in candidate and "(" not in candidate:
+        return candidate
+    return None
+
+
+def discover_go_test_files(package: str, run_pattern: str) -> list[Path]:
+    cache_key = (package, run_pattern)
+    if cache_key in GO_TEST_FILE_CACHE:
+        return GO_TEST_FILE_CACHE[cache_key]
+    test_name = primary_go_test_name(run_pattern)
+    if not test_name:
+        GO_TEST_FILE_CACHE[cache_key] = []
+        return []
+    pkg_dir = terminal_server_package_dir(package)
+    matches: list[Path] = []
+    if pkg_dir.exists():
+        for path in pkg_dir.rglob("*_test.go"):
+            try:
+                text = path.read_text()
+            except OSError:
+                continue
+            if f"func {test_name}(" in text:
+                matches.append(path)
+    GO_TEST_FILE_CACHE[cache_key] = matches
+    return matches
+
+
+def yaml_paths_from_evidence(evidence: str) -> list[str]:
+    paths: list[str] = []
+    for match in VALIDATOR_YAML_RE.findall(evidence):
+        normalized = match if match.startswith("terminal_server/") else f"terminal_server/{match}"
+        if (REPO / normalized).exists():
+            paths.append(normalized)
+    return sorted(dict.fromkeys(paths))
+
+
+def validation_evidence_links(usecase_id: str) -> tuple[ValidationLink, ...]:
+    if not VALIDATOR.exists():
+        return ()
+    metadata = validation_metadata()
+    _, evidence = metadata.get(usecase_id, ("", ""))
+    links: list[ValidationLink] = []
+    seen: set[str] = set()
+
+    def add(label: str, path: str) -> None:
+        if path in seen:
+            return
+        seen.add(path)
+        links.append(ValidationLink(label=label, path=path))
+
+    for yaml_path in yaml_paths_from_evidence(evidence):
+        add(f"YAML scenario: {Path(yaml_path).name}", yaml_path)
+
+    block = run_usecase_block(usecase_id)
+    for package, run_pattern in RUN_GO_TEST_RE.findall(block):
+        for path in discover_go_test_files(package, run_pattern):
+            rel = path.relative_to(REPO).as_posix()
+            test_name = primary_go_test_name(run_pattern) or run_pattern.rstrip("$")
+            add(f"Go test: {test_name} ({path.name})", rel)
+    for rel_path, plain_name in RUN_FLUTTER_TEST_RE.findall(block):
+        client_path = f"terminal_client/{rel_path}"
+        if (REPO / client_path).exists():
+            add(f"Flutter test: {plain_name}", client_path)
+    for app_name in RUN_APP_TEST_RE.findall(block):
+        add(f"App test: {app_name}", "terminal_server/cmd/term")
+
+    return tuple(links)
 
 
 def parse_timestamp(value: str) -> datetime:
@@ -414,8 +523,8 @@ def status_rank(usecase: UseCase) -> int:
     if not result:
         return 2
     if is_stale(result):
-        return 2
-    return 3
+        return 3
+    return 4
 
 
 def status_label(usecase: UseCase) -> str:
@@ -608,6 +717,10 @@ def render_usecase(usecase: UseCase) -> str:
             depth = f"{usecase.validation_depth}: " if usecase.validation_depth else ""
             evidence_items.append(
                 f"<li>Primary validation evidence: {html.escape(depth + usecase.validation_evidence)}</li>"
+            )
+        for link in validation_evidence_links(usecase.id):
+            evidence_items.append(
+                f'<li><a href="../../{html.escape(link.path)}">{html.escape(link.label)}</a></li>'
             )
     else:
         evidence_items.append("<li>No automated validation command wired yet.</li>")
@@ -1281,6 +1394,7 @@ def main() -> int:
 
 RESULTS: dict[str, Result] = {}
 BUG_REPORTS_BY_USECASE: dict[str, tuple[BugReport, ...]] = {}
+GO_TEST_FILE_CACHE: dict[tuple[str, str], list[Path]] = {}
 
 if __name__ == "__main__":
     sys.exit(main())
