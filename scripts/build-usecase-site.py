@@ -65,6 +65,13 @@ class MediaAsset:
 
 
 @dataclass(frozen=True)
+class InteractionStep:
+    kind: str
+    summary: str
+    terminal: str
+
+
+@dataclass(frozen=True)
 class Result:
     usecase_id: str
     run_id: str
@@ -72,7 +79,7 @@ class Result:
     timestamp_end: str
     pass_: bool
     failing_assertions: tuple[str, ...]
-    interaction_trace: tuple[str, ...]
+    interaction_trace: tuple[InteractionStep, ...]
     frames: tuple[MediaAsset, ...]
     videos: tuple[MediaAsset, ...]
     audio: tuple[MediaAsset, ...]
@@ -177,7 +184,7 @@ def result_from_manifest(path: Path) -> Result | None:
         timestamp_end=str(raw.get("timestamp_end", "")),
         pass_=bool(raw.get("pass", False)),
         failing_assertions=tuple(str(item) for item in raw.get("failing_assertions", [])),
-        interaction_trace=tuple(interaction_summaries(raw.get("interaction_trace", []))),
+        interaction_trace=tuple(interaction_steps(raw.get("interaction_trace", []))),
         frames=tuple(media_assets(raw, "frames", "screenshot", path)),
         videos=tuple(media_assets(raw, "videos", "video", path)),
         audio=tuple(media_assets(raw, "audio", "audio", path)),
@@ -185,17 +192,23 @@ def result_from_manifest(path: Path) -> Result | None:
     )
 
 
-def interaction_summaries(raw: object) -> list[str]:
+def interaction_steps(raw: object) -> list[InteractionStep]:
     if not isinstance(raw, list):
         return []
-    summaries: list[str] = []
+    steps: list[InteractionStep] = []
     for item in raw:
         if not isinstance(item, dict):
             continue
         summary = str(item.get("summary", "")).strip()
         if summary:
-            summaries.append(summary)
-    return summaries
+            steps.append(
+                InteractionStep(
+                    kind=str(item.get("kind", "")).strip(),
+                    summary=summary,
+                    terminal=str(item.get("terminal", "")).strip(),
+                )
+            )
+    return steps
 
 
 def media_assets(raw: dict[str, object], key: str, kind: str, manifest_path: Path) -> list[MediaAsset]:
@@ -556,7 +569,7 @@ def render_usecase(usecase: UseCase) -> str:
             evidence_items.append(f"<li>Scenario: {html.escape(result.scenario_name)}</li>")
     evidence_html = "\n        ".join(evidence_items)
     if result and result.interaction_trace:
-        interaction_items = "\n        ".join(f"<li>{html.escape(item)}</li>" for item in result.interaction_trace)
+        interaction_items = "\n        ".join(f"<li>{html.escape(item.summary)}</li>" for item in result.interaction_trace)
         interaction_html = f"<ol>\n        {interaction_items}\n      </ol>"
     elif usecase.automated:
         interaction_html = f'<p class="placeholder">Run <code>make usecase-validate USECASE={usecase.id}</code> to generate interaction traces for this use case.</p>'
@@ -633,7 +646,28 @@ def render_visual_media(result: Result | None) -> str:
             parts.append(
                 f'<p class="media-note">{hidden} additional frames are available through the scrubber and raw result manifest.</p>'
             )
+    if result.interaction_trace:
+        parts.append(render_interaction_transcript(result.interaction_trace))
     return "\n      ".join(parts)
+
+
+def render_interaction_transcript(interactions: tuple[InteractionStep, ...]) -> str:
+    rows: list[str] = []
+    for index, interaction in enumerate(interactions, start=1):
+        detail = interaction.summary
+        if interaction.terminal:
+            detail = f"{detail} ({interaction.terminal})"
+        kind = interaction.kind.upper() if interaction.kind else "STEP"
+        rows.append(
+            f"<li><span>{index}</span><strong>{html.escape(kind)}</strong>{html.escape(detail)}</li>"
+        )
+    items = "\n          ".join(rows)
+    return (
+        '<aside class="interaction-transcript" aria-label="Interaction transcript">'
+        "<h3>Interaction transcript</h3>"
+        f"<ol>\n          {items}\n        </ol>"
+        "</aside>"
+    )
 
 
 def render_audio_media(result: Result | None) -> str:
@@ -764,9 +798,10 @@ a { color: #0b5cad; }
   text-transform: uppercase;
 }
 
-h1, h2 { line-height: 1.15; }
+h1, h2, h3 { line-height: 1.15; }
 h1 { margin: 0 0 12px; font-size: 2.2rem; }
 h2 { margin: 0 0 10px; font-size: 1.25rem; }
+h3 { margin: 0 0 10px; font-size: 1rem; }
 
 .lede { max-width: 760px; font-size: 1.1rem; }
 
@@ -911,6 +946,38 @@ th button {
   display: block;
   font-size: 0.85rem;
   padding: 6px 8px;
+}
+
+.interaction-transcript {
+  background: #fff;
+  border: 1px solid #d9dedc;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.interaction-transcript ol {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.interaction-transcript li {
+  align-items: baseline;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 2rem 5.5rem 1fr;
+}
+
+.interaction-transcript span {
+  color: #586467;
+  font-variant-numeric: tabular-nums;
+}
+
+.interaction-transcript strong {
+  color: #334044;
+  font-size: 0.78rem;
 }
 
 .back {

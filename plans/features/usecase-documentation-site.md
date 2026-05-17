@@ -313,6 +313,12 @@ Each milestone is independently shippable and leaves the site usable.
   empty family sections without adding dependencies. Focused generator tests
   cover the controls, row metadata, and filter script; the committed static
   site plus embedded admin copy were regenerated.
+- 2026-05-17: Interaction traces now stay structured inside the site generator
+  and captured media pages render an "Interaction transcript" panel beside the
+  visual evidence. The panel preserves action kind and terminal context while
+  the existing "How to use it" section remains a user-facing ordered list.
+  Focused generator tests cover the transcript markup; the committed static
+  site plus embedded admin copy were regenerated.
 
 ## Open Questions
 

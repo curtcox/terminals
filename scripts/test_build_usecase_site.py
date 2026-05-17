@@ -146,6 +146,10 @@ family: "C"
                 {"label": "Caller audio", "path": "audio/caller.wav"},
             ],
         }
+        data["interaction_trace"] = [
+            {"kind": "voice", "summary": 'Say "call the kitchen".', "terminal": "hall"},
+            {"kind": "command", "summary": 'Tap "End call".', "terminal": "hall"},
+        ]
         path.write_text(json.dumps(data))
 
         self.module.RESULTS = self.module.latest_results(include_results=True)
@@ -163,6 +167,9 @@ family: "C"
         self.assertIn('<img class="frame-preview-image" src="../../artifacts/usecases/C1/frames/connected.png"', c1_page)
         self.assertIn('<img src="../../artifacts/usecases/C1/frames/connected.png"', c1_page)
         self.assertIn('<audio controls src="../../artifacts/usecases/C1/audio/caller.wav">', c1_page)
+        self.assertIn('<aside class="interaction-transcript" aria-label="Interaction transcript">', c1_page)
+        self.assertIn("<strong>VOICE</strong>Say &quot;call the kitchen&quot;. (hall)", c1_page)
+        self.assertIn("<strong>COMMAND</strong>Tap &quot;End call&quot;. (hall)", c1_page)
         self.assertNotIn("Rendered server-primitive screenshots are not captured yet", c1_page)
         self.assertNotIn("Audio artifacts are not captured yet", c1_page)
 
