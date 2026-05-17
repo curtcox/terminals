@@ -225,6 +225,9 @@ Each milestone is independently shippable and leaves the site usable.
   only the first, so secondary use cases (T4) get frames and interaction
   traces in their own result.json. Server CI now also uploads
   `artifacts/usecases/` as a `usecase-results-<run>` workflow artifact.
+- 2026-05-17: Fixed the direct combined T3/T4 evidence test to write separate
+  canonical `T3` and `T4` result manifests, so generated per-use-case pages can
+  join captured frames/video/audio by stable use-case ID.
 - 2026-05-17: Extended CaptureFrame and RecordInteraction coverage to all
   direct harness tests. Added CaptureFrame to c1, c2, t2, t3, t4, aa2, aa3,
   aa4, aa5, v1, v2, v3 direct harness tests so every harness-validated use

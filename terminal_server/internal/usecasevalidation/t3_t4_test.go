@@ -153,7 +153,8 @@ func TestUseCaseT3T4WithEvidence(t *testing.T) {
 		t.Logf("child-room disconnect: %v", err)
 	}
 
-	h.Evidence("T3/T4")
+	h.Evidence("T3")
+	h.Evidence("T4")
 }
 
 // TestUseCaseT3ActivityCancelsAlert validates that when camera activity IS
