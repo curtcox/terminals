@@ -151,6 +151,28 @@ family: "C"
         self.assertNotIn("Rendered server-primitive screenshots are not captured yet", c1_page)
         self.assertNotIn("Audio artifacts are not captured yet", c1_page)
 
+    def test_frame_strip_is_capped_but_scrubber_keeps_all_frames(self) -> None:
+        path = self.write_result("C1", "2026-05-17T12:00:00Z", True)
+        data = json.loads(path.read_text())
+        data["media"] = {
+            "frames": [
+                {"step_id": f"step-{index:02d}", "path": f"frames/step-{index:02d}.png"}
+                for index in range(1, 31)
+            ],
+        }
+        path.write_text(json.dumps(data))
+
+        self.module.RESULTS = self.module.latest_results(include_results=True)
+        usecases = self.module.parse_usecases()
+        c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
+
+        self.assertIn("&quot;label&quot;: &quot;step-30&quot;", c1_page)
+        self.assertIn('max="29"', c1_page)
+        self.assertIn("6 additional frames are available through the scrubber and raw result manifest.", c1_page)
+        self.assertEqual(c1_page.count('class="frame-link"'), 24)
+        self.assertIn("frames/step-24.png", c1_page)
+        self.assertNotIn("frames/step-25.png\"><img", c1_page)
+
     def test_result_feed_marks_failed_usecase_as_defect(self) -> None:
         path = self.write_result("C1", "2026-05-17T12:00:00Z", False, "C1-route-stream")
         data = json.loads(path.read_text())

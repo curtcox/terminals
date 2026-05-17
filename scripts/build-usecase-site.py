@@ -30,6 +30,7 @@ BUG_REPORTS = REPO / "terminal_server" / "logs" / "bug_reports"
 RESOLVED_BUGS = REPO / "terminal_server" / "bug_reports" / "resolved"
 UI_AUDIT = REPO / "terminal_server" / "internal" / "scenario" / "audit" / "verify_terminal_ui_usecases.sh"
 STALE_RESULT_DAYS = 30
+MAX_FRAME_STRIP_ITEMS = 24
 
 ID_RE = re.compile(r"^[A-Z]+\d+$")
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
@@ -556,11 +557,17 @@ def render_visual_media(result: Result | None) -> str:
             f'<div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="{max_index}" value="0" aria-label="Scrub captured frames">'
             f'<span class="frame-preview-label">{html.escape(first.label)}</span></div></div>'
         )
+        strip_frames = result.frames[:MAX_FRAME_STRIP_ITEMS]
         frame_items = "\n        ".join(
             f'<a class="frame-link" href="{html.escape(frame.path)}"><img src="{html.escape(frame.path)}" alt="{html.escape(frame.label)}"><span>{html.escape(frame.label)}</span></a>'
-            for frame in result.frames
+            for frame in strip_frames
         )
         parts.append(f'<div class="frame-strip">\n        {frame_items}\n      </div>')
+        if len(result.frames) > len(strip_frames):
+            hidden = len(result.frames) - len(strip_frames)
+            parts.append(
+                f'<p class="media-note">{hidden} additional frames are available through the scrubber and raw result manifest.</p>'
+            )
     return "\n      ".join(parts)
 
 

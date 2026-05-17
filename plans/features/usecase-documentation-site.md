@@ -278,14 +278,16 @@ Each milestone is independently shippable and leaves the site usable.
   range input for scrubbing through the frame sequence, and the existing
   thumbnail lightbox below it. Generated videos are now marked `autoplay muted
   loop playsinline`, matching the planned walkthrough behavior.
+- 2026-05-17: Added a frame-budget guard to generated pages. The scrubber still
+  spans every captured frame, but the thumbnail/lightbox strip now caps at 24
+  frames and renders a summary note for the remaining frames, keeping long
+  scenarios browseable while preserving full evidence through the scrubber and
+  raw manifest.
 
 ## Open Questions
 
 - **Audio capture format and licensing.** TTS output from external
   providers may not be redistributable. Decide per-provider before M4.
-- **Frame budget.** A long scenario could produce hundreds of PNGs.
-  Default to one frame per `expect` step; allow scenarios to opt into
-  finer cadence.
 - **Cross-client divergence.** Server-side renders won't catch Flutter /
   macOS visual bugs. The `ui-inspect` skill already covers this — link
   out from each page rather than duplicating its captures here.
