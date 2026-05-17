@@ -543,10 +543,19 @@ def render_visual_media(result: Result | None) -> str:
     ]
     for video in result.videos:
         parts.append(
-            f'<figure class="media-block"><video controls muted loop playsinline src="{html.escape(video.path)}"></video>'
+            f'<figure class="media-block"><video controls autoplay muted loop playsinline src="{html.escape(video.path)}"></video>'
             f"<figcaption>{html.escape(video.label)}</figcaption></figure>"
         )
     if result.frames:
+        first = result.frames[0]
+        max_index = len(result.frames) - 1
+        preview_options = html.escape(json.dumps([{"src": frame.path, "label": frame.label} for frame in result.frames]))
+        parts.append(
+            f'<div class="frame-scrubber" data-frames="{preview_options}">'
+            f'<img class="frame-preview-image" src="{html.escape(first.path)}" alt="{html.escape(first.label)}">'
+            f'<div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="{max_index}" value="0" aria-label="Scrub captured frames">'
+            f'<span class="frame-preview-label">{html.escape(first.label)}</span></div></div>'
+        )
         frame_items = "\n        ".join(
             f'<a class="frame-link" href="{html.escape(frame.path)}"><img src="{html.escape(frame.path)}" alt="{html.escape(frame.label)}"><span>{html.escape(frame.label)}</span></a>'
             for frame in result.frames
@@ -726,6 +735,38 @@ th button {
   margin: 0 0 6px;
 }
 
+.frame-scrubber {
+  background: #fff;
+  border: 1px solid #d9dedc;
+  margin: 0 0 14px;
+}
+
+.frame-preview-image {
+  aspect-ratio: 16 / 9;
+  background: #111;
+  display: block;
+  object-fit: contain;
+  width: 100%;
+}
+
+.frame-scrubber-controls {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  padding: 10px 12px;
+}
+
+.frame-range {
+  width: 100%;
+}
+
+.frame-preview-label {
+  color: #465154;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 .frame-strip {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -838,6 +879,21 @@ def javascript() -> str:
       });
       rows.forEach((row) => tbody.appendChild(row));
     });
+  });
+});
+
+document.querySelectorAll(".frame-scrubber").forEach((scrubber) => {
+  const frames = JSON.parse(scrubber.dataset.frames || "[]");
+  const image = scrubber.querySelector(".frame-preview-image");
+  const label = scrubber.querySelector(".frame-preview-label");
+  const range = scrubber.querySelector(".frame-range");
+  if (!frames.length || !image || !label || !range) return;
+  range.addEventListener("input", () => {
+    const frame = frames[Number(range.value)];
+    if (!frame) return;
+    image.src = frame.src;
+    image.alt = frame.label;
+    label.textContent = frame.label;
   });
 });
 

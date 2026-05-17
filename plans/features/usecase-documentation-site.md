@@ -273,6 +273,11 @@ Each milestone is independently shippable and leaves the site usable.
   Defects section renders validation failures and open bug-report links as
   separate evidence lists, preserving passing-result messaging while making
   failure pages more directly actionable.
+- 2026-05-17: M3 frame-strip rendering now includes an actual scrub control.
+  Pages generated with captured frames show a large current-frame preview, a
+  range input for scrubbing through the frame sequence, and the existing
+  thumbnail lightbox below it. Generated videos are now marked `autoplay muted
+  loop playsinline`, matching the planned walkthrough behavior.
 
 ## Open Questions
 

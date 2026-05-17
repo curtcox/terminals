@@ -142,7 +142,10 @@ family: "C"
             '<a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>',
             c1_page,
         )
-        self.assertIn('<video controls muted loop playsinline src="../../artifacts/usecases/C1/video/intercom.mp4">', c1_page)
+        self.assertIn('<video controls autoplay muted loop playsinline src="../../artifacts/usecases/C1/video/intercom.mp4">', c1_page)
+        self.assertIn('<div class="frame-scrubber"', c1_page)
+        self.assertIn('<input class="frame-range" type="range" min="0" max="0" value="0"', c1_page)
+        self.assertIn('<img class="frame-preview-image" src="../../artifacts/usecases/C1/frames/connected.png"', c1_page)
         self.assertIn('<img src="../../artifacts/usecases/C1/frames/connected.png"', c1_page)
         self.assertIn('<audio controls src="../../artifacts/usecases/C1/audio/caller.wav">', c1_page)
         self.assertNotIn("Rendered server-primitive screenshots are not captured yet", c1_page)

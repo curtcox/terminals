@@ -18,6 +18,21 @@ document.querySelectorAll("table").forEach((table) => {
   });
 });
 
+document.querySelectorAll(".frame-scrubber").forEach((scrubber) => {
+  const frames = JSON.parse(scrubber.dataset.frames || "[]");
+  const image = scrubber.querySelector(".frame-preview-image");
+  const label = scrubber.querySelector(".frame-preview-label");
+  const range = scrubber.querySelector(".frame-range");
+  if (!frames.length || !image || !label || !range) return;
+  range.addEventListener("input", () => {
+    const frame = frames[Number(range.value)];
+    if (!frame) return;
+    image.src = frame.src;
+    image.alt = frame.label;
+    label.textContent = frame.label;
+  });
+});
+
 (function () {
   const links = document.querySelectorAll(".frame-link");
   if (!links.length) return;
