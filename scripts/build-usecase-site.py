@@ -62,6 +62,9 @@ class MediaAsset:
     label: str
     path: str
     kind: str
+    source: str = ""
+    rights_note: str = ""
+    transcript: str = ""
 
 
 @dataclass(frozen=True)
@@ -243,7 +246,21 @@ def media_asset(item: object, kind: str, index: int, manifest_path: Path) -> Med
         label = str(item.get("label") or item.get("step_id") or item.get("id") or label)
     if not path:
         return None
-    return MediaAsset(label=label, path=site_relative_asset_path(path, manifest_path), kind=kind)
+    source = ""
+    rights_note = ""
+    transcript = ""
+    if isinstance(item, dict):
+        source = str(item.get("source", "")).strip()
+        rights_note = str(item.get("rights_note", "") or item.get("rightsNote", "")).strip()
+        transcript = str(item.get("transcript", "")).strip()
+    return MediaAsset(
+        label=label,
+        path=site_relative_asset_path(path, manifest_path),
+        kind=kind,
+        source=source,
+        rights_note=rights_note,
+        transcript=transcript,
+    )
 
 
 def site_relative_asset_path(path: str, manifest_path: Path) -> str:
@@ -673,11 +690,23 @@ def render_interaction_transcript(interactions: tuple[InteractionStep, ...]) -> 
 def render_audio_media(result: Result | None) -> str:
     if not result or not result.audio:
         return '<p class="placeholder">Audio artifacts are not captured yet.</p>'
-    items = "\n        ".join(
-        f'<figure class="media-block audio-block"><figcaption>{html.escape(asset.label)}</figcaption><audio controls src="{html.escape(asset.path)}"></audio></figure>'
-        for asset in result.audio
-    )
-    return items
+    figures: list[str] = []
+    for asset in result.audio:
+        notes: list[str] = []
+        if asset.source:
+            notes.append(f"Source: {html.escape(asset.source)}")
+        if asset.transcript:
+            notes.append(f"Transcript: {html.escape(asset.transcript)}")
+        if asset.rights_note:
+            notes.append(html.escape(asset.rights_note))
+        notes_html = ""
+        if notes:
+            notes_html = '<p class="media-note">' + "<br>".join(notes) + "</p>"
+        figures.append(
+            f'<figure class="media-block audio-block"><figcaption>{html.escape(asset.label)}</figcaption>'
+            f'<audio controls src="{html.escape(asset.path)}"></audio>{notes_html}</figure>'
+        )
+    return "\n        ".join(figures)
 
 
 def render_defects(result: Result | None, bugs: tuple[BugReport, ...]) -> str:

@@ -126,10 +126,12 @@ func (h *Harness) CaptureAudio(stepID, _ string, messages []transport.ProtoServe
 		index++
 		h.mu.Lock()
 		h.audioClips = append(h.audioClips, AudioRecord{
-			Label:     label,
-			Path:      filepath.ToSlash(filepath.Join("audio", safeArtifactName(label)+".wav")),
-			PCM:       append([]byte(nil), pcm.PcmData...),
-			Timestamp: time.Now().UTC(),
+			Label:      label,
+			Path:       filepath.ToSlash(filepath.Join("audio", safeArtifactName(label)+".wav")),
+			Source:     "play-audio-pcm",
+			RightsNote: "Captured from a PlayAudio protobuf message emitted during validation.",
+			PCM:        append([]byte(nil), pcm.PcmData...),
+			Timestamp:  time.Now().UTC(),
 		})
 		h.mu.Unlock()
 	}

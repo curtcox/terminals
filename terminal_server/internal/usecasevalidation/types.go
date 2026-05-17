@@ -38,9 +38,12 @@ type FrameRecord struct {
 
 // AudioRecord describes a captured audio artifact from a PlayAudio server message.
 type AudioRecord struct {
-	Label     string    `json:"label"`
-	Path      string    `json:"path"`
-	Timestamp time.Time `json:"timestamp"`
+	Label      string    `json:"label"`
+	Path       string    `json:"path"`
+	Source     string    `json:"source,omitempty"`
+	RightsNote string    `json:"rights_note,omitempty"`
+	Transcript string    `json:"transcript,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
 	// PCM holds the raw pcm16 bytes — populated only in memory, not serialised.
 	PCM []byte `json:"-"`
 }

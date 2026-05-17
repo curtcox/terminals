@@ -319,11 +319,20 @@ Each milestone is independently shippable and leaves the site usable.
   the existing "How to use it" section remains a user-facing ordered list.
   Focused generator tests cover the transcript markup; the committed static
   site plus embedded admin copy were regenerated.
+- 2026-05-17: Audio evidence now carries provenance metadata. Harness-written
+  `AudioRecord` entries include `source`, `rights_note`, and optional
+  `transcript` fields; fake TTS captures are explicitly labeled as silent
+  validation audio with no redistributed external-provider output, and raw
+  `PlayAudio` captures are labeled as protobuf-emitted PCM evidence. The site
+  generator renders those notes beside audio players when present, with focused
+  generator coverage.
 
 ## Open Questions
 
-- **Audio capture format and licensing.** TTS output from external
-  providers may not be redistributable. Decide per-provider before M4.
+- **Audio capture format and licensing.** Validation-generated fake TTS audio is
+  now labeled as safe synthetic evidence. If future runs capture external
+  provider TTS output, those providers still need explicit redistribution
+  decisions before publishing artifacts outside CI.
 - **Cross-client divergence.** Server-side renders won't catch Flutter /
   macOS visual bugs. The `ui-inspect` skill already covers this — link
   out from each page rather than duplicating its captures here.
