@@ -38,6 +38,9 @@ class BuildUsecaseSiteTest(unittest.TestCase):
         self.module.USECASE_VALIDATION = self.root / "artifacts" / "usecase-validation"
         self.module.BUG_REPORTS = self.root / "terminal_server" / "logs" / "bug_reports"
         self.module.RESOLVED_BUGS = self.root / "terminal_server" / "bug_reports" / "resolved"
+        self.module.UI_AUDIT = (
+            self.root / "terminal_server" / "internal" / "scenario" / "audit" / "verify_terminal_ui_usecases.sh"
+        )
         self.module.RESULTS = {}
         self.module.BUG_REPORTS_BY_USECASE = {}
         self.module.USECASES_DIR.mkdir(parents=True)
@@ -135,6 +138,10 @@ family: "C"
         c1_page = self.module.render_usecase(next(usecase for usecase in usecases if usecase.id == "C1"))
 
         self.assertIn("Rendered from server primitives", c1_page)
+        self.assertIn(
+            '<a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>',
+            c1_page,
+        )
         self.assertIn('<video controls muted loop playsinline src="../../artifacts/usecases/C1/video/intercom.mp4">', c1_page)
         self.assertIn('<img src="../../artifacts/usecases/C1/frames/connected.png"', c1_page)
         self.assertIn('<audio controls src="../../artifacts/usecases/C1/audio/caller.wav">', c1_page)

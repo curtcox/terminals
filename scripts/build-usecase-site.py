@@ -28,6 +28,7 @@ USECASE_RESULTS = REPO / "artifacts" / "usecases"
 USECASE_VALIDATION = REPO / "artifacts" / "usecase-validation"
 BUG_REPORTS = REPO / "terminal_server" / "logs" / "bug_reports"
 RESOLVED_BUGS = REPO / "terminal_server" / "bug_reports" / "resolved"
+UI_AUDIT = REPO / "terminal_server" / "internal" / "scenario" / "audit" / "verify_terminal_ui_usecases.sh"
 STALE_RESULT_DAYS = 30
 
 ID_RE = re.compile(r"^[A-Z]+\d+$")
@@ -536,8 +537,9 @@ def render_usecase(usecase: UseCase) -> str:
 def render_visual_media(result: Result | None) -> str:
     if not result or (not result.frames and not result.videos):
         return '<p class="placeholder">Rendered server-primitive screenshots are not captured yet.</p>'
+    audit_href = "../../" + UI_AUDIT.relative_to(REPO).as_posix()
     parts = [
-        '<p class="media-note">Rendered from server primitives; client pixel parity is covered by the manual UI audit.</p>',
+        f'<p class="media-note">Rendered from server primitives; client pixel parity is covered by the <a href="{html.escape(audit_href)}">manual UI audit</a>.</p>',
     ]
     for video in result.videos:
         parts.append(
