@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0   # full history required for blame/new-code detection
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: terminal_server/go.mod
 
