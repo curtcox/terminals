@@ -55,6 +55,26 @@ make proto-generate
 make all-check
 ```
 
+### Running a single test
+
+Use these for fast feedback while iterating; the full suites are slow.
+
+```bash
+# Go server: one package, optionally one test (regex on test name)
+cd terminal_server && go test ./internal/transport/... -run TestNameHere -v
+cd terminal_server && go test ./internal/transport/ -run '^TestFoo$' -count=1
+
+# Flutter client: one test file
+cd terminal_client && flutter test test/path/to/foo_test.dart
+cd terminal_client && flutter test --plain-name "specific test name"
+
+# Android client: one test class
+cd android_client && ./gradlew app:testDebugUnitTest --tests com.example.FooTest
+
+# Protobuf: lint a single file
+buf lint api/terminals/io/v1/io.proto
+```
+
 ## Local Development
 
 1. Start server: `make run-server`
