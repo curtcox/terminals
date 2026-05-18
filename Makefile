@@ -31,12 +31,12 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index usecases-site usecases-site-check usecase-wiring-audit pick-next-work next bug-resolved-check bug-resolve-test \
 	all-lint all-test all-check ci-local stop-server stop-server-test run-server run-client-web run-web-client \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
-	ui-inspect-test help
+	ui-inspect-test format help help-all
 
-server-build:
+server-build: ## Build the Go server
 	cd terminal_server && go build ./...
 
-server-test:
+server-test: ## Run Go server tests
 	cd terminal_server && go test ./...
 
 server-test-network-probe:
@@ -51,13 +51,13 @@ server-test-network-probe-test:
 server-test-sandbox:
 	./scripts/server-test-sandbox.sh
 
-server-lint:
+server-lint: ## Lint Go server (golangci-lint)
 	cd terminal_server && golangci-lint run ./...
 
 server-coverage:
 	cd terminal_server && go test ./... -coverprofile=coverage.out
 
-client-build:
+client-build: ## Build Flutter client (web)
 	$(MAKE) client-build-web
 
 client-build-web:
@@ -113,10 +113,10 @@ client-build-macos:
 
 client-build-all: client-build-web client-build-android client-build-ios client-build-linux client-build-windows client-build-macos
 
-client-test:
+client-test: ## Run Flutter client tests
 	cd terminal_client && flutter test
 
-client-lint:
+client-lint: ## Lint Flutter client (analyze + dart format check)
 	cd terminal_client && flutter analyze && dart format --set-exit-if-changed .
 
 client-boundary:
@@ -254,14 +254,14 @@ web-client-proto-check:
 web-client-smoke-test:
 	./scripts/test-web-client-smoke.sh
 
-proto-lint:
+proto-lint: ## Lint protobuf definitions (buf lint + round-trip test)
 	cd api && buf lint
 	cd terminal_server && GOCACHE="$(LOCAL_GO_CACHE)" go test ./internal/transport -run 'TestProtoRoundTrip' -count=1
 
-proto-breaking:
+proto-breaking: ## Check for breaking protobuf changes against main
 	cd api && buf breaking --against '../.git#branch=main,subdir=api'
 
-proto-generate:
+proto-generate: ## Regenerate Go + Dart code from .proto files
 	cd api && buf generate
 
 proto-flex-check:
@@ -310,16 +310,16 @@ usecase-wiring-audit:
 	bash terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh
 	python3 scripts/audit-usecase-wiring.py
 
-ci-status:
+ci-status: ## Probe CI gates and write scripts/ci-status.json
 	@scripts/check-ci-gates.sh; true
 
 pick-next-work:
 	@python3 ./scripts/pick-next-work.py
 
-next:
+next: ## Print the recommended next work item (reads ci-status + plan frontmatter)
 	@python3 ./scripts/next.py
 
-quality-check:
+quality-check: ## Flag oversized files and other quality checks
 	@python3 ./scripts/find-oversized-files.py --check
 
 oversized-toc-audit:
@@ -347,24 +347,24 @@ all-check: quality-check bug-resolved-check bug-resolve-test all-lint all-test p
 # Fast subset: lint + cheap checks only.  Targets the inner-loop signal an
 # agent typically needs after editing one or two files — no full builds, no
 # Flutter/Android build, no integration tests.
-check-fast: quality-check all-lint proto-breaking usecase-wiring-audit
+check-fast: quality-check all-lint proto-breaking usecase-wiring-audit ## Lint + cheap checks only (no builds, no integration tests)
 
 # Same prerequisites as all-check, but with -k so a single failure does not
 # mask downstream gates.  Use when you want every failure surfaced in one
 # pass (e.g. before opening a PR).
-check-all-keep-going:
+check-all-keep-going: ## Full gate with -k so all failures surface in one pass
 	@$(MAKE) -k all-check
 
 ci-local: all-check
 
-stop-server:
+stop-server: ## Kill running server process(es)
 	./scripts/stop-server.sh
 
 stop-server-test:
 	./scripts/test-stop-server-target.sh
 	./scripts/test-stop-server-safety.sh
 
-run-server:
+run-server: ## Start the Go server (ports 50051–50056)
 	cd terminal_server && \
 		TERMINALS_GRPC_HOST=0.0.0.0 \
 		TERMINALS_CONTROL_WS_HOST=0.0.0.0 \
@@ -375,14 +375,14 @@ run-server:
 		TERMINALS_BUILD_DATE=$(BUILD_DATE) \
 		go run ./cmd/server
 
-run-client-web:
+run-client-web: ## Build Flutter web client and serve on port 8080
 	cd terminal_client && flutter build web --no-wasm-dry-run --pwa-strategy=none --dart-define=TERMINALS_BUILD_SHA=$(BUILD_SHA) --dart-define=TERMINALS_BUILD_DATE=$(BUILD_DATE)
 	cd terminal_client && python3 -m http.server $(CLIENT_WEB_PORT) --bind $(CLIENT_WEB_HOST) --directory build/web
 
 run-web-client:
 	cd web_client && WEB_CLIENT_PORT=$(CLIENT_WEB_PORT) WEB_CLIENT_HOST=$(CLIENT_WEB_HOST) npm run serve
 
-run-local:
+run-local: ## Start server + Flutter web client (writes .tmp/run-local-*.log)
 	./scripts/run-local.sh
 
 run-local-test:
@@ -397,13 +397,25 @@ run-mac:
 mac-e2e-test:
 	./scripts/test-mac-e2e.sh
 
-usecase-validate:
+usecase-validate: ## Run automated validation for a use-case ID  (e.g. make usecase-validate USECASE=C1)
 	INFO="$(INFO)" ./scripts/usecase-validate.sh "$(USECASE)"
 
 ui-inspect-test:
 	./scripts/test-ui-inspect-run.sh
 
-help:
+format: ## Auto-format all code (Go: gofumpt, Flutter: dart format)
+	cd terminal_server && gofumpt -w .
+	cd terminal_client && dart format .
+
+help: ## Show annotated targets; all targets listed via make help-all
+	@printf "Annotated targets (## description):\n\n"
+	@grep -E '^[a-zA-Z_-]+:.*## ' Makefile \
+	  | sed 's/:.*## /\t/' \
+	  | awk -F'\t' '{ printf "  %-35s %s\n", $$1, $$2 }' \
+	  | sort
+	@printf "\nRun 'make help-all' for the full target list.\n"
+
+help-all: ## List every target name (unsorted, no descriptions)
 	@grep -E '^[a-zA-Z_-]+:' Makefile \
 	  | grep -v '^\.PHONY' \
 	  | sed 's/:.*$$//' \

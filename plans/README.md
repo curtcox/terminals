@@ -25,6 +25,17 @@ with a one-line stub pointing to the archive.
 The archive path convention is `plans/archive/<plan-name>/progress-<YYYY-MM>.md`
 where the date is the most recent month covered by the archived entries.
 
+## Frontmatter fields
+
+| Field | Values | Meaning |
+|---|---|---|
+| `title` | string | Human-readable plan name |
+| `kind` | `plan`, `audit` | `plan` = feature/refactor work; `audit` = investigation or review |
+| `status` | see below | Current lifecycle state |
+| `owner` | `copilot`, `curtcox`, `unowned`, … | Who is driving the work |
+| `validation` | `none`, `manual`, `automated:<ID>` | How the plan's success is verified; `automated:<ID>` links to a use-case ID in `usecases/INDEX.md` |
+| `last-reviewed` | `YYYY-MM-DD` | Date the plan was last read and verified as current |
+
 ## Status values
 
 | Status | Meaning |
@@ -33,5 +44,6 @@ where the date is the most recent month covered by the archived entries.
 | `building` | Actively being implemented |
 | `complete` | Implementation done, not yet validated |
 | `shipped-validated` | Complete and all automated validations pass |
+| `superseded` | Replaced by a newer plan |
 | `paused` | Work stopped temporarily |
 | `cancelled` | Dropped |
