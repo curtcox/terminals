@@ -52,7 +52,9 @@ make client-test
 make client-lint
 make proto-lint
 make proto-generate
-make all-check
+make all-check          # full gate, stops on first failure
+make check-fast         # lint + cheap checks only (no builds, no integration tests)
+make check-all-keep-going  # same as all-check but -k, surfaces every failure
 ```
 
 ### Running a single test

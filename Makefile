@@ -333,6 +333,17 @@ all-test: server-test client-test client-boundary-test android-client-boundary-t
 
 all-check: quality-check bug-resolved-check bug-resolve-test all-lint all-test proto-breaking proto-contract-test web-client-proto-check client-build-all android-client-build web-client-build development-docs-test usecases-index usecases-site-check usecase-wiring-audit validation-matrix
 
+# Fast subset: lint + cheap checks only.  Targets the inner-loop signal an
+# agent typically needs after editing one or two files — no full builds, no
+# Flutter/Android build, no integration tests.
+check-fast: quality-check all-lint proto-breaking usecase-wiring-audit
+
+# Same prerequisites as all-check, but with -k so a single failure does not
+# mask downstream gates.  Use when you want every failure surfaced in one
+# pass (e.g. before opening a PR).
+check-all-keep-going:
+	@$(MAKE) -k all-check
+
 ci-local: all-check
 
 stop-server:
