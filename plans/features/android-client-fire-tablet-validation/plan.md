@@ -4,7 +4,7 @@ kind: plan
 status: building
 owner: curtcox
 validation: manual
-last-reviewed: 2026-05-12
+last-reviewed: 2026-05-18
 ---
 
 # Android Client: Fire Tablet Validation & WebRTC Enablement
