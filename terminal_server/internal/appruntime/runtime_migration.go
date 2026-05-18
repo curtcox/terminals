@@ -11,6 +11,32 @@ import (
 	"time"
 )
 
+// CONTENTS:
+//   line  14  const defaultMigrationDrainTimeout
+//   line  16  const ( // runtimeMigrationFixtureMaxRows, runtimeMigrationFixtureMaxKeyBytes
+//   line  21  const ( // migrationMaxWriteVolumeBytes, migrationMaxStoreOps, migrationMaxArtifactPatches
+//   line  27  const ( // MigrationAbortToCheckpoint, MigrationAbortToBaseline, RollbackDataMode* constants
+//   line  40  type migrationState struct
+//   line  59  type migrationPlanStep struct
+//   line  69  func (r *Runtime) SetMigrationDryRunGateEnabled(enabled bool)
+//   line  77  func (r *Runtime) GetMigrationStatus(name string) (MigrationStatus, error)
+//   line  91  func (r *Runtime) RetryMigration(name string) (MigrationStatus, error)
+//   line 354  func (r *Runtime) maybeFailMigrationRuntimeTimeoutLocked(name string, pkg Package, state migrationState, step int, startedAt time.Time) (bool, MigrationStatus)
+//   line 373  func (r *Runtime) appendMigrationCheckpointEntriesLocked(name string, pkg Package, state migrationState, step migrationPlanStep, effectCount int) (migrationState, error)
+//   line 395  func (r *Runtime) maybeInterruptMigrationLocked(name string, state migrationState, event string) (migrationState, error)
+//   line 407  func (r *Runtime) SetMigrationDrainReady(name string, ready bool) error
+//   line 434  func (r *Runtime) DryRunMigrationJournalReplay(name string) ([]MigrationDryRunResult, error)
+//   line 451  func (r *Runtime) dryRunMigrationJournalReplayForPackage(pkg Package, name string) ([]MigrationDryRunResult, error)
+//   line 483  func validateMigrationDryRunPlan(root string, plan []migrationPlanStep) error
+//   line 502  func dryRunMigrationBoundary(pkg Package, kernelAPIVersion string, name string, boundary MigrationDryRunBoundary) (MigrationDryRunResult, error)
+//   line 580  func migrationJournalDryRunBoundaries(root string, plan []migrationPlanStep) ([]MigrationDryRunBoundary, error)
+//   line 600  func migrationStepEmitsCheckpoint(root string, step migrationPlanStep, checkpointEvery int) (bool, error)
+//   line 623  func (r *Runtime) AbortMigration(name, target string) (MigrationStatus, error)
+//   line 691  func (r *Runtime) ReconcileMigration(name, recordID, resolution string) (MigrationStatus, error)
+//   line 726  func (r *Runtime) requireMigrationStateLocked(name string) (Package, migrationState, error)
+//   line 739  func newMigrationState(pkg Package, installedVersion string) migrationState
+//   line 783  func migrationStepsCompletedForInstalledVersion(plan []migrationPlanStep, installedVersion string, targetVersion string) (int, error)
+
 const defaultMigrationDrainTimeout = 90 * time.Second
 
 const (

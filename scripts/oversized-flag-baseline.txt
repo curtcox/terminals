@@ -9,4 +9,5 @@
 #
 # Do NOT add new files here without a corresponding code-reduction plan.
 terminal_client/lib/app/terminal_client_shell.dart
+terminal_server/cmd/server/main.go
 terminal_server/internal/appruntime/runtime_migration_script_fixture.go

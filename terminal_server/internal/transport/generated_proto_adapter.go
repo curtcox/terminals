@@ -15,6 +15,42 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
+// CONTENTS:
+//   line  18  type GeneratedProtoAdapter struct
+//   line  22  func (GeneratedProtoAdapter) ToInternal(env ProtoClientEnvelope) (ClientMessage, error)
+//   line  33  func (GeneratedProtoAdapter) FromInternal(msg ServerMessage) (ProtoServerEnvelope, error)
+//   line  38  func internalFromProtoRequest(req *controlv1.ConnectRequest) (ClientMessage, error)
+//   line 217  func protoFromInternalServer(msg ServerMessage) *controlv1.ConnectResponse
+//   line 434  func capabilityInvalidationsToProto(in []CapabilityInvalidation) []*controlv1.ResourceInvalidation
+//   line 448  func internalActionFromProto(action controlv1.CommandAction) string
+//   line 461  func internalKindFromProto(kind controlv1.CommandKind) string
+//   line 476  func internalPointerActionFromProto(legacy string, action iov1.PointerAction) string
+//   line 495  func internalTouchActionFromProto(legacy string, action iov1.TouchAction) string
+//   line 512  func commandArgumentsToInternalMap(typed []*controlv1.CommandArgumentEntry, legacy map[string]string) map[string]string
+//   line 534  func commandTypedValueToString(value *controlv1.CommandTypedValue) (string, bool)
+//   line 557  func commandResultDataEntriesFromMap(data map[string]string) []*controlv1.CommandResultDataEntry
+//   line 576  func commandTypedValueFromLegacyString(key, raw string) *controlv1.CommandTypedValue
+//   line 620  func shouldUseStringListValue(key, value string) bool
+//   line 633  func internalWebRTCSignalTypeFromProto(legacy string, signalType controlv1.WebRTCSignalType) string
+//   line 648  func protoWebRTCSignalTypeFromInternal(signalType string) controlv1.WebRTCSignalType
+//   line 661  func protoStreamKindFromInternal(kind string) iov1.StreamKind
+//   line 676  func flowNodeTypedArgsFromArgs(args map[string]string) *iov1.FlowNodeArgs
+//   line 696  func protoExecPolicyFromInternal(exec iorouter.ExecPolicy) iov1.ExecPolicy
+//   line 711  func protoErrorCodeFromInternal(code string) controlv1.ControlErrorCode
+//   line 732  func descriptorToUINode(d ui.Descriptor) *uiv1.Node
+//   line 755  func applyWidgetFromDescriptor(node *uiv1.Node, d ui.Descriptor)
+//   line 844  func parseInt32(raw string) int32
+//   line 852  func parseFloat64(raw string) float64
+//   line 860  func parseBool(raw string) bool
+//   line 872  func observationAttributesFromProto(ob *iov1.Observation) map[string]string
+//   line 900  func observationTypedAttributesFromInternal(attrs map[string]string) *iov1.ObservationAttributes
+//   line 921  func observationFromProto(ob *iov1.Observation) iorouter.Observation
+//   line 969  func artifactFromProto(artifact *iov1.ArtifactRef) iorouter.ArtifactRef
+//   line 983  func flowPlanToProto(plan iorouter.FlowPlan) *iov1.FlowPlan
+//   line 1008 func unixMSTime(unixMS int64) time.Time
+//   line 1015 func scrollDirectionFromString(value string) uiv1.ScrollDirection
+//   line 1026 func cloneStringMapAdapter(in map[string]string) map[string]string
+
 // GeneratedProtoAdapter maps generated protobuf messages to internal transport messages.
 type GeneratedProtoAdapter struct{}
 

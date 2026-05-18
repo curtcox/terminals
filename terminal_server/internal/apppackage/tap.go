@@ -28,6 +28,50 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+// CONTENTS:
+//   line  31  const ( // canonicalFileMode, zstd constants, signature bundle constants
+//   line  46  var ( // ErrInvalidTapFormat, ErrMissingManifest, and other sentinel errors
+//   line  79  var allowedTopLevelDirs
+//   line  88  var ( // migrateStepFilePattern, migrateLoadPattern, migrateReadPattern, migrateReadAdapterIdentityReturnPattern
+//   line  95  var allowedMigrationModules
+//   line 102  type VerifiedTap struct
+//   line 109  type VerifiedStatement struct
+//   line 120  type VerifiedPackage struct
+//   line 128  func BuildTapFromDir(root string) ([]byte, string, error)
+//   line 157  func VerifyTap(tapBytes []byte) (VerifiedTap, error)
+//   line 174  func VerifyPackage(tapBytes []byte, sigBytes []byte) (VerifiedPackage, error)
+//   line 208  func collectSourceFiles(root string) ([]string, error)
+//   line 264  func buildCanonicalTar(root string, packageName string, relPaths []string) ([]byte, error)
+//   line 304  func compressCanonicalTar(canonicalTar []byte) ([]byte, error)
+//   line 321  func decompressTap(tapBytes []byte) ([]byte, error)
+//   line 342  func validateCanonicalZstdFrame(tapBytes []byte) error
+//   line 436  func zstdContentSizeFieldLen(fcsFlag byte, singleSegment bool) int
+//   line 452  func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte, error)
+//   line 553  type manifestIdentity struct
+//   line 558  type manifestMigration struct
+//   line 563  type manifestStorageConfig struct
+//   line 567  type manifestStoreSchema struct
+//   line 573  type manifestMigrationConfig struct
+//   line 582  type manifestMigrationStep struct
+//   line 589  type manifestMigrationFixture struct
+//   line 598  type parsedMigrationStep struct
+//   line 605  type migrationFixtureRecord struct
+//   line 611  type signatureBundle struct
+//   line 617  type signatureStatement struct
+//   line 628  func parseManifestIdentity(manifestBytes []byte) (string, string, error)
+//   line 639  func validateManifestMigrations(manifestBytes []byte, files []string, migrationSources map[string][]byte) error
+//   line 862  func validateMigrationFixtureNDJSON(path string, payload []byte) ([]migrationFixtureRecord, error)
+//   line 911  func validateMigrationFixtureSeedSchema(fixture manifestMigrationFixture, records []migrationFixtureRecord, schemaPayload []byte) error
+//   line 918  func validateMigrationFixtureValueSchema(fixturePath string, schemaPath string, records []migrationFixtureRecord, schemaPayload []byte) error
+//   line 943  func resolveFixtureExpectedSchema(fixture manifestMigrationFixture, manifestStep manifestMigrationStep, stepByName map[string]parsedMigrationStep, storeSchemaByVersion map[string][]manifestStoreSchema, migrationSources map[string][]byte) (schemaPath string, schemaPayload []byte, shouldValidate bool, err error)
+//   line 976  func validateMigrationReadAdapterSource(path string, payload []byte) error
+//   line 1004 func stripTALLineComment(line string) string
+//   line 1032 func parseCanonicalFixtureRecord(line []byte) ([]byte, string, map[string]any, error)
+//   line 1080 func validateArchivePath(name string) error
+//   line 1099 func validateRelativeArchivePath(rel string) error
+//   line 1106 func validatePathComponent(component string) error
+//   line 1116 func validateTopLevelPath(rel string) error
+
 const (
 	canonicalFileMode = 0o644
 	zstdWindowSize    = 8 << 20

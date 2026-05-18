@@ -322,6 +322,16 @@ next:
 quality-check:
 	@python3 ./scripts/find-oversized-files.py --check
 
+oversized-toc-audit:
+	@python3 ./scripts/find-oversized-files.py --json \
+	  | python3 -c "\
+import json, sys, pathlib; \
+data = json.load(sys.stdin); \
+missing = [f for f in data if int(f.get('lines',0)) > 800 \
+  and '// CONTENTS:' not in pathlib.Path(f['path']).read_text()]; \
+[print(f['path'], 'missing // CONTENTS: block') for f in missing]; \
+sys.exit(1 if missing else 0)"
+
 bug-resolved-check:
 	@python3 ./scripts/check-resolved-bugs.py
 

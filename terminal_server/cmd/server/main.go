@@ -48,6 +48,44 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/world"
 )
 
+// CONTENTS:
+//   line  51  const ( // registerMetadata keys
+//   line  57  func registerAckMetadata(photoBaseURL string) map[string]string
+//   line  65  func normalizeBuildMetadataValue(raw string) string
+//   line  73  func main()
+//   line 402  func runREPL(stdin io.Reader, stdout, stderr io.Writer) int
+//   line 417  func runMCPStdio(stdin io.Reader, stdout, stderr io.Writer) int
+//   line 453  func proxyMCPStdio(ctx context.Context, in io.Reader, out io.Writer, mcpURL string) error
+//   line 559  func postMCPRPC(ctx context.Context, client *http.Client, mcpURL string, payload map[string]any, sessionID string, confirmationID string) (map[string]any, string, error)
+//   line 601  func elicitViaProxy(ctx context.Context, dec *json.Decoder, enc *json.Encoder, proxyRequestID int, originalRequest map[string]any, confirmationMeta map[string]any) (bool, error)
+//   line 692  func approvalRejectedResponse(id any) map[string]any
+//   line 712  func cloneMapAny(src map[string]any) map[string]any
+//   line 723  func mcpAnyMap(v any) map[string]any
+//   line 733  func mcpAnyBool(v any) bool
+//   line 745  func mcpAnyString(v any) string
+//   line 750  func mcpCapabilityEnabled(v any) bool
+//   line 766  func rpcIDMatches(id any, want int) bool
+//   line 789  type scenarioAnalyzerRunner struct
+//   line 794  func (r scenarioAnalyzerRunner) StartAnalyzer(ctx context.Context, sourceDeviceID string, analyzer string, emit func(iorouter.AnalyzerEvent)) (func(), error)
+//   line 848  func copyStringMap(in map[string]string) map[string]string
+//   line 859  func loadAppPackages(ctx context.Context, runtime *appruntime.Runtime)
+//   line 882  func newServerAppRuntime() *appruntime.Runtime
+//   line 888  type worldModelAdapter struct
+//   line 892  func (w worldModelAdapter) LocateEntity(ctx context.Context, query scenario.EntityQuery) (*iorouter.LocationEstimate, error)
+//   line 905  func (w worldModelAdapter) WhoIsHome(ctx context.Context) ([]scenario.EntityRecord, error)
+//   line 927  func (w worldModelAdapter) VerifyDevice(ctx context.Context, deviceID string, method string) error
+//   line 934  func (w worldModelAdapter) RecentObservations(ctx context.Context, zone string, kind string, since time.Time) ([]iorouter.Observation, error)
+//   line 944  func buildTelephonyBridge(ctx context.Context, cfg config.SIPConfig) (scenario.TelephonyBridge, error)
+//   line 973  func runDueTimerLoop(ctx context.Context, runtime *scenario.Runtime, interval time.Duration)
+//   line 1000 func runLivenessLoop(ctx context.Context, control *transport.ControlService, timeout, interval time.Duration)
+//   line 1027 func configurePhotoFrame(handler *transport.StreamHandler, cfg config.Config, baseURL string)
+//   line 1048 func loadPhotoFrameSlides(dir, baseURL string) ([]string, error)
+//   line 1091 func startPhotoFrameAssetServer(cfg config.Config) (*http.Server, string, error)
+//   line 1121 func newPhotoFrameAssetHandler(dir string) http.Handler
+//   line 1137 func photoFrameAssetBaseURL(cfg config.Config) string
+//   line 1151 func mcpEndpointURL(cfg config.Config) string
+//   line 1162 func firstModel(models []string) string
+
 const (
 	registerMetadataPhotoFrameAssetBaseURLKey = "photo_frame_asset_base_url"
 	registerMetadataServerBuildSHAKey         = "server_build_sha"

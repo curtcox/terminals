@@ -12,6 +12,9 @@ import (
 	"strings"
 )
 
+// CONTENTS:
+//   line  15  func (s *state) evalControlPlaneOps(ctx context.Context, group string, args []string, jsonOut bool) error
+
 func (s *state) evalControlPlaneOps(ctx context.Context, group string, args []string, jsonOut bool) error {
 	sub := strings.ToLower(args[0])
 	switch group {
