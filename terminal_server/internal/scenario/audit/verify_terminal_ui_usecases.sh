@@ -6,8 +6,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 for id in UI1 UI2 UI3 UI4 UI5 UI6 UI7 UI8 UI9 UI10; do
-  if ! grep -qE "\\b${id}\\b" scripts/usecase-validate.sh; then
-    echo "audit: missing ${id} in scripts/usecase-validate.sh" >&2
+  if ! grep -qE "\\b${id}\\b" scripts/usecase-validate.sh scripts/usecase-validate.yaml; then
+    echo "audit: missing ${id} in scripts/usecase-validate.sh or scripts/usecase-validate.yaml" >&2
     exit 1
   fi
 done

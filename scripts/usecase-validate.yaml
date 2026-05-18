@@ -1,0 +1,536 @@
+# Source of truth for use-case ID metadata and test mappings.
+# Referenced by scripts/usecase-validate.sh and scripts/generate-validation-matrix.py.
+# Step kinds: go_test (pkg + run), app_test (name), flutter_test (path + plain_name).
+usecases:
+  - id: AB1
+    family: Simulation
+    description: "kitchen/front-of-house intercom: audio route opened from front_of_house to kitchen_terminal; stop closes route; harness-backed evidence"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAB1WithEvidence$'
+
+  - id: AB2
+    family: Simulation
+    description: "PA broadcast to sales floor: pa_system scenario started on manager_terminal; broadcast delivers 'PA from manager_terminal' to all sales floor devices"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAB2WithEvidence$'
+
+  - id: AB3
+    family: Simulation
+    description: "guest welcome display: photo_frame scenario started on lobby_display device; broadcast confirms display mode active"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAB3WithEvidence$'
+
+  - id: AB4
+    family: Simulation
+    description: "multi-window camera grid: multi_window scenario started on supervisor_terminal; video routes established from all four dock cameras"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAB4WithEvidence$'
+
+  - id: AB5
+    family: Simulation
+    description: "after-hours alarm monitoring: audio_monitor armed for glass_break; FakeSoundClassifier emits glass_break; alert broadcast to security_terminal"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAB5WithEvidence$'
+
+  - id: AB6
+    family: Simulation
+    description: "voice timer for food service: voice 'set a timer for 12 minutes table 5' sets timer with label; fake-clock advance fires 'Timer done!' broadcast"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAB6WithEvidence$'
+
+  - id: AB7
+    family: Simulation
+    description: "voice announcement to waiting area: announcement scenario started; waiting_area_terminal receives announcement_audio RouteStream; no duplicate routes"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAB7WithEvidence$'
+
+  - id: AA1
+    family: Simulation
+    description: "external automation agent triggers announcement scenario via manual API; display terminal receives announcement_audio route; YAML scenario in internal/usecasevalidation/testdata/aa1-webhook-announce.yaml"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAA1WithEvidence$'
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestYAMLScenarioAA1WebhookAnnounce$'
+
+  - id: AA2
+    family: Simulation
+    description: "monitoring agent arms audio monitoring via manual API; fake classifier emits dryer_beep; broadcast targeted at agent device ID"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAA2WithEvidence$'
+
+  - id: AA3
+    family: Simulation
+    description: "AI agent resolves ambiguous voice command via fake LLM; LLM-decoded announce intent routes announcement_audio to a second terminal"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAA3WithEvidence$'
+
+  - id: AA4
+    family: Simulation
+    description: "scheduling agent creates and cancels a timer via manual API; cancelled timer produces no 'Timer done!' broadcast; YAML scenario in internal/usecasevalidation/testdata/aa4-timer-cancel.yaml"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAA4WithEvidence$'
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestYAMLScenarioAA4TimerCancel$'
+
+  - id: AA5
+    family: Simulation
+    description: "vision analysis agent: FakeVisionAnalyzer returns caption and labels; camera_activity sensor triggers analysis; broadcast verified with caption, labels, and agent device target"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseAA5WithEvidence$'
+
+  - id: AA6
+    family: Simulation
+    description: "admin scripts run over seeded sim/store/ui/bus fixture plus mutating Layer 2 message, board, artifact, canvas, and session paths"
+    steps:
+      - kind: go_test
+        pkg: ./internal/admin
+        run: 'TestScriptsRunCrossUsecaseSimulationFixture$'
+
+  - id: B1
+    family: Scenario
+    description: "transport input bug-report action coverage for modality parity"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestHandleMessageInputBugReportAction(FilesReport|RespectsModalitySources)$'
+
+  - id: B2
+    family: Scenario
+    description: "diagnostics bug-report service cross-device subject/offline coverage"
+    steps:
+      - kind: go_test
+        pkg: ./internal/diagnostics/bugreport
+        run: 'TestServiceFileCrossDeviceSubjectMarksOfflineWhenUnavailable$'
+
+  - id: B3
+    family: Scenario
+    description: "diagnostics service autodetect merge test"
+    steps:
+      - kind: go_test
+        pkg: ./internal/diagnostics/bugreport
+        run: 'TestServiceAutodetectMerge$'
+
+  - id: B4
+    family: Scenario
+    description: "admin bug intake/list/detail and filter tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/admin
+        run: 'TestBug(IntakeAndListAndDetail|ListFilterByTag)$'
+
+  - id: B5
+    family: Scenario
+    description: "admin bug intake JSON SIP source + transcript hints test"
+    steps:
+      - kind: go_test
+        pkg: ./internal/admin
+        run: 'TestBugIntakeJSONSIPSourceAndTranscriptHints$'
+
+  - id: C1
+    family: Transport
+    description: "internal/transport generated+wire integration tests; internal/usecasevalidation harness-backed evidence test"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)SessionIntercom(EmitsRouteStream|StopEmitsStopStream|FanOutRelaysMediaToPeerSession)$'
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseC1WithEvidence$'
+
+  - id: C2
+    family: Simulation
+    description: "whole-house announcement: 1 speaker + 3 receivers; harness-backed broadcast routing and no-duplicate-delivery evidence"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseC2WithEvidence$'
+
+  - id: C3
+    family: Transport
+    description: "PA relay, voice start, voice stop alias tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)Session(PASystemRelaysReceiverOverlayAndTransitions|VoicePAModeStartsPASystem|PASystemVoiceStopAliasesRelayCleanup)$'
+
+  - id: C5
+    family: Transport
+    description: "TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestGeneratedSessionInternalVideoCallStartSetUIAndHangupFlow$'
+
+  - id: I3
+    family: Transport
+    description: "capability manifest on connection: server records full hardware capability set declared by connecting device"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)SessionCapabilityManifestReportedOnConnection$'
+
+  - id: I4
+    family: Transport
+    description: "device registry capability query: placement engine returns only devices matching required capability set; generated+wire variants register two devices and verify filtered routing"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)SessionDeviceRegistryCapabilityQueryRoutesScenarioToMatchingDevices$'
+
+  - id: I6
+    family: Scenario
+    description: "preemption: engine suspends lower-priority scenario routes when higher-priority scenario starts and resumes them on stop"
+    steps:
+      - kind: go_test
+        pkg: ./internal/scenario
+        run: 'TestRuntime(Intercom|PA)PreemptedByRedAlertSuspendsAndResumesRoutes$'
+
+  - id: D3
+    family: Transport
+    description: "standby/clock mode activated by voice or manual command; server notifies requesting device"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)SessionStandbyModeActivatedByVoiceCommand$'
+
+  - id: D1
+    family: Scenario
+    description: "photo-frame config + heartbeat rotation tests"
+    steps:
+      - kind: go_test
+        pkg: ./cmd/server
+        run: 'TestConfigurePhotoFrameUsesDirectorySlidesAndInterval$'
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestHandleMessageHeartbeatRotatesPhotoFrameAfterInterval$'
+
+  - id: D2
+    family: Scenario
+    description: "photo frame yields to higher-priority scenario (alert/call) and resumes afterward"
+    steps:
+      - kind: go_test
+        pkg: ./internal/scenario
+        run: 'TestRuntimePhotoFrameYields(ToHigherPriorityScenarioAndResumes|ToCallAndResumes)$'
+
+  - id: M1
+    family: Scenario
+    description: "silence classifier integration test"
+    steps:
+      - kind: go_test
+        pkg: ./cmd/server
+        run: 'TestSilenceClassifierThroughAudioHubNotifiesAudioMonitor$'
+
+  - id: M2
+    family: Scenario
+    description: "audio monitor runtime test for dryer beep detection"
+    steps:
+      - kind: go_test
+        pkg: ./internal/scenario
+        run: 'TestRuntimeAudioMonitorNotifiesWhenDryerBeeps$'
+
+  - id: M3
+    family: Transport
+    description: "generated+wire red alert integration tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)SessionRedAlertRelaysBroadcastNotification$'
+
+  - id: M4
+    family: Transport
+    description: "generated+wire voice stop/stand-down tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)Session(VoiceStandDownStopsRedAlert|VoiceStopRedAlertStopsRedAlert)$'
+
+  - id: M5
+    family: Simulation
+    description: "camera activity watch: time-window policy gates alerts; harness-backed sensor routing and suppression evidence"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseM5WithEvidence$'
+
+  - id: P2
+    family: Scenario
+    description: "REPL session mobility and coexistence lifecycle test"
+    steps:
+      - kind: go_test
+        pkg: ./internal/replsession
+        run: 'TestUseCaseP2SessionMobilityAndCoexistence$'
+
+  - id: P3
+    family: Scenario
+    description: "REPL ai ask/gen commands plus mutating approval-gate metadata test"
+    steps:
+      - kind: go_test
+        pkg: ./internal/repl
+        run: 'TestUseCaseP3AIAssistanceAskGenerateAndMutatingGateMetadata$'
+
+  - id: P4
+    family: Scenario
+    description: "sticky REPL AI provider/model survives detach and reattach"
+    steps:
+      - kind: go_test
+        pkg: ./internal/replsession
+        run: 'TestUseCaseP4StickyAISelectionSurvivesDetachReattach$'
+
+  - id: S1
+    family: Transport
+    description: "generated+wire voice show-all-cameras tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)Session(VoiceShowAllCamerasStartsMultiWindow|VoiceAllCamerasStartsMultiWindow)$'
+
+  - id: S2
+    family: Transport
+    description: "generated+wire focus-action routing tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)SessionMultiWindowSetUI(IncludesFocusActions|AndFocusActionRouting)$'
+
+  - id: S3
+    family: Transport
+    description: "generated+wire multi-window audio mix tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)SessionMultiWindowAudioMixAndFocusSelection$'
+
+  - id: P1
+    family: Transport
+    description: "generated+wire terminal transition tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'Test(Generated|Wire)SessionTerminalTransitions$'
+
+  - id: PL1
+    family: Contract
+    description: "capability message room/thread/unread acknowledgement lifecycle test"
+    steps:
+      - kind: go_test
+        pkg: ./internal/capability
+        run: 'TestMessageRoomThreadUnreadAcknowledgeLifecycle$'
+
+  - id: PL8
+    family: Contract
+    description: "interactive session join/leave and control lifecycle capability tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/capability
+        run: 'Test(SessionJoinAndLeave|SessionAttachDetachAndControlLifecycle)$'
+
+  - id: PL20
+    family: Contract
+    description: "capability artifact template save/apply and artifact history tests"
+    steps:
+      - kind: go_test
+        pkg: ./internal/capability
+        run: 'Test(ArtifactReplaceAndTemplateApply|MessageAcknowledgeUnreadAndArtifactPatch)$'
+
+  - id: T1
+    family: Simulation
+    description: "due-timer loop; transport run_due_timers; kitchen timer package smoke test; voice-path fake-clock harness (timer fires via synthetic time advance)"
+    steps:
+      - kind: go_test
+        pkg: ./cmd/server
+        run: 'TestRunDueTimerLoopProcessesTimers$'
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestHandleMessageSystemRunDueTimers$'
+      - kind: app_test
+        name: kitchen_timer
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseT1WithEvidence$'
+
+  - id: T2
+    family: Simulation
+    description: "timer reminder: fake-clock advance triggers ProcessDueTimers; broadcast confirms 'Timer done!' without real elapsed time; YAML scenario in internal/usecasevalidation/testdata/t2-timer-reminder.yaml"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseT2WithEvidence$'
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestYAMLScenarioT2TimerReminder$'
+
+  - id: T3
+    family: Simulation
+    description: "school-morning monitor: no camera activity by alert time notifies parent; activity before alert cancels notification; YAML scenarios in internal/usecasevalidation/testdata/t3-t4-school-morning.yaml and t3-activity-cancels-alert.yaml"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseT3(T4WithEvidence|ActivityCancelsAlert)$'
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestYAMLScenarioT3(ActivityCancelsAlert|T4SchoolMorning)$'
+
+  - id: T4
+    family: Simulation
+    description: "school-morning warning: bus-warning broadcast fires to child-room at configured warning time via synthetic clock advance; YAML scenario in internal/usecasevalidation/testdata/t3-t4-school-morning.yaml"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseT3T4WithEvidence$'
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestYAMLScenarioT3T4SchoolMorning$'
+
+  - id: UI1
+    family: Transport
+    description: "idle photo-frame SetUI includes scoped corner affordance (terminal-ui plan)"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance$'
+
+  - id: UI2
+    family: Transport
+    description: "corner.open toggles menu overlay claim without disturbing main"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestHandleMessageInputCornerOpenTogglesMenuOverlayAndClaim$'
+
+  - id: UI3
+    family: Transport
+    description: "menu overlay default MIXED policy: main pointer blocked, audio live"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestHandleMessageInputMenuOverlayDefaultMixedPolicyBlocksMainPointerButKeepsAudioLive$'
+
+  - id: UI4
+    family: "Transport+Client"
+    description: "privacy toggle: proto withdrawal, server routes, post-cutover frame drop"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestHandleMessageVoiceAudioDropsPostPrivacyCutoverFrames$'
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestGeneratedSessionPrivacyToggleCapabilityLossStopsAudioAndVideoRoutes$'
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestGeneratedSessionPrivacyToggleExitReaddsCapabilitiesAndResumesClaims$'
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestProtoRoundTripCapabilityDeltaPrivacyWithdrawalOmitsMicAndCameraFields$'
+      - kind: flutter_test
+        path: test/widget_test_media.dart
+        plain_name: "privacy.toggle stops local capture before sending capability delta"
+
+  - id: UI5
+    family: Client
+    description: "privacy mode: no VoiceAudio after withdrawal; no client-chrome privacy indicators"
+    steps:
+      - kind: flutter_test
+        path: test/widget_test_reconnect.dart
+        plain_name: "wake-word utterance does not send VoiceAudio after privacy.toggle withdraws microphone capability"
+      - kind: flutter_test
+        path: test/widget_test_reconnect.dart
+        plain_name: "privacy.toggle does not render persistent client-chrome privacy/capture indicator"
+
+  - id: UI6
+    family: Transport
+    description: "wake-word path activates scenario (single client)"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestControlStreamVoiceAudioWakeWordDetectedActivatesScenario$'
+
+  - id: UI7
+    family: Transport
+    description: "wake-word dedupe across two clients dispatches at most one intent"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestControlStreamVoiceAudioWakeWordDedupeAcrossClientsDispatchesAtMostOneIntent$'
+
+  - id: UI8
+    family: "Transport+Client"
+    description: "capability delta on rotation/resize; overlay survives orientation delta"
+    steps:
+      - kind: flutter_test
+        path: test/widget_test_connection.dart
+        plain_name: "deterministic metrics seam emits CapabilityDelta on rotation with fresh generation"
+      - kind: flutter_test
+        path: test/widget_test_connection.dart
+        plain_name: "deterministic metrics seam emits CapabilityDelta on resize"
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestCapabilityDeltaWhileMenuOverlayOpenPreservesMainAndOverlayActivations$'
+
+  - id: UI9
+    family: Simulation
+    description: "reconnect restores main + overlay UI state; harness-backed evidence (RECON-1)"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestGeneratedSessionUI_RECON_1$'
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseUI9WithEvidence$'
+
+  - id: UI10
+    family: Scenario
+    description: "registry corner affordance reachability invariant for every main-layer scenario"
+    steps:
+      - kind: go_test
+        pkg: ./internal/transport
+        run: 'TestWithCornerAffordance_RegistryReachabilityInvariant$'
+
+  - id: V1
+    family: Simulation
+    description: "voice assistant wake-and-answer: 'assistant <question>' triggers VoiceAssistantScenario; FakeLLM queried; response broadcast back to source device"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseV1WithEvidence$'
+
+  - id: V2
+    family: Simulation
+    description: "voice recipe request: 'assistant how do I make <dish>' triggers VoiceAssistantScenario; FakeLLM returns recipe; broadcast back to kitchen terminal"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseV2WithEvidence$'
+
+  - id: V3
+    family: Simulation
+    description: "voice general-knowledge query: 'assistant <question>' triggers VoiceAssistantScenario; FakeLLM returns answer; broadcast back to requesting device"
+    steps:
+      - kind: go_test
+        pkg: ./internal/usecasevalidation
+        run: 'TestUseCaseV3WithEvidence$'

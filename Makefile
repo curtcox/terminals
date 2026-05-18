@@ -308,6 +308,7 @@ usecases-site-check:
 
 usecase-wiring-audit:
 	bash terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh
+	python3 scripts/audit-usecase-wiring.py
 
 ci-status:
 	@scripts/check-ci-gates.sh; true
