@@ -10,10 +10,10 @@
 <body>
   <main>
     <p class="back"><a href="index.html">Back to all use cases</a></p>
-    <header class="case-header not-validated">
+    <header class="case-header passing">
       <p class="eyebrow">Terminal UI Use Cases / UI1</p>
       <h1>See an idle tablet show server-driven ambient UI with a reachable corner menu affordance</h1>
-      <p>NOT VALIDATED - automated validation is wired, but no captured passing result exists yet. Run &#x27;make usecase-validate USECASE=UI1&#x27; to generate results.</p>
+      <p>Validated on 2026-05-17 12:39 UTC - all assertions passed.</p>
     </header>
     <section>
       <h2>What it does</h2>
@@ -29,11 +29,11 @@
     </section>
     <section>
       <h2>What you hear</h2>
-      <p class="placeholder">Audio artifacts are not captured yet.</p>
+      <p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>
     </section>
     <section>
       <h2>Defects</h2>
-      <p>No result.json defect feed is available yet.</p>
+      <p>No defects detected in the latest captured result.</p>
     </section>
     <section>
       <h2>Evidence</h2>
@@ -44,6 +44,8 @@
         <li><a href="../../terminal_server/internal/transport/control_stream_command_terminal_test.go">Go test: TestUseCaseUI1IdlePhotoFrameSetUIIncludesCornerAffordance (control_stream_command_terminal_test.go)</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
+        <li><a href="../../artifacts/usecases/UI1/result.json">Latest result manifest</a></li>
+        <li>Scenario: scripts/usecase-validate.sh UI1</li>
       </ul>
     </section>
   </main>

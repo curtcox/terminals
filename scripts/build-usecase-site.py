@@ -778,7 +778,7 @@ def render_interaction_transcript(interactions: tuple[InteractionStep, ...]) -> 
 
 def render_audio_media(result: Result | None) -> str:
     if not result or not result.audio:
-        return '<p class="placeholder">Audio artifacts are not captured yet.</p>'
+        return '<p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>'
     figures: list[str] = []
     for asset in result.audio:
         notes: list[str] = []

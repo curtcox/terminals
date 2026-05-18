@@ -10,10 +10,10 @@
 <body>
   <main>
     <p class="back"><a href="index.html">Back to all use cases</a></p>
-    <header class="case-header untested">
+    <header class="case-header passing">
       <p class="eyebrow">Adjacent — Business / Retail / Hospitality Use Cases / AB5</p>
       <h1>Set up audio monitoring to detect alarm or glass-break sounds after hours</h1>
-      <p>UNTESTED - no automated scenario exists for this use case.</p>
+      <p>Validated on 2026-05-17 22:36 UTC - all assertions passed.</p>
     </header>
     <section>
       <h2>What it does</h2>
@@ -21,16 +21,41 @@
     </section>
     <section>
       <h2>How to use it</h2>
-      <p class="placeholder">No automated scenario exists yet. Interaction trace not available.</p>
+      <ol>
+        <li>Arm glass-break audio monitoring on the Security Monitor terminal.</li>
+      </ol>
     </section>
-    
+        <section>
+      <h2>What you see</h2>
+      <p class="media-note">Rendered from server primitives; client pixel parity is covered by the <a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>.</p>
+      <figure class="media-block"><video controls autoplay muted loop playsinline src="../../artifacts/usecases/AB5/video/validation.mp4"></video><figcaption>Validation walkthrough</figcaption></figure>
+      <div class="frame-scrubber" data-frames="[{&quot;src&quot;: &quot;../../artifacts/usecases/AB5/frames/ab5-monitor-armed.png&quot;, &quot;label&quot;: &quot;AB5-monitor-armed&quot;}]"><img class="frame-preview-image" src="../../artifacts/usecases/AB5/frames/ab5-monitor-armed.png" alt="AB5-monitor-armed"><div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="0" value="0" aria-label="Scrub captured frames"><span class="frame-preview-label">AB5-monitor-armed</span></div></div>
+      <div class="frame-strip">
+        <a class="frame-link" href="../../artifacts/usecases/AB5/frames/ab5-monitor-armed.png"><img src="../../artifacts/usecases/AB5/frames/ab5-monitor-armed.png" alt="AB5-monitor-armed"><span>AB5-monitor-armed</span></a>
+      </div>
+      <aside class="interaction-transcript" aria-label="Interaction transcript"><h3>Interaction transcript</h3><ol>
+          <li><span>1</span><strong>COMMAND</strong>Arm glass-break audio monitoring on the Security Monitor terminal. (security_terminal)</li>
+        </ol></aside>
+    </section>
+    <section>
+      <h2>What you hear</h2>
+      <p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>
+    </section>
+    <section>
+      <h2>Defects</h2>
+      <p>No defects detected in the latest captured result.</p>
+    </section>
     <section>
       <h2>Evidence</h2>
       <ul>
         <li><a href="../../usecases/adjacent-business.md">usecases/adjacent-business.md</a></li>
-        <li>No automated validation command wired yet.</li>
+        <li><code>make usecase-validate USECASE=AB5</code></li>
+        <li>Primary validation evidence: Simulation: after-hours alarm monitoring: audio_monitor armed for glass_break; FakeSoundClassifier emits glass_break; alert broadcast to security_terminal</li>
+        <li><a href="../../terminal_server/internal/usecasevalidation/ab_test.go">Go test: TestUseCaseAB5WithEvidence (ab_test.go)</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
+        <li><a href="../../artifacts/usecases/AB5/result.json">Latest result manifest</a></li>
+        <li>Scenario: scripts/usecase-validate.sh AB5</li>
       </ul>
     </section>
   </main>

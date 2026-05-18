@@ -10,10 +10,10 @@
 <body>
   <main>
     <p class="back"><a href="index.html">Back to all use cases</a></p>
-    <header class="case-header not-validated">
+    <header class="case-header passing">
       <p class="eyebrow">Communication Use Cases / C1</p>
       <h1>Press a button or say &quot;intercom to kitchen&quot; and have two-way audio with the kitchen device</h1>
-      <p>NOT VALIDATED - automated validation is wired, but no captured passing result exists yet. Run &#x27;make usecase-validate USECASE=C1&#x27; to generate results.</p>
+      <p>Validated on 2026-05-17 21:26 UTC - all assertions passed.</p>
     </header>
     <section>
       <h2>What it does</h2>
@@ -21,19 +21,31 @@
     </section>
     <section>
       <h2>How to use it</h2>
-      <p class="placeholder">Run <code>make usecase-validate USECASE=C1</code> to generate interaction traces for this use case.</p>
+      <ol>
+        <li>Press intercom button or say &quot;intercom to kitchen&quot; from the Kitchen device.</li>
+        <li>End the intercom call (stop command).</li>
+      </ol>
     </section>
         <section>
       <h2>What you see</h2>
-      <p class="placeholder">Rendered server-primitive screenshots are not captured yet.</p>
+      <p class="media-note">Rendered from server primitives; client pixel parity is covered by the <a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>.</p>
+      <figure class="media-block"><video controls autoplay muted loop playsinline src="../../artifacts/usecases/C1/video/validation.mp4"></video><figcaption>Validation walkthrough</figcaption></figure>
+      <div class="frame-scrubber" data-frames="[{&quot;src&quot;: &quot;../../artifacts/usecases/C1/frames/c1-intercom-routed.png&quot;, &quot;label&quot;: &quot;C1-intercom-routed&quot;}]"><img class="frame-preview-image" src="../../artifacts/usecases/C1/frames/c1-intercom-routed.png" alt="C1-intercom-routed"><div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="0" value="0" aria-label="Scrub captured frames"><span class="frame-preview-label">C1-intercom-routed</span></div></div>
+      <div class="frame-strip">
+        <a class="frame-link" href="../../artifacts/usecases/C1/frames/c1-intercom-routed.png"><img src="../../artifacts/usecases/C1/frames/c1-intercom-routed.png" alt="C1-intercom-routed"><span>C1-intercom-routed</span></a>
+      </div>
+      <aside class="interaction-transcript" aria-label="Interaction transcript"><h3>Interaction transcript</h3><ol>
+          <li><span>1</span><strong>COMMAND</strong>Press intercom button or say &quot;intercom to kitchen&quot; from the Kitchen device. (device-1)</li>
+          <li><span>2</span><strong>COMMAND</strong>End the intercom call (stop command). (device-1)</li>
+        </ol></aside>
     </section>
     <section>
       <h2>What you hear</h2>
-      <p class="placeholder">Audio artifacts are not captured yet.</p>
+      <p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>
     </section>
     <section>
       <h2>Defects</h2>
-      <p>No result.json defect feed is available yet.</p>
+      <p>No defects detected in the latest captured result.</p>
     </section>
     <section>
       <h2>Evidence</h2>
@@ -44,6 +56,8 @@
         <li><a href="../../terminal_server/internal/usecasevalidation/c1_test.go">Go test: TestUseCaseC1WithEvidence (c1_test.go)</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
+        <li><a href="../../artifacts/usecases/C1/result.json">Latest result manifest</a></li>
+        <li>Scenario: TestUseCaseC1WithEvidence</li>
       </ul>
     </section>
   </main>

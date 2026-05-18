@@ -10,10 +10,10 @@
 <body>
   <main>
     <p class="back"><a href="index.html">Back to all use cases</a></p>
-    <header class="case-header not-validated">
+    <header class="case-header passing">
       <p class="eyebrow">PLATO-Inspired Extension Use Cases / PL20</p>
       <h1>Save reusable icons, signs, and visual templates for announcements and routines</h1>
-      <p>NOT VALIDATED - automated validation is wired, but no captured passing result exists yet. Run &#x27;make usecase-validate USECASE=PL20&#x27; to generate results.</p>
+      <p>Validated on 2026-05-17 12:39 UTC - all assertions passed.</p>
     </header>
     <section>
       <h2>What it does</h2>
@@ -29,11 +29,11 @@
     </section>
     <section>
       <h2>What you hear</h2>
-      <p class="placeholder">Audio artifacts are not captured yet.</p>
+      <p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>
     </section>
     <section>
       <h2>Defects</h2>
-      <p>No result.json defect feed is available yet.</p>
+      <p>No defects detected in the latest captured result.</p>
     </section>
     <section>
       <h2>Evidence</h2>
@@ -43,6 +43,8 @@
         <li>Primary validation evidence: Contract: capability artifact template save/apply and artifact history tests</li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
+        <li><a href="../../artifacts/usecases/PL20/result.json">Latest result manifest</a></li>
+        <li>Scenario: scripts/usecase-validate.sh PL20</li>
       </ul>
     </section>
   </main>

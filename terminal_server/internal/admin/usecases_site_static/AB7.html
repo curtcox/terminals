@@ -10,10 +10,10 @@
 <body>
   <main>
     <p class="back"><a href="index.html">Back to all use cases</a></p>
-    <header class="case-header untested">
+    <header class="case-header passing">
       <p class="eyebrow">Adjacent — Business / Retail / Hospitality Use Cases / AB7</p>
       <h1>Use voice to announce &quot;patient Smith, room 3 is ready&quot; to the waiting area device</h1>
-      <p>UNTESTED - no automated scenario exists for this use case.</p>
+      <p>Validated on 2026-05-17 22:36 UTC - all assertions passed.</p>
     </header>
     <section>
       <h2>What it does</h2>
@@ -21,16 +21,41 @@
     </section>
     <section>
       <h2>How to use it</h2>
-      <p class="placeholder">No automated scenario exists yet. Interaction trace not available.</p>
+      <ol>
+        <li>Announce &quot;patient Smith, room 3 is ready&quot; from the Reception Desk terminal.</li>
+      </ol>
     </section>
-    
+        <section>
+      <h2>What you see</h2>
+      <p class="media-note">Rendered from server primitives; client pixel parity is covered by the <a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>.</p>
+      <figure class="media-block"><video controls autoplay muted loop playsinline src="../../artifacts/usecases/AB7/video/validation.mp4"></video><figcaption>Validation walkthrough</figcaption></figure>
+      <div class="frame-scrubber" data-frames="[{&quot;src&quot;: &quot;../../artifacts/usecases/AB7/frames/ab7-announcement-routed.png&quot;, &quot;label&quot;: &quot;AB7-announcement-routed&quot;}]"><img class="frame-preview-image" src="../../artifacts/usecases/AB7/frames/ab7-announcement-routed.png" alt="AB7-announcement-routed"><div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="0" value="0" aria-label="Scrub captured frames"><span class="frame-preview-label">AB7-announcement-routed</span></div></div>
+      <div class="frame-strip">
+        <a class="frame-link" href="../../artifacts/usecases/AB7/frames/ab7-announcement-routed.png"><img src="../../artifacts/usecases/AB7/frames/ab7-announcement-routed.png" alt="AB7-announcement-routed"><span>AB7-announcement-routed</span></a>
+      </div>
+      <aside class="interaction-transcript" aria-label="Interaction transcript"><h3>Interaction transcript</h3><ol>
+          <li><span>1</span><strong>COMMAND</strong>Announce &quot;patient Smith, room 3 is ready&quot; from the Reception Desk terminal. (reception_terminal)</li>
+        </ol></aside>
+    </section>
+    <section>
+      <h2>What you hear</h2>
+      <p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>
+    </section>
+    <section>
+      <h2>Defects</h2>
+      <p>No defects detected in the latest captured result.</p>
+    </section>
     <section>
       <h2>Evidence</h2>
       <ul>
         <li><a href="../../usecases/adjacent-business.md">usecases/adjacent-business.md</a></li>
-        <li>No automated validation command wired yet.</li>
+        <li><code>make usecase-validate USECASE=AB7</code></li>
+        <li>Primary validation evidence: Simulation: voice announcement to waiting area: announcement scenario started; waiting_area_terminal receives announcement_audio RouteStream; no duplicate routes</li>
+        <li><a href="../../terminal_server/internal/usecasevalidation/ab_test.go">Go test: TestUseCaseAB7WithEvidence (ab_test.go)</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
+        <li><a href="../../artifacts/usecases/AB7/result.json">Latest result manifest</a></li>
+        <li>Scenario: scripts/usecase-validate.sh AB7</li>
       </ul>
     </section>
   </main>

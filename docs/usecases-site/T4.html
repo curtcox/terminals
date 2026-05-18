@@ -10,10 +10,10 @@
 <body>
   <main>
     <p class="back"><a href="index.html">Back to all use cases</a></p>
-    <header class="case-header not-validated">
+    <header class="case-header passing">
       <p class="eyebrow">Timers, Reminders, and Scheduling Use Cases / T4</p>
       <h1>Have the system warn my child via speaker (&quot;the bus comes in 10 minutes&quot;)</h1>
-      <p>NOT VALIDATED - automated validation is wired, but no captured passing result exists yet. Run &#x27;make usecase-validate USECASE=T4&#x27; to generate results.</p>
+      <p>Validated on 2026-05-17 21:26 UTC - all assertions passed.</p>
     </header>
     <section>
       <h2>What it does</h2>
@@ -21,19 +21,31 @@
     </section>
     <section>
       <h2>How to use it</h2>
-      <p class="placeholder">Run <code>make usecase-validate USECASE=T4</code> to generate interaction traces for this use case.</p>
+      <ol>
+        <li>Parent arms school morning monitor: alert at 7:30 AM if child not seen, warn child at 7:50 AM (bus in 10 min).</li>
+      </ol>
     </section>
         <section>
       <h2>What you see</h2>
-      <p class="placeholder">Rendered server-primitive screenshots are not captured yet.</p>
+      <p class="media-note">Rendered from server primitives; client pixel parity is covered by the <a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>.</p>
+      <figure class="media-block"><video controls autoplay muted loop playsinline src="../../artifacts/usecases/T4/video/validation.mp4"></video><figcaption>Validation walkthrough</figcaption></figure>
+      <div class="frame-scrubber" data-frames="[{&quot;src&quot;: &quot;../../artifacts/usecases/T4/frames/t3-monitor-armed.png&quot;, &quot;label&quot;: &quot;T3-monitor-armed&quot;}, {&quot;src&quot;: &quot;../../artifacts/usecases/T4/frames/t3-parent-alert.png&quot;, &quot;label&quot;: &quot;T3-parent-alert&quot;}, {&quot;src&quot;: &quot;../../artifacts/usecases/T4/frames/t4-child-warned.png&quot;, &quot;label&quot;: &quot;T4-child-warned&quot;}]"><img class="frame-preview-image" src="../../artifacts/usecases/T4/frames/t3-monitor-armed.png" alt="T3-monitor-armed"><div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="2" value="0" aria-label="Scrub captured frames"><span class="frame-preview-label">T3-monitor-armed</span></div></div>
+      <div class="frame-strip">
+        <a class="frame-link" href="../../artifacts/usecases/T4/frames/t3-monitor-armed.png"><img src="../../artifacts/usecases/T4/frames/t3-monitor-armed.png" alt="T3-monitor-armed"><span>T3-monitor-armed</span></a>
+        <a class="frame-link" href="../../artifacts/usecases/T4/frames/t3-parent-alert.png"><img src="../../artifacts/usecases/T4/frames/t3-parent-alert.png" alt="T3-parent-alert"><span>T3-parent-alert</span></a>
+        <a class="frame-link" href="../../artifacts/usecases/T4/frames/t4-child-warned.png"><img src="../../artifacts/usecases/T4/frames/t4-child-warned.png" alt="T4-child-warned"><span>T4-child-warned</span></a>
+      </div>
+      <aside class="interaction-transcript" aria-label="Interaction transcript"><h3>Interaction transcript</h3><ol>
+          <li><span>1</span><strong>COMMAND</strong>Parent arms school morning monitor: alert at 7:30 AM if child not seen, warn child at 7:50 AM (bus in 10 min). (parent)</li>
+        </ol></aside>
     </section>
     <section>
       <h2>What you hear</h2>
-      <p class="placeholder">Audio artifacts are not captured yet.</p>
+      <p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>
     </section>
     <section>
       <h2>Defects</h2>
-      <p>No result.json defect feed is available yet.</p>
+      <p>No defects detected in the latest captured result.</p>
     </section>
     <section>
       <h2>Evidence</h2>
@@ -46,6 +58,8 @@
         <li><a href="../../terminal_server/internal/usecasevalidation/scenario_yaml_test.go">Go test: TestYAMLScenarioT3T4SchoolMorning (scenario_yaml_test.go)</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
+        <li><a href="../../artifacts/usecases/T4/result.json">Latest result manifest</a></li>
+        <li>Scenario: TestUseCaseT3T4WithEvidence</li>
       </ul>
     </section>
   </main>

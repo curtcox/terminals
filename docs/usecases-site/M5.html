@@ -10,10 +10,10 @@
 <body>
   <main>
     <p class="back"><a href="index.html">Back to all use cases</a></p>
-    <header class="case-header not-validated">
+    <header class="case-header passing">
       <p class="eyebrow">Monitoring and Alerts Use Cases / M5</p>
       <h1>Have the system watch a room&#x27;s camera for activity during certain hours</h1>
-      <p>NOT VALIDATED - automated validation is wired, but no captured passing result exists yet. Run &#x27;make usecase-validate USECASE=M5&#x27; to generate results.</p>
+      <p>Validated on 2026-05-17 21:26 UTC - all assertions passed.</p>
     </header>
     <section>
       <h2>What it does</h2>
@@ -21,19 +21,31 @@
     </section>
     <section>
       <h2>How to use it</h2>
-      <p class="placeholder">Run <code>make usecase-validate USECASE=M5</code> to generate interaction traces for this use case.</p>
+      <ol>
+        <li>Arm camera monitor on child-room device with window 7:00–8:00 AM.</li>
+        <li>Camera activity detected at 7:15 AM (inside monitored window — triggers alert).</li>
+      </ol>
     </section>
         <section>
       <h2>What you see</h2>
-      <p class="placeholder">Rendered server-primitive screenshots are not captured yet.</p>
+      <p class="media-note">Rendered from server primitives; client pixel parity is covered by the <a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>.</p>
+      <figure class="media-block"><video controls autoplay muted loop playsinline src="../../artifacts/usecases/M5/video/validation.mp4"></video><figcaption>Validation walkthrough</figcaption></figure>
+      <div class="frame-scrubber" data-frames="[{&quot;src&quot;: &quot;../../artifacts/usecases/M5/frames/m5-monitor-armed.png&quot;, &quot;label&quot;: &quot;M5-monitor-armed&quot;}]"><img class="frame-preview-image" src="../../artifacts/usecases/M5/frames/m5-monitor-armed.png" alt="M5-monitor-armed"><div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="0" value="0" aria-label="Scrub captured frames"><span class="frame-preview-label">M5-monitor-armed</span></div></div>
+      <div class="frame-strip">
+        <a class="frame-link" href="../../artifacts/usecases/M5/frames/m5-monitor-armed.png"><img src="../../artifacts/usecases/M5/frames/m5-monitor-armed.png" alt="M5-monitor-armed"><span>M5-monitor-armed</span></a>
+      </div>
+      <aside class="interaction-transcript" aria-label="Interaction transcript"><h3>Interaction transcript</h3><ol>
+          <li><span>1</span><strong>COMMAND</strong>Arm camera monitor on child-room device with window 7:00–8:00 AM. (child-room)</li>
+          <li><span>2</span><strong>SENSOR</strong>Camera activity detected at 7:15 AM (inside monitored window — triggers alert). (child-room)</li>
+        </ol></aside>
     </section>
     <section>
       <h2>What you hear</h2>
-      <p class="placeholder">Audio artifacts are not captured yet.</p>
+      <p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>
     </section>
     <section>
       <h2>Defects</h2>
-      <p>No result.json defect feed is available yet.</p>
+      <p>No defects detected in the latest captured result.</p>
     </section>
     <section>
       <h2>Evidence</h2>
@@ -44,6 +56,8 @@
         <li><a href="../../terminal_server/internal/usecasevalidation/m5_test.go">Go test: TestUseCaseM5WithEvidence (m5_test.go)</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
+        <li><a href="../../artifacts/usecases/M5/result.json">Latest result manifest</a></li>
+        <li>Scenario: TestUseCaseM5WithEvidence</li>
       </ul>
     </section>
   </main>

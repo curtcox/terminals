@@ -10,10 +10,10 @@
 <body>
   <main>
     <p class="back"><a href="index.html">Back to all use cases</a></p>
-    <header class="case-header not-validated">
+    <header class="case-header passing">
       <p class="eyebrow">Software Agents and Automation Use Cases / AA1</p>
       <h1>Trigger scenarios via the server API based on external events (calendar, webhook, sensor)</h1>
-      <p>NOT VALIDATED - automated validation is wired, but no captured passing result exists yet. Run &#x27;make usecase-validate USECASE=AA1&#x27; to generate results.</p>
+      <p>Validated on 2026-05-17 21:26 UTC - all assertions passed.</p>
     </header>
     <section>
       <h2>What it does</h2>
@@ -21,19 +21,30 @@
     </section>
     <section>
       <h2>How to use it</h2>
-      <p class="placeholder">Run <code>make usecase-validate USECASE=AA1</code> to generate interaction traces for this use case.</p>
+      <ol>
+        <li>Run &quot;announce&quot;.</li>
+      </ol>
     </section>
         <section>
       <h2>What you see</h2>
-      <p class="placeholder">Rendered server-primitive screenshots are not captured yet.</p>
+      <p class="media-note">Rendered from server primitives; client pixel parity is covered by the <a href="../../terminal_server/internal/scenario/audit/verify_terminal_ui_usecases.sh">manual UI audit</a>.</p>
+      <figure class="media-block"><video controls autoplay muted loop playsinline src="../../artifacts/usecases/AA1/video/validation.mp4"></video><figcaption>Validation walkthrough</figcaption></figure>
+      <div class="frame-scrubber" data-frames="[{&quot;src&quot;: &quot;../../artifacts/usecases/AA1/frames/aa1-scenario-triggered.png&quot;, &quot;label&quot;: &quot;AA1-scenario-triggered&quot;}, {&quot;src&quot;: &quot;../../artifacts/usecases/AA1/frames/aa1-route-delivered.png&quot;, &quot;label&quot;: &quot;AA1-route-delivered&quot;}]"><img class="frame-preview-image" src="../../artifacts/usecases/AA1/frames/aa1-scenario-triggered.png" alt="AA1-scenario-triggered"><div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="1" value="0" aria-label="Scrub captured frames"><span class="frame-preview-label">AA1-scenario-triggered</span></div></div>
+      <div class="frame-strip">
+        <a class="frame-link" href="../../artifacts/usecases/AA1/frames/aa1-scenario-triggered.png"><img src="../../artifacts/usecases/AA1/frames/aa1-scenario-triggered.png" alt="AA1-scenario-triggered"><span>AA1-scenario-triggered</span></a>
+        <a class="frame-link" href="../../artifacts/usecases/AA1/frames/aa1-route-delivered.png"><img src="../../artifacts/usecases/AA1/frames/aa1-route-delivered.png" alt="AA1-route-delivered"><span>AA1-route-delivered</span></a>
+      </div>
+      <aside class="interaction-transcript" aria-label="Interaction transcript"><h3>Interaction transcript</h3><ol>
+          <li><span>1</span><strong>COMMAND</strong>Run &quot;announce&quot;. (agent)</li>
+        </ol></aside>
     </section>
     <section>
       <h2>What you hear</h2>
-      <p class="placeholder">Audio artifacts are not captured yet.</p>
+      <p class="placeholder">Audio is routed live between devices. Byte-level capture is not available for routing scenarios; see the interaction transcript for route evidence.</p>
     </section>
     <section>
       <h2>Defects</h2>
-      <p>No result.json defect feed is available yet.</p>
+      <p>No defects detected in the latest captured result.</p>
     </section>
     <section>
       <h2>Evidence</h2>
@@ -46,6 +57,8 @@
         <li><a href="../../terminal_server/internal/usecasevalidation/scenario_yaml_test.go">Go test: TestYAMLScenarioAA1WebhookAnnounce (scenario_yaml_test.go)</a></li>
         <li><a href="../../.claude/skills/ui-inspect/SKILL.md">Client UI inspection workflow</a></li>
         <li><code>make usecase-wiring-audit</code></li>
+        <li><a href="../../artifacts/usecases/AA1/result.json">Latest result manifest</a></li>
+        <li>Scenario: TestYAMLScenarioAA1WebhookAnnounce</li>
       </ul>
     </section>
   </main>
