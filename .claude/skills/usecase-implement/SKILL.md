@@ -1,11 +1,11 @@
 ---
 name: usecase-implement
-description: Implement a use case from usecases.md — add server-side behavior, protobuf changes, integration tests, and wire the ID into the validation gate. Use when the user asks to "implement use case X", "add use case X", "automate validation for X", "promote X from planned to automated", or references an un-automated ID (e.g. C2, V1, T3, M5, AH7, AA4). For running an already-automated validation, use usecase-validate instead.
+description: Implement a use case from usecases/INDEX.md — add server-side behavior, protobuf changes, integration tests, and wire the ID into the validation gate. Use when the user asks to "implement use case X", "add use case X", "automate validation for X", "promote X from planned to automated", or references an un-automated ID (e.g. C2, V1, T3, M5, AH7, AA4). For running an already-automated validation, use usecase-validate instead.
 ---
 
 # Implement a Use Case
 
-Adds behavior and/or automated validation for an ID from [usecases.md](../../../usecases.md). The endpoint of this workflow is: the ID passes `make usecase-validate USECASE=<ID>` and appears in the **Automated IDs** table of [docs/usecase-validation-matrix.md](../../../docs/usecase-validation-matrix.md).
+Adds behavior and/or automated validation for an ID from [usecases/INDEX.md](../../../usecases/INDEX.md). The endpoint of this workflow is: the ID passes `make usecase-validate USECASE=<ID>` and appears in the **Automated IDs** table of [docs/usecase-validation-matrix.md](../../../docs/usecase-validation-matrix.md).
 
 ## Scope check before starting
 
@@ -18,7 +18,7 @@ Adds behavior and/or automated validation for an ID from [usecases.md](../../../
 From [CLAUDE.md](../../../CLAUDE.md) / [AGENTS.md](../../../AGENTS.md):
 
 1. **No scenario-specific behavior in the Flutter client.** All new logic goes in the Go server. The client is a generic terminal.
-2. **All client/server messages live in protobuf** under `api/terminals/<domain>/v1/*.proto` — never ad-hoc JSON. (Note: [CLAUDE.md](../../../CLAUDE.md) says `api/proto/` but the actual path is `api/terminals/<domain>/v1/` — trust the filesystem.)
+2. **All client/server messages live in protobuf** under `api/terminals/<domain>/v1/*.proto` — never ad-hoc JSON.
 3. **AI providers stay behind interfaces** in server code.
 4. **UIs are assembled from shared server-driven primitives**, not scenario-specific widgets.
 
@@ -27,7 +27,7 @@ If your design requires violating any of these, stop and discuss with the user b
 ## Procedure
 
 ### 1. Ground the work
-Re-read the target row in [usecases.md](../../../usecases.md) and the relevant plan file(s):
+Re-read the target row in [usecases/INDEX.md](../../../usecases/INDEX.md) (or the per-family file under [usecases/](../../../usecases/)) and the relevant plan file(s):
 - [plans/use-case-flows.md](../../../plans/features/use-case-flows.md) — end-to-end flow for each planned scenario; start here.
 - [plans/scenario-engine.md](../../../plans/features/scenario-engine.md) — scenario definitions, activations, triggers, preemption.
 - [plans/application-runtime.md](../../../plans/features/application-runtime.md) — session lifecycle and orchestration.

@@ -20,8 +20,8 @@ and use-case sources, not hand-maintained.
 
 - **Pick** — the top recommendation from `pick-next-work.py`'s four
   priority buckets (needs-attention → in-flight → promote → planned-small).
-- **Un-validated planned use-case IDs** — IDs in `usecases.md` (or
-  `usecases/*.md` after F2) that no plan references via
+- **Un-validated planned use-case IDs** — IDs in `usecases/*.md`
+  (indexed at `usecases/INDEX.md`) that no plan references via
   `validation: automated:<ID>` and that `scripts/usecase-validate.sh`
   doesn't already wire up.
 - **Open audits and incidents** — `kind: audit`/`incident` with
