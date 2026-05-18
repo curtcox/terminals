@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/transport"
+	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
 // AssertionRecord captures the result of a single named assertion.
@@ -28,12 +29,13 @@ type InteractionRecord struct {
 
 // FrameRecord describes a deterministic visual artifact captured from server primitives.
 type FrameRecord struct {
-	StepID    string    `json:"step_id"`
-	Terminal  string    `json:"terminal,omitempty"`
-	Label     string    `json:"label"`
-	Path      string    `json:"path"`
-	Summary   string    `json:"summary,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
+	StepID     string         `json:"step_id"`
+	Terminal   string         `json:"terminal,omitempty"`
+	Label      string         `json:"label"`
+	Path       string         `json:"path"`
+	Summary    string         `json:"summary,omitempty"`
+	Descriptor *ui.Descriptor `json:"descriptor,omitempty"`
+	Timestamp  time.Time      `json:"timestamp"`
 }
 
 // AudioRecord describes a captured audio artifact from a PlayAudio server message.

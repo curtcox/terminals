@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"sort"
+	"strconv"
 	"strings"
 
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
@@ -18,21 +19,422 @@ func renderFrameImage(frame FrameRecord) image.Image {
 	const height = 540
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	fillRect(img, img.Bounds(), color.RGBA{R: 16, G: 20, B: 24, A: 255})
-	fillRect(img, image.Rect(0, 0, width, 72), color.RGBA{R: 37, G: 90, B: 99, A: 255})
-	drawText(img, 32, 28, "Terminals validation frame", color.RGBA{R: 238, G: 246, B: 247, A: 255})
-	drawText(img, 32, 94, "Step: "+frame.StepID, color.RGBA{R: 226, G: 232, B: 234, A: 255})
-	if frame.Terminal != "" {
-		drawText(img, 32, 122, "Terminal: "+frame.Terminal, color.RGBA{R: 190, G: 203, B: 207, A: 255})
+	if frame.Descriptor != nil && frame.Descriptor.Type != "" {
+		renderDescriptor(img, *frame.Descriptor, img.Bounds())
 	}
-	y := 166
-	for _, line := range wrapText(frame.Summary, 74) {
-		drawText(img, 32, y, line, color.RGBA{R: 238, G: 238, B: 232, A: 255})
-		y += 28
-		if y > height-36 {
+	return img
+}
+
+// extractLatestDescriptor finds the most recent SetUI message in msgs and converts
+// its root Node to a ui.Descriptor for rendering. Returns nil if no SetUI is found.
+func extractLatestDescriptor(msgs []transport.ProtoServerEnvelope) *ui.Descriptor {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		resp, ok := msgs[i].(*controlv1.ConnectResponse)
+		if !ok {
+			continue
+		}
+		if setUI := resp.GetSetUi(); setUI != nil {
+			d := nodeToDescriptor(setUI.GetRoot())
+			return &d
+		}
+	}
+	return nil
+}
+
+// nodeToDescriptor converts a proto uiv1.Node tree to a ui.Descriptor tree.
+func nodeToDescriptor(n *uiv1.Node) ui.Descriptor {
+	if n == nil {
+		return ui.Descriptor{}
+	}
+	name := nodeWidgetName(n)
+	props := make(map[string]string, len(n.GetProps())+4)
+	for k, v := range n.GetProps() {
+		props[k] = v
+	}
+	switch name {
+	case "text":
+		if t := n.GetText(); t != nil {
+			if v := t.GetValue(); v != "" {
+				props["value"] = v
+			}
+			if c := t.GetColor(); c != "" {
+				props["color"] = c
+			}
+			if s := t.GetStyle(); s != "" {
+				props["style"] = s
+			}
+		}
+	case "button":
+		if b := n.GetButton(); b != nil {
+			if l := b.GetLabel(); l != "" {
+				props["label"] = l
+			}
+			if a := b.GetAction(); a != "" {
+				props["action"] = a
+			}
+		}
+	case "image":
+		if img := n.GetImage(); img != nil {
+			if u := img.GetUrl(); u != "" {
+				props["url"] = u
+			}
+		}
+	case "video_surface":
+		if v := n.GetVideoSurface(); v != nil {
+			if id := v.GetTrackId(); id != "" {
+				props["track_id"] = id
+			}
+		}
+	case "audio_visualizer":
+		if a := n.GetAudioVisualizer(); a != nil {
+			if id := a.GetStreamId(); id != "" {
+				props["stream_id"] = id
+			}
+		}
+	case "grid":
+		if g := n.GetGrid(); g != nil {
+			if c := g.GetColumns(); c > 0 {
+				props["columns"] = strconv.Itoa(int(c))
+			}
+		}
+	}
+	children := make([]ui.Descriptor, 0, len(n.GetChildren()))
+	for _, child := range n.GetChildren() {
+		children = append(children, nodeToDescriptor(child))
+	}
+	return ui.Descriptor{
+		ID:       n.GetId(),
+		Type:     name,
+		Props:    props,
+		Children: children,
+	}
+}
+
+const descPad = 8
+
+// renderDescriptor paints a ui.Descriptor tree into img within the given bounds,
+// following the same layout rules as the web and Flutter clients.
+func renderDescriptor(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	if d.Type == "" || bounds.Dx() <= 0 || bounds.Dy() <= 0 {
+		return
+	}
+	switch d.Type {
+	case "stack", "center", "padding", "fullscreen", "keep_awake", "brightness":
+		renderStack(img, d, bounds)
+	case "row":
+		renderRow(img, d, bounds)
+	case "grid":
+		renderGrid(img, d, bounds)
+	case "overlay":
+		renderOverlay(img, d, bounds)
+	case "expand", "scroll":
+		renderStack(img, d, bounds)
+	case "text":
+		renderText(img, d, bounds)
+	case "button":
+		renderButton(img, d, bounds)
+	case "image":
+		renderImagePlaceholder(img, d, bounds)
+	case "video_surface", "audio_visualizer":
+		renderMediaPlaceholder(img, d, bounds)
+	default:
+		if bg := d.Props["background"]; bg != "" {
+			fillRect(img, bounds, parseHexColorRGBA(bg))
+		}
+		for _, child := range d.Children {
+			renderDescriptor(img, child, bounds)
+		}
+	}
+}
+
+func renderStack(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	if bg := d.Props["background"]; bg != "" {
+		fillRect(img, bounds, parseHexColorRGBA(bg))
+	}
+	children := d.Children
+	if len(children) == 0 {
+		return
+	}
+	inner := image.Rect(
+		bounds.Min.X+descPad,
+		bounds.Min.Y+descPad,
+		bounds.Max.X-descPad,
+		bounds.Max.Y-descPad,
+	)
+	if inner.Dx() <= 0 || inner.Dy() <= 0 {
+		return
+	}
+	heights := make([]int, len(children))
+	totalFixed, expandCount := 0, 0
+	for i, child := range children {
+		if child.Type == "expand" {
+			expandCount++
+			heights[i] = -1
+		} else {
+			h := estimateDescHeight(child, inner.Dx())
+			heights[i] = h
+			totalFixed += h
+		}
+	}
+	const gap = 8
+	gapTotal := gap * (len(children) - 1)
+	expandH := 20
+	if expandCount > 0 {
+		if remaining := inner.Dy() - totalFixed - gapTotal; remaining > 0 {
+			expandH = remaining / expandCount
+		}
+	}
+	y := inner.Min.Y
+	for i, child := range children {
+		h := heights[i]
+		if h < 0 {
+			h = expandH
+		}
+		childBounds := image.Rect(inner.Min.X, y, inner.Max.X, min(y+h, bounds.Max.Y-descPad))
+		if childBounds.Dy() > 0 {
+			renderDescriptor(img, child, childBounds)
+		}
+		y += h + gap
+		if y >= bounds.Max.Y-descPad {
 			break
 		}
 	}
-	return img
+}
+
+func renderRow(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	if bg := d.Props["background"]; bg != "" {
+		fillRect(img, bounds, parseHexColorRGBA(bg))
+	}
+	children := d.Children
+	if len(children) == 0 {
+		return
+	}
+	childW := bounds.Dx() / len(children)
+	x := bounds.Min.X
+	for _, child := range children {
+		renderDescriptor(img, child, image.Rect(x, bounds.Min.Y, x+childW, bounds.Max.Y))
+		x += childW
+	}
+}
+
+func renderGrid(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	if bg := d.Props["background"]; bg != "" {
+		fillRect(img, bounds, parseHexColorRGBA(bg))
+	}
+	cols, _ := strconv.Atoi(d.Props["columns"])
+	if cols < 1 {
+		cols = 1
+	}
+	children := d.Children
+	if len(children) == 0 {
+		return
+	}
+	rows := (len(children) + cols - 1) / cols
+	if rows == 0 {
+		return
+	}
+	cellW := bounds.Dx() / cols
+	cellH := bounds.Dy() / rows
+	for i, child := range children {
+		col := i % cols
+		row := i / cols
+		x := bounds.Min.X + col*cellW
+		y := bounds.Min.Y + row*cellH
+		renderDescriptor(img, child, image.Rect(x, y, x+cellW, y+cellH))
+	}
+}
+
+func renderOverlay(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	// All children occupy the same bounds, rendered in order (later = on top).
+	for _, child := range d.Children {
+		renderDescriptor(img, child, bounds)
+	}
+}
+
+func renderText(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	text := d.Props["value"]
+	if text == "" || bounds.Dx() <= 0 || bounds.Dy() <= 0 {
+		return
+	}
+	c := parseHexColorRGBA(d.Props["color"])
+	if c == (color.RGBA{}) {
+		c = color.RGBA{R: 238, G: 246, B: 247, A: 255}
+	}
+	style := d.Props["style"]
+	lineH := descTextLineHeight(style)
+	maxChars := bounds.Dx() / 12
+	if maxChars < 1 {
+		maxChars = 1
+	}
+	y := bounds.Min.Y
+	for _, line := range wrapText(text, maxChars) {
+		if y+lineH > bounds.Max.Y {
+			break
+		}
+		drawText(img, bounds.Min.X, y, line, c)
+		y += lineH + 2
+	}
+}
+
+func renderButton(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	btnBg := color.RGBA{R: 37, G: 90, B: 99, A: 255}
+	btnBorder := color.RGBA{R: 80, G: 150, B: 160, A: 255}
+	fillRect(img, bounds, btnBg)
+	for x := bounds.Min.X; x < bounds.Max.X; x++ {
+		img.SetRGBA(x, bounds.Min.Y, btnBorder)
+		img.SetRGBA(x, bounds.Max.Y-1, btnBorder)
+	}
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		img.SetRGBA(bounds.Min.X, y, btnBorder)
+		img.SetRGBA(bounds.Max.X-1, y, btnBorder)
+	}
+	label := d.Props["label"]
+	if label == "" {
+		return
+	}
+	labelW := len(label) * 12
+	textX := bounds.Min.X + (bounds.Dx()-labelW)/2
+	textY := bounds.Min.Y + (bounds.Dy()-14)/2
+	if textX < bounds.Min.X+2 {
+		textX = bounds.Min.X + 2
+	}
+	if textY < bounds.Min.Y+2 {
+		textY = bounds.Min.Y + 2
+	}
+	drawText(img, textX, textY, label, color.RGBA{R: 238, G: 246, B: 247, A: 255})
+}
+
+func renderImagePlaceholder(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	fillRect(img, bounds, color.RGBA{R: 40, G: 40, B: 40, A: 255})
+	label := "[image]"
+	if u := d.Props["url"]; u != "" {
+		if len(u) > 30 {
+			u = u[:27] + "..."
+		}
+		label = "[image: " + u + "]"
+	}
+	drawText(img, bounds.Min.X+4, bounds.Min.Y+4, label, color.RGBA{R: 160, G: 160, B: 160, A: 255})
+}
+
+func renderMediaPlaceholder(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
+	fillRect(img, bounds, color.RGBA{R: 20, G: 20, B: 20, A: 255})
+	id := d.Props["track_id"]
+	if id == "" {
+		id = d.Props["stream_id"]
+	}
+	label := "[" + d.Type + ": " + id + "]"
+	if len(label) > 40 {
+		label = label[:37] + "...]"
+	}
+	drawText(img, bounds.Min.X+4, bounds.Min.Y+4, label, color.RGBA{R: 100, G: 100, B: 100, A: 255})
+}
+
+func estimateDescHeight(d ui.Descriptor, width int) int {
+	switch d.Type {
+	case "text":
+		if width <= 0 {
+			return 20
+		}
+		maxChars := width / 12
+		if maxChars < 1 {
+			maxChars = 1
+		}
+		lines := wrapText(d.Props["value"], maxChars)
+		if len(lines) == 0 {
+			lines = []string{""}
+		}
+		return len(lines)*(descTextLineHeight(d.Props["style"])+2) + 4
+	case "button":
+		return 32
+	case "image":
+		return 80
+	case "video_surface", "audio_visualizer":
+		return 120
+	case "expand":
+		return -1
+	case "overlay":
+		maxH := 0
+		for _, child := range d.Children {
+			if h := estimateDescHeight(child, width); h > maxH {
+				maxH = h
+			}
+		}
+		return maxH
+	case "row":
+		childW := width / max(1, len(d.Children))
+		maxH := 0
+		for _, child := range d.Children {
+			if h := estimateDescHeight(child, childW); h > maxH {
+				maxH = h
+			}
+		}
+		return maxH + 2*descPad
+	case "grid":
+		cols, _ := strconv.Atoi(d.Props["columns"])
+		if cols < 1 {
+			cols = 1
+		}
+		cellW := width / cols
+		maxCellH := 0
+		for _, child := range d.Children {
+			if h := estimateDescHeight(child, cellW); h > maxCellH {
+				maxCellH = h
+			}
+		}
+		rows := (len(d.Children) + cols - 1) / cols
+		return rows*maxCellH + 2*descPad
+	default:
+		total := 2 * descPad
+		for _, child := range d.Children {
+			h := estimateDescHeight(child, width-2*descPad)
+			if h < 0 {
+				h = 40
+			}
+			total += h + 8
+		}
+		if total == 2*descPad {
+			return 20
+		}
+		return total
+	}
+}
+
+func descTextLineHeight(style string) int {
+	switch style {
+	case "headline", "title":
+		return 28
+	default:
+		return 16
+	}
+}
+
+func parseHexColorRGBA(hex string) color.RGBA {
+	hex = strings.TrimSpace(hex)
+	if !strings.HasPrefix(hex, "#") {
+		return color.RGBA{}
+	}
+	hex = hex[1:]
+	var r, g, b, a uint8 = 0, 0, 0, 255
+	switch len(hex) {
+	case 6:
+		n, err := strconv.ParseUint(hex, 16, 32)
+		if err == nil {
+			r, g, b = uint8(n>>16), uint8(n>>8), uint8(n)
+		}
+	case 8:
+		n, err := strconv.ParseUint(hex, 16, 32)
+		if err == nil {
+			r, g, b, a = uint8(n>>24), uint8(n>>16), uint8(n>>8), uint8(n)
+		}
+	case 3:
+		n, err := strconv.ParseUint(hex, 16, 16)
+		if err == nil {
+			r = uint8((n>>8)&0xF) * 17
+			g = uint8((n>>4)&0xF) * 17
+			b = uint8(n&0xF) * 17
+		}
+	}
+	return color.RGBA{R: r, G: g, B: b, A: a}
 }
 
 func summarizeLatestUI(messages []transport.ProtoServerEnvelope) string {

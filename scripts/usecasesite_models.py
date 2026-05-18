@@ -31,6 +31,7 @@ class MediaAsset:
     source: str = ""
     rights_note: str = ""
     transcript: str = ""
+    descriptor: dict | None = None
 
 
 @dataclass(frozen=True)

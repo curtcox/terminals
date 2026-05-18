@@ -15,14 +15,16 @@ import (
 // CaptureFrame records a deterministic server-side visual snapshot for docs.
 func (h *Harness) CaptureFrame(stepID, terminal string, messages []transport.ProtoServerEnvelope) {
 	summary := summarizeLatestUI(messages)
+	descriptor := extractLatestDescriptor(messages)
 	h.mu.Lock()
 	h.frames = append(h.frames, FrameRecord{
-		StepID:    stepID,
-		Terminal:  terminal,
-		Label:     stepID,
-		Summary:   summary,
-		Path:      filepath.ToSlash(filepath.Join("frames", safeArtifactName(stepID)+".png")),
-		Timestamp: time.Now().UTC(),
+		StepID:     stepID,
+		Terminal:   terminal,
+		Label:      stepID,
+		Summary:    summary,
+		Descriptor: descriptor,
+		Path:       filepath.ToSlash(filepath.Join("frames", safeArtifactName(stepID)+".png")),
+		Timestamp:  time.Now().UTC(),
 	})
 	h.mu.Unlock()
 }
@@ -50,12 +52,13 @@ func (h *Harness) CaptureHostFrame(stepID, deviceID string) {
 	summary := "UI state: " + summarizeDescriptor(current)
 	h.mu.Lock()
 	h.frames = append(h.frames, FrameRecord{
-		StepID:    stepID,
-		Terminal:  deviceID,
-		Label:     stepID,
-		Summary:   summary,
-		Path:      filepath.ToSlash(filepath.Join("frames", safeArtifactName(stepID)+".png")),
-		Timestamp: time.Now().UTC(),
+		StepID:     stepID,
+		Terminal:   deviceID,
+		Label:      stepID,
+		Summary:    summary,
+		Descriptor: &current,
+		Path:       filepath.ToSlash(filepath.Join("frames", safeArtifactName(stepID)+".png")),
+		Timestamp:  time.Now().UTC(),
 	})
 	h.mu.Unlock()
 }

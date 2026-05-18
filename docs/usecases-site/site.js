@@ -41,19 +41,81 @@ if (textFilter && statusFilter) {
   statusFilter.addEventListener("change", applyFilters);
 }
 
+// Render a ui.Descriptor JSON tree into a container element,
+// reusing the same CSS classes as the web client renderer.
+function renderDescriptorNode(container, node) {
+  if (!node || !node.type) return;
+  const props = node.props || {};
+  let el;
+  switch (node.type) {
+    case "text":
+      el = document.createElement("p");
+      el.className = "sd sd-text";
+      el.textContent = props.value || "";
+      if (props.style) el.dataset.style = props.style;
+      if (props.color) el.style.color = props.color;
+      break;
+    case "button":
+      el = document.createElement("div");
+      el.className = "sd sd-button";
+      el.textContent = props.label || "";
+      break;
+    case "image":
+      el = document.createElement("div");
+      el.className = "sd sd-image";
+      el.textContent = props.url ? "[image: " + props.url.slice(0, 40) + "]" : "[image]";
+      break;
+    case "video_surface":
+      el = document.createElement("div");
+      el.className = "sd sd-video-surface";
+      el.textContent = "[video: " + (props.track_id || "") + "]";
+      break;
+    case "audio_visualizer":
+      el = document.createElement("div");
+      el.className = "sd sd-audio-visualizer";
+      el.textContent = "[audio: " + (props.stream_id || "") + "]";
+      break;
+    case "fullscreen":
+    case "keep_awake":
+    case "brightness":
+      el = document.createElement("div");
+      el.className = "sd sd-" + node.type.replace(/_/g, "-");
+      break;
+    default:
+      el = document.createElement("div");
+      el.className = "sd sd-" + node.type.replace(/_/g, "-");
+  }
+  if (props.background) el.style.background = props.background;
+  if (node.type === "grid" && props.columns) {
+    el.style.gridTemplateColumns = "repeat(" + props.columns + ", minmax(0, 1fr))";
+  }
+  for (const child of (node.children || [])) {
+    renderDescriptorNode(el, child);
+  }
+  container.appendChild(el);
+}
+
 document.querySelectorAll(".frame-scrubber").forEach((scrubber) => {
   const frames = JSON.parse(scrubber.dataset.frames || "[]");
-  const image = scrubber.querySelector(".frame-preview-image");
+  const preview = scrubber.querySelector(".frame-live-preview");
   const label = scrubber.querySelector(".frame-preview-label");
   const range = scrubber.querySelector(".frame-range");
-  if (!frames.length || !image || !label || !range) return;
-  range.addEventListener("input", () => {
-    const frame = frames[Number(range.value)];
+  if (!frames.length || !label || !range) return;
+
+  function showFrame(frame) {
     if (!frame) return;
-    image.src = frame.src;
-    image.alt = frame.label;
     label.textContent = frame.label;
-  });
+    if (preview) {
+      preview.replaceChildren();
+      preview.setAttribute("aria-label", frame.label);
+      if (frame.descriptor) {
+        renderDescriptorNode(preview, frame.descriptor);
+      }
+    }
+  }
+
+  showFrame(frames[0]);
+  range.addEventListener("input", () => showFrame(frames[Number(range.value)]));
 });
 
 (function () {

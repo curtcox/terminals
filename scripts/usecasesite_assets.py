@@ -197,6 +197,113 @@ th button {
   width: 100%;
 }
 
+/* Live descriptor rendering — matches the web client CSS */
+.frame-live-preview {
+  aspect-ratio: 16 / 9;
+  background: #101418;
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.sd { min-width: 0; }
+
+.sd-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.sd-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.sd-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.sd-scroll {
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+.sd-center {
+  display: grid;
+  place-items: center;
+}
+
+.sd-expand { flex: 1 1 auto; }
+
+.sd-overlay {
+  display: grid;
+}
+
+.sd-overlay > * { grid-area: 1 / 1; }
+
+.sd-text {
+  margin: 2px 0;
+  line-height: 1.4;
+}
+
+.sd-text[data-style="headline"] {
+  font-size: 1.3em;
+  font-weight: 600;
+}
+
+.sd-text[data-style="monospace"] {
+  font-family: monospace;
+}
+
+.sd-button {
+  background: #25595e;
+  border: 1px solid #508090;
+  border-radius: 4px;
+  color: #eef6f7;
+  cursor: default;
+  min-height: 36px;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.sd-image,
+.sd-video-surface,
+.sd-audio-visualizer {
+  align-items: center;
+  background: #181818;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #888;
+  display: flex;
+  font-size: 0.8em;
+  font-family: monospace;
+  min-height: 60px;
+  padding: 8px;
+}
+
+.sd-text-input {
+  background: #1a2030;
+  border: 1px solid #3a4a5a;
+  border-radius: 4px;
+  color: #cdd8e0;
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+.sd-fullscreen,
+.sd-keep-awake,
+.sd-brightness {
+  display: contents;
+}
+
 .frame-scrubber-controls {
   align-items: center;
   display: grid;
@@ -386,19 +493,81 @@ if (textFilter && statusFilter) {
   statusFilter.addEventListener("change", applyFilters);
 }
 
+// Render a ui.Descriptor JSON tree into a container element,
+// reusing the same CSS classes as the web client renderer.
+function renderDescriptorNode(container, node) {
+  if (!node || !node.type) return;
+  const props = node.props || {};
+  let el;
+  switch (node.type) {
+    case "text":
+      el = document.createElement("p");
+      el.className = "sd sd-text";
+      el.textContent = props.value || "";
+      if (props.style) el.dataset.style = props.style;
+      if (props.color) el.style.color = props.color;
+      break;
+    case "button":
+      el = document.createElement("div");
+      el.className = "sd sd-button";
+      el.textContent = props.label || "";
+      break;
+    case "image":
+      el = document.createElement("div");
+      el.className = "sd sd-image";
+      el.textContent = props.url ? "[image: " + props.url.slice(0, 40) + "]" : "[image]";
+      break;
+    case "video_surface":
+      el = document.createElement("div");
+      el.className = "sd sd-video-surface";
+      el.textContent = "[video: " + (props.track_id || "") + "]";
+      break;
+    case "audio_visualizer":
+      el = document.createElement("div");
+      el.className = "sd sd-audio-visualizer";
+      el.textContent = "[audio: " + (props.stream_id || "") + "]";
+      break;
+    case "fullscreen":
+    case "keep_awake":
+    case "brightness":
+      el = document.createElement("div");
+      el.className = "sd sd-" + node.type.replace(/_/g, "-");
+      break;
+    default:
+      el = document.createElement("div");
+      el.className = "sd sd-" + node.type.replace(/_/g, "-");
+  }
+  if (props.background) el.style.background = props.background;
+  if (node.type === "grid" && props.columns) {
+    el.style.gridTemplateColumns = "repeat(" + props.columns + ", minmax(0, 1fr))";
+  }
+  for (const child of (node.children || [])) {
+    renderDescriptorNode(el, child);
+  }
+  container.appendChild(el);
+}
+
 document.querySelectorAll(".frame-scrubber").forEach((scrubber) => {
   const frames = JSON.parse(scrubber.dataset.frames || "[]");
-  const image = scrubber.querySelector(".frame-preview-image");
+  const preview = scrubber.querySelector(".frame-live-preview");
   const label = scrubber.querySelector(".frame-preview-label");
   const range = scrubber.querySelector(".frame-range");
-  if (!frames.length || !image || !label || !range) return;
-  range.addEventListener("input", () => {
-    const frame = frames[Number(range.value)];
+  if (!frames.length || !label || !range) return;
+
+  function showFrame(frame) {
     if (!frame) return;
-    image.src = frame.src;
-    image.alt = frame.label;
     label.textContent = frame.label;
-  });
+    if (preview) {
+      preview.replaceChildren();
+      preview.setAttribute("aria-label", frame.label);
+      if (frame.descriptor) {
+        renderDescriptorNode(preview, frame.descriptor);
+      }
+    }
+  }
+
+  showFrame(frames[0]);
+  range.addEventListener("input", () => showFrame(frames[Number(range.value)]));
 });
 
 (function () {

@@ -292,10 +292,14 @@ def media_asset(item: object, kind: str, index: int, manifest_path: Path) -> Med
     source = ""
     rights_note = ""
     transcript = ""
+    descriptor = None
     if isinstance(item, dict):
         source = str(item.get("source", "")).strip()
         rights_note = str(item.get("rights_note", "") or item.get("rightsNote", "")).strip()
         transcript = str(item.get("transcript", "")).strip()
+        raw_desc = item.get("descriptor")
+        if isinstance(raw_desc, dict) and raw_desc.get("type"):
+            descriptor = raw_desc
     return MediaAsset(
         label=label,
         path=site_relative_asset_path(path, manifest_path),
@@ -303,6 +307,7 @@ def media_asset(item: object, kind: str, index: int, manifest_path: Path) -> Med
         source=source,
         rights_note=rights_note,
         transcript=transcript,
+        descriptor=descriptor,
     )
 
 
@@ -734,10 +739,15 @@ def render_visual_media(result: Result | None) -> str:
     if result.frames:
         first = result.frames[0]
         max_index = len(result.frames) - 1
-        preview_options = html.escape(json.dumps([{"src": frame.path, "label": frame.label} for frame in result.frames]))
+        def frame_entry(frame: object) -> dict:  # type: ignore[type-arg]
+            entry: dict = {"src": frame.path, "label": frame.label}  # type: ignore[attr-defined]
+            if frame.descriptor:  # type: ignore[attr-defined]
+                entry["descriptor"] = frame.descriptor  # type: ignore[attr-defined]
+            return entry
+        preview_options = html.escape(json.dumps([frame_entry(frame) for frame in result.frames]))
         parts.append(
             f'<div class="frame-scrubber" data-frames="{preview_options}">'
-            f'<img class="frame-preview-image" src="{html.escape(first.path)}" alt="{html.escape(first.label)}">'
+            f'<div class="frame-live-preview" aria-label="{html.escape(first.label)}"></div>'
             f'<div class="frame-scrubber-controls"><input class="frame-range" type="range" min="0" max="{max_index}" value="0" aria-label="Scrub captured frames">'
             f'<span class="frame-preview-label">{html.escape(first.label)}</span></div></div>'
         )

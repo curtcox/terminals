@@ -4,7 +4,7 @@ kind: plan
 status: shipped
 owner: curtcox
 validation: automated:C1,C2,M5,T1,T2,T3,T4,AA1,AA2,AA3,AA4,AA5,UI9,D2,D3,I3,I4,I6,V1,V2,V3
-last-reviewed: 2026-05-16
+last-reviewed: 2026-05-17
 progress:
   - 2026-05-16: Phase 1 complete (C1 harness skeleton, evidence bundle, USECASE_ARTIFACTS flag)
   - 2026-05-16: Phase 2 complete (simulated terminal transport; UI9 reconnect + C2 multi-terminal broadcast)
@@ -20,6 +20,7 @@ progress:
   - 2026-05-16: I4 added (device registry capability query; Generated+Wire transport tests register two devices with different caps, verify placement engine returns only matching devices for camera/screen/microphone/speaker queries; wired into validate script and matrix)
   - 2026-05-16: YAML scenario loading (Phase 4): scenario-schema.md, LoadScenarioFile/RunScenarioFile, t2-timer-reminder.yaml; TestYAMLScenarioT2TimerReminder wired into T2 validation
   - 2026-05-16: Phase 4 YAML migration complete for T3/T4, AA1, AA4: sensor/mark_broadcast/yield/broadcast_not_contains steps; testdata YAML scenarios wired into usecase-validate.sh alongside Go-authored tests
+  - 2026-05-17: Frame rendering replaced with ui.Descriptor-based renderer: FrameRecord.Descriptor field carries the actual UI tree; Go renderer paints the rendered terminal layout (stack/row/grid/overlay/text/button/video placeholder) instead of a diagnostic overlay; docs site live-renders frames in-browser via renderDescriptorNode() reusing web-client CSS classes; descriptor JSON embedded in result.json and site HTML; Step/SetUI text preserved in interaction transcript
 ---
 
 # Use Case Validation Automation
@@ -517,6 +518,16 @@ must preserve the full evidence bundle automatically.
   summaries only for passing runs.
 - **First Phase 2 scenarios**: both UI9 and C2, chosen because UI9 has a clear
   existing transport boundary and C2 demonstrates multi-terminal broadcast.
+- **Frame rendering (2026-05-17)**: frames render the actual `ui.Descriptor` tree,
+  not a diagnostic overlay. `FrameRecord.Descriptor` carries the descriptor.
+  `CaptureFrame` converts the latest `SetUI` proto Node via `nodeToDescriptor`;
+  `CaptureHostFrame` uses the descriptor directly. The Go renderer in `render.go`
+  (`renderDescriptor`) paints stack/row/grid/overlay/text/button/placeholder
+  nodes following the same layout model as the web and Flutter clients. The docs
+  site also renders frames live in-browser via `renderDescriptorNode()` in
+  `site.js`, reusing the web-client CSS classes (`.sd-stack`, `.sd-text`, etc.).
+  Step and SetUI text is preserved in the interaction transcript, not in the frame
+  image. Media nodes (video_surface, image) render as labeled placeholders.
 
 ## Open Questions
 
