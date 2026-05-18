@@ -42,8 +42,16 @@ When working a bug report:
 
 ## Build and Check Commands
 
+Start here every session:
+
 ```bash
-make ci-status          # probe CI gates and write scripts/ci-status.json (run before make next)
+make ci-status          # probe CI gates → writes scripts/ci-status.json
+make next               # what to work on (reads ci-status + plan frontmatter)
+```
+
+Full command reference:
+
+```bash
 make server-build
 make server-test
 make server-lint
@@ -56,6 +64,22 @@ make all-check          # full gate, stops on first failure
 make check-fast         # lint + cheap checks only (no builds, no integration tests)
 make check-all-keep-going  # same as all-check but -k, surfaces every failure
 ```
+
+## Side-effecting Targets
+
+These targets start processes, write to disk outside the repo, or mutate running state. Do not run them inside tests or in restricted CI sandboxes without understanding their blast radius.
+
+| Target | What it mutates |
+|--------|-----------------|
+| `make run-server` | Starts server process on ports 50051–50056 |
+| `make run-client-web` | Builds Flutter web and starts HTTP server on port 8080 |
+| `make run-local` | Starts server + client; writes `.tmp/run-local-*.log` |
+| `make stop-server` | Kills running server process(es) |
+| `make usecase-validate USECASE=X` | Runs in-process server; writes to `artifacts/` |
+| `make ci-status` | Writes `scripts/ci-status.json` |
+| `make bug-resolve` | Writes to `terminal_server/bug_reports/` |
+| `make usecases-site` | Generates `docs/usecases-site/` |
+| `make ui-inspect` | Launches clients and captures screenshots to `.tmp/` |
 
 ### Running a single test
 
@@ -86,6 +110,28 @@ buf lint api/terminals/io/v1/io.proto
 ## Source of Truth
 
 Architectural details live in `masterplan.md`.
+
+## Git Conventions
+
+Commit messages follow Conventional Commits with a scope:
+
+```
+type(scope): short imperative summary
+
+# Examples:
+docs(plans): introduce progress-log rollover convention
+refactor(scripts): extract use-case ID metadata to YAML sidecar
+build: add check-fast and check-all-keep-going targets
+fix(transport): handle nil capability snapshot in claim resolution
+```
+
+Common types: `feat`, `fix`, `refactor`, `docs`, `build`, `test`, `chore`, `skills`.  
+Scope is the top-level directory or subsystem (`server`, `client`, `proto`, `scripts`, `plans`, `transport`, etc.).  
+Branch names: `<type>/<short-description>` (e.g., `feat/timer-reminder`, `fix/placement-nil`).
+
+## Oversized Files
+
+Files over ~300 LOC should include a `// CONTENTS:` TOC block near the top. Run `make quality-check` to see what's flagged. See recent commits for examples of the block format.
 
 ## Skills
 

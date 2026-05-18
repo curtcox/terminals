@@ -6,6 +6,7 @@ Detailed build-and-run guides for each component of the Terminals system.
 
 | Guide | Description |
 |-------|-------------|
+| [Glossary](glossary.md) | Domain terms: activation, claim, scenario, TAL, placement, world model, etc. |
 | [Server](server.md) | Go server — configuration, build, run, test |
 | [Code Quality and CI](code-quality-and-ci.md) | Local gates, workflow coverage, and quality-tool contract |
 | [Agent Configuration](agent-configuration.md) | Durable conventions and required files for Claude Code, Codex, and Copilot |

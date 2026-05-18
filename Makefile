@@ -31,7 +31,7 @@ export PATH := $(LOCAL_BIN):$(LOCAL_FLUTTER_BIN):$(PATH)
 	skills-validate development-docs-test server-test-network-probe-test plans-index validation-matrix usecases-index usecases-site usecases-site-check usecase-wiring-audit pick-next-work next bug-resolved-check bug-resolve-test \
 	all-lint all-test all-check ci-local stop-server stop-server-test run-server run-client-web run-web-client \
 	run-local run-local-test run-local-smoke-test run-mac mac-e2e-test usecase-validate \
-	ui-inspect-test
+	ui-inspect-test help
 
 server-build:
 	cd terminal_server && go build ./...
@@ -402,3 +402,10 @@ usecase-validate:
 
 ui-inspect-test:
 	./scripts/test-ui-inspect-run.sh
+
+help:
+	@grep -E '^[a-zA-Z_-]+:' Makefile \
+	  | grep -v '^\.PHONY' \
+	  | sed 's/:.*$$//' \
+	  | sort \
+	  | pr -3 -t -w 80
