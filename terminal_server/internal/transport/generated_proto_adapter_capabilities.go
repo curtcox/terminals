@@ -15,58 +15,81 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 	out := map[string]string{
 		"device_id": caps.GetDeviceId(),
 	}
-	identity := caps.GetIdentity()
-	if identity != nil {
-		out["device_name"] = identity.GetDeviceName()
-		out["device_type"] = identity.GetDeviceType()
-		out["platform"] = identity.GetPlatform()
+	addIdentityCapabilities(out, caps.GetIdentity())
+	addScreenCapabilities(out, "screen", caps.GetScreen(), true)
+	addDisplayCapabilities(out, caps.GetDisplays())
+	addInputCapabilities(out, caps)
+	addAudioOutputCapabilities(out, caps.GetSpeakers())
+	addAudioInputCapabilities(out, caps.GetMicrophone())
+	addCameraCapabilities(out, caps.GetCamera())
+	addSensorCapabilities(out, caps.GetSensors())
+	addConnectivityCapabilities(out, caps.GetConnectivity())
+	addBatteryCapabilities(out, caps.GetBattery())
+	addHapticCapabilities(out, caps.GetHaptics())
+	addEdgeCapabilities(out, caps.GetEdge())
+	return out
+}
+
+func addIdentityCapabilities(out map[string]string, identity *capabilitiesv1.DeviceIdentity) {
+	if identity == nil {
+		return
 	}
-	if screen := caps.GetScreen(); screen != nil {
-		out["screen.width"] = strconv.FormatInt(int64(screen.GetWidth()), 10)
-		out["screen.height"] = strconv.FormatInt(int64(screen.GetHeight()), 10)
-		out["screen.density"] = strconv.FormatFloat(screen.GetDensity(), 'f', -1, 64)
-		if screen.GetTouch() {
-			out["screen.touch"] = "true"
-		}
-		if orientation := strings.TrimSpace(screen.GetOrientation()); orientation != "" {
-			out["screen.orientation"] = orientation
-		}
-		if screen.GetFullscreenSupported() {
-			out["screen.fullscreen_supported"] = "true"
-		}
-		if screen.GetMultiWindowSupported() {
-			out["screen.multi_window_supported"] = "true"
-		}
-		if safeArea := screen.GetSafeArea(); safeArea != nil {
-			out["screen.safe_area.left"] = strconv.FormatInt(int64(safeArea.GetLeft()), 10)
-			out["screen.safe_area.top"] = strconv.FormatInt(int64(safeArea.GetTop()), 10)
-			out["screen.safe_area.right"] = strconv.FormatInt(int64(safeArea.GetRight()), 10)
-			out["screen.safe_area.bottom"] = strconv.FormatInt(int64(safeArea.GetBottom()), 10)
-		}
+	out["device_name"] = identity.GetDeviceName()
+	out["device_type"] = identity.GetDeviceType()
+	out["platform"] = identity.GetPlatform()
+}
+
+func addScreenCapabilities(out map[string]string, prefix string, screen *capabilitiesv1.ScreenCapability, includeExtras bool) {
+	if screen == nil {
+		return
 	}
-	if displays := caps.GetDisplays(); len(displays) > 0 {
-		out["display.count"] = strconv.FormatInt(int64(len(displays)), 10)
-		for idx, display := range displays {
-			prefix := "display." + strconv.Itoa(idx)
-			if displayID := strings.TrimSpace(display.GetDisplayId()); displayID != "" {
-				out[prefix+".id"] = displayID
-			}
-			if name := strings.TrimSpace(display.GetDisplayName()); name != "" {
-				out[prefix+".name"] = name
-			}
-			if display.GetPrimary() {
-				out[prefix+".primary"] = "true"
-			}
-			if screen := display.GetScreen(); screen != nil {
-				out[prefix+".width"] = strconv.FormatInt(int64(screen.GetWidth()), 10)
-				out[prefix+".height"] = strconv.FormatInt(int64(screen.GetHeight()), 10)
-				out[prefix+".density"] = strconv.FormatFloat(screen.GetDensity(), 'f', -1, 64)
-				if orientation := strings.TrimSpace(screen.GetOrientation()); orientation != "" {
-					out[prefix+".orientation"] = orientation
-				}
-			}
-		}
+	out[prefix+".width"] = strconv.FormatInt(int64(screen.GetWidth()), 10)
+	out[prefix+".height"] = strconv.FormatInt(int64(screen.GetHeight()), 10)
+	out[prefix+".density"] = strconv.FormatFloat(screen.GetDensity(), 'f', -1, 64)
+	if orientation := strings.TrimSpace(screen.GetOrientation()); orientation != "" {
+		out[prefix+".orientation"] = orientation
 	}
+	if !includeExtras {
+		return
+	}
+	if screen.GetTouch() {
+		out[prefix+".touch"] = "true"
+	}
+	if screen.GetFullscreenSupported() {
+		out[prefix+".fullscreen_supported"] = "true"
+	}
+	if screen.GetMultiWindowSupported() {
+		out[prefix+".multi_window_supported"] = "true"
+	}
+	if safeArea := screen.GetSafeArea(); safeArea != nil {
+		out[prefix+".safe_area.left"] = strconv.FormatInt(int64(safeArea.GetLeft()), 10)
+		out[prefix+".safe_area.top"] = strconv.FormatInt(int64(safeArea.GetTop()), 10)
+		out[prefix+".safe_area.right"] = strconv.FormatInt(int64(safeArea.GetRight()), 10)
+		out[prefix+".safe_area.bottom"] = strconv.FormatInt(int64(safeArea.GetBottom()), 10)
+	}
+}
+
+func addDisplayCapabilities(out map[string]string, displays []*capabilitiesv1.DisplayCapability) {
+	if len(displays) == 0 {
+		return
+	}
+	out["display.count"] = strconv.FormatInt(int64(len(displays)), 10)
+	for idx, display := range displays {
+		prefix := "display." + strconv.Itoa(idx)
+		if displayID := strings.TrimSpace(display.GetDisplayId()); displayID != "" {
+			out[prefix+".id"] = displayID
+		}
+		if name := strings.TrimSpace(display.GetDisplayName()); name != "" {
+			out[prefix+".name"] = name
+		}
+		if display.GetPrimary() {
+			out[prefix+".primary"] = "true"
+		}
+		addScreenCapabilities(out, prefix, display.GetScreen(), false)
+	}
+}
+
+func addInputCapabilities(out map[string]string, caps *capabilitiesv1.DeviceCapabilities) {
 	if keyboard := caps.GetKeyboard(); keyboard != nil {
 		out["keyboard.physical"] = strconv.FormatBool(keyboard.GetPhysical())
 		out["keyboard.layout"] = keyboard.GetLayout()
@@ -79,236 +102,222 @@ func capabilitiesToDataMap(caps *capabilitiesv1.DeviceCapabilities) map[string]s
 		out["touch.supported"] = strconv.FormatBool(touch.GetSupported())
 		out["touch.max_points"] = strconv.FormatInt(int64(touch.GetMaxPoints()), 10)
 	}
-	if speakers := caps.GetSpeakers(); speakers != nil {
-		out["speakers.present"] = "true"
-		if speakers.GetChannels() > 0 {
-			out["speakers.channels"] = strconv.FormatInt(int64(speakers.GetChannels()), 10)
-		}
-		if rates := joinInts(speakers.GetSampleRates()); rates != "" {
-			out["speakers.sample_rates"] = rates
-		}
-		if endpoints := speakers.GetEndpoints(); len(endpoints) > 0 {
-			out["speakers.endpoint_count"] = strconv.FormatInt(int64(len(endpoints)), 10)
-			for idx, endpoint := range endpoints {
-				prefix := "speakers.endpoint." + strconv.Itoa(idx)
-				if endpointID := strings.TrimSpace(endpoint.GetEndpointId()); endpointID != "" {
-					out[prefix+".id"] = endpointID
-				}
-				if endpointName := strings.TrimSpace(endpoint.GetEndpointName()); endpointName != "" {
-					out[prefix+".name"] = endpointName
-				}
-				if connectionType := strings.TrimSpace(endpoint.GetConnectionType()); connectionType != "" {
-					out[prefix+".connection_type"] = connectionType
-				}
-				if endpoint.GetChannels() > 0 {
-					out[prefix+".channels"] = strconv.FormatInt(int64(endpoint.GetChannels()), 10)
-				}
-				if rates := joinInts(endpoint.GetSampleRates()); rates != "" {
-					out[prefix+".sample_rates"] = rates
-				}
-				if endpoint.GetAvailable() {
-					out[prefix+".available"] = "true"
-				}
-			}
+}
+
+func addAudioOutputCapabilities(out map[string]string, speakers *capabilitiesv1.AudioOutputCapability) {
+	if speakers == nil {
+		return
+	}
+	out["speakers.present"] = "true"
+	addAudioStats(out, "speakers", speakers.GetChannels(), speakers.GetSampleRates())
+	addAudioEndpoints(out, "speakers.endpoint", speakers.GetEndpoints())
+}
+
+func addAudioInputCapabilities(out map[string]string, mic *capabilitiesv1.AudioInputCapability) {
+	if mic == nil {
+		return
+	}
+	out["microphone.present"] = "true"
+	addAudioStats(out, "microphone", mic.GetChannels(), mic.GetSampleRates())
+	addAudioEndpoints(out, "microphone.endpoint", mic.GetEndpoints())
+}
+
+func addAudioStats(out map[string]string, prefix string, channels int32, rates []int32) {
+	if channels > 0 {
+		out[prefix+".channels"] = strconv.FormatInt(int64(channels), 10)
+	}
+	if formatted := joinInts(rates); formatted != "" {
+		out[prefix+".sample_rates"] = formatted
+	}
+}
+
+func addAudioEndpoints(out map[string]string, prefix string, endpoints []*capabilitiesv1.AudioEndpoint) {
+	if len(endpoints) == 0 {
+		return
+	}
+	out[prefix+"_count"] = strconv.FormatInt(int64(len(endpoints)), 10)
+	for idx, endpoint := range endpoints {
+		endpointPrefix := prefix + "." + strconv.Itoa(idx)
+		addTrimmed(out, endpointPrefix+".id", endpoint.GetEndpointId())
+		addTrimmed(out, endpointPrefix+".name", endpoint.GetEndpointName())
+		addTrimmed(out, endpointPrefix+".connection_type", endpoint.GetConnectionType())
+		addAudioStats(out, endpointPrefix, endpoint.GetChannels(), endpoint.GetSampleRates())
+		if endpoint.GetAvailable() {
+			out[endpointPrefix+".available"] = "true"
 		}
 	}
-	if mic := caps.GetMicrophone(); mic != nil {
-		out["microphone.present"] = "true"
-		if mic.GetChannels() > 0 {
-			out["microphone.channels"] = strconv.FormatInt(int64(mic.GetChannels()), 10)
+}
+
+func addCameraCapabilities(out map[string]string, camera *capabilitiesv1.CameraCapability) {
+	if camera == nil {
+		return
+	}
+	out["camera.present"] = "true"
+	addCameraLens(out, "camera.front", camera.GetFront())
+	addCameraLens(out, "camera.back", camera.GetBack())
+	addCameraEndpoints(out, camera.GetEndpoints())
+}
+
+func addCameraLens(out map[string]string, prefix string, lens *capabilitiesv1.CameraLens) {
+	if lens == nil {
+		return
+	}
+	addPositiveInt(out, prefix+".width", lens.GetWidth())
+	addPositiveInt(out, prefix+".height", lens.GetHeight())
+	addPositiveInt(out, prefix+".fps", lens.GetFps())
+}
+
+func addCameraEndpoints(out map[string]string, endpoints []*capabilitiesv1.CameraEndpoint) {
+	if len(endpoints) == 0 {
+		return
+	}
+	out["camera.endpoint_count"] = strconv.FormatInt(int64(len(endpoints)), 10)
+	for idx, endpoint := range endpoints {
+		prefix := "camera.endpoint." + strconv.Itoa(idx)
+		addTrimmed(out, prefix+".id", endpoint.GetEndpointId())
+		addTrimmed(out, prefix+".name", endpoint.GetEndpointName())
+		addTrimmed(out, prefix+".connection_type", endpoint.GetConnectionType())
+		addTrimmed(out, prefix+".facing", endpoint.GetFacing())
+		if endpoint.GetAvailable() {
+			out[prefix+".available"] = "true"
 		}
-		if rates := joinInts(mic.GetSampleRates()); rates != "" {
-			out["microphone.sample_rates"] = rates
-		}
-		if endpoints := mic.GetEndpoints(); len(endpoints) > 0 {
-			out["microphone.endpoint_count"] = strconv.FormatInt(int64(len(endpoints)), 10)
-			for idx, endpoint := range endpoints {
-				prefix := "microphone.endpoint." + strconv.Itoa(idx)
-				if endpointID := strings.TrimSpace(endpoint.GetEndpointId()); endpointID != "" {
-					out[prefix+".id"] = endpointID
-				}
-				if endpointName := strings.TrimSpace(endpoint.GetEndpointName()); endpointName != "" {
-					out[prefix+".name"] = endpointName
-				}
-				if connectionType := strings.TrimSpace(endpoint.GetConnectionType()); connectionType != "" {
-					out[prefix+".connection_type"] = connectionType
-				}
-				if endpoint.GetChannels() > 0 {
-					out[prefix+".channels"] = strconv.FormatInt(int64(endpoint.GetChannels()), 10)
-				}
-				if rates := joinInts(endpoint.GetSampleRates()); rates != "" {
-					out[prefix+".sample_rates"] = rates
-				}
-				if endpoint.GetAvailable() {
-					out[prefix+".available"] = "true"
-				}
-			}
+		addCameraModes(out, prefix, endpoint.GetModes())
+	}
+}
+
+func addCameraModes(out map[string]string, prefix string, modes []*capabilitiesv1.CameraLens) {
+	for modeIndex, mode := range modes {
+		modePrefix := prefix + ".mode." + strconv.Itoa(modeIndex)
+		addPositiveInt(out, modePrefix+".width", mode.GetWidth())
+		addPositiveInt(out, modePrefix+".height", mode.GetHeight())
+		addPositiveInt(out, modePrefix+".fps", mode.GetFps())
+	}
+}
+
+func addSensorCapabilities(out map[string]string, sensors *capabilitiesv1.SensorCapability) {
+	if sensors == nil {
+		return
+	}
+	addTrue(out, "sensors.accelerometer", sensors.GetAccelerometer())
+	addTrue(out, "sensors.gyroscope", sensors.GetGyroscope())
+	addTrue(out, "sensors.compass", sensors.GetCompass())
+	addTrue(out, "sensors.ambient_light", sensors.GetAmbientLight())
+	addTrue(out, "sensors.proximity", sensors.GetProximity())
+	addTrue(out, "sensors.gps", sensors.GetGps())
+}
+
+func addConnectivityCapabilities(out map[string]string, connectivity *capabilitiesv1.ConnectivityCapability) {
+	if connectivity == nil {
+		return
+	}
+	addTrimmed(out, "connectivity.bluetooth_version", connectivity.GetBluetoothVersion())
+	addTrue(out, "connectivity.wifi_signal_strength", connectivity.GetWifiSignalStrength())
+	addTrue(out, "connectivity.usb_host", connectivity.GetUsbHost())
+	addPositiveInt(out, "connectivity.usb_ports", connectivity.GetUsbPorts())
+	addTrue(out, "connectivity.nfc", connectivity.GetNfc())
+}
+
+func addBatteryCapabilities(out map[string]string, battery *capabilitiesv1.BatteryCapability) {
+	if battery == nil {
+		return
+	}
+	out["battery.level"] = strconv.FormatFloat(float64(battery.GetLevel()), 'f', -1, 32)
+	out["battery.charging"] = strconv.FormatBool(battery.GetCharging())
+}
+
+func addHapticCapabilities(out map[string]string, haptics *capabilitiesv1.HapticCapability) {
+	if haptics == nil {
+		return
+	}
+	addTrue(out, "haptics.supported", haptics.GetSupported())
+	addTrue(out, "haptics.vibration", haptics.GetVibration())
+	addTrue(out, "haptics.engine", haptics.GetHapticsEngine())
+}
+
+func addEdgeCapabilities(out map[string]string, edge *capabilitiesv1.EdgeCapability) {
+	if edge == nil {
+		return
+	}
+	if runtimes := edge.GetRuntimes(); len(runtimes) > 0 {
+		out["edge.runtimes"] = strings.Join(runtimes, ",")
+	}
+	addEdgeOperators(out, edge.GetOperators())
+	addEdgeCompute(out, edge.GetCompute())
+	addEdgeRetention(out, edge.GetRetention())
+	if timing := edge.GetTiming(); timing != nil {
+		out["edge.timing.sync_error_ms"] = strconv.FormatFloat(timing.GetSyncErrorMs(), 'f', -1, 64)
+	}
+	if geometry := edge.GetGeometry(); geometry != nil {
+		out["edge.geometry.mic_array"] = strconv.FormatBool(geometry.GetMicArray())
+		out["edge.geometry.camera_intrinsics"] = strconv.FormatBool(geometry.GetCameraIntrinsics())
+		out["edge.geometry.compass"] = strconv.FormatBool(geometry.GetCompass())
+	}
+}
+
+func addEdgeOperators(out map[string]string, operators []string) {
+	if len(operators) == 0 {
+		return
+	}
+	out["edge.operators"] = strings.Join(operators, ",")
+	foregroundOnly := false
+	backgroundCapable := false
+	for _, operator := range operators {
+		switch strings.TrimSpace(strings.ToLower(operator)) {
+		case "monitor.foreground_only", "monitor.tier.foreground_only":
+			foregroundOnly = true
+			out["monitor.foreground_only"] = "true"
+			out["monitor.support_tier"] = "foreground_only"
+		case "monitor.background_capable", "monitor.tier.background_capable":
+			backgroundCapable = true
+			out["monitor.background_capable"] = "true"
+			out["monitor.support_tier"] = "background_capable"
+		case "monitor.lifecycle.foreground":
+			out["monitor.runtime_state"] = "foreground"
+		case "monitor.lifecycle.background":
+			out["monitor.runtime_state"] = "background"
 		}
 	}
-	if camera := caps.GetCamera(); camera != nil {
-		out["camera.present"] = "true"
-		if front := camera.GetFront(); front != nil {
-			if front.GetWidth() > 0 {
-				out["camera.front.width"] = strconv.FormatInt(int64(front.GetWidth()), 10)
-			}
-			if front.GetHeight() > 0 {
-				out["camera.front.height"] = strconv.FormatInt(int64(front.GetHeight()), 10)
-			}
-			if front.GetFps() > 0 {
-				out["camera.front.fps"] = strconv.FormatInt(int64(front.GetFps()), 10)
-			}
-		}
-		if back := camera.GetBack(); back != nil {
-			if back.GetWidth() > 0 {
-				out["camera.back.width"] = strconv.FormatInt(int64(back.GetWidth()), 10)
-			}
-			if back.GetHeight() > 0 {
-				out["camera.back.height"] = strconv.FormatInt(int64(back.GetHeight()), 10)
-			}
-			if back.GetFps() > 0 {
-				out["camera.back.fps"] = strconv.FormatInt(int64(back.GetFps()), 10)
-			}
-		}
-		if endpoints := camera.GetEndpoints(); len(endpoints) > 0 {
-			out["camera.endpoint_count"] = strconv.FormatInt(int64(len(endpoints)), 10)
-			for idx, endpoint := range endpoints {
-				prefix := "camera.endpoint." + strconv.Itoa(idx)
-				if endpointID := strings.TrimSpace(endpoint.GetEndpointId()); endpointID != "" {
-					out[prefix+".id"] = endpointID
-				}
-				if endpointName := strings.TrimSpace(endpoint.GetEndpointName()); endpointName != "" {
-					out[prefix+".name"] = endpointName
-				}
-				if connectionType := strings.TrimSpace(endpoint.GetConnectionType()); connectionType != "" {
-					out[prefix+".connection_type"] = connectionType
-				}
-				if facing := strings.TrimSpace(endpoint.GetFacing()); facing != "" {
-					out[prefix+".facing"] = facing
-				}
-				if endpoint.GetAvailable() {
-					out[prefix+".available"] = "true"
-				}
-				if modes := endpoint.GetModes(); len(modes) > 0 {
-					for modeIndex, mode := range modes {
-						modePrefix := prefix + ".mode." + strconv.Itoa(modeIndex)
-						if mode.GetWidth() > 0 {
-							out[modePrefix+".width"] = strconv.FormatInt(int64(mode.GetWidth()), 10)
-						}
-						if mode.GetHeight() > 0 {
-							out[modePrefix+".height"] = strconv.FormatInt(int64(mode.GetHeight()), 10)
-						}
-						if mode.GetFps() > 0 {
-							out[modePrefix+".fps"] = strconv.FormatInt(int64(mode.GetFps()), 10)
-						}
-					}
-				}
-			}
-		}
+	if foregroundOnly && !backgroundCapable {
+		out["monitor.background_capable"] = "false"
 	}
-	if sensors := caps.GetSensors(); sensors != nil {
-		if sensors.GetAccelerometer() {
-			out["sensors.accelerometer"] = "true"
-		}
-		if sensors.GetGyroscope() {
-			out["sensors.gyroscope"] = "true"
-		}
-		if sensors.GetCompass() {
-			out["sensors.compass"] = "true"
-		}
-		if sensors.GetAmbientLight() {
-			out["sensors.ambient_light"] = "true"
-		}
-		if sensors.GetProximity() {
-			out["sensors.proximity"] = "true"
-		}
-		if sensors.GetGps() {
-			out["sensors.gps"] = "true"
-		}
+}
+
+func addEdgeCompute(out map[string]string, compute *capabilitiesv1.EdgeComputeCapability) {
+	if compute == nil {
+		return
 	}
-	if connectivity := caps.GetConnectivity(); connectivity != nil {
-		if bluetoothVersion := strings.TrimSpace(connectivity.GetBluetoothVersion()); bluetoothVersion != "" {
-			out["connectivity.bluetooth_version"] = bluetoothVersion
-		}
-		if connectivity.GetWifiSignalStrength() {
-			out["connectivity.wifi_signal_strength"] = "true"
-		}
-		if connectivity.GetUsbHost() {
-			out["connectivity.usb_host"] = "true"
-		}
-		if connectivity.GetUsbPorts() > 0 {
-			out["connectivity.usb_ports"] = strconv.FormatInt(int64(connectivity.GetUsbPorts()), 10)
-		}
-		if connectivity.GetNfc() {
-			out["connectivity.nfc"] = "true"
-		}
+	out["edge.compute.cpu_realtime"] = strconv.FormatInt(int64(compute.GetCpuRealtime()), 10)
+	out["edge.compute.gpu_realtime"] = strconv.FormatInt(int64(compute.GetGpuRealtime()), 10)
+	out["edge.compute.npu_realtime"] = strconv.FormatInt(int64(compute.GetNpuRealtime()), 10)
+	out["edge.compute.mem_mb"] = strconv.FormatInt(int64(compute.GetMemMb()), 10)
+}
+
+func addEdgeRetention(out map[string]string, retention *capabilitiesv1.EdgeRetentionCapability) {
+	if retention == nil {
+		return
 	}
-	if battery := caps.GetBattery(); battery != nil {
-		out["battery.level"] = strconv.FormatFloat(float64(battery.GetLevel()), 'f', -1, 32)
-		out["battery.charging"] = strconv.FormatBool(battery.GetCharging())
+	out["edge.retention.audio_sec"] = strconv.FormatInt(int64(retention.GetAudioSec()), 10)
+	out["edge.retention.video_sec"] = strconv.FormatInt(int64(retention.GetVideoSec()), 10)
+	out["edge.retention.sensor_sec"] = strconv.FormatInt(int64(retention.GetSensorSec()), 10)
+	out["edge.retention.radio_sec"] = strconv.FormatInt(int64(retention.GetRadioSec()), 10)
+}
+
+func addTrimmed(out map[string]string, key string, value string) {
+	if trimmed := strings.TrimSpace(value); trimmed != "" {
+		out[key] = trimmed
 	}
-	if haptics := caps.GetHaptics(); haptics != nil {
-		if haptics.GetSupported() {
-			out["haptics.supported"] = "true"
-		}
-		if haptics.GetVibration() {
-			out["haptics.vibration"] = "true"
-		}
-		if haptics.GetHapticsEngine() {
-			out["haptics.engine"] = "true"
-		}
+}
+
+func addTrue(out map[string]string, key string, value bool) {
+	if value {
+		out[key] = "true"
 	}
-	if edge := caps.GetEdge(); edge != nil {
-		if runtimes := edge.GetRuntimes(); len(runtimes) > 0 {
-			out["edge.runtimes"] = strings.Join(runtimes, ",")
-		}
-		operators := edge.GetOperators()
-		if len(operators) > 0 {
-			out["edge.operators"] = strings.Join(operators, ",")
-		}
-		foregroundOnly := false
-		backgroundCapable := false
-		for _, operator := range operators {
-			normalized := strings.TrimSpace(strings.ToLower(operator))
-			switch normalized {
-			case "monitor.foreground_only", "monitor.tier.foreground_only":
-				foregroundOnly = true
-				out["monitor.foreground_only"] = "true"
-				out["monitor.support_tier"] = "foreground_only"
-			case "monitor.background_capable", "monitor.tier.background_capable":
-				backgroundCapable = true
-				out["monitor.background_capable"] = "true"
-				out["monitor.support_tier"] = "background_capable"
-			case "monitor.lifecycle.foreground":
-				out["monitor.runtime_state"] = "foreground"
-			case "monitor.lifecycle.background":
-				out["monitor.runtime_state"] = "background"
-			}
-		}
-		if foregroundOnly && !backgroundCapable {
-			out["monitor.background_capable"] = "false"
-		}
-		if compute := edge.GetCompute(); compute != nil {
-			out["edge.compute.cpu_realtime"] = strconv.FormatInt(int64(compute.GetCpuRealtime()), 10)
-			out["edge.compute.gpu_realtime"] = strconv.FormatInt(int64(compute.GetGpuRealtime()), 10)
-			out["edge.compute.npu_realtime"] = strconv.FormatInt(int64(compute.GetNpuRealtime()), 10)
-			out["edge.compute.mem_mb"] = strconv.FormatInt(int64(compute.GetMemMb()), 10)
-		}
-		if retention := edge.GetRetention(); retention != nil {
-			out["edge.retention.audio_sec"] = strconv.FormatInt(int64(retention.GetAudioSec()), 10)
-			out["edge.retention.video_sec"] = strconv.FormatInt(int64(retention.GetVideoSec()), 10)
-			out["edge.retention.sensor_sec"] = strconv.FormatInt(int64(retention.GetSensorSec()), 10)
-			out["edge.retention.radio_sec"] = strconv.FormatInt(int64(retention.GetRadioSec()), 10)
-		}
-		if timing := edge.GetTiming(); timing != nil {
-			out["edge.timing.sync_error_ms"] = strconv.FormatFloat(timing.GetSyncErrorMs(), 'f', -1, 64)
-		}
-		if geometry := edge.GetGeometry(); geometry != nil {
-			out["edge.geometry.mic_array"] = strconv.FormatBool(geometry.GetMicArray())
-			out["edge.geometry.camera_intrinsics"] = strconv.FormatBool(geometry.GetCameraIntrinsics())
-			out["edge.geometry.compass"] = strconv.FormatBool(geometry.GetCompass())
-		}
+}
+
+func addPositiveInt(out map[string]string, key string, value int32) {
+	if value > 0 {
+		out[key] = strconv.FormatInt(int64(value), 10)
 	}
-	return out
 }
 
 func joinInts(values []int32) string {
