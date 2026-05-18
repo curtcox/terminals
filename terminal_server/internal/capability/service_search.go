@@ -58,17 +58,7 @@ func (s *Service) SearchRelated(subjectRef string) []SearchResult {
 	matches := make([]scored, 0)
 	subjectLower := strings.ToLower(subjectRef)
 	for _, item := range s.searchCorpusLocked() {
-		score := 0
-		idLower := strings.ToLower(item.ID)
-		textLower := strings.ToLower(item.Text)
-		if strings.EqualFold(item.ID, subjectRef) {
-			score += 3
-		}
-		for _, token := range tokens {
-			if strings.Contains(textLower, token) || strings.Contains(idLower, token) || strings.Contains(subjectLower, idLower) {
-				score++
-			}
-		}
+		score := relatedSearchScore(item, subjectRef, subjectLower, tokens)
 		if score == 0 {
 			continue
 		}
@@ -92,6 +82,27 @@ func (s *Service) SearchRelated(subjectRef string) []SearchResult {
 		out = append(out, item.result)
 	}
 	return out
+}
+
+func relatedSearchScore(item searchableItem, subjectRef, subjectLower string, tokens []string) int {
+	score := 0
+	idLower := strings.ToLower(item.ID)
+	textLower := strings.ToLower(item.Text)
+	if strings.EqualFold(item.ID, subjectRef) {
+		score += 3
+	}
+	for _, token := range tokens {
+		if searchItemContainsToken(idLower, textLower, subjectLower, token) {
+			score++
+		}
+	}
+	return score
+}
+
+func searchItemContainsToken(idLower, textLower, subjectLower, token string) bool {
+	return strings.Contains(textLower, token) ||
+		strings.Contains(idLower, token) ||
+		strings.Contains(subjectLower, idLower)
 }
 
 // SearchRecent returns the newest timeline entries for a scope.

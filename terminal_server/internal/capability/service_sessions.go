@@ -2,6 +2,7 @@ package capability
 
 import (
 	"strings"
+	"time"
 )
 
 // CreateSession creates a new interactive session of the given kind and target.
@@ -252,32 +253,8 @@ func (s *Service) GrantControl(sessionID, participant, grantedBy, controlType st
 			return cloneSession(s.sessions[i]), true
 		}
 		now := s.now()
-		nextReq := s.sessions[i].ControlRequests[:0]
-		for _, req := range s.sessions[i].ControlRequests {
-			if strings.EqualFold(req.ParticipantID, participant) {
-				continue
-			}
-			nextReq = append(nextReq, req)
-		}
-		s.sessions[i].ControlRequests = nextReq
-		grantUpdated := false
-		for j := range s.sessions[i].ControlGrants {
-			if strings.EqualFold(s.sessions[i].ControlGrants[j].ParticipantID, participant) {
-				s.sessions[i].ControlGrants[j].GrantedBy = grantedBy
-				s.sessions[i].ControlGrants[j].ControlType = controlType
-				s.sessions[i].ControlGrants[j].GrantedAt = now
-				grantUpdated = true
-				break
-			}
-		}
-		if !grantUpdated {
-			s.sessions[i].ControlGrants = append(s.sessions[i].ControlGrants, SessionControlGrant{
-				ParticipantID: participant,
-				GrantedBy:     grantedBy,
-				ControlType:   controlType,
-				GrantedAt:     now,
-			})
-		}
+		s.sessions[i].ControlRequests = controlRequestsWithoutParticipant(s.sessions[i].ControlRequests, participant)
+		s.sessions[i].ControlGrants = upsertControlGrant(s.sessions[i].ControlGrants, participant, grantedBy, controlType, now)
 		s.sessions[i].UpdatedAt = now
 		s.sessions[i].Audit = append(s.sessions[i].Audit, SessionAuditEvent{
 			Action:    "session.control.grant",
@@ -290,6 +267,33 @@ func (s *Service) GrantControl(sessionID, participant, grantedBy, controlType st
 		return cloneSession(s.sessions[i]), true
 	}
 	return InteractiveSession{}, false
+}
+
+func controlRequestsWithoutParticipant(requests []SessionControlRequest, participant string) []SessionControlRequest {
+	next := requests[:0]
+	for _, req := range requests {
+		if !strings.EqualFold(req.ParticipantID, participant) {
+			next = append(next, req)
+		}
+	}
+	return next
+}
+
+func upsertControlGrant(grants []SessionControlGrant, participant, grantedBy, controlType string, now time.Time) []SessionControlGrant {
+	for i := range grants {
+		if strings.EqualFold(grants[i].ParticipantID, participant) {
+			grants[i].GrantedBy = grantedBy
+			grants[i].ControlType = controlType
+			grants[i].GrantedAt = now
+			return grants
+		}
+	}
+	return append(grants, SessionControlGrant{
+		ParticipantID: participant,
+		GrantedBy:     grantedBy,
+		ControlType:   controlType,
+		GrantedAt:     now,
+	})
 }
 
 // RevokeControl removes control grants for one participant and records an audit entry.

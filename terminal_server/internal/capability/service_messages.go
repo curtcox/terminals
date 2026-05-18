@@ -153,30 +153,39 @@ func (s *Service) ListUnreadMessages(identityID, room string) []Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	identityID = strings.TrimSpace(identityID)
-	roomRef := strings.TrimSpace(room)
-	roomName := roomRef
-	if roomRef != "" {
-		for _, existingRoom := range s.messageRooms {
-			if strings.EqualFold(existingRoom.ID, roomRef) || strings.EqualFold(existingRoom.Name, roomRef) {
-				roomName = existingRoom.Name
-				break
-			}
-		}
-	}
+	roomName := s.messageRoomNameLocked(room)
 
 	out := make([]Message, 0, len(s.messages))
 	for _, item := range s.messages {
-		if roomName != "" && item.Room != roomName {
-			continue
+		if s.messageIsUnreadForLocked(item, identityID, roomName) {
+			out = append(out, item)
 		}
-		if identityID != "" {
-			if _, ok := s.acks[ackKey("person:"+identityID, "message:"+item.ID)]; ok {
-				continue
-			}
-		}
-		out = append(out, item)
 	}
 	return out
+}
+
+func (s *Service) messageRoomNameLocked(room string) string {
+	roomRef := strings.TrimSpace(room)
+	if roomRef == "" {
+		return ""
+	}
+	for _, existingRoom := range s.messageRooms {
+		if strings.EqualFold(existingRoom.ID, roomRef) || strings.EqualFold(existingRoom.Name, roomRef) {
+			return existingRoom.Name
+		}
+	}
+	return roomRef
+}
+
+func (s *Service) messageIsUnreadForLocked(item Message, identityID, roomName string) bool {
+	if roomName != "" && item.Room != roomName {
+		return false
+	}
+	if identityID == "" {
+		return true
+	}
+	_, acknowledged := s.acks[ackKey("person:"+identityID, "message:"+item.ID)]
+	return !acknowledged
 }
 
 func normalizeTargetRef(targetRef string) string {

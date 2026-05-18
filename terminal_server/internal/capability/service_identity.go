@@ -74,11 +74,7 @@ func (s *Service) ResolveAudience(audience string) []Identity {
 
 	audience = strings.TrimSpace(audience)
 	if audience == "" || strings.EqualFold(audience, "all") {
-		out := make([]Identity, 0, len(s.identities))
-		for _, identity := range s.identities {
-			out = append(out, cloneIdentity(identity))
-		}
-		return out
+		return cloneIdentities(s.identities)
 	}
 
 	key := audience
@@ -93,19 +89,8 @@ func (s *Service) ResolveAudience(audience string) []Identity {
 
 	out := make([]Identity, 0)
 	for _, identity := range s.identities {
-		switch strings.ToLower(key) {
-		case "id":
-			if strings.EqualFold(identity.ID, value) {
-				out = append(out, cloneIdentity(identity))
-			}
-		case "group":
-			if sliceContainsFold(identity.Groups, value) {
-				out = append(out, cloneIdentity(identity))
-			}
-		case "alias":
-			if sliceContainsFold(identity.Aliases, value) {
-				out = append(out, cloneIdentity(identity))
-			}
+		if identityMatchesAudience(identity, key, value) {
+			out = append(out, cloneIdentity(identity))
 		}
 	}
 	return out
@@ -209,6 +194,27 @@ func cloneIdentity(identity Identity) Identity {
 	identity.Aliases = append([]string(nil), identity.Aliases...)
 	identity.Preferences = cloneStringMap(identity.Preferences)
 	return identity
+}
+
+func cloneIdentities(identities []Identity) []Identity {
+	out := make([]Identity, 0, len(identities))
+	for _, identity := range identities {
+		out = append(out, cloneIdentity(identity))
+	}
+	return out
+}
+
+func identityMatchesAudience(identity Identity, key, value string) bool {
+	switch strings.ToLower(key) {
+	case "id":
+		return strings.EqualFold(identity.ID, value)
+	case "group":
+		return sliceContainsFold(identity.Groups, value)
+	case "alias":
+		return sliceContainsFold(identity.Aliases, value)
+	default:
+		return false
+	}
 }
 
 func cloneStringMap(input map[string]string) map[string]string {

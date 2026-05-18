@@ -129,46 +129,7 @@ func (s *Service) SimExpect(deviceID, kind, selector string, within time.Duratio
 		result.Within = within.String()
 	}
 
-	switch kind {
-	case "ui":
-		snapshot, hasSnapshot := s.uiSnapshots[deviceID]
-		if !hasSnapshot {
-			result.Reason = "no UI snapshot captured"
-			break
-		}
-		if selector == "" {
-			result.Matched = true
-			break
-		}
-		haystack := strings.ToLower(snapshot.Descriptor + "\n" + snapshot.LastPatchDescriptor + "\n" + snapshot.LastTransition)
-		result.Matched = strings.Contains(haystack, strings.ToLower(selector))
-		if !result.Matched {
-			result.Reason = "selector not found in captured UI payload"
-		}
-	case "message":
-		if len(s.bus) == 0 {
-			result.Reason = "no bus messages captured"
-			break
-		}
-		if selector == "" {
-			result.Matched = true
-			break
-		}
-		needle := strings.ToLower(selector)
-		for i := len(s.bus) - 1; i >= 0; i-- {
-			event := s.bus[i]
-			haystack := strings.ToLower(event.Kind + "\n" + event.Name + "\n" + event.Payload)
-			if strings.Contains(haystack, needle) {
-				result.Matched = true
-				break
-			}
-		}
-		if !result.Matched {
-			result.Reason = "selector not found in captured bus messages"
-		}
-	default:
-		result.Reason = "unsupported expectation kind"
-	}
+	result.Matched, result.Reason = s.matchSimExpectationLocked(deviceID, kind, selector)
 
 	status := "failed"
 	if result.Matched {
@@ -176,6 +137,50 @@ func (s *Service) SimExpect(deviceID, kind, selector string, within time.Duratio
 	}
 	s.appendRecentLocked("sim", "expect "+deviceID+" "+kind+" "+status)
 	return result, true
+}
+
+func (s *Service) matchSimExpectationLocked(deviceID, kind, selector string) (bool, string) {
+	switch kind {
+	case "ui":
+		return s.matchUISimExpectationLocked(deviceID, selector)
+	case "message":
+		return s.matchMessageSimExpectationLocked(selector)
+	default:
+		return false, "unsupported expectation kind"
+	}
+}
+
+func (s *Service) matchUISimExpectationLocked(deviceID, selector string) (bool, string) {
+	snapshot, hasSnapshot := s.uiSnapshots[deviceID]
+	if !hasSnapshot {
+		return false, "no UI snapshot captured"
+	}
+	if selector == "" {
+		return true, ""
+	}
+	haystack := strings.ToLower(snapshot.Descriptor + "\n" + snapshot.LastPatchDescriptor + "\n" + snapshot.LastTransition)
+	if strings.Contains(haystack, strings.ToLower(selector)) {
+		return true, ""
+	}
+	return false, "selector not found in captured UI payload"
+}
+
+func (s *Service) matchMessageSimExpectationLocked(selector string) (bool, string) {
+	if len(s.bus) == 0 {
+		return false, "no bus messages captured"
+	}
+	if selector == "" {
+		return true, ""
+	}
+	needle := strings.ToLower(selector)
+	for i := len(s.bus) - 1; i >= 0; i-- {
+		event := s.bus[i]
+		haystack := strings.ToLower(event.Kind + "\n" + event.Name + "\n" + event.Payload)
+		if strings.Contains(haystack, needle) {
+			return true, ""
+		}
+	}
+	return false, "selector not found in captured bus messages"
 }
 
 // SimRecord returns simulation captures for one device and optional lookback duration.
