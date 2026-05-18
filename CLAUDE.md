@@ -11,8 +11,23 @@ Terminals is a thin-client system:
 ## Repo Layout
 
 - `terminal_server/`: Go server
-- `terminal_client/`: Flutter client
+- `terminal_client/`: Flutter client (Flutter/Dart, targets web and macOS)
+- `android_client/`: native Android/Kindle terminal client
+- `web_client/`: plain HTML/JS client for browser-first smoke tests
 - `api/terminals/`: protobuf definitions
+- `scripts/`: helper scripts invoked by `make` targets
+- `plans/`: one directory per plan; `plans/INDEX.md` is auto-generated
+- `usecases/`: user-story use-case files; IDs are stable contracts
+- `docs/`: build-and-run guides and architecture documents
+
+## Navigation
+
+Hubs to check before grepping:
+
+- [docs/glossary.md](docs/glossary.md) — domain terms with canonical code paths
+- [usecases/INDEX.md](usecases/INDEX.md) — auto-generated index of use cases and their validation status
+- [plans/INDEX.md](plans/INDEX.md) — auto-generated plan index; `BUILDING` rows are in-flight work
+- [SKILLS.md](SKILLS.md) — repo-local skills and trigger phrases
 
 ## Engineering Priorities
 

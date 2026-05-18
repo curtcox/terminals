@@ -31,7 +31,7 @@ These touch ports, files, or running processes — do not call from tests or CI 
 | `audit-usecase-wiring.py` | `make usecase-wiring-audit` | Checks every use-case ID has a mapped validation |
 | `find-oversized-files.py` | `make quality-check` | Flags Go files over the size threshold |
 | `assert-server-test-network-probe.sh` | `make server-test-network-probe` | Validates network probe test output |
-| `validate-skills.sh` | `make skills-check` | Validates `.claude/skills/` structure |
+| `validate-skills.sh` | `make skills-validate` | Validates `.claude/skills/` structure |
 
 ## Generate (writes to repo)
 
