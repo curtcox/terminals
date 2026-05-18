@@ -65,3 +65,8 @@ make all-check
 
 Architectural details live in `masterplan.md`.
 
+## Skills
+
+1. Before acting on any request that names a skill, read `.claude/skills/<name>/SKILL.md` first.
+2. Use `SKILLS.md` as the quick index for available skills, trigger phrases, and "must use when" guidance.
+
