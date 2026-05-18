@@ -438,34 +438,53 @@ func newJSONHandler(w io.Writer, level slog.Level) slog.Handler {
 		Level:     level,
 		AddSource: true,
 		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
-			switch a.Key {
-			case slog.TimeKey:
-				tm, ok := a.Value.Any().(time.Time)
-				if !ok {
-					return slog.String("ts", time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00"))
-				}
-				return slog.String("ts", tm.UTC().Format("2006-01-02T15:04:05.000Z07:00"))
-			case slog.SourceKey:
-				source, ok := a.Value.Any().(*slog.Source)
-				if !ok || source == nil {
-					return slog.Attr{}
-				}
-				file := source.File
-				if wd, err := os.Getwd(); err == nil {
-					if rel, relErr := filepath.Rel(wd, source.File); relErr == nil {
-						file = rel
-					}
-				}
-				return slog.Group("caller",
-					slog.String("file", file),
-					slog.Int("line", source.Line),
-					slog.String("func", shortFunc(source.Function)),
-				)
-			}
-			return a
+			return replaceJSONAttr(a)
 		},
 	}
 	return slog.NewJSONHandler(w, opts)
+}
+
+func replaceJSONAttr(a slog.Attr) slog.Attr {
+	switch a.Key {
+	case slog.TimeKey:
+		return replaceTimeAttr(a)
+	case slog.SourceKey:
+		return replaceSourceAttr(a)
+	default:
+		return a
+	}
+}
+
+func replaceTimeAttr(a slog.Attr) slog.Attr {
+	tm, ok := a.Value.Any().(time.Time)
+	if !ok {
+		tm = time.Now()
+	}
+	return slog.String("ts", tm.UTC().Format("2006-01-02T15:04:05.000Z07:00"))
+}
+
+func replaceSourceAttr(a slog.Attr) slog.Attr {
+	source, ok := a.Value.Any().(*slog.Source)
+	if !ok || source == nil {
+		return slog.Attr{}
+	}
+	return slog.Group("caller",
+		slog.String("file", relativeSourceFile(source.File)),
+		slog.Int("line", source.Line),
+		slog.String("func", shortFunc(source.Function)),
+	)
+}
+
+func relativeSourceFile(file string) string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return file
+	}
+	rel, err := filepath.Rel(wd, file)
+	if err != nil {
+		return file
+	}
+	return rel
 }
 
 func shortFunc(fn string) string {

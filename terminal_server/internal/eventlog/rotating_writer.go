@@ -98,23 +98,8 @@ func (w *RotatingWriter) rotateLocked() error {
 		w.file = nil
 	}
 
-	if w.maxArchives > 0 {
-		oldest := w.activePath + "." + strconv.Itoa(w.maxArchives)
-		_ = os.Remove(oldest)
-		for i := w.maxArchives - 1; i >= 1; i-- {
-			from := w.activePath + "." + strconv.Itoa(i)
-			to := w.activePath + "." + strconv.Itoa(i+1)
-			if _, err := os.Stat(from); err == nil {
-				_ = os.Rename(from, to)
-			}
-		}
-		if _, err := os.Stat(w.activePath); err == nil {
-			if err := os.Rename(w.activePath, w.activePath+".1"); err != nil {
-				return fmt.Errorf("rotate active log file: %w", err)
-			}
-		}
-	} else {
-		_ = os.Remove(w.activePath)
+	if err := w.rotateArchivesLocked(); err != nil {
+		return err
 	}
 
 	f, err := os.OpenFile(w.activePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -123,5 +108,27 @@ func (w *RotatingWriter) rotateLocked() error {
 	}
 	w.file = f
 	w.size = 0
+	return nil
+}
+
+func (w *RotatingWriter) rotateArchivesLocked() error {
+	if w.maxArchives <= 0 {
+		_ = os.Remove(w.activePath)
+		return nil
+	}
+	_ = os.Remove(w.activePath + "." + strconv.Itoa(w.maxArchives))
+	for i := w.maxArchives - 1; i >= 1; i-- {
+		from := w.activePath + "." + strconv.Itoa(i)
+		to := w.activePath + "." + strconv.Itoa(i+1)
+		if _, err := os.Stat(from); err == nil {
+			_ = os.Rename(from, to)
+		}
+	}
+	if _, err := os.Stat(w.activePath); err != nil {
+		return nil
+	}
+	if err := os.Rename(w.activePath, w.activePath+".1"); err != nil {
+		return fmt.Errorf("rotate active log file: %w", err)
+	}
 	return nil
 }

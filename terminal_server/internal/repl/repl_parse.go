@@ -133,19 +133,24 @@ func nonFlagArgsSkippingFlagValues(args []string, valueFlags ...string) []string
 			continue
 		}
 		if strings.HasPrefix(trimmed, "--") {
-			if _, ok := skipValueFlags[strings.ToLower(trimmed)]; ok {
-				if i+1 < len(args) {
-					next := strings.TrimSpace(args[i+1])
-					if !strings.HasPrefix(next, "--") {
-						i++
-					}
-				}
+			if shouldSkipFollowingFlagValue(args, i, skipValueFlags) {
+				i++
 			}
 			continue
 		}
 		out = append(out, trimmed)
 	}
 	return out
+}
+
+func shouldSkipFollowingFlagValue(args []string, i int, valueFlags map[string]struct{}) bool {
+	if _, ok := valueFlags[strings.ToLower(strings.TrimSpace(args[i]))]; !ok {
+		return false
+	}
+	if i+1 >= len(args) {
+		return false
+	}
+	return !strings.HasPrefix(strings.TrimSpace(args[i+1]), "--")
 }
 
 func parseHandlersEmitValue(args []string) (kind string, name string, payload string) {
