@@ -19,8 +19,8 @@ linters:
     - unused
   settings:
     gocognit:
-      # TODO(complexity): current ceiling is 722 (repl_eval_control_plane_ops.go); aspirational target is 15.
-      min-complexity: 730
+      # TODO(complexity): current ceiling is 471 (repl_eval_control_plane_mid.go); aspirational target is 15.
+      min-complexity: 480
 
 formatters:
   enable:
