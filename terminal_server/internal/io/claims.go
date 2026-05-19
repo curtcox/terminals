@@ -80,6 +80,17 @@ func (m *ClaimManager) Request(_ context.Context, claims []Claim) (Grant, error)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	normalized := normalizeClaimsInput(claims)
+	if len(normalized) == 0 {
+		return Grant{}, nil
+	}
+	if !claimsGrantable(m, normalized) {
+		return Grant{}, ErrClaimConflict
+	}
+	return m.grantClaimsLocked(normalized), nil
+}
+
+func normalizeClaimsInput(claims []Claim) []Claim {
 	normalized := make([]Claim, 0, len(claims))
 	for _, claim := range claims {
 		claim = normalizeClaim(claim)
@@ -88,22 +99,21 @@ func (m *ClaimManager) Request(_ context.Context, claims []Claim) (Grant, error)
 		}
 		normalized = append(normalized, claim)
 	}
-	if len(normalized) == 0 {
-		return Grant{}, nil
-	}
+	return normalized
+}
 
-	// First pass: ensure every claim is grantable.
+func claimsGrantable(m *ClaimManager, normalized []Claim) bool {
 	for _, request := range normalized {
 		key := resourceKey{deviceID: request.DeviceID, resource: request.Resource}
-		active := m.activeByResource[key]
-		if !isGrantable(request, active) {
-			return Grant{}, ErrClaimConflict
+		if !isGrantable(request, m.activeByResource[key]) {
+			return false
 		}
 	}
+	return true
+}
 
-	grant := Grant{
-		Granted: make([]Claim, 0, len(normalized)),
-	}
+func (m *ClaimManager) grantClaimsLocked(normalized []Claim) Grant {
+	grant := Grant{Granted: make([]Claim, 0, len(normalized))}
 	for _, request := range normalized {
 		key := resourceKey{deviceID: request.DeviceID, resource: request.Resource}
 		active := m.activeByResource[key]
@@ -123,8 +133,7 @@ func (m *ClaimManager) Request(_ context.Context, claims []Claim) (Grant, error)
 		m.activeByAct[request.ActivationID] = append(m.activeByAct[request.ActivationID], request)
 		grant.Granted = append(grant.Granted, request)
 	}
-
-	return grant, nil
+	return grant
 }
 
 // Release removes all active claims for activationID and restores parked

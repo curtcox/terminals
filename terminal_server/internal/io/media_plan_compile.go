@@ -10,12 +10,23 @@ import (
 )
 
 func indexMediaPlanNodes(plan FlowPlan) (map[string]FlowNode, map[string][]string, error) {
-	nodeByID := make(map[string]FlowNode, len(plan.Nodes))
-	incoming := make(map[string][]string)
-	for _, node := range plan.Nodes {
+	nodeByID, err := indexMediaPlanNodeIDs(plan.Nodes)
+	if err != nil {
+		return nil, nil, err
+	}
+	incoming, err := indexMediaPlanEdges(plan.Edges, nodeByID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return nodeByID, incoming, nil
+}
+
+func indexMediaPlanNodeIDs(nodes []FlowNode) (map[string]FlowNode, error) {
+	nodeByID := make(map[string]FlowNode, len(nodes))
+	for _, node := range nodes {
 		id := strings.TrimSpace(node.ID)
 		if id == "" {
-			return nil, nil, ErrInvalidMediaPlan
+			return nil, ErrInvalidMediaPlan
 		}
 		node.ID = id
 		if node.Args == nil {
@@ -26,21 +37,26 @@ func indexMediaPlanNodes(plan FlowPlan) (map[string]FlowNode, map[string][]strin
 		}
 		nodeByID[id] = node
 	}
-	for _, edge := range plan.Edges {
+	return nodeByID, nil
+}
+
+func indexMediaPlanEdges(edges []FlowEdge, nodeByID map[string]FlowNode) (map[string][]string, error) {
+	incoming := make(map[string][]string)
+	for _, edge := range edges {
 		from := strings.TrimSpace(edge.From)
 		to := strings.TrimSpace(edge.To)
 		if from == "" || to == "" {
-			return nil, nil, ErrInvalidMediaPlan
+			return nil, ErrInvalidMediaPlan
 		}
 		if _, ok := nodeByID[from]; !ok {
-			return nil, nil, ErrInvalidMediaPlan
+			return nil, ErrInvalidMediaPlan
 		}
 		if _, ok := nodeByID[to]; !ok {
-			return nil, nil, ErrInvalidMediaPlan
+			return nil, ErrInvalidMediaPlan
 		}
 		incoming[to] = append(incoming[to], from)
 	}
-	return nodeByID, incoming, nil
+	return incoming, nil
 }
 
 func (p *MediaPlanner) applySinkEdge(

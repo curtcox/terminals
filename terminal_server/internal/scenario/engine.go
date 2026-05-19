@@ -182,11 +182,21 @@ func (e *Engine) ActivateMatched(ctx context.Context, env *Environment, match Ma
 
 // Stop deactivates the named scenario and resumes any suspended scenario.
 func (e *Engine) Stop(ctx context.Context, env *Environment, name string, deviceIDs []string) error {
+	toStop, toResume, err := e.planStop(name, deviceIDs)
+	if err != nil {
+		return err
+	}
+	if err := stopScenarios(toStop); err != nil {
+		return err
+	}
+	return resumeScenarios(ctx, env, toResume)
+}
+
+func (e *Engine) planStop(name string, deviceIDs []string) (map[Scenario]struct{}, map[Scenario]struct{}, error) {
 	e.mu.Lock()
-	_, exists := e.registry[name]
-	if !exists {
-		e.mu.Unlock()
-		return ErrScenarioNotFound
+	defer e.mu.Unlock()
+	if _, exists := e.registry[name]; !exists {
+		return nil, nil, ErrScenarioNotFound
 	}
 
 	toStop := make(map[Scenario]struct{})
@@ -208,14 +218,20 @@ func (e *Engine) Stop(ctx context.Context, env *Environment, name string, device
 		e.activeByDev[deviceID] = resumed
 		toResume[resumed.scenario] = struct{}{}
 	}
-	e.mu.Unlock()
+	return toStop, toResume, nil
+}
 
-	for activation := range toStop {
+func stopScenarios(activations map[Scenario]struct{}) error {
+	for activation := range activations {
 		if err := activation.Stop(); err != nil {
 			return err
 		}
 	}
-	for resumed := range toResume {
+	return nil
+}
+
+func resumeScenarios(ctx context.Context, env *Environment, activations map[Scenario]struct{}) error {
+	for resumed := range activations {
 		r, ok := resumed.(Resumable)
 		if !ok {
 			continue

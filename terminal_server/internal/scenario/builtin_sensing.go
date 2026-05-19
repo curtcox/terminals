@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 )
 
 // ScheduleMonitorScenario schedules a check and confirms activation.
@@ -499,16 +501,18 @@ func (s *BluetoothInventoryScenario) Start(ctx context.Context, env *Environment
 	if len(observations) == 0 {
 		return notifySource(ctx, env, s.trigger.SourceID, "No Bluetooth devices were recently observed.")
 	}
+	names := recentBluetoothDeviceNames(observations, 5)
+	if len(names) == 0 {
+		return notifySource(ctx, env, s.trigger.SourceID, "Bluetooth scans are active, but no identifiable devices were found.")
+	}
+	return notifySource(ctx, env, s.trigger.SourceID, "Recent Bluetooth devices: "+strings.Join(names, ", ")+".")
+}
+
+func recentBluetoothDeviceNames(observations []iorouter.Observation, limit int) []string {
 	names := make([]string, 0, len(observations))
 	seen := map[string]struct{}{}
 	for _, ob := range observations {
-		label := strings.TrimSpace(ob.Subject)
-		if label == "" {
-			label = strings.TrimSpace(ob.Attributes["device"])
-		}
-		if label == "" {
-			label = strings.TrimSpace(ob.Attributes["mac"])
-		}
+		label := bluetoothObservationLabel(ob)
 		if label == "" {
 			continue
 		}
@@ -517,14 +521,21 @@ func (s *BluetoothInventoryScenario) Start(ctx context.Context, env *Environment
 		}
 		seen[label] = struct{}{}
 		names = append(names, label)
-		if len(names) >= 5 {
+		if limit > 0 && len(names) >= limit {
 			break
 		}
 	}
-	if len(names) == 0 {
-		return notifySource(ctx, env, s.trigger.SourceID, "Bluetooth scans are active, but no identifiable devices were found.")
+	return names
+}
+
+func bluetoothObservationLabel(ob iorouter.Observation) string {
+	if label := strings.TrimSpace(ob.Subject); label != "" {
+		return label
 	}
-	return notifySource(ctx, env, s.trigger.SourceID, "Recent Bluetooth devices: "+strings.Join(names, ", ")+".")
+	if label := strings.TrimSpace(ob.Attributes["device"]); label != "" {
+		return label
+	}
+	return strings.TrimSpace(ob.Attributes["mac"])
 }
 
 // Stop ends this one-shot scenario.

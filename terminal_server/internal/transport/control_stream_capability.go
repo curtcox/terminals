@@ -234,6 +234,67 @@ func truthyCapability(raw string) bool {
 	return true
 }
 
+type lostRouteResources struct {
+	micCapture       bool
+	micAnalyze       bool
+	speaker          bool
+	cameraCapture    bool
+	cameraAnalyze    bool
+	screenMain       bool
+	screenOverlay    bool
+	audioInEndpoint  bool
+	audioOutEndpoint bool
+	cameraEndpoint   bool
+	displayEndpoint  bool
+}
+
+func classifyLostRouteResources(lostResources map[string]struct{}) lostRouteResources {
+	_, micCapture := lostResources["mic.capture"]
+	_, micAnalyze := lostResources["mic.analyze"]
+	_, speaker := lostResources["speaker.main"]
+	_, cameraCapture := lostResources["camera.capture"]
+	_, cameraAnalyze := lostResources["camera.analyze"]
+	_, screenMain := lostResources["screen.main"]
+	_, screenOverlay := lostResources["screen.overlay"]
+	return lostRouteResources{
+		micCapture:       micCapture,
+		micAnalyze:       micAnalyze,
+		speaker:          speaker,
+		cameraCapture:    cameraCapture,
+		cameraAnalyze:    cameraAnalyze,
+		screenMain:       screenMain,
+		screenOverlay:    screenOverlay,
+		audioInEndpoint:  hasLostResourcePrefix(lostResources, "audio_in."),
+		audioOutEndpoint: hasLostResourcePrefix(lostResources, "audio_out."),
+		cameraEndpoint:   hasLostResourcePrefix(lostResources, "camera."),
+		displayEndpoint:  hasLostResourcePrefix(lostResources, "display."),
+	}
+}
+
+func (lost lostRouteResources) disconnectsAudioSource(deviceID, sourceID, streamKind string) bool {
+	return (lost.micCapture || lost.micAnalyze || lost.audioInEndpoint) &&
+		sourceID == deviceID &&
+		strings.Contains(streamKind, "audio")
+}
+
+func (lost lostRouteResources) disconnectsAudioTarget(deviceID, targetID, streamKind string) bool {
+	return (lost.speaker || lost.audioOutEndpoint) &&
+		targetID == deviceID &&
+		strings.Contains(streamKind, "audio")
+}
+
+func (lost lostRouteResources) disconnectsVideoSource(deviceID, sourceID, streamKind string) bool {
+	return (lost.cameraCapture || lost.cameraAnalyze || lost.cameraEndpoint) &&
+		sourceID == deviceID &&
+		strings.Contains(streamKind, "video")
+}
+
+func (lost lostRouteResources) disconnectsVideoTarget(deviceID, targetID, streamKind string) bool {
+	return (lost.screenMain || lost.screenOverlay || lost.displayEndpoint) &&
+		targetID == deviceID &&
+		strings.Contains(streamKind, "video")
+}
+
 func shouldDisconnectRouteForLostResources(route iorouter.Route, deviceID string, lostResources map[string]struct{}) bool {
 	if len(lostResources) == 0 {
 		return false
@@ -244,33 +305,11 @@ func shouldDisconnectRouteForLostResources(route iorouter.Route, deviceID string
 	if sourceID != deviceID && targetID != deviceID {
 		return false
 	}
-
-	_, lostMicCapture := lostResources["mic.capture"]
-	_, lostMicAnalyze := lostResources["mic.analyze"]
-	_, lostSpeaker := lostResources["speaker.main"]
-	_, lostCameraCapture := lostResources["camera.capture"]
-	_, lostCameraAnalyze := lostResources["camera.analyze"]
-	_, lostScreenMain := lostResources["screen.main"]
-	_, lostScreenOverlay := lostResources["screen.overlay"]
-	lostAudioInEndpoint := hasLostResourcePrefix(lostResources, "audio_in.")
-	lostAudioOutEndpoint := hasLostResourcePrefix(lostResources, "audio_out.")
-	lostCameraEndpoint := hasLostResourcePrefix(lostResources, "camera.")
-	lostDisplayEndpoint := hasLostResourcePrefix(lostResources, "display.")
-
-	if (lostMicCapture || lostMicAnalyze || lostAudioInEndpoint) && sourceID == deviceID && strings.Contains(streamKind, "audio") {
-		return true
-	}
-	if (lostSpeaker || lostAudioOutEndpoint) && targetID == deviceID && strings.Contains(streamKind, "audio") {
-		return true
-	}
-	if (lostCameraCapture || lostCameraAnalyze || lostCameraEndpoint) && sourceID == deviceID && strings.Contains(streamKind, "video") {
-		return true
-	}
-	if (lostScreenMain || lostScreenOverlay || lostDisplayEndpoint) && targetID == deviceID && strings.Contains(streamKind, "video") {
-		return true
-	}
-
-	return false
+	lost := classifyLostRouteResources(lostResources)
+	return lost.disconnectsAudioSource(deviceID, sourceID, streamKind) ||
+		lost.disconnectsAudioTarget(deviceID, targetID, streamKind) ||
+		lost.disconnectsVideoSource(deviceID, sourceID, streamKind) ||
+		lost.disconnectsVideoTarget(deviceID, targetID, streamKind)
 }
 
 func hasLostResourcePrefix(lostResources map[string]struct{}, prefix string) bool {

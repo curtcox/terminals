@@ -243,21 +243,40 @@ func (s *VoiceAssistantScenario) Stop() error {
 	if env == nil {
 		return nil
 	}
-	if routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner }); ok {
-		if planner := routeIO.MediaPlanner(); planner != nil && planHandle != "" {
-			if err := planner.Tear(context.Background(), planHandle); err != nil {
-				return err
-			}
-		}
+	if err := tearVoiceAssistantMediaPlan(env, planHandle); err != nil {
+		return err
 	}
-	if routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok {
-		if claims := routeIO.Claims(); claims != nil && activationID != "" {
-			if err := claims.Release(context.Background(), activationID); err != nil {
-				return err
-			}
-		}
+	return releaseVoiceAssistantClaims(env, activationID)
+}
+
+func tearVoiceAssistantMediaPlan(env *Environment, planHandle iorouter.PlanHandle) error {
+	if planHandle == "" {
+		return nil
 	}
-	return nil
+	routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner })
+	if !ok {
+		return nil
+	}
+	planner := routeIO.MediaPlanner()
+	if planner == nil {
+		return nil
+	}
+	return planner.Tear(context.Background(), planHandle)
+}
+
+func releaseVoiceAssistantClaims(env *Environment, activationID string) error {
+	if activationID == "" {
+		return nil
+	}
+	routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager })
+	if !ok {
+		return nil
+	}
+	claims := routeIO.Claims()
+	if claims == nil {
+		return nil
+	}
+	return claims.Release(context.Background(), activationID)
 }
 
 // Suspend releases assistant-owned media resources while preempted.

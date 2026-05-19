@@ -76,6 +76,14 @@ func ValidateMainLayerAffordanceCoverage(
 	allowlist []AffordanceOptOutEntry,
 	now time.Time,
 ) error {
+	registryIDs := registryScenarioIDs(registry)
+	if err := ValidateAffordanceOptOutAllowlist(allowlist, registryIDs, now); err != nil {
+		return err
+	}
+	return validateSkippedAffordanceAllowlisted(skipsAffordance, registryIDs, allowlistedScenarioIDs(allowlist))
+}
+
+func registryScenarioIDs(registry []RegistrationInfo) map[string]struct{} {
 	registryIDs := make(map[string]struct{}, len(registry))
 	for _, item := range registry {
 		name := strings.TrimSpace(item.Name)
@@ -84,10 +92,10 @@ func ValidateMainLayerAffordanceCoverage(
 		}
 		registryIDs[name] = struct{}{}
 	}
-	if err := ValidateAffordanceOptOutAllowlist(allowlist, registryIDs, now); err != nil {
-		return err
-	}
+	return registryIDs
+}
 
+func allowlistedScenarioIDs(allowlist []AffordanceOptOutEntry) map[string]struct{} {
 	allowlisted := make(map[string]struct{}, len(allowlist))
 	for _, entry := range allowlist {
 		name := strings.TrimSpace(entry.ScenarioID)
@@ -96,7 +104,14 @@ func ValidateMainLayerAffordanceCoverage(
 		}
 		allowlisted[name] = struct{}{}
 	}
+	return allowlisted
+}
 
+func validateSkippedAffordanceAllowlisted(
+	skipsAffordance map[string]struct{},
+	registryIDs map[string]struct{},
+	allowlisted map[string]struct{},
+) error {
 	missing := make([]string, 0, len(skipsAffordance))
 	for name := range skipsAffordance {
 		scenarioID := strings.TrimSpace(name)
@@ -110,11 +125,11 @@ func ValidateMainLayerAffordanceCoverage(
 			missing = append(missing, scenarioID)
 		}
 	}
-	if len(missing) > 0 {
-		sort.Strings(missing)
-		return fmt.Errorf("main-layer scenario(s) skip withCornerAffordance without allowlist entry: %s", strings.Join(missing, ", "))
+	if len(missing) == 0 {
+		return nil
 	}
-	return nil
+	sort.Strings(missing)
+	return fmt.Errorf("main-layer scenario(s) skip withCornerAffordance without allowlist entry: %s", strings.Join(missing, ", "))
 }
 
 // CodeownersHasPathOwner reports whether CODEOWNERS contains a path rule with the requested owner.

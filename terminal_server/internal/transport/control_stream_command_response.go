@@ -139,22 +139,35 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	if commandResult.ScenarioStop != "" {
 		h.disconnectScenarioRoutes(cmd.DeviceID, commandResult.ScenarioStop)
 	}
+	if extra, done := h.commandResponsesEarly(ctx, cmd, commandResult); done {
+		return append(responses, extra...)
+	}
+	responses = h.commandResponsesAfterEarly(ctx, cmd, commandResult, responses)
+	return responses
+}
+
+func (h *StreamHandler) commandResponsesEarly(ctx context.Context, cmd *CommandRequest, commandResult ServerMessage) ([]ServerMessage, bool) {
 	if refresh, ok := h.commandTerminalRefresh(ctx, cmd); ok {
-		responses = append(responses, refresh)
-		return responses
+		return []ServerMessage{refresh}, true
 	}
 	if playback, ok := h.commandPlaybackDispatch(cmd, commandResult); ok {
-		responses = append(responses, playback)
-		return responses
+		return []ServerMessage{playback}, true
 	}
 	if extra, handled := h.commandResponsesForScenarioStop(ctx, cmd, commandResult); handled {
-		responses = append(responses, extra...)
-		return responses
+		return extra, true
 	}
 	if extra, handled := h.commandResponsesForScenarioStart(ctx, cmd, commandResult); handled {
-		responses = append(responses, extra...)
-		return responses
+		return extra, true
 	}
+	return nil, false
+}
+
+func (h *StreamHandler) commandResponsesAfterEarly(
+	ctx context.Context,
+	cmd *CommandRequest,
+	commandResult ServerMessage,
+	responses []ServerMessage,
+) []ServerMessage {
 	if commandResult.ScenarioStart == "multi_window" {
 		responses = h.appendMultiWindowStartUI(cmd, responses)
 	}
@@ -169,8 +182,7 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	if commandResult.ScenarioStart != "terminal" {
 		return responses
 	}
-	responses = append(responses, h.commandResponsesTerminalStart(ctx, cmd)...)
-	return responses
+	return append(responses, h.commandResponsesTerminalStart(ctx, cmd)...)
 }
 
 func (h *StreamHandler) commandPlaybackDispatch(cmd *CommandRequest, commandResult ServerMessage) (ServerMessage, bool) {

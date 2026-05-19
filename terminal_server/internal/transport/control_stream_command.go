@@ -20,79 +20,51 @@ func manualPassthroughTrigger(cmd *CommandRequest) (scenario.Trigger, bool) {
 	if cmd == nil {
 		return scenario.Trigger{}, false
 	}
-	intent := strings.TrimSpace(cmd.Intent)
-	switch intent {
+	switch strings.TrimSpace(cmd.Intent) {
 	case ManualIntentBluetoothScan:
-		args := copyStringMap(cmd.Arguments)
-		if strings.TrimSpace(args["action"]) == "" {
-			args["action"] = "scan"
-		}
-		return scenario.Trigger{
-			Kind:      scenario.TriggerManual,
-			SourceID:  cmd.DeviceID,
-			Intent:    "bluetooth_passthrough",
-			Arguments: args,
-			IntentV2: &scenario.IntentRecord{
-				Action: "bluetooth_passthrough",
-				Slots:  copyStringMap(args),
-				Source: scenario.SourceManual,
-			},
-		}, true
+		return manualPassthroughTriggerFor(cmd, "bluetooth_passthrough", "scan", nil), true
 	case ManualIntentBluetoothConnect:
-		args := copyStringMap(cmd.Arguments)
-		if strings.TrimSpace(args["action"]) == "" {
-			args["action"] = "connect"
-		}
-		if strings.TrimSpace(args["target_id"]) == "" {
-			if target := strings.TrimSpace(args["target"]); target != "" {
-				args["target_id"] = target
-			}
-		}
-		return scenario.Trigger{
-			Kind:      scenario.TriggerManual,
-			SourceID:  cmd.DeviceID,
-			Intent:    "bluetooth_passthrough",
-			Arguments: args,
-			IntentV2: &scenario.IntentRecord{
-				Action: "bluetooth_passthrough",
-				Slots:  copyStringMap(args),
-				Source: scenario.SourceManual,
-			},
-		}, true
+		return manualPassthroughTriggerFor(cmd, "bluetooth_passthrough", "connect", fillBluetoothConnectTarget), true
 	case ManualIntentUSBEnumerate:
-		args := copyStringMap(cmd.Arguments)
-		if strings.TrimSpace(args["action"]) == "" {
-			args["action"] = "enumerate"
-		}
-		return scenario.Trigger{
-			Kind:      scenario.TriggerManual,
-			SourceID:  cmd.DeviceID,
-			Intent:    "usb_passthrough",
-			Arguments: args,
-			IntentV2: &scenario.IntentRecord{
-				Action: "usb_passthrough",
-				Slots:  copyStringMap(args),
-				Source: scenario.SourceManual,
-			},
-		}, true
+		return manualPassthroughTriggerFor(cmd, "usb_passthrough", "enumerate", nil), true
 	case ManualIntentUSBClaim:
-		args := copyStringMap(cmd.Arguments)
-		if strings.TrimSpace(args["action"]) == "" {
-			args["action"] = "claim"
-		}
-		return scenario.Trigger{
-			Kind:      scenario.TriggerManual,
-			SourceID:  cmd.DeviceID,
-			Intent:    "usb_passthrough",
-			Arguments: args,
-			IntentV2: &scenario.IntentRecord{
-				Action: "usb_passthrough",
-				Slots:  copyStringMap(args),
-				Source: scenario.SourceManual,
-			},
-		}, true
+		return manualPassthroughTriggerFor(cmd, "usb_passthrough", "claim", nil), true
 	default:
 		return scenario.Trigger{}, false
+	}
+}
+
+func manualPassthroughTriggerFor(
+	cmd *CommandRequest,
+	intentName, defaultAction string,
+	patch func(map[string]string),
+) scenario.Trigger {
+	args := copyStringMap(cmd.Arguments)
+	if strings.TrimSpace(args["action"]) == "" {
+		args["action"] = defaultAction
+	}
+	if patch != nil {
+		patch(args)
+	}
+	return scenario.Trigger{
+		Kind:      scenario.TriggerManual,
+		SourceID:  cmd.DeviceID,
+		Intent:    intentName,
+		Arguments: args,
+		IntentV2: &scenario.IntentRecord{
+			Action: intentName,
+			Slots:  copyStringMap(args),
+			Source: scenario.SourceManual,
+		},
+	}
+}
+
+func fillBluetoothConnectTarget(args map[string]string) {
+	if strings.TrimSpace(args["target_id"]) != "" {
+		return
+	}
+	if target := strings.TrimSpace(args["target"]); target != "" {
+		args["target_id"] = target
 	}
 }
 
