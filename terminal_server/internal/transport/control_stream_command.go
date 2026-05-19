@@ -189,110 +189,133 @@ func (h *StreamHandler) handleCommand(ctx context.Context, cmd *CommandRequest) 
 
 	switch kind {
 	case CommandKindVoice:
-		if strings.TrimSpace(cmd.Text) == "" {
-			return ServerMessage{}, ErrMissingCommandText
-		}
-		if action == CommandActionStop {
-			name, err := h.runtime.StopVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
-			if err != nil {
-				return ServerMessage{}, err
-			}
-			return ServerMessage{
-				ScenarioStop: name,
-				Notification: "Scenario stopped: " + name,
-			}, nil
-		}
-		name, err := h.runtime.HandleVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
-		if err != nil {
-			return ServerMessage{}, err
-		}
-		return ServerMessage{
-			ScenarioStart: name,
-			Notification:  "Scenario started: " + name,
-		}, nil
+		return h.handleVoiceCommand(ctx, cmd, action)
 	case CommandKindManual:
-		if manualIntent == "" {
-			return ServerMessage{}, ErrMissingCommandIntent
-		}
-		if manualIntent == SystemIntentTerminalRefresh {
-			if action == CommandActionStop {
-				return ServerMessage{}, ErrInvalidCommandAction
-			}
-			return ServerMessage{
-				Notification: "Terminal refresh requested",
-				Data: map[string]string{
-					"device_id": cmd.DeviceID,
-				},
-			}, nil
-		}
-		if manualIntent == ManualIntentPlaybackMetadata {
-			if action == CommandActionStop {
-				return ServerMessage{}, ErrInvalidCommandAction
-			}
-			artifactID := strings.TrimSpace(cmd.Arguments["artifact_id"])
-			if artifactID == "" {
-				return ServerMessage{}, fmt.Errorf("playback_metadata requires artifact_id")
-			}
-			targetDeviceID := strings.TrimSpace(cmd.Arguments["target_device_id"])
-			if targetDeviceID == "" {
-				targetDeviceID = strings.TrimSpace(cmd.DeviceID)
-			}
-			if targetDeviceID == "" {
-				return ServerMessage{}, ErrMissingCommandDeviceID
-			}
-			metadata, ok := h.playbackMetadataForTarget(artifactID, targetDeviceID)
-			if !ok {
-				return ServerMessage{}, fmt.Errorf("playback artifact not found: %s", artifactID)
-			}
-			return ServerMessage{
-				Notification: "Playback metadata ready",
-				Data:         metadata,
-			}, nil
-		}
-		if passthroughTrigger, ok := manualPassthroughTrigger(cmd); ok {
-			if action == CommandActionStop {
-				return ServerMessage{}, ErrInvalidCommandAction
-			}
-			name, err := h.runtime.HandleTrigger(ctx, passthroughTrigger)
-			if err != nil {
-				return ServerMessage{}, err
-			}
-			return ServerMessage{
-				ScenarioStart: name,
-				Notification:  "Scenario started: " + name,
-			}, nil
-		}
-		trigger := scenario.Trigger{
-			Kind:      scenario.TriggerManual,
-			SourceID:  cmd.DeviceID,
-			Intent:    cmd.Intent,
-			Arguments: copyStringMap(cmd.Arguments),
-			IntentV2: &scenario.IntentRecord{
-				Action: strings.TrimSpace(cmd.Intent),
-				Slots:  copyStringMap(cmd.Arguments),
-				Source: scenario.SourceManual,
-			},
-		}
-		if action == CommandActionStop {
-			name, err := h.runtime.StopTrigger(ctx, trigger)
-			if err != nil {
-				return ServerMessage{}, err
-			}
-			return ServerMessage{
-				ScenarioStop: name,
-				Notification: "Scenario stopped: " + name,
-			}, nil
-		}
-		name, err := h.runtime.HandleTrigger(ctx, trigger)
-		if err != nil {
-			return ServerMessage{}, err
-		}
-		return ServerMessage{
-			ScenarioStart: name,
-			Notification:  "Scenario started: " + name,
-		}, nil
+		return h.handleManualCommand(ctx, cmd, action, manualIntent)
 	default:
 		return ServerMessage{}, ErrInvalidCommandKind
+	}
+}
+
+func (h *StreamHandler) handleVoiceCommand(ctx context.Context, cmd *CommandRequest, action string) (ServerMessage, error) {
+	if strings.TrimSpace(cmd.Text) == "" {
+		return ServerMessage{}, ErrMissingCommandText
+	}
+	if action == CommandActionStop {
+		name, err := h.runtime.StopVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
+		if err != nil {
+			return ServerMessage{}, err
+		}
+		return scenarioStoppedMessage(name), nil
+	}
+	name, err := h.runtime.HandleVoiceText(ctx, cmd.DeviceID, cmd.Text, h.control.now().UTC())
+	if err != nil {
+		return ServerMessage{}, err
+	}
+	return scenarioStartedMessage(name), nil
+}
+
+func (h *StreamHandler) handleManualCommand(ctx context.Context, cmd *CommandRequest, action, manualIntent string) (ServerMessage, error) {
+	if manualIntent == "" {
+		return ServerMessage{}, ErrMissingCommandIntent
+	}
+	if manualIntent == SystemIntentTerminalRefresh {
+		return terminalRefreshCommandMessage(cmd.DeviceID, action)
+	}
+	if manualIntent == ManualIntentPlaybackMetadata {
+		return h.playbackMetadataCommandMessage(cmd, action)
+	}
+	if passthroughTrigger, ok := manualPassthroughTrigger(cmd); ok {
+		return h.handlePassthroughTrigger(ctx, passthroughTrigger, action)
+	}
+	return h.handleManualScenarioTrigger(ctx, cmd, action)
+}
+
+func terminalRefreshCommandMessage(deviceID, action string) (ServerMessage, error) {
+	if action == CommandActionStop {
+		return ServerMessage{}, ErrInvalidCommandAction
+	}
+	return ServerMessage{
+		Notification: "Terminal refresh requested",
+		Data: map[string]string{
+			"device_id": deviceID,
+		},
+	}, nil
+}
+
+func (h *StreamHandler) playbackMetadataCommandMessage(cmd *CommandRequest, action string) (ServerMessage, error) {
+	if action == CommandActionStop {
+		return ServerMessage{}, ErrInvalidCommandAction
+	}
+	artifactID := strings.TrimSpace(cmd.Arguments["artifact_id"])
+	if artifactID == "" {
+		return ServerMessage{}, fmt.Errorf("playback_metadata requires artifact_id")
+	}
+	targetDeviceID := strings.TrimSpace(cmd.Arguments["target_device_id"])
+	if targetDeviceID == "" {
+		targetDeviceID = strings.TrimSpace(cmd.DeviceID)
+	}
+	if targetDeviceID == "" {
+		return ServerMessage{}, ErrMissingCommandDeviceID
+	}
+	metadata, ok := h.playbackMetadataForTarget(artifactID, targetDeviceID)
+	if !ok {
+		return ServerMessage{}, fmt.Errorf("playback artifact not found: %s", artifactID)
+	}
+	return ServerMessage{
+		Notification: "Playback metadata ready",
+		Data:         metadata,
+	}, nil
+}
+
+func (h *StreamHandler) handlePassthroughTrigger(ctx context.Context, trigger scenario.Trigger, action string) (ServerMessage, error) {
+	if action == CommandActionStop {
+		return ServerMessage{}, ErrInvalidCommandAction
+	}
+	name, err := h.runtime.HandleTrigger(ctx, trigger)
+	if err != nil {
+		return ServerMessage{}, err
+	}
+	return scenarioStartedMessage(name), nil
+}
+
+func (h *StreamHandler) handleManualScenarioTrigger(ctx context.Context, cmd *CommandRequest, action string) (ServerMessage, error) {
+	trigger := scenario.Trigger{
+		Kind:      scenario.TriggerManual,
+		SourceID:  cmd.DeviceID,
+		Intent:    cmd.Intent,
+		Arguments: copyStringMap(cmd.Arguments),
+		IntentV2: &scenario.IntentRecord{
+			Action: strings.TrimSpace(cmd.Intent),
+			Slots:  copyStringMap(cmd.Arguments),
+			Source: scenario.SourceManual,
+		},
+	}
+	if action == CommandActionStop {
+		name, err := h.runtime.StopTrigger(ctx, trigger)
+		if err != nil {
+			return ServerMessage{}, err
+		}
+		return scenarioStoppedMessage(name), nil
+	}
+	name, err := h.runtime.HandleTrigger(ctx, trigger)
+	if err != nil {
+		return ServerMessage{}, err
+	}
+	return scenarioStartedMessage(name), nil
+}
+
+func scenarioStartedMessage(name string) ServerMessage {
+	return ServerMessage{
+		ScenarioStart: name,
+		Notification:  "Scenario started: " + name,
+	}
+}
+
+func scenarioStoppedMessage(name string) ServerMessage {
+	return ServerMessage{
+		ScenarioStop: name,
+		Notification: "Scenario stopped: " + name,
 	}
 }
 
@@ -304,6 +327,29 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 	if err != nil {
 		return ServerMessage{}, err
 	}
+	if msg, ok, err := h.systemStatusCommand(ctx, parsed); ok || err != nil {
+		return msg, err
+	}
+	if msg, ok := h.systemInventoryCommand(parsed); ok {
+		return msg, nil
+	}
+	if parsed.Name == SystemIntentTerminalRefresh {
+		return h.systemTerminalRefreshMessage(cmd.DeviceID, parsed.Arg)
+	}
+	if parsed.Name == SystemIntentDeviceStatus && parsed.Arg != "" {
+		data, err := h.deviceStatusData(parsed.Arg)
+		if err != nil {
+			return ServerMessage{}, err
+		}
+		return ServerMessage{
+			Notification: "System query: device_status",
+			Data:         data,
+		}, nil
+	}
+	return ServerMessage{}, fmt.Errorf("unknown system intent: %s", cmd.Intent)
+}
+
+func (h *StreamHandler) systemStatusCommand(ctx context.Context, parsed ParsedSystemIntent) (ServerMessage, bool, error) {
 	switch parsed.Name {
 	case SystemIntentHelp:
 		return ServerMessage{
@@ -313,49 +359,28 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 				"command_kinds":   "voice,manual,system",
 				"command_actions": "start,stop",
 			},
-		}, nil
+		}, true, nil
 	case SystemIntentServerStatus:
 		return ServerMessage{
 			Notification: "System query: server_status",
 			Data:         h.control.StatusData(),
-		}, nil
+		}, true, nil
 	case SystemIntentRuntimeStatus:
-		data := map[string]string{}
-		if h.runtime != nil {
-			for k, v := range h.runtime.StatusData() {
-				data[k] = v
-			}
-		}
-		for k, v := range h.mediaStreamStatusData() {
-			data[k] = v
-		}
-		for k, v := range h.sensorStatusData() {
-			data[k] = v
-		}
-		for k, v := range h.recordingStatusData() {
-			data[k] = v
-		}
 		return ServerMessage{
 			Notification: "System query: runtime_status",
-			Data:         data,
-		}, nil
+			Data:         h.runtimeStatusData(),
+		}, true, nil
 	case SystemIntentScenarioRegistry:
-		data := map[string]string{}
-		if h.runtime != nil && h.runtime.Engine != nil {
-			for _, item := range h.runtime.Engine.RegistrySnapshot() {
-				data[item.Name] = fmt.Sprintf("priority=%d", item.Priority)
-			}
-		}
 		return ServerMessage{
 			Notification: "System query: scenario_registry",
-			Data:         data,
-		}, nil
+			Data:         h.scenarioRegistryData(),
+		}, true, nil
 	case SystemIntentRunDueTimers:
 		processed := 0
 		if h.runtime != nil {
 			count, err := h.runtime.ProcessDueTimers(ctx, h.control.now().UTC())
 			if err != nil {
-				return ServerMessage{}, err
+				return ServerMessage{}, true, err
 			}
 			processed = count
 		}
@@ -364,14 +389,14 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 			Data: map[string]string{
 				"processed": toString(int64(processed)),
 			},
-		}, nil
+		}, true, nil
 	case SystemIntentReconcileLiveness:
 		timeout := 2 * time.Minute
 		timeoutSeconds := "120"
 		if parsed.Arg != "" {
 			seconds, convErr := strconv.Atoi(parsed.Arg)
 			if convErr != nil || seconds < 0 {
-				return ServerMessage{}, fmt.Errorf("invalid reconcile_liveness seconds: %s", parsed.Arg)
+				return ServerMessage{}, true, fmt.Errorf("invalid reconcile_liveness seconds: %s", parsed.Arg)
 			}
 			timeout = time.Duration(seconds) * time.Second
 			timeoutSeconds = parsed.Arg
@@ -383,167 +408,240 @@ func (h *StreamHandler) handleSystemCommand(ctx context.Context, cmd *CommandReq
 				"updated":         toString(int64(updated)),
 				"timeout_seconds": timeoutSeconds,
 			},
-		}, nil
+		}, true, nil
 	case SystemIntentTransportMetrics:
-		data := map[string]string{}
-		if h.metrics != nil {
-			for k, v := range h.metrics.Snapshot() {
-				data[k] = v
-			}
-		}
 		return ServerMessage{
 			Notification: "System query: transport_metrics",
-			Data:         data,
-		}, nil
+			Data:         h.transportMetricsData(),
+		}, true, nil
+	default:
+		return ServerMessage{}, false, nil
+	}
+}
+
+func (h *StreamHandler) systemInventoryCommand(parsed ParsedSystemIntent) (ServerMessage, bool) {
+	switch parsed.Name {
 	case SystemIntentListDevices:
-		data := map[string]string{}
-		devices := h.control.devices.List()
-		sort.Slice(devices, func(i, j int) bool {
-			return devices[i].DeviceID < devices[j].DeviceID
-		})
-		for _, d := range devices {
-			data[d.DeviceID] = fmt.Sprintf("%s|%s|%s", d.DeviceName, d.Platform, d.State)
-		}
 		return ServerMessage{
 			Notification: "System query: list_devices",
-			Data:         data,
-		}, nil
+			Data:         h.listDevicesData(),
+		}, true
 	case SystemIntentActiveScenarios:
-		data := map[string]string{}
-		if h.runtime != nil && h.runtime.Engine != nil {
-			for deviceID, scenarioName := range h.runtime.Engine.ActiveSnapshot() {
-				data[deviceID] = scenarioName
-			}
-		}
 		return ServerMessage{
 			Notification: "System query: active_scenarios",
-			Data:         data,
-		}, nil
+			Data:         h.activeScenariosData(),
+		}, true
 	case SystemIntentPendingTimers:
-		data := map[string]string{}
-		if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Scheduler != nil {
-			if structured, ok := h.runtime.Env.Scheduler.(interface {
-				DueRecords(int64) []storage.ScheduleRecord
-			}); ok {
-				for _, record := range structured.DueRecords(math.MaxInt64) {
-					data[record.Key] = pendingTimerRecordValue(record)
-				}
-			} else {
-				for _, key := range h.runtime.Env.Scheduler.Due(math.MaxInt64) {
-					data[key] = "scheduled"
-				}
-			}
-		}
 		return ServerMessage{
 			Notification: "System query: pending_timers",
-			Data:         data,
-		}, nil
+			Data:         h.pendingTimersData(),
+		}, true
 	case SystemIntentRecentCommands:
-		data := map[string]string{}
-		events := h.commandDispatcher.Recent()
-		for i, ev := range events {
-			key := fmt.Sprintf("%03d", i)
-			data[key] = strings.Join([]string{
-				ev.RequestID,
-				ev.DeviceID,
-				ev.Kind,
-				ev.Action,
-				ev.Intent,
-				ev.Outcome,
-				strconv.FormatInt(ev.WhenUnix, 10),
-			}, "|")
-		}
 		return ServerMessage{
 			Notification: "System query: recent_commands",
-			Data:         data,
-		}, nil
+			Data:         h.recentCommandsData(),
+		}, true
 	case SystemIntentRecordingEvents:
-		data := map[string]string{}
-		var events []recording.Event
-		if h.mediaControl != nil {
-			events = h.mediaControl.RecentRecordingEvents(50)
-		}
-		for i, event := range events {
-			key := fmt.Sprintf("%03d", i)
-			data[key] = strings.Join([]string{
-				strconv.FormatInt(event.AtUnixMS, 10),
-				event.Action,
-				event.StreamID,
-				event.Kind,
-				event.SourceID,
-				event.TargetID,
-			}, "|")
-		}
 		return ServerMessage{
 			Notification: "System query: recording_events",
-			Data:         data,
-		}, nil
+			Data:         h.recordingEventsData(),
+		}, true
 	case SystemIntentListPlaybackFiles:
-		data := map[string]string{}
-		for i, artifact := range h.listPlaybackArtifacts() {
-			key := fmt.Sprintf("%03d", i)
-			data[key] = strings.Join([]string{
-				artifact.ArtifactID,
-				artifact.StreamID,
-				artifact.Kind,
-				artifact.SourceDeviceID,
-				artifact.TargetDeviceID,
-				strconv.FormatInt(artifact.SizeBytes, 10),
-				strconv.FormatInt(artifact.UpdatedUnixMS, 10),
-				artifact.AudioPath,
-			}, "|")
-		}
 		return ServerMessage{
 			Notification: "System query: list_playback_artifacts",
-			Data:         data,
-		}, nil
-	case SystemIntentTerminalRefresh:
-		targetDeviceID := strings.TrimSpace(parsed.Arg)
-		if targetDeviceID == "" {
-			targetDeviceID = strings.TrimSpace(cmd.DeviceID)
-		}
-		if targetDeviceID == "" {
-			return ServerMessage{}, ErrMissingCommandDeviceID
-		}
-		return ServerMessage{
-			Notification: "System query: terminal_refresh",
-			Data: map[string]string{
-				"device_id": targetDeviceID,
-			},
-		}, nil
+			Data:         h.listPlaybackArtifactsData(),
+		}, true
 	default:
-		if parsed.Name == SystemIntentDeviceStatus && parsed.Arg != "" {
-			deviceState, ok := h.control.devices.Get(parsed.Arg)
-			if !ok {
-				return ServerMessage{}, fmt.Errorf("device not found: %s", parsed.Arg)
-			}
-			data := map[string]string{
-				"device_id":   deviceState.DeviceID,
-				"device_name": deviceState.DeviceName,
-				"device_type": deviceState.DeviceType,
-				"platform":    deviceState.Platform,
-				"state":       string(deviceState.State),
-			}
-			for k, v := range deviceState.Capabilities {
-				data["cap."+k] = v
-			}
-			if snapshot, ok := h.sensorDataForDevice(parsed.Arg); ok {
-				data["sensor.unix_ms"] = strconv.FormatInt(snapshot.UnixMS, 10)
-				keys := make([]string, 0, len(snapshot.Values))
-				for key := range snapshot.Values {
-					keys = append(keys, key)
-				}
-				sort.Strings(keys)
-				for _, key := range keys {
-					data["sensor."+key] = strconv.FormatFloat(snapshot.Values[key], 'f', -1, 64)
-				}
-			}
-			return ServerMessage{
-				Notification: "System query: device_status",
-				Data:         data,
-			}, nil
+		return ServerMessage{}, false
+	}
+}
+
+func (h *StreamHandler) systemTerminalRefreshMessage(commandDeviceID, arg string) (ServerMessage, error) {
+	targetDeviceID := strings.TrimSpace(arg)
+	if targetDeviceID == "" {
+		targetDeviceID = strings.TrimSpace(commandDeviceID)
+	}
+	if targetDeviceID == "" {
+		return ServerMessage{}, ErrMissingCommandDeviceID
+	}
+	return ServerMessage{
+		Notification: "System query: terminal_refresh",
+		Data: map[string]string{
+			"device_id": targetDeviceID,
+		},
+	}, nil
+}
+
+func (h *StreamHandler) runtimeStatusData() map[string]string {
+	data := map[string]string{}
+	if h.runtime != nil {
+		for k, v := range h.runtime.StatusData() {
+			data[k] = v
 		}
-		return ServerMessage{}, fmt.Errorf("unknown system intent: %s", cmd.Intent)
+	}
+	for k, v := range h.mediaStreamStatusData() {
+		data[k] = v
+	}
+	for k, v := range h.sensorStatusData() {
+		data[k] = v
+	}
+	for k, v := range h.recordingStatusData() {
+		data[k] = v
+	}
+	return data
+}
+
+func (h *StreamHandler) scenarioRegistryData() map[string]string {
+	data := map[string]string{}
+	if h.runtime == nil || h.runtime.Engine == nil {
+		return data
+	}
+	for _, item := range h.runtime.Engine.RegistrySnapshot() {
+		data[item.Name] = fmt.Sprintf("priority=%d", item.Priority)
+	}
+	return data
+}
+
+func (h *StreamHandler) transportMetricsData() map[string]string {
+	data := map[string]string{}
+	if h.metrics == nil {
+		return data
+	}
+	for k, v := range h.metrics.Snapshot() {
+		data[k] = v
+	}
+	return data
+}
+
+func (h *StreamHandler) listDevicesData() map[string]string {
+	data := map[string]string{}
+	devices := h.control.devices.List()
+	sort.Slice(devices, func(i, j int) bool {
+		return devices[i].DeviceID < devices[j].DeviceID
+	})
+	for _, d := range devices {
+		data[d.DeviceID] = fmt.Sprintf("%s|%s|%s", d.DeviceName, d.Platform, d.State)
+	}
+	return data
+}
+
+func (h *StreamHandler) activeScenariosData() map[string]string {
+	data := map[string]string{}
+	if h.runtime == nil || h.runtime.Engine == nil {
+		return data
+	}
+	for deviceID, scenarioName := range h.runtime.Engine.ActiveSnapshot() {
+		data[deviceID] = scenarioName
+	}
+	return data
+}
+
+func (h *StreamHandler) pendingTimersData() map[string]string {
+	data := map[string]string{}
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.Scheduler == nil {
+		return data
+	}
+	if structured, ok := h.runtime.Env.Scheduler.(interface {
+		DueRecords(int64) []storage.ScheduleRecord
+	}); ok {
+		for _, record := range structured.DueRecords(math.MaxInt64) {
+			data[record.Key] = pendingTimerRecordValue(record)
+		}
+		return data
+	}
+	for _, key := range h.runtime.Env.Scheduler.Due(math.MaxInt64) {
+		data[key] = "scheduled"
+	}
+	return data
+}
+
+func (h *StreamHandler) recentCommandsData() map[string]string {
+	data := map[string]string{}
+	events := h.commandDispatcher.Recent()
+	for i, ev := range events {
+		key := fmt.Sprintf("%03d", i)
+		data[key] = strings.Join([]string{
+			ev.RequestID,
+			ev.DeviceID,
+			ev.Kind,
+			ev.Action,
+			ev.Intent,
+			ev.Outcome,
+			strconv.FormatInt(ev.WhenUnix, 10),
+		}, "|")
+	}
+	return data
+}
+
+func (h *StreamHandler) recordingEventsData() map[string]string {
+	data := map[string]string{}
+	if h.mediaControl == nil {
+		return data
+	}
+	for i, event := range h.mediaControl.RecentRecordingEvents(50) {
+		key := fmt.Sprintf("%03d", i)
+		data[key] = strings.Join([]string{
+			strconv.FormatInt(event.AtUnixMS, 10),
+			event.Action,
+			event.StreamID,
+			event.Kind,
+			event.SourceID,
+			event.TargetID,
+		}, "|")
+	}
+	return data
+}
+
+func (h *StreamHandler) listPlaybackArtifactsData() map[string]string {
+	data := map[string]string{}
+	for i, artifact := range h.listPlaybackArtifacts() {
+		key := fmt.Sprintf("%03d", i)
+		data[key] = strings.Join([]string{
+			artifact.ArtifactID,
+			artifact.StreamID,
+			artifact.Kind,
+			artifact.SourceDeviceID,
+			artifact.TargetDeviceID,
+			strconv.FormatInt(artifact.SizeBytes, 10),
+			strconv.FormatInt(artifact.UpdatedUnixMS, 10),
+			artifact.AudioPath,
+		}, "|")
+	}
+	return data
+}
+
+func (h *StreamHandler) deviceStatusData(deviceID string) (map[string]string, error) {
+	deviceState, ok := h.control.devices.Get(deviceID)
+	if !ok {
+		return nil, fmt.Errorf("device not found: %s", deviceID)
+	}
+	data := map[string]string{
+		"device_id":   deviceState.DeviceID,
+		"device_name": deviceState.DeviceName,
+		"device_type": deviceState.DeviceType,
+		"platform":    deviceState.Platform,
+		"state":       string(deviceState.State),
+	}
+	for k, v := range deviceState.Capabilities {
+		data["cap."+k] = v
+	}
+	h.addDeviceSensorData(data, deviceID)
+	return data, nil
+}
+
+func (h *StreamHandler) addDeviceSensorData(data map[string]string, deviceID string) {
+	snapshot, ok := h.sensorDataForDevice(deviceID)
+	if !ok {
+		return
+	}
+	data["sensor.unix_ms"] = strconv.FormatInt(snapshot.UnixMS, 10)
+	keys := make([]string, 0, len(snapshot.Values))
+	for key := range snapshot.Values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		data["sensor."+key] = strconv.FormatFloat(snapshot.Values[key], 'f', -1, 64)
 	}
 }
 

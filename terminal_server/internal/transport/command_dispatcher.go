@@ -59,25 +59,8 @@ func (d *CommandDispatcher) Dispatch(ctx context.Context, cmd *CommandRequest) (
 	h := d.h
 	h.metrics.commandReceived.Add(1)
 	priorActiveScenario := h.activeScenarioName(cmd.DeviceID)
-	if cmd.RequestID != "" {
-		h.mu.Lock()
-		if prior, ok := h.seen[cmd.RequestID]; ok {
-			if h.metrics != nil {
-				h.metrics.dedupeHits.Add(1)
-			}
-			d.appendEvent(CommandEvent{
-				RequestID: cmd.RequestID,
-				DeviceID:  cmd.DeviceID,
-				Kind:      cmd.Kind,
-				Action:    defaultAction(cmd.Action),
-				Intent:    cmd.Intent,
-				Outcome:   "deduped",
-				WhenUnix:  h.control.now().UTC().UnixMilli(),
-			})
-			h.mu.Unlock()
-			return []ServerMessage{prior}, nil
-		}
-		h.mu.Unlock()
+	if prior, ok := d.priorCommandResponse(cmd); ok {
+		return []ServerMessage{prior}, nil
 	}
 	beforeRoutes := h.routeSnapshotForDevice(cmd.DeviceID)
 	beforeBroadcastEvents := h.broadcastEventCount()
@@ -85,41 +68,14 @@ func (d *CommandDispatcher) Dispatch(ctx context.Context, cmd *CommandRequest) (
 	commandResult, err := d.runCommand(ctx, cmd)
 	if err != nil {
 		h.metrics.commandErrors.Add(1)
-		d.appendEvent(CommandEvent{
-			RequestID: cmd.RequestID,
-			DeviceID:  cmd.DeviceID,
-			Kind:      cmd.Kind,
-			Action:    defaultAction(cmd.Action),
-			Intent:    cmd.Intent,
-			Outcome:   "error:" + err.Error(),
-			WhenUnix:  h.control.now().UTC().UnixMilli(),
-		})
+		d.appendEvent(commandEventFor(cmd, "error:"+err.Error(), h.control.now().UTC().UnixMilli()))
 		return []ServerMessage{{ErrorCode: errorCodeFor(err), Error: err.Error()}}, err
 	}
-	d.appendEvent(CommandEvent{
-		RequestID: cmd.RequestID,
-		DeviceID:  cmd.DeviceID,
-		Kind:      cmd.Kind,
-		Action:    defaultAction(cmd.Action),
-		Intent:    cmd.Intent,
-		Outcome:   commandOutcome(commandResult),
-		WhenUnix:  h.control.now().UTC().UnixMilli(),
-	})
+	d.appendEvent(commandEventFor(cmd, commandOutcome(commandResult), h.control.now().UTC().UnixMilli()))
 	if commandResult.ScenarioStart == "multi_window" && defaultAction(cmd.Action) == CommandActionStart {
 		h.captureMultiWindowResume(cmd.DeviceID, priorActiveScenario)
 	}
-	if cmd.RequestID != "" {
-		commandResult.CommandAck = cmd.RequestID
-		h.mu.Lock()
-		h.seen[cmd.RequestID] = commandResult
-		h.seenOrder = append(h.seenOrder, cmd.RequestID)
-		if len(h.seenOrder) > h.seenLimit {
-			evict := h.seenOrder[0]
-			h.seenOrder = h.seenOrder[1:]
-			delete(h.seen, evict)
-		}
-		h.mu.Unlock()
-	}
+	d.rememberCommandResponse(cmd, &commandResult)
 	postResponses := h.commandResponses(ctx, cmd, commandResult)
 	afterRoutes := h.routeSnapshotForDevice(cmd.DeviceID)
 	routeUpdates := h.routeUpdatesForCommand(cmd, commandResult, beforeRoutes, afterRoutes)
@@ -144,6 +100,54 @@ func (d *CommandDispatcher) Dispatch(ctx context.Context, cmd *CommandRequest) (
 	}
 	h.uiSession.RememberSetUI(cmd.DeviceID, postResponses)
 	return postResponses, nil
+}
+
+func (d *CommandDispatcher) priorCommandResponse(cmd *CommandRequest) (ServerMessage, bool) {
+	h := d.h
+	if cmd.RequestID == "" {
+		return ServerMessage{}, false
+	}
+	h.mu.Lock()
+	prior, ok := h.seen[cmd.RequestID]
+	h.mu.Unlock()
+	if !ok {
+		return ServerMessage{}, false
+	}
+	if h.metrics != nil {
+		h.metrics.dedupeHits.Add(1)
+	}
+	d.appendEvent(commandEventFor(cmd, "deduped", h.control.now().UTC().UnixMilli()))
+	return prior, true
+}
+
+func (d *CommandDispatcher) rememberCommandResponse(cmd *CommandRequest, commandResult *ServerMessage) {
+	if cmd.RequestID == "" {
+		return
+	}
+	h := d.h
+	commandResult.CommandAck = cmd.RequestID
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.seen[cmd.RequestID] = *commandResult
+	h.seenOrder = append(h.seenOrder, cmd.RequestID)
+	if len(h.seenOrder) <= h.seenLimit {
+		return
+	}
+	evict := h.seenOrder[0]
+	h.seenOrder = h.seenOrder[1:]
+	delete(h.seen, evict)
+}
+
+func commandEventFor(cmd *CommandRequest, outcome string, whenUnix int64) CommandEvent {
+	return CommandEvent{
+		RequestID: cmd.RequestID,
+		DeviceID:  cmd.DeviceID,
+		Kind:      cmd.Kind,
+		Action:    defaultAction(cmd.Action),
+		Intent:    cmd.Intent,
+		Outcome:   outcome,
+		WhenUnix:  whenUnix,
+	}
 }
 
 // BroadcastNotificationsForCommand fans out broadcast events that were

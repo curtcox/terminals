@@ -38,7 +38,7 @@ func (s *Session) Run(stream ControlStream) error {
 		return ErrNilStream
 	}
 
-	var connectedDeviceID string
+	state := controlSessionState{}
 	capabilityReady := false
 	var sendMu sync.Mutex
 	send := func(msg ServerMessage) error {
@@ -46,26 +46,25 @@ func (s *Session) Run(stream ControlStream) error {
 		defer sendMu.Unlock()
 		return stream.Send(msg)
 	}
-	registeredRelayDeviceID := ""
 	defer func() {
-		if registeredRelayDeviceID != "" {
-			globalSessionRelayRegistry.Unregister(registeredRelayDeviceID)
+		if state.registeredRelayDeviceID != "" {
+			globalSessionRelayRegistry.Unregister(state.registeredRelayDeviceID)
 		}
 	}()
 	for {
 		in, err := stream.Recv()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				if connectedDeviceID != "" {
-					s.handler.HandleDisconnect(connectedDeviceID)
-					_ = s.control.Disconnect(stream.Context(), connectedDeviceID)
+				if state.connectedDeviceID != "" {
+					s.handler.HandleDisconnect(state.connectedDeviceID)
+					_ = s.control.Disconnect(stream.Context(), state.connectedDeviceID)
 				}
 				return nil
 			}
 			return err
 		}
 
-		if sessionErr := validateSessionMessage(connectedDeviceID, capabilityReady, in); sessionErr != nil {
+		if sessionErr := validateSessionMessage(state.connectedDeviceID, capabilityReady, in); sessionErr != nil {
 			s.handler.NoteProtocolError()
 			if sendErr := send(ServerMessage{
 				ErrorCode: ErrorCodeProtocolViolation,
@@ -76,135 +75,153 @@ func (s *Session) Run(stream ControlStream) error {
 			continue
 		}
 
-		if in.Register != nil {
-			connectedDeviceID = in.Register.DeviceID
-			capabilityReady = true
-			if connectedDeviceID != "" && connectedDeviceID != registeredRelayDeviceID {
-				if registeredRelayDeviceID != "" {
-					globalSessionRelayRegistry.Unregister(registeredRelayDeviceID)
-				}
-				globalSessionRelayRegistry.Register(connectedDeviceID, send)
-				registeredRelayDeviceID = connectedDeviceID
-			}
-		}
-		if in.Hello != nil && connectedDeviceID == "" {
-			connectedDeviceID = in.Hello.DeviceID
-		}
-		if in.CapabilitySnap != nil {
-			if connectedDeviceID == "" {
-				connectedDeviceID = in.CapabilitySnap.DeviceID
-			}
-			capabilityReady = true
-			if connectedDeviceID != "" && connectedDeviceID != registeredRelayDeviceID {
-				if registeredRelayDeviceID != "" {
-					globalSessionRelayRegistry.Unregister(registeredRelayDeviceID)
-				}
-				globalSessionRelayRegistry.Register(connectedDeviceID, send)
-				registeredRelayDeviceID = connectedDeviceID
-			}
-		}
-		if in.Heartbeat != nil && connectedDeviceID == "" {
-			connectedDeviceID = in.Heartbeat.DeviceID
-		}
-		in.SessionDeviceID = connectedDeviceID
+		capabilityReady = state.observeClientMessage(in, capabilityReady, send)
+		in.SessionDeviceID = state.connectedDeviceID
 
 		out, handleErr := s.handler.HandleMessage(stream.Context(), in)
-		for _, msg := range out {
-			targetDeviceID := connectedDeviceID
-			if relayTarget := msg.RelayToDeviceID; relayTarget != "" {
-				targetDeviceID = relayTarget
-			}
-			msg = s.handler.decorateBugReportAffordance(targetDeviceID, msg)
-			msg, err = s.handler.prepareOutboundUI(targetDeviceID, msg)
-			if err != nil {
-				return err
-			}
-			if msg.RelayToDeviceID != "" {
-				relayMsg := msg
-				relayMsg.RelayToDeviceID = ""
-				if sendErr := globalSessionRelayRegistry.Relay(msg.RelayToDeviceID, relayMsg); sendErr != nil {
-					return sendErr
-				}
-				continue
-			}
-			if sendErr := send(msg); sendErr != nil {
-				return sendErr
-			}
+		if err := s.sendSessionMessages(out, state.connectedDeviceID, send); err != nil {
+			return err
+		}
+		if shouldContinueSession(out, handleErr) {
+			continue
 		}
 		if handleErr != nil {
-			// If we emitted an explicit error response, keep the session alive
-			// so a malformed client message does not force reconnect.
-			if hasStructuredError(out) {
-				continue
-			}
 			return handleErr
 		}
 	}
 }
 
+type controlSessionState struct {
+	connectedDeviceID       string
+	registeredRelayDeviceID string
+}
+
+func (s *controlSessionState) observeClientMessage(in ClientMessage, capabilityReady bool, send func(ServerMessage) error) bool {
+	if in.Register != nil {
+		s.connectedDeviceID = in.Register.DeviceID
+		capabilityReady = true
+	}
+	if in.Hello != nil && s.connectedDeviceID == "" {
+		s.connectedDeviceID = in.Hello.DeviceID
+	}
+	if in.CapabilitySnap != nil {
+		if s.connectedDeviceID == "" {
+			s.connectedDeviceID = in.CapabilitySnap.DeviceID
+		}
+		capabilityReady = true
+	}
+	if in.Heartbeat != nil && s.connectedDeviceID == "" {
+		s.connectedDeviceID = in.Heartbeat.DeviceID
+	}
+	s.registerRelay(send)
+	return capabilityReady
+}
+
+func (s *controlSessionState) registerRelay(send func(ServerMessage) error) {
+	if s.connectedDeviceID == "" || s.connectedDeviceID == s.registeredRelayDeviceID {
+		return
+	}
+	if s.registeredRelayDeviceID != "" {
+		globalSessionRelayRegistry.Unregister(s.registeredRelayDeviceID)
+	}
+	globalSessionRelayRegistry.Register(s.connectedDeviceID, send)
+	s.registeredRelayDeviceID = s.connectedDeviceID
+}
+
+func (s *Session) sendSessionMessages(out []ServerMessage, connectedDeviceID string, send func(ServerMessage) error) error {
+	for _, msg := range out {
+		targetDeviceID := connectedDeviceID
+		if relayTarget := msg.RelayToDeviceID; relayTarget != "" {
+			targetDeviceID = relayTarget
+		}
+		msg = s.handler.decorateBugReportAffordance(targetDeviceID, msg)
+		prepared, err := s.handler.prepareOutboundUI(targetDeviceID, msg)
+		if err != nil {
+			return err
+		}
+		if prepared.RelayToDeviceID != "" {
+			relayMsg := prepared
+			relayMsg.RelayToDeviceID = ""
+			if err := globalSessionRelayRegistry.Relay(prepared.RelayToDeviceID, relayMsg); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := send(prepared); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func shouldContinueSession(out []ServerMessage, handleErr error) bool {
+	return handleErr != nil && hasStructuredError(out)
+}
+
 func validateSessionMessage(connectedDeviceID string, capabilityReady bool, in ClientMessage) error {
 	if in.Register != nil {
-		if in.Register.DeviceID == "" {
-			return fmt.Errorf("register requires device id")
-		}
-		if connectedDeviceID != "" && in.Register.DeviceID != connectedDeviceID {
-			return fmt.Errorf("register device id mismatch: connected=%s requested=%s", connectedDeviceID, in.Register.DeviceID)
-		}
-		return nil
+		return validateSessionDeviceID("register", "requested", connectedDeviceID, in.Register.DeviceID)
 	}
 
 	if in.Hello != nil {
-		if in.Hello.DeviceID == "" {
-			return fmt.Errorf("hello requires device id")
-		}
-		if connectedDeviceID != "" && in.Hello.DeviceID != connectedDeviceID {
-			return fmt.Errorf("hello device id mismatch: connected=%s hello=%s", connectedDeviceID, in.Hello.DeviceID)
-		}
-		return nil
+		return validateSessionDeviceID("hello", "hello", connectedDeviceID, in.Hello.DeviceID)
 	}
 
 	if in.CapabilitySnap != nil {
-		if in.CapabilitySnap.DeviceID == "" {
-			return fmt.Errorf("capability snapshot requires device id")
-		}
-		if in.CapabilitySnap.Generation == 0 {
-			return fmt.Errorf("capability snapshot requires generation > 0")
-		}
-		if connectedDeviceID != "" && in.CapabilitySnap.DeviceID != connectedDeviceID {
-			return fmt.Errorf("capability snapshot device id mismatch: connected=%s snapshot=%s", connectedDeviceID, in.CapabilitySnap.DeviceID)
-		}
-		return nil
+		return validateSessionGenerationMessage("capability snapshot", "snapshot", connectedDeviceID, in.CapabilitySnap.DeviceID, in.CapabilitySnap.Generation)
 	}
 
 	if in.CapabilityDelta != nil {
-		if connectedDeviceID == "" {
-			return fmt.Errorf("hello or register required before capability delta")
-		}
-		if !capabilityReady {
-			return fmt.Errorf("capability snapshot or register required before capability delta")
-		}
-		if in.CapabilityDelta.DeviceID == "" {
-			return fmt.Errorf("capability delta requires device id")
-		}
-		if in.CapabilityDelta.Generation == 0 {
-			return fmt.Errorf("capability delta requires generation > 0")
-		}
-		if in.CapabilityDelta.DeviceID != connectedDeviceID {
-			return fmt.Errorf("capability delta device id mismatch: connected=%s delta=%s", connectedDeviceID, in.CapabilityDelta.DeviceID)
-		}
-		return nil
+		return validateCapabilityDelta(connectedDeviceID, capabilityReady, in.CapabilityDelta)
 	}
 
-	if connectedDeviceID == "" {
-		return fmt.Errorf("hello or register required before other messages")
-	}
-	if !capabilityReady {
-		return fmt.Errorf("capability snapshot or register required before other messages")
-	}
+	return validateEstablishedSessionMessage(connectedDeviceID, capabilityReady, in)
+}
 
+func validateSessionDeviceID(kind, messageLabel, connectedDeviceID, messageDeviceID string) error {
+	if messageDeviceID == "" {
+		return fmt.Errorf("%s requires device id", kind)
+	}
+	if connectedDeviceID != "" && messageDeviceID != connectedDeviceID {
+		return fmt.Errorf("%s device id mismatch: connected=%s %s=%s", kind, connectedDeviceID, messageLabel, messageDeviceID)
+	}
+	return nil
+}
+
+func validateSessionGenerationMessage(kind, messageLabel, connectedDeviceID, messageDeviceID string, generation uint64) error {
+	if err := validateSessionDeviceID(kind, messageLabel, connectedDeviceID, messageDeviceID); err != nil {
+		return err
+	}
+	if generation == 0 {
+		return fmt.Errorf("%s requires generation > 0", kind)
+	}
+	return nil
+}
+
+func validateCapabilityDelta(connectedDeviceID string, capabilityReady bool, delta *CapabilityDeltaRequest) error {
+	if err := validateSessionReady(connectedDeviceID, capabilityReady, "capability delta"); err != nil {
+		return err
+	}
+	return validateSessionGenerationMessage("capability delta", "delta", connectedDeviceID, delta.DeviceID, delta.Generation)
+}
+
+func validateEstablishedSessionMessage(connectedDeviceID string, capabilityReady bool, in ClientMessage) error {
+	if err := validateSessionReady(connectedDeviceID, capabilityReady, "other messages"); err != nil {
+		return err
+	}
 	msgDeviceID, hasDeviceID := extractMessageDeviceID(in)
 	if hasDeviceID && msgDeviceID != "" && msgDeviceID != connectedDeviceID {
 		return fmt.Errorf("message device id mismatch: connected=%s message=%s", connectedDeviceID, msgDeviceID)
+	}
+	return nil
+}
+
+func validateSessionReady(connectedDeviceID string, capabilityReady bool, messageKind string) error {
+	if connectedDeviceID == "" {
+		return fmt.Errorf("hello or register required before %s", messageKind)
+	}
+	if !capabilityReady {
+		return fmt.Errorf("capability snapshot or register required before %s", messageKind)
 	}
 	return nil
 }
