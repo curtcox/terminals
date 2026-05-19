@@ -261,83 +261,15 @@ func (a *Adapter) CallToolStream(ctx context.Context, req CallToolRequest, onChu
 		req.Arguments = map[string]any{}
 	}
 
-	if tool.Name == ToolReplComplete {
-		prefix := anyString(req.Arguments["prefix"])
-		limit := anyInt(req.Arguments["limit"])
-		return CallToolResponse{
-			Status: "ok",
-			Metadata: map[string]any{
-				"matches": repl.Complete(prefix, limit),
-			},
-		}, nil
-	}
-	if tool.Name == ToolReplDescribe {
-		name := strings.TrimSpace(anyString(req.Arguments["command"]))
-		if name == "" {
-			return CallToolResponse{
-				Status: "ok",
-				Metadata: map[string]any{
-					"commands": repl.CommandSpecs(),
-				},
-			}, nil
-		}
-		spec, found := repl.DescribeCommand(name)
-		if !found {
-			return CallToolResponse{Status: "error", ErrorCode: "unknown_command", ErrorMessage: "unknown command"}, nil
-		}
-		return CallToolResponse{Status: "ok", Metadata: map[string]any{"command": spec}}, nil
+	if resp, handled, err := a.callBuiltinTool(tool, req); handled {
+		return resp, err
 	}
 
 	rendered, canonicalArgs, err := renderCommand(tool, req.Arguments)
 	if err != nil {
 		return CallToolResponse{Status: "error", ErrorCode: "invalid_arguments", ErrorMessage: err.Error()}, nil
 	}
-	if tool.Classification.RequiresApproval() {
-		gate, err := a.authorizeMutation(ctx, sess, tool, rendered, canonicalArgs, strings.TrimSpace(req.MetaConfirmationID))
-		if err != nil {
-			return CallToolResponse{}, err
-		}
-		if gate.Status != "approved" {
-			return gate, nil
-		}
-	}
-
-	if tool.Classification == repl.CommandClassificationOperational {
-		release, budgetDenied := a.acquireOperationalSlot(req.SessionID, rendered, tool.Classification)
-		if budgetDenied != nil {
-			return *budgetDenied, nil
-		}
-		defer release()
-		ctxWithTTL, cancel := context.WithTimeout(ctx, a.cfg.OperationalTTL)
-		defer cancel()
-		result, err := repl.ExecuteCommandStream(ctxWithTTL, rendered, repl.ExecuteOptions{
-			AdminBaseURL: a.cfg.AdminBaseURL,
-			SessionID:    req.SessionID,
-			DocsMode:     repl.DocsRenderModeMarkdown,
-		}, onChunk)
-		if errors.Is(err, context.DeadlineExceeded) {
-			return CallToolResponse{
-				Status:          "error",
-				ErrorCode:       "operational_ttl_exceeded",
-				ErrorMessage:    "operational command exceeded session stream_ttl budget",
-				RenderedCommand: rendered,
-				Classification:  tool.Classification,
-			}, nil
-		}
-		if err != nil {
-			return CallToolResponse{Status: "error", ErrorCode: "command_failed", ErrorMessage: err.Error(), RenderedCommand: rendered, Classification: tool.Classification}, nil
-		}
-		return CallToolResponse{Status: "ok", Output: result.Output, RenderedCommand: rendered, Classification: tool.Classification}, nil
-	}
-	result, err := repl.ExecuteCommandStream(ctx, rendered, repl.ExecuteOptions{
-		AdminBaseURL: a.cfg.AdminBaseURL,
-		SessionID:    req.SessionID,
-		DocsMode:     repl.DocsRenderModeMarkdown,
-	}, onChunk)
-	if err != nil {
-		return CallToolResponse{Status: "error", ErrorCode: "command_failed", ErrorMessage: err.Error(), RenderedCommand: rendered, Classification: tool.Classification}, nil
-	}
-	return CallToolResponse{Status: "ok", Output: result.Output, RenderedCommand: rendered, Classification: tool.Classification}, nil
+	return a.executeRenderedTool(ctx, req, tool, sess, rendered, canonicalArgs, onChunk)
 }
 
 func (a *Adapter) acquireOperationalSlot(sessionID, rendered string, classification repl.CommandClassification) (func(), *CallToolResponse) {

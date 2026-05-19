@@ -87,7 +87,7 @@ func parseRuntimeMigrationStoreFixturePlan(scriptSource []byte) (*runtimeMigrati
 			return nil, err
 		}
 		switch result.action {
-		case migrationStoreLineSkip, migrationStoreLineIgnorable:
+		case migrationStoreLineSkip, migrationStoreLineIgnorable, migrationStoreLineUnsupported:
 			continue
 		case migrationStoreLinePrefix:
 			if prefix != "" && prefix != result.prefix {

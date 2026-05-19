@@ -216,89 +216,16 @@ func (s *VoiceAssistantScenario) Start(ctx context.Context, env *Environment) er
 	s.mu.Unlock()
 
 	activationID := s.ensureActivationID()
-	if routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok {
-		if claims := routeIO.Claims(); claims != nil {
-			analyzeResource := resolveAudioInputAnalyzeResource(env, strings.TrimSpace(s.trigger.SourceID))
-			speakerResource := resolveAudioOutResource(env, strings.TrimSpace(s.trigger.SourceID))
-			overlayResource := resolveDisplayOverlayResource(env, strings.TrimSpace(s.trigger.SourceID))
-			_, err := claims.Request(ctx, []iorouter.Claim{
-				{
-					ActivationID: activationID,
-					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
-					Resource:     analyzeResource,
-					Mode:         iorouter.ClaimShared,
-					Priority:     int(PriorityNormal),
-				},
-				{
-					ActivationID: activationID,
-					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
-					Resource:     speakerResource,
-					Mode:         iorouter.ClaimExclusive,
-					Priority:     int(PriorityNormal),
-				},
-				{
-					ActivationID: activationID,
-					DeviceID:     strings.TrimSpace(s.trigger.SourceID),
-					Resource:     overlayResource,
-					Mode:         iorouter.ClaimShared,
-					Priority:     int(PriorityNormal),
-				},
-			})
-			if err != nil && !errors.Is(err, iorouter.ErrClaimConflict) {
-				return err
-			}
-		}
+	deviceID := strings.TrimSpace(s.trigger.SourceID)
+	if err := s.requestVoiceAssistantClaims(ctx, env, activationID, deviceID); err != nil {
+		return err
 	}
-	if routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner }); ok {
-		planner := routeIO.MediaPlanner()
-		if planner != nil {
-			handle, err := planner.Apply(ctx, iorouter.MediaPlan{
-				Nodes: []iorouter.MediaNode{
-					{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": strings.TrimSpace(s.trigger.SourceID)}},
-					{ID: "fork", Kind: iorouter.NodeFork},
-					{ID: "stt", Kind: iorouter.NodeSinkSTT, Args: map[string]string{"device_id": "server"}},
-					{ID: "rec", Kind: iorouter.NodeRecorder, Args: map[string]string{"device_id": "server"}},
-					{ID: "tts", Kind: iorouter.NodeSourceTTS, Args: map[string]string{"device_id": "server"}},
-					{ID: "speaker", Kind: iorouter.NodeSinkSpeaker, Args: map[string]string{"device_id": strings.TrimSpace(s.trigger.SourceID)}},
-				},
-				Edges: []iorouter.MediaEdge{
-					{From: "mic", To: "fork"},
-					{From: "fork", To: "stt"},
-					{From: "fork", To: "rec"},
-					{From: "tts", To: "speaker"},
-				},
-			})
-			if err != nil {
-				return err
-			}
-			s.mu.Lock()
-			s.planHandle = handle
-			s.mu.Unlock()
-		}
+	if err := s.applyVoiceAssistantMediaPlan(ctx, env, deviceID); err != nil {
+		return err
 	}
-
-	query := strings.TrimSpace(s.trigger.Arguments["query"])
-	if query == "" {
-		query = "hello"
-	}
-	response := "Voice assistant active"
-	switch {
-	case env.LLM != nil:
-		out, err := env.LLM.Query(ctx, []LLMMessage{{Role: "user", Content: query}}, LLMOptions{})
-		if err != nil {
-			return err
-		}
-		if out != nil && strings.TrimSpace(out.Text) != "" {
-			response = out.Text
-		}
-	case env.AI != nil:
-		out, err := env.AI.Query(ctx, query)
-		if err != nil {
-			return err
-		}
-		if strings.TrimSpace(out) != "" {
-			response = out
-		}
+	response, err := voiceAssistantQueryResponse(ctx, env, voiceAssistantQueryText(s.trigger))
+	if err != nil {
+		return err
 	}
 	return notifySource(ctx, env, s.trigger.SourceID, response)
 }

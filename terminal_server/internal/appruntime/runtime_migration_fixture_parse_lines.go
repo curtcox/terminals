@@ -8,17 +8,17 @@ import (
 )
 
 var migrationStoreBoilerplateLines = map[string]struct{}{
-	"cursor = None":                      {},
-	"count = 0":                          {},
-	"while True:":                        {},
-	"if len(page) == 0: break":           {},
-	"for key in page:":                   {},
-	"count += 1":                         {},
-	"cursor = page[-1]":                  {},
-	"return label.strip().lower()":       {},
-	"if len(page) == 0:":                 {},
-	"break":                              {},
-	"continue":                           {},
+	"cursor = None":                {},
+	"count = 0":                    {},
+	"while True:":                  {},
+	"if len(page) == 0: break":     {},
+	"for key in page:":             {},
+	"count += 1":                   {},
+	"cursor = page[-1]":            {},
+	"return label.strip().lower()": {},
+	"if len(page) == 0:":           {},
+	"break":                        {},
+	"continue":                     {},
 }
 
 func migrationFixtureSkippableLine(line string) bool {

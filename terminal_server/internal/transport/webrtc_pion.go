@@ -60,56 +60,8 @@ func (m *PionWebRTCSignalEngine) HandleSignal(_ context.Context, req WebRTCSigna
 		return nil, err
 	}
 
-	switch signalType {
-	case "offer":
-		sdp, err := parseSDPPayload(req.Signal.Payload)
-		if err != nil {
-			return nil, err
-		}
-		if err := session.pc.SetRemoteDescription(webrtc.SessionDescription{Type: webrtc.SDPTypeOffer, SDP: sdp}); err != nil {
-			return nil, fmt.Errorf("set remote offer: %w", err)
-		}
-		answer, err := session.pc.CreateAnswer(nil)
-		if err != nil {
-			return nil, fmt.Errorf("create answer: %w", err)
-		}
-		if err := session.pc.SetLocalDescription(answer); err != nil {
-			return nil, fmt.Errorf("set local answer: %w", err)
-		}
-		local := session.pc.LocalDescription()
-		if local == nil || strings.TrimSpace(local.SDP) == "" {
-			return nil, fmt.Errorf("local answer unavailable")
-		}
-		payload, err := encodeSDPPayload(local.SDP)
-		if err != nil {
-			return nil, err
-		}
-		m.enqueue(session, WebRTCSignalEngineResponse{
-			TargetDeviceID: deviceID,
-			Signal: WebRTCSignalResponse{
-				StreamID:   streamID,
-				SignalType: "answer",
-				Payload:    payload,
-			},
-		})
-	case "answer":
-		sdp, err := parseSDPPayload(req.Signal.Payload)
-		if err != nil {
-			return nil, err
-		}
-		if err := session.pc.SetRemoteDescription(webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: sdp}); err != nil {
-			return nil, fmt.Errorf("set remote answer: %w", err)
-		}
-	case "candidate":
-		candidate, err := parseCandidatePayload(req.Signal.Payload)
-		if err != nil {
-			return nil, err
-		}
-		if err := session.pc.AddICECandidate(candidate); err != nil {
-			return nil, fmt.Errorf("add ice candidate: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("unsupported webrtc signal type: %s", signalType)
+	if err := m.handleSignalType(session, streamID, deviceID, signalType, req.Signal.Payload); err != nil {
+		return nil, err
 	}
 
 	return m.drainPending(session), nil

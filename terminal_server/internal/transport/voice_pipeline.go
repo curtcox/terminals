@@ -6,11 +6,9 @@ import (
 	"io"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/curtcox/terminals/terminal_server/internal/recording"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
-	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
 
 // VoicePipeline owns per-device voice audio buffering and the live audio
@@ -63,94 +61,7 @@ func (p *VoicePipeline) HandleAudio(ctx context.Context, va *VoiceAudioRequest) 
 		return nil, nil
 	}
 
-	if h.runtime == nil || h.runtime.Env == nil {
-		return nil, errors.New("scenario runtime not configured")
-	}
-	if h.runtime.Env.STT == nil {
-		return nil, errors.New("speech-to-text backend not configured")
-	}
-
-	source := &voiceAudioReader{buf: buf}
-	transcripts, err := h.runtime.Env.STT.Transcribe(ctx, source)
-	if err != nil {
-		return nil, err
-	}
-	spoken, spokenConfidence := finalSpokenText(transcripts)
-	if spoken == "" {
-		return nil, ErrMissingCommandText
-	}
-	if h.runtime.Env.WakeWord != nil {
-		detection, err := h.runtime.Env.WakeWord.Detect(ctx, spoken)
-		if err != nil {
-			return nil, err
-		}
-		if !detection.Detected {
-			return nil, nil
-		}
-		if normalized := strings.TrimSpace(detection.Command); normalized != "" {
-			spoken = normalized
-		}
-	}
-	if h.wakeWordDedupe != nil {
-		heardAt := time.Now().UTC()
-		if h.control != nil {
-			heardAt = h.control.now().UTC()
-		}
-		if !h.wakeWordDedupe.Allow(wakeWordCandidate{
-			DeviceID:   deviceID,
-			Spoken:     spoken,
-			HeardAt:    heardAt,
-			Confidence: spokenConfidence,
-		}) {
-			return nil, nil
-		}
-	}
-
-	beforeCount := h.broadcastEventCount()
-	scenarioName, err := h.runtime.HandleVoiceText(ctx, deviceID, spoken, h.control.now().UTC())
-	if err != nil {
-		return nil, err
-	}
-
-	out := []ServerMessage{
-		{ScenarioStart: scenarioName, Notification: "Scenario started: " + scenarioName},
-	}
-
-	responseText := h.latestBroadcastForDevice(deviceID, beforeCount)
-	if responseText == "" {
-		return out, nil
-	}
-	responseView := ui.VoiceAssistantResponsePatch(responseText)
-	out = append(out, ServerMessage{
-		UpdateUI: &UIUpdate{
-			ComponentID: ui.GlobalOverlayComponentID,
-			Node:        responseView,
-		},
-	})
-	if h.runtime.Env.TTS == nil {
-		return out, nil
-	}
-
-	playback, err := h.runtime.Env.TTS.Synthesize(ctx, responseText, scenario.TTSOptions{
-		Voice:  "default",
-		Format: "pcm16",
-	})
-	if err != nil {
-		return nil, err
-	}
-	audio, err := readAudioPlayback(playback)
-	if err != nil {
-		return nil, err
-	}
-
-	out = append(out, ServerMessage{
-		PlayAudio: &PlayAudioResponse{
-			DeviceID: deviceID,
-			Audio:    audio,
-			Format:   "pcm16",
-		},
-	})
-	return out, nil
+	return p.finalizeVoiceAudio(ctx, h, deviceID, buf)
 }
 
 func (p *VoicePipeline) captureChunk(deviceID string, chunk []byte, final bool) ([]byte, DeviceAudioPublisher) {

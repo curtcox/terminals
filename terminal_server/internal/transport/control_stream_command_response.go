@@ -147,136 +147,16 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 		responses = append(responses, playback)
 		return responses
 	}
-	if commandResult.ScenarioStop == "terminal" {
-		h.terminateTerminalForDevice(cmd.DeviceID)
-		responses = append(responses, ServerMessage{
-			TransitionUI: &UITransition{
-				Transition: "terminal_exit",
-				DurationMS: 220,
-			},
-		})
-		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "terminal"); len(restored) > 0 {
-			responses = append(responses, restored...)
-		}
+	if extra, handled := h.commandResponsesForScenarioStop(ctx, cmd, commandResult); handled {
+		responses = append(responses, extra...)
 		return responses
 	}
-	if commandResult.ScenarioStop == "photo_frame" {
-		for _, deviceID := range h.commandTargetDeviceIDs(cmd) {
-			h.clearPhotoFrameState(deviceID)
-		}
-		responses = append(responses, ServerMessage{
-			TransitionUI: &UITransition{
-				Transition: "photo_frame_exit",
-				DurationMS: 220,
-			},
-		})
-		for _, targetDeviceID := range h.commandTargetDeviceIDs(cmd) {
-			targetDeviceID = strings.TrimSpace(targetDeviceID)
-			if targetDeviceID == "" || targetDeviceID == strings.TrimSpace(cmd.DeviceID) {
-				continue
-			}
-			responses = append(responses, ServerMessage{
-				TransitionUI: &UITransition{
-					Transition: "photo_frame_exit",
-					DurationMS: 220,
-				},
-				RelayToDeviceID: targetDeviceID,
-			})
-		}
-		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "photo_frame"); len(restored) > 0 {
-			responses = append(responses, restored...)
-		}
-		return responses
-	}
-	if commandResult.ScenarioStop == "internal_video_call" {
-		responses = append(responses, ServerMessage{
-			TransitionUI: &UITransition{
-				Transition: "internal_video_call_exit",
-				DurationMS: 220,
-			},
-		})
-		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "internal_video_call"); len(restored) > 0 {
-			responses = append(responses, restored...)
-		}
-		return responses
-	}
-	if commandResult.ScenarioStop == "multi_window" {
-		if restoredUI, restoredTransition, ok := h.restoreMultiWindowResume(cmd.DeviceID); ok {
-			if restoredUI != nil {
-				responses = append(responses, ServerMessage{SetUI: restoredUI})
-			}
-			if restoredTransition != nil {
-				responses = append(responses, ServerMessage{TransitionUI: restoredTransition})
-			}
-		}
-		return responses
-	}
-	if commandResult.ScenarioStart == "chat" {
-		chatUI := h.chatEntryUI(cmd.DeviceID)
-		responses = append(responses, ServerMessage{SetUI: &chatUI})
-		broadcast := h.chatBroadcastMessagesUpdate(cmd.DeviceID)
-		// skip index 0 (self) since we already pushed the full SetUI
-		if len(broadcast) > 1 {
-			responses = append(responses, broadcast[1:]...)
-		}
-		return responses
-	}
-	if commandResult.ScenarioStop == "chat" {
-		if restored := h.resumedScenarioUI(ctx, cmd.DeviceID, "chat"); len(restored) > 0 {
-			responses = append(responses, restored...)
-		}
-		broadcast := h.chatBroadcastMessagesUpdate(cmd.DeviceID)
-		if len(broadcast) > 1 {
-			responses = append(responses, broadcast[1:]...)
-		}
+	if extra, handled := h.commandResponsesForScenarioStart(ctx, cmd, commandResult); handled {
+		responses = append(responses, extra...)
 		return responses
 	}
 	if commandResult.ScenarioStart == "multi_window" {
-		peerIDs, focusedPeerID := h.multiWindowPeersAndFocus(cmd.DeviceID)
-		multiWindowUI := ui.MultiWindowView(cmd.DeviceID, peerIDs, focusedPeerID)
-		responses = append(responses, ServerMessage{SetUI: &multiWindowUI})
-	}
-	if commandResult.ScenarioStart == "photo_frame" {
-		photoFrameUI := h.photoFrameSetUI(cmd.DeviceID, true)
-		responses = append(responses, ServerMessage{SetUI: &photoFrameUI})
-		responses = append(responses, ServerMessage{
-			TransitionUI: &UITransition{
-				Transition: "photo_frame_enter",
-				DurationMS: 220,
-			},
-		})
-		for _, targetDeviceID := range h.commandTargetDeviceIDs(cmd) {
-			targetDeviceID = strings.TrimSpace(targetDeviceID)
-			if targetDeviceID == "" || targetDeviceID == strings.TrimSpace(cmd.DeviceID) {
-				continue
-			}
-			peerUI := h.photoFrameSetUI(targetDeviceID, true)
-			responses = append(responses, ServerMessage{
-				SetUI:           &peerUI,
-				RelayToDeviceID: targetDeviceID,
-			})
-			responses = append(responses, ServerMessage{
-				TransitionUI: &UITransition{
-					Transition: "photo_frame_enter",
-					DurationMS: 220,
-				},
-				RelayToDeviceID: targetDeviceID,
-			})
-		}
-		return responses
-	}
-	if commandResult.ScenarioStart == "internal_video_call" {
-		if peerID, ok := h.internalVideoCallPeer(cmd.DeviceID); ok {
-			internalVideoCallUI := ui.InternalVideoCallView(cmd.DeviceID, peerID)
-			responses = append(responses, ServerMessage{SetUI: &internalVideoCallUI})
-		}
-		responses = append(responses, ServerMessage{
-			TransitionUI: &UITransition{
-				Transition: "internal_video_call_enter",
-				DurationMS: 220,
-			},
-		})
-		return responses
+		responses = h.appendMultiWindowStartUI(cmd, responses)
 	}
 	if cmd.Action != "" && cmd.Action != CommandActionStart {
 		if commandResult.ScenarioStop != "" {
@@ -289,22 +169,7 @@ func (h *StreamHandler) commandResponses(ctx context.Context, cmd *CommandReques
 	if commandResult.ScenarioStart != "terminal" {
 		return responses
 	}
-
-	output, err := h.ensureTerminalSession(ctx, cmd.DeviceID)
-	if err != nil {
-		responses = append(responses, ServerMessage{
-			Notification: "Terminal session failed: " + err.Error(),
-		})
-		return responses
-	}
-	terminalUI := ui.TerminalViewWithOutput(cmd.DeviceID, output)
-	responses = append(responses, ServerMessage{SetUI: &terminalUI})
-	responses = append(responses, ServerMessage{
-		TransitionUI: &UITransition{
-			Transition: "terminal_enter",
-			DurationMS: 220,
-		},
-	})
+	responses = append(responses, h.commandResponsesTerminalStart(ctx, cmd)...)
 	return responses
 }
 
@@ -369,88 +234,14 @@ func (h *StreamHandler) routeUpdatesForCommand(
 	if action != CommandActionStart && action != CommandActionStop {
 		return nil
 	}
-	beforeSet := map[string]struct{}{}
-	for _, route := range before {
-		beforeSet[routeStreamID(route)] = struct{}{}
+	switch action {
+	case CommandActionStart:
+		return h.routeStartUpdatesForCommand(cmd, before, after)
+	case CommandActionStop:
+		return h.routeStopUpdatesForCommand(cmd, before, after)
+	default:
+		return nil
 	}
-	afterSet := map[string]iorouter.Route{}
-	for _, route := range after {
-		afterSet[routeStreamID(route)] = route
-	}
-	out := make([]ServerMessage, 0, len(after))
-	if action == CommandActionStart {
-		for _, route := range after {
-			routeID := routeStreamID(route)
-			if _, exists := beforeSet[routeID]; exists {
-				continue
-			}
-			routing := routeDeltaStreamRouting()
-			startMsg := ServerMessage{
-				StartStream: &StartStreamResponse{
-					StreamID:       routeID,
-					Kind:           route.StreamKind,
-					SourceDeviceID: route.SourceID,
-					TargetDeviceID: route.TargetID,
-					Metadata: map[string]string{
-						"origin":      "route_delta",
-						"webrtc_mode": "server_managed",
-					},
-					Routing: routing,
-				},
-			}
-			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, startMsg)
-			h.registerMediaStream(StartStreamResponse{
-				StreamID:       routeID,
-				Kind:           route.StreamKind,
-				SourceDeviceID: route.SourceID,
-				TargetDeviceID: route.TargetID,
-				Metadata: map[string]string{
-					"origin":      "route_delta",
-					"webrtc_mode": "server_managed",
-				},
-				Routing: routing,
-			})
-			routeMsg := ServerMessage{
-				RouteStream: &RouteStreamResponse{
-					StreamID:       routeID,
-					SourceDeviceID: route.SourceID,
-					TargetDeviceID: route.TargetID,
-					Kind:           route.StreamKind,
-					Routing:        routing,
-				},
-			}
-			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, routeMsg)
-		}
-		for _, route := range before {
-			routeID := routeStreamID(route)
-			if _, exists := afterSet[routeID]; exists {
-				continue
-			}
-			stopMsg := ServerMessage{
-				StopStream: &StopStreamResponse{
-					StreamID: routeID,
-				},
-			}
-			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, stopMsg)
-			h.unregisterMediaStream(routeID)
-		}
-	}
-	if action == CommandActionStop {
-		for _, route := range before {
-			routeID := routeStreamID(route)
-			if _, exists := afterSet[routeID]; exists {
-				continue
-			}
-			stopMsg := ServerMessage{
-				StopStream: &StopStreamResponse{
-					StreamID: routeID,
-				},
-			}
-			out = h.appendRouteMessageForPeers(out, cmd.DeviceID, route.SourceID, route.TargetID, stopMsg)
-			h.unregisterMediaStream(routeID)
-		}
-	}
-	return out
 }
 
 func (h *StreamHandler) resumedScenarioUI(ctx context.Context, deviceID, stoppedScenario string) []ServerMessage {
@@ -604,42 +395,8 @@ func (h *StreamHandler) commandTargetDeviceIDs(cmd *CommandRequest) []string {
 	if cmd == nil {
 		return nil
 	}
-
-	args := cmd.Arguments
-	if len(args) > 0 {
-		if rawList := strings.TrimSpace(args["device_ids"]); rawList != "" {
-			parts := strings.Split(rawList, ",")
-			out := make([]string, 0, len(parts))
-			seen := map[string]struct{}{}
-			for _, part := range parts {
-				deviceID := strings.TrimSpace(part)
-				if deviceID == "" {
-					continue
-				}
-				if _, exists := seen[deviceID]; exists {
-					continue
-				}
-				seen[deviceID] = struct{}{}
-				out = append(out, deviceID)
-			}
-			if len(out) > 0 {
-				return out
-			}
-		}
-		if one := strings.TrimSpace(args["device_id"]); one != "" {
-			return []string{one}
-		}
+	if targets := commandTargetDeviceIDsFromArgs(cmd.Arguments); len(targets) > 0 {
+		return targets
 	}
-
-	if h.runtime != nil && h.runtime.Env != nil && h.runtime.Env.Devices != nil {
-		all := h.runtime.Env.Devices.ListDeviceIDs()
-		if len(all) > 0 {
-			return all
-		}
-	}
-
-	if source := strings.TrimSpace(cmd.DeviceID); source != "" {
-		return []string{source}
-	}
-	return nil
+	return h.commandTargetDeviceIDsFallback(cmd)
 }

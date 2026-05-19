@@ -41,75 +41,6 @@ func extractLatestDescriptor(msgs []transport.ProtoServerEnvelope) *ui.Descripto
 	return nil
 }
 
-// nodeToDescriptor converts a proto uiv1.Node tree to a ui.Descriptor tree.
-func nodeToDescriptor(n *uiv1.Node) ui.Descriptor {
-	if n == nil {
-		return ui.Descriptor{}
-	}
-	name := nodeWidgetName(n)
-	props := make(map[string]string, len(n.GetProps())+4)
-	for k, v := range n.GetProps() {
-		props[k] = v
-	}
-	switch name {
-	case "text":
-		if t := n.GetText(); t != nil {
-			if v := t.GetValue(); v != "" {
-				props["value"] = v
-			}
-			if c := t.GetColor(); c != "" {
-				props["color"] = c
-			}
-			if s := t.GetStyle(); s != "" {
-				props["style"] = s
-			}
-		}
-	case "button":
-		if b := n.GetButton(); b != nil {
-			if l := b.GetLabel(); l != "" {
-				props["label"] = l
-			}
-			if a := b.GetAction(); a != "" {
-				props["action"] = a
-			}
-		}
-	case "image":
-		if img := n.GetImage(); img != nil {
-			if u := img.GetUrl(); u != "" {
-				props["url"] = u
-			}
-		}
-	case "video_surface":
-		if v := n.GetVideoSurface(); v != nil {
-			if id := v.GetTrackId(); id != "" {
-				props["track_id"] = id
-			}
-		}
-	case "audio_visualizer":
-		if a := n.GetAudioVisualizer(); a != nil {
-			if id := a.GetStreamId(); id != "" {
-				props["stream_id"] = id
-			}
-		}
-	case "grid":
-		if g := n.GetGrid(); g != nil {
-			if c := g.GetColumns(); c > 0 {
-				props["columns"] = strconv.Itoa(int(c))
-			}
-		}
-	}
-	children := make([]ui.Descriptor, 0, len(n.GetChildren()))
-	for _, child := range n.GetChildren() {
-		children = append(children, nodeToDescriptor(child))
-	}
-	return ui.Descriptor{
-		ID:       n.GetId(),
-		Type:     name,
-		Props:    props,
-		Children: children,
-	}
-}
-
 const descPad = 8
 
 // renderDescriptor paints a ui.Descriptor tree into img within the given bounds,
@@ -275,76 +206,6 @@ func renderMediaPlaceholder(img *image.RGBA, d ui.Descriptor, bounds image.Recta
 	drawText(img, bounds.Min.X+4, bounds.Min.Y+4, label, color.RGBA{R: 100, G: 100, B: 100, A: 255})
 }
 
-func estimateDescHeight(d ui.Descriptor, width int) int {
-	switch d.Type {
-	case "text":
-		if width <= 0 {
-			return 20
-		}
-		maxChars := width / 12
-		if maxChars < 1 {
-			maxChars = 1
-		}
-		lines := wrapText(d.Props["value"], maxChars)
-		if len(lines) == 0 {
-			lines = []string{""}
-		}
-		return len(lines)*(descTextLineHeight(d.Props["style"])+2) + 4
-	case "button":
-		return 32
-	case "image":
-		return 80
-	case "video_surface", "audio_visualizer":
-		return 120
-	case "expand":
-		return -1
-	case "overlay":
-		maxH := 0
-		for _, child := range d.Children {
-			if h := estimateDescHeight(child, width); h > maxH {
-				maxH = h
-			}
-		}
-		return maxH
-	case "row":
-		childW := width / max(1, len(d.Children))
-		maxH := 0
-		for _, child := range d.Children {
-			if h := estimateDescHeight(child, childW); h > maxH {
-				maxH = h
-			}
-		}
-		return maxH + 2*descPad
-	case "grid":
-		cols, _ := strconv.Atoi(d.Props["columns"])
-		if cols < 1 {
-			cols = 1
-		}
-		cellW := width / cols
-		maxCellH := 0
-		for _, child := range d.Children {
-			if h := estimateDescHeight(child, cellW); h > maxCellH {
-				maxCellH = h
-			}
-		}
-		rows := (len(d.Children) + cols - 1) / cols
-		return rows*maxCellH + 2*descPad
-	default:
-		total := 2 * descPad
-		for _, child := range d.Children {
-			h := estimateDescHeight(child, width-2*descPad)
-			if h < 0 {
-				h = 40
-			}
-			total += h + 8
-		}
-		if total == 2*descPad {
-			return 20
-		}
-		return total
-	}
-}
-
 func descTextLineHeight(style string) int {
 	switch style {
 	case "headline", "title":
@@ -400,53 +261,6 @@ func summarizeLatestUI(messages []transport.ProtoServerEnvelope) string {
 		}
 	}
 	return "No server-driven UI message was observed before this assertion."
-}
-
-func summarizeNode(node *uiv1.Node) string {
-	if node == nil {
-		return "(empty)"
-	}
-	parts := []string{nodeWidgetName(node)}
-	if node.GetId() != "" {
-		parts = append(parts, "#"+node.GetId())
-	}
-	if text := node.GetText(); text != nil && text.GetValue() != "" {
-		parts = append(parts, quoteSummary(text.GetValue()))
-	}
-	if button := node.GetButton(); button != nil && button.GetLabel() != "" {
-		parts = append(parts, "button "+quoteSummary(button.GetLabel()))
-	}
-	props := node.GetProps()
-	if len(props) > 0 {
-		keys := make([]string, 0, len(props))
-		for key := range props {
-			if key == "id" || key == "draw_ops_json" {
-				continue
-			}
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			if props[key] != "" {
-				parts = append(parts, key+"="+quoteSummary(props[key]))
-			}
-		}
-	}
-	children := node.GetChildren()
-	if len(children) > 0 {
-		childSummaries := make([]string, 0, min(len(children), 4))
-		for _, child := range children {
-			if len(childSummaries) == 4 {
-				break
-			}
-			childSummaries = append(childSummaries, summarizeNode(child))
-		}
-		if len(children) > 4 {
-			childSummaries = append(childSummaries, fmt.Sprintf("%d more", len(children)-4))
-		}
-		parts = append(parts, "children=["+strings.Join(childSummaries, "; ")+"]")
-	}
-	return strings.Join(parts, " ")
 }
 
 func nodeWidgetName(node *uiv1.Node) string {

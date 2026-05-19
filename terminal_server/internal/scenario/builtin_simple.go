@@ -141,37 +141,11 @@ func (s *MultiWindowScenario) Start(ctx context.Context, env *Environment) error
 	if env.IO != nil && env.Devices != nil && strings.TrimSpace(s.trigger.SourceID) != "" {
 		source := strings.TrimSpace(s.trigger.SourceID)
 		peers := peerTargetDeviceIDs(env, source, s.trigger.Arguments)
-		for _, peer := range peers {
-			if err := env.IO.Connect(peer, source, "video"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
-				return err
-			}
-		}
-		if err := clearMultiWindowAudioRoutes(env, source); err != nil {
+		if err := connectMultiWindowVideoRoutes(env, source, peers); err != nil {
 			return err
 		}
-		focusedPeer := strings.TrimSpace(s.trigger.Arguments["audio_focus_device_id"])
-		if focusedPeer != "" {
-			focusMatched := false
-			for _, peer := range peers {
-				if peer != focusedPeer {
-					continue
-				}
-				if err := env.IO.Connect(peer, source, "audio"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
-					return err
-				}
-				focusMatched = true
-				break
-			}
-			if !focusMatched {
-				focusedPeer = ""
-			}
-		}
-		if focusedPeer == "" {
-			for _, peer := range peers {
-				if err := env.IO.Connect(peer, source, "audio_mix"); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
-					return err
-				}
-			}
+		if err := connectMultiWindowAudioRoutes(env, source, peers, s.trigger.Arguments["audio_focus_device_id"]); err != nil {
+			return err
 		}
 	}
 	return notifySource(ctx, env, s.trigger.SourceID, "Multi-window active")

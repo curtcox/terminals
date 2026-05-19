@@ -180,65 +180,17 @@ func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out io.Writer) er
 		default:
 		}
 
-		var raw map[string]any
-		if err := dec.Decode(&raw); err != nil {
-			if errors.Is(err, io.EOF) {
-				if sessionID := conn.getSessionID(); sessionID != "" {
-					s.closeSession(context.Background(), sessionID)
-				}
+		raw, err := readStdioMessage(dec)
+		if err != nil {
+			if isStdioEOF(err) {
+				s.closeStdioSession(conn)
 				wg.Wait()
 				return nil
 			}
 			wg.Wait()
 			return err
 		}
-
-		if method := strings.TrimSpace(anyString(raw["method"])); method == "" {
-			if conn.routeResponse(raw) {
-				continue
-			}
-			continue
-		}
-		reqRaw, err := json.Marshal(raw)
-		if err != nil {
-			continue
-		}
-		var req rpcRequest
-		if err := json.Unmarshal(reqRaw, &req); err != nil {
-			continue
-		}
-		if strings.EqualFold(strings.TrimSpace(req.Method), "initialize") {
-			resp, sessionFromResponse, ok := s.handleRPCRequest(
-				ctx,
-				req,
-				rpcTransportStdio,
-				requestContext{SessionID: conn.getSessionID(), Stdio: conn},
-			)
-			if sessionFromResponse != "" {
-				conn.setSessionID(sessionFromResponse)
-			}
-			if ok {
-				_ = conn.writeRPCResponse(resp)
-			}
-			continue
-		}
-		wg.Add(1)
-		go func(req rpcRequest) {
-			defer wg.Done()
-			resp, sessionFromResponse, ok := s.handleRPCRequest(
-				ctx,
-				req,
-				rpcTransportStdio,
-				requestContext{SessionID: conn.getSessionID(), Stdio: conn},
-			)
-			if sessionFromResponse != "" {
-				conn.setSessionID(sessionFromResponse)
-			}
-			if !ok {
-				return
-			}
-			_ = conn.writeRPCResponse(resp)
-		}(req)
+		s.processStdioMessage(ctx, conn, raw, &wg)
 	}
 }
 
@@ -254,161 +206,6 @@ type requestContext struct {
 	ConfirmationID string
 	Stdio          *stdioConnection
 	HTTPStream     func(method string, params map[string]any) error
-}
-
-func (s *Server) handleRPCRequest(
-	ctx context.Context,
-	req rpcRequest,
-	transport rpcTransport,
-	rc requestContext,
-) (rpcResponse, string, bool) {
-	id := req.ID
-	method := strings.TrimSpace(req.Method)
-	if method == "" {
-		return rpcResponse{JSONRPC: "2.0", ID: id, Error: &rpcError{Code: -32600, Message: "missing method"}}, "", hasRPCID(id)
-	}
-	switch method {
-	case "notifications/cancelled":
-		params := parseAnyMap(req.Params)
-		requestID := requestIDFromParams(params)
-		if requestID != "" && strings.TrimSpace(rc.SessionID) != "" {
-			s.cancelInflight(rc.SessionID, requestID)
-		}
-		return rpcResponse{}, rc.SessionID, false
-	case "notifications/initialized":
-		return rpcResponse{}, "", false
-	case "initialize":
-		params := parseAnyMap(req.Params)
-		clientIdentity := parseClientIdentity(params)
-		caps := parseClientCapabilities(params, transport)
-		sessionID := strings.TrimSpace(rc.SessionID)
-		if sessionID == "" {
-			sessionID = strings.TrimSpace(anyString(params["session_id"]))
-		}
-		info, err := s.openSession(ctx, sessionID, clientIdentity, caps)
-		if err != nil {
-			return rpcResponse{
-				JSONRPC: "2.0",
-				ID:      id,
-				Error:   &rpcError{Code: -32603, Message: err.Error()},
-			}, "", hasRPCID(id)
-		}
-		result := map[string]any{
-			"protocolVersion": "2025-03-26",
-			"serverInfo": map[string]any{
-				"name":    "terminals-mcp",
-				"version": "1",
-			},
-			"capabilities": map[string]any{
-				"tools": map[string]any{},
-			},
-			"session_id":          info.SessionID,
-			"mutating_capability": string(info.Capability),
-			"registry_version":    s.adapter.RegistryVersion(),
-		}
-		if transport == rpcTransportStdio && rc.Stdio != nil {
-			s.mu.Lock()
-			s.stdio[info.SessionID] = rc.Stdio
-			s.mu.Unlock()
-		}
-		return rpcResponse{JSONRPC: "2.0", ID: id, Result: result}, info.SessionID, hasRPCID(id)
-	case "tools/list":
-		tools := s.adapter.Tools()
-		out := make([]map[string]any, 0, len(tools))
-		for _, tool := range tools {
-			out = append(out, map[string]any{
-				"name":        tool.Name,
-				"description": tool.Description,
-				"inputSchema": tool.ArgumentsSchema,
-			})
-		}
-		return rpcResponse{
-			JSONRPC: "2.0",
-			ID:      id,
-			Result:  map[string]any{"tools": out, "registry_version": s.adapter.RegistryVersion()},
-		}, rc.SessionID, hasRPCID(id)
-	case "tools/call":
-		sessionID := strings.TrimSpace(rc.SessionID)
-		if sessionID == "" {
-			return rpcResponse{
-				JSONRPC: "2.0",
-				ID:      id,
-				Error:   &rpcError{Code: -32001, Message: ErrMissingSession.Error()},
-			}, "", hasRPCID(id)
-		}
-		params := parseAnyMap(req.Params)
-		toolName := strings.TrimSpace(anyString(params["name"]))
-		args := parseAnyMap(params["arguments"])
-		confirmationID := strings.TrimSpace(rc.ConfirmationID)
-		if confirmationID == "" {
-			meta := parseAnyMap(params["_meta"])
-			confirmationID = strings.TrimSpace(anyString(meta["terminals_confirmation_id"]))
-		}
-		callCtx := ctx
-		requestID := rpcIDString(id)
-		if requestID != "" {
-			var cancel context.CancelFunc
-			callCtx, cancel = context.WithCancel(ctx)
-			s.addInflight(sessionID, requestID, cancel)
-			defer func() {
-				cancel()
-				s.removeInflight(sessionID, requestID)
-			}()
-		}
-		stream := func(string) error { return nil }
-		if transport == rpcTransportStdio && rc.Stdio != nil && requestID != "" {
-			stream = func(chunk string) error {
-				if strings.TrimSpace(chunk) == "" {
-					return nil
-				}
-				return rc.Stdio.sendNotification("notifications/tools/call_output", map[string]any{
-					"session_id": sessionID,
-					"request_id": requestID,
-					"chunk":      chunk,
-				})
-			}
-		}
-		if transport == rpcTransportHTTP && rc.HTTPStream != nil && requestID != "" {
-			stream = func(chunk string) error {
-				if strings.TrimSpace(chunk) == "" {
-					return nil
-				}
-				return rc.HTTPStream("notifications/tools/call_output", map[string]any{
-					"session_id": sessionID,
-					"request_id": requestID,
-					"chunk":      chunk,
-				})
-			}
-		}
-		toolResp, err := s.adapter.CallToolStream(callCtx, CallToolRequest{
-			SessionID:          sessionID,
-			ToolName:           toolName,
-			Arguments:          args,
-			MetaConfirmationID: confirmationID,
-		}, stream)
-		if err != nil {
-			return rpcResponse{
-				JSONRPC: "2.0",
-				ID:      id,
-				Error:   &rpcError{Code: -32002, Message: err.Error()},
-			}, sessionID, hasRPCID(id)
-		}
-		s.emitCallLog(ctx, sessionID, toolName, toolResp)
-		result := toolResult(toolResp)
-		return rpcResponse{JSONRPC: "2.0", ID: id, Result: result}, sessionID, hasRPCID(id)
-	case "shutdown":
-		sessionID := strings.TrimSpace(rc.SessionID)
-		if sessionID != "" {
-			s.closeSession(ctx, sessionID)
-		}
-		return rpcResponse{JSONRPC: "2.0", ID: id, Result: map[string]any{"status": "ok"}}, "", hasRPCID(id)
-	default:
-		return rpcResponse{
-			JSONRPC: "2.0",
-			ID:      id,
-			Error:   &rpcError{Code: -32601, Message: "method not found"},
-		}, rc.SessionID, hasRPCID(id)
-	}
 }
 
 func (s *Server) openSession(ctx context.Context, requestedID, clientIdentity string, caps ClientCapabilities) (SessionInfo, error) {

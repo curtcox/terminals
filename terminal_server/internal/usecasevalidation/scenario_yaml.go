@@ -1,19 +1,16 @@
 package usecasevalidation
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	capabilitiesv1 "github.com/curtcox/terminals/terminal_server/gen/go/capabilities/v1"
 	controlv1 "github.com/curtcox/terminals/terminal_server/gen/go/control/v1"
-	"github.com/curtcox/terminals/terminal_server/internal/transport"
 	"gopkg.in/yaml.v3"
 )
 
@@ -146,164 +143,6 @@ func (h *Harness) RunScenarioFile(t *testing.T, path string) *ScenarioFile {
 	return spec
 }
 
-func (h *Harness) runScenario(t *testing.T, spec *ScenarioFile) {
-	t.Helper()
-	if spec.Clock.Start != "" {
-		start, err := time.Parse(time.RFC3339, spec.Clock.Start)
-		if err != nil {
-			t.Fatalf("scenario %s: clock.start: %v", spec.ID, err)
-		}
-		h.Clock().SetNow(start)
-	}
-
-	terminals := make(map[string]*SimTerminal)
-	profiles := make(map[string]TerminalProfile, len(spec.Terminals))
-	broadcastMark := 0
-
-	for alias, prof := range spec.Terminals {
-		deviceID := prof.DeviceID
-		if deviceID == "" {
-			deviceID = alias
-		}
-		name := prof.Name
-		if name == "" {
-			name = deviceID
-		}
-		profiles[alias] = TerminalProfile{DeviceID: deviceID, Name: name}
-	}
-
-	h.StartServer()
-
-	for i, step := range spec.Steps {
-		switch {
-		case step.Connect != nil:
-			for alias, prof := range profiles {
-				if _, ok := terminals[alias]; ok {
-					continue
-				}
-				term := h.connectProfile(prof)
-				if !term.WaitForAny(scenarioStepTimeout) {
-					t.Fatalf("scenario %s step %d: terminal %s timed out connecting", spec.ID, i, alias)
-				}
-				terminals[alias] = term
-			}
-		case step.Command != nil:
-			term := terminals[step.Command.Terminal]
-			if term == nil {
-				t.Fatalf("scenario %s step %d: unknown terminal %q", spec.ID, i, step.Command.Terminal)
-			}
-			args := copyStringMap(step.Command.Arguments)
-			if args == nil {
-				args = map[string]string{}
-			}
-			if _, hasFire := args["fire_unix_ms"]; !hasFire {
-				if durStr, ok := args["duration_seconds"]; ok && durStr != "" {
-					secs, err := strconv.Atoi(durStr)
-					if err != nil {
-						t.Fatalf("scenario %s step %d: duration_seconds: %v", spec.ID, i, err)
-					}
-					fire := h.Clock().Now().Add(time.Duration(secs) * time.Second)
-					args["fire_unix_ms"] = strconv.FormatInt(fire.UnixMilli(), 10)
-				}
-			}
-			term.Send(&controlv1.ConnectRequest{
-				Payload: &controlv1.ConnectRequest_Command{
-					Command: &controlv1.CommandRequest{
-						RequestId: fmt.Sprintf("%s-cmd-%d", spec.ID, i),
-						DeviceId:  term.DeviceID,
-						Kind:      controlv1.CommandKind_COMMAND_KIND_MANUAL,
-						Intent:    step.Command.Intent,
-						Arguments: args,
-					},
-				},
-			})
-			h.RecordInteraction("command", describeCommandInteraction(step.Command, args), step.Command.Terminal)
-		case step.Says != nil:
-			term := terminals[step.Says.Terminal]
-			if term == nil {
-				t.Fatalf("scenario %s step %d: unknown terminal %q", spec.ID, i, step.Says.Terminal)
-			}
-			term.Send(&controlv1.ConnectRequest{
-				Payload: &controlv1.ConnectRequest_Command{
-					Command: &controlv1.CommandRequest{
-						RequestId: fmt.Sprintf("%s-says-%d", spec.ID, i),
-						DeviceId:  term.DeviceID,
-						Kind:      controlv1.CommandKind_COMMAND_KIND_VOICE,
-						Text:      step.Says.Text,
-					},
-				},
-			})
-			h.RecordInteraction("voice", fmt.Sprintf("Say %q.", step.Says.Text), step.Says.Terminal)
-		case step.Sensor != nil:
-			term := terminals[step.Sensor.Terminal]
-			if term == nil {
-				t.Fatalf("scenario %s step %d: unknown terminal %q", spec.ID, i, step.Sensor.Terminal)
-			}
-			if len(step.Sensor.Values) == 0 {
-				t.Fatalf("scenario %s step %d: sensor.values required", spec.ID, i)
-			}
-			term.Send(SensorDataRequest(term.DeviceID, h.Clock().Now().UnixMilli(), step.Sensor.Values))
-			h.RecordInteraction("sensor", describeSensorInteraction(step.Sensor), step.Sensor.Terminal)
-		case step.ClockAdvance != nil:
-			d, err := time.ParseDuration(step.ClockAdvance.Duration)
-			if err != nil {
-				t.Fatalf("scenario %s step %d: clock_advance.duration: %v", spec.ID, i, err)
-			}
-			h.Clock().Advance(d)
-		case step.ClockAdvanceTo != nil:
-			target, err := time.Parse(time.RFC3339, step.ClockAdvanceTo.Time)
-			if err != nil {
-				t.Fatalf("scenario %s step %d: clock_advance_to.time: %v", spec.ID, i, err)
-			}
-			h.Clock().AdvanceTo(target)
-		case step.ProcessDueTimers != nil:
-			processed, err := h.ProcessDueTimers(context.Background())
-			assertID := step.ProcessDueTimers.AssertID
-			if assertID == "" {
-				assertID = "process-due-timers"
-			}
-			if step.ProcessDueTimers.ExpectProcessed != nil {
-				want := *step.ProcessDueTimers.ExpectProcessed
-				h.Assert(assertID, fmt.Sprintf("process due timers: want %d processed", want),
-					err == nil && processed == want,
-					fmt.Sprintf("processed=%d err=%v", processed, err))
-			} else if err != nil {
-				t.Fatalf("scenario %s step %d: ProcessDueTimers: %v", spec.ID, i, err)
-			}
-		case step.MarkBroadcast != nil:
-			broadcastMark = len(h.Broadcast.Events())
-		case step.Yield != nil:
-			d := 50 * time.Millisecond
-			if step.Yield.Duration != "" {
-				parsed, err := time.ParseDuration(step.Yield.Duration)
-				if err != nil {
-					t.Fatalf("scenario %s step %d: yield.duration: %v", spec.ID, i, err)
-				}
-				d = parsed
-			}
-			time.Sleep(d)
-		case step.Expect != nil:
-			h.runExpectStep(t, spec.ID, i, step.Expect, terminals, broadcastMark)
-		case step.Disconnect != nil:
-			if step.Disconnect.Terminal == "" {
-				for _, term := range terminals {
-					_ = term.Disconnect()
-				}
-				terminals = make(map[string]*SimTerminal)
-			} else {
-				term := terminals[step.Disconnect.Terminal]
-				if term == nil {
-					t.Fatalf("scenario %s step %d: unknown terminal %q", spec.ID, i, step.Disconnect.Terminal)
-				}
-				_ = term.Disconnect()
-				delete(terminals, step.Disconnect.Terminal)
-			}
-		default:
-			t.Fatalf("scenario %s step %d: unsupported or empty step", spec.ID, i)
-		}
-	}
-}
-
 func (h *Harness) connectProfile(prof TerminalProfile) *SimTerminal {
 	return h.ConnectTerminal(prof.DeviceID, &controlv1.ConnectRequest{
 		Payload: &controlv1.ConnectRequest_Register{
@@ -315,113 +154,6 @@ func (h *Harness) connectProfile(prof TerminalProfile) *SimTerminal {
 			},
 		},
 	})
-}
-
-func (h *Harness) runExpectStep(t *testing.T, scenarioID string, stepIdx int, exp *ExpectStep, terminals map[string]*SimTerminal, broadcastMark int) {
-	t.Helper()
-	id := exp.ID
-	if id == "" {
-		id = fmt.Sprintf("%s-expect-%d", scenarioID, stepIdx)
-	}
-	desc := exp.Description
-	if desc == "" {
-		desc = id
-	}
-
-	pass := true
-	var detail string
-
-	if exp.Terminal != "" && exp.ScenarioStart != "" {
-		term := terminals[exp.Terminal]
-		if term == nil {
-			t.Fatalf("scenario %s step %d: unknown terminal %q", scenarioID, stepIdx, exp.Terminal)
-		}
-		_, saw := term.WaitFor(func(env transport.ProtoServerEnvelope) bool {
-			resp, ok := env.(*controlv1.ConnectResponse)
-			return ok && resp.GetCommandResult() != nil &&
-				resp.GetCommandResult().GetScenarioStart() == exp.ScenarioStart
-		}, scenarioStepTimeout)
-		if !saw {
-			pass = false
-			detail = fmt.Sprintf("terminal %s: scenario_start %q not seen (%d messages)",
-				exp.Terminal, exp.ScenarioStart, len(term.Received()))
-		}
-	}
-
-	if exp.Terminal != "" && exp.RouteKind != "" {
-		term := terminals[exp.Terminal]
-		_, saw := term.WaitFor(func(env transport.ProtoServerEnvelope) bool {
-			resp, ok := env.(*controlv1.ConnectResponse)
-			if !ok {
-				return false
-			}
-			r := resp.GetRouteStream()
-			return r != nil && r.GetKind() == exp.RouteKind
-		}, scenarioStepTimeout)
-		if !saw {
-			pass = false
-			if detail != "" {
-				detail += "; "
-			}
-			detail += fmt.Sprintf("terminal %s: route_kind %q not seen", exp.Terminal, exp.RouteKind)
-		}
-	}
-
-	events := h.Broadcast.Events()
-	if exp.BroadcastSinceMark {
-		events = events[broadcastMark:]
-	}
-
-	if exp.BroadcastContains != "" {
-		found := false
-		for _, ev := range events {
-			if ev.Message == exp.BroadcastContains {
-				found = true
-				break
-			}
-		}
-		if !found {
-			pass = false
-			if detail != "" {
-				detail += "; "
-			}
-			detail += fmt.Sprintf("broadcast missing %q (%d events)", exp.BroadcastContains, len(events))
-		}
-	}
-
-	if exp.BroadcastNotContains != "" {
-		for _, ev := range events {
-			if ev.Message == exp.BroadcastNotContains {
-				pass = false
-				if detail != "" {
-					detail += "; "
-				}
-				detail += fmt.Sprintf("broadcast unexpectedly contains %q", exp.BroadcastNotContains)
-				break
-			}
-		}
-	}
-
-	if exp.TimersProcessed != nil {
-		processed, err := h.ProcessDueTimers(context.Background())
-		want := *exp.TimersProcessed
-		if err != nil || processed != want {
-			pass = false
-			if detail != "" {
-				detail += "; "
-			}
-			detail += fmt.Sprintf("timers processed=%d want=%d err=%v", processed, want, err)
-		}
-	}
-
-	h.Assert(id, desc, pass, detail)
-	if exp.Terminal != "" {
-		if term := terminals[exp.Terminal]; term != nil {
-			msgs := term.Received()
-			h.CaptureFrame(id, exp.Terminal, msgs)
-			h.CaptureAudio(id, exp.Terminal, msgs)
-		}
-	}
 }
 
 // ScenarioFilePath resolves a path under testdata/ next to this package.

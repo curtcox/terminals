@@ -332,102 +332,20 @@ func (p *MediaPlanner) Tear(ctx context.Context, handle PlanHandle) error {
 }
 
 func (p *MediaPlanner) compileLocked(ctx context.Context, plan FlowPlan) (planRuntime, error) {
-	nodeByID := make(map[string]FlowNode, len(plan.Nodes))
-	incoming := make(map[string][]string)
-	for _, node := range plan.Nodes {
-		id := strings.TrimSpace(node.ID)
-		if id == "" {
-			return planRuntime{}, ErrInvalidMediaPlan
-		}
-		node.ID = id
-		if node.Args == nil {
-			node.Args = map[string]string{}
-		}
-		if node.Exec == "" {
-			node.Exec = ExecAuto
-		}
-		nodeByID[id] = node
-	}
-	for _, edge := range plan.Edges {
-		from := strings.TrimSpace(edge.From)
-		to := strings.TrimSpace(edge.To)
-		if from == "" || to == "" {
-			return planRuntime{}, ErrInvalidMediaPlan
-		}
-		if _, ok := nodeByID[from]; !ok {
-			return planRuntime{}, ErrInvalidMediaPlan
-		}
-		if _, ok := nodeByID[to]; !ok {
-			return planRuntime{}, ErrInvalidMediaPlan
-		}
-		incoming[to] = append(incoming[to], from)
+	nodeByID, incoming, err := indexMediaPlanNodes(plan)
+	if err != nil {
+		return planRuntime{}, err
 	}
 
 	runtime := planRuntime{}
 	for _, edge := range plan.Edges {
 		from := nodeByID[strings.TrimSpace(edge.From)]
 		to := nodeByID[strings.TrimSpace(edge.To)]
-
-		// Route concrete source->sink links onto the imperative router.
-		if isSinkNode(to.Kind) {
-			sourceNode, ok := resolveSourceNode(from.ID, nodeByID, incoming, map[string]struct{}{})
-			if !ok {
-				continue
-			}
-			sourceDeviceID := strings.TrimSpace(sourceNode.Args["device_id"])
-			targetDeviceID := strings.TrimSpace(to.Args["device_id"])
-			if sourceDeviceID == "" || targetDeviceID == "" {
-				continue
-			}
-			sourceResource := strings.TrimSpace(sourceNode.Args["resource"])
-			targetResource := strings.TrimSpace(to.Args["resource"])
-			streamKind := streamKindFor(sourceNode.Kind, to.Kind)
-			if inferred := streamKindForResources(sourceResource, targetResource); inferred != "" {
-				streamKind = inferred
-			}
-			if override := strings.TrimSpace(to.Args["stream_kind"]); override != "" {
-				streamKind = override
-			}
-			if streamKind == "" {
-				continue
-			}
-			if err := p.router.Connect(sourceDeviceID, targetDeviceID, streamKind); err != nil && !errors.Is(err, ErrRouteExists) {
-				return planRuntime{}, err
-			}
-			runtime.routes = append(runtime.routes, Route{
-				SourceID:   sourceDeviceID,
-				TargetID:   targetDeviceID,
-				StreamKind: streamKind,
-			})
-			eventlog.Emit(ctx, "io.route.applied", slog.LevelInfo, "route applied",
-				slog.String("component", "io.router"),
-				slog.String("source_device_id", sourceDeviceID),
-				slog.String("target_device_id", targetDeviceID),
-				slog.String("stream_kind", streamKind),
-			)
+		if err := p.applySinkEdge(ctx, &runtime, from, to, nodeByID, incoming); err != nil {
+			return planRuntime{}, err
 		}
-
-		// Analyzer nodes publish typed events through the planner sinks.
-		if to.Kind == NodeAnalyzer && p.analyzer != nil {
-			sourceNode, ok := resolveSourceNode(from.ID, nodeByID, incoming, map[string]struct{}{})
-			if !ok {
-				continue
-			}
-			sourceDeviceID := strings.TrimSpace(sourceNode.Args["device_id"])
-			if sourceDeviceID == "" {
-				continue
-			}
-			analyzerName := strings.TrimSpace(to.Args["name"])
-			if analyzerName == "" {
-				analyzerName = "sound"
-			}
-			stop, err := p.analyzer.StartAnalyzer(ctx, sourceDeviceID, analyzerName, p.emitAnalyzerEvent)
-			if err != nil {
-				return planRuntime{}, err
-			}
-			if stop != nil {
-				runtime.stops = append(runtime.stops, stop)
-			}
+		if err := p.applyAnalyzerEdge(ctx, &runtime, from, to, nodeByID, incoming); err != nil {
+			return planRuntime{}, err
 		}
 	}
 	return runtime, nil

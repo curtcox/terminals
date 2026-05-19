@@ -2,7 +2,6 @@ package scenario
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -141,140 +140,18 @@ func (s *AudioMonitorScenario) startMonitorLoop(ctx context.Context, env *Enviro
 
 	s.clearMonitorLoop()
 
-	activationID := ""
-	s.mu.Lock()
-	activationID = s.activationID
-	s.mu.Unlock()
-	if activationID == "" {
-		activationID = "audio_monitor:" + sourceID
-	}
-
-	analyzerPlanActive := false
-	if routeIO, ok := env.IO.(interface {
-		MediaPlanner() *iorouter.MediaPlanner
-		Claims() *iorouter.ClaimManager
-	}); ok {
-		if claims := routeIO.Claims(); claims != nil {
-			analyzeResource := resolveAudioInputAnalyzeResource(env, sourceID)
-			_, err := claims.Request(ctx, []iorouter.Claim{{
-				ActivationID: activationID,
-				DeviceID:     sourceID,
-				Resource:     analyzeResource,
-				Mode:         iorouter.ClaimShared,
-				Priority:     int(PriorityNormal),
-			}})
-			if err != nil && !errors.Is(err, iorouter.ErrClaimConflict) {
-				return err
-			}
-		}
-		if planner := routeIO.MediaPlanner(); planner != nil {
-			if planner.AnalyzerEnabled() {
-				handle, err := planner.Apply(ctx, iorouter.MediaPlan{
-					Nodes: []iorouter.MediaNode{
-						{ID: "mic", Kind: iorouter.NodeSourceMic, Args: map[string]string{"device_id": sourceID}},
-						{ID: "analyzer", Kind: iorouter.NodeAnalyzer, Args: map[string]string{"name": "sound"}},
-					},
-					Edges: []iorouter.MediaEdge{
-						{From: "mic", To: "analyzer"},
-					},
-				})
-				if err == nil {
-					s.mu.Lock()
-					s.planHandle = handle
-					s.mu.Unlock()
-					analyzerPlanActive = true
-				}
-			}
-		}
-	}
-
-	// Prefer event-bus subscriptions emitted by analyzer nodes.
-	if analyzerPlanActive && env.TriggerBus != nil {
-		sub, cancel := env.TriggerBus.Subscribe(16)
-		audioCtx, cancelAudio := context.WithCancel(ctx)
-		stopFn := func() {
-			cancelAudio()
-			cancel()
-		}
-		s.mu.Lock()
-		s.stopFn = stopFn
-		s.mu.Unlock()
-
-		go func() {
-			defer stopFn()
-			for {
-				select {
-				case <-audioCtx.Done():
-					return
-				case trigger, ok := <-sub:
-					if !ok || trigger.EventV2 == nil {
-						continue
-					}
-					if strings.TrimSpace(trigger.EventV2.Kind) != "sound.detected" {
-						continue
-					}
-					if src := strings.TrimSpace(trigger.SourceID); src != "" && src != sourceID {
-						continue
-					}
-					label := strings.TrimSpace(trigger.EventV2.Subject)
-					if label == "" {
-						label = strings.TrimSpace(trigger.EventV2.Attributes["label"])
-					}
-					if !audioMonitorEventMatchesTarget(target, label) {
-						continue
-					}
-					if label == "" {
-						label = target
-					}
-					_ = notifySource(ctx, env, sourceID, "Audio monitor detected: "+label)
-					return
-				}
-			}
-		}()
-		return nil
-	}
-
-	// Fallback path for tests/contexts without an event bus analyzer runner.
-	if env.Sound == nil {
-		return nil
-	}
-	audioCtx, cancelAudio := context.WithCancel(ctx)
-	audio, closeAudio, err := openAudioMonitorSource(audioCtx, env, sourceID)
-	if err != nil {
-		cancelAudio()
+	activationID := s.audioMonitorActivationID(sourceID)
+	if err := s.requestAudioMonitorAnalyzeClaim(ctx, env, activationID, sourceID); err != nil {
 		return err
 	}
-	stream, err := env.Sound.Classify(audioCtx, audio)
+	analyzerPlanActive, err := s.applyAudioMonitorAnalyzerPlan(ctx, env, sourceID)
 	if err != nil {
-		closeAudio()
-		cancelAudio()
 		return err
 	}
-	var stopOnce sync.Once
-	stopFn := func() {
-		stopOnce.Do(func() {
-			cancelAudio()
-			closeAudio()
-		})
+	if analyzerPlanActive && s.runAudioMonitorTriggerBusLoop(ctx, env, target, sourceID) {
+		return nil
 	}
-	s.mu.Lock()
-	s.stopFn = stopFn
-	s.mu.Unlock()
-	go func() {
-		defer stopFn()
-		for event := range stream {
-			if !audioMonitorEventMatchesTarget(target, event.Label) {
-				continue
-			}
-			messageLabel := strings.TrimSpace(event.Label)
-			if messageLabel == "" {
-				messageLabel = target
-			}
-			_ = notifySource(ctx, env, sourceID, "Audio monitor detected: "+messageLabel)
-			return
-		}
-	}()
-	return nil
+	return s.runAudioMonitorClassifierLoop(ctx, env, target, sourceID)
 }
 
 type audioMonitorSilenceSource struct{}

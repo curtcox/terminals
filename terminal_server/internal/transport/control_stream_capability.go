@@ -2,7 +2,6 @@ package transport
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strings"
 
@@ -43,43 +42,11 @@ func (h *StreamHandler) handleCapabilityChangeEffects(
 		return nil
 	}
 
-	claims := routeIO.Claims()
-	if claims != nil {
-		if len(lostResources) > 0 {
-			suspendedClaims := make([]iorouter.Claim, 0)
-			for _, claim := range claims.Snapshot(deviceID) {
-				if _, exists := lostResources[claim.Resource]; !exists {
-					continue
-				}
-				suspendedClaims = append(suspendedClaims, claim)
-			}
-			h.rememberSuspendedClaims(deviceID, suspendedClaims)
-			if len(suspendedClaims) > 0 {
-				_ = claims.ReleaseClaims(ctx, suspendedClaims)
-			}
-		}
-		if len(gainedResources) > 0 {
-			h.restoreSuspendedClaims(ctx, claims, deviceID, gainedResources)
-		}
+	h.suspendClaimsForLostResources(ctx, routeIO, deviceID, lostResources)
+	if claims := routeIO.Claims(); claims != nil && len(gainedResources) > 0 {
+		h.restoreSuspendedClaims(ctx, claims, deviceID, gainedResources)
 	}
-
-	routes := routeIO.RoutesForDevice(deviceID)
-	out := make([]ServerMessage, 0, len(routes))
-	if len(lostResources) == 0 {
-		return out
-	}
-	for _, route := range routes {
-		if !shouldDisconnectRouteForLostResources(route, deviceID, lostResources) {
-			continue
-		}
-		if err := routeIO.Disconnect(route.SourceID, route.TargetID, route.StreamKind); err != nil && !errors.Is(err, iorouter.ErrRouteNotFound) {
-			continue
-		}
-		out = append(out, ServerMessage{
-			StopStream: &StopStreamResponse{StreamID: routeStreamID(route)},
-		})
-	}
-	return out
+	return h.disconnectRoutesForLostResources(routeIO, deviceID, lostResources)
 }
 
 func (h *StreamHandler) rememberSuspendedClaims(deviceID string, claims []iorouter.Claim) {
@@ -215,76 +182,12 @@ func capabilityResources(caps map[string]string) map[string]struct{} {
 	if len(caps) == 0 {
 		return resources
 	}
-
-	if (caps["screen.width"] != "" && caps["screen.height"] != "") || truthyCapability(caps["display.count"]) {
-		resources["screen.main"] = struct{}{}
-		resources["screen.overlay"] = struct{}{}
-	}
-	for _, displayID := range endpointResourceIDs(caps, "display.") {
-		resources["display."+displayID+".main"] = struct{}{}
-		resources["display."+displayID+".overlay"] = struct{}{}
-	}
-	if truthyCapability(caps["keyboard.physical"]) || strings.TrimSpace(caps["keyboard.layout"]) != "" {
-		resources["keyboard.primary"] = struct{}{}
-	}
-	if strings.TrimSpace(caps["pointer.type"]) != "" {
-		resources["pointer.primary"] = struct{}{}
-	}
-	if truthyCapability(caps["touch.supported"]) {
-		resources["touch.primary"] = struct{}{}
-	}
-	if truthyCapability(caps["speakers.present"]) || truthyCapability(caps["speakers.endpoint_count"]) {
-		resources["speaker.main"] = struct{}{}
-	}
-	for _, endpointID := range endpointResourceIDs(caps, "speakers.endpoint.") {
-		resources["audio_out."+endpointID] = struct{}{}
-	}
-	if truthyCapability(caps["microphone.present"]) || truthyCapability(caps["microphone.endpoint_count"]) {
-		resources["mic.capture"] = struct{}{}
-		resources["mic.analyze"] = struct{}{}
-	}
-	for _, endpointID := range endpointResourceIDs(caps, "microphone.endpoint.") {
-		resources["audio_in."+endpointID+".capture"] = struct{}{}
-		resources["audio_in."+endpointID+".analyze"] = struct{}{}
-	}
-	if truthyCapability(caps["camera.present"]) || truthyCapability(caps["camera.endpoint_count"]) {
-		resources["camera.capture"] = struct{}{}
-		resources["camera.analyze"] = struct{}{}
-	}
-	for _, endpointID := range endpointResourceIDs(caps, "camera.endpoint.") {
-		resources["camera."+endpointID+".capture"] = struct{}{}
-		resources["camera."+endpointID+".analyze"] = struct{}{}
-	}
-	if truthyCapability(caps["haptics.supported"]) {
-		resources["haptic.primary"] = struct{}{}
-	}
-	if truthyCapability(caps["edge.compute.cpu_realtime"]) {
-		resources[iorouter.ResourceComputeCPUShared] = struct{}{}
-	}
-	if truthyCapability(caps["edge.compute.gpu_realtime"]) {
-		resources[iorouter.ResourceComputeGPUShared] = struct{}{}
-	}
-	if truthyCapability(caps["edge.compute.npu_realtime"]) {
-		resources[iorouter.ResourceComputeNPUShared] = struct{}{}
-	}
-	if truthyCapability(caps["edge.retention.audio_sec"]) {
-		resources[iorouter.ResourceBufferAudio] = struct{}{}
-	}
-	if truthyCapability(caps["edge.retention.video_sec"]) {
-		resources[iorouter.ResourceBufferVideo] = struct{}{}
-	}
-	if truthyCapability(caps["edge.retention.sensor_sec"]) {
-		resources[iorouter.ResourceBufferSensor] = struct{}{}
-	}
-	if truthyCapability(caps["edge.retention.radio_sec"]) {
-		resources[iorouter.ResourceBufferRadio] = struct{}{}
-	}
-	if truthyCapability(caps["connectivity.bluetooth_version"]) {
-		resources[iorouter.ResourceRadioBLEScan] = struct{}{}
-	}
-	if truthyCapability(caps["connectivity.wifi_signal_strength"]) {
-		resources[iorouter.ResourceRadioWiFiScan] = struct{}{}
-	}
+	capabilityDisplayResources(caps, resources)
+	capabilityInputResources(caps, resources)
+	capabilityAudioResources(caps, resources)
+	capabilityCameraResources(caps, resources)
+	capabilityEdgeResources(caps, resources)
+	capabilityConnectivityResources(caps, resources)
 	return resources
 }
 
@@ -292,58 +195,7 @@ func endpointResourceIDs(caps map[string]string, prefix string) []string {
 	if len(caps) == 0 || prefix == "" {
 		return nil
 	}
-
-	indexToID := map[string]string{}
-	indexes := map[string]struct{}{}
-	indexHasAvailability := map[string]bool{}
-	indexAvailable := map[string]bool{}
-	for key, value := range caps {
-		rest, ok := strings.CutPrefix(key, prefix)
-		if !ok {
-			continue
-		}
-		parts := strings.Split(rest, ".")
-		if len(parts) < 2 {
-			continue
-		}
-		index := strings.TrimSpace(parts[0])
-		if index == "" {
-			continue
-		}
-		indexes[index] = struct{}{}
-		if parts[1] == "id" {
-			if id := sanitizeResourceID(value); id != "" {
-				indexToID[index] = id
-			}
-		}
-		if parts[1] == "available" {
-			indexHasAvailability[index] = true
-			indexAvailable[index] = truthyCapability(value)
-		}
-	}
-
-	if len(indexes) == 0 {
-		return nil
-	}
-
-	sortedIndexes := make([]string, 0, len(indexes))
-	for index := range indexes {
-		sortedIndexes = append(sortedIndexes, index)
-	}
-	sort.Strings(sortedIndexes)
-
-	ids := make([]string, 0, len(sortedIndexes))
-	for _, index := range sortedIndexes {
-		if indexHasAvailability[index] && !indexAvailable[index] {
-			continue
-		}
-		if id := indexToID[index]; id != "" {
-			ids = append(ids, id)
-			continue
-		}
-		ids = append(ids, "endpoint-"+sanitizeResourceID(index))
-	}
-	return ids
+	return endpointIDsFromIndexState(parseEndpointIndexState(caps, prefix))
 }
 
 func sanitizeResourceID(raw string) string {

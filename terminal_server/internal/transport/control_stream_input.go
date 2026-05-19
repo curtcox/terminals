@@ -2,13 +2,10 @@ package transport
 
 import (
 	"context"
-	"log/slog"
 	"strings"
 	"time"
 
 	diagnosticsv1 "github.com/curtcox/terminals/terminal_server/gen/go/diagnostics/v1"
-	"github.com/curtcox/terminals/terminal_server/internal/eventlog"
-	"github.com/curtcox/terminals/terminal_server/internal/replsession"
 )
 
 func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]ServerMessage, error) {
@@ -19,120 +16,66 @@ func (h *StreamHandler) handleInput(ctx context.Context, in *InputRequest) ([]Se
 	if deviceID == "" {
 		return nil, ErrMissingCommandDeviceID
 	}
-
 	action := strings.ToLower(strings.TrimSpace(in.Action))
 	componentID := strings.TrimSpace(in.ComponentID)
+	logicalComponentID := logicalInputComponentID(componentID)
+	if h.rejectUnknownScopedInput(deviceID, componentID, action) {
+		return nil, nil
+	}
+	return h.dispatchInput(ctx, deviceID, componentID, logicalComponentID, action, in)
+}
+
+func logicalInputComponentID(componentID string) string {
 	_, _, logicalComponentID, _ := parseScopedComponentID(componentID)
 	if logicalComponentID == "" {
-		logicalComponentID = componentID
+		return componentID
 	}
-	if requiresScopedUIActionComponent(action) && h.uiOwners.HasKnownActivation(deviceID) {
-		if _, reason, ok := h.uiOwners.Resolve(deviceID, componentID); !ok {
-			if h.metrics != nil {
-				h.metrics.IncUnknownUIActionComponent(reason)
-			}
-			return nil, nil
-		}
-	}
+	return logicalComponentID
+}
 
-	if strings.HasPrefix(action, bugReportActionPrefix) {
-		return h.handleBugReportUIAction(ctx, deviceID, action, strings.TrimSpace(in.Value))
+func (h *StreamHandler) rejectUnknownScopedInput(deviceID, componentID, action string) bool {
+	if !requiresScopedUIActionComponent(action) || !h.uiOwners.HasKnownActivation(deviceID) {
+		return false
 	}
+	_, reason, ok := h.uiOwners.Resolve(deviceID, componentID)
+	if ok {
+		return false
+	}
+	if h.metrics != nil {
+		h.metrics.IncUnknownUIActionComponent(reason)
+	}
+	return true
+}
 
-	if responses, handled := h.handleChatInput(deviceID, componentID, action, in.Value); handled {
-		return responses, nil
-	}
-	if responses, handled, err := h.handleMenuOverlayInput(ctx, deviceID, componentID, action); handled {
-		return responses, err
+func (h *StreamHandler) dispatchInput(
+	ctx context.Context,
+	deviceID, componentID, logicalComponentID, action string,
+	in *InputRequest,
+) ([]ServerMessage, error) {
+	if handled, out, err := h.handleInputEarly(ctx, deviceID, componentID, action, in.Value); handled {
+		return out, err
 	}
 	if h.shouldDropMainInputWhileOverlayOpen(deviceID, in) {
 		return nil, nil
 	}
-
-	switch action {
-	case "change":
-		if logicalComponentID == "terminal_input" {
-			if sessionID, ok := h.replSessionIDForDevice(deviceID); ok {
-				_ = h.replSessions.SetDraft(sessionID, deviceID, in.Value)
-			}
-			return nil, nil
-		}
-		if update, ok := h.renderTerminalUIAction(deviceID, componentID, action, in.Value); ok {
-			return []ServerMessage{{UpdateUI: update}}, nil
-		}
-		return nil, nil
-	case "toggle", "select":
-		if update, ok := h.renderTerminalUIAction(deviceID, componentID, action, in.Value); ok {
-			return []ServerMessage{{UpdateUI: update}}, nil
-		}
-		return nil, nil
-	case SystemIntentTerminalRefresh:
-		cmd := &CommandRequest{
-			DeviceID: deviceID,
-			Kind:     CommandKindManual,
-			Intent:   SystemIntentTerminalRefresh,
-		}
-		commandResult, err := h.handleCommand(ctx, cmd)
-		if err != nil {
-			return nil, err
-		}
-		return h.commandResponses(ctx, cmd, commandResult), nil
+	if handled, out, err := h.handleInputUIChange(deviceID, componentID, logicalComponentID, action, in.Value); handled {
+		return out, err
 	}
-
+	if action == SystemIntentTerminalRefresh {
+		handled, out, err := h.handleInputSystemRefresh(ctx, deviceID)
+		if handled {
+			return out, err
+		}
+	}
 	if action != "" && (logicalComponentID != "terminal_input" || action != "submit") {
 		if out, routed, err := h.routeScenarioUIAction(ctx, deviceID, action); routed {
 			return out, err
 		}
 	}
-
-	sessionID, ok := h.replSessionIDForDevice(deviceID)
-	if !ok {
-		return nil, nil
+	if handled, out, err := h.handleInputTerminalSubmit(ctx, deviceID, componentID, logicalComponentID, in); handled {
+		return out, err
 	}
-
-	text := in.Value
-	fromKey := false
-	if text == "" && logicalComponentID == "terminal_input" {
-		draft, err := h.replSessions.Draft(sessionID, deviceID)
-		if err == nil {
-			text = draft
-		}
-	}
-	if text == "" {
-		text = in.KeyText
-		fromKey = text != ""
-	}
-	if text == "" || (!fromKey && strings.TrimSpace(text) == "") {
-		return nil, nil
-	}
-	if fromKey {
-		text = normalizeTerminalKeyText(text)
-		eventlog.Emit(ctx, "terminal.input.received", slog.LevelDebug, "terminal key input received",
-			slog.String("component", "transport.input"),
-			slog.String("device_id", deviceID),
-			slog.String("component_id", componentID),
-			slog.Int("text_len", len(text)),
-			slog.String("text", strings.NewReplacer("\n", "\\n", "\r", "\\r", "\b", "\\b", "\x7f", "<DEL>").Replace(text)),
-		)
-	}
-	if !fromKey && !strings.HasSuffix(text, "\n") {
-		text += "\n"
-	}
-	if _, err := h.replSessions.SendInput(ctx, replsession.SendInputRequest{
-		SessionID: sessionID,
-		DeviceID:  deviceID,
-		Input:     text,
-	}); err != nil {
-		return nil, err
-	}
-	if logicalComponentID == "terminal_input" {
-		_ = h.replSessions.ClearDraft(sessionID, deviceID)
-	}
-
-	h.readTerminalOutput(deviceID, sessionID)
-	return []ServerMessage{{
-		UpdateUI: h.terminalOutputUpdate(sessionID),
-	}}, nil
+	return nil, nil
 }
 
 func requiresScopedUIActionComponent(action string) bool {

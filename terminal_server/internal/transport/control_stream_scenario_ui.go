@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	iorouter "github.com/curtcox/terminals/terminal_server/internal/io"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"github.com/curtcox/terminals/terminal_server/internal/ui"
 )
@@ -15,120 +16,69 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 	if h.runtime == nil || h.runtime.Engine == nil {
 		return nil, false, nil
 	}
-
 	activeName, active := h.runtime.Engine.Active(deviceID)
 	if !active {
 		return nil, false, nil
 	}
-
-	action = strings.TrimSpace(action)
-	if action == "" {
+	uiCmd, resolved := resolveScenarioUICommand(activeName, action, deviceID)
+	if !resolved {
 		return nil, false, nil
 	}
+	if uiCmd.intent == "" {
+		return nil, true, nil
+	}
+	if uiCmd.commandAction == CommandActionStart && !h.isRegisteredScenario(uiCmd.intent) {
+		return nil, false, nil
+	}
+	if uiCmd.commandAction == CommandActionStop && action != "stop_active" && !h.isRegisteredScenario(uiCmd.intent) {
+		return nil, false, nil
+	}
+
 	beforeRoutes := h.routeSnapshotForDevice(deviceID)
 	beforeBroadcastEvents := h.broadcastEventCount()
 	beforeUIEvents := h.uiHostEventCount()
+	trigger := h.scenarioUITrigger(deviceID, uiCmd)
+	cmd := h.scenarioUICommandRequest(deviceID, uiCmd)
 
-	intent := ""
-	commandAction := CommandActionStart
-	triggerArgs := map[string]string{
-		"device_id": deviceID,
+	if uiCmd.commandAction == CommandActionStop {
+		return h.finishScenarioUIStop(ctx, deviceID, trigger, cmd, beforeRoutes, beforeBroadcastEvents, beforeUIEvents)
 	}
-	switch {
-	case action == "stop_active":
-		intent = activeName
-		commandAction = CommandActionStop
-	case action == "internal_video_call_end":
-		if activeName != "internal_video_call" {
-			return nil, false, nil
-		}
-		intent = "internal_video_call"
-		commandAction = CommandActionStop
-	case action == "multi_window_end":
-		if activeName != "multi_window" {
-			return nil, false, nil
-		}
-		intent = "multi_window"
-		commandAction = CommandActionStop
-	case strings.HasPrefix(action, "multi_window_focus:"):
-		if activeName != "multi_window" {
-			return nil, false, nil
-		}
-		focusDeviceID := strings.TrimSpace(strings.TrimPrefix(action, "multi_window_focus:"))
-		if focusDeviceID == "" {
-			return nil, true, nil
-		}
-		intent = "multi_window"
-		triggerArgs["audio_focus_device_id"] = focusDeviceID
-	case strings.HasPrefix(action, "start:"):
-		intent = strings.TrimSpace(strings.TrimPrefix(action, "start:"))
-	case strings.HasPrefix(action, "stop:"):
-		intent = strings.TrimSpace(strings.TrimPrefix(action, "stop:"))
-		commandAction = CommandActionStop
-	default:
-		intent = action
-	}
-	if intent == "" {
-		return nil, true, nil
-	}
-	if commandAction == CommandActionStart && !h.isRegisteredScenario(intent) {
-		return nil, false, nil
-	}
-	if commandAction == CommandActionStop && action != "stop_active" && !h.isRegisteredScenario(intent) {
-		return nil, false, nil
-	}
+	return h.finishScenarioUIStart(ctx, deviceID, activeName, trigger, cmd, beforeRoutes, beforeBroadcastEvents, beforeUIEvents)
+}
 
-	trigger := scenario.Trigger{
-		Kind:      scenario.TriggerManual,
-		SourceID:  deviceID,
-		Intent:    intent,
-		Arguments: triggerArgs,
-		IntentV2: &scenario.IntentRecord{
-			Action: intent,
-			Slots:  copyStringMap(triggerArgs),
-			Source: scenario.SourceUI,
-		},
+func (h *StreamHandler) finishScenarioUIStop(
+	ctx context.Context,
+	deviceID string,
+	trigger scenario.Trigger,
+	cmd *CommandRequest,
+	beforeRoutes []iorouter.Route,
+	beforeBroadcastEvents int,
+	beforeUIEvents int,
+) ([]ServerMessage, bool, error) {
+	name, err := h.runtime.StopTrigger(ctx, trigger)
+	if err != nil {
+		return nil, true, err
 	}
-	if commandAction == CommandActionStop {
-		name, err := h.runtime.StopTrigger(ctx, trigger)
-		if err != nil {
-			return nil, true, err
-		}
-		result := ServerMessage{
-			ScenarioStop: name,
-			Notification: "Scenario stopped: " + name,
-		}
-		cmd := &CommandRequest{
-			DeviceID:  deviceID,
-			Action:    commandAction,
-			Kind:      CommandKindManual,
-			Intent:    intent,
-			Arguments: copyStringMap(triggerArgs),
-		}
-		responses := h.commandResponses(ctx, cmd, result)
-		afterRoutes := h.routeSnapshotForDevice(deviceID)
-		routeUpdates := h.routeUpdatesForCommand(cmd, result, beforeRoutes, afterRoutes)
-		if len(routeUpdates) > 0 {
-			responses = append(responses, routeUpdates...)
-		}
-		paTransitions := h.paTransitionsForCommand(cmd, result, beforeRoutes, afterRoutes)
-		if len(paTransitions) > 0 {
-			responses = append(responses, paTransitions...)
-		}
-		overlayClears := h.paOverlayClearsForCommand(cmd, result, beforeRoutes)
-		if len(overlayClears) > 0 {
-			responses = append(responses, overlayClears...)
-		}
-		broadcastNotifications := h.commandDispatcher.BroadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
-		if len(broadcastNotifications) > 0 {
-			responses = append(responses, broadcastNotifications...)
-		}
-		uiMessages := h.uiHostMessagesSince(beforeUIEvents, deviceID, true)
-		if len(uiMessages) > 0 {
-			responses = append(responses, uiMessages...)
-		}
-		return responses, true, nil
+	result := ServerMessage{
+		ScenarioStop: name,
+		Notification: "Scenario stopped: " + name,
 	}
+	responses := h.commandResponses(ctx, cmd, result)
+	responses = h.appendScenarioUICommandSideEffects(
+		ctx, deviceID, cmd, result, beforeRoutes, beforeBroadcastEvents, beforeUIEvents, responses,
+	)
+	return responses, true, nil
+}
+
+func (h *StreamHandler) finishScenarioUIStart(
+	ctx context.Context,
+	deviceID, activeName string,
+	trigger scenario.Trigger,
+	cmd *CommandRequest,
+	beforeRoutes []iorouter.Route,
+	beforeBroadcastEvents int,
+	beforeUIEvents int,
+) ([]ServerMessage, bool, error) {
 	name, err := h.runtime.HandleTrigger(ctx, trigger)
 	if err != nil {
 		return nil, true, err
@@ -137,38 +87,13 @@ func (h *StreamHandler) routeScenarioUIAction(ctx context.Context, deviceID, act
 		ScenarioStart: name,
 		Notification:  "Scenario started: " + name,
 	}
-	if result.ScenarioStart == "multi_window" && commandAction == CommandActionStart {
+	if result.ScenarioStart == "multi_window" {
 		h.captureMultiWindowResume(deviceID, activeName)
 	}
-	cmd := &CommandRequest{
-		DeviceID:  deviceID,
-		Action:    commandAction,
-		Kind:      CommandKindManual,
-		Intent:    intent,
-		Arguments: copyStringMap(triggerArgs),
-	}
 	responses := h.commandResponses(ctx, cmd, result)
-	afterRoutes := h.routeSnapshotForDevice(deviceID)
-	routeUpdates := h.routeUpdatesForCommand(cmd, result, beforeRoutes, afterRoutes)
-	if len(routeUpdates) > 0 {
-		responses = append(responses, routeUpdates...)
-	}
-	paTransitions := h.paTransitionsForCommand(cmd, result, beforeRoutes, afterRoutes)
-	if len(paTransitions) > 0 {
-		responses = append(responses, paTransitions...)
-	}
-	overlayClears := h.paOverlayClearsForCommand(cmd, result, beforeRoutes)
-	if len(overlayClears) > 0 {
-		responses = append(responses, overlayClears...)
-	}
-	broadcastNotifications := h.commandDispatcher.BroadcastNotificationsForCommand(cmd, result, beforeBroadcastEvents)
-	if len(broadcastNotifications) > 0 {
-		responses = append(responses, broadcastNotifications...)
-	}
-	uiMessages := h.uiHostMessagesSince(beforeUIEvents, deviceID, true)
-	if len(uiMessages) > 0 {
-		responses = append(responses, uiMessages...)
-	}
+	responses = h.appendScenarioUICommandSideEffects(
+		ctx, deviceID, cmd, result, beforeRoutes, beforeBroadcastEvents, beforeUIEvents, responses,
+	)
 	return responses, true, nil
 }
 
