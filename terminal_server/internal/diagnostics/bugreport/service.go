@@ -22,7 +22,6 @@ import (
 	"github.com/curtcox/terminals/terminal_server/internal/eventlog/query"
 	"github.com/curtcox/terminals/terminal_server/internal/scenario"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 // Service stores and retrieves bug reports plus server-side enrichment.
@@ -148,17 +147,7 @@ func (s *Service) file(ctx context.Context, in *diagnosticsv1.BugReport, isAutod
 	}
 
 	now := s.now().UTC()
-	report := proto.Clone(in).(*diagnosticsv1.BugReport)
-	if report.GetTimestampUnixMs() <= 0 {
-		report.TimestampUnixMs = now.UnixMilli()
-	}
-	report.ReporterDeviceId = strings.TrimSpace(report.GetReporterDeviceId())
-	report.SubjectDeviceId = strings.TrimSpace(report.GetSubjectDeviceId())
-	report.Description = strings.TrimSpace(report.GetDescription())
-	report.Tags = normalizeTags(report.GetTags())
-	if report.GetReportId() == "" {
-		report.ReportId = makeReportID(now)
-	}
+	report := normalizeIncomingBugReport(in, now)
 	if existing, ok, err := s.Get(report.GetReportId()); err != nil {
 		return nil, fmt.Errorf("check existing bug report: %w", err)
 	} else if ok {
@@ -172,151 +161,43 @@ func (s *Service) file(ctx context.Context, in *diagnosticsv1.BugReport, isAutod
 		)
 		return ackFromRecord(existing, "ack_replayed"), nil
 	}
-	if report.ReporterDeviceId == "" && report.GetClientContext() != nil && report.GetClientContext().GetIdentity() != nil {
-		report.ReporterDeviceId = strings.TrimSpace(report.GetClientContext().GetIdentity().GetDeviceId())
-	}
-	if report.SubjectDeviceId == "" {
-		report.SubjectDeviceId = report.ReporterDeviceId
-	}
 
-	summary := Summary{
-		ReportID:         report.GetReportId(),
-		CorrelationID:    "bug:" + report.GetReportId(),
-		Status:           diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED.String(),
-		Source:           report.GetSource().String(),
-		ReporterDeviceID: report.GetReporterDeviceId(),
-		SubjectDeviceID:  report.GetSubjectDeviceId(),
-		Tags:             append([]string(nil), report.GetTags()...),
-		Description:      report.GetDescription(),
-		TimestampUnixMS:  report.GetTimestampUnixMs(),
-		CreatedUnixMS:    now.UnixMilli(),
-	}
-	if summary.Source == diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_UNSPECIFIED.String() {
-		summary.Source = diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_OTHER.String()
-	}
-
-	var mergedAutodetectID string
-	status := diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_FILED
-	if strings.TrimSpace(summary.SubjectDeviceID) != "" {
-		if recent := s.findRecentAutodetectLocked(summary.SubjectDeviceID, now, autodetectDedupWindow); recent != nil {
-			if isAutodetect {
-				return &diagnosticsv1.BugReportAck{
-					ReportId:                 recent.Summary.ReportID,
-					CorrelationId:            recent.Summary.CorrelationID,
-					Status:                   diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT,
-					ReportPath:               recent.Summary.ReportPath,
-					MergedAutodetectReportId: recent.Summary.ReportID,
-					Message:                  "merged_with_autodetect",
-				}, nil
-			}
-			if report.GetSource() != diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_AUTODETECT {
-				mergedAutodetectID = recent.Summary.ReportID
-				status = diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT
-				summary.MergedAutodetectID = recent.Summary.ReportID
-				summary.Status = diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT.String()
-			}
-		}
+	plan := s.planBugReportFile(report, now, isAutodetect)
+	if plan.earlyAck != nil {
+		return plan.earlyAck, nil
 	}
 
 	subject, offline := s.subjectSnapshot(report.GetSubjectDeviceId())
-	summary.SubjectOffline = offline
+	plan.summary.SubjectOffline = offline
 	events := s.subjectEvents(ctx, report.GetSubjectDeviceId(), report.GetTimestampUnixMs())
 
-	recordReport := proto.Clone(report).(*diagnosticsv1.BugReport)
-	reportJSON, err := s.jsonMarshal.Marshal(recordReport)
+	reportMap, err := s.bugReportRecordMap(report)
 	if err != nil {
-		return nil, fmt.Errorf("marshal bug report: %w", err)
-	}
-	reportMap := map[string]any{}
-	if err := json.Unmarshal(reportJSON, &reportMap); err != nil {
-		return nil, fmt.Errorf("decode bug report json: %w", err)
+		return nil, err
 	}
 
 	rec := Record{
-		Summary:       summary,
+		Summary:       plan.summary,
 		Report:        reportMap,
 		Subject:       subject,
 		SubjectEvents: events,
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	dateDir := time.UnixMilli(report.GetTimestampUnixMs()).UTC().Format("2006-01-02")
-	if dateDir == "" || dateDir == "0001-01-01" {
-		dateDir = now.Format("2006-01-02")
-	}
-	relDir := filepath.ToSlash(filepath.Join("bug_reports", dateDir))
-	absDir := filepath.Join(s.logDir, relDir)
-	if err := os.MkdirAll(absDir, 0o755); err != nil {
-		return nil, fmt.Errorf("create bug report dir: %w", err)
-	}
-
-	if png := report.GetScreenshotPng(); len(png) > 0 {
-		name := report.GetReportId() + ".screenshot.png"
-		rel := filepath.ToSlash(filepath.Join(relDir, name))
-		if err := os.WriteFile(filepath.Join(s.logDir, rel), png, 0o644); err != nil {
-			return nil, fmt.Errorf("write screenshot: %w", err)
-		}
-		rec.Summary.ScreenshotPath = filepath.ToSlash(filepath.Join(s.logDir, rel))
-	}
-	if wav := report.GetAudioWav(); len(wav) > 0 {
-		name := report.GetReportId() + ".audio.wav"
-		rel := filepath.ToSlash(filepath.Join(relDir, name))
-		if err := os.WriteFile(filepath.Join(s.logDir, rel), wav, 0o644); err != nil {
-			return nil, fmt.Errorf("write audio: %w", err)
-		}
-		rec.Summary.AudioPath = filepath.ToSlash(filepath.Join(s.logDir, rel))
-	}
-
-	relJSON := filepath.ToSlash(filepath.Join(relDir, report.GetReportId()+".json"))
-	rec.Summary.ReportPath = filepath.ToSlash(filepath.Join(s.logDir, relJSON))
-	summary = rec.Summary
-	encoded, err := json.MarshalIndent(rec, "", "  ")
+	summary, err := s.persistBugReportLocked(rec, report, now)
+	s.mu.Unlock()
 	if err != nil {
-		return nil, fmt.Errorf("encode bug report record: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(s.logDir, relJSON), encoded, 0o644); err != nil {
-		return nil, fmt.Errorf("write bug report record: %w", err)
+		return nil, err
 	}
 
-	eventCtx := eventlog.WithCorrelation(ctx, summary.CorrelationID)
-	eventName := "bug.report.filed"
-	eventMsg := "bug report filed"
-	if report.GetSource() == diagnosticsv1.BugReportSource_BUG_REPORT_SOURCE_AUTODETECT {
-		eventName = "bug.report.autodetected"
-		eventMsg = "bug report autodetected"
-	}
-	eventAttrs := []slog.Attr{
-		slog.String("component", "diagnostics.bugreport"),
-		slog.String("report_id", summary.ReportID),
-		slog.String("correlation_id", summary.CorrelationID),
-		slog.String("reporter_device_id", summary.ReporterDeviceID),
-		slog.String("subject_device_id", summary.SubjectDeviceID),
-		slog.String("source", summary.Source),
-		slog.String("report_path", summary.ReportPath),
-		slog.Int("tag_count", len(summary.Tags)),
-		slog.Bool("subject_offline", summary.SubjectOffline),
-	}
-	if tokenWord := strings.TrimSpace(report.GetSourceHints()["bug_token_word"]); tokenWord != "" {
-		eventAttrs = append(eventAttrs, slog.String("bug_token_word", tokenWord))
-	}
-	if tokenCode := strings.TrimSpace(report.GetSourceHints()["bug_token_code"]); tokenCode != "" {
-		eventAttrs = append(eventAttrs, slog.String("bug_token_code", tokenCode))
-	}
-	eventlog.Emit(eventCtx, eventName, slog.LevelInfo, eventMsg, eventAttrs...)
-
+	emitBugReportFiled(ctx, report, summary)
 	return &diagnosticsv1.BugReportAck{
 		ReportId:                 summary.ReportID,
 		CorrelationId:            summary.CorrelationID,
-		Status:                   status,
+		Status:                   plan.status,
 		ReportPath:               summary.ReportPath,
-		MergedAutodetectReportId: mergedAutodetectID,
-		Message: func() string {
-			if status == diagnosticsv1.BugReportStatus_BUG_REPORT_STATUS_MERGED_WITH_AUTODETECT {
-				return "merged_with_autodetect"
-			}
-			return "filed"
-		}(),
+		MergedAutodetectReportId: plan.mergedAutodetectID,
+		Message:                  bugReportFiledMessage(plan.status),
 	}, nil
 }
 
@@ -589,71 +470,11 @@ func (s *Service) subjectEvents(ctx context.Context, subjectID string, reportUni
 	if subjectID == "" {
 		return nil
 	}
-	readAll := s.readAllEvents
-	if readAll == nil {
-		readAll = query.ReadAll
-	}
-	queryCtx := ctx
-	if queryCtx == nil {
-		queryCtx = context.Background()
-	}
-	if budget := s.subjectEventsQueryBudget; budget > 0 {
-		var cancel context.CancelFunc
-		queryCtx, cancel = context.WithTimeout(queryCtx, budget)
-		defer cancel()
-	}
-	type eventReadResult struct {
-		records []query.Record
-		err     error
-	}
-	readDone := make(chan eventReadResult, 1)
-	// query.ReadAll is not context-aware, so run it in a goroutine and bound
-	// how long filing waits for enrichment before continuing without it.
-	go func() {
-		all, err := readAll(s.logDir)
-		readDone <- eventReadResult{records: all, err: err}
-	}()
-
-	var all []query.Record
-	select {
-	case <-queryCtx.Done():
-		return nil
-	case result := <-readDone:
-		if result.err != nil || len(result.records) == 0 {
-			return nil
-		}
-		all = result.records
-	}
+	all := s.readAllSubjectEvents(ctx)
 	if len(all) == 0 {
 		return nil
 	}
-	reportTime := time.UnixMilli(reportUnixMS).UTC()
-	if reportUnixMS <= 0 {
-		reportTime = s.now().UTC()
-	}
-	windowStart := reportTime.Add(-5 * time.Minute)
-	out := make([]query.Record, 0, 64)
-	for _, rec := range all {
-		devID := strings.TrimSpace(readString(rec, "device_id"))
-		if devID == "" {
-			devID = strings.TrimSpace(readString(rec, "subject_device_id"))
-		}
-		if devID != subjectID {
-			continue
-		}
-		ts := readTime(rec)
-		if ts.IsZero() {
-			continue
-		}
-		if ts.Before(windowStart) || ts.After(reportTime) {
-			continue
-		}
-		out = append(out, rec)
-		if len(out) > 64 {
-			out = out[len(out)-64:]
-		}
-	}
-	return out
+	return filterSubjectEvents(all, subjectID, reportUnixMS, s.now())
 }
 
 func readString(rec query.Record, key string) string {

@@ -115,22 +115,8 @@ func verifyMigrationFixtureStep(root string, step migrationPlanStep, scriptSourc
 		return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d: %v", ErrMigrationResourceLimit, step.Number, err)
 	}
 
-	if len(actualRecords) != len(expectedRecords) {
-		return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d key count mismatch (actual=%d expected=%d)", ErrMigrationFixtureMismatch, step.Number, len(actualRecords), len(expectedRecords))
-	}
-	for key, actualValue := range actualRecords {
-		expectedValue, ok := expectedRecords[key]
-		if !ok {
-			return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d expected missing key %q", ErrMigrationFixtureMismatch, step.Number, key)
-		}
-		if expectedValue != actualValue {
-			return runtimeMigrationResourceStats{}, runtimeFixtureValueMismatchError(step.Number, "", key, expectedValue, actualValue)
-		}
-	}
-	for key := range expectedRecords {
-		if _, ok := actualRecords[key]; !ok {
-			return runtimeMigrationResourceStats{}, fmt.Errorf("%w: step %04d expected contains extra key %q", ErrMigrationFixtureMismatch, step.Number, key)
-		}
+	if err := compareRuntimeFixtureRecords(actualRecords, expectedRecords, step.Number, ""); err != nil {
+		return runtimeMigrationResourceStats{}, err
 	}
 	if strings.EqualFold(strings.TrimSpace(step.DrainPolicy), "multi_version") {
 		if err := verifyMigrationReadAdapterStep(root, step, fixture, expectedRecords, seedRecords); err != nil {
@@ -281,60 +267,13 @@ func executeRuntimeMigrationFixture(scriptSource []byte, seedRecords map[string]
 	var writeVolume int64
 	storeOps := 0
 	for key, rawValue := range seedRecords {
-		var record map[string]any
-		if err := json.Unmarshal([]byte(rawValue), &record); err != nil {
-			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
-		}
-		skipRemainingTransforms := false
-		for _, transform := range transforms {
-			if skipRemainingTransforms {
-				break
-			}
-			switch transform.Operation {
-			case "skip_if_present":
-				if _, ok := record[transform.Source]; ok {
-					skipRemainingTransforms = true
-				}
-			case "copy":
-				record[transform.Destination] = runtimeMigrationFixtureValue(record, transform)
-			case "lower":
-				value, ok := runtimeMigrationFixtureStringValue(record, transform)
-				if !ok {
-					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
-				}
-				record[transform.Destination] = strings.ToLower(value)
-			case "trim":
-				value, ok := runtimeMigrationFixtureStringValue(record, transform)
-				if !ok {
-					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for trim()", key, transform.Source)
-				}
-				record[transform.Destination] = strings.TrimSpace(value)
-			case "lower_trim":
-				value, ok := runtimeMigrationFixtureStringValue(record, transform)
-				if !ok {
-					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for lower(trim())", key, transform.Source)
-				}
-				record[transform.Destination] = strings.ToLower(strings.TrimSpace(value))
-			case "literal":
-				record[transform.Destination] = transform.Value
-			case "delete":
-				delete(record, transform.Destination)
-			case "abort":
-				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
-			default:
-				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
-			}
-		}
-		canonical, err := json.Marshal(record)
+		canonicalValue, ops, writeBytes, err := migrateFixtureSeedRecord(key, rawValue, transforms)
 		if err != nil {
-			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
+			return nil, runtimeMigrationResourceStats{}, err
 		}
-		canonicalValue := string(canonical)
 		out[key] = canonicalValue
-		if canonicalValue != rawValue {
-			storeOps++
-			writeVolume += int64(len(canonical))
-		}
+		storeOps += ops
+		writeVolume += writeBytes
 	}
 	stats.StoreOps = storeOps
 	stats.WriteVolumeBytes = writeVolume
@@ -358,79 +297,55 @@ func executeRuntimeMigrationStoreFixture(scriptSource []byte, seedRecords map[st
 		out[key] = value
 	}
 
+	keys := storeFixtureKeys(seedRecords, plan.Prefix)
+	stats, err := migrateStoreFixtureKeys(out, keys, plan.Transforms)
+	if err != nil {
+		return nil, runtimeMigrationResourceStats{}, err
+	}
+	stats.Logs = logs
+	return out, stats, nil
+}
+
+func storeFixtureKeys(seedRecords map[string]string, prefix string) []string {
 	keys := make([]string, 0, len(seedRecords))
 	for key := range seedRecords {
-		if strings.HasPrefix(key, plan.Prefix) {
+		if strings.HasPrefix(key, prefix) {
 			keys = append(keys, key)
 		}
 	}
 	sort.Strings(keys)
+	return keys
+}
 
-	stats := runtimeMigrationResourceStats{Logs: logs}
+func migrateStoreFixtureKeys(out map[string]string, keys []string, transforms []runtimeMigrationFixtureTransform) (runtimeMigrationResourceStats, error) {
+	stats := runtimeMigrationResourceStats{}
 	for _, key := range keys {
 		var record map[string]any
 		if err := json.Unmarshal([]byte(out[key]), &record); err != nil {
-			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
+			return runtimeMigrationResourceStats{}, fmt.Errorf("seed key %q is not a JSON object: %w", key, err)
 		}
-		skipPut := false
-		for _, transform := range plan.Transforms {
-			if skipPut {
-				break
-			}
-			switch transform.Operation {
-			case "skip_if_present":
-				if _, ok := record[transform.Source]; ok {
-					skipPut = true
-				}
-			case "copy":
-				record[transform.Destination] = runtimeMigrationFixtureValue(record, transform)
-			case "lower":
-				value, ok := runtimeMigrationFixtureStringValue(record, transform)
-				if !ok {
-					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for lower()", key, transform.Source)
-				}
-				record[transform.Destination] = strings.ToLower(value)
-			case "trim":
-				value, ok := runtimeMigrationFixtureStringValue(record, transform)
-				if !ok {
-					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for trim()", key, transform.Source)
-				}
-				record[transform.Destination] = strings.TrimSpace(value)
-			case "lower_trim":
-				value, ok := runtimeMigrationFixtureStringValue(record, transform)
-				if !ok {
-					return nil, runtimeMigrationResourceStats{}, fmt.Errorf("record key %q field %q is not a string for lower(trim())", key, transform.Source)
-				}
-				record[transform.Destination] = strings.ToLower(strings.TrimSpace(value))
-			case "literal":
-				record[transform.Destination] = transform.Value
-			case "delete":
-				delete(record, transform.Destination)
-			case "delete_record":
-				delete(out, key)
-				stats.StoreOps++
-				skipPut = true
-			case "abort":
-				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("%w: %s", ErrMigrationAborted, transform.Reason)
-			default:
-				return nil, runtimeMigrationResourceStats{}, fmt.Errorf("unsupported fixture transform %q", transform.Operation)
-			}
+		deleted, skipPut, err := applyStoreFixtureTransforms(out, key, record, transforms)
+		if err != nil {
+			return runtimeMigrationResourceStats{}, err
 		}
 		if skipPut {
+			if deleted {
+				stats.StoreOps++
+			}
 			continue
 		}
-		canonical, err := json.Marshal(record)
+		canonicalValue, err := canonicalizeMigrationFixtureRecord(record)
 		if err != nil {
-			return nil, runtimeMigrationResourceStats{}, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
+			return runtimeMigrationResourceStats{}, fmt.Errorf("canonicalize migrated record %q: %w", key, err)
 		}
-		canonicalValue := string(canonical)
-		if canonicalValue != out[key] {
-			out[key] = canonicalValue
-			stats.StoreOps++
-			stats.WriteVolumeBytes += int64(len(canonical))
+		if canonicalValue == out[key] {
+			continue
 		}
+		out[key] = canonicalValue
+		stats.StoreOps++
+		stats.WriteVolumeBytes += int64(len(canonicalValue))
 	}
-	return out, stats, nil
+	return stats, nil
 }
 
 func collectRuntimeMigrationLogs(scriptSource []byte) []runtimeMigrationLogEntry {
