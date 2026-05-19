@@ -159,37 +159,7 @@ func (s *state) evalControlPlaneBusClaims(ctx context.Context, sub string, _ []s
 		return writeJSON(s.out, body)
 	}
 	claimsByDevice, _ := body["claims_by_device"].(map[string]any)
-	if len(claimsByDevice) == 0 {
-		_, err := fmt.Fprintln(s.out, "(no claims)")
-		return err
-	}
-	deviceIDs := make([]string, 0, len(claimsByDevice))
-	for deviceID := range claimsByDevice {
-		deviceIDs = append(deviceIDs, deviceID)
-	}
-	sort.Strings(deviceIDs)
-	for _, deviceID := range deviceIDs {
-		if _, err := fmt.Fprintf(s.out, "%s\n", deviceID); err != nil {
-			return err
-		}
-		claims, _ := claimsByDevice[deviceID].([]any)
-		if len(claims) == 0 {
-			if _, err := fmt.Fprintln(s.out, "  (none)"); err != nil {
-				return err
-			}
-			continue
-		}
-		for _, claimAny := range claims {
-			claim, _ := claimAny.(map[string]any)
-			if claim == nil {
-				continue
-			}
-			if _, err := fmt.Fprintf(s.out, "  - %s by %s\n", toString(claim["resource"]), toString(claim["activation_id"])); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return printClaimsByDeviceTree(s.out, claimsByDevice)
 }
 
 func (s *state) evalControlPlaneBusSimDevice(ctx context.Context, _ string, args []string, jsonOut bool) error {
@@ -199,39 +169,9 @@ func (s *state) evalControlPlaneBusSimDevice(ctx context.Context, _ string, args
 	deviceSub := strings.ToLower(strings.TrimSpace(args[1]))
 	switch deviceSub {
 	case "new":
-		plain := nonFlagArgsSkippingFlagValues(args[2:], "--caps")
-		if len(plain) < 1 {
-			return errors.New("usage: sim device new <id> [--caps <cap[,cap...]>]")
-		}
-		form := url.Values{"device_id": {plain[0]}}
-		if capsRaw := strings.TrimSpace(flagValue(args[2:], "--caps")); capsRaw != "" {
-			for _, capValue := range parseCSVValues(capsRaw) {
-				form.Add("caps", capValue)
-			}
-		}
-		body, err := s.postFormJSON(ctx, "/admin/api/sim/devices/new", form)
-		if err != nil {
-			return err
-		}
-		if jsonOut {
-			return writeJSON(s.out, body)
-		}
-		_, err = fmt.Fprintf(s.out, "OK  action=sim.device.new device=%s\n", plain[0])
-		return err
+		return s.evalSimDeviceNew(ctx, args[2:], jsonOut)
 	case "rm":
-		plain := nonFlagArgs(args[2:])
-		if len(plain) < 1 {
-			return errors.New("usage: sim device rm <id>")
-		}
-		body, err := s.postFormJSON(ctx, "/admin/api/sim/devices/rm", url.Values{"device_id": {plain[0]}})
-		if err != nil {
-			return err
-		}
-		if jsonOut {
-			return writeJSON(s.out, body)
-		}
-		_, err = fmt.Fprintf(s.out, "OK  action=sim.device.rm device=%s deleted=%s\n", plain[0], toString(body["deleted"]))
-		return err
+		return s.evalSimDeviceRm(ctx, args[2:], jsonOut)
 	default:
 		return fmt.Errorf("unknown command: sim device %s", deviceSub)
 	}

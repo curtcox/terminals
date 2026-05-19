@@ -30,31 +30,13 @@ func (s *scenarioRecipeState) start(ctx context.Context, env *Environment, recip
 	if env == nil {
 		return nil
 	}
-	targets := []string(nil)
-	if recipe.Resolve != nil {
-		targets = recipe.Resolve(ctx, env)
+	targets := resolveRecipeTargets(ctx, env, recipe)
+	if err := requestRecipeClaims(ctx, env, recipe, targets); err != nil {
+		return err
 	}
-
-	if routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok && recipe.Claims != nil {
-		if claims := routeIO.Claims(); claims != nil {
-			if _, err := claims.Request(ctx, recipe.Claims(targets)); err != nil && err != iorouter.ErrClaimConflict {
-				return err
-			}
-		}
-	}
-
-	var planHandle iorouter.PlanHandle
-	if routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner }); ok && recipe.MediaPlan != nil {
-		if planner := routeIO.MediaPlanner(); planner != nil {
-			plan := recipe.MediaPlan(targets)
-			if plan != nil {
-				handle, err := planner.Apply(ctx, *plan)
-				if err != nil {
-					return err
-				}
-				planHandle = handle
-			}
-		}
+	planHandle, err := applyRecipeMediaPlan(ctx, env, recipe, targets)
+	if err != nil {
+		return err
 	}
 
 	s.mu.Lock()

@@ -3,9 +3,6 @@ package scenario
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/curtcox/terminals/terminal_server/internal/device"
@@ -73,65 +70,6 @@ func resolveEndpointResource(
 		return compose(endpointID)
 	}
 	return fallback
-}
-
-func endpointResourceIDsForDevice(env *Environment, deviceID string, family string) []string {
-	caps := capabilitiesForDevice(env, deviceID)
-	if len(caps) == 0 {
-		return nil
-	}
-	family = strings.TrimSpace(strings.ToLower(family))
-	if family == "" {
-		return nil
-	}
-
-	endpointPrefix := family + ".endpoint."
-	endpoints := map[string]string{}
-	for key, value := range caps {
-		key = strings.TrimSpace(strings.ToLower(key))
-		if !strings.HasPrefix(key, endpointPrefix) {
-			continue
-		}
-		remainder := strings.TrimPrefix(key, endpointPrefix)
-		parts := strings.Split(remainder, ".")
-		if len(parts) < 2 {
-			continue
-		}
-		indexToken := strings.TrimSpace(parts[0])
-		fieldToken := strings.TrimSpace(parts[1])
-		if indexToken == "" || fieldToken != "id" {
-			continue
-		}
-		index, err := strconv.Atoi(indexToken)
-		if err != nil || index < 0 {
-			continue
-		}
-		if endpointID := sanitizeResourceToken(value); endpointID != "" {
-			endpoints[indexToken] = endpointID
-		}
-	}
-
-	if len(endpoints) == 0 {
-		return nil
-	}
-	indexes := make([]int, 0, len(endpoints))
-	for raw := range endpoints {
-		idx, err := strconv.Atoi(raw)
-		if err != nil {
-			continue
-		}
-		indexes = append(indexes, idx)
-	}
-	sort.Ints(indexes)
-	resolved := make([]string, 0, len(indexes))
-	for _, index := range indexes {
-		endpointID := endpoints[strconv.Itoa(index)]
-		if endpointID == "" {
-			endpointID = fmt.Sprintf("endpoint-%d", index)
-		}
-		resolved = append(resolved, endpointID)
-	}
-	return resolved
 }
 
 func capabilitiesForDevice(env *Environment, deviceID string) map[string]string {

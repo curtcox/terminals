@@ -882,24 +882,8 @@ func parseTALTestCases(path string) ([]talTestCase, error) {
 	}
 
 	for idx := 0; idx < len(lines); idx++ {
-		rawLine := lines[idx]
-		lineNo := idx + 1
-
-		for {
-			action, err := scanTALTestLine(path, rawLine, lineNo, &current, &currentIndent)
-			if err != nil {
-				return nil, err
-			}
-			if action == talScanBreak {
-				break
-			}
-			if action == talScanAppendCurrent {
-				if err := appendCurrent(); err != nil {
-					return nil, err
-				}
-				continue
-			}
-			break
+		if err := processTALTestLine(path, lines[idx], idx+1, &current, &currentIndent, appendCurrent); err != nil {
+			return nil, err
 		}
 	}
 	if err := appendCurrent(); err != nil {
@@ -917,6 +901,21 @@ const (
 	talScanBreak talScanAction = iota
 	talScanAppendCurrent
 )
+
+func processTALTestLine(path, rawLine string, lineNo int, current **talTestCase, currentIndent *int, appendCurrent func() error) error {
+	for {
+		action, err := scanTALTestLine(path, rawLine, lineNo, current, currentIndent)
+		if err != nil {
+			return err
+		}
+		if action == talScanBreak {
+			return nil
+		}
+		if err := appendCurrent(); err != nil {
+			return err
+		}
+	}
+}
 
 func scanTALTestLine(path, rawLine string, lineNo int, current **talTestCase, currentIndent *int) (talScanAction, error) {
 	trimmed := strings.TrimSpace(rawLine)

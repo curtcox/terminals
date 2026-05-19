@@ -28,67 +28,7 @@ func LoadAffordanceOptOutAllowlist(path string) ([]AffordanceOptOutEntry, error)
 	if err != nil {
 		return nil, err
 	}
-	lines := strings.Split(string(raw), "\n")
-	out := make([]AffordanceOptOutEntry, 0, 4)
-	var current *AffordanceOptOutEntry
-	flush := func() error {
-		if current == nil {
-			return nil
-		}
-		if strings.TrimSpace(current.ScenarioID) == "" ||
-			strings.TrimSpace(current.Reason) == "" ||
-			strings.TrimSpace(current.Approver) == "" ||
-			strings.TrimSpace(current.ExpiresAt) == "" {
-			return fmt.Errorf("affordance opt-out entry missing required field: %+v", *current)
-		}
-		out = append(out, *current)
-		current = nil
-		return nil
-	}
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "- ") {
-			if err := flush(); err != nil {
-				return nil, err
-			}
-			current = &AffordanceOptOutEntry{}
-			trimmed = strings.TrimPrefix(trimmed, "- ")
-			if trimmed == "" {
-				continue
-			}
-		}
-		if current == nil {
-			return nil, fmt.Errorf("invalid affordance opt-out format: %q", line)
-		}
-		key, value, ok := strings.Cut(trimmed, ":")
-		if !ok {
-			return nil, fmt.Errorf("invalid affordance opt-out entry line: %q", line)
-		}
-		key = strings.TrimSpace(key)
-		value = strings.Trim(strings.TrimSpace(value), "\"'")
-		switch key {
-		case "scenario_id":
-			current.ScenarioID = value
-		case "reason":
-			current.Reason = value
-		case "approver":
-			current.Approver = value
-		case "expires_at":
-			current.ExpiresAt = value
-		case "replacement_affordance":
-			current.ReplacementAffordance = value
-		default:
-			return nil, fmt.Errorf("unknown affordance opt-out field %q", key)
-		}
-	}
-	if err := flush(); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return parseAffordanceOptOutAllowlistLines(strings.Split(string(raw), "\n"))
 }
 
 // ValidateAffordanceOptOutAllowlist validates expiry and scenario references.

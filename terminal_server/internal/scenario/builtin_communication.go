@@ -114,15 +114,8 @@ func (s *InternalVideoCallScenario) Start(ctx context.Context, env *Environment)
 		return notifySource(ctx, env, sourceID, "Video call target unavailable")
 	}
 
-	if env.IO != nil {
-		for _, streamKind := range []string{"audio", "video"} {
-			if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
-				return err
-			}
-			if err := env.IO.Connect(targetID, sourceID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
-				return err
-			}
-		}
+	if err := connectBidirectionalStreams(env, sourceID, targetID, "audio", "video"); err != nil {
+		return err
 	}
 
 	if err := notifySource(ctx, env, sourceID, "Video call active: "+targetID); err != nil {
@@ -348,4 +341,19 @@ func (s *VoiceAssistantScenario) Suspend() error {
 // Resume restores assistant media resources and claims after preemption.
 func (s *VoiceAssistantScenario) Resume(ctx context.Context, env *Environment) error {
 	return s.Start(ctx, env)
+}
+
+func connectBidirectionalStreams(env *Environment, sourceID, targetID string, kinds ...string) error {
+	if env == nil || env.IO == nil {
+		return nil
+	}
+	for _, streamKind := range kinds {
+		if err := env.IO.Connect(sourceID, targetID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+			return err
+		}
+		if err := env.IO.Connect(targetID, sourceID, streamKind); err != nil && !errors.Is(err, iorouter.ErrRouteExists) {
+			return err
+		}
+	}
+	return nil
 }

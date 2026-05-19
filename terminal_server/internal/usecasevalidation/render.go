@@ -147,60 +147,6 @@ func renderDescriptor(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) 
 	}
 }
 
-func renderStack(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
-	if bg := d.Props["background"]; bg != "" {
-		fillRect(img, bounds, parseHexColorRGBA(bg))
-	}
-	children := d.Children
-	if len(children) == 0 {
-		return
-	}
-	inner := image.Rect(
-		bounds.Min.X+descPad,
-		bounds.Min.Y+descPad,
-		bounds.Max.X-descPad,
-		bounds.Max.Y-descPad,
-	)
-	if inner.Dx() <= 0 || inner.Dy() <= 0 {
-		return
-	}
-	heights := make([]int, len(children))
-	totalFixed, expandCount := 0, 0
-	for i, child := range children {
-		if child.Type == "expand" {
-			expandCount++
-			heights[i] = -1
-		} else {
-			h := estimateDescHeight(child, inner.Dx())
-			heights[i] = h
-			totalFixed += h
-		}
-	}
-	const gap = 8
-	gapTotal := gap * (len(children) - 1)
-	expandH := 20
-	if expandCount > 0 {
-		if remaining := inner.Dy() - totalFixed - gapTotal; remaining > 0 {
-			expandH = remaining / expandCount
-		}
-	}
-	y := inner.Min.Y
-	for i, child := range children {
-		h := heights[i]
-		if h < 0 {
-			h = expandH
-		}
-		childBounds := image.Rect(inner.Min.X, y, inner.Max.X, min(y+h, bounds.Max.Y-descPad))
-		if childBounds.Dy() > 0 {
-			renderDescriptor(img, child, childBounds)
-		}
-		y += h + gap
-		if y >= bounds.Max.Y-descPad {
-			break
-		}
-	}
-}
-
 func renderRow(img *image.RGBA, d ui.Descriptor, bounds image.Rectangle) {
 	if bg := d.Props["background"]; bg != "" {
 		fillRect(img, bounds, parseHexColorRGBA(bg))
@@ -564,34 +510,47 @@ func summarizeDescriptor(d ui.Descriptor) string {
 	if d.ID != "" {
 		parts = append(parts, "#"+d.ID)
 	}
-	props := d.Props
-	if len(props) > 0 {
-		keys := make([]string, 0, len(props))
-		for key := range props {
-			if key == "id" || key == "draw_ops_json" {
-				continue
-			}
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			if v := props[key]; v != "" {
-				parts = append(parts, key+"="+quoteSummary(v))
-			}
-		}
-	}
-	if len(d.Children) > 0 {
-		limit := min(len(d.Children), 4)
-		childParts := make([]string, 0, limit)
-		for _, child := range d.Children[:limit] {
-			childParts = append(childParts, summarizeDescriptor(child))
-		}
-		if len(d.Children) > 4 {
-			childParts = append(childParts, fmt.Sprintf("%d more", len(d.Children)-4))
-		}
-		parts = append(parts, "children=["+strings.Join(childParts, "; ")+"]")
+	parts = append(parts, summarizeDescriptorProps(d.Props)...)
+	if childSummary := summarizeDescriptorChildren(d.Children); childSummary != "" {
+		parts = append(parts, childSummary)
 	}
 	return strings.Join(parts, " ")
+}
+
+func summarizeDescriptorProps(props map[string]string) []string {
+	if len(props) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(props))
+	for key := range props {
+		if key == "id" || key == "draw_ops_json" {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if v := props[key]; v != "" {
+			out = append(out, key+"="+quoteSummary(v))
+		}
+	}
+	return out
+}
+
+func summarizeDescriptorChildren(children []ui.Descriptor) string {
+	if len(children) == 0 {
+		return ""
+	}
+	limit := min(len(children), 4)
+	childParts := make([]string, 0, limit)
+	for _, child := range children[:limit] {
+		childParts = append(childParts, summarizeDescriptor(child))
+	}
+	if len(children) > 4 {
+		childParts = append(childParts, fmt.Sprintf("%d more", len(children)-4))
+	}
+	return "children=[" + strings.Join(childParts, "; ") + "]"
 }
 
 func quoteSummary(value string) string {

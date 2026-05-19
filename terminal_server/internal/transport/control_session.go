@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 )
 
@@ -52,41 +51,11 @@ func (s *Session) Run(stream ControlStream) error {
 		}
 	}()
 	for {
-		in, err := stream.Recv()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				if state.connectedDeviceID != "" {
-					s.handler.HandleDisconnect(state.connectedDeviceID)
-					_ = s.control.Disconnect(stream.Context(), state.connectedDeviceID)
-				}
-				return nil
-			}
+		var done bool
+		var err error
+		done, capabilityReady, err = s.runOneClientMessage(stream.Context(), stream, &state, capabilityReady, send)
+		if done || err != nil {
 			return err
-		}
-
-		if sessionErr := validateSessionMessage(state.connectedDeviceID, capabilityReady, in); sessionErr != nil {
-			s.handler.NoteProtocolError()
-			if sendErr := send(ServerMessage{
-				ErrorCode: ErrorCodeProtocolViolation,
-				Error:     sessionErr.Error(),
-			}); sendErr != nil {
-				return sendErr
-			}
-			continue
-		}
-
-		capabilityReady = state.observeClientMessage(in, capabilityReady, send)
-		in.SessionDeviceID = state.connectedDeviceID
-
-		out, handleErr := s.handler.HandleMessage(stream.Context(), in)
-		if err := s.sendSessionMessages(out, state.connectedDeviceID, send); err != nil {
-			return err
-		}
-		if shouldContinueSession(out, handleErr) {
-			continue
-		}
-		if handleErr != nil {
-			return handleErr
 		}
 	}
 }

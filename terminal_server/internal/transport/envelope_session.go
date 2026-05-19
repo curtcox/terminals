@@ -51,47 +51,56 @@ type envelopeProtoStream struct {
 
 func (e *envelopeProtoStream) RecvProto() (ProtoClientEnvelope, error) {
 	for {
-		env, err := e.stream.ReadEnvelope()
+		msg, again, err := e.recvNextEnvelope()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil, io.EOF
-			}
 			return nil, err
 		}
-		if env == nil {
+		if again {
 			continue
 		}
-
-		if err := e.processSequence(env.GetSequence()); err != nil {
-			return nil, err
-		}
-
-		if hello := env.GetTransportHello(); hello != nil {
-			if err := e.handleHello(hello, env.GetSessionId()); err != nil {
-				return nil, err
-			}
-			continue
-		}
-
-		e.mu.Lock()
-		helloAcked := e.helloAcked
-		e.mu.Unlock()
-		if !helloAcked {
-			return nil, fmt.Errorf("transport hello required before client messages")
-		}
-
-		if msg := env.GetClientMessage(); msg != nil {
-			return msg, nil
-		}
-
-		if env.GetTransportHeartbeat() != nil {
-			continue
-		}
-
-		if terr := env.GetTransportError(); terr != nil {
-			return nil, fmt.Errorf("transport error %s: %s", terr.GetCode(), terr.GetMessage())
-		}
+		return msg, nil
 	}
+}
+
+func (e *envelopeProtoStream) recvNextEnvelope() (ProtoClientEnvelope, bool, error) {
+	env, err := e.stream.ReadEnvelope()
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, false, io.EOF
+		}
+		return nil, false, err
+	}
+	if env == nil {
+		return nil, true, nil
+	}
+	if err := e.processSequence(env.GetSequence()); err != nil {
+		return nil, false, err
+	}
+	if hello := env.GetTransportHello(); hello != nil {
+		if err := e.handleHello(hello, env.GetSessionId()); err != nil {
+			return nil, false, err
+		}
+		return nil, true, nil
+	}
+	if !e.helloAcknowledged() {
+		return nil, false, fmt.Errorf("transport hello required before client messages")
+	}
+	if msg := env.GetClientMessage(); msg != nil {
+		return msg, false, nil
+	}
+	if env.GetTransportHeartbeat() != nil {
+		return nil, true, nil
+	}
+	if terr := env.GetTransportError(); terr != nil {
+		return nil, false, fmt.Errorf("transport error %s: %s", terr.GetCode(), terr.GetMessage())
+	}
+	return nil, true, nil
+}
+
+func (e *envelopeProtoStream) helloAcknowledged() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.helloAcked
 }
 
 func (e *envelopeProtoStream) SendProto(msg ProtoServerEnvelope) error {

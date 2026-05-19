@@ -169,59 +169,15 @@ func (e *Engine) Activate(ctx context.Context, env *Environment, name string, de
 // ActivateMatched starts a pre-matched activation across target devices.
 func (e *Engine) ActivateMatched(ctx context.Context, env *Environment, match MatchResult, deviceIDs []string) error {
 	e.mu.Lock()
-	reg := match.Registration
-	name := strings.TrimSpace(reg.name())
-	if name == "" || match.Activation == nil {
-		e.mu.Unlock()
-		return ErrScenarioNotFound
-	}
-
-	toSuspend := make(map[Scenario]struct{})
-	for _, deviceID := range deviceIDs {
-		if active, ok := e.activeByDev[deviceID]; ok {
-			if active.priority > reg.Priority {
-				// A higher-priority scenario already owns this device.
-				continue
-			}
-			if active.priority < reg.Priority {
-				e.suspendedDev[deviceID] = append(e.suspendedDev[deviceID], active)
-				toSuspend[active.scenario] = struct{}{}
-			}
-		}
-		e.activeByDev[deviceID] = activeScenario{
-			name:     name,
-			priority: reg.Priority,
-			scenario: match.Activation,
-		}
-	}
+	plan, err := planActivation(e, match.Registration, match.Activation, deviceIDs)
 	e.mu.Unlock()
-
-	for suspended := range toSuspend {
-		s, ok := suspended.(Suspendable)
-		if !ok {
-			continue
-		}
-		if err := s.Suspend(); err != nil {
-			return err
-		}
+	if err != nil {
+		return err
 	}
-
-	if resultScenario, ok := match.Activation.(ResultScenario); ok {
-		result, err := resultScenario.StartResult(ctx, env)
-		if err != nil {
-			return err
-		}
-		if err := ExecuteOperations(ctx, env, result.Ops, match.Request.RequestedAt); err != nil {
-			return err
-		}
-		for _, trigger := range result.Emit {
-			if env != nil && env.TriggerBus != nil {
-				env.TriggerBus.Publish(trigger)
-			}
-		}
-		return nil
+	if err := suspendScenarios(plan); err != nil {
+		return err
 	}
-	return match.Activation.Start(ctx, env)
+	return startMatchedActivation(ctx, env, match)
 }
 
 // Stop deactivates the named scenario and resumes any suspended scenario.

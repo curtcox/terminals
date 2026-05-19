@@ -6,8 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -170,59 +168,9 @@ func (s *Service) ArchiveKey(keyID string) error {
 // This is a critical_mutating operation; the caller is responsible for enforcing
 // operator confirmation before calling.
 func (s *Service) RotateAccept(oldStmt OldKeyRotationStatement, newStmt NewKeyRotationStatement) (*RotationRecord, error) {
-	if oldStmt.Schema != "rotation-stmt/1" {
-		return nil, errors.New("trust: OldKeyRotationStatement has wrong schema (want rotation-stmt/1)")
-	}
-	if newStmt.Schema != "rotation-stmt/1" {
-		return nil, errors.New("trust: NewKeyRotationStatement has wrong schema (want rotation-stmt/1)")
-	}
-	if oldStmt.NewKey != newStmt.NewKey {
-		return nil, errors.New("trust: new_key mismatch between old and new rotation statements")
-	}
-
-	// Parse and verify old key signature.
-	oldPub, err := parseKeyID(oldStmt.OldKey)
+	_, newPub, err := validateRotationStatements(oldStmt, newStmt)
 	if err != nil {
-		return nil, fmt.Errorf("trust: rotation old_key: %w", err)
-	}
-	oldPayload, err := json.Marshal(struct {
-		Schema    string   `json:"schema"`
-		OldKey    string   `json:"old_key"`
-		NewKey    string   `json:"new_key"`
-		Proposed  int64    `json:"proposed_at"`
-		NameScope []string `json:"name_scope"`
-		Reason    string   `json:"reason,omitempty"`
-	}{oldStmt.Schema, oldStmt.OldKey, oldStmt.NewKey, oldStmt.ProposedAt, oldStmt.NameScope, oldStmt.Reason})
-	if err != nil {
-		return nil, fmt.Errorf("trust: marshal old rotation statement: %w", err)
-	}
-	if !ed25519.Verify(oldPub, oldPayload, oldStmt.SigOld) {
-		return nil, errors.New("trust: old rotation statement signature verification failed")
-	}
-
-	// Verify the new statement's digest matches the old statement payload.
-	oldDigest := "sha256:" + hex.EncodeToString(func() []byte { h := sha256.Sum256(oldPayload); return h[:] }())
-	if newStmt.OldKeyStmtDigest != oldDigest {
-		return nil, fmt.Errorf("trust: new rotation statement old_key_stmt_digest mismatch: got %s want %s",
-			newStmt.OldKeyStmtDigest, oldDigest)
-	}
-
-	// Parse and verify new key signature.
-	newPub, err := parseKeyID(newStmt.NewKey)
-	if err != nil {
-		return nil, fmt.Errorf("trust: rotation new_key: %w", err)
-	}
-	newPayload, err := json.Marshal(struct {
-		Schema    string `json:"schema"`
-		OldDigest string `json:"old_key_stmt_digest"`
-		NewKey    string `json:"new_key"`
-		AcceptAt  int64  `json:"accept_at"`
-	}{newStmt.Schema, newStmt.OldKeyStmtDigest, newStmt.NewKey, newStmt.AcceptAt})
-	if err != nil {
-		return nil, fmt.Errorf("trust: marshal new rotation statement: %w", err)
-	}
-	if !ed25519.Verify(newPub, newPayload, newStmt.SigNew) {
-		return nil, errors.New("trust: new rotation statement signature verification failed (only old key signature is not sufficient)")
+		return nil, err
 	}
 
 	s.mu.Lock()
@@ -390,41 +338,8 @@ func (s *Service) VerifyChain() error {
 		return nil
 	}
 	for i, e := range s.log {
-		// Recompute this_hash.
-		want := computeLogHash(e.Seq, e.At, e.Actor, e.Op, e.Args, e.PrevHash)
-		if e.ThisHash != want {
-			return fmt.Errorf("trust: log entry %d hash mismatch: got %s want %s", i+1, e.ThisHash, want)
-		}
-		// Verify prev_hash chain.
-		if i > 0 && e.PrevHash != s.log[i-1].ThisHash {
-			return fmt.Errorf("trust: log chain broken at entry %d: prev_hash mismatch", i+1)
-		}
-		// Verify installer signature over this_hash using the key that was active
-		// when the entry was appended (identified by InstallerKeyID).
-		sigBytes, err := base64.StdEncoding.DecodeString(e.InstallerSig)
-		if err != nil {
-			return fmt.Errorf("trust: log entry %d installer_sig is not valid base64: %w", i+1, err)
-		}
-		// Determine the public key for this entry.
-		var verifyPub ed25519.PublicKey
-		if e.InstallerKeyID == "" {
-			// Legacy entries without a key ID: use the current installer key.
-			verifyPub = s.installerPub
-		} else {
-			rec, ok := s.keys[e.InstallerKeyID]
-			if !ok {
-				// Fall back to parsing from the key ID itself.
-				parsed, parseErr := parseKeyID(e.InstallerKeyID)
-				if parseErr != nil {
-					return fmt.Errorf("trust: log entry %d references unknown installer key %s", i+1, e.InstallerKeyID)
-				}
-				verifyPub = parsed
-			} else {
-				verifyPub = rec.PubKey
-			}
-		}
-		if !ed25519.Verify(verifyPub, []byte(e.ThisHash), sigBytes) {
-			return fmt.Errorf("trust: log entry %d installer signature verification failed", i+1)
+		if err := s.verifyLogEntry(i, e); err != nil {
+			return err
 		}
 	}
 	return nil
