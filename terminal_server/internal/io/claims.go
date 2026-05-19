@@ -141,33 +141,19 @@ func (m *ClaimManager) Release(_ context.Context, activationID string) error {
 	affected := map[resourceKey]struct{}{}
 	for _, claim := range m.activeByAct[activationID] {
 		key := resourceKey{deviceID: claim.DeviceID, resource: claim.Resource}
-		active := m.activeByResource[key]
-		next := make([]Claim, 0, len(active))
-		for _, existing := range active {
-			if existing.ActivationID == activationID {
-				continue
-			}
-			next = append(next, existing)
-		}
-		m.activeByResource[key] = next
+		m.activeByResource[key] = claimsExceptActivation(m.activeByResource[key], activationID)
 		affected[key] = struct{}{}
 	}
 	delete(m.activeByAct, activationID)
 
 	// Drop any parked claims owned by the released activation too.
 	for key, parked := range m.parkedByResource {
-		next := parked[:0]
-		for _, existing := range parked {
-			if existing.ActivationID == activationID {
-				continue
-			}
-			next = append(next, existing)
-		}
+		next := claimsExceptActivation(parked, activationID)
 		if len(next) == 0 {
 			delete(m.parkedByResource, key)
 			continue
 		}
-		m.parkedByResource[key] = append([]Claim(nil), next...)
+		m.parkedByResource[key] = next
 		affected[key] = struct{}{}
 	}
 	delete(m.parkedByAct, activationID)
@@ -176,6 +162,16 @@ func (m *ClaimManager) Release(_ context.Context, activationID string) error {
 		m.restoreParkedForResource(key)
 	}
 	return nil
+}
+
+func claimsExceptActivation(claims []Claim, activationID string) []Claim {
+	next := make([]Claim, 0, len(claims))
+	for _, existing := range claims {
+		if existing.ActivationID != activationID {
+			next = append(next, existing)
+		}
+	}
+	return next
 }
 
 // ReleaseClaims removes only the provided claims and restores parked claims

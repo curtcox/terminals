@@ -294,6 +294,23 @@ func (m *DiskManager) streamAudioPath(streamID string) string {
 // ListPlayableArtifacts returns playable audio artifacts discovered in the
 // recording directory. Artifacts are ordered by newest first.
 func (m *DiskManager) ListPlayableArtifacts() []Artifact {
+	artifacts := make([]Artifact, 0)
+	for streamID, stream := range m.playableCandidates() {
+		if artifact, ok := m.playableArtifact(streamID, stream); ok {
+			artifacts = append(artifacts, artifact)
+		}
+	}
+
+	sort.Slice(artifacts, func(i, j int) bool {
+		if artifacts[i].UpdatedUnixMS == artifacts[j].UpdatedUnixMS {
+			return artifacts[i].ArtifactID < artifacts[j].ArtifactID
+		}
+		return artifacts[i].UpdatedUnixMS > artifacts[j].UpdatedUnixMS
+	})
+	return artifacts
+}
+
+func (m *DiskManager) playableCandidates() map[string]Stream {
 	candidates := map[string]Stream{}
 	for streamID, stream := range m.Active() {
 		candidates[streamID] = stream
@@ -315,33 +332,25 @@ func (m *DiskManager) ListPlayableArtifacts() []Artifact {
 		}
 		candidates[event.StreamID] = stream
 	}
+	return candidates
+}
 
-	artifacts := make([]Artifact, 0, len(candidates))
-	for streamID, stream := range candidates {
-		audioPath := m.streamAudioPath(streamID)
-		stat, err := os.Stat(audioPath)
-		if err != nil || stat.Size() <= 0 {
-			continue
-		}
-		artifacts = append(artifacts, Artifact{
-			ArtifactID:     streamID,
-			StreamID:       streamID,
-			Kind:           stream.Kind,
-			SourceDeviceID: stream.SourceDeviceID,
-			TargetDeviceID: stream.TargetDeviceID,
-			AudioPath:      audioPath,
-			SizeBytes:      stat.Size(),
-			UpdatedUnixMS:  stat.ModTime().UnixMilli(),
-		})
+func (m *DiskManager) playableArtifact(streamID string, stream Stream) (Artifact, bool) {
+	audioPath := m.streamAudioPath(streamID)
+	stat, err := os.Stat(audioPath)
+	if err != nil || stat.Size() <= 0 {
+		return Artifact{}, false
 	}
-
-	sort.Slice(artifacts, func(i, j int) bool {
-		if artifacts[i].UpdatedUnixMS == artifacts[j].UpdatedUnixMS {
-			return artifacts[i].ArtifactID < artifacts[j].ArtifactID
-		}
-		return artifacts[i].UpdatedUnixMS > artifacts[j].UpdatedUnixMS
-	})
-	return artifacts
+	return Artifact{
+		ArtifactID:     streamID,
+		StreamID:       streamID,
+		Kind:           stream.Kind,
+		SourceDeviceID: stream.SourceDeviceID,
+		TargetDeviceID: stream.TargetDeviceID,
+		AudioPath:      audioPath,
+		SizeBytes:      stat.Size(),
+		UpdatedUnixMS:  stat.ModTime().UnixMilli(),
+	}, true
 }
 
 // PlaybackMetadata resolves one playback artifact for a target device.

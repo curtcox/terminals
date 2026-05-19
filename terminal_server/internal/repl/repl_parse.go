@@ -9,37 +9,53 @@ import (
 func splitSegments(line string) []string {
 	segments := make([]string, 0)
 	var b strings.Builder
-	inSingle := false
-	inDouble := false
+	var quote splitQuoteState
 	for _, r := range line {
-		switch r {
-		case '\'':
-			if !inDouble {
-				inSingle = !inSingle
-			}
+		if quote.update(r) {
 			b.WriteRune(r)
-		case '"':
-			if !inSingle {
-				inDouble = !inDouble
-			}
-			b.WriteRune(r)
-		case ';':
-			if inSingle || inDouble {
-				b.WriteRune(r)
-				continue
-			}
-			segment := strings.TrimSpace(b.String())
-			if segment != "" {
-				segments = append(segments, segment)
-			}
-			b.Reset()
-		default:
-			b.WriteRune(r)
+			continue
 		}
+		if r != ';' || quote.inQuote() {
+			b.WriteRune(r)
+			continue
+		}
+		segments = appendSegment(segments, &b)
 	}
-	if tail := strings.TrimSpace(b.String()); tail != "" {
-		segments = append(segments, tail)
+	return appendSegment(segments, &b)
+}
+
+type splitQuoteState struct {
+	inSingle bool
+	inDouble bool
+}
+
+func (q *splitQuoteState) update(r rune) bool {
+	switch r {
+	case '\'':
+		if !q.inDouble {
+			q.inSingle = !q.inSingle
+		}
+		return true
+	case '"':
+		if !q.inSingle {
+			q.inDouble = !q.inDouble
+		}
+		return true
+	default:
+		return false
 	}
+}
+
+func (q splitQuoteState) inQuote() bool {
+	return q.inSingle || q.inDouble
+}
+
+func appendSegment(segments []string, b *strings.Builder) []string {
+	segment := strings.TrimSpace(b.String())
+	if segment != "" {
+		segments = append(segments, segment)
+	}
+	b.Reset()
 	return segments
 }
 

@@ -509,16 +509,9 @@ func (s *Service) findRecentAutodetectLocked(subjectID string, now time.Time, wi
 func (s *Service) readAllRecords() ([]Record, error) {
 	entries := make([]string, 0, 128)
 	err := filepath.WalkDir(s.rootDir, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return nil
+		if isBugReportRecordFile(d, walkErr) {
+			entries = append(entries, path)
 		}
-		if d == nil || d.IsDir() {
-			return nil
-		}
-		if !strings.HasSuffix(strings.ToLower(d.Name()), ".json") {
-			return nil
-		}
-		entries = append(entries, path)
 		return nil
 	})
 	if err != nil && !os.IsNotExist(err) {
@@ -541,6 +534,13 @@ func (s *Service) readAllRecords() ([]Record, error) {
 		records = append(records, rec)
 	}
 	return records, nil
+}
+
+func isBugReportRecordFile(d fs.DirEntry, walkErr error) bool {
+	if walkErr != nil || d == nil || d.IsDir() {
+		return false
+	}
+	return strings.HasSuffix(strings.ToLower(d.Name()), ".json")
 }
 
 func (s *Service) subjectSnapshot(subjectID string) (*SubjectSnapshot, bool) {

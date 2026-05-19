@@ -250,43 +250,15 @@ func VerifyPackage(tapBytes []byte, sigBytes []byte) (VerifiedPackage, error) {
 }
 
 func collectSourceFiles(root string) ([]string, error) {
-	relPaths := make([]string, 0, 16)
-	err := filepath.WalkDir(root, func(current string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if current == root {
-			return nil
-		}
-
-		rel, err := filepath.Rel(root, current)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		if err := validateRelativeArchivePath(rel); err != nil {
-			return fmt.Errorf("%w: %s", ErrPathTraversalDetected, rel)
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-		if !d.Type().IsRegular() {
-			return fmt.Errorf("%w: %s", ErrInvalidTarEntry, rel)
-		}
-		if err := validateTopLevelPath(rel); err != nil {
-			return err
-		}
-		relPaths = append(relPaths, rel)
-		return nil
-	})
+	collector := sourceFileCollector{root: root, relPaths: make([]string, 0, 16)}
+	err := filepath.WalkDir(root, collector.visit)
 	if err != nil {
 		return nil, err
 	}
 
 	hasManifest := false
 	hasMain := false
-	for _, rel := range relPaths {
+	for _, rel := range collector.relPaths {
 		switch rel {
 		case "manifest.toml":
 			hasManifest = true
@@ -301,8 +273,49 @@ func collectSourceFiles(root string) ([]string, error) {
 		return nil, ErrMissingMainTAL
 	}
 
-	sort.Strings(relPaths)
-	return relPaths, nil
+	sort.Strings(collector.relPaths)
+	return collector.relPaths, nil
+}
+
+type sourceFileCollector struct {
+	root     string
+	relPaths []string
+}
+
+func (c *sourceFileCollector) visit(current string, d fs.DirEntry, walkErr error) error {
+	if walkErr != nil || current == c.root {
+		return walkErr
+	}
+	rel, err := filepath.Rel(c.root, current)
+	if err != nil {
+		return err
+	}
+	rel = filepath.ToSlash(rel)
+	if d.IsDir() {
+		return validateSourceArchivePath(rel)
+	}
+	if err := validateSourceFileEntry(rel, d); err != nil {
+		return err
+	}
+	c.relPaths = append(c.relPaths, rel)
+	return nil
+}
+
+func validateSourceFileEntry(rel string, d fs.DirEntry) error {
+	if err := validateSourceArchivePath(rel); err != nil {
+		return err
+	}
+	if !d.Type().IsRegular() {
+		return fmt.Errorf("%w: %s", ErrInvalidTarEntry, rel)
+	}
+	return validateTopLevelPath(rel)
+}
+
+func validateSourceArchivePath(rel string) error {
+	if err := validateRelativeArchivePath(rel); err != nil {
+		return fmt.Errorf("%w: %s", ErrPathTraversalDetected, rel)
+	}
+	return nil
 }
 
 func buildCanonicalTar(root string, packageName string, relPaths []string) ([]byte, error) {
