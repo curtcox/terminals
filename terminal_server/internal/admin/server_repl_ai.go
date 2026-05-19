@@ -59,51 +59,39 @@ func (h *Handler) handleReplAISelection(w http.ResponseWriter, req *http.Request
 	}
 	switch req.Method {
 	case http.MethodGet:
-		sessionID := strings.TrimSpace(req.URL.Query().Get("session_id"))
-		resp, err := h.ai.GetSelection(req.Context(), replai.GetSelectionRequest{SessionID: sessionID})
-		if err != nil {
-			status := http.StatusInternalServerError
-			if errors.Is(err, replai.ErrMissingSessionID) ||
-				errors.Is(err, replai.ErrMissingProvider) ||
-				errors.Is(err, replai.ErrMissingModel) ||
-				errors.Is(err, replai.ErrProviderNotFound) {
-				status = http.StatusBadRequest
-			}
-			if errors.Is(err, replsession.ErrSessionNotFound) {
-				status = http.StatusNotFound
-			}
-			h.writeJSONError(w, status, err.Error())
-			return
-		}
-		h.writeJSON(w, http.StatusOK, resp)
+		h.handleReplAISelectionGet(w, req)
 	case http.MethodPost:
-		if err := req.ParseForm(); err != nil {
-			h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
-			return
-		}
-		resp, err := h.ai.SetSelection(req.Context(), replai.SetSelectionRequest{
-			SessionID: strings.TrimSpace(req.Form.Get("session_id")),
-			Provider:  strings.TrimSpace(req.Form.Get("provider")),
-			Model:     strings.TrimSpace(req.Form.Get("model")),
-		})
-		if err != nil {
-			status := http.StatusInternalServerError
-			if errors.Is(err, replai.ErrMissingSessionID) ||
-				errors.Is(err, replai.ErrMissingProvider) ||
-				errors.Is(err, replai.ErrMissingModel) ||
-				errors.Is(err, replai.ErrProviderNotFound) {
-				status = http.StatusBadRequest
-			}
-			if errors.Is(err, replsession.ErrSessionNotFound) {
-				status = http.StatusNotFound
-			}
-			h.writeJSONError(w, status, err.Error())
-			return
-		}
-		h.writeJSON(w, http.StatusOK, resp)
+		h.handleReplAISelectionPost(w, req)
 	default:
 		h.writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func (h *Handler) handleReplAISelectionGet(w http.ResponseWriter, req *http.Request) {
+	sessionID := strings.TrimSpace(req.URL.Query().Get("session_id"))
+	resp, err := h.ai.GetSelection(req.Context(), replai.GetSelectionRequest{SessionID: sessionID})
+	if err != nil {
+		h.writeReplAIError(w, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) handleReplAISelectionPost(w http.ResponseWriter, req *http.Request) {
+	if err := req.ParseForm(); err != nil {
+		h.writeJSONError(w, http.StatusBadRequest, "invalid form body")
+		return
+	}
+	resp, err := h.ai.SetSelection(req.Context(), replai.SetSelectionRequest{
+		SessionID: strings.TrimSpace(req.Form.Get("session_id")),
+		Provider:  strings.TrimSpace(req.Form.Get("provider")),
+		Model:     strings.TrimSpace(req.Form.Get("model")),
+	})
+	if err != nil {
+		h.writeReplAIError(w, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) handleReplAIAsk(w http.ResponseWriter, req *http.Request) {

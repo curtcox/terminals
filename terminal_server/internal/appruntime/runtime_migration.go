@@ -553,8 +553,29 @@ func dryRunMigrationBoundary(pkg Package, kernelAPIVersion string, name string, 
 		return MigrationDryRunResult{}, fmt.Errorf("set dry-run drain readiness: %w", err)
 	}
 
+	isolated.migrationHook = migrationDryRunCrashHook(boundary)
+
+	interrupted, err := isolated.RetryMigration(resolvedName)
+	if !errors.Is(err, ErrMigrationInterrupted) {
+		return MigrationDryRunResult{}, fmt.Errorf("dry-run boundary %s/%d did not interrupt: %w", boundary.Event, boundary.Step, err)
+	}
+
+	replay, final, err := replayMigrationDryRun(kernelAPIVersion, copyRoot, resolvedName)
+	if err != nil {
+		return MigrationDryRunResult{}, err
+	}
+
+	return MigrationDryRunResult{
+		Boundary:    boundary,
+		Replay:      replay,
+		Final:       final,
+		Interrupted: interrupted,
+	}, nil
+}
+
+func migrationDryRunCrashHook(boundary MigrationDryRunBoundary) func(event string, step int) error {
 	crashInjected := false
-	isolated.migrationHook = func(event string, step int) error {
+	return func(event string, step int) error {
 		if crashInjected {
 			return nil
 		}
@@ -564,43 +585,32 @@ func dryRunMigrationBoundary(pkg Package, kernelAPIVersion string, name string, 
 		}
 		return nil
 	}
+}
 
-	interrupted, err := isolated.RetryMigration(resolvedName)
-	if !errors.Is(err, ErrMigrationInterrupted) {
-		return MigrationDryRunResult{}, fmt.Errorf("dry-run boundary %s/%d did not interrupt: %w", boundary.Event, boundary.Step, err)
-	}
-
+func replayMigrationDryRun(kernelAPIVersion, copyRoot, appName string) (replay, final MigrationStatus, err error) {
 	restarted := NewRuntimeWithKernelAPI(kernelAPIVersion)
 	restarted.skipDryRunGate = true
 	if _, err := restarted.LoadPackage(context.Background(), copyRoot); err != nil {
-		return MigrationDryRunResult{}, fmt.Errorf("reload dry-run package: %w", err)
+		return MigrationStatus{}, MigrationStatus{}, fmt.Errorf("reload dry-run package: %w", err)
 	}
-	if err := restarted.SetMigrationDrainReady(resolvedName, true); err != nil {
-		return MigrationDryRunResult{}, fmt.Errorf("set replay drain readiness: %w", err)
+	if err := restarted.SetMigrationDrainReady(appName, true); err != nil {
+		return MigrationStatus{}, MigrationStatus{}, fmt.Errorf("set replay drain readiness: %w", err)
 	}
-
-	replay, err := restarted.GetMigrationStatus(resolvedName)
+	replay, err = restarted.GetMigrationStatus(appName)
 	if err != nil {
-		return MigrationDryRunResult{}, fmt.Errorf("read replay status: %w", err)
+		return MigrationStatus{}, MigrationStatus{}, fmt.Errorf("read replay status: %w", err)
 	}
 	if replay.Verdict != "step_failed" {
-		return MigrationDryRunResult{}, fmt.Errorf("dry-run replay verdict = %q, want step_failed", replay.Verdict)
+		return MigrationStatus{}, MigrationStatus{}, fmt.Errorf("dry-run replay verdict = %q, want step_failed", replay.Verdict)
 	}
-
-	final, err := restarted.RetryMigration(resolvedName)
+	final, err = restarted.RetryMigration(appName)
 	if err != nil {
-		return MigrationDryRunResult{}, fmt.Errorf("resume replayed migration: %w", err)
+		return MigrationStatus{}, MigrationStatus{}, fmt.Errorf("resume replayed migration: %w", err)
 	}
 	if final.Verdict != "ok" {
-		return MigrationDryRunResult{}, fmt.Errorf("dry-run final verdict = %q, want ok", final.Verdict)
+		return MigrationStatus{}, MigrationStatus{}, fmt.Errorf("dry-run final verdict = %q, want ok", final.Verdict)
 	}
-
-	return MigrationDryRunResult{
-		Boundary:    boundary,
-		Replay:      replay,
-		Final:       final,
-		Interrupted: interrupted,
-	}, nil
+	return replay, final, nil
 }
 
 func migrationJournalDryRunBoundaries(root string, plan []migrationPlanStep) ([]MigrationDryRunBoundary, error) {

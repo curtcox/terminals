@@ -23,8 +23,20 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 	}
 	hasFixtureDeclarations := len(manifest.Migrate.Fixture) > 0
 
+	match, err := selectRuntimeMigrationFixture(manifest.Migrate.Fixture, step)
+	if err != nil {
+		return nil, err
+	}
+	if match == nil && hasFixtureDeclarations {
+		return nil, fmt.Errorf("%w: step %04d missing migrate.fixture declaration", ErrMigrationFixtureUnavailable, step.Number)
+	}
+
+	return match, nil
+}
+
+func selectRuntimeMigrationFixture(declarations []migrationManifestFixture, step migrationPlanStep) (*runtimeMigrationFixture, error) {
 	var match *runtimeMigrationFixture
-	for _, fixture := range manifest.Migrate.Fixture {
+	for _, fixture := range declarations {
 		stepIDRaw := strings.TrimSpace(fixture.Step)
 		if stepIDRaw == "" {
 			continue
@@ -53,10 +65,6 @@ func findRuntimeMigrationFixture(root string, step migrationPlanStep) (*runtimeM
 			ReadAdapterPath: strings.TrimSpace(fixture.ReadAdapter),
 		}
 	}
-	if match == nil && hasFixtureDeclarations {
-		return nil, fmt.Errorf("%w: step %04d missing migrate.fixture declaration", ErrMigrationFixtureUnavailable, step.Number)
-	}
-
 	return match, nil
 }
 

@@ -134,61 +134,76 @@ func (s *state) eval(ctx context.Context, line string) (bool, error) {
 
 func (s *state) evalOne(ctx context.Context, tokens []string) (bool, error) {
 	cmd := strings.ToLower(tokens[0])
+	if exit, handled, err := s.evalOneBuiltin(ctx, cmd, tokens); handled {
+		return exit, err
+	}
+	return s.evalOneDispatch(ctx, cmd, tokens)
+}
+
+func (s *state) evalOneBuiltin(ctx context.Context, cmd string, tokens []string) (exit bool, handled bool, err error) {
 	switch cmd {
 	case "help":
-		return false, s.printHelp(tokens[1:])
+		return false, true, s.printHelp(tokens[1:])
 	case "describe":
-		if err := s.describeCommand(tokens[1:]); err != nil {
-			return false, err
-		}
-		return false, nil
+		return false, true, s.describeCommand(tokens[1:])
 	case "complete":
-		if err := s.completeCommand(tokens[1:]); err != nil {
-			return false, err
-		}
-		return false, nil
+		return false, true, s.completeCommand(tokens[1:])
 	case "echo":
 		_, err := fmt.Fprintln(s.out, strings.Join(tokens[1:], " "))
-		return false, err
+		return false, true, err
 	case "sleep":
-		if len(tokens) < 2 {
-			return false, errors.New("usage: sleep <seconds>")
-		}
-		secs, err := strconv.ParseFloat(tokens[1], 64)
-		if err != nil || secs < 0 {
-			return false, fmt.Errorf("invalid sleep duration: %s", tokens[1])
-		}
-		t := time.NewTimer(time.Duration(secs * float64(time.Second)))
-		defer t.Stop()
-		select {
-		case <-ctx.Done():
-			return false, ctx.Err()
-		case <-t.C:
-			return false, nil
-		}
+		exit, err := s.evalSleep(ctx, tokens)
+		return exit, true, err
 	case "printf":
-		if len(tokens) < 2 {
-			return false, errors.New("usage: printf <text>")
-		}
-		text := decodeEscapes(strings.Join(tokens[1:], " "))
-		_, err := fmt.Fprint(s.out, text)
-		return false, err
+		return false, true, s.evalPrintf(tokens)
 	case "clear":
 		_, err := fmt.Fprint(s.out, "\033[2J\033[H")
-		return false, err
+		return false, true, err
 	case "exit", "quit":
 		_, err := fmt.Fprintln(s.out, "bye")
-		return true, err
-	case "devices", "sessions", "identity", "session", "message", "board", "artifact", "canvas", "search", "memory", "bug", "placement", "cohort", "ui", "recent", "store", "bus", "handlers", "scenarios", "sim", "scripts", "activations", "claims", "app", "apps", "config", "docs", "logs", "observe", "ai":
-		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
+		return true, true, err
 	default:
-		input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
-		suggestions := suggestApproxCommands(input, 3)
-		if len(suggestions) == 0 {
-			return false, fmt.Errorf("unknown command: %s", tokens[0])
-		}
-		return false, fmt.Errorf("unknown command: %s (try: %s)", tokens[0], strings.Join(suggestions, ", "))
+		return false, false, nil
 	}
+}
+
+func (s *state) evalSleep(ctx context.Context, tokens []string) (bool, error) {
+	if len(tokens) < 2 {
+		return false, errors.New("usage: sleep <seconds>")
+	}
+	secs, err := strconv.ParseFloat(tokens[1], 64)
+	if err != nil || secs < 0 {
+		return false, fmt.Errorf("invalid sleep duration: %s", tokens[1])
+	}
+	t := time.NewTimer(time.Duration(secs * float64(time.Second)))
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	case <-t.C:
+		return false, nil
+	}
+}
+
+func (s *state) evalPrintf(tokens []string) error {
+	if len(tokens) < 2 {
+		return errors.New("usage: printf <text>")
+	}
+	text := decodeEscapes(strings.Join(tokens[1:], " "))
+	_, err := fmt.Fprint(s.out, text)
+	return err
+}
+
+func (s *state) evalOneDispatch(ctx context.Context, cmd string, tokens []string) (bool, error) {
+	if _, ok := replControlPlaneCommands[cmd]; ok {
+		return false, s.evalControlPlane(ctx, cmd, tokens[1:])
+	}
+	input := strings.ToLower(strings.TrimSpace(strings.Join(tokens, " ")))
+	suggestions := suggestApproxCommands(input, 3)
+	if len(suggestions) == 0 {
+		return false, fmt.Errorf("unknown command: %s", tokens[0])
+	}
+	return false, fmt.Errorf("unknown command: %s (try: %s)", tokens[0], strings.Join(suggestions, ", "))
 }
 
 func (s *state) capturePendingAIProposal(body map[string]any) {

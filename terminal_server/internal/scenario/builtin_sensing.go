@@ -162,35 +162,44 @@ func (s *CameraMonitorScenario) HandleSensor(ctx context.Context, env *Environme
 	if eventUnixMS <= 0 {
 		eventUnixMS = time.Now().UnixMilli()
 	}
+	if cameraEventOutsideWindow(s.trigger.Arguments, eventUnixMS) {
+		return nil
+	}
+	if s.cameraAlertInCooldown(eventUnixMS, s.trigger.Arguments) {
+		return nil
+	}
 
-	// Enforce optional time window.
-	if raw := strings.TrimSpace(s.trigger.Arguments["window_start_ms"]); raw != "" {
+	return notifySource(ctx, env, reading.DeviceID, fmt.Sprintf("Camera activity detected: activity=%.2f", activity))
+}
+
+func cameraEventOutsideWindow(args map[string]string, eventUnixMS int64) bool {
+	if raw := strings.TrimSpace(args["window_start_ms"]); raw != "" {
 		startMS, err := strconv.ParseInt(raw, 10, 64)
 		if err == nil && eventUnixMS < startMS {
-			return nil
+			return true
 		}
 	}
-	if raw := strings.TrimSpace(s.trigger.Arguments["window_end_ms"]); raw != "" {
+	if raw := strings.TrimSpace(args["window_end_ms"]); raw != "" {
 		endMS, err := strconv.ParseInt(raw, 10, 64)
 		if err == nil && eventUnixMS > endMS {
-			return nil
+			return true
 		}
 	}
+	return false
+}
 
-	cooldownMS := int64(parseFloatOrDefault(s.trigger.Arguments["cooldown_ms"], 60_000))
+func (s *CameraMonitorScenario) cameraAlertInCooldown(eventUnixMS int64, args map[string]string) bool {
+	cooldownMS := int64(parseFloatOrDefault(args["cooldown_ms"], 60_000))
 	if cooldownMS < 0 {
 		cooldownMS = 0
 	}
-
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.lastAlertUnixMS > 0 && eventUnixMS-s.lastAlertUnixMS < cooldownMS {
-		s.mu.Unlock()
-		return nil
+		return true
 	}
 	s.lastAlertUnixMS = eventUnixMS
-	s.mu.Unlock()
-
-	return notifySource(ctx, env, reading.DeviceID, fmt.Sprintf("Camera activity detected: activity=%.2f", activity))
+	return false
 }
 
 // VisionAnalysisScenario watches for camera activity and runs the vision

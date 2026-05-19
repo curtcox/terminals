@@ -977,25 +977,10 @@ func (s *state) evalControlPlaneAppOpsReload(ctx context.Context, sub string, ar
 	route := "/admin/api/apps/reload"
 	form := url.Values{"app": {appName}}
 	if sub == "rollback" {
-		route = "/admin/api/apps/rollback"
-		keepData := hasFlag(args[2:], "--keep-data")
-		archiveData := hasFlag(args[2:], "--archive-data")
-		purge := hasFlag(args[2:], "--purge")
-		selected := 0
-		if keepData {
-			selected++
-			form.Set("mode", "keep_data")
-		}
-		if archiveData {
-			selected++
-			form.Set("mode", "archive_data")
-		}
-		if purge {
-			selected++
-			form.Set("mode", "purge")
-		}
-		if selected > 1 {
-			return errors.New("usage: app rollback <app> [--keep-data|--archive-data|--purge]")
+		var err error
+		route, form, err = appRollbackRequest(appName, args[2:])
+		if err != nil {
+			return err
 		}
 	}
 	body, err := s.postFormJSON(ctx, route, form)
@@ -1007,6 +992,30 @@ func (s *state) evalControlPlaneAppOpsReload(ctx context.Context, sub string, ar
 	}
 	_, err = fmt.Fprintf(s.out, "OK  app=%s action=%s version=%s\n", appName, sub, toString(body["version"]))
 	return err
+}
+
+func appRollbackRequest(appName string, flagArgs []string) (string, url.Values, error) {
+	form := url.Values{"app": {appName}}
+	keepData := hasFlag(flagArgs, "--keep-data")
+	archiveData := hasFlag(flagArgs, "--archive-data")
+	purge := hasFlag(flagArgs, "--purge")
+	selected := 0
+	if keepData {
+		selected++
+		form.Set("mode", "keep_data")
+	}
+	if archiveData {
+		selected++
+		form.Set("mode", "archive_data")
+	}
+	if purge {
+		selected++
+		form.Set("mode", "purge")
+	}
+	if selected > 1 {
+		return "", nil, errors.New("usage: app rollback <app> [--keep-data|--archive-data|--purge]")
+	}
+	return "/admin/api/apps/rollback", form, nil
 }
 
 func (s *state) evalControlPlaneAppOpsLogs(ctx context.Context, _ string, args []string, _ bool) error {

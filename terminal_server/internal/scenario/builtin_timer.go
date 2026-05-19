@@ -163,32 +163,36 @@ func timerRecordsForDevice(scheduler Scheduler, sourceID string) []storage.Sched
 	if structured, ok := scheduler.(interface {
 		DueRecords(int64) []storage.ScheduleRecord
 	}); ok {
-		records := structured.DueRecords(math.MaxInt64)
-		out := make([]storage.ScheduleRecord, 0, len(records))
-		for _, record := range records {
-			if record.Kind != "timer" && record.Kind != "timer.tick" &&
-				!strings.HasPrefix(record.Key, "timer:") && !strings.HasPrefix(record.Key, "timer_tick:") {
-				continue
-			}
-			meta := timerMetadataFromScheduleRecord(record)
-			if sourceID == "" || meta.DeviceID == sourceID {
-				out = append(out, record)
-			}
-		}
-		return out
+		return filterTimerRecords(structured.DueRecords(math.MaxInt64), sourceID)
 	}
 	keys := scheduler.Due(math.MaxInt64)
 	out := make([]storage.ScheduleRecord, 0, len(keys))
 	for _, key := range keys {
-		if !strings.HasPrefix(key, "timer:") && !strings.HasPrefix(key, "timer_tick:") {
-			continue
-		}
-		meta := timerMetadataFromScheduleRecord(storage.ScheduleRecord{Key: key, Kind: scheduleKindFromKey(key)})
-		if sourceID == "" || meta.DeviceID == sourceID {
-			out = append(out, storage.ScheduleRecord{Key: key, Kind: scheduleKindFromKey(key)})
+		record := storage.ScheduleRecord{Key: key, Kind: scheduleKindFromKey(key)}
+		if timerRecordMatchesDevice(record, sourceID) {
+			out = append(out, record)
 		}
 	}
 	return out
+}
+
+func filterTimerRecords(records []storage.ScheduleRecord, sourceID string) []storage.ScheduleRecord {
+	out := make([]storage.ScheduleRecord, 0, len(records))
+	for _, record := range records {
+		if timerRecordMatchesDevice(record, sourceID) {
+			out = append(out, record)
+		}
+	}
+	return out
+}
+
+func timerRecordMatchesDevice(record storage.ScheduleRecord, sourceID string) bool {
+	if record.Kind != "timer" && record.Kind != "timer.tick" &&
+		!strings.HasPrefix(record.Key, "timer:") && !strings.HasPrefix(record.Key, "timer_tick:") {
+		return false
+	}
+	meta := timerMetadataFromScheduleRecord(record)
+	return sourceID == "" || meta.DeviceID == sourceID
 }
 
 func timerTargetDevice(ctx context.Context, env *Environment, sourceID string) string {

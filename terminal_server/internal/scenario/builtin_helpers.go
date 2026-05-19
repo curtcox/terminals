@@ -211,6 +211,21 @@ type ioRoute struct {
 	streamKind string
 }
 
+func connectOwnedRoute(env *Environment, sourceID, targetID, streamKind string) (ioRoute, bool, error) {
+	err := env.IO.Connect(sourceID, targetID, streamKind)
+	if err != nil {
+		if errors.Is(err, iorouter.ErrRouteExists) {
+			return ioRoute{}, false, nil
+		}
+		return ioRoute{}, false, err
+	}
+	return ioRoute{
+		sourceID:   sourceID,
+		targetID:   targetID,
+		streamKind: streamKind,
+	}, true, nil
+}
+
 func connectBidirectionalSourceTargetsOwned(
 	_ context.Context,
 	env *Environment,
@@ -230,31 +245,36 @@ func connectBidirectionalSourceTargetsOwned(
 	}
 	routes := make([]ioRoute, 0)
 	for _, peerID := range targetIDs {
-		if peerID == "" || peerID == sourceID {
-			continue
+		var err error
+		routes, err = appendBidirectionalPeerRoutes(routes, env, sourceID, peerID, streamKind)
+		if err != nil {
+			return nil, err
 		}
-		if err := env.IO.Connect(sourceID, peerID, streamKind); err != nil {
-			if !errors.Is(err, iorouter.ErrRouteExists) {
-				return nil, err
-			}
-		} else {
-			routes = append(routes, ioRoute{
-				sourceID:   sourceID,
-				targetID:   peerID,
-				streamKind: streamKind,
-			})
-		}
-		if err := env.IO.Connect(peerID, sourceID, streamKind); err != nil {
-			if !errors.Is(err, iorouter.ErrRouteExists) {
-				return nil, err
-			}
-		} else {
-			routes = append(routes, ioRoute{
-				sourceID:   peerID,
-				targetID:   sourceID,
-				streamKind: streamKind,
-			})
-		}
+	}
+	return routes, nil
+}
+
+func appendBidirectionalPeerRoutes(
+	routes []ioRoute,
+	env *Environment,
+	sourceID, peerID, streamKind string,
+) ([]ioRoute, error) {
+	if peerID == "" || peerID == sourceID {
+		return routes, nil
+	}
+	route, added, err := connectOwnedRoute(env, sourceID, peerID, streamKind)
+	if err != nil {
+		return nil, err
+	}
+	if added {
+		routes = append(routes, route)
+	}
+	route, added, err = connectOwnedRoute(env, peerID, sourceID, streamKind)
+	if err != nil {
+		return nil, err
+	}
+	if added {
+		routes = append(routes, route)
 	}
 	return routes, nil
 }
@@ -313,7 +333,10 @@ func peerTargetDeviceIDs(env *Environment, sourceID string, args map[string]stri
 	if raw == "" {
 		return nonSourceDeviceIDs(env, sourceID)
 	}
+	return filterPeerDeviceIDs(sourceID, strings.Split(raw, ","), peerDeviceIDSet(env, sourceID))
+}
 
+func peerDeviceIDSet(env *Environment, sourceID string) map[string]struct{} {
 	validSet := map[string]struct{}{}
 	for _, deviceID := range env.Devices.ListDeviceIDs() {
 		trimmed := strings.TrimSpace(deviceID)
@@ -322,8 +345,10 @@ func peerTargetDeviceIDs(env *Environment, sourceID string, args map[string]stri
 		}
 		validSet[trimmed] = struct{}{}
 	}
+	return validSet
+}
 
-	parts := strings.Split(raw, ",")
+func filterPeerDeviceIDs(sourceID string, parts []string, validSet map[string]struct{}) []string {
 	out := make([]string, 0, len(parts))
 	seen := map[string]struct{}{}
 	for _, part := range parts {

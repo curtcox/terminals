@@ -301,47 +301,17 @@ func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	var (
-		status appruntime.MigrationStatus
-		err    error
-		target string
-		ready  bool
-	)
-	switch action {
-	case "retry":
-		status, err = h.appRuntime.RetryMigration(name)
-	case "abort":
-		target = strings.TrimSpace(req.FormValue("to"))
-		status, err = h.appRuntime.AbortMigration(name, target)
-	case "drain-ready":
-		readyRaw := strings.TrimSpace(req.FormValue("ready"))
-		if readyRaw == "" {
-			h.writeJSONError(w, http.StatusBadRequest, "ready is required")
-			return
-		}
-		ready, err = strconv.ParseBool(readyRaw)
-		if err != nil {
-			h.writeJSONError(w, http.StatusBadRequest, "ready must be true or false")
-			return
-		}
-		err = h.appRuntime.SetMigrationDrainReady(name, ready)
-		if err == nil {
-			status, err = h.appRuntime.GetMigrationStatus(name)
-		}
-	case "reconcile":
-		recordID := strings.TrimSpace(req.FormValue("record_id"))
-		resolution := strings.TrimSpace(req.FormValue("resolution"))
-		if recordID == "" || resolution == "" {
-			h.writeJSONError(w, http.StatusBadRequest, "record_id and resolution are required")
-			return
-		}
-		status, err = h.appRuntime.ReconcileMigration(name, recordID, resolution)
-	default:
-		h.writeJSONError(w, http.StatusBadRequest, "unknown migration action")
-		return
-	}
+	status, target, ready, err := h.runAppMigrationAction(req, action, name)
 	if err != nil {
-		h.writeMigrationError(w, err)
+		var reqErr migrationActionRequestError
+		switch {
+		case errors.As(err, &reqErr):
+			h.writeJSONError(w, http.StatusBadRequest, reqErr.Error())
+		case errors.Is(err, errMigrationActionUnknown):
+			h.writeJSONError(w, http.StatusBadRequest, err.Error())
+		default:
+			h.writeMigrationError(w, err)
+		}
 		return
 	}
 
@@ -361,6 +331,52 @@ func (h *Handler) handleAppMigrationAction(w http.ResponseWriter, req *http.Requ
 		response["ready"] = ready
 	}
 	h.writeJSON(w, http.StatusOK, response)
+}
+
+var errMigrationActionUnknown = errors.New("unknown migration action")
+
+type migrationActionRequestError struct {
+	msg string
+}
+
+func (e migrationActionRequestError) Error() string {
+	return e.msg
+}
+
+func (h *Handler) runAppMigrationAction(
+	req *http.Request,
+	action, name string,
+) (status appruntime.MigrationStatus, target string, ready bool, err error) {
+	switch action {
+	case "retry":
+		status, err = h.appRuntime.RetryMigration(name)
+	case "abort":
+		target = strings.TrimSpace(req.FormValue("to"))
+		status, err = h.appRuntime.AbortMigration(name, target)
+	case "drain-ready":
+		readyRaw := strings.TrimSpace(req.FormValue("ready"))
+		if readyRaw == "" {
+			return status, target, ready, migrationActionRequestError{msg: "ready is required"}
+		}
+		ready, err = strconv.ParseBool(readyRaw)
+		if err != nil {
+			return status, target, ready, migrationActionRequestError{msg: "ready must be true or false"}
+		}
+		err = h.appRuntime.SetMigrationDrainReady(name, ready)
+		if err == nil {
+			status, err = h.appRuntime.GetMigrationStatus(name)
+		}
+	case "reconcile":
+		recordID := strings.TrimSpace(req.FormValue("record_id"))
+		resolution := strings.TrimSpace(req.FormValue("resolution"))
+		if recordID == "" || resolution == "" {
+			return status, target, ready, migrationActionRequestError{msg: "record_id and resolution are required"}
+		}
+		status, err = h.appRuntime.ReconcileMigration(name, recordID, resolution)
+	default:
+		err = errMigrationActionUnknown
+	}
+	return status, target, ready, err
 }
 
 func (h *Handler) writeMigrationError(w http.ResponseWriter, err error) {

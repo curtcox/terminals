@@ -100,34 +100,54 @@ func (h *StreamHandler) handleWebRTCSignal(
 
 	engine, serverManaged := h.serverManagedSignalEngine(streamID)
 	if serverManaged && engine != nil {
-		responses, err := engine.HandleSignal(ctx, WebRTCSignalEngineRequest{
-			StreamID: streamID,
-			DeviceID: sourceDeviceID,
-			Signal:   *signal,
-		})
-		if err == nil {
-			out := make([]ServerMessage, 0, len(responses))
-			for _, response := range responses {
-				msg := ServerMessage{
-					WebRTCSignal: &WebRTCSignalResponse{
-						StreamID:   strings.TrimSpace(response.Signal.StreamID),
-						SignalType: strings.TrimSpace(response.Signal.SignalType),
-						Payload:    response.Signal.Payload,
-					},
-				}
-				target := strings.TrimSpace(response.TargetDeviceID)
-				if msg.WebRTCSignal.StreamID == "" || msg.WebRTCSignal.SignalType == "" || target == "" {
-					continue
-				}
-				if target != sourceDeviceID {
-					msg.RelayToDeviceID = target
-				}
-				out = append(out, msg)
-			}
+		if out, ok := serverManagedWebRTCMessages(ctx, engine, streamID, sourceDeviceID, *signal); ok {
 			return out
 		}
 	}
 	return h.relayWebRTCSignal(signal, sourceDeviceID)
+}
+
+func serverManagedWebRTCMessages(
+	ctx context.Context,
+	engine WebRTCSignalEngine,
+	streamID, sourceDeviceID string,
+	signal WebRTCSignalRequest,
+) ([]ServerMessage, bool) {
+	responses, err := engine.HandleSignal(ctx, WebRTCSignalEngineRequest{
+		StreamID: streamID,
+		DeviceID: sourceDeviceID,
+		Signal:   signal,
+	})
+	if err != nil {
+		return nil, false
+	}
+	out := make([]ServerMessage, 0, len(responses))
+	for _, response := range responses {
+		msg, ok := serverMessageFromWebRTCEngineResponse(response, sourceDeviceID)
+		if !ok {
+			continue
+		}
+		out = append(out, msg)
+	}
+	return out, true
+}
+
+func serverMessageFromWebRTCEngineResponse(response WebRTCSignalEngineResponse, sourceDeviceID string) (ServerMessage, bool) {
+	msg := ServerMessage{
+		WebRTCSignal: &WebRTCSignalResponse{
+			StreamID:   strings.TrimSpace(response.Signal.StreamID),
+			SignalType: strings.TrimSpace(response.Signal.SignalType),
+			Payload:    response.Signal.Payload,
+		},
+	}
+	target := strings.TrimSpace(response.TargetDeviceID)
+	if msg.WebRTCSignal.StreamID == "" || msg.WebRTCSignal.SignalType == "" || target == "" {
+		return ServerMessage{}, false
+	}
+	if target != sourceDeviceID {
+		msg.RelayToDeviceID = target
+	}
+	return msg, true
 }
 
 func (h *StreamHandler) disconnectScenarioRoutes(deviceID, scenarioName string) {

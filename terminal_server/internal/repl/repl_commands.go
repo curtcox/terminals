@@ -24,6 +24,15 @@ type commandSpec struct {
 	DiscouragedForAgents bool
 }
 
+var replControlPlaneCommands = map[string]struct{}{
+	"devices": {}, "sessions": {}, "identity": {}, "session": {}, "message": {},
+	"board": {}, "artifact": {}, "canvas": {}, "search": {}, "memory": {}, "bug": {},
+	"placement": {}, "cohort": {}, "ui": {}, "recent": {}, "store": {}, "bus": {},
+	"handlers": {}, "scenarios": {}, "sim": {}, "scripts": {}, "activations": {},
+	"claims": {}, "app": {}, "apps": {}, "config": {}, "docs": {}, "logs": {},
+	"observe": {}, "ai": {},
+}
+
 func replCommandSpecs() []commandSpec {
 	return []commandSpec{
 		{Name: "help", Usage: "help [command]", Summary: "Show REPL help or help for one command", Classification: commandReadOnly, Examples: []string{"help", "help app reload"}},

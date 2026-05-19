@@ -501,13 +501,7 @@ func (s *Service) RotateInstallerKey() (newKeyID string, err error) {
 func (s *Service) RollbackRotation(acceptedSeq int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var rot *RotationRecord
-	for _, r := range s.rotations {
-		if r.AcceptedSeq == acceptedSeq {
-			rot = r
-			break
-		}
-	}
+	rot := rotationByAcceptedSeq(s.rotations, acceptedSeq)
 	if rot == nil {
 		return fmt.Errorf("trust: no rotation found with accepted_seq %d", acceptedSeq)
 	}
@@ -523,30 +517,10 @@ func (s *Service) RollbackRotation(acceptedSeq int64) error {
 		return fmt.Errorf("trust: new key %s not found after rollback lookup", rot.NewKeyID)
 	}
 
-	// Restore old key to active; revoke the new key.
 	oldRec.State = StateActive
 	newRec.State = StateRevoked
-
-	// Remove the lineage edges that were added by this rotation.
-	for _, lin := range s.lineage {
-		edges := lin.Edges[:0]
-		for _, e := range lin.Edges {
-			if e.AuthorKeyID == rot.NewKeyID && e.AddedAt == rot.AcceptedAt {
-				continue // remove this edge
-			}
-			edges = append(edges, e)
-		}
-		lin.Edges = edges
-	}
-
-	// Remove the rotation record.
-	filtered := s.rotations[:0]
-	for _, r := range s.rotations {
-		if r.AcceptedSeq != acceptedSeq {
-			filtered = append(filtered, r)
-		}
-	}
-	s.rotations = filtered
+	stripRotationLineageEdges(s.lineage, rot)
+	s.rotations = rotationsExcept(s.rotations, acceptedSeq)
 
 	s.appendLog("operator", "keys.rotate.rollback", map[string]any{
 		"rolled_back_seq": acceptedSeq,
@@ -554,6 +528,38 @@ func (s *Service) RollbackRotation(acceptedSeq int64) error {
 		"new_key":         rot.NewKeyID,
 	})
 	return nil
+}
+
+func rotationByAcceptedSeq(rotations []*RotationRecord, acceptedSeq int64) *RotationRecord {
+	for _, r := range rotations {
+		if r.AcceptedSeq == acceptedSeq {
+			return r
+		}
+	}
+	return nil
+}
+
+func stripRotationLineageEdges(lineage map[string]*AppLineage, rot *RotationRecord) {
+	for _, lin := range lineage {
+		edges := lin.Edges[:0]
+		for _, e := range lin.Edges {
+			if e.AuthorKeyID == rot.NewKeyID && e.AddedAt == rot.AcceptedAt {
+				continue
+			}
+			edges = append(edges, e)
+		}
+		lin.Edges = edges
+	}
+}
+
+func rotationsExcept(rotations []*RotationRecord, acceptedSeq int64) []*RotationRecord {
+	filtered := rotations[:0]
+	for _, r := range rotations {
+		if r.AcceptedSeq != acceptedSeq {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
 }
 
 // Rotations returns a copy of all rotation records.

@@ -497,51 +497,18 @@ func (h *StreamHandler) uiHostMessagesForDevice(deviceID string) []ServerMessage
 }
 
 func (h *StreamHandler) uiHostMessagesSince(beforeCount int, sessionDeviceID string, includeSession bool) []ServerMessage {
-	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.UI == nil {
-		return nil
-	}
-	eventReader, ok := h.runtime.Env.UI.(interface {
-		Events() []ui.HostEvent
-	})
+	events, ok := h.uiHostEvents()
 	if !ok {
 		return nil
 	}
-	events := eventReader.Events()
-	if beforeCount < 0 {
-		beforeCount = 0
-	}
-	if beforeCount > len(events) {
-		beforeCount = len(events)
-	}
+	beforeCount = clampUIHostBeforeCount(beforeCount, len(events))
 	sessionDeviceID = strings.TrimSpace(sessionDeviceID)
 	out := make([]ServerMessage, 0, len(events)-beforeCount)
 	delivered := map[string]struct{}{}
 	for _, event := range events[beforeCount:] {
-		targetDeviceID := strings.TrimSpace(event.DeviceID)
-		if targetDeviceID == "" {
+		msg, targetDeviceID, ok := uiHostEventMessage(event, sessionDeviceID, includeSession)
+		if !ok {
 			continue
-		}
-		if targetDeviceID == sessionDeviceID && !includeSession {
-			continue
-		}
-		msg := ServerMessage{}
-		switch event.Kind {
-		case "set":
-			node := event.Node
-			msg.SetUI = &node
-		case "patch":
-			msg.UpdateUI = &UIUpdate{
-				ComponentID: strings.TrimSpace(event.ComponentID),
-				Node:        event.Node,
-			}
-		case "clear":
-			node := ui.HelloWorld(targetDeviceID)
-			msg.SetUI = &node
-		default:
-			continue
-		}
-		if targetDeviceID != sessionDeviceID {
-			msg.RelayToDeviceID = targetDeviceID
 		}
 		out = append(out, msg)
 		delivered[targetDeviceID] = struct{}{}
@@ -551,6 +518,67 @@ func (h *StreamHandler) uiHostMessagesSince(beforeCount int, sessionDeviceID str
 		h.uiSession.MarkUIHostDelivered(delivered, len(events))
 	}
 	return out
+}
+
+func (h *StreamHandler) uiHostEvents() ([]ui.HostEvent, bool) {
+	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.UI == nil {
+		return nil, false
+	}
+	eventReader, ok := h.runtime.Env.UI.(interface {
+		Events() []ui.HostEvent
+	})
+	if !ok {
+		return nil, false
+	}
+	return eventReader.Events(), true
+}
+
+func clampUIHostBeforeCount(beforeCount, eventCount int) int {
+	if beforeCount < 0 {
+		return 0
+	}
+	if beforeCount > eventCount {
+		return eventCount
+	}
+	return beforeCount
+}
+
+func uiHostEventMessage(event ui.HostEvent, sessionDeviceID string, includeSession bool) (ServerMessage, string, bool) {
+	targetDeviceID := strings.TrimSpace(event.DeviceID)
+	if targetDeviceID == "" {
+		return ServerMessage{}, "", false
+	}
+	if targetDeviceID == sessionDeviceID && !includeSession {
+		return ServerMessage{}, "", false
+	}
+	msg, ok := serverMessageFromUIHostEvent(event, targetDeviceID)
+	if !ok {
+		return ServerMessage{}, "", false
+	}
+	if targetDeviceID != sessionDeviceID {
+		msg.RelayToDeviceID = targetDeviceID
+	}
+	return msg, targetDeviceID, true
+}
+
+func serverMessageFromUIHostEvent(event ui.HostEvent, targetDeviceID string) (ServerMessage, bool) {
+	switch event.Kind {
+	case "set":
+		node := event.Node
+		return ServerMessage{SetUI: &node}, true
+	case "patch":
+		return ServerMessage{
+			UpdateUI: &UIUpdate{
+				ComponentID: strings.TrimSpace(event.ComponentID),
+				Node:        event.Node,
+			},
+		}, true
+	case "clear":
+		node := ui.HelloWorld(targetDeviceID)
+		return ServerMessage{SetUI: &node}, true
+	default:
+		return ServerMessage{}, false
+	}
 }
 
 func (h *StreamHandler) broadcastNotificationsSince(

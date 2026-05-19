@@ -79,22 +79,42 @@ func (s *scenarioRecipeState) stop(ctx context.Context, recipe ScenarioRecipe) e
 	if env == nil {
 		return nil
 	}
-	if routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner }); ok {
-		if planner := routeIO.MediaPlanner(); planner != nil && planHandle != "" {
-			if err := planner.Tear(ctx, planHandle); err != nil {
-				return err
-			}
-		}
+	if err := tearRecipeMediaPlan(ctx, env, planHandle); err != nil {
+		return err
 	}
-	if routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager }); ok {
-		if claims := routeIO.Claims(); claims != nil && strings.TrimSpace(recipe.ActivationID) != "" {
-			if err := claims.Release(ctx, recipe.ActivationID); err != nil {
-				return err
-			}
-		}
+	if err := releaseRecipeClaims(ctx, env, recipe.ActivationID); err != nil {
+		return err
 	}
 	if recipe.OnStop != nil {
 		return recipe.OnStop(ctx, env)
 	}
 	return nil
+}
+
+func tearRecipeMediaPlan(ctx context.Context, env *Environment, planHandle iorouter.PlanHandle) error {
+	routeIO, ok := env.IO.(interface{ MediaPlanner() *iorouter.MediaPlanner })
+	if !ok {
+		return nil
+	}
+	planner := routeIO.MediaPlanner()
+	if planner == nil || planHandle == "" {
+		return nil
+	}
+	return planner.Tear(ctx, planHandle)
+}
+
+func releaseRecipeClaims(ctx context.Context, env *Environment, activationID string) error {
+	activationID = strings.TrimSpace(activationID)
+	if activationID == "" {
+		return nil
+	}
+	routeIO, ok := env.IO.(interface{ Claims() *iorouter.ClaimManager })
+	if !ok {
+		return nil
+	}
+	claims := routeIO.Claims()
+	if claims == nil {
+		return nil
+	}
+	return claims.Release(ctx, activationID)
 }

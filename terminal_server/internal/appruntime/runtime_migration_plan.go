@@ -15,20 +15,22 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+type migrationManifestFixture struct {
+	Step         string `toml:"step"`
+	PriorVersion string `toml:"prior_version"`
+	Seed         string `toml:"seed"`
+	Expected     string `toml:"expected"`
+	ReadAdapter  string `toml:"read_adapter"`
+}
+
 type runtimeMigrationManifest struct {
 	Migrate struct {
-		DeclaredSteps       int  `toml:"declared_steps"`
-		MaxRuntimeSeconds   *int `toml:"max_runtime_seconds"`
-		CheckpointEvery     *int `toml:"checkpoint_every"`
-		DrainTimeoutSeconds *int `toml:"drain_timeout_seconds"`
-		Fixture             []struct {
-			Step         string `toml:"step"`
-			PriorVersion string `toml:"prior_version"`
-			Seed         string `toml:"seed"`
-			Expected     string `toml:"expected"`
-			ReadAdapter  string `toml:"read_adapter"`
-		} `toml:"fixture"`
-		Step []struct {
+		DeclaredSteps       int                        `toml:"declared_steps"`
+		MaxRuntimeSeconds   *int                       `toml:"max_runtime_seconds"`
+		CheckpointEvery     *int                       `toml:"checkpoint_every"`
+		DrainTimeoutSeconds *int                       `toml:"drain_timeout_seconds"`
+		Fixture             []migrationManifestFixture `toml:"fixture"`
+		Step                []struct {
 			From          string `toml:"from"`
 			To            string `toml:"to"`
 			Compatibility string `toml:"compatibility"`
