@@ -38,58 +38,14 @@ func verifySignatureBundle(sigBytes []byte, expectedPackageID string, packageHas
 	verified := make([]VerifiedStatement, 0, len(bundle.Statement))
 
 	for _, stmt := range bundle.Statement {
-		if err := validateStatementFields(stmt); err != nil {
-			return nil, err
-		}
-		nonceRaw, err := parsePrefixedBase64URL(stmt.Nonce, "base64url:", statementNonceLen)
+		statement, err := verifySignatureStatement(stmt, expectedPackageID, packageHash, expectedManifestName, expectedManifestVersion, seen)
 		if err != nil {
 			return nil, err
 		}
-		sigRaw, err := parsePrefixedBase64(stmt.Sig, "base64:")
-		if err != nil {
-			return nil, err
-		}
-		publicKey, err := parseKeyID(stmt.KeyID)
-		if err != nil {
-			return nil, err
-		}
-		scope, err := normalizeScope(stmt.Role, stmt.Scope)
-		if err != nil {
-			return nil, err
-		}
-
-		payload, err := encodeStatementCBOR(stmt, scope, packageHash, nonceRaw)
-		if err != nil {
-			return nil, err
-		}
-		if !ed25519.Verify(publicKey, payload, sigRaw) {
-			return nil, ErrSignatureVerificationFailed
-		}
-
-		if stmt.ManifestName != expectedManifestName || stmt.ManifestVersion != expectedManifestVersion {
-			return nil, ErrInvalidSignatureStatement
-		}
-
-		nonceKey := base64.RawURLEncoding.EncodeToString(nonceRaw)
-		triple := stmt.KeyID + "\x00" + expectedPackageID + "\x00" + nonceKey
-		if _, ok := seen[triple]; ok {
-			return nil, ErrInvalidSignatureStatement
-		}
-		seen[triple] = struct{}{}
-
 		if stmt.Role == "author" {
 			authorSeen = true
 		}
-
-		verified = append(verified, VerifiedStatement{
-			Role:            stmt.Role,
-			KeyID:           stmt.KeyID,
-			CreatedUnix:     stmt.CreatedUnix,
-			ManifestName:    stmt.ManifestName,
-			ManifestVersion: stmt.ManifestVersion,
-			Nonce:           stmt.Nonce,
-			Scope:           scope,
-		})
+		verified = append(verified, statement)
 	}
 
 	if !authorSeen {
@@ -97,6 +53,75 @@ func verifySignatureBundle(sigBytes []byte, expectedPackageID string, packageHas
 	}
 
 	return verified, nil
+}
+
+func verifySignatureStatement(
+	stmt signatureStatement,
+	expectedPackageID string,
+	packageHash []byte,
+	expectedManifestName string,
+	expectedManifestVersion string,
+	seen map[string]struct{},
+) (VerifiedStatement, error) {
+	if err := validateStatementFields(stmt); err != nil {
+		return VerifiedStatement{}, err
+	}
+	nonceRaw, sigRaw, publicKey, scope, err := parseSignatureStatementParts(stmt)
+	if err != nil {
+		return VerifiedStatement{}, err
+	}
+	payload, err := encodeStatementCBOR(stmt, scope, packageHash, nonceRaw)
+	if err != nil {
+		return VerifiedStatement{}, err
+	}
+	if !ed25519.Verify(publicKey, payload, sigRaw) {
+		return VerifiedStatement{}, ErrSignatureVerificationFailed
+	}
+	if stmt.ManifestName != expectedManifestName || stmt.ManifestVersion != expectedManifestVersion {
+		return VerifiedStatement{}, ErrInvalidSignatureStatement
+	}
+	if err := rememberSignatureStatement(stmt, expectedPackageID, nonceRaw, seen); err != nil {
+		return VerifiedStatement{}, err
+	}
+	return VerifiedStatement{
+		Role:            stmt.Role,
+		KeyID:           stmt.KeyID,
+		CreatedUnix:     stmt.CreatedUnix,
+		ManifestName:    stmt.ManifestName,
+		ManifestVersion: stmt.ManifestVersion,
+		Nonce:           stmt.Nonce,
+		Scope:           scope,
+	}, nil
+}
+
+func parseSignatureStatementParts(stmt signatureStatement) ([]byte, []byte, ed25519.PublicKey, map[string]any, error) {
+	nonceRaw, err := parsePrefixedBase64URL(stmt.Nonce, "base64url:", statementNonceLen)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	sigRaw, err := parsePrefixedBase64(stmt.Sig, "base64:")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	publicKey, err := parseKeyID(stmt.KeyID)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	scope, err := normalizeScope(stmt.Role, stmt.Scope)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return nonceRaw, sigRaw, publicKey, scope, nil
+}
+
+func rememberSignatureStatement(stmt signatureStatement, expectedPackageID string, nonceRaw []byte, seen map[string]struct{}) error {
+	nonceKey := base64.RawURLEncoding.EncodeToString(nonceRaw)
+	triple := stmt.KeyID + "\x00" + expectedPackageID + "\x00" + nonceKey
+	if _, ok := seen[triple]; ok {
+		return ErrInvalidSignatureStatement
+	}
+	seen[triple] = struct{}{}
+	return nil
 }
 
 func validateStatementFields(stmt signatureStatement) error {
@@ -169,81 +194,125 @@ func normalizeScope(role string, input map[string]any) (map[string]any, error) {
 
 	switch role {
 	case "author":
-		if len(input) != 0 {
-			return nil, ErrInvalidSignatureStatement
-		}
-		return map[string]any{}, nil
+		return normalizeAuthorScope(input)
 	case "voucher":
-		allowed := map[string]struct{}{"tier": {}, "reviewed": {}, "tested_under": {}, "notes": {}, "expires_unix": {}}
-		for key := range input {
-			if _, ok := allowed[key]; !ok {
-				return nil, ErrInvalidSignatureStatement
-			}
-		}
-
-		tier, ok := input["tier"].(string)
-		if !ok || (tier != "full" && tier != "quarantine" && tier != "custom") {
-			return nil, ErrInvalidSignatureStatement
-		}
-
-		reviewedRaw, ok := input["reviewed"].([]any)
-		if !ok {
-			return nil, ErrInvalidSignatureStatement
-		}
-		reviewed := make([]string, 0, len(reviewedRaw))
-		for _, value := range reviewedRaw {
-			v, ok := value.(string)
-			if !ok {
-				return nil, ErrInvalidSignatureStatement
-			}
-			switch v {
-			case "manifest", "tal", "tests", "kernels", "models", "assets":
-				reviewed = append(reviewed, v)
-			default:
-				return nil, ErrInvalidSignatureStatement
-			}
-		}
-
-		testedUnder, ok := input["tested_under"].(string)
-		if !ok || (testedUnder != "sim-only" && testedUnder != "hardware" && testedUnder != "production") {
-			return nil, ErrInvalidSignatureStatement
-		}
-
-		normalized := map[string]any{
-			"tier":         tier,
-			"reviewed":     reviewed,
-			"tested_under": testedUnder,
-		}
-		if notesRaw, ok := input["notes"]; ok {
-			notes, ok := notesRaw.(string)
-			if !ok || len(notes) > voucherNotesMaxBytes {
-				return nil, ErrInvalidSignatureStatement
-			}
-			normalized["notes"] = notes
-		}
-		if expiresRaw, ok := input["expires_unix"]; ok {
-			expiresUnix, ok := asUint64(expiresRaw)
-			if !ok {
-				return nil, ErrInvalidSignatureStatement
-			}
-			normalized["expires_unix"] = expiresUnix
-		}
-		return normalized, nil
+		return normalizeVoucherScope(input)
 	case "publisher":
-		allowed := map[string]struct{}{"via": {}}
-		for key := range input {
-			if _, ok := allowed[key]; !ok {
-				return nil, ErrInvalidSignatureStatement
-			}
-		}
-		via, ok := input["via"].(string)
-		if !ok || via == "" || len(via) > publisherViaMaxBytes {
-			return nil, ErrInvalidSignatureStatement
-		}
-		return map[string]any{"via": via}, nil
+		return normalizePublisherScope(input)
 	default:
 		return nil, ErrInvalidSignatureStatement
 	}
+}
+
+func normalizeAuthorScope(input map[string]any) (map[string]any, error) {
+	if len(input) != 0 {
+		return nil, ErrInvalidSignatureStatement
+	}
+	return map[string]any{}, nil
+}
+
+func normalizeVoucherScope(input map[string]any) (map[string]any, error) {
+	allowed := map[string]struct{}{"tier": {}, "reviewed": {}, "tested_under": {}, "notes": {}, "expires_unix": {}}
+	if err := requireOnlyScopeKeys(input, allowed); err != nil {
+		return nil, err
+	}
+	tier, err := normalizeVoucherTier(input["tier"])
+	if err != nil {
+		return nil, err
+	}
+	reviewed, err := normalizeVoucherReviewed(input["reviewed"])
+	if err != nil {
+		return nil, err
+	}
+	testedUnder, err := normalizeVoucherTestedUnder(input["tested_under"])
+	if err != nil {
+		return nil, err
+	}
+	normalized := map[string]any{
+		"tier":         tier,
+		"reviewed":     reviewed,
+		"tested_under": testedUnder,
+	}
+	if err := addOptionalVoucherScope(normalized, input); err != nil {
+		return nil, err
+	}
+	return normalized, nil
+}
+
+func normalizePublisherScope(input map[string]any) (map[string]any, error) {
+	allowed := map[string]struct{}{"via": {}}
+	if err := requireOnlyScopeKeys(input, allowed); err != nil {
+		return nil, err
+	}
+	via, ok := input["via"].(string)
+	if !ok || via == "" || len(via) > publisherViaMaxBytes {
+		return nil, ErrInvalidSignatureStatement
+	}
+	return map[string]any{"via": via}, nil
+}
+
+func requireOnlyScopeKeys(input map[string]any, allowed map[string]struct{}) error {
+	for key := range input {
+		if _, ok := allowed[key]; !ok {
+			return ErrInvalidSignatureStatement
+		}
+	}
+	return nil
+}
+
+func normalizeVoucherTier(value any) (string, error) {
+	tier, ok := value.(string)
+	if !ok || (tier != "full" && tier != "quarantine" && tier != "custom") {
+		return "", ErrInvalidSignatureStatement
+	}
+	return tier, nil
+}
+
+func normalizeVoucherReviewed(value any) ([]string, error) {
+	reviewedRaw, ok := value.([]any)
+	if !ok {
+		return nil, ErrInvalidSignatureStatement
+	}
+	reviewed := make([]string, 0, len(reviewedRaw))
+	for _, value := range reviewedRaw {
+		v, ok := value.(string)
+		if !ok {
+			return nil, ErrInvalidSignatureStatement
+		}
+		switch v {
+		case "manifest", "tal", "tests", "kernels", "models", "assets":
+			reviewed = append(reviewed, v)
+		default:
+			return nil, ErrInvalidSignatureStatement
+		}
+	}
+	return reviewed, nil
+}
+
+func normalizeVoucherTestedUnder(value any) (string, error) {
+	testedUnder, ok := value.(string)
+	if !ok || (testedUnder != "sim-only" && testedUnder != "hardware" && testedUnder != "production") {
+		return "", ErrInvalidSignatureStatement
+	}
+	return testedUnder, nil
+}
+
+func addOptionalVoucherScope(normalized map[string]any, input map[string]any) error {
+	if notesRaw, ok := input["notes"]; ok {
+		notes, ok := notesRaw.(string)
+		if !ok || len(notes) > voucherNotesMaxBytes {
+			return ErrInvalidSignatureStatement
+		}
+		normalized["notes"] = notes
+	}
+	if expiresRaw, ok := input["expires_unix"]; ok {
+		expiresUnix, ok := asUint64(expiresRaw)
+		if !ok {
+			return ErrInvalidSignatureStatement
+		}
+		normalized["expires_unix"] = expiresUnix
+	}
+	return nil
 }
 
 func asUint64(value any) (uint64, bool) {

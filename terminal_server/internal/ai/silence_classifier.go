@@ -20,6 +20,17 @@ const (
 	silenceStateQuiet
 )
 
+type silenceClassifierRuntime struct {
+	cfg         SilenceClassifierConfig
+	out         chan<- SoundEvent
+	audio       io.Reader
+	windowBytes int
+	holdFrames  int64
+	state       int
+	quietFrames int64
+	totalFrames int64
+}
+
 // SilenceClassifierConfig configures the RMS-energy silence detector. All
 // fields are optional; zero values are replaced with sensible defaults.
 type SilenceClassifierConfig struct {
@@ -84,102 +95,157 @@ func NewSilenceClassifier(cfg SilenceClassifierConfig) *SilenceClassifier {
 func (c *SilenceClassifier) Classify(ctx context.Context, audio io.Reader) (<-chan SoundEvent, error) {
 	out := make(chan SoundEvent, 1)
 
-	windowFrames := int(int64(c.cfg.SampleRate) * int64(c.cfg.WindowDuration) / int64(time.Second))
-	if windowFrames <= 0 {
-		windowFrames = 1
-	}
+	windowFrames := silenceWindowFrames(c.cfg)
 	windowBytes := windowFrames * 2 * c.cfg.Channels
 	if windowBytes < 2 {
 		windowBytes = 2
 	}
-	holdFrames := int64(c.cfg.SampleRate) * int64(c.cfg.HoldDuration) / int64(time.Second)
-	if holdFrames < 1 {
-		holdFrames = 1
-	}
+	holdFrames := silenceHoldFrames(c.cfg)
 
 	go func() {
 		defer close(out)
-		if audio == nil {
-			return
+		runtime := silenceClassifierRuntime{
+			cfg:         c.cfg,
+			out:         out,
+			audio:       audio,
+			windowBytes: windowBytes,
+			holdFrames:  holdFrames,
+			state:       silenceStateUnknown,
 		}
-		accum := make([]byte, 0, windowBytes*2)
-		tmp := make([]byte, windowBytes)
-
-		state := silenceStateUnknown
-		var quietFrames, totalFrames int64
-
-		process := func(window []byte) bool {
-			rms := computeRMS(window)
-			frames := int64(len(window) / 2 / c.cfg.Channels)
-			if frames < 1 {
-				frames = 1
-			}
-			totalFrames += frames
-			switch state {
-			case silenceStateUnknown:
-				if rms >= c.cfg.LoudThreshold {
-					state = silenceStateLoud
-				}
-			case silenceStateLoud:
-				if rms <= c.cfg.QuietThreshold {
-					quietFrames = frames
-					state = silenceStateQuiet
-				}
-			case silenceStateQuiet:
-				if rms > c.cfg.QuietThreshold {
-					quietFrames = 0
-					state = silenceStateLoud
-					return false
-				}
-				quietFrames += frames
-				if quietFrames >= holdFrames {
-					atMS := int64(0)
-					if c.cfg.SampleRate > 0 {
-						atMS = totalFrames * 1000 / int64(c.cfg.SampleRate)
-					}
-					select {
-					case out <- SoundEvent{
-						Label:      c.cfg.Label,
-						Confidence: 1.0,
-						AtMS:       atMS,
-					}:
-					case <-ctx.Done():
-					}
-					return true
-				}
-			}
-			return false
-		}
-
-		for {
-			if err := ctx.Err(); err != nil {
-				return
-			}
-			n, err := audio.Read(tmp)
-			if n > 0 {
-				accum = append(accum, tmp[:n]...)
-				for len(accum) >= windowBytes {
-					if process(accum[:windowBytes]) {
-						return
-					}
-					accum = accum[windowBytes:]
-				}
-			}
-			if err != nil {
-				// Process any remaining bytes as a final short window.
-				if len(accum) >= 2 {
-					trim := len(accum) - (len(accum) % 2)
-					if trim >= 2 {
-						if process(accum[:trim]) {
-							return
-						}
-					}
-				}
-				return
-			}
-		}
+		runtime.run(ctx)
 	}()
 	return out, nil
+}
+
+func silenceWindowFrames(cfg SilenceClassifierConfig) int {
+	windowFrames := int(int64(cfg.SampleRate) * int64(cfg.WindowDuration) / int64(time.Second))
+	if windowFrames <= 0 {
+		return 1
+	}
+	return windowFrames
+}
+
+func silenceHoldFrames(cfg SilenceClassifierConfig) int64 {
+	holdFrames := int64(cfg.SampleRate) * int64(cfg.HoldDuration) / int64(time.Second)
+	if holdFrames < 1 {
+		return 1
+	}
+	return holdFrames
+}
+
+func (r *silenceClassifierRuntime) process(ctx context.Context, window []byte) bool {
+	rms := computeRMS(window)
+	frames := int64(len(window) / 2 / r.cfg.Channels)
+	if frames < 1 {
+		frames = 1
+	}
+	r.totalFrames += frames
+
+	switch r.state {
+	case silenceStateUnknown:
+		return r.processUnknown(rms)
+	case silenceStateLoud:
+		return r.processLoud(rms, frames)
+	case silenceStateQuiet:
+		return r.processQuiet(ctx, rms, frames)
+	}
+	return false
+}
+
+func (r *silenceClassifierRuntime) run(ctx context.Context) {
+	if r.audio == nil {
+		return
+	}
+	accum := make([]byte, 0, r.windowBytes*2)
+	tmp := make([]byte, r.windowBytes)
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		if r.readNextWindow(ctx, &accum, tmp) {
+			return
+		}
+	}
+}
+
+func (r *silenceClassifierRuntime) readNextWindow(ctx context.Context, accum *[]byte, tmp []byte) bool {
+	n, err := r.audio.Read(tmp)
+	if n > 0 {
+		*accum = append(*accum, tmp[:n]...)
+		if r.processFullWindows(ctx, accum) {
+			return true
+		}
+	}
+	if err == nil {
+		return false
+	}
+	r.processFinalWindow(ctx, *accum)
+	return true
+}
+
+func (r *silenceClassifierRuntime) processFullWindows(ctx context.Context, accum *[]byte) bool {
+	for len(*accum) >= r.windowBytes {
+		if r.process(ctx, (*accum)[:r.windowBytes]) {
+			return true
+		}
+		*accum = (*accum)[r.windowBytes:]
+	}
+	return false
+}
+
+func (r *silenceClassifierRuntime) processFinalWindow(ctx context.Context, accum []byte) bool {
+	if len(accum) < 2 {
+		return false
+	}
+	trim := len(accum) - (len(accum) % 2)
+	if trim < 2 {
+		return false
+	}
+	return r.process(ctx, accum[:trim])
+}
+
+func (r *silenceClassifierRuntime) processUnknown(rms float64) bool {
+	if rms >= r.cfg.LoudThreshold {
+		r.state = silenceStateLoud
+	}
+	return false
+}
+
+func (r *silenceClassifierRuntime) processLoud(rms float64, frames int64) bool {
+	if rms <= r.cfg.QuietThreshold {
+		r.quietFrames = frames
+		r.state = silenceStateQuiet
+	}
+	return false
+}
+
+func (r *silenceClassifierRuntime) processQuiet(ctx context.Context, rms float64, frames int64) bool {
+	if rms > r.cfg.QuietThreshold {
+		r.quietFrames = 0
+		r.state = silenceStateLoud
+		return false
+	}
+	r.quietFrames += frames
+	if r.quietFrames < r.holdFrames {
+		return false
+	}
+	r.emit(ctx)
+	return true
+}
+
+func (r *silenceClassifierRuntime) emit(ctx context.Context) {
+	atMS := int64(0)
+	if r.cfg.SampleRate > 0 {
+		atMS = r.totalFrames * 1000 / int64(r.cfg.SampleRate)
+	}
+	select {
+	case r.out <- SoundEvent{
+		Label:      r.cfg.Label,
+		Confidence: 1.0,
+		AtMS:       atMS,
+	}:
+	case <-ctx.Done():
+	}
 }
 
 // computeRMS returns the root-mean-square energy of the given 16-bit

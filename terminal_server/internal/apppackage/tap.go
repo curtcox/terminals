@@ -169,6 +169,23 @@ type VerifiedPackage struct {
 	Statements      []VerifiedStatement
 }
 
+type canonicalTarValidationState struct {
+	seen           map[string]struct{}
+	seenCaseFolded map[string]struct{}
+	files          []string
+	archiveSources map[string][]byte
+	packageName    string
+	lastName       string
+	manifestCount  int
+	mainCount      int
+	manifestBytes  []byte
+}
+
+type canonicalTarEntry struct {
+	rel     string
+	payload []byte
+}
+
 // BuildTapFromDir builds a canonical .tap archive from one app root directory.
 func BuildTapFromDir(root string) ([]byte, string, error) {
 	cleanRoot := filepath.Clean(root)
@@ -418,33 +435,16 @@ func validateCanonicalZstdFrame(tapBytes []byte) error {
 
 	fcsFlag := descriptor >> 6
 	singleSegment := descriptor&0x20 != 0
-	if descriptor&0x04 != 0 {
-		return fmt.Errorf("%w: zstd content checksum flag must be unset", ErrInvalidTapFormat)
-	}
-	if descriptor&0x03 != 0 {
-		return fmt.Errorf("%w: zstd dictionary id flag must be unset", ErrInvalidTapFormat)
-	}
-	if fcsFlag == 0 {
-		return fmt.Errorf("%w: zstd content size flag must be set", ErrInvalidTapFormat)
+	if err := validateZstdFrameDescriptor(descriptor, fcsFlag); err != nil {
+		return err
 	}
 
 	if !singleSegment {
-		if len(tapBytes) < offset+1 {
-			return fmt.Errorf("%w: truncated zstd window descriptor", ErrInvalidTapFormat)
+		nextOffset, err := validateZstdWindowDescriptor(tapBytes, offset)
+		if err != nil {
+			return err
 		}
-		windowDescriptor := tapBytes[offset]
-		offset++
-
-		windowLog := uint(windowDescriptor>>3) + 10
-		if windowLog > 23 {
-			return fmt.Errorf("%w: zstd window log too large", ErrInvalidTapFormat)
-		}
-		windowBase := uint64(1) << windowLog
-		windowAdd := (windowBase / 8) * uint64(windowDescriptor&0x07)
-		windowSize := windowBase + windowAdd
-		if windowSize > uint64(zstdWindowSize) {
-			return fmt.Errorf("%w: zstd window size too large", ErrInvalidTapFormat)
-		}
+		offset = nextOffset
 	}
 
 	contentSizeFieldLen := zstdContentSizeFieldLen(fcsFlag, singleSegment)
@@ -454,31 +454,11 @@ func validateCanonicalZstdFrame(tapBytes []byte) error {
 	offset += contentSizeFieldLen
 
 	for {
-		if len(tapBytes) < offset+3 {
-			return fmt.Errorf("%w: truncated zstd block header", ErrInvalidTapFormat)
+		nextOffset, lastBlock, err := validateZstdBlock(tapBytes, offset)
+		if err != nil {
+			return err
 		}
-		blockHeader := uint32(tapBytes[offset]) | uint32(tapBytes[offset+1])<<8 | uint32(tapBytes[offset+2])<<16
-		offset += 3
-
-		lastBlock := blockHeader&0x1 != 0
-		blockType := (blockHeader >> 1) & 0x3
-		blockSize := int(blockHeader >> 3)
-
-		switch blockType {
-		case 0, 2:
-			if len(tapBytes) < offset+blockSize {
-				return fmt.Errorf("%w: truncated zstd block payload", ErrInvalidTapFormat)
-			}
-			offset += blockSize
-		case 1:
-			if len(tapBytes) < offset+1 {
-				return fmt.Errorf("%w: truncated zstd RLE payload", ErrInvalidTapFormat)
-			}
-			offset++
-		default:
-			return fmt.Errorf("%w: reserved zstd block type", ErrInvalidTapFormat)
-		}
-
+		offset = nextOffset
 		if lastBlock {
 			break
 		}
@@ -488,6 +468,71 @@ func validateCanonicalZstdFrame(tapBytes []byte) error {
 		return fmt.Errorf("%w: trailing bytes or extra frame detected", ErrInvalidTapFormat)
 	}
 	return nil
+}
+
+func validateZstdFrameDescriptor(descriptor byte, fcsFlag byte) error {
+	if descriptor&0x04 != 0 {
+		return fmt.Errorf("%w: zstd content checksum flag must be unset", ErrInvalidTapFormat)
+	}
+	if descriptor&0x03 != 0 {
+		return fmt.Errorf("%w: zstd dictionary id flag must be unset", ErrInvalidTapFormat)
+	}
+	if fcsFlag == 0 {
+		return fmt.Errorf("%w: zstd content size flag must be set", ErrInvalidTapFormat)
+	}
+	return nil
+}
+
+func validateZstdWindowDescriptor(tapBytes []byte, offset int) (int, error) {
+	if len(tapBytes) < offset+1 {
+		return 0, fmt.Errorf("%w: truncated zstd window descriptor", ErrInvalidTapFormat)
+	}
+	windowDescriptor := tapBytes[offset]
+	windowLog := uint(windowDescriptor>>3) + 10
+	if windowLog > 23 {
+		return 0, fmt.Errorf("%w: zstd window log too large", ErrInvalidTapFormat)
+	}
+	windowBase := uint64(1) << windowLog
+	windowAdd := (windowBase / 8) * uint64(windowDescriptor&0x07)
+	if windowBase+windowAdd > uint64(zstdWindowSize) {
+		return 0, fmt.Errorf("%w: zstd window size too large", ErrInvalidTapFormat)
+	}
+	return offset + 1, nil
+}
+
+func validateZstdBlock(tapBytes []byte, offset int) (int, bool, error) {
+	if len(tapBytes) < offset+3 {
+		return 0, false, fmt.Errorf("%w: truncated zstd block header", ErrInvalidTapFormat)
+	}
+	blockHeader := uint32(tapBytes[offset]) | uint32(tapBytes[offset+1])<<8 | uint32(tapBytes[offset+2])<<16
+	offset += 3
+
+	lastBlock := blockHeader&0x1 != 0
+	blockType := (blockHeader >> 1) & 0x3
+	blockSize := int(blockHeader >> 3)
+
+	switch blockType {
+	case 0, 2:
+		return validateZstdSizedBlock(tapBytes, offset, blockSize, lastBlock)
+	case 1:
+		return validateZstdRLEBlock(tapBytes, offset, lastBlock)
+	default:
+		return 0, false, fmt.Errorf("%w: reserved zstd block type", ErrInvalidTapFormat)
+	}
+}
+
+func validateZstdSizedBlock(tapBytes []byte, offset int, blockSize int, lastBlock bool) (int, bool, error) {
+	if len(tapBytes) < offset+blockSize {
+		return 0, false, fmt.Errorf("%w: truncated zstd block payload", ErrInvalidTapFormat)
+	}
+	return offset + blockSize, lastBlock, nil
+}
+
+func validateZstdRLEBlock(tapBytes []byte, offset int, lastBlock bool) (int, bool, error) {
+	if len(tapBytes) < offset+1 {
+		return 0, false, fmt.Errorf("%w: truncated zstd RLE payload", ErrInvalidTapFormat)
+	}
+	return offset + 1, lastBlock, nil
 }
 
 func zstdContentSizeFieldLen(fcsFlag byte, singleSegment bool) int {
@@ -508,15 +553,12 @@ func zstdContentSizeFieldLen(fcsFlag byte, singleSegment bool) int {
 
 func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte, error) {
 	tr := tar.NewReader(bytes.NewReader(canonicalTar))
-	seen := make(map[string]struct{})
-	seenCaseFolded := make(map[string]struct{})
-	files := make([]string, 0, 16)
-	archiveSources := make(map[string][]byte)
-	packageName := ""
-	lastName := ""
-	manifestCount := 0
-	mainCount := 0
-	var manifestBytes []byte
+	state := canonicalTarValidationState{
+		seen:           make(map[string]struct{}),
+		seenCaseFolded: make(map[string]struct{}),
+		files:          make([]string, 0, 16),
+		archiveSources: make(map[string][]byte),
+	}
 
 	for {
 		hdr, err := tr.Next()
@@ -526,52 +568,10 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 		if err != nil {
 			return VerifiedTap{}, nil, fmt.Errorf("%w: %v", ErrInvalidTarEntry, err)
 		}
-
-		if hdr.Typeflag != tar.TypeReg {
-			return VerifiedTap{}, nil, ErrInvalidTarEntry
-		}
-		if hdr.Name <= lastName {
-			return VerifiedTap{}, nil, ErrNonCanonicalOrder
-		}
-		lastName = hdr.Name
-
-		if err := validateArchivePath(hdr.Name); err != nil {
+		entry, err := state.validateEntryHeader(hdr)
+		if err != nil {
 			return VerifiedTap{}, nil, err
 		}
-		if _, ok := seen[hdr.Name]; ok {
-			return VerifiedTap{}, nil, ErrDuplicateArchivePath
-		}
-		seen[hdr.Name] = struct{}{}
-
-		folded := strings.ToLower(hdr.Name)
-		if _, ok := seenCaseFolded[folded]; ok {
-			return VerifiedTap{}, nil, ErrCaseCollidingPath
-		}
-		seenCaseFolded[folded] = struct{}{}
-
-		parts := strings.Split(hdr.Name, "/")
-		if len(parts) < 2 {
-			return VerifiedTap{}, nil, ErrInvalidTarEntry
-		}
-		entryPackage := parts[0]
-		if packageName == "" {
-			packageName = entryPackage
-		}
-		if entryPackage != packageName {
-			return VerifiedTap{}, nil, ErrInvalidTarEntry
-		}
-		rel := strings.Join(parts[1:], "/")
-		if err := validateTopLevelPath(rel); err != nil {
-			return VerifiedTap{}, nil, err
-		}
-
-		if hdr.Mode != canonicalFileMode || hdr.Uid != 0 || hdr.Gid != 0 || hdr.Uname != "" || hdr.Gname != "" {
-			return VerifiedTap{}, nil, ErrInvalidTarEntry
-		}
-		if !hdr.ModTime.Equal(time.Unix(0, 0).UTC()) {
-			return VerifiedTap{}, nil, ErrInvalidTarEntry
-		}
-
 		payload, err := io.ReadAll(tr)
 		if err != nil {
 			return VerifiedTap{}, nil, fmt.Errorf("%w: %v", ErrInvalidTarEntry, err)
@@ -579,32 +579,97 @@ func validateCanonicalTarWithManifest(canonicalTar []byte) (VerifiedTap, []byte,
 		if int64(len(payload)) != hdr.Size {
 			return VerifiedTap{}, nil, ErrInvalidTarEntry
 		}
-
-		switch rel {
-		case "manifest.toml":
-			manifestCount++
-			manifestBytes = append([]byte(nil), payload...)
-		case "main.tal":
-			mainCount++
-		}
-		archiveSources[rel] = append([]byte(nil), payload...)
-		files = append(files, rel)
+		entry.payload = payload
+		state.addEntry(entry)
 	}
 
-	if packageName == "" {
+	if state.packageName == "" {
 		return VerifiedTap{}, nil, fmt.Errorf("%w: no entries", ErrInvalidTapFormat)
 	}
-	if manifestCount != 1 {
+	if state.manifestCount != 1 {
 		return VerifiedTap{}, nil, ErrMissingManifest
 	}
-	if mainCount != 1 {
+	if state.mainCount != 1 {
 		return VerifiedTap{}, nil, ErrMissingMainTAL
 	}
-	if err := validateManifestMigrations(manifestBytes, files, archiveSources); err != nil {
+	if err := validateManifestMigrations(state.manifestBytes, state.files, state.archiveSources); err != nil {
 		return VerifiedTap{}, nil, err
 	}
 
-	return VerifiedTap{PackageName: packageName, Files: files}, manifestBytes, nil
+	return VerifiedTap{PackageName: state.packageName, Files: state.files}, state.manifestBytes, nil
+}
+
+func (s *canonicalTarValidationState) validateEntryHeader(hdr *tar.Header) (canonicalTarEntry, error) {
+	if hdr.Typeflag != tar.TypeReg {
+		return canonicalTarEntry{}, ErrInvalidTarEntry
+	}
+	if hdr.Name <= s.lastName {
+		return canonicalTarEntry{}, ErrNonCanonicalOrder
+	}
+	s.lastName = hdr.Name
+	if err := s.validateEntryPath(hdr.Name); err != nil {
+		return canonicalTarEntry{}, err
+	}
+	if hdr.Mode != canonicalFileMode || hdr.Uid != 0 || hdr.Gid != 0 || hdr.Uname != "" || hdr.Gname != "" {
+		return canonicalTarEntry{}, ErrInvalidTarEntry
+	}
+	if !hdr.ModTime.Equal(time.Unix(0, 0).UTC()) {
+		return canonicalTarEntry{}, ErrInvalidTarEntry
+	}
+	rel, err := s.entryRelativePath(hdr.Name)
+	if err != nil {
+		return canonicalTarEntry{}, err
+	}
+	return canonicalTarEntry{rel: rel}, nil
+}
+
+func (s *canonicalTarValidationState) validateEntryPath(name string) error {
+	if err := validateArchivePath(name); err != nil {
+		return err
+	}
+	if _, ok := s.seen[name]; ok {
+		return ErrDuplicateArchivePath
+	}
+	s.seen[name] = struct{}{}
+
+	folded := strings.ToLower(name)
+	if _, ok := s.seenCaseFolded[folded]; ok {
+		return ErrCaseCollidingPath
+	}
+	s.seenCaseFolded[folded] = struct{}{}
+	return nil
+}
+
+func (s *canonicalTarValidationState) entryRelativePath(name string) (string, error) {
+	parts := strings.Split(name, "/")
+	if len(parts) < 2 {
+		return "", ErrInvalidTarEntry
+	}
+	entryPackage := parts[0]
+	if s.packageName == "" {
+		s.packageName = entryPackage
+	}
+	if entryPackage != s.packageName {
+		return "", ErrInvalidTarEntry
+	}
+	rel := strings.Join(parts[1:], "/")
+	if err := validateTopLevelPath(rel); err != nil {
+		return "", err
+	}
+	return rel, nil
+}
+
+func (s *canonicalTarValidationState) addEntry(entry canonicalTarEntry) {
+	payload := append([]byte(nil), entry.payload...)
+	switch entry.rel {
+	case "manifest.toml":
+		s.manifestCount++
+		s.manifestBytes = payload
+	case "main.tal":
+		s.mainCount++
+	}
+	s.archiveSources[entry.rel] = payload
+	s.files = append(s.files, entry.rel)
 }
 
 type manifestIdentity struct {
@@ -704,42 +769,9 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 		availableFiles[rel] = struct{}{}
 	}
 
-	migrationFiles := make([]parsedMigrationStep, 0)
-	for _, rel := range files {
-		if !strings.HasPrefix(rel, "migrate/") {
-			continue
-		}
-		name := strings.TrimPrefix(rel, "migrate/")
-		if strings.HasPrefix(name, "downgrade/") {
-			downgradeName := strings.TrimPrefix(name, "downgrade/")
-			if strings.TrimSpace(downgradeName) == "" {
-				return fmt.Errorf("%w: migration downgrade script path is empty", ErrInvalidManifest)
-			}
-			if strings.Contains(downgradeName, "/") {
-				return fmt.Errorf("%w: migration downgrade script %s must be a single-level file under migrate/downgrade/", ErrInvalidManifest, rel)
-			}
-			match := migrateStepFilePattern.FindStringSubmatch(downgradeName)
-			if match == nil {
-				return fmt.Errorf("%w: migration downgrade script %s must match <step>_<from>_to_<to>.tal", ErrInvalidManifest, rel)
-			}
-			stepNumber, err := strconv.Atoi(match[1])
-			if err != nil || stepNumber <= 0 {
-				return fmt.Errorf("%w: migration downgrade script %s has invalid step number", ErrInvalidManifest, rel)
-			}
-			continue
-		}
-		if strings.Contains(name, "/") {
-			return fmt.Errorf("%w: migration script %s must be a single-level file under migrate/", ErrInvalidManifest, rel)
-		}
-		match := migrateStepFilePattern.FindStringSubmatch(name)
-		if match == nil {
-			return fmt.Errorf("%w: migration script %s must match <step>_<from>_to_<to>.tal", ErrInvalidManifest, rel)
-		}
-		stepNumber, err := strconv.Atoi(match[1])
-		if err != nil || stepNumber <= 0 {
-			return fmt.Errorf("%w: migration script %s has invalid step number", ErrInvalidManifest, rel)
-		}
-		migrationFiles = append(migrationFiles, parsedMigrationStep{stepNumber: stepNumber, stepName: strings.TrimSuffix(name, ".tal"), from: match[2], to: match[3]})
+	migrationFiles, err := parseManifestMigrationFiles(files)
+	if err != nil {
+		return err
 	}
 
 	declaredSteps := manifest.Migrate.DeclaredSteps
@@ -754,52 +786,174 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 	if declaredSteps <= 0 || declaredSteps != declaredManifestSteps || declaredSteps != len(migrationFiles) {
 		return ErrInvalidManifest
 	}
-	if manifest.Migrate.DrainTimeoutSeconds != nil && *manifest.Migrate.DrainTimeoutSeconds <= 0 {
-		return fmt.Errorf("%w: migrate.drain_timeout_seconds must be a positive integer", ErrInvalidManifest)
-	}
-	if manifest.Migrate.MaxRuntimeSeconds != nil && *manifest.Migrate.MaxRuntimeSeconds <= 0 {
-		return fmt.Errorf("%w: migrate.max_runtime_seconds must be a positive integer", ErrInvalidManifest)
-	}
-	if manifest.Migrate.CheckpointEvery != nil && *manifest.Migrate.CheckpointEvery <= 0 {
-		return fmt.Errorf("%w: migrate.checkpoint_every must be a positive integer", ErrInvalidManifest)
+	if err := validateManifestMigrationLimits(manifest.Migrate); err != nil {
+		return err
 	}
 
 	sort.Slice(migrationFiles, func(i, j int) bool {
 		return migrationFiles[i].stepNumber < migrationFiles[j].stepNumber
 	})
 
+	if err := validateManifestMigrationSteps(manifest.Migrate.Step, migrationFiles); err != nil {
+		return err
+	}
+	if err := validateManifestStoreSchemas(manifest.Storage.StoreSchema, availableFiles); err != nil {
+		return err
+	}
+
+	if len(manifest.Migrate.Fixture) != len(migrationFiles) {
+		return ErrInvalidManifest
+	}
+
+	stepNames, stepByName := indexManifestMigrationSteps(migrationFiles)
+	storeSchemaByVersion := indexManifestStoreSchemasByVersion(manifest.Storage.StoreSchema)
+
+	if err := validateManifestMigrationFixtures(manifest.Migrate.Fixture, manifest.Migrate.Step, stepNames, stepByName, storeSchemaByVersion, availableFiles, migrationSources); err != nil {
+		return err
+	}
+
+	return validateManifestMigrationModules(files, migrationSources)
+}
+
+func indexManifestMigrationSteps(migrationFiles []parsedMigrationStep) (map[string]struct{}, map[string]parsedMigrationStep) {
+	stepNames := make(map[string]struct{}, len(migrationFiles))
+	stepByName := make(map[string]parsedMigrationStep, len(migrationFiles))
+	for _, step := range migrationFiles {
+		stepNames[step.stepName] = struct{}{}
+		stepByName[step.stepName] = step
+	}
+	return stepNames, stepByName
+}
+
+func indexManifestStoreSchemasByVersion(schemas []manifestStoreSchema) map[string][]manifestStoreSchema {
+	storeSchemaByVersion := make(map[string][]manifestStoreSchema, len(schemas))
+	for _, schema := range schemas {
+		version := strings.TrimSpace(schema.Version)
+		storeSchemaByVersion[version] = append(storeSchemaByVersion[version], schema)
+	}
+	return storeSchemaByVersion
+}
+
+func parseManifestMigrationFiles(files []string) ([]parsedMigrationStep, error) {
+	migrationFiles := make([]parsedMigrationStep, 0)
+	for _, rel := range files {
+		step, include, err := parseManifestMigrationFile(rel)
+		if err != nil {
+			return nil, err
+		}
+		if include {
+			migrationFiles = append(migrationFiles, step)
+		}
+	}
+	return migrationFiles, nil
+}
+
+func parseManifestMigrationFile(rel string) (parsedMigrationStep, bool, error) {
+	if !strings.HasPrefix(rel, "migrate/") {
+		return parsedMigrationStep{}, false, nil
+	}
+	name := strings.TrimPrefix(rel, "migrate/")
+	if strings.HasPrefix(name, "downgrade/") {
+		return parsedMigrationStep{}, false, validateManifestMigrationDowngradeFile(rel, strings.TrimPrefix(name, "downgrade/"))
+	}
+	step, err := parseManifestMigrationStepFile(rel, name, "migrate/")
+	return step, true, err
+}
+
+func validateManifestMigrationDowngradeFile(rel string, name string) error {
+	_, err := parseManifestMigrationStepFileWithMode(rel, name, "migrate/downgrade/", true)
+	return err
+}
+
+func parseManifestMigrationStepFile(rel string, name string, dir string) (parsedMigrationStep, error) {
+	return parseManifestMigrationStepFileWithMode(rel, name, dir, false)
+}
+
+func parseManifestMigrationStepFileWithMode(rel string, name string, dir string, downgrade bool) (parsedMigrationStep, error) {
+	if strings.TrimSpace(name) == "" {
+		if downgrade {
+			return parsedMigrationStep{}, fmt.Errorf("%w: migration downgrade script path is empty", ErrInvalidManifest)
+		}
+		return parsedMigrationStep{}, fmt.Errorf("%w: migration script %s must match <step>_<from>_to_<to>.tal", ErrInvalidManifest, rel)
+	}
+	if strings.Contains(name, "/") {
+		if downgrade {
+			return parsedMigrationStep{}, fmt.Errorf("%w: migration downgrade script %s must be a single-level file under migrate/downgrade/", ErrInvalidManifest, rel)
+		}
+		return parsedMigrationStep{}, fmt.Errorf("%w: migration script %s must be a single-level file under %s", ErrInvalidManifest, rel, dir)
+	}
+	match := migrateStepFilePattern.FindStringSubmatch(name)
+	if match == nil {
+		if downgrade {
+			return parsedMigrationStep{}, fmt.Errorf("%w: migration downgrade script %s must match <step>_<from>_to_<to>.tal", ErrInvalidManifest, rel)
+		}
+		return parsedMigrationStep{}, fmt.Errorf("%w: migration script %s must match <step>_<from>_to_<to>.tal", ErrInvalidManifest, rel)
+	}
+	stepNumber, err := strconv.Atoi(match[1])
+	if err != nil || stepNumber <= 0 {
+		if downgrade {
+			return parsedMigrationStep{}, fmt.Errorf("%w: migration downgrade script %s has invalid step number", ErrInvalidManifest, rel)
+		}
+		return parsedMigrationStep{}, fmt.Errorf("%w: migration script %s has invalid step number", ErrInvalidManifest, rel)
+	}
+	return parsedMigrationStep{stepNumber: stepNumber, stepName: strings.TrimSuffix(name, ".tal"), from: match[2], to: match[3]}, nil
+}
+
+func validateManifestMigrationLimits(migrate manifestMigrationConfig) error {
+	if migrate.DrainTimeoutSeconds != nil && *migrate.DrainTimeoutSeconds <= 0 {
+		return fmt.Errorf("%w: migrate.drain_timeout_seconds must be a positive integer", ErrInvalidManifest)
+	}
+	if migrate.MaxRuntimeSeconds != nil && *migrate.MaxRuntimeSeconds <= 0 {
+		return fmt.Errorf("%w: migrate.max_runtime_seconds must be a positive integer", ErrInvalidManifest)
+	}
+	if migrate.CheckpointEvery != nil && *migrate.CheckpointEvery <= 0 {
+		return fmt.Errorf("%w: migrate.checkpoint_every must be a positive integer", ErrInvalidManifest)
+	}
+	return nil
+}
+
+func validateManifestMigrationSteps(manifestSteps []manifestMigrationStep, migrationFiles []parsedMigrationStep) error {
 	for i, fileStep := range migrationFiles {
 		if fileStep.stepNumber != i+1 {
 			return fmt.Errorf("%w: migration step numbering gap: expected step %04d, found %04d", ErrInvalidManifest, i+1, fileStep.stepNumber)
 		}
-		manifestStep := manifest.Migrate.Step[i]
-		if strings.TrimSpace(manifestStep.From) == "" || strings.TrimSpace(manifestStep.To) == "" {
-			return ErrInvalidManifest
-		}
-		if strings.TrimSpace(manifestStep.Compatibility) == "" {
-			return fmt.Errorf("%w: migrate.step %04d must declare compatibility", ErrInvalidManifest, i+1)
-		}
-		if strings.TrimSpace(manifestStep.DrainPolicy) == "" {
-			return fmt.Errorf("%w: migrate.step %04d must declare drain_policy", ErrInvalidManifest, i+1)
-		}
-		if manifestStep.Compatibility != "" && manifestStep.Compatibility != "compatible" && manifestStep.Compatibility != "incompatible" {
-			return ErrInvalidManifest
-		}
-		if manifestStep.DrainPolicy != "" && manifestStep.DrainPolicy != "none" && manifestStep.DrainPolicy != "drain" && manifestStep.DrainPolicy != "multi_version" {
-			return ErrInvalidManifest
-		}
-		if manifestStep.Compatibility == "incompatible" && manifestStep.DrainPolicy == "none" {
-			return fmt.Errorf("%w: migrate.step %04d declares compatibility=incompatible with drain_policy=none", ErrInvalidManifest, i+1)
-		}
-		if manifestStep.From != fileStep.from || manifestStep.To != fileStep.to {
-			return ErrInvalidManifest
+		if err := validateManifestMigrationStep(i+1, manifestSteps[i], fileStep); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
-	if len(manifest.Storage.StoreSchema) == 0 {
+func validateManifestMigrationStep(stepNumber int, manifestStep manifestMigrationStep, fileStep parsedMigrationStep) error {
+	if strings.TrimSpace(manifestStep.From) == "" || strings.TrimSpace(manifestStep.To) == "" {
 		return ErrInvalidManifest
 	}
-	for _, schema := range manifest.Storage.StoreSchema {
+	if strings.TrimSpace(manifestStep.Compatibility) == "" {
+		return fmt.Errorf("%w: migrate.step %04d must declare compatibility", ErrInvalidManifest, stepNumber)
+	}
+	if strings.TrimSpace(manifestStep.DrainPolicy) == "" {
+		return fmt.Errorf("%w: migrate.step %04d must declare drain_policy", ErrInvalidManifest, stepNumber)
+	}
+	if manifestStep.Compatibility != "compatible" && manifestStep.Compatibility != "incompatible" {
+		return ErrInvalidManifest
+	}
+	if manifestStep.DrainPolicy != "none" && manifestStep.DrainPolicy != "drain" && manifestStep.DrainPolicy != "multi_version" {
+		return ErrInvalidManifest
+	}
+	if manifestStep.Compatibility == "incompatible" && manifestStep.DrainPolicy == "none" {
+		return fmt.Errorf("%w: migrate.step %04d declares compatibility=incompatible with drain_policy=none", ErrInvalidManifest, stepNumber)
+	}
+	if manifestStep.From != fileStep.from || manifestStep.To != fileStep.to {
+		return ErrInvalidManifest
+	}
+	return nil
+}
+
+func validateManifestStoreSchemas(schemas []manifestStoreSchema, availableFiles map[string]struct{}) error {
+	if len(schemas) == 0 {
+		return ErrInvalidManifest
+	}
+	for _, schema := range schemas {
 		if strings.TrimSpace(schema.Store) == "" || strings.TrimSpace(schema.Version) == "" || strings.TrimSpace(schema.RecordSchema) == "" {
 			return ErrInvalidManifest
 		}
@@ -807,112 +961,141 @@ func validateManifestMigrations(manifestBytes []byte, files []string, migrationS
 			return ErrInvalidManifest
 		}
 	}
+	return nil
+}
 
-	if len(manifest.Migrate.Fixture) != len(migrationFiles) {
+func validateManifestMigrationFixtures(
+	fixtures []manifestMigrationFixture,
+	manifestSteps []manifestMigrationStep,
+	stepNames map[string]struct{},
+	stepByName map[string]parsedMigrationStep,
+	storeSchemaByVersion map[string][]manifestStoreSchema,
+	availableFiles map[string]struct{},
+	migrationSources map[string][]byte,
+) error {
+	fixtureByStep := make(map[string]struct{}, len(fixtures))
+	for _, fixture := range fixtures {
+		if err := validateManifestMigrationFixture(fixture, manifestSteps, stepNames, stepByName, storeSchemaByVersion, availableFiles, migrationSources, fixtureByStep); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateManifestMigrationFixture(
+	fixture manifestMigrationFixture,
+	manifestSteps []manifestMigrationStep,
+	stepNames map[string]struct{},
+	stepByName map[string]parsedMigrationStep,
+	storeSchemaByVersion map[string][]manifestStoreSchema,
+	availableFiles map[string]struct{},
+	migrationSources map[string][]byte,
+	fixtureByStep map[string]struct{},
+) error {
+	if err := validateManifestMigrationFixtureMetadata(fixture, manifestSteps, stepNames, stepByName, availableFiles, fixtureByStep); err != nil {
+		return err
+	}
+	readAdapter := strings.TrimSpace(fixture.ReadAdapter)
+	if readAdapter != "" {
+		source, ok := migrationSources[readAdapter]
+		if !ok {
+			return fmt.Errorf("%w: migrate.fixture %s read_adapter %q missing from archive", ErrInvalidManifest, fixture.Step, readAdapter)
+		}
+		if err := validateMigrationReadAdapterSource(readAdapter, source); err != nil {
+			return err
+		}
+	}
+	seedRecords, err := validateMigrationFixtureNDJSON(fixture.Seed, migrationSources[fixture.Seed])
+	if err != nil {
+		return err
+	}
+	if err := validateMigrationFixtureSeedSchema(fixture, seedRecords, migrationSources[fixture.PriorRecordSchema]); err != nil {
+		return err
+	}
+	expectedRecords, err := validateMigrationFixtureNDJSON(fixture.Expected, migrationSources[fixture.Expected])
+	if err != nil {
+		return err
+	}
+	manifestStep := manifestSteps[stepByName[fixture.Step].stepNumber-1]
+	return validateManifestMigrationFixtureExpected(fixture, manifestStep, stepByName, storeSchemaByVersion, migrationSources, expectedRecords)
+}
+
+func validateManifestMigrationFixtureMetadata(
+	fixture manifestMigrationFixture,
+	manifestSteps []manifestMigrationStep,
+	stepNames map[string]struct{},
+	stepByName map[string]parsedMigrationStep,
+	availableFiles map[string]struct{},
+	fixtureByStep map[string]struct{},
+) error {
+	if strings.TrimSpace(fixture.Step) == "" || strings.TrimSpace(fixture.PriorVersion) == "" || strings.TrimSpace(fixture.PriorRecordSchema) == "" || strings.TrimSpace(fixture.Seed) == "" || strings.TrimSpace(fixture.Expected) == "" {
 		return ErrInvalidManifest
 	}
-
-	stepNames := make(map[string]struct{}, len(migrationFiles))
-	stepByName := make(map[string]parsedMigrationStep, len(migrationFiles))
-	for _, step := range migrationFiles {
-		stepNames[step.stepName] = struct{}{}
-		stepByName[step.stepName] = step
+	if _, ok := stepNames[fixture.Step]; !ok {
+		return ErrInvalidManifest
 	}
-
-	storeSchemaByVersion := make(map[string][]manifestStoreSchema, len(manifest.Storage.StoreSchema))
-	for _, schema := range manifest.Storage.StoreSchema {
-		version := strings.TrimSpace(schema.Version)
-		storeSchemaByVersion[version] = append(storeSchemaByVersion[version], schema)
+	step := stepByName[fixture.Step]
+	if fixture.PriorVersion != step.from {
+		return fmt.Errorf("%w: migrate.fixture %s prior_version %q does not match step from-version %q", ErrInvalidManifest, fixture.Step, fixture.PriorVersion, step.from)
 	}
-
-	fixtureByStep := make(map[string]struct{}, len(manifest.Migrate.Fixture))
-	for _, fixture := range manifest.Migrate.Fixture {
-		if strings.TrimSpace(fixture.Step) == "" ||
-			strings.TrimSpace(fixture.PriorVersion) == "" ||
-			strings.TrimSpace(fixture.PriorRecordSchema) == "" ||
-			strings.TrimSpace(fixture.Seed) == "" ||
-			strings.TrimSpace(fixture.Expected) == "" {
+	if _, ok := fixtureByStep[fixture.Step]; ok {
+		return ErrInvalidManifest
+	}
+	fixtureByStep[fixture.Step] = struct{}{}
+	if manifestSteps[step.stepNumber-1].DrainPolicy == "multi_version" && strings.TrimSpace(fixture.ReadAdapter) == "" {
+		return fmt.Errorf("%w: migrate.fixture %s must declare read_adapter for multi_version migration", ErrInvalidManifest, fixture.Step)
+	}
+	for _, path := range []string{fixture.PriorRecordSchema, fixture.Seed, fixture.Expected} {
+		if _, ok := availableFiles[path]; !ok {
 			return ErrInvalidManifest
-		}
-		if _, ok := stepNames[fixture.Step]; !ok {
-			return ErrInvalidManifest
-		}
-		if step, ok := stepByName[fixture.Step]; ok {
-			if fixture.PriorVersion != step.from {
-				return fmt.Errorf("%w: migrate.fixture %s prior_version %q does not match step from-version %q", ErrInvalidManifest, fixture.Step, fixture.PriorVersion, step.from)
-			}
-		}
-		if _, ok := fixtureByStep[fixture.Step]; ok {
-			return ErrInvalidManifest
-		}
-		fixtureByStep[fixture.Step] = struct{}{}
-		readAdapter := strings.TrimSpace(fixture.ReadAdapter)
-		if step, ok := stepByName[fixture.Step]; ok {
-			manifestStep := manifest.Migrate.Step[step.stepNumber-1]
-			if manifestStep.DrainPolicy == "multi_version" && readAdapter == "" {
-				return fmt.Errorf("%w: migrate.fixture %s must declare read_adapter for multi_version migration", ErrInvalidManifest, fixture.Step)
-			}
-		}
-		if _, ok := availableFiles[fixture.PriorRecordSchema]; !ok {
-			return ErrInvalidManifest
-		}
-		if _, ok := availableFiles[fixture.Seed]; !ok {
-			return ErrInvalidManifest
-		}
-		if _, ok := availableFiles[fixture.Expected]; !ok {
-			return ErrInvalidManifest
-		}
-		if readAdapter != "" {
-			source, ok := migrationSources[readAdapter]
-			if !ok {
-				return fmt.Errorf("%w: migrate.fixture %s read_adapter %q missing from archive", ErrInvalidManifest, fixture.Step, readAdapter)
-			}
-			if err := validateMigrationReadAdapterSource(readAdapter, source); err != nil {
-				return err
-			}
-		}
-		seedRecords, err := validateMigrationFixtureNDJSON(fixture.Seed, migrationSources[fixture.Seed])
-		if err != nil {
-			return err
-		}
-		if err := validateMigrationFixtureSeedSchema(fixture, seedRecords, migrationSources[fixture.PriorRecordSchema]); err != nil {
-			return err
-		}
-		expectedRecords, err := validateMigrationFixtureNDJSON(fixture.Expected, migrationSources[fixture.Expected])
-		if err != nil {
-			return err
-		}
-		manifestStep := manifest.Migrate.Step[stepByName[fixture.Step].stepNumber-1]
-		targetSchemaPath, targetSchemaPayload, shouldValidateExpected, err := resolveFixtureExpectedSchema(fixture, manifestStep, stepByName, storeSchemaByVersion, migrationSources)
-		if err != nil {
-			return err
-		}
-		if shouldValidateExpected {
-			if err := validateMigrationFixtureValueSchema(fixture.Expected, targetSchemaPath, expectedRecords, targetSchemaPayload); err != nil {
-				return err
-			}
 		}
 	}
+	return nil
+}
 
+func validateManifestMigrationFixtureExpected(
+	fixture manifestMigrationFixture,
+	manifestStep manifestMigrationStep,
+	stepByName map[string]parsedMigrationStep,
+	storeSchemaByVersion map[string][]manifestStoreSchema,
+	migrationSources map[string][]byte,
+	expectedRecords []migrationFixtureRecord,
+) error {
+	targetSchemaPath, targetSchemaPayload, shouldValidateExpected, err := resolveFixtureExpectedSchema(fixture, manifestStep, stepByName, storeSchemaByVersion, migrationSources)
+	if err != nil {
+		return err
+	}
+	if !shouldValidateExpected {
+		return nil
+	}
+	return validateMigrationFixtureValueSchema(fixture.Expected, targetSchemaPath, expectedRecords, targetSchemaPayload)
+}
+
+func validateManifestMigrationModules(files []string, migrationSources map[string][]byte) error {
 	for _, rel := range files {
 		if !strings.HasPrefix(rel, "migrate/") {
 			continue
 		}
-		source, ok := migrationSources[rel]
-		if !ok {
-			return ErrInvalidManifest
-		}
-		for _, match := range migrateLoadPattern.FindAllSubmatch(source, -1) {
-			if len(match) < 2 {
-				continue
-			}
-			module := strings.TrimSpace(string(match[1]))
-			if _, allowed := allowedMigrationModules[module]; !allowed {
-				return fmt.Errorf("%w: migration %s loads disallowed module %q", ErrInvalidManifest, rel, module)
-			}
+		if err := validateManifestMigrationModule(rel, migrationSources[rel]); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
+func validateManifestMigrationModule(rel string, source []byte) error {
+	if source == nil {
+		return ErrInvalidManifest
+	}
+	for _, match := range migrateLoadPattern.FindAllSubmatch(source, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		module := strings.TrimSpace(string(match[1]))
+		if _, allowed := allowedMigrationModules[module]; !allowed {
+			return fmt.Errorf("%w: migration %s loads disallowed module %q", ErrInvalidManifest, rel, module)
+		}
+	}
 	return nil
 }
 
@@ -938,31 +1121,36 @@ func validateMigrationFixtureNDJSON(path string, payload []byte) ([]migrationFix
 
 	for i := 0; i < len(lines)-1; i++ {
 		lineNumber := i + 1
-		line := lines[i]
-		if len(line) == 0 {
-			return nil, fmt.Errorf("%w: migration fixture %s line %d is blank", ErrInvalidManifest, path, lineNumber)
-		}
-
-		canonical, key, value, err := parseCanonicalFixtureRecord(line)
+		key, value, err := validateMigrationFixtureNDJSONLine(path, lineNumber, lines[i], previousKey, seenKeys)
 		if err != nil {
-			return nil, fmt.Errorf("%w: migration fixture %s line %d: %v", ErrInvalidManifest, path, lineNumber, err)
+			return nil, err
 		}
-		if !bytes.Equal(line, canonical) {
-			return nil, fmt.Errorf("%w: migration fixture %s line %d is not canonical JSON", ErrInvalidManifest, path, lineNumber)
-		}
-		if _, dup := seenKeys[key]; dup {
-			return nil, fmt.Errorf("%w: migration fixture %s line %d has duplicate key %q", ErrInvalidManifest, path, lineNumber, key)
-		}
-		if previousKey != "" && bytes.Compare([]byte(previousKey), []byte(key)) >= 0 {
-			return nil, fmt.Errorf("%w: migration fixture %s line %d is out of key order", ErrInvalidManifest, path, lineNumber)
-		}
-
 		seenKeys[key] = struct{}{}
 		previousKey = key
 		records = append(records, migrationFixtureRecord{Key: key, Value: value, Line: lineNumber})
 	}
 
 	return records, nil
+}
+
+func validateMigrationFixtureNDJSONLine(path string, lineNumber int, line []byte, previousKey string, seenKeys map[string]struct{}) (string, map[string]any, error) {
+	if len(line) == 0 {
+		return "", nil, fmt.Errorf("%w: migration fixture %s line %d is blank", ErrInvalidManifest, path, lineNumber)
+	}
+	canonical, key, value, err := parseCanonicalFixtureRecord(line)
+	if err != nil {
+		return "", nil, fmt.Errorf("%w: migration fixture %s line %d: %v", ErrInvalidManifest, path, lineNumber, err)
+	}
+	if !bytes.Equal(line, canonical) {
+		return "", nil, fmt.Errorf("%w: migration fixture %s line %d is not canonical JSON", ErrInvalidManifest, path, lineNumber)
+	}
+	if _, dup := seenKeys[key]; dup {
+		return "", nil, fmt.Errorf("%w: migration fixture %s line %d has duplicate key %q", ErrInvalidManifest, path, lineNumber, key)
+	}
+	if previousKey != "" && bytes.Compare([]byte(previousKey), []byte(key)) >= 0 {
+		return "", nil, fmt.Errorf("%w: migration fixture %s line %d is out of key order", ErrInvalidManifest, path, lineNumber)
+	}
+	return key, value, nil
 }
 
 func validateMigrationFixtureSeedSchema(fixture manifestMigrationFixture, records []migrationFixtureRecord, schemaPayload []byte) error {
