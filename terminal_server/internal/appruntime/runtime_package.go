@@ -144,56 +144,54 @@ func copyDirTree(src, dst string) error {
 		if walkErr != nil {
 			return walkErr
 		}
-
 		rel, err := filepath.Rel(cleanSrc, path)
 		if err != nil {
 			return err
 		}
-		target := filepath.Join(cleanDst, rel)
+		return copyDirTreeEntry(path, filepath.Join(cleanDst, rel), d)
+	})
+}
 
-		if d.IsDir() {
-			info, err := d.Info()
-			if err != nil {
-				return err
-			}
-			return os.MkdirAll(target, info.Mode().Perm())
-		}
-
-		if d.Type()&fs.ModeSymlink != 0 {
-			linkTarget, err := os.Readlink(path)
-			if err != nil {
-				return err
-			}
-			return os.Symlink(linkTarget, target)
-		}
-
+func copyDirTreeEntry(path, target string, d fs.DirEntry) error {
+	if d.IsDir() {
 		info, err := d.Info()
 		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-
-		in, err := os.Open(filepath.Clean(path))
+		return os.MkdirAll(target, info.Mode().Perm())
+	}
+	if d.Type()&fs.ModeSymlink != 0 {
+		linkTarget, err := os.Readlink(path)
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = in.Close()
-		}()
+		return os.Symlink(linkTarget, target)
+	}
+	return copyDirTreeFile(path, target, d)
+}
 
-		out, err := os.OpenFile(filepath.Clean(target), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode().Perm())
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = out.Close()
-		}()
-
-		if _, err := io.Copy(out, in); err != nil {
-			return err
-		}
-		return nil
-	})
+func copyDirTreeFile(path, target string, d fs.DirEntry) error {
+	info, err := d.Info()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	in, err := os.Open(filepath.Clean(path))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = in.Close()
+	}()
+	out, err := os.OpenFile(filepath.Clean(target), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode().Perm())
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = out.Close()
+	}()
+	_, err = io.Copy(out, in)
+	return err
 }

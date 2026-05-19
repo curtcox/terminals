@@ -32,47 +32,53 @@ func Run(ctx context.Context, in io.Reader, out io.Writer, opts Options) error {
 	if out == nil {
 		return errors.New("nil output")
 	}
-	prompt := strings.TrimSpace(opts.Prompt)
-	if prompt == "" {
-		prompt = "repl>"
-	}
-	prompt += " "
-
+	prompt := replPrompt(opts.Prompt)
 	state := newStateWithDocsMode(out, opts.AdminBaseURL, opts.SessionID, opts.DocsMode)
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 1024), 1024*1024)
-
 	if _, err := fmt.Fprintf(out, "Terminals REPL (control-plane only). Type 'help' for commands.\n"); err != nil {
 		return err
 	}
+	return runREPLLoop(ctx, state, scanner, out, prompt)
+}
+
+func replPrompt(raw string) string {
+	prompt := strings.TrimSpace(raw)
+	if prompt == "" {
+		prompt = "repl>"
+	}
+	return prompt + " "
+}
+
+func runREPLLoop(ctx context.Context, state *state, scanner *bufio.Scanner, out io.Writer, prompt string) error {
 	if _, err := fmt.Fprint(out, prompt); err != nil {
 		return err
 	}
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			if _, err := fmt.Fprint(out, prompt); err != nil {
-				return err
-			}
-			continue
-		}
-		exit, err := state.eval(ctx, line)
-		if err != nil {
-			if _, writeErr := fmt.Fprintf(out, "error: %v\n", err); writeErr != nil {
-				return writeErr
-			}
-		}
-		if exit {
-			return nil
-		}
-		if _, err := fmt.Fprint(out, prompt); err != nil {
+		if done, err := replHandleLine(ctx, state, scanner.Text(), out, prompt); done || err != nil {
 			return err
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return err
+	return scanner.Err()
+}
+
+func replHandleLine(ctx context.Context, state *state, rawLine string, out io.Writer, prompt string) (done bool, err error) {
+	line := strings.TrimSpace(rawLine)
+	if line == "" {
+		_, err = fmt.Fprint(out, prompt)
+		return false, err
 	}
-	return nil
+	exit, evalErr := state.eval(ctx, line)
+	if evalErr != nil {
+		if _, writeErr := fmt.Fprintf(out, "error: %v\n", evalErr); writeErr != nil {
+			return false, writeErr
+		}
+	}
+	if exit {
+		return true, nil
+	}
+	_, err = fmt.Fprint(out, prompt)
+	return false, err
 }
 
 type state struct {

@@ -164,14 +164,34 @@ func (h *Harness) Evidence(usecaseID string) *EvidenceBundle {
 }
 
 func writeSummaryMD(path string, b *EvidenceBundle) error {
-	m := b.Manifest
+	var sb strings.Builder
+	writeSummaryMDHeader(&sb, b.Manifest)
+	writeSummaryMDAssertions(&sb, b)
+	writeSummaryMDInteractions(&sb, b.Interactions)
+	writeSummaryMDFrames(&sb, b.Frames)
+	writeSummaryMDVideos(&sb, b.Videos)
+	fmt.Fprintf(&sb, "\n## Replay\n\n```bash\ngo test ./internal/usecasevalidation -run TestReplay -args -bundle %s\n```\n", filepath.Dir(path))
+	return os.WriteFile(path, []byte(sb.String()), 0o644)
+}
+
+func writeSummaryMDHeader(sb *strings.Builder, m Manifest) {
 	result := "PASS"
 	if !m.Pass {
 		result = "FAIL"
 	}
+	fmt.Fprintf(sb, "# Use Case %s — Validation Summary\n\n", m.UseCaseID)
+	fmt.Fprintf(sb, "**Run ID:** %s  \n", m.RunID)
+	fmt.Fprintf(sb, "**Scenario:** %s  \n", m.ScenarioName)
+	fmt.Fprintf(sb, "**Result:** %s  \n", result)
+	fmt.Fprintf(sb, "**Start:** %s  \n", m.TimestampStart.Format(time.RFC3339))
+	fmt.Fprintf(sb, "**End:** %s  \n", m.TimestampEnd.Format(time.RFC3339))
+	if m.GitCommit != "" {
+		fmt.Fprintf(sb, "**Git commit:** %s  \n", m.GitCommit)
+	}
+}
 
-	passed := 0
-	failed := 0
+func writeSummaryMDAssertions(sb *strings.Builder, b *EvidenceBundle) {
+	passed, failed := 0, 0
 	for _, a := range b.Assertions {
 		if a.Pass {
 			passed++
@@ -179,50 +199,49 @@ func writeSummaryMD(path string, b *EvidenceBundle) error {
 			failed++
 		}
 	}
-
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "# Use Case %s — Validation Summary\n\n", m.UseCaseID)
-	fmt.Fprintf(&sb, "**Run ID:** %s  \n", m.RunID)
-	fmt.Fprintf(&sb, "**Scenario:** %s  \n", m.ScenarioName)
-	fmt.Fprintf(&sb, "**Result:** %s  \n", result)
-	fmt.Fprintf(&sb, "**Start:** %s  \n", m.TimestampStart.Format(time.RFC3339))
-	fmt.Fprintf(&sb, "**End:** %s  \n", m.TimestampEnd.Format(time.RFC3339))
-	if m.GitCommit != "" {
-		fmt.Fprintf(&sb, "**Git commit:** %s  \n", m.GitCommit)
-	}
-	fmt.Fprintf(&sb, "\n## Assertions (%d passed, %d failed)\n\n", passed, failed)
-	fmt.Fprintf(&sb, "| ID | Description | Result | Detail |\n")
-	fmt.Fprintf(&sb, "|---|---|---|---|\n")
+	fmt.Fprintf(sb, "\n## Assertions (%d passed, %d failed)\n\n", passed, failed)
+	fmt.Fprintf(sb, "| ID | Description | Result | Detail |\n")
+	fmt.Fprintf(sb, "|---|---|---|---|\n")
 	for _, a := range b.Assertions {
 		mark := "✓ PASS"
 		if !a.Pass {
 			mark = "✗ FAIL"
 		}
-		fmt.Fprintf(&sb, "| %s | %s | %s | %s |\n", a.ID, a.Description, mark, a.Detail)
+		fmt.Fprintf(sb, "| %s | %s | %s | %s |\n", a.ID, a.Description, mark, a.Detail)
 	}
-	if len(m.FailingAssertions) > 0 {
-		fmt.Fprintf(&sb, "\n**Failing assertions:** %s\n", strings.Join(m.FailingAssertions, ", "))
+	if len(b.Manifest.FailingAssertions) > 0 {
+		fmt.Fprintf(sb, "\n**Failing assertions:** %s\n", strings.Join(b.Manifest.FailingAssertions, ", "))
 	}
-	if len(b.Interactions) > 0 {
-		fmt.Fprintf(&sb, "\n## Interaction trace\n\n")
-		for i, interaction := range b.Interactions {
-			fmt.Fprintf(&sb, "%d. %s\n", i+1, interaction.Summary)
-		}
+}
+
+func writeSummaryMDInteractions(sb *strings.Builder, interactions []InteractionRecord) {
+	if len(interactions) == 0 {
+		return
 	}
-	if len(b.Frames) > 0 {
-		fmt.Fprintf(&sb, "\n## Visual frames\n\n")
-		for _, frame := range b.Frames {
-			fmt.Fprintf(&sb, "- [%s](%s): %s\n", frame.Label, frame.Path, frame.Summary)
-		}
+	fmt.Fprintf(sb, "\n## Interaction trace\n\n")
+	for i, interaction := range interactions {
+		fmt.Fprintf(sb, "%d. %s\n", i+1, interaction.Summary)
 	}
-	if len(b.Videos) > 0 {
-		fmt.Fprintf(&sb, "\n## Video\n\n")
-		for _, video := range b.Videos {
-			fmt.Fprintf(&sb, "- [%s](%s)\n", video.Label, video.Path)
-		}
+}
+
+func writeSummaryMDFrames(sb *strings.Builder, frames []FrameRecord) {
+	if len(frames) == 0 {
+		return
 	}
-	fmt.Fprintf(&sb, "\n## Replay\n\n```bash\ngo test ./internal/usecasevalidation -run TestReplay -args -bundle %s\n```\n", filepath.Dir(path))
-	return os.WriteFile(path, []byte(sb.String()), 0o644)
+	fmt.Fprintf(sb, "\n## Visual frames\n\n")
+	for _, frame := range frames {
+		fmt.Fprintf(sb, "- [%s](%s): %s\n", frame.Label, frame.Path, frame.Summary)
+	}
+}
+
+func writeSummaryMDVideos(sb *strings.Builder, videos []VideoRecord) {
+	if len(videos) == 0 {
+		return
+	}
+	fmt.Fprintf(sb, "\n## Video\n\n")
+	for _, video := range videos {
+		fmt.Fprintf(sb, "- [%s](%s)\n", video.Label, video.Path)
+	}
 }
 
 func writeFramePNGs(baseDir string, frames []FrameRecord) error {

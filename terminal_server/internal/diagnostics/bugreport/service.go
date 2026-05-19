@@ -422,37 +422,51 @@ func (s *Service) Confirm(ctx context.Context, reportID, confirmedBy string) (Re
 }
 
 func matchFilter(rec Record, filter ListFilter) bool {
+	return matchFilterConfirmation(rec, filter) &&
+		matchFilterDevices(rec, filter) &&
+		matchFilterSource(rec, filter) &&
+		matchFilterTag(rec, filter) &&
+		matchFilterTimeRange(rec, filter)
+}
+
+func matchFilterConfirmation(rec Record, filter ListFilter) bool {
 	if filter.ConfirmedOnly && !rec.Confirmed {
 		return false
 	}
 	if filter.PendingOnly && rec.Confirmed {
 		return false
 	}
+	return true
+}
+
+func matchFilterDevices(rec Record, filter ListFilter) bool {
 	subject := strings.TrimSpace(filter.SubjectDeviceID)
 	if subject != "" && !strings.EqualFold(strings.TrimSpace(rec.Summary.SubjectDeviceID), subject) {
 		return false
 	}
 	reporter := strings.TrimSpace(filter.ReporterDeviceID)
-	if reporter != "" && !strings.EqualFold(strings.TrimSpace(rec.Summary.ReporterDeviceID), reporter) {
-		return false
-	}
+	return reporter == "" || strings.EqualFold(strings.TrimSpace(rec.Summary.ReporterDeviceID), reporter)
+}
+
+func matchFilterSource(rec Record, filter ListFilter) bool {
 	source := normalizeSourceFilter(filter.Source)
-	if source != "" && strings.TrimSpace(rec.Summary.Source) != source {
-		return false
-	}
+	return source == "" || strings.TrimSpace(rec.Summary.Source) == source
+}
+
+func matchFilterTag(rec Record, filter ListFilter) bool {
 	tag := strings.TrimSpace(strings.ToLower(filter.Tag))
-	if tag != "" {
-		tagMatch := false
-		for _, item := range rec.Summary.Tags {
-			if strings.TrimSpace(strings.ToLower(item)) == tag {
-				tagMatch = true
-				break
-			}
-		}
-		if !tagMatch {
-			return false
+	if tag == "" {
+		return true
+	}
+	for _, item := range rec.Summary.Tags {
+		if strings.TrimSpace(strings.ToLower(item)) == tag {
+			return true
 		}
 	}
+	return false
+}
+
+func matchFilterTimeRange(rec Record, filter ListFilter) bool {
 	if filter.FromUnixMS > 0 && rec.Summary.TimestampUnixMS < filter.FromUnixMS {
 		return false
 	}

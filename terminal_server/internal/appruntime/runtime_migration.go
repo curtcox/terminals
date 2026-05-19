@@ -124,54 +124,14 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 	if !state.ExecutorReady {
 		return statusFromState(pkg, state), nil
 	}
-	if state.Verdict == "reconcile_pending" || len(state.PendingRecords) > 0 {
-		state.Verdict = "reconcile_pending"
-		state.LastError = ErrMigrationReconcilePending.Error()
-		r.migrations[name] = state
-		appendMigrationJournalEntry(pkg, state, "retry_blocked_reconcile_pending", nil)
-		return statusFromState(pkg, state), ErrMigrationReconcilePending
+	if _, status, blocked, blockErr := r.retryMigrationBlockedByReconcile(name, pkg, state); blocked {
+		return status, blockErr
 	}
-	if state.RequiresDrain && !state.DrainReady {
-		now := time.Now().UTC()
-		if state.DrainBlockedAt.IsZero() {
-			state.DrainBlockedAt = now
-		}
-		timeout := state.DrainTimeout
-		if timeout <= 0 {
-			timeout = defaultMigrationDrainTimeout
-		}
-		if now.Sub(state.DrainBlockedAt) < timeout {
-			state.Verdict = "drain_pending"
-			state.LastError = ErrMigrationDrainPending.Error()
-			r.migrations[name] = state
-			appendMigrationJournalEntry(pkg, state, "retry_blocked_drain_pending", map[string]any{
-				"timeout_seconds": int(timeout.Seconds()),
-				"blocked_since":   state.DrainBlockedAt.Format(time.RFC3339Nano),
-			})
-			return statusFromState(pkg, state), ErrMigrationDrainPending
-		}
-		state.Verdict = "aborted"
-		state.LastError = ErrMigrationDrainTimeout.Error()
-		r.migrations[name] = state
-		appendMigrationJournalEntry(pkg, state, "retry_blocked_drain_timeout", map[string]any{
-			"timeout_seconds": int(timeout.Seconds()),
-			"blocked_since":   state.DrainBlockedAt.Format(time.RFC3339Nano),
-		})
-		return statusFromState(pkg, state), ErrMigrationDrainTimeout
+	if _, status, blocked, blockErr := r.retryMigrationDrainGate(name, pkg, state); blocked {
+		return status, blockErr
 	}
 
-	nextStep := state.StepsCompleted + 1
-	if nextStep < 1 {
-		nextStep = 1
-	}
-	state.RequiresDrain = migrationPlanRequiresDrainFromStep(state.StepPlan, nextStep)
-	if !state.RequiresDrain {
-		state.DrainReady = true
-	}
-
-	state.Verdict = "running"
-	state.LastError = ""
-	state.DrainBlockedAt = time.Time{}
+	state, nextStep := r.retryMigrationPrepareState(name, state)
 	retryStartedAt := time.Now()
 	appendMigrationJournalEntry(pkg, state, "retry_started", map[string]any{"from_step": nextStep})
 	state, err = r.maybeInterruptMigrationLocked(name, state, "retry_started")
@@ -182,184 +142,12 @@ func (r *Runtime) RetryMigration(name string) (MigrationStatus, error) {
 		return timeoutStatus, ErrMigrationRuntimeTimeout
 	}
 	for _, step := range migrationPlanPendingSteps(state.StepPlan, nextStep) {
-		stepStartedAt := time.Now()
-		stepPath := filepath.Join(pkg.RootPath, "migrate", step.ScriptName)
-		if _, statErr := os.Stat(stepPath); statErr != nil {
-			state.Verdict = "step_failed"
-			state.LastStep = step.Number
-			state.LastError = fmt.Sprintf("step %d script unavailable: %s", step.Number, step.ScriptName)
-			r.migrations[name] = state
-			appendMigrationJournalEntry(pkg, state, "step_failed_unavailable", map[string]any{
-				"step_id":      step.Number,
-				"from_version": step.FromVersion,
-				"to_version":   step.ToVersion,
-				"script":       step.ScriptName,
-				"error":        statErr.Error(),
-			})
-			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepUnavailable, step.Number, step.ScriptName, statErr)
-		}
-		scriptSource, readErr := os.ReadFile(stepPath)
-		if readErr != nil {
-			state.Verdict = "step_failed"
-			state.LastStep = step.Number
-			state.LastError = fmt.Sprintf("step %d script unavailable: %s", step.Number, step.ScriptName)
-			r.migrations[name] = state
-			appendMigrationJournalEntry(pkg, state, "step_failed_unavailable", map[string]any{
-				"step_id":      step.Number,
-				"from_version": step.FromVersion,
-				"to_version":   step.ToVersion,
-				"script":       step.ScriptName,
-				"error":        readErr.Error(),
-			})
-			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepUnavailable, step.Number, step.ScriptName, readErr)
-		}
-		if scriptErr := validateRuntimeMigrationScript(scriptSource); scriptErr != nil {
-			state.Verdict = "step_failed"
-			state.LastStep = step.Number
-			state.LastError = fmt.Sprintf("step %d script invalid: %s", step.Number, step.ScriptName)
-			r.migrations[name] = state
-			appendMigrationJournalEntry(pkg, state, "step_failed_invalid_script", map[string]any{
-				"step_id":      step.Number,
-				"from_version": step.FromVersion,
-				"to_version":   step.ToVersion,
-				"script":       step.ScriptName,
-				"error":        scriptErr.Error(),
-			})
-			return statusFromState(pkg, state), fmt.Errorf("%w: step %d script %s: %v", ErrMigrationStepInvalid, step.Number, step.ScriptName, scriptErr)
-		}
-		hostEffects, hostErr := collectRuntimeMigrationHostEffects(pkg, scriptSource)
-		if hostErr != nil {
-			state.Verdict = "step_failed"
-			state.LastStep = step.Number
-			r.migrations[name] = state
-			if errors.Is(hostErr, ErrMigrationResourceLimit) {
-				state.LastError = fmt.Sprintf("step %d resource limit exceeded: %s", step.Number, step.ScriptName)
-				r.migrations[name] = state
-				appendMigrationJournalEntry(pkg, state, "step_failed_resource_limit", map[string]any{
-					"step_id":      step.Number,
-					"from_version": step.FromVersion,
-					"to_version":   step.ToVersion,
-					"script":       step.ScriptName,
-					"error":        hostErr.Error(),
-				})
-				return statusFromState(pkg, state), hostErr
-			}
-			state.LastError = fmt.Sprintf("step %d host effect rejected: %s", step.Number, step.ScriptName)
-			r.migrations[name] = state
-			appendMigrationJournalEntry(pkg, state, "step_failed_host_rejected", map[string]any{
-				"step_id":      step.Number,
-				"from_version": step.FromVersion,
-				"to_version":   step.ToVersion,
-				"script":       step.ScriptName,
-				"error":        hostErr.Error(),
-			})
-			return statusFromState(pkg, state), hostErr
-		}
-		state.LastStep = step.Number
-		appendMigrationJournalEntry(pkg, state, "step_started", map[string]any{
-			"step_id":      step.Number,
-			"from_version": step.FromVersion,
-			"to_version":   step.ToVersion,
-			"script":       step.ScriptName,
-		})
-		state, err = r.maybeInterruptMigrationLocked(name, state, "step_started")
-		if err != nil {
-			return statusFromState(pkg, state), err
-		}
-		for _, effect := range hostEffects.ArtifactPatches {
-			appendMigrationJournalEntry(pkg, state, "artifact_patch_planned", map[string]any{
-				"step_id":         step.Number,
-				"from_version":    step.FromVersion,
-				"to_version":      step.ToVersion,
-				"script":          step.ScriptName,
-				"artifact_id":     effect.ArtifactID,
-				"owner_app_id":    effect.OwnerAppID,
-				"effect_sequence": effect.Sequence,
-			})
-		}
-		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, stepStartedAt); timedOut {
-			return timeoutStatus, ErrMigrationRuntimeTimeout
-		}
-		stats, fixtureErr := verifyMigrationFixtureStep(pkg.RootPath, step, scriptSource)
-		if fixtureErr != nil {
-			state.Verdict = "step_failed"
-			state.LastStep = step.Number
-			switch {
-			case errors.Is(fixtureErr, ErrMigrationAborted):
-				state.LastError = fixtureErr.Error()
-				r.migrations[name] = state
-				appendMigrationJournalEntry(pkg, state, "step_failed_aborted", map[string]any{
-					"step_id":      step.Number,
-					"from_version": step.FromVersion,
-					"to_version":   step.ToVersion,
-					"script":       step.ScriptName,
-					"error":        fixtureErr.Error(),
-				})
-				return statusFromState(pkg, state), fixtureErr
-			case errors.Is(fixtureErr, ErrMigrationResourceLimit):
-				state.LastError = fmt.Sprintf("step %d resource limit exceeded: %s", step.Number, step.ScriptName)
-				r.migrations[name] = state
-				appendMigrationJournalEntry(pkg, state, "step_failed_resource_limit", map[string]any{
-					"step_id":      step.Number,
-					"from_version": step.FromVersion,
-					"to_version":   step.ToVersion,
-					"script":       step.ScriptName,
-					"error":        fixtureErr.Error(),
-				})
-				return statusFromState(pkg, state), fixtureErr
-			case errors.Is(fixtureErr, ErrMigrationFixtureUnavailable):
-				state.LastError = fmt.Sprintf("step %d fixture unavailable: %s", step.Number, step.ScriptName)
-				r.migrations[name] = state
-				appendMigrationJournalEntry(pkg, state, "step_failed_fixture_unavailable", map[string]any{
-					"step_id":      step.Number,
-					"from_version": step.FromVersion,
-					"to_version":   step.ToVersion,
-					"script":       step.ScriptName,
-					"error":        fixtureErr.Error(),
-				})
-				return statusFromState(pkg, state), fixtureErr
-			default:
-				state.LastError = fmt.Sprintf("step %d fixture mismatch: %s", step.Number, step.ScriptName)
-				r.migrations[name] = state
-				appendMigrationJournalEntry(pkg, state, "step_failed_fixture_mismatch", map[string]any{
-					"step_id":      step.Number,
-					"from_version": step.FromVersion,
-					"to_version":   step.ToVersion,
-					"script":       step.ScriptName,
-					"error":        fixtureErr.Error(),
-				})
-				return statusFromState(pkg, state), fixtureErr
-			}
-		}
-		for _, logEntry := range stats.Logs {
-			appendMigrationJournalEntry(pkg, state, "migration_log", map[string]any{
-				"step_id":      step.Number,
-				"from_version": step.FromVersion,
-				"to_version":   step.ToVersion,
-				"script":       step.ScriptName,
-				"level":        logEntry.Level,
-				"message":      logEntry.Message,
-				"arguments":    logEntry.Arguments,
-			})
-		}
-		state, err = r.appendMigrationCheckpointEntriesLocked(name, pkg, state, step, stats.StoreOps)
-		if err != nil {
-			return statusFromState(pkg, state), err
-		}
-		state.StepsCompleted = step.Number
-		state.LastStep = step.Number
-		appendMigrationJournalEntry(pkg, state, "step_committed", map[string]any{
-			"step_id":      step.Number,
-			"from_version": step.FromVersion,
-			"to_version":   step.ToVersion,
-			"script":       step.ScriptName,
-		})
-		state, err = r.maybeInterruptMigrationLocked(name, state, "step_committed")
-		if err != nil {
-			return statusFromState(pkg, state), err
-		}
-		if timedOut, timeoutStatus := r.maybeFailMigrationRuntimeTimeoutLocked(name, pkg, state, step.Number, stepStartedAt); timedOut {
-			return timeoutStatus, ErrMigrationRuntimeTimeout
+		var status MigrationStatus
+		var stepErr error
+		var done bool
+		state, status, done, stepErr = r.retryMigrationRunStep(name, pkg, state, step)
+		if done {
+			return status, stepErr
 		}
 	}
 	if state.StepsCompleted > state.StepsPlanned {

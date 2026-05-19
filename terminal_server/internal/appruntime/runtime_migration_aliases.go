@@ -42,28 +42,21 @@ func migrationStoreAliases(scriptSource []byte) runtimeMigrationStoreAliases {
 		if len(match) < 2 {
 			continue
 		}
-		for _, aliasMatch := range migrateStoreListKeysAliasPattern.FindAllSubmatch(match[1], -1) {
-			if len(aliasMatch) >= 2 {
-				aliases.ListKeys[string(aliasMatch[1])] = struct{}{}
-			}
-		}
-		for _, aliasMatch := range migrateStoreGetAliasPattern.FindAllSubmatch(match[1], -1) {
-			if len(aliasMatch) >= 2 {
-				aliases.Get[string(aliasMatch[1])] = struct{}{}
-			}
-		}
-		for _, aliasMatch := range migrateStorePutAliasPattern.FindAllSubmatch(match[1], -1) {
-			if len(aliasMatch) >= 2 {
-				aliases.Put[string(aliasMatch[1])] = struct{}{}
-			}
-		}
-		for _, aliasMatch := range migrateStoreDeleteAliasPattern.FindAllSubmatch(match[1], -1) {
-			if len(aliasMatch) >= 2 {
-				aliases.Delete[string(aliasMatch[1])] = struct{}{}
-			}
-		}
+		block := match[1]
+		addMigrationAliasMatches(block, migrateStoreListKeysAliasPattern, aliases.ListKeys)
+		addMigrationAliasMatches(block, migrateStoreGetAliasPattern, aliases.Get)
+		addMigrationAliasMatches(block, migrateStorePutAliasPattern, aliases.Put)
+		addMigrationAliasMatches(block, migrateStoreDeleteAliasPattern, aliases.Delete)
 	}
 	return aliases
+}
+
+func addMigrationAliasMatches(block []byte, pattern *regexp.Regexp, into map[string]struct{}) {
+	for _, aliasMatch := range pattern.FindAllSubmatch(block, -1) {
+		if len(aliasMatch) >= 2 {
+			into[string(aliasMatch[1])] = struct{}{}
+		}
+	}
 }
 
 func migrationCheckpointAliases(scriptSource []byte) map[string]struct{} {

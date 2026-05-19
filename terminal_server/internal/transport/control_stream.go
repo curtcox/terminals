@@ -586,6 +586,19 @@ func (h *StreamHandler) broadcastNotificationsSince(
 	sessionDeviceID string,
 	includeSession bool,
 ) []ServerMessage {
+	newEvents := h.broadcastEventsSince(beforeCount)
+	if len(newEvents) == 0 {
+		return nil
+	}
+	trimmedSessionDeviceID := strings.TrimSpace(sessionDeviceID)
+	out := make([]ServerMessage, 0, len(newEvents))
+	for _, event := range newEvents {
+		out = append(out, broadcastMessagesForEvent(event, trimmedSessionDeviceID, includeSession)...)
+	}
+	return out
+}
+
+func (h *StreamHandler) broadcastEventsSince(beforeCount int) []ui.BroadcastEvent {
 	if h.runtime == nil || h.runtime.Env == nil || h.runtime.Env.Broadcast == nil {
 		return nil
 	}
@@ -602,48 +615,47 @@ func (h *StreamHandler) broadcastNotificationsSince(
 	if beforeCount > len(events) {
 		beforeCount = len(events)
 	}
-	newEvents := events[beforeCount:]
-	if len(newEvents) == 0 {
+	return events[beforeCount:]
+}
+
+func broadcastMessagesForEvent(event ui.BroadcastEvent, sessionDeviceID string, includeSession bool) []ServerMessage {
+	if len(event.DeviceIDs) == 0 {
 		return nil
 	}
-
-	trimmedSessionDeviceID := strings.TrimSpace(sessionDeviceID)
-	out := make([]ServerMessage, 0, len(newEvents))
-	for _, event := range newEvents {
-		if len(event.DeviceIDs) == 0 {
+	out := make([]ServerMessage, 0, len(event.DeviceIDs))
+	for _, targetDeviceID := range event.DeviceIDs {
+		targetDeviceID = strings.TrimSpace(targetDeviceID)
+		if targetDeviceID == "" {
 			continue
 		}
-		for _, targetDeviceID := range event.DeviceIDs {
-			targetDeviceID = strings.TrimSpace(targetDeviceID)
-			if targetDeviceID == "" {
-				continue
-			}
-			if targetDeviceID == trimmedSessionDeviceID && !includeSession {
-				continue
-			}
-			msg := ServerMessage{
-				Notification: event.Message,
-			}
-			if targetDeviceID != trimmedSessionDeviceID {
-				msg.RelayToDeviceID = targetDeviceID
-			}
-			out = append(out, msg)
-
-			if strings.HasPrefix(event.Message, "PA from ") {
-				overlayMsg := ServerMessage{
-					UpdateUI: &UIUpdate{
-						ComponentID: ui.GlobalOverlayComponentID,
-						Node:        ui.PAReceiverOverlayPatch(event.Message),
-					},
-				}
-				if targetDeviceID != trimmedSessionDeviceID {
-					overlayMsg.RelayToDeviceID = targetDeviceID
-				}
-				out = append(out, overlayMsg)
-			}
+		if targetDeviceID == sessionDeviceID && !includeSession {
+			continue
 		}
+		out = append(out, broadcastNotificationMessage(event, targetDeviceID, sessionDeviceID)...)
 	}
 	return out
+}
+
+func broadcastNotificationMessage(event ui.BroadcastEvent, targetDeviceID, sessionDeviceID string) []ServerMessage {
+	msg := ServerMessage{Notification: event.Message}
+	if targetDeviceID != sessionDeviceID {
+		msg.RelayToDeviceID = targetDeviceID
+	}
+	out := make([]ServerMessage, 0, 2)
+	out = append(out, msg)
+	if !strings.HasPrefix(event.Message, "PA from ") {
+		return out
+	}
+	overlayMsg := ServerMessage{
+		UpdateUI: &UIUpdate{
+			ComponentID: ui.GlobalOverlayComponentID,
+			Node:        ui.PAReceiverOverlayPatch(event.Message),
+		},
+	}
+	if targetDeviceID != sessionDeviceID {
+		overlayMsg.RelayToDeviceID = targetDeviceID
+	}
+	return append(out, overlayMsg)
 }
 
 // NoteProtocolError increments the transport protocol-error counter exposed via metrics.

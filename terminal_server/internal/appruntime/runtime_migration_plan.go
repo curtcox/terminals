@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -48,80 +47,22 @@ func loadMigrationPlan(root string) (int, []migrationPlanStep, error) {
 		return 0, nil, nil
 	}
 
-	steps := make([]migrationPlanStep, 0, len(matches))
-	for _, match := range matches {
-		base := filepath.Base(match)
-		parts := migrateStepFilePattern.FindStringSubmatch(base)
-		if parts == nil {
-			return len(matches), nil, fmt.Errorf("%w: migration script %s must match <step>_<from>_to_<to>.tal", ErrInvalidManifest, base)
-		}
-		stepNumber, err := strconv.Atoi(parts[1])
-		if err != nil || stepNumber <= 0 {
-			return len(matches), nil, fmt.Errorf("%w: migration script %s has invalid step number", ErrInvalidManifest, base)
-		}
-		steps = append(steps, migrationPlanStep{
-			Number:      stepNumber,
-			FromVersion: strings.TrimSpace(parts[2]),
-			ToVersion:   strings.TrimSpace(parts[3]),
-			ScriptName:  base,
-		})
+	steps, err := migrationStepsFromScripts(matches)
+	if err != nil {
+		return len(matches), nil, err
 	}
-
-	sort.Slice(steps, func(i, j int) bool {
-		return steps[i].Number < steps[j].Number
-	})
-	for i := range steps {
-		expected := i + 1
-		if steps[i].Number != expected {
-			return len(matches), nil, fmt.Errorf("%w: migration step numbering gap: expected step %04d, found %04d", ErrInvalidManifest, expected, steps[i].Number)
-		}
+	if err := validateMigrationStepNumbering(steps); err != nil {
+		return len(matches), nil, err
 	}
 
 	manifestPath := filepath.Join(root, "manifest.toml")
 	var manifest runtimeMigrationManifest
 	if _, err := toml.DecodeFile(manifestPath, &manifest); err == nil {
-		if manifest.Migrate.DrainTimeoutSeconds != nil && *manifest.Migrate.DrainTimeoutSeconds <= 0 {
-			return len(matches), nil, fmt.Errorf("%w: migrate.drain_timeout_seconds must be a positive integer", ErrInvalidManifest)
+		if err := validateMigrationManifestNumericFields(manifest); err != nil {
+			return len(matches), nil, err
 		}
-		if manifest.Migrate.MaxRuntimeSeconds != nil && *manifest.Migrate.MaxRuntimeSeconds <= 0 {
-			return len(matches), nil, fmt.Errorf("%w: migrate.max_runtime_seconds must be a positive integer", ErrInvalidManifest)
-		}
-		if manifest.Migrate.CheckpointEvery != nil && *manifest.Migrate.CheckpointEvery <= 0 {
-			return len(matches), nil, fmt.Errorf("%w: migrate.checkpoint_every must be a positive integer", ErrInvalidManifest)
-		}
-		if len(manifest.Migrate.Step) > 0 {
-			if manifest.Migrate.DeclaredSteps > 0 && manifest.Migrate.DeclaredSteps != len(manifest.Migrate.Step) {
-				return len(matches), nil, fmt.Errorf("%w: migrate.declared_steps (%d) does not match migrate.step entries (%d)", ErrInvalidManifest, manifest.Migrate.DeclaredSteps, len(manifest.Migrate.Step))
-			}
-			if len(manifest.Migrate.Step) != len(steps) {
-				return len(matches), nil, fmt.Errorf("%w: migrate.step entries (%d) do not match migrate scripts (%d)", ErrInvalidManifest, len(manifest.Migrate.Step), len(steps))
-			}
-			for i := range steps {
-				manifestStep := manifest.Migrate.Step[i]
-				steps[i].Compatibility = strings.TrimSpace(manifestStep.Compatibility)
-				steps[i].DrainPolicy = strings.TrimSpace(manifestStep.DrainPolicy)
-				if steps[i].Compatibility == "" {
-					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d must declare compatibility", ErrInvalidManifest, i+1)
-				}
-				if steps[i].DrainPolicy == "" {
-					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d must declare drain_policy", ErrInvalidManifest, i+1)
-				}
-				if steps[i].Compatibility != "" && steps[i].Compatibility != "compatible" && steps[i].Compatibility != "incompatible" {
-					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d has invalid compatibility %q", ErrInvalidManifest, i+1, steps[i].Compatibility)
-				}
-				if steps[i].DrainPolicy != "" && steps[i].DrainPolicy != "none" && steps[i].DrainPolicy != "drain" && steps[i].DrainPolicy != "multi_version" {
-					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d has invalid drain_policy %q", ErrInvalidManifest, i+1, steps[i].DrainPolicy)
-				}
-				if steps[i].Compatibility == "incompatible" && steps[i].DrainPolicy == "none" {
-					return len(matches), nil, fmt.Errorf("%w: migrate.step %04d declares compatibility=incompatible with drain_policy=none", ErrInvalidManifest, i+1)
-				}
-				steps[i].RequiresDrain = strings.EqualFold(steps[i].Compatibility, "incompatible") && strings.EqualFold(steps[i].DrainPolicy, "drain")
-				if strings.TrimSpace(manifestStep.From) != "" && strings.TrimSpace(manifestStep.To) != "" {
-					if strings.TrimSpace(manifestStep.From) != steps[i].FromVersion || strings.TrimSpace(manifestStep.To) != steps[i].ToVersion {
-						return len(matches), nil, fmt.Errorf("%w: migrate.step %04d from/to does not match script %s", ErrInvalidManifest, i+1, steps[i].ScriptName)
-					}
-				}
-			}
+		if err := enrichMigrationStepsFromManifest(manifest, steps); err != nil {
+			return len(matches), nil, err
 		}
 	}
 

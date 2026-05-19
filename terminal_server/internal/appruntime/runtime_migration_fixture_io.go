@@ -104,31 +104,35 @@ func readRuntimeFixtureRecords(root string, relPath string) (map[string]string, 
 	records := make(map[string]string)
 	previousKey := ""
 	for i := 0; i < len(lines)-1; i++ {
-		lineNumber := i + 1
-		line := lines[i]
-		if len(line) == 0 {
-			return nil, fmt.Errorf("%w: %s line %d is blank", ErrMigrationFixtureMismatch, relPath, lineNumber)
+		key, value, nextKey, err := ingestRuntimeFixtureLine(lines[i], i+1, relPath, previousKey, records)
+		if err != nil {
+			return nil, err
 		}
-
-		key, canonicalEnvelope, canonicalValue, parseErr := parseRuntimeFixtureRecord(line)
-		if parseErr != nil {
-			return nil, fmt.Errorf("%w: %s line %d: %v", ErrMigrationFixtureMismatch, relPath, lineNumber, parseErr)
-		}
-		if !bytes.Equal(line, canonicalEnvelope) {
-			return nil, fmt.Errorf("%w: %s line %d is not canonical JSON", ErrMigrationFixtureMismatch, relPath, lineNumber)
-		}
-		if previousKey != "" && strings.Compare(previousKey, key) >= 0 {
-			return nil, fmt.Errorf("%w: %s line %d is out of key order", ErrMigrationFixtureMismatch, relPath, lineNumber)
-		}
-		if _, exists := records[key]; exists {
-			return nil, fmt.Errorf("%w: %s duplicate key %q", ErrMigrationFixtureMismatch, relPath, key)
-		}
-
-		records[key] = canonicalValue
-		previousKey = key
+		records[key] = value
+		previousKey = nextKey
 	}
 
 	return records, nil
+}
+
+func ingestRuntimeFixtureLine(line []byte, lineNumber int, relPath, previousKey string, records map[string]string) (key, value, nextKey string, err error) {
+	if len(line) == 0 {
+		return "", "", previousKey, fmt.Errorf("%w: %s line %d is blank", ErrMigrationFixtureMismatch, relPath, lineNumber)
+	}
+	key, canonicalEnvelope, canonicalValue, parseErr := parseRuntimeFixtureRecord(line)
+	if parseErr != nil {
+		return "", "", previousKey, fmt.Errorf("%w: %s line %d: %v", ErrMigrationFixtureMismatch, relPath, lineNumber, parseErr)
+	}
+	if !bytes.Equal(line, canonicalEnvelope) {
+		return "", "", previousKey, fmt.Errorf("%w: %s line %d is not canonical JSON", ErrMigrationFixtureMismatch, relPath, lineNumber)
+	}
+	if previousKey != "" && strings.Compare(previousKey, key) >= 0 {
+		return "", "", previousKey, fmt.Errorf("%w: %s line %d is out of key order", ErrMigrationFixtureMismatch, relPath, lineNumber)
+	}
+	if _, exists := records[key]; exists {
+		return "", "", previousKey, fmt.Errorf("%w: %s duplicate key %q", ErrMigrationFixtureMismatch, relPath, key)
+	}
+	return key, canonicalValue, key, nil
 }
 
 func resolveRuntimeFixturePath(root string, relPath string) (string, error) {
