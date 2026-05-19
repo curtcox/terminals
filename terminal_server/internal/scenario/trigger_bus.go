@@ -70,6 +70,12 @@ func normalizeTrigger(trigger Trigger, now time.Time) Trigger {
 	} else {
 		trigger.Arguments = copyStringMap(trigger.Arguments)
 	}
+	normalizeIntentRecord(&trigger)
+	normalizeTriggerEventRecord(&trigger, now)
+	return trigger
+}
+
+func normalizeIntentRecord(trigger *Trigger) {
 	if trigger.IntentV2 != nil {
 		trigger.IntentV2.Action = strings.TrimSpace(trigger.IntentV2.Action)
 		if trigger.Intent == "" && trigger.IntentV2.Action != "" {
@@ -91,6 +97,9 @@ func normalizeTrigger(trigger Trigger, now time.Time) Trigger {
 			RawText: trigger.Intent,
 		}
 	}
+}
+
+func normalizeTriggerEventRecord(trigger *Trigger, now time.Time) {
 	if trigger.EventV2 != nil {
 		trigger.EventV2.Kind = strings.TrimSpace(trigger.EventV2.Kind)
 		trigger.EventV2.Attributes = copyStringMap(trigger.EventV2.Attributes)
@@ -101,7 +110,6 @@ func normalizeTrigger(trigger Trigger, now time.Time) Trigger {
 			trigger.EventV2.Source = sourceFromKind(trigger.Kind)
 		}
 	}
-	return trigger
 }
 
 func sourceFromKind(kind TriggerKind) TriggerSource {

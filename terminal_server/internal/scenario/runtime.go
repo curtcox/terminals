@@ -478,100 +478,10 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 		return 0, nil
 	}
 
-	dueRecords := []storage.ScheduleRecord{}
-	if structured, ok := r.Env.Scheduler.(interface {
-		DueRecords(int64) []storage.ScheduleRecord
-	}); ok {
-		dueRecords = structured.DueRecords(now.UnixMilli())
-	} else {
-		for _, key := range r.Env.Scheduler.Due(now.UnixMilli()) {
-			dueRecords = append(dueRecords, storage.ScheduleRecord{
-				Key:    key,
-				Kind:   scheduleKindFromKey(key),
-				UnixMS: now.UnixMilli(),
-			})
-		}
-	}
-
 	processed := 0
-	for _, record := range dueRecords {
-		if record.Kind == "timer.tick" || strings.HasPrefix(record.Key, "timer_tick:") {
-			meta := timerMetadataFromScheduleRecord(record)
-			if meta.FireUnixMS > now.UnixMilli() && meta.TargetDeviceID != "" && r.Env.UI != nil {
-				remaining := int((meta.FireUnixMS - now.UnixMilli() + 999) / 1000)
-				if remaining < 0 {
-					remaining = 0
-				}
-				node := timerRemainingPatch(remaining)
-				if err := r.Env.UI.Patch(ctx, meta.TargetDeviceID, "remaining", node); err != nil {
-					return processed, err
-				}
-				nextUnixMS := now.Add(time.Second).UnixMilli()
-				if nextUnixMS < meta.FireUnixMS {
-					if structured, ok := r.Env.Scheduler.(interface {
-						ScheduleRecord(context.Context, storage.ScheduleRecord) error
-					}); ok {
-						if err := structured.ScheduleRecord(ctx, storage.ScheduleRecord{
-							Key:      timerTickScheduleKey(meta.DeviceID, meta.FireUnixMS, meta.DurationSeconds, meta.Label, nextUnixMS),
-							Kind:     "timer.tick",
-							Subject:  meta.Label,
-							DeviceID: meta.DeviceID,
-							UnixMS:   nextUnixMS,
-							Payload: map[string]string{
-								"duration_seconds": strconv.Itoa(meta.DurationSeconds),
-								"expiry_unix_ms":   strconv.FormatInt(meta.FireUnixMS, 10),
-								"target_device_id": meta.TargetDeviceID,
-							},
-						}); err != nil {
-							return processed, err
-						}
-					}
-				}
-			}
-		} else if record.Kind == "timer" || strings.HasPrefix(record.Key, "timer:") {
-			meta := timerMetadataFromScheduleRecord(record)
-			if meta.TargetDeviceID != "" && r.Env.UI != nil {
-				node := timerDoneBannerPatch()
-				if err := r.Env.UI.Patch(ctx, meta.TargetDeviceID, "banner", node); err != nil {
-					return processed, err
-				}
-			}
-			if r.Env.Broadcast != nil {
-				deviceIDs := []string{}
-				if meta.DeviceID != "" {
-					deviceIDs = []string{meta.DeviceID}
-				}
-				if err := r.Env.Broadcast.Notify(ctx, deviceIDs, "Timer done!"); err != nil {
-					return processed, err
-				}
-			}
-			if r.Env.TTS != nil {
-				if _, err := r.Env.TTS.Synthesize(ctx, timerExpiredSpeech(meta.Label), TTSOptions{
-					Voice:  "default",
-					Format: "pcm16",
-				}); err != nil {
-					return processed, err
-				}
-			}
-			if r.Env.TriggerBus != nil {
-				r.Env.TriggerBus.Publish(Trigger{
-					Kind:     TriggerSchedule,
-					SourceID: meta.DeviceID,
-					EventV2: &EventRecord{
-						Kind:    "timer.expired",
-						Subject: meta.Label,
-						Attributes: map[string]string{
-							"duration_seconds": strconv.Itoa(meta.DurationSeconds),
-						},
-						Source:     SourceSchedule,
-						OccurredAt: now.UTC(),
-					},
-				})
-			}
-		} else if handled, err := processMorningRoutineRecord(ctx, r.Env, record); handled {
-			if err != nil {
-				return processed, err
-			}
+	for _, record := range dueTimerRecords(r.Env.Scheduler, now) {
+		if err := r.processDueTimerRecord(ctx, record, now); err != nil {
+			return processed, err
 		}
 		if err := r.Env.Scheduler.Remove(ctx, record.Key); err != nil {
 			return processed, err
@@ -579,6 +489,149 @@ func (r *Runtime) ProcessDueTimers(ctx context.Context, now time.Time) (int, err
 		processed++
 	}
 	return processed, nil
+}
+
+func dueTimerRecords(scheduler Scheduler, now time.Time) []storage.ScheduleRecord {
+	if structured, ok := scheduler.(interface {
+		DueRecords(int64) []storage.ScheduleRecord
+	}); ok {
+		return structured.DueRecords(now.UnixMilli())
+	}
+	records := []storage.ScheduleRecord{}
+	for _, key := range scheduler.Due(now.UnixMilli()) {
+		records = append(records, storage.ScheduleRecord{
+			Key:    key,
+			Kind:   scheduleKindFromKey(key),
+			UnixMS: now.UnixMilli(),
+		})
+	}
+	return records
+}
+
+func (r *Runtime) processDueTimerRecord(ctx context.Context, record storage.ScheduleRecord, now time.Time) error {
+	switch {
+	case isTimerTickRecord(record):
+		return r.processTimerTickRecord(ctx, record, now)
+	case isTimerExpirationRecord(record):
+		return r.processTimerExpirationRecord(ctx, record, now)
+	default:
+		handled, err := processMorningRoutineRecord(ctx, r.Env, record)
+		if handled {
+			return err
+		}
+		return nil
+	}
+}
+
+func isTimerTickRecord(record storage.ScheduleRecord) bool {
+	return record.Kind == "timer.tick" || strings.HasPrefix(record.Key, "timer_tick:")
+}
+
+func isTimerExpirationRecord(record storage.ScheduleRecord) bool {
+	return record.Kind == "timer" || strings.HasPrefix(record.Key, "timer:")
+}
+
+func (r *Runtime) processTimerTickRecord(ctx context.Context, record storage.ScheduleRecord, now time.Time) error {
+	meta := timerMetadataFromScheduleRecord(record)
+	if meta.FireUnixMS <= now.UnixMilli() || meta.TargetDeviceID == "" || r.Env.UI == nil {
+		return nil
+	}
+	remaining := int((meta.FireUnixMS - now.UnixMilli() + 999) / 1000)
+	if remaining < 0 {
+		remaining = 0
+	}
+	if err := r.Env.UI.Patch(ctx, meta.TargetDeviceID, "remaining", timerRemainingPatch(remaining)); err != nil {
+		return err
+	}
+	return r.scheduleNextTimerTick(ctx, meta, now)
+}
+
+func (r *Runtime) scheduleNextTimerTick(ctx context.Context, meta timerScheduleMetadata, now time.Time) error {
+	nextUnixMS := now.Add(time.Second).UnixMilli()
+	if nextUnixMS >= meta.FireUnixMS {
+		return nil
+	}
+	structured, ok := r.Env.Scheduler.(interface {
+		ScheduleRecord(context.Context, storage.ScheduleRecord) error
+	})
+	if !ok {
+		return nil
+	}
+	return structured.ScheduleRecord(ctx, storage.ScheduleRecord{
+		Key:      timerTickScheduleKey(meta.DeviceID, meta.FireUnixMS, meta.DurationSeconds, meta.Label, nextUnixMS),
+		Kind:     "timer.tick",
+		Subject:  meta.Label,
+		DeviceID: meta.DeviceID,
+		UnixMS:   nextUnixMS,
+		Payload: map[string]string{
+			"duration_seconds": strconv.Itoa(meta.DurationSeconds),
+			"expiry_unix_ms":   strconv.FormatInt(meta.FireUnixMS, 10),
+			"target_device_id": meta.TargetDeviceID,
+		},
+	})
+}
+
+func (r *Runtime) processTimerExpirationRecord(ctx context.Context, record storage.ScheduleRecord, now time.Time) error {
+	meta := timerMetadataFromScheduleRecord(record)
+	if err := r.patchExpiredTimerUI(ctx, meta); err != nil {
+		return err
+	}
+	if err := r.notifyExpiredTimer(ctx, meta); err != nil {
+		return err
+	}
+	if err := r.speakExpiredTimer(ctx, meta); err != nil {
+		return err
+	}
+	r.publishExpiredTimer(meta, now)
+	return nil
+}
+
+func (r *Runtime) patchExpiredTimerUI(ctx context.Context, meta timerScheduleMetadata) error {
+	if meta.TargetDeviceID == "" || r.Env.UI == nil {
+		return nil
+	}
+	return r.Env.UI.Patch(ctx, meta.TargetDeviceID, "banner", timerDoneBannerPatch())
+}
+
+func (r *Runtime) notifyExpiredTimer(ctx context.Context, meta timerScheduleMetadata) error {
+	if r.Env.Broadcast == nil {
+		return nil
+	}
+	deviceIDs := []string{}
+	if meta.DeviceID != "" {
+		deviceIDs = []string{meta.DeviceID}
+	}
+	return r.Env.Broadcast.Notify(ctx, deviceIDs, "Timer done!")
+}
+
+func (r *Runtime) speakExpiredTimer(ctx context.Context, meta timerScheduleMetadata) error {
+	if r.Env.TTS == nil {
+		return nil
+	}
+	_, err := r.Env.TTS.Synthesize(ctx, timerExpiredSpeech(meta.Label), TTSOptions{
+		Voice:  "default",
+		Format: "pcm16",
+	})
+	return err
+}
+
+func (r *Runtime) publishExpiredTimer(meta timerScheduleMetadata, now time.Time) {
+	if r.Env.TriggerBus == nil {
+		return
+	}
+	r.Env.TriggerBus.Publish(Trigger{
+		Kind:     TriggerSchedule,
+		SourceID: meta.DeviceID,
+		EventV2: &EventRecord{
+			Kind:    "timer.expired",
+			Subject: meta.Label,
+			Attributes: map[string]string{
+				"duration_seconds": strconv.Itoa(meta.DurationSeconds),
+			},
+			Source:     SourceSchedule,
+			OccurredAt: now.UTC(),
+		},
+	})
 }
 
 func scheduleKindFromKey(key string) string {
@@ -658,77 +711,101 @@ func targetDevices(ctx context.Context, env *Environment, trigger Trigger) []str
 	if env == nil || env.Devices == nil {
 		return nil
 	}
-	if sourceID := strings.TrimSpace(trigger.SourceID); sourceID != "" {
-		intent := strings.TrimSpace(strings.ToLower(trigger.Intent))
-		// PA/announcement claims are resource-scoped and should coexist with
-		// peers' screen.main scenarios; track activation ownership on source only.
-		if intent == "pa_system" || intent == "pa system" || intent == "announcement" || intent == "announce" {
-			return []string{sourceID}
-		}
+	if devices := sourceOnlyTargetDevices(trigger); len(devices) > 0 {
+		return devices
 	}
-	if explicitMany, ok := trigger.Arguments["device_ids"]; ok && strings.TrimSpace(explicitMany) != "" {
-		parts := strings.Split(explicitMany, ",")
-		out := make([]string, 0, len(parts))
-		seen := map[string]struct{}{}
-		for _, part := range parts {
-			deviceID := strings.TrimSpace(part)
-			if deviceID == "" {
-				continue
-			}
-			if _, exists := seen[deviceID]; exists {
-				continue
-			}
-			seen[deviceID] = struct{}{}
-			out = append(out, deviceID)
-		}
-		if len(out) > 0 {
-			return out
-		}
+	if devices := explicitTargetDevices(trigger); len(devices) > 0 {
+		return devices
 	}
-	if explicit, ok := trigger.Arguments["device_id"]; ok && explicit != "" {
-		if normalized := normalizeDeviceIDs([]string{explicit}); len(normalized) > 0 {
-			return normalized
-		}
-	}
-	if env.Placement != nil {
-		zone := strings.TrimSpace(trigger.Arguments["zone"])
-		role := strings.TrimSpace(trigger.Arguments["role"])
-		scopeDeviceID := strings.TrimSpace(trigger.Arguments["scope_device_id"])
-		if scopeDeviceID == "" {
-			scopeDeviceID = strings.TrimSpace(trigger.SourceID)
-		}
-		nearestCap := strings.TrimSpace(trigger.Arguments["nearest_capability"])
-		if nearestCap != "" || strings.EqualFold(strings.TrimSpace(trigger.Arguments["nearest"]), "true") {
-			ref, err := env.Placement.NearestWith(ctx, DeviceRef{DeviceID: scopeDeviceID}, nearestCap)
-			if err == nil && strings.TrimSpace(ref.DeviceID) != "" {
-				return []string{ref.DeviceID}
-			}
-		}
-		if zone != "" || role != "" || scopeDeviceID != "" {
-			query := PlacementQuery{
-				Scope: TargetScope{
-					Zone:      zone,
-					Role:      role,
-					DeviceID:  strings.TrimSpace(trigger.Arguments["placement_device_id"]),
-					Source:    DeviceRef{DeviceID: scopeDeviceID},
-					Broadcast: true,
-				},
-			}
-			refs, err := env.Placement.Find(ctx, query)
-			if err == nil && len(refs) > 0 {
-				out := make([]string, 0, len(refs))
-				for _, ref := range refs {
-					if id := strings.TrimSpace(ref.DeviceID); id != "" {
-						out = append(out, id)
-					}
-				}
-				if len(out) > 0 {
-					return out
-				}
-			}
-		}
+	if devices := placementTargetDevices(ctx, env, trigger); len(devices) > 0 {
+		return devices
 	}
 	return env.Devices.ListDeviceIDs()
+}
+
+func sourceOnlyTargetDevices(trigger Trigger) []string {
+	sourceID := strings.TrimSpace(trigger.SourceID)
+	if sourceID == "" {
+		return nil
+	}
+	intent := strings.TrimSpace(strings.ToLower(trigger.Intent))
+	// PA/announcement claims are resource-scoped and should coexist with
+	// peers' screen.main scenarios; track activation ownership on source only.
+	if intent == "pa_system" || intent == "pa system" || intent == "announcement" || intent == "announce" {
+		return []string{sourceID}
+	}
+	return nil
+}
+
+func explicitTargetDevices(trigger Trigger) []string {
+	if explicitMany, ok := trigger.Arguments["device_ids"]; ok && strings.TrimSpace(explicitMany) != "" {
+		return normalizeDeviceIDs(strings.Split(explicitMany, ","))
+	}
+	if explicit, ok := trigger.Arguments["device_id"]; ok && explicit != "" {
+		return normalizeDeviceIDs([]string{explicit})
+	}
+	return nil
+}
+
+func placementTargetDevices(ctx context.Context, env *Environment, trigger Trigger) []string {
+	if env.Placement == nil {
+		return nil
+	}
+	zone := strings.TrimSpace(trigger.Arguments["zone"])
+	role := strings.TrimSpace(trigger.Arguments["role"])
+	scopeDeviceID := placementScopeDeviceID(trigger)
+	if devices := nearestPlacementTargetDevices(ctx, env, trigger, scopeDeviceID); len(devices) > 0 {
+		return devices
+	}
+	if zone == "" && role == "" && scopeDeviceID == "" {
+		return nil
+	}
+	query := PlacementQuery{
+		Scope: TargetScope{
+			Zone:      zone,
+			Role:      role,
+			DeviceID:  strings.TrimSpace(trigger.Arguments["placement_device_id"]),
+			Source:    DeviceRef{DeviceID: scopeDeviceID},
+			Broadcast: true,
+		},
+	}
+	refs, err := env.Placement.Find(ctx, query)
+	if err != nil || len(refs) == 0 {
+		return nil
+	}
+	return deviceIDsFromRefs(refs)
+}
+
+func placementScopeDeviceID(trigger Trigger) string {
+	if scopeDeviceID := strings.TrimSpace(trigger.Arguments["scope_device_id"]); scopeDeviceID != "" {
+		return scopeDeviceID
+	}
+	return strings.TrimSpace(trigger.SourceID)
+}
+
+func nearestPlacementTargetDevices(ctx context.Context, env *Environment, trigger Trigger, scopeDeviceID string) []string {
+	nearestCap := strings.TrimSpace(trigger.Arguments["nearest_capability"])
+	if nearestCap == "" && !strings.EqualFold(strings.TrimSpace(trigger.Arguments["nearest"]), "true") {
+		return nil
+	}
+	ref, err := env.Placement.NearestWith(ctx, DeviceRef{DeviceID: scopeDeviceID}, nearestCap)
+	if err != nil {
+		return nil
+	}
+	if deviceID := strings.TrimSpace(ref.DeviceID); deviceID != "" {
+		return []string{deviceID}
+	}
+	return nil
+}
+
+func deviceIDsFromRefs(refs []DeviceRef) []string {
+	out := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		if id := strings.TrimSpace(ref.DeviceID); id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 func normalizeDeviceIDs(deviceIDs []string) []string {

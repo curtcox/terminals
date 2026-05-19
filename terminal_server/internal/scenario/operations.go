@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -89,80 +90,127 @@ func ValidateOperations(env *Environment, ops []Operation) error {
 		if op.Args == nil {
 			op.Args = map[string]string{}
 		}
-		switch op.Kind {
-		case OperationSchedulerAfter:
-			if env == nil || env.Scheduler == nil {
-				return fmt.Errorf("op %d %s requires scheduler", i, op.Kind)
+		if err := validateOperation(env, op); err != nil {
+			if strings.HasPrefix(err.Error(), "has unsupported kind ") {
+				return fmt.Errorf("op %d %w", i, err)
 			}
-			if strings.TrimSpace(op.Target) == "" {
-				return fmt.Errorf("op %d %s requires target key", i, op.Kind)
-			}
-			if _, err := strconv.ParseInt(strings.TrimSpace(op.Args["unix_ms"]), 10, 64); err != nil {
-				return fmt.Errorf("op %d %s requires unix_ms: %w", i, op.Kind, err)
-			}
-		case OperationSchedulerCancel:
-			if env == nil || env.Scheduler == nil {
-				return fmt.Errorf("op %d %s requires scheduler", i, op.Kind)
-			}
-			if strings.TrimSpace(op.Target) == "" {
-				return fmt.Errorf("op %d %s requires target key", i, op.Kind)
-			}
-		case OperationBroadcastNotify:
-			if env == nil || env.Broadcast == nil {
-				return fmt.Errorf("op %d %s requires broadcaster", i, op.Kind)
-			}
-			if strings.TrimSpace(op.Args["message"]) == "" {
-				return fmt.Errorf("op %d %s requires message", i, op.Kind)
-			}
-		case OperationAITTS:
-			if env == nil || env.TTS == nil {
-				return fmt.Errorf("op %d %s requires tts", i, op.Kind)
-			}
-			if strings.TrimSpace(op.Args["text"]) == "" {
-				return fmt.Errorf("op %d %s requires text", i, op.Kind)
-			}
-		case OperationBusEmit:
-			if env == nil || env.TriggerBus == nil {
-				return fmt.Errorf("op %d %s requires trigger bus", i, op.Kind)
-			}
-			if strings.TrimSpace(op.Target) == "" {
-				return fmt.Errorf("op %d %s requires event kind target", i, op.Kind)
-			}
-		case OperationUISet:
-			if env == nil || env.UI == nil {
-				return fmt.Errorf("op %d %s requires ui host", i, op.Kind)
-			}
-			if strings.TrimSpace(op.Target) == "" {
-				return fmt.Errorf("op %d %s requires target device", i, op.Kind)
-			}
-			if op.Node == nil {
-				return fmt.Errorf("op %d %s requires node", i, op.Kind)
-			}
-		case OperationUIPatch:
-			if env == nil || env.UI == nil {
-				return fmt.Errorf("op %d %s requires ui host", i, op.Kind)
-			}
-			if strings.TrimSpace(op.Target) == "" {
-				return fmt.Errorf("op %d %s requires target device", i, op.Kind)
-			}
-			if strings.TrimSpace(op.Args["component_id"]) == "" {
-				return fmt.Errorf("op %d %s requires component_id", i, op.Kind)
-			}
-			if op.Node == nil {
-				return fmt.Errorf("op %d %s requires node", i, op.Kind)
-			}
-		case OperationUIClear:
-			if env == nil || env.UI == nil {
-				return fmt.Errorf("op %d %s requires ui host", i, op.Kind)
-			}
-			if strings.TrimSpace(op.Target) == "" {
-				return fmt.Errorf("op %d %s requires target device", i, op.Kind)
-			}
-		case OperationUITransition, OperationFlowApply, OperationFlowStop:
-			return fmt.Errorf("op %d %s is not executable yet", i, op.Kind)
-		default:
-			return fmt.Errorf("op %d has unsupported kind %q", i, op.Kind)
+			return fmt.Errorf("op %d %s %w", i, op.Kind, err)
 		}
+	}
+	return nil
+}
+
+func validateOperation(env *Environment, op Operation) error {
+	switch op.Kind {
+	case OperationSchedulerAfter:
+		return validateSchedulerAfterOperation(env, op)
+	case OperationSchedulerCancel:
+		return validateSchedulerCancelOperation(env, op)
+	case OperationBroadcastNotify:
+		return validateBroadcastNotifyOperation(env, op)
+	case OperationAITTS:
+		return validateTTSOperation(env, op)
+	case OperationBusEmit:
+		return validateBusEmitOperation(env, op)
+	case OperationUISet:
+		return validateUISetOperation(env, op)
+	case OperationUIPatch:
+		return validateUIPatchOperation(env, op)
+	case OperationUIClear:
+		return validateUIClearOperation(env, op)
+	case OperationUITransition, OperationFlowApply, OperationFlowStop:
+		return errors.New("is not executable yet")
+	default:
+		return fmt.Errorf("has unsupported kind %q", op.Kind)
+	}
+}
+
+func validateSchedulerAfterOperation(env *Environment, op Operation) error {
+	if env == nil || env.Scheduler == nil {
+		return errors.New("requires scheduler")
+	}
+	if strings.TrimSpace(op.Target) == "" {
+		return errors.New("requires target key")
+	}
+	if _, err := strconv.ParseInt(strings.TrimSpace(op.Args["unix_ms"]), 10, 64); err != nil {
+		return fmt.Errorf("requires unix_ms: %w", err)
+	}
+	return nil
+}
+
+func validateSchedulerCancelOperation(env *Environment, op Operation) error {
+	if env == nil || env.Scheduler == nil {
+		return errors.New("requires scheduler")
+	}
+	if strings.TrimSpace(op.Target) == "" {
+		return errors.New("requires target key")
+	}
+	return nil
+}
+
+func validateBroadcastNotifyOperation(env *Environment, op Operation) error {
+	if env == nil || env.Broadcast == nil {
+		return errors.New("requires broadcaster")
+	}
+	if strings.TrimSpace(op.Args["message"]) == "" {
+		return errors.New("requires message")
+	}
+	return nil
+}
+
+func validateTTSOperation(env *Environment, op Operation) error {
+	if env == nil || env.TTS == nil {
+		return errors.New("requires tts")
+	}
+	if strings.TrimSpace(op.Args["text"]) == "" {
+		return errors.New("requires text")
+	}
+	return nil
+}
+
+func validateBusEmitOperation(env *Environment, op Operation) error {
+	if env == nil || env.TriggerBus == nil {
+		return errors.New("requires trigger bus")
+	}
+	if strings.TrimSpace(op.Target) == "" {
+		return errors.New("requires event kind target")
+	}
+	return nil
+}
+
+func validateUISetOperation(env *Environment, op Operation) error {
+	if err := validateUIOperationTarget(env, op); err != nil {
+		return err
+	}
+	if op.Node == nil {
+		return errors.New("requires node")
+	}
+	return nil
+}
+
+func validateUIPatchOperation(env *Environment, op Operation) error {
+	if err := validateUIOperationTarget(env, op); err != nil {
+		return err
+	}
+	if strings.TrimSpace(op.Args["component_id"]) == "" {
+		return errors.New("requires component_id")
+	}
+	if op.Node == nil {
+		return errors.New("requires node")
+	}
+	return nil
+}
+
+func validateUIClearOperation(env *Environment, op Operation) error {
+	return validateUIOperationTarget(env, op)
+}
+
+func validateUIOperationTarget(env *Environment, op Operation) error {
+	if env == nil || env.UI == nil {
+		return errors.New("requires ui host")
+	}
+	if strings.TrimSpace(op.Target) == "" {
+		return errors.New("requires target device")
 	}
 	return nil
 }
