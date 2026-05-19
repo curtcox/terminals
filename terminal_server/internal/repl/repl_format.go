@@ -49,6 +49,19 @@ func printTable(out io.Writer, headers []string, rows [][]string) error {
 	if len(headers) == 0 {
 		return nil
 	}
+	widths := tableColumnWidths(headers, rows)
+	if err := printTableLine(out, headers, widths); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := printTableLine(out, row, widths); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func tableColumnWidths(headers []string, rows [][]string) []int {
 	widths := make([]int, len(headers))
 	for i, h := range headers {
 		widths[i] = len(h)
@@ -63,33 +76,23 @@ func printTable(out io.Writer, headers []string, rows [][]string) error {
 			}
 		}
 	}
+	return widths
+}
+
+func printTableLine(out io.Writer, cells []string, widths []int) error {
 	var line bytes.Buffer
-	for i, h := range headers {
+	for i := range widths {
 		if i > 0 {
 			line.WriteString("  ")
 		}
-		line.WriteString(padRight(h, widths[i]))
-	}
-	if _, err := fmt.Fprintln(out, line.String()); err != nil {
-		return err
-	}
-	for _, row := range rows {
-		line.Reset()
-		for i := range headers {
-			if i > 0 {
-				line.WriteString("  ")
-			}
-			cell := ""
-			if i < len(row) {
-				cell = row[i]
-			}
-			line.WriteString(padRight(cell, widths[i]))
+		cell := ""
+		if i < len(cells) {
+			cell = cells[i]
 		}
-		if _, err := fmt.Fprintln(out, line.String()); err != nil {
-			return err
-		}
+		line.WriteString(padRight(cell, widths[i]))
 	}
-	return nil
+	_, err := fmt.Fprintln(out, line.String())
+	return err
 }
 
 func padRight(s string, width int) string {

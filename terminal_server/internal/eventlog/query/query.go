@@ -79,42 +79,50 @@ func Search(dir string, args []string, now time.Time) ([]Record, error) {
 func ParseFilters(args []string, now time.Time) (Filters, error) {
 	f := Filters{Equals: map[string][]string{}}
 	for _, raw := range args {
-		tok := strings.TrimSpace(raw)
-		if tok == "" {
-			continue
+		if err := parseFilterToken(&f, raw, now); err != nil {
+			return Filters{}, err
 		}
-		if k, v, ok := strings.Cut(tok, ">="); ok {
-			if strings.TrimSpace(strings.ToLower(k)) == "level" {
-				f.LevelMin = strings.ToLower(strings.TrimSpace(v))
-				continue
-			}
-		}
-		if k, v, ok := strings.Cut(tok, "="); ok {
-			key := strings.TrimSpace(strings.ToLower(k))
-			val := strings.TrimSpace(v)
-			switch key {
-			case "since":
-				ts, err := parseTimeValue(val, now)
-				if err != nil {
-					return Filters{}, err
-				}
-				f.Since = &ts
-			case "until":
-				ts, err := parseTimeValue(val, now)
-				if err != nil {
-					return Filters{}, err
-				}
-				f.Until = &ts
-			case "trace":
-				f.TraceID = val
-			default:
-				f.Equals[key] = append(f.Equals[key], val)
-			}
-			continue
-		}
-		f.FreeText = append(f.FreeText, tok)
 	}
 	return f, nil
+}
+
+func parseFilterToken(f *Filters, raw string, now time.Time) error {
+	tok := strings.TrimSpace(raw)
+	if tok == "" {
+		return nil
+	}
+	if k, v, ok := strings.Cut(tok, ">="); ok && strings.TrimSpace(strings.ToLower(k)) == "level" {
+		f.LevelMin = strings.ToLower(strings.TrimSpace(v))
+		return nil
+	}
+	k, v, ok := strings.Cut(tok, "=")
+	if !ok {
+		f.FreeText = append(f.FreeText, tok)
+		return nil
+	}
+	return parseFieldFilter(f, strings.TrimSpace(strings.ToLower(k)), strings.TrimSpace(v), now)
+}
+
+func parseFieldFilter(f *Filters, key, val string, now time.Time) error {
+	switch key {
+	case "since":
+		ts, err := parseTimeValue(val, now)
+		if err != nil {
+			return err
+		}
+		f.Since = &ts
+	case "until":
+		ts, err := parseTimeValue(val, now)
+		if err != nil {
+			return err
+		}
+		f.Until = &ts
+	case "trace":
+		f.TraceID = val
+	default:
+		f.Equals[key] = append(f.Equals[key], val)
+	}
+	return nil
 }
 
 // Trace returns records matching the provided trace id.
@@ -167,52 +175,69 @@ func Stats(records []Record, by string) map[string]int {
 }
 
 func matches(rec Record, filters Filters) bool {
-	if filters.TraceID != "" && fieldString(rec, "trace_id") != filters.TraceID {
+	return matchesTrace(rec, filters) &&
+		matchesTimeWindow(rec, filters) &&
+		matchesLevel(rec, filters) &&
+		matchesEquals(rec, filters.Equals) &&
+		matchesFreeText(rec, filters.FreeText)
+}
+
+func matchesTrace(rec Record, filters Filters) bool {
+	return filters.TraceID == "" || fieldString(rec, "trace_id") == filters.TraceID
+}
+
+func matchesTimeWindow(rec Record, filters Filters) bool {
+	if filters.Since == nil && filters.Until == nil {
+		return true
+	}
+	ts := fieldTime(rec)
+	if ts.IsZero() {
 		return false
 	}
-	if filters.Since != nil {
-		ts := fieldTime(rec)
-		if ts.IsZero() || ts.Before(*filters.Since) {
+	if filters.Since != nil && ts.Before(*filters.Since) {
+		return false
+	}
+	return filters.Until == nil || !ts.After(*filters.Until)
+}
+
+func matchesLevel(rec Record, filters Filters) bool {
+	return filters.LevelMin == "" || levelRank(fieldString(rec, "level")) >= levelRank(filters.LevelMin)
+}
+
+func matchesEquals(rec Record, equals map[string][]string) bool {
+	for key, values := range equals {
+		if !fieldMatchesAny(rec, key, values) {
 			return false
 		}
 	}
-	if filters.Until != nil {
-		ts := fieldTime(rec)
-		if ts.IsZero() || ts.After(*filters.Until) {
-			return false
+	return true
+}
+
+func fieldMatchesAny(rec Record, key string, values []string) bool {
+	if len(values) == 0 {
+		return true
+	}
+	actual := fieldString(rec, key)
+	if actual == "" {
+		return false
+	}
+	for _, want := range values {
+		if actual == want {
+			return true
 		}
 	}
-	if filters.LevelMin != "" {
-		if levelRank(fieldString(rec, "level")) < levelRank(filters.LevelMin) {
-			return false
-		}
+	return false
+}
+
+func matchesFreeText(rec Record, tokens []string) bool {
+	if len(tokens) == 0 {
+		return true
 	}
-	for key, values := range filters.Equals {
-		if len(values) == 0 {
-			continue
-		}
-		actual := fieldString(rec, key)
-		if actual == "" {
+	b, _ := json.Marshal(rec)
+	hay := strings.ToLower(string(b))
+	for _, token := range tokens {
+		if !strings.Contains(hay, strings.ToLower(token)) {
 			return false
-		}
-		ok := false
-		for _, want := range values {
-			if actual == want {
-				ok = true
-				break
-			}
-		}
-		if !ok {
-			return false
-		}
-	}
-	if len(filters.FreeText) > 0 {
-		b, _ := json.Marshal(rec)
-		hay := strings.ToLower(string(b))
-		for _, token := range filters.FreeText {
-			if !strings.Contains(hay, strings.ToLower(token)) {
-				return false
-			}
 		}
 	}
 	return true

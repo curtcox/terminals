@@ -24,18 +24,10 @@ func rewriteDescriptorIDsForActivation(root ui.Descriptor, activationID string) 
 	ids := make([]string, 0, 16)
 	var rewriteNode func(node ui.Descriptor, path string) (ui.Descriptor, error)
 	rewriteNode = func(node ui.Descriptor, path string) (ui.Descriptor, error) {
-		rawID := descriptorNodeID(node)
-		if rawID != "" {
-			scopedID, err := canonicalScopedComponentID(rawID, activationID)
-			if err != nil {
-				return ui.Descriptor{}, fmt.Errorf("%s.id: %w", path, err)
-			}
-			if _, exists := seen[scopedID]; exists {
-				return ui.Descriptor{}, fmt.Errorf("%s.id: duplicate component id %q", path, scopedID)
-			}
-			seen[scopedID] = struct{}{}
-			ids = append(ids, scopedID)
-			node = setDescriptorNodeID(node, scopedID)
+		var err error
+		node, err = rewriteDescriptorNodeID(node, path, activationID, seen, &ids)
+		if err != nil {
+			return ui.Descriptor{}, err
 		}
 		if len(node.Children) == 0 {
 			return node, nil
@@ -58,6 +50,23 @@ func rewriteDescriptorIDsForActivation(root ui.Descriptor, activationID string) 
 		return ui.Descriptor{}, nil, err
 	}
 	return rewritten, ids, nil
+}
+
+func rewriteDescriptorNodeID(node ui.Descriptor, path, activationID string, seen map[string]struct{}, ids *[]string) (ui.Descriptor, error) {
+	rawID := descriptorNodeID(node)
+	if rawID == "" {
+		return node, nil
+	}
+	scopedID, err := canonicalScopedComponentID(rawID, activationID)
+	if err != nil {
+		return ui.Descriptor{}, fmt.Errorf("%s.id: %w", path, err)
+	}
+	if _, exists := seen[scopedID]; exists {
+		return ui.Descriptor{}, fmt.Errorf("%s.id: duplicate component id %q", path, scopedID)
+	}
+	seen[scopedID] = struct{}{}
+	*ids = append(*ids, scopedID)
+	return setDescriptorNodeID(node, scopedID), nil
 }
 
 func canonicalScopedComponentID(rawID, defaultActivationID string) (string, error) {
@@ -136,15 +145,24 @@ func (t *uiActionOwnershipTracker) RecordSetUI(deviceID, activationID string, co
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if _, exists := t.knownActivations[deviceID]; !exists {
-		t.knownActivations[deviceID] = map[string]struct{}{}
-	}
+	t.ensureKnownActivations(deviceID)
 	prefix := ownershipActivationPrefix(deviceID, activationID)
 	for key := range t.componentOwner {
 		if strings.HasPrefix(key, prefix) {
 			delete(t.componentOwner, key)
 		}
 	}
+	t.recordComponentOwnersLocked(deviceID, activationID, componentIDs)
+	t.knownActivations[deviceID][activationID] = struct{}{}
+}
+
+func (t *uiActionOwnershipTracker) ensureKnownActivations(deviceID string) {
+	if _, exists := t.knownActivations[deviceID]; !exists {
+		t.knownActivations[deviceID] = map[string]struct{}{}
+	}
+}
+
+func (t *uiActionOwnershipTracker) recordComponentOwnersLocked(deviceID, activationID string, componentIDs []string) {
 	for _, componentID := range componentIDs {
 		componentID = strings.TrimSpace(componentID)
 		if componentID == "" {
@@ -158,12 +176,6 @@ func (t *uiActionOwnershipTracker) RecordSetUI(deviceID, activationID string, co
 		if ownerActivationID != "" {
 			t.knownActivations[deviceID][ownerActivationID] = struct{}{}
 		}
-	}
-	if activationID != "" {
-		if _, exists := t.knownActivations[deviceID]; !exists {
-			t.knownActivations[deviceID] = map[string]struct{}{}
-		}
-		t.knownActivations[deviceID][activationID] = struct{}{}
 	}
 }
 
@@ -178,26 +190,9 @@ func (t *uiActionOwnershipTracker) RecordUpdate(deviceID, activationID string, c
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if _, exists := t.knownActivations[deviceID]; !exists {
-		t.knownActivations[deviceID] = map[string]struct{}{}
-	}
-	for _, componentID := range componentIDs {
-		componentID = strings.TrimSpace(componentID)
-		if componentID == "" {
-			continue
-		}
-		ownerActivationID := activationID
-		if _, parsedActivationID, _, ok := parseScopedComponentID(componentID); ok {
-			ownerActivationID = parsedActivationID
-		}
-		t.componentOwner[ownershipKey(deviceID, componentID)] = ownerActivationID
-		if ownerActivationID != "" {
-			t.knownActivations[deviceID][ownerActivationID] = struct{}{}
-		}
-	}
-	if activationID != "" {
-		t.knownActivations[deviceID][activationID] = struct{}{}
-	}
+	t.ensureKnownActivations(deviceID)
+	t.recordComponentOwnersLocked(deviceID, activationID, componentIDs)
+	t.knownActivations[deviceID][activationID] = struct{}{}
 }
 
 func (t *uiActionOwnershipTracker) Resolve(deviceID, componentID string) (string, string, bool) {

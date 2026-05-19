@@ -297,59 +297,58 @@ func (h *Handler) resolveCohortMembers(selectors []string) []string {
 
 func deviceMatchesSelectors(d device.Device, selectors []string) bool {
 	for _, selector := range selectors {
-		selector = strings.ToLower(strings.TrimSpace(selector))
-		if selector == "" {
-			continue
-		}
-		key, value, ok := strings.Cut(selector, ":")
-		if !ok || strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
-			return false
-		}
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		switch key {
-		case "id", "device":
-			if !strings.EqualFold(d.DeviceID, value) {
-				return false
-			}
-		case "zone":
-			if !strings.EqualFold(d.Placement.Zone, value) {
-				return false
-			}
-		case "role":
-			matched := false
-			for _, role := range d.Placement.Roles {
-				if strings.EqualFold(role, value) {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				return false
-			}
-		case "platform":
-			if !strings.EqualFold(d.Platform, value) {
-				return false
-			}
-		case "type":
-			if !strings.EqualFold(d.DeviceType, value) {
-				return false
-			}
-		case "state":
-			if !strings.EqualFold(string(d.State), value) {
-				return false
-			}
-		case "mobility":
-			if !strings.EqualFold(d.Placement.Mobility, value) {
-				return false
-			}
-		case "affinity":
-			if !strings.EqualFold(d.Placement.Affinity, value) {
-				return false
-			}
-		default:
+		if ok, skip := deviceMatchesSelector(d, selector); !skip && !ok {
 			return false
 		}
 	}
 	return true
+}
+
+func deviceMatchesSelector(d device.Device, selector string) (matched bool, skip bool) {
+	selector = strings.ToLower(strings.TrimSpace(selector))
+	if selector == "" {
+		return true, true
+	}
+	key, value, ok := strings.Cut(selector, ":")
+	if !ok {
+		return false, false
+	}
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+	if key == "" || value == "" {
+		return false, false
+	}
+	return deviceSelectorFieldMatches(d, key, value), false
+}
+
+func deviceSelectorFieldMatches(d device.Device, key, value string) bool {
+	switch key {
+	case "id", "device":
+		return strings.EqualFold(d.DeviceID, value)
+	case "zone":
+		return strings.EqualFold(d.Placement.Zone, value)
+	case "role":
+		return stringSliceContainsFold(d.Placement.Roles, value)
+	case "platform":
+		return strings.EqualFold(d.Platform, value)
+	case "type":
+		return strings.EqualFold(d.DeviceType, value)
+	case "state":
+		return strings.EqualFold(string(d.State), value)
+	case "mobility":
+		return strings.EqualFold(d.Placement.Mobility, value)
+	case "affinity":
+		return strings.EqualFold(d.Placement.Affinity, value)
+	default:
+		return false
+	}
+}
+
+func stringSliceContainsFold(values []string, want string) bool {
+	for _, value := range values {
+		if strings.EqualFold(value, want) {
+			return true
+		}
+	}
+	return false
 }
