@@ -492,10 +492,13 @@ func proxyMCPStdio(ctx context.Context, in io.Reader, out io.Writer, mcpURL stri
 	dec := json.NewDecoder(bufio.NewReader(in))
 	enc := json.NewEncoder(out)
 	enc.SetEscapeHTML(false)
-	client := &http.Client{Timeout: 30 * time.Second}
-	sessionID := ""
-	clientSupportsElicitation := false
-	proxyRequestID := 1000000
+	proxy := &mcpStdioProxy{
+		decoder:        dec,
+		encoder:        enc,
+		client:         &http.Client{Timeout: 30 * time.Second},
+		mcpURL:         mcpURL,
+		proxyRequestID: 1000000,
+	}
 
 	for {
 		select {
@@ -516,82 +519,163 @@ func proxyMCPStdio(ctx context.Context, in io.Reader, out io.Writer, mcpURL stri
 			// Client responses are consumed only while awaiting an in-flight elicitation.
 			continue
 		}
-		// Requests without an id are notifications per JSON-RPC 2.0 §4.1 and
-		// receive no response. Forward them to the server but do not write
-		// anything back to the client — clients validate stdout against a
-		// strict JSON-RPC schema and reject empty envelopes.
-		isNotification := req["id"] == nil
-
-		httpReqPayload := cloneMapAny(req)
-		if strings.EqualFold(method, "initialize") {
-			caps := mcpAnyMap(mcpAnyMap(httpReqPayload["params"])["capabilities"])
-			clientSupportsElicitation = mcpCapabilityEnabled(caps["elicitation"]) || mcpCapabilityEnabled(caps["mcp_elicitation"])
-			if clientSupportsElicitation {
-				// Drive elicitation from the proxy against the client, using the
-				// server's fallback confirmation_id protocol as the wire format.
-				// The server HTTP path has no elicitation hook; if it classified
-				// the session as mutating_via_elicitation it would reject mutating
-				// tool calls with elicit_unavailable.
-				delete(caps, "elicitation")
-				delete(caps, "mcp_elicitation")
-				caps["terminals_fallback_confirmation"] = true
-				params := mcpAnyMap(httpReqPayload["params"])
-				params["capabilities"] = caps
-				httpReqPayload["params"] = params
-			}
-		}
-
-		rpcResp, nextSessionID, err := postMCPRPC(ctx, client, mcpURL, httpReqPayload, sessionID, "")
-		if err != nil {
-			return err
-		}
-		if strings.TrimSpace(nextSessionID) != "" {
-			sessionID = strings.TrimSpace(nextSessionID)
-		}
-
-		if strings.EqualFold(method, "initialize") && clientSupportsElicitation {
-			result := mcpAnyMap(mcpAnyMap(rpcResp)["result"])
-			if strings.EqualFold(strings.TrimSpace(mcpAnyString(result["mutating_capability"])), "mutating_via_fallback") {
-				result["mutating_capability"] = "mutating_via_elicitation"
-				respMap := mcpAnyMap(rpcResp)
-				respMap["result"] = result
-				rpcResp = respMap
-			}
-		}
-
-		if strings.EqualFold(method, "tools/call") && clientSupportsElicitation {
-			result := mcpAnyMap(mcpAnyMap(rpcResp)["result"])
-			meta := mcpAnyMap(result["_meta"])
-			if strings.EqualFold(strings.TrimSpace(mcpAnyString(meta["status"])), "confirmation_required") {
-				confirmationID := strings.TrimSpace(mcpAnyString(meta["confirmation_id"]))
-				if confirmationID != "" {
-					proxyRequestID++
-					approved, err := elicitViaProxy(ctx, dec, enc, proxyRequestID, req, meta)
-					if err != nil {
-						return err
-					}
-					if approved {
-						rpcResp, nextSessionID, err = postMCPRPC(ctx, client, mcpURL, httpReqPayload, sessionID, confirmationID)
-						if err != nil {
-							return err
-						}
-						if strings.TrimSpace(nextSessionID) != "" {
-							sessionID = strings.TrimSpace(nextSessionID)
-						}
-					} else {
-						rpcResp = approvalRejectedResponse(req["id"])
-					}
-				}
-			}
-		}
-
-		if isNotification {
-			continue
-		}
-		if err := enc.Encode(rpcResp); err != nil {
+		if err := proxy.handleRequest(ctx, method, req); err != nil {
 			return err
 		}
 	}
+}
+
+type mcpStdioProxy struct {
+	decoder                   *json.Decoder
+	encoder                   *json.Encoder
+	client                    *http.Client
+	mcpURL                    string
+	sessionID                 string
+	clientSupportsElicitation bool
+	proxyRequestID            int
+}
+
+func (p *mcpStdioProxy) handleRequest(ctx context.Context, method string, req map[string]any) error {
+	payload := cloneMapAny(req)
+	if strings.EqualFold(method, "initialize") {
+		p.clientSupportsElicitation = prepareMCPInitializeForProxy(payload)
+	}
+	resp, err := p.forward(ctx, payload, "")
+	if err != nil {
+		return err
+	}
+	resp, err = p.rewriteResponse(ctx, method, req, payload, resp)
+	if err != nil {
+		return err
+	}
+	if req["id"] == nil {
+		return nil
+	}
+	return p.encoder.Encode(resp)
+}
+
+func (p *mcpStdioProxy) forward(ctx context.Context, payload map[string]any, confirmationID string) (map[string]any, error) {
+	resp, nextSessionID, err := postMCPRPC(ctx, p.client, p.mcpURL, payload, p.sessionID, confirmationID)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(nextSessionID) != "" {
+		p.sessionID = strings.TrimSpace(nextSessionID)
+	}
+	return resp, nil
+}
+
+func (p *mcpStdioProxy) rewriteResponse(
+	ctx context.Context,
+	method string,
+	original map[string]any,
+	payload map[string]any,
+	resp map[string]any,
+) (map[string]any, error) {
+	if strings.EqualFold(method, "initialize") && p.clientSupportsElicitation {
+		return rewriteMCPInitializeResponseForElicitation(resp), nil
+	}
+	if !strings.EqualFold(method, "tools/call") || !p.clientSupportsElicitation {
+		return resp, nil
+	}
+	p.proxyRequestID++
+	nextResp, updatedSessionID, handled, err := handleMCPToolConfirmation(
+		ctx,
+		mcpToolConfirmationRequest{
+			decoder:        p.decoder,
+			encoder:        p.encoder,
+			client:         p.client,
+			mcpURL:         p.mcpURL,
+			payload:        payload,
+			sessionID:      p.sessionID,
+			proxyRequestID: p.proxyRequestID,
+			original:       original,
+			response:       resp,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if handled {
+		p.sessionID = updatedSessionID
+		return nextResp, nil
+	}
+	return resp, nil
+}
+
+func prepareMCPInitializeForProxy(payload map[string]any) bool {
+	params := mcpAnyMap(payload["params"])
+	caps := mcpAnyMap(params["capabilities"])
+	clientSupportsElicitation := mcpCapabilityEnabled(caps["elicitation"]) || mcpCapabilityEnabled(caps["mcp_elicitation"])
+	if !clientSupportsElicitation {
+		return false
+	}
+	// Drive elicitation from the proxy against the client, using the
+	// server's fallback confirmation_id protocol as the wire format.
+	// The server HTTP path has no elicitation hook; if it classified
+	// the session as mutating_via_elicitation it would reject mutating
+	// tool calls with elicit_unavailable.
+	delete(caps, "elicitation")
+	delete(caps, "mcp_elicitation")
+	caps["terminals_fallback_confirmation"] = true
+	params["capabilities"] = caps
+	payload["params"] = params
+	return true
+}
+
+func rewriteMCPInitializeResponseForElicitation(resp map[string]any) map[string]any {
+	result := mcpAnyMap(mcpAnyMap(resp)["result"])
+	if !strings.EqualFold(strings.TrimSpace(mcpAnyString(result["mutating_capability"])), "mutating_via_fallback") {
+		return resp
+	}
+	result["mutating_capability"] = "mutating_via_elicitation"
+	respMap := mcpAnyMap(resp)
+	respMap["result"] = result
+	return respMap
+}
+
+type mcpToolConfirmationRequest struct {
+	decoder        *json.Decoder
+	encoder        *json.Encoder
+	client         *http.Client
+	mcpURL         string
+	payload        map[string]any
+	sessionID      string
+	proxyRequestID int
+	original       map[string]any
+	response       map[string]any
+}
+
+func handleMCPToolConfirmation(ctx context.Context, req mcpToolConfirmationRequest) (map[string]any, string, bool, error) {
+	meta := mcpConfirmationMeta(req.response)
+	confirmationID := strings.TrimSpace(mcpAnyString(meta["confirmation_id"]))
+	if confirmationID == "" {
+		return req.response, req.sessionID, false, nil
+	}
+	approved, err := elicitViaProxy(ctx, req.decoder, req.encoder, req.proxyRequestID, req.original, meta)
+	if err != nil {
+		return nil, req.sessionID, false, err
+	}
+	if !approved {
+		return approvalRejectedResponse(req.original["id"]), req.sessionID, true, nil
+	}
+	resp, nextSessionID, err := postMCPRPC(ctx, req.client, req.mcpURL, req.payload, req.sessionID, confirmationID)
+	if err != nil {
+		return nil, req.sessionID, false, err
+	}
+	if strings.TrimSpace(nextSessionID) == "" {
+		nextSessionID = req.sessionID
+	}
+	return resp, strings.TrimSpace(nextSessionID), true, nil
+}
+
+func mcpConfirmationMeta(resp map[string]any) map[string]any {
+	result := mcpAnyMap(mcpAnyMap(resp)["result"])
+	meta := mcpAnyMap(result["_meta"])
+	if !strings.EqualFold(strings.TrimSpace(mcpAnyString(meta["status"])), "confirmation_required") {
+		return nil
+	}
+	return meta
 }
 
 func postMCPRPC(
@@ -644,24 +728,24 @@ func elicitViaProxy(
 	originalRequest map[string]any,
 	confirmationMeta map[string]any,
 ) (bool, error) {
+	if err := enc.Encode(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      proxyRequestID,
+		"method":  "elicitation/create",
+		"params":  mcpElicitationParams(originalRequest, confirmationMeta),
+	}); err != nil {
+		return false, err
+	}
+	return awaitMCPApproval(ctx, dec, proxyRequestID)
+}
+
+func mcpElicitationParams(originalRequest map[string]any, confirmationMeta map[string]any) map[string]any {
 	toolName := strings.TrimSpace(mcpAnyString(mcpAnyMap(originalRequest["params"])["name"]))
 	rendered := strings.TrimSpace(mcpAnyString(confirmationMeta["rendered_command"]))
-	classification := strings.TrimSpace(mcpAnyString(confirmationMeta["classification"]))
-	if classification == "" {
-		classification = string(repl.CommandClassificationMutating)
-	}
+	classification := mcpConfirmationClassification(confirmationMeta)
 	promptLabel := strings.ReplaceAll(classification, "_", " ")
-	// Per MCP spec 2025-06-18, elicitation/create requires `message` and
-	// `requestedSchema` (a JSON Schema). Clients treat any other shape as a
-	// malformed request and return action=decline without showing a prompt.
-	message := fmt.Sprintf(
-		"Approve %s command?\n\nTool: %s\nCommand: %s",
-		promptLabel,
-		toolName,
-		rendered,
-	)
-	params := map[string]any{
-		"message": message,
+	return map[string]any{
+		"message": fmt.Sprintf("Approve %s command?\n\nTool: %s\nCommand: %s", promptLabel, toolName, rendered),
 		"requestedSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -679,15 +763,17 @@ func elicitViaProxy(
 		"rendered_command": rendered,
 		"classification":   classification,
 	}
-	if err := enc.Encode(map[string]any{
-		"jsonrpc": "2.0",
-		"id":      proxyRequestID,
-		"method":  "elicitation/create",
-		"params":  params,
-	}); err != nil {
-		return false, err
-	}
+}
 
+func mcpConfirmationClassification(meta map[string]any) string {
+	classification := strings.TrimSpace(mcpAnyString(meta["classification"]))
+	if classification == "" {
+		return string(repl.CommandClassificationMutating)
+	}
+	return classification
+}
+
+func awaitMCPApproval(ctx context.Context, dec *json.Decoder, proxyRequestID int) (bool, error) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -704,27 +790,26 @@ func elicitViaProxy(
 		if !rpcIDMatches(msg["id"], proxyRequestID) {
 			continue
 		}
-		result := mcpAnyMap(msg["result"])
-		// Per MCP spec, an accept response has action=="accept" and the
-		// schema-shaped answer under `content`. Anything else (decline,
-		// cancel, error, or ambiguous shape) counts as not-approved.
-		action := strings.ToLower(strings.TrimSpace(mcpAnyString(result["action"])))
-		content := mcpAnyMap(result["content"])
-		switch action {
-		case "accept", "accepted", "approve", "approved", "yes":
-			if _, hasApproved := content["approved"]; hasApproved {
-				return mcpAnyBool(content["approved"]), nil
-			}
-			return true, nil
-		case "decline", "declined", "reject", "rejected", "no", "cancel", "cancelled", "canceled":
-			return false, nil
-		}
-		// Legacy/custom shapes: direct `approved` at result level.
-		if mcpAnyBool(result["approved"]) {
-			return true, nil
-		}
-		return false, nil
+		return mcpApprovalResult(mcpAnyMap(msg["result"])), nil
 	}
+}
+
+func mcpApprovalResult(result map[string]any) bool {
+	// Per MCP spec, an accept response has action=="accept" and the
+	// schema-shaped answer under `content`. Anything else (decline,
+	// cancel, error, or ambiguous shape) counts as not-approved.
+	action := strings.ToLower(strings.TrimSpace(mcpAnyString(result["action"])))
+	content := mcpAnyMap(result["content"])
+	switch action {
+	case "accept", "accepted", "approve", "approved", "yes":
+		if _, hasApproved := content["approved"]; hasApproved {
+			return mcpAnyBool(content["approved"])
+		}
+		return true
+	case "decline", "declined", "reject", "rejected", "no", "cancel", "cancelled", "canceled":
+		return false
+	}
+	return mcpAnyBool(result["approved"])
 }
 
 func approvalRejectedResponse(id any) map[string]any {
