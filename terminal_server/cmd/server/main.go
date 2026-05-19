@@ -116,12 +116,70 @@ func main() {
 		os.Exit(runMCPStdio(os.Stdin, os.Stdout, os.Stderr))
 	}
 
-	cfg, err := config.Load()
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "load config: %v\n", err)
+	if err := runServer(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
+}
 
+type serverRuntime struct {
+	cfg               config.Config
+	logger            *slog.Logger
+	deviceManager     *device.Manager
+	ioRouter          *iorouter.Router
+	scenarioEngine    *scenario.Engine
+	controlService    *transport.ControlService
+	scheduler         *storage.MemoryScheduler
+	scenarioRuntime   *scenario.Runtime
+	controlStream     *transport.StreamHandler
+	appRuntime        *appruntime.Runtime
+	telephonyBridge   scenario.TelephonyBridge
+	photoServer       *http.Server
+	adminServer       *http.Server
+	grpcServer        *transport.Server
+	websocketServer   *transport.WebSocketServer
+	tcpServer         *transport.TCPServer
+	httpControlServer *transport.HTTPControlServer
+	mdns              *discovery.MDNSAdvertiser
+}
+
+func runServer() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	evtLogger, err := configureEventLogger(cfg)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = evtLogger.Flush() }()
+	logger := eventlog.Component("main")
+	logger.Info("config loaded", "event", "config.loaded")
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	ctx, endSpan := eventlog.WithSpan(ctx, "server:start")
+	defer endSpan()
+
+	runtime, err := newServerRuntime(ctx, cfg, logger)
+	if err != nil {
+		logger.Error("configure server runtime", "event", "server.configure.failed", "error", err)
+		return nil
+	}
+	if err := runtime.start(ctx); err != nil {
+		return nil
+	}
+	runtime.logReady()
+	runtime.startHousekeeping(ctx)
+
+	<-ctx.Done()
+	logger.Info("terminal server shutting down", "event", "server.stopping")
+	runtime.shutdown()
+	logger.Info("terminal server stopped", "event", "server.stopped")
+	return nil
+}
+
+func configureEventLogger(cfg config.Config) (*eventlog.Logger, error) {
 	evtLogger, err := eventlog.New(eventlog.Config{
 		Dir:           cfg.LogDir,
 		Level:         cfg.LogLevel,
@@ -132,21 +190,15 @@ func main() {
 		ServerVersion: cfg.Version,
 	})
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "init event logger: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("init event logger: %w", err)
 	}
-	defer func() { _ = evtLogger.Flush() }()
 	eventlog.SetDefault(evtLogger)
 	log.SetFlags(0)
 	log.SetOutput(evtLogger.StdLogAdapter("legacy"))
-	logger := eventlog.Component("main")
-	logger.Info("config loaded", "event", "config.loaded")
+	return evtLogger, nil
+}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	ctx, endSpan := eventlog.WithSpan(ctx, "server:start")
-	defer endSpan()
-
+func newServerRuntime(ctx context.Context, cfg config.Config, logger *slog.Logger) (*serverRuntime, error) {
 	deviceManager := device.NewManager()
 	ioRouter := iorouter.NewRouter()
 	audioHub := audio.NewHub()
@@ -163,8 +215,7 @@ func main() {
 	registerAppScenarioDefinitions(scenarioEngine, appRuntime)
 	telephonyBridge, err := buildTelephonyBridge(ctx, cfg.SIP)
 	if err != nil {
-		logger.Error("configure telephony bridge", "event", "telephony.bridge.failed", "error", err)
-		return
+		return nil, fmt.Errorf("configure telephony bridge: %w", err)
 	}
 	aiBackends := ai.NewNoopBackends()
 	// Swap the noop sound classifier for a real RMS-based silence detector
@@ -213,6 +264,100 @@ func main() {
 	if err := scenarioRuntime.RecoverActivations(ctx); err != nil {
 		logger.Error("recover scenario activations", "event", "scenario.recovery.failed", "error", err)
 	}
+
+	controlStream, mcpServer, err := newControlStreamAndMCP(cfg, controlService)
+	if err != nil {
+		return nil, fmt.Errorf("configure mcp adapter: %w", err)
+	}
+	replAIService := replai.NewService(controlStream.ReplSessions(), replai.Config{
+		DefaultProvider: cfg.AI.DefaultProvider,
+		DefaultModel:    cfg.AI.DefaultModel,
+		LLM:             aiBackends.LLM,
+		Providers: []replai.ProviderConfig{
+			{
+				Name:         "openrouter",
+				DefaultModel: firstModel(cfg.AI.OpenRouter.Models),
+				Models:       cfg.AI.OpenRouter.Models,
+			},
+			{
+				Name:         "ollama",
+				DefaultModel: firstModel(cfg.AI.Ollama.Models),
+				Models:       cfg.AI.Ollama.Models,
+			},
+		},
+	})
+	bugReports := bugreport.NewService(cfg.LogDir, deviceManager, scenarioRuntime)
+	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
+	if err != nil {
+		return nil, fmt.Errorf("configure webrtc signal engine: %w", err)
+	}
+	controlStream.SetWebRTCSignalEngine(webrtcEngine)
+	photoServer, photoBaseURL, err := startPhotoFrameAssetServer(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("start photo frame asset server: %w", err)
+	}
+	adminHandler := admin.NewHandler(
+		controlService,
+		scenarioRuntime,
+		controlStream.ReplSessions(),
+		replAIService,
+		appRuntime,
+		func() { registerAppScenarioDefinitions(scenarioEngine, appRuntime) },
+		deviceManager,
+		cfg,
+		worldModel,
+		trust.NewService(),
+	)
+	adminMux := http.NewServeMux()
+	adminMux.Handle("/mcp", mcpServer)
+	adminMux.Handle("/mcp/", mcpServer)
+	adminMux.Handle("/", adminHandler)
+	adminServer, err := startAdminServer(cfg, adminMux)
+	if err != nil {
+		return nil, fmt.Errorf("start admin dashboard: %w", err)
+	}
+	controlService.SetRegisterMetadata(registerAckMetadata(photoBaseURL))
+	configurePhotoFrame(controlStream, cfg, photoBaseURL)
+	recordingManager, err := recording.NewDiskManager(cfg.RecordingDir)
+	if err != nil {
+		return nil, fmt.Errorf("configure recording manager: %w", err)
+	}
+	controlStream.SetRecordingManager(recordingManager)
+	grpcServer := transport.NewServer(cfg.GRPCAddress())
+	grpcServer.ConfigureControl(controlService, transport.GeneratedProtoAdapter{})
+	grpcServer.ConfigureRuntime(scenarioRuntime)
+	grpcServer.ConfigureDeviceAudio(audioHub)
+	grpcServer.ConfigureRecording(recordingManager)
+	grpcServer.ConfigureWebRTCSignalEngine(webrtcEngine)
+	grpcServer.ConfigureBugReportIntake(bugReports)
+	websocketServer := transport.NewWebSocketServer(cfg.ControlWSAddress(), grpcServer, cfg.ControlWSAllowedOrigins)
+	tcpServer := transport.NewTCPServer(cfg.ControlTCPAddress(), grpcServer)
+	httpControlServer := transport.NewHTTPControlServer(cfg.ControlHTTPAddress(), grpcServer)
+	mdns := discovery.NewMDNSAdvertiser()
+
+	return &serverRuntime{
+		cfg:               cfg,
+		logger:            logger,
+		deviceManager:     deviceManager,
+		ioRouter:          ioRouter,
+		scenarioEngine:    scenarioEngine,
+		controlService:    controlService,
+		scheduler:         scheduler,
+		scenarioRuntime:   scenarioRuntime,
+		controlStream:     controlStream,
+		appRuntime:        appRuntime,
+		telephonyBridge:   telephonyBridge,
+		photoServer:       photoServer,
+		adminServer:       adminServer,
+		grpcServer:        grpcServer,
+		websocketServer:   websocketServer,
+		tcpServer:         tcpServer,
+		httpControlServer: httpControlServer,
+		mdns:              mdns,
+	}, nil
+}
+
+func newControlStreamAndMCP(cfg config.Config, controlService *transport.ControlService) (*transport.StreamHandler, *mcpadapter.Server, error) {
 	controlStream := transport.NewStreamHandler(controlService)
 	adminBaseURL := fmt.Sprintf("http://127.0.0.1:%d", cfg.AdminHTTPPort)
 	controlStream.SetTerminalREPLAdminURL(adminBaseURL)
@@ -240,201 +385,144 @@ func main() {
 		AdminBaseURL: adminBaseURL,
 	})
 	if err != nil {
-		logger.Error("configure mcp adapter", "event", "mcp.configure.failed", "error", err)
-		return
+		return nil, nil, err
 	}
-	replAIService := replai.NewService(controlStream.ReplSessions(), replai.Config{
-		DefaultProvider: cfg.AI.DefaultProvider,
-		DefaultModel:    cfg.AI.DefaultModel,
-		LLM:             aiBackends.LLM,
-		Providers: []replai.ProviderConfig{
-			{
-				Name:         "openrouter",
-				DefaultModel: firstModel(cfg.AI.OpenRouter.Models),
-				Models:       cfg.AI.OpenRouter.Models,
-			},
-			{
-				Name:         "ollama",
-				DefaultModel: firstModel(cfg.AI.Ollama.Models),
-				Models:       cfg.AI.Ollama.Models,
-			},
-		},
-	})
-	bugReports := bugreport.NewService(cfg.LogDir, deviceManager, scenarioRuntime)
-	webrtcEngine, err := transport.NewPionWebRTCSignalEngine()
-	if err != nil {
-		logger.Error("configure webrtc signal engine", "event", "transport.webrtc.configure_failed", "error", err)
-		return
-	}
-	controlStream.SetWebRTCSignalEngine(webrtcEngine)
-	photoServer, photoBaseURL, err := startPhotoFrameAssetServer(cfg)
-	if err != nil {
-		logger.Error("start photo frame asset server", "event", "transport.http.photo_frame.start_failed", "error", err)
-		return
-	}
-	adminHandler := admin.NewHandler(
-		controlService,
-		scenarioRuntime,
-		controlStream.ReplSessions(),
-		replAIService,
-		appRuntime,
-		func() { registerAppScenarioDefinitions(scenarioEngine, appRuntime) },
-		deviceManager,
-		cfg,
-		worldModel,
-		trust.NewService(),
-	)
-	adminMux := http.NewServeMux()
-	adminMux.Handle("/mcp", mcpServer)
-	adminMux.Handle("/mcp/", mcpServer)
-	adminMux.Handle("/", adminHandler)
-	adminServer, err := startAdminServer(cfg, adminMux)
-	if err != nil {
-		logger.Error("start admin dashboard", "event", "admin.http.start_failed", "error", err)
-		return
-	}
-	controlService.SetRegisterMetadata(registerAckMetadata(photoBaseURL))
-	configurePhotoFrame(controlStream, cfg, photoBaseURL)
-	recordingManager, err := recording.NewDiskManager(cfg.RecordingDir)
-	if err != nil {
-		logger.Error("configure recording manager", "event", "recording.configure_failed", "error", err)
-		return
-	}
-	controlStream.SetRecordingManager(recordingManager)
-	grpcServer := transport.NewServer(cfg.GRPCAddress())
-	grpcServer.ConfigureControl(controlService, transport.GeneratedProtoAdapter{})
-	grpcServer.ConfigureRuntime(scenarioRuntime)
-	grpcServer.ConfigureDeviceAudio(audioHub)
-	grpcServer.ConfigureRecording(recordingManager)
-	grpcServer.ConfigureWebRTCSignalEngine(webrtcEngine)
-	grpcServer.ConfigureBugReportIntake(bugReports)
-	websocketServer := transport.NewWebSocketServer(cfg.ControlWSAddress(), grpcServer, cfg.ControlWSAllowedOrigins)
-	tcpServer := transport.NewTCPServer(cfg.ControlTCPAddress(), grpcServer)
-	httpControlServer := transport.NewHTTPControlServer(cfg.ControlHTTPAddress(), grpcServer)
-	mdns := discovery.NewMDNSAdvertiser()
+	return controlStream, mcpServer, nil
+}
 
-	logger.Info("terminal server starting", "event", "server.starting", "grpc_address", grpcServer.Address())
-
-	if err := mdns.Start(ctx, discovery.ServiceInfo{
-		ServiceType: cfg.MDNSService,
-		Name:        cfg.MDNSName,
-		Port:        cfg.GRPCPort,
-		Version:     cfg.Version,
-		GRPC:        cfg.GRPCAddress(),
-		WebSocket:   fmt.Sprintf("ws://%s%s", cfg.ControlWSAddress(), websocketServer.Path()),
-		TCP:         cfg.ControlTCPAddress(),
-		HTTP:        fmt.Sprintf("http://%s", cfg.ControlHTTPAddress()),
-		MCP:         mcpEndpointURL(cfg),
+func (r *serverRuntime) start(ctx context.Context) error {
+	r.logger.Info("terminal server starting", "event", "server.starting", "grpc_address", r.grpcServer.Address())
+	if err := r.mdns.Start(ctx, discovery.ServiceInfo{
+		ServiceType: r.cfg.MDNSService,
+		Name:        r.cfg.MDNSName,
+		Port:        r.cfg.GRPCPort,
+		Version:     r.cfg.Version,
+		GRPC:        r.cfg.GRPCAddress(),
+		WebSocket:   fmt.Sprintf("ws://%s%s", r.cfg.ControlWSAddress(), r.websocketServer.Path()),
+		TCP:         r.cfg.ControlTCPAddress(),
+		HTTP:        fmt.Sprintf("http://%s", r.cfg.ControlHTTPAddress()),
+		MCP:         mcpEndpointURL(r.cfg),
 		Priority:    []string{"grpc", "websocket", "tcp", "http", "mcp"},
 	}); err != nil {
-		logger.Error("start mDNS", "event", "discovery.mdns.failed", "error", err)
-		return
+		r.logger.Error("start mDNS", "event", "discovery.mdns.failed", "error", err)
+		return err
 	}
+	if err := r.startTransports(ctx); err != nil {
+		return err
+	}
+	return r.validateBootstrap()
+}
 
-	if err := grpcServer.Start(ctx); err != nil {
-		logger.Error("start transport", "event", "transport.grpc.start_failed", "error", err)
-		return
+func (r *serverRuntime) startTransports(ctx context.Context) error {
+	if err := r.grpcServer.Start(ctx); err != nil {
+		r.logger.Error("start transport", "event", "transport.grpc.start_failed", "error", err)
+		return err
 	}
-	if err := websocketServer.Start(ctx); err != nil {
-		logger.Error("start websocket transport", "event", "transport.websocket.start_failed", "error", err)
-		return
+	if err := r.websocketServer.Start(ctx); err != nil {
+		r.logger.Error("start websocket transport", "event", "transport.websocket.start_failed", "error", err)
+		return err
 	}
-	if err := tcpServer.Start(ctx); err != nil {
-		logger.Error("start tcp transport", "event", "transport.tcp.start_failed", "error", err)
-		return
+	if err := r.tcpServer.Start(ctx); err != nil {
+		r.logger.Error("start tcp transport", "event", "transport.tcp.start_failed", "error", err)
+		return err
 	}
-	if err := httpControlServer.Start(ctx); err != nil {
-		logger.Error("start http fallback transport", "event", "transport.http.start_failed", "error", err)
-		return
+	if err := r.httpControlServer.Start(ctx); err != nil {
+		r.logger.Error("start http fallback transport", "event", "transport.http.start_failed", "error", err)
+		return err
 	}
+	return nil
+}
 
-	// Keep this non-empty so startup validates major foundational services.
-	if len(deviceManager.List()) != 0 {
-		logger.Error("unexpected initial device registry state", "event", "server.bootstrap.invalid_state")
-		return
+func (r *serverRuntime) validateBootstrap() error {
+	if len(r.deviceManager.List()) != 0 {
+		r.logger.Error("unexpected initial device registry state", "event", "server.bootstrap.invalid_state")
+		return errors.New("unexpected initial device registry state")
 	}
-	if len(ioRouter.Routes()) != 0 {
-		logger.Error("unexpected initial route registry state", "event", "server.bootstrap.invalid_state")
-		return
+	if len(r.ioRouter.Routes()) != 0 {
+		r.logger.Error("unexpected initial route registry state", "event", "server.bootstrap.invalid_state")
+		return errors.New("unexpected initial route registry state")
 	}
-	if _, ok := scenarioEngine.Active("bootstrap"); ok {
-		logger.Error("unexpected initial scenario state", "event", "server.bootstrap.invalid_state")
-		return
+	if _, ok := r.scenarioEngine.Active("bootstrap"); ok {
+		r.logger.Error("unexpected initial scenario state", "event", "server.bootstrap.invalid_state")
+		return errors.New("unexpected initial scenario state")
 	}
-	if len(scheduler.List()) != 0 {
-		logger.Error("unexpected initial scheduler state", "event", "server.bootstrap.invalid_state")
-		return
+	if len(r.scheduler.List()) != 0 {
+		r.logger.Error("unexpected initial scheduler state", "event", "server.bootstrap.invalid_state")
+		return errors.New("unexpected initial scheduler state")
 	}
-	logger.Info("control service ready", "event", "server.started", "server_id", cfg.MDNSName)
-	logger.Info("websocket control ready", "event", "transport.websocket.ready", "websocket_address", websocketServer.Address(), "path", websocketServer.Path())
-	logger.Info("tcp control ready", "event", "transport.tcp.ready", "tcp_address", tcpServer.Address())
-	logger.Info("http fallback control ready", "event", "transport.http.ready", "http_address", httpControlServer.Address())
-	if adminServer != nil {
-		logger.Info("admin dashboard available", "event", "admin.http.ready", "addr", adminServer.Addr)
+	return nil
+}
+
+func (r *serverRuntime) logReady() {
+	r.logger.Info("control service ready", "event", "server.started", "server_id", r.cfg.MDNSName)
+	r.logger.Info("websocket control ready", "event", "transport.websocket.ready", "websocket_address", r.websocketServer.Address(), "path", r.websocketServer.Path())
+	r.logger.Info("tcp control ready", "event", "transport.tcp.ready", "tcp_address", r.tcpServer.Address())
+	r.logger.Info("http fallback control ready", "event", "transport.http.ready", "http_address", r.httpControlServer.Address())
+	if r.adminServer != nil {
+		r.logger.Info("admin dashboard available", "event", "admin.http.ready", "addr", r.adminServer.Addr)
 	}
-	logger.Info("control stream handler initialized", "event", "transport.stream.ready")
-	logger.Info("recording manager initialized", "event", "recording.started", "dir", cfg.RecordingDir)
-	logger.Info("scenario runtime initialized", "event", "scenario.definition.registered", "builtin_scenarios", 3)
-	logger.Info(
+	r.logger.Info("control stream handler initialized", "event", "transport.stream.ready")
+	r.logger.Info("recording manager initialized", "event", "recording.started", "dir", r.cfg.RecordingDir)
+	r.logger.Info("scenario runtime initialized", "event", "scenario.definition.registered", "builtin_scenarios", 3)
+	r.logger.Info(
 		"app runtime initialized",
 		"event", "appruntime.package.loaded",
-		"packages", len(appRuntime.ListPackages()),
-		"definitions", len(appRuntime.Definitions()),
+		"packages", len(r.appRuntime.ListPackages()),
+		"definitions", len(r.appRuntime.Definitions()),
 	)
-	logger.Info(
+	r.logger.Info(
 		"housekeeping configured",
 		"event", "housekeeping.configured",
-		"heartbeat_timeout_seconds", cfg.HeartbeatTimeoutSeconds,
-		"liveness_interval_seconds", cfg.LivenessReconcileIntervalSecs,
-		"due_timer_interval_seconds", cfg.DueTimerProcessIntervalSecs,
+		"heartbeat_timeout_seconds", r.cfg.HeartbeatTimeoutSeconds,
+		"liveness_interval_seconds", r.cfg.LivenessReconcileIntervalSecs,
+		"due_timer_interval_seconds", r.cfg.DueTimerProcessIntervalSecs,
 	)
-	_ = controlService
-	_ = controlStream
+	_ = r.controlStream
+}
 
-	go runDueTimerLoop(ctx, scenarioRuntime, time.Duration(cfg.DueTimerProcessIntervalSecs)*time.Second)
+func (r *serverRuntime) startHousekeeping(ctx context.Context) {
+	go runDueTimerLoop(ctx, r.scenarioRuntime, time.Duration(r.cfg.DueTimerProcessIntervalSecs)*time.Second)
 	go runLivenessLoop(
 		ctx,
-		controlService,
-		time.Duration(cfg.HeartbeatTimeoutSeconds)*time.Second,
-		time.Duration(cfg.LivenessReconcileIntervalSecs)*time.Second,
+		r.controlService,
+		time.Duration(r.cfg.HeartbeatTimeoutSeconds)*time.Second,
+		time.Duration(r.cfg.LivenessReconcileIntervalSecs)*time.Second,
 	)
+}
 
-	<-ctx.Done()
-	logger.Info("terminal server shutting down", "event", "server.stopping")
-
+func (r *serverRuntime) shutdown() {
 	shutdownCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if err := httpControlServer.Stop(shutdownCtx); err != nil {
-		logger.Error("stop http fallback transport", "event", "transport.http.stop_failed", "error", err)
+	if err := r.httpControlServer.Stop(shutdownCtx); err != nil {
+		r.logger.Error("stop http fallback transport", "event", "transport.http.stop_failed", "error", err)
 	}
-	if err := tcpServer.Stop(shutdownCtx); err != nil {
-		logger.Error("stop tcp transport", "event", "transport.tcp.stop_failed", "error", err)
+	if err := r.tcpServer.Stop(shutdownCtx); err != nil {
+		r.logger.Error("stop tcp transport", "event", "transport.tcp.stop_failed", "error", err)
 	}
-	if err := websocketServer.Stop(shutdownCtx); err != nil {
-		logger.Error("stop websocket transport", "event", "transport.websocket.stop_failed", "error", err)
+	if err := r.websocketServer.Stop(shutdownCtx); err != nil {
+		r.logger.Error("stop websocket transport", "event", "transport.websocket.stop_failed", "error", err)
 	}
-	if err := grpcServer.Stop(shutdownCtx); err != nil {
-		logger.Error("stop transport", "event", "transport.grpc.stop_failed", "error", err)
+	if err := r.grpcServer.Stop(shutdownCtx); err != nil {
+		r.logger.Error("stop transport", "event", "transport.grpc.stop_failed", "error", err)
 	}
-	if photoServer != nil {
-		if err := photoServer.Shutdown(shutdownCtx); err != nil {
-			logger.Error("stop photo frame asset server", "event", "transport.http.photo_frame.stop_failed", "error", err)
+	if r.photoServer != nil {
+		if err := r.photoServer.Shutdown(shutdownCtx); err != nil {
+			r.logger.Error("stop photo frame asset server", "event", "transport.http.photo_frame.stop_failed", "error", err)
 		}
 	}
-	if adminServer != nil {
-		if err := adminServer.Shutdown(shutdownCtx); err != nil {
-			logger.Error("stop admin dashboard", "event", "admin.http.stop_failed", "error", err)
+	if r.adminServer != nil {
+		if err := r.adminServer.Shutdown(shutdownCtx); err != nil {
+			r.logger.Error("stop admin dashboard", "event", "admin.http.stop_failed", "error", err)
 		}
 	}
-	if err := mdns.Stop(shutdownCtx); err != nil {
-		logger.Error("stop mDNS", "event", "discovery.mdns.stop_failed", "error", err)
+	if err := r.mdns.Stop(shutdownCtx); err != nil {
+		r.logger.Error("stop mDNS", "event", "discovery.mdns.stop_failed", "error", err)
 	}
-	if bridge, ok := telephonyBridge.(*telephony.SIPBridge); ok {
+	if bridge, ok := r.telephonyBridge.(*telephony.SIPBridge); ok {
 		if err := bridge.Stop(shutdownCtx); err != nil {
-			logger.Error("stop telephony bridge", "event", "telephony.bridge.stop_failed", "error", err)
+			r.logger.Error("stop telephony bridge", "event", "telephony.bridge.stop_failed", "error", err)
 		}
 	}
-	logger.Info("terminal server stopped", "event", "server.stopped")
 }
 
 func runREPL(stdin io.Reader, stdout, stderr io.Writer) int {

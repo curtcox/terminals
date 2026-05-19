@@ -90,7 +90,33 @@ type AgentApprovalConfig struct {
 
 // Load reads config from environment with sane defaults for local development.
 func Load() (Config, error) {
-	cfg := Config{
+	cfg := defaultConfig()
+	if prefixes := parseCSVStrings(os.Getenv("TERMINALS_WAKE_WORD_PREFIXES")); len(prefixes) > 0 {
+		cfg.WakeWordPrefixes = prefixes
+	}
+	if origins := parseCSVStrings(os.Getenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS")); len(origins) > 0 {
+		if err := validateControlWSAllowedOrigins(origins); err != nil {
+			return Config{}, err
+		}
+		cfg.ControlWSAllowedOrigins = origins
+	}
+	if err := applyOptionalInts(&cfg); err != nil {
+		return Config{}, err
+	}
+	if err := applyOptionalBool("TERMINALS_LOG_STDERR", &cfg.LogStderr); err != nil {
+		return Config{}, err
+	}
+	sip, err := loadSIPConfig()
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.SIP = sip
+	applyAIModelOverrides(&cfg)
+	return cfg, nil
+}
+
+func defaultConfig() Config {
+	return Config{
 		GRPCHost:                      getenv("TERMINALS_GRPC_HOST", "0.0.0.0"),
 		GRPCPort:                      50051,
 		ControlWSHost:                 getenv("TERMINALS_CONTROL_WS_HOST", "0.0.0.0"),
@@ -144,118 +170,62 @@ func Load() (Config, error) {
 			},
 		},
 	}
+}
 
-	if prefixes := parseCSVStrings(os.Getenv("TERMINALS_WAKE_WORD_PREFIXES")); len(prefixes) > 0 {
-		cfg.WakeWordPrefixes = prefixes
+type optionalIntBinding struct {
+	env   string
+	apply func(int)
+}
+
+func applyOptionalInts(cfg *Config) error {
+	bindings := []optionalIntBinding{
+		{env: "TERMINALS_GRPC_PORT", apply: func(v int) { cfg.GRPCPort = v }},
+		{env: "TERMINALS_CONTROL_WS_PORT", apply: func(v int) { cfg.ControlWSPort = v }},
+		{env: "TERMINALS_CONTROL_TCP_PORT", apply: func(v int) { cfg.ControlTCPPort = v }},
+		{env: "TERMINALS_CONTROL_HTTP_PORT", apply: func(v int) { cfg.ControlHTTPPort = v }},
+		{env: "TERMINALS_PHOTO_FRAME_HTTP_PORT", apply: func(v int) { cfg.PhotoFrameHTTPPort = v }},
+		{env: "TERMINALS_ADMIN_HTTP_PORT", apply: func(v int) { cfg.AdminHTTPPort = v }},
+		{env: "TERMINALS_LOG_MAX_BYTES", apply: func(v int) { cfg.LogMaxBytes = int64(v) }},
+		{env: "TERMINALS_LOG_MAX_ARCHIVES", apply: func(v int) { cfg.LogMaxArchives = v }},
+		{env: "TERMINALS_HEARTBEAT_TIMEOUT_SECONDS", apply: func(v int) { cfg.HeartbeatTimeoutSeconds = v }},
+		{env: "TERMINALS_LIVENESS_RECONCILE_INTERVAL_SECONDS", apply: func(v int) { cfg.LivenessReconcileIntervalSecs = v }},
+		{env: "TERMINALS_DUE_TIMER_PROCESS_INTERVAL_SECONDS", apply: func(v int) { cfg.DueTimerProcessIntervalSecs = v }},
+		{env: "TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS", apply: func(v int) { cfg.PhotoFrameIntervalSeconds = v }},
+		{env: "TERMINALS_AGENT_OPERATIONAL_MAX_STREAMS", apply: func(v int) { cfg.Agent.Operational.MaxStreams = v }},
+		{env: "TERMINALS_AGENT_OPERATIONAL_STREAM_TTL_SECONDS", apply: func(v int) { cfg.Agent.Operational.StreamTTLSeconds = v }},
+		{env: "TERMINALS_AGENT_APPROVAL_MIN_HUMAN_LATENCY_MS", apply: func(v int) { cfg.Agent.Approval.MinHumanLatencyMS = v }},
+		{env: "TERMINALS_AGENT_APPROVAL_CONFIRMATION_TTL_SECONDS", apply: func(v int) { cfg.Agent.Approval.ConfirmationTTLSeconds = v }},
 	}
-
-	if rawPort := os.Getenv("TERMINALS_GRPC_PORT"); rawPort != "" {
-		parsed, err := strconv.Atoi(rawPort)
+	for _, binding := range bindings {
+		v, ok, err := parseOptionalInt(binding.env)
 		if err != nil {
-			return Config{}, fmt.Errorf("parse TERMINALS_GRPC_PORT: %w", err)
+			return err
 		}
-		cfg.GRPCPort = parsed
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_CONTROL_WS_PORT"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.ControlWSPort = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_CONTROL_TCP_PORT"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.ControlTCPPort = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_CONTROL_HTTP_PORT"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.ControlHTTPPort = v
-	}
-	if origins := parseCSVStrings(os.Getenv("TERMINALS_CONTROL_WS_ALLOWED_ORIGINS")); len(origins) > 0 {
-		if err := validateControlWSAllowedOrigins(origins); err != nil {
-			return Config{}, err
+		if ok {
+			binding.apply(v)
 		}
-		cfg.ControlWSAllowedOrigins = origins
 	}
-	if v, ok, err := parseOptionalInt("TERMINALS_PHOTO_FRAME_HTTP_PORT"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.PhotoFrameHTTPPort = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_ADMIN_HTTP_PORT"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.AdminHTTPPort = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_LOG_MAX_BYTES"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.LogMaxBytes = int64(v)
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_LOG_MAX_ARCHIVES"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.LogMaxArchives = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_HEARTBEAT_TIMEOUT_SECONDS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.HeartbeatTimeoutSeconds = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_LIVENESS_RECONCILE_INTERVAL_SECONDS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.LivenessReconcileIntervalSecs = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_DUE_TIMER_PROCESS_INTERVAL_SECONDS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.DueTimerProcessIntervalSecs = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_PHOTO_FRAME_INTERVAL_SECONDS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.PhotoFrameIntervalSeconds = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_AGENT_OPERATIONAL_MAX_STREAMS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.Agent.Operational.MaxStreams = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_AGENT_OPERATIONAL_STREAM_TTL_SECONDS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.Agent.Operational.StreamTTLSeconds = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_AGENT_APPROVAL_MIN_HUMAN_LATENCY_MS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.Agent.Approval.MinHumanLatencyMS = v
-	}
-	if v, ok, err := parseOptionalInt("TERMINALS_AGENT_APPROVAL_CONFIRMATION_TTL_SECONDS"); err != nil {
-		return Config{}, err
-	} else if ok {
-		cfg.Agent.Approval.ConfirmationTTLSeconds = v
-	}
-	if v, err := parseOptionalBool("TERMINALS_LOG_STDERR"); err != nil {
-		return Config{}, err
-	} else if strings.TrimSpace(os.Getenv("TERMINALS_LOG_STDERR")) != "" {
-		cfg.LogStderr = v
-	}
+	return nil
+}
 
-	sip, err := loadSIPConfig()
+func applyOptionalBool(env string, target *bool) error {
+	v, err := parseOptionalBool(env)
 	if err != nil {
-		return Config{}, err
+		return err
 	}
-	cfg.SIP = sip
+	if strings.TrimSpace(os.Getenv(env)) != "" {
+		*target = v
+	}
+	return nil
+}
+
+func applyAIModelOverrides(cfg *Config) {
 	if models := parseCSVStrings(os.Getenv("TERMINALS_AI_OPENROUTER_MODELS")); len(models) > 0 {
 		cfg.AI.OpenRouter.Models = models
 	}
 	if models := parseCSVStrings(os.Getenv("TERMINALS_AI_OLLAMA_MODELS")); len(models) > 0 {
 		cfg.AI.Ollama.Models = models
 	}
-
-	return cfg, nil
 }
 
 func loadSIPConfig() (SIPConfig, error) {
